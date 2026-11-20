@@ -10,7 +10,7 @@
 ## Open questions
 
 - [ ] Electron utility process 里能否用 `node:sqlite`，不行就用 better-sqlite3。M0 核实。
-- [ ] 角色长相保持一致的做法：母图 + 图片编辑派生，还是每张单独生成并带参考图。和 M0 并行做对比试验，看图再定。
+- [x] 角色长相一致：造型基准图重画、表情编辑派生，见 `character-consistency.md`。
 - [x] Novelive Agent 内部设计：编排见 `agent-orchestration.md`，各阶段细节见 `novelive-agent.md`。剩下按卷综合的分块做法和各角色提示词正文，M1 实现时定。
 - [ ] 测试用书：M1 开始前定。
 - [ ] 品牌图标：发布前重新设计。
