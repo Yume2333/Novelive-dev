@@ -1,5 +1,7 @@
 # pi 技术调研报告：pi-ai / pi-agent-core / pi-coding-agent 能力边界
 
+> 2026-11-21：子 Agent、`pi-durable`、重试默认值等结论已过时，以 `../pi-scaffolding.md` 和 `pi-2026-11-*.md` 为准。
+
 调研基于 npm `@earendil-works/pi-ai@1.5.2` 与 `pi-agent-core@1.5.2` 的 dist 产物，以及 GitHub 仓库 `earendil-works/pi`（main 分支，coding-agent 已升级到 1.6.0）的源码。整仓 MIT 许可，`author: Mario Zechner`（`packages/coding-agent/package.json`）。
 
 ## 一、三层架构总览

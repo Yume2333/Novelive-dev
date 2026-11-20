@@ -583,3 +583,27 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 每项等所有者回来再定。
 - **Because:** 都可以回改；等所有者会让无人值守停下。
 - **Decided by:** user
+
+## 2026-11-21 - 编排继续用 pi-agent-core，不用 pi-durable
+
+- **Decided:** 文本 Agent 继续用 `pi-ai` + `pi-agent-core`（1.6.x）。子 Agent、确认闸门、运行记录、压缩、会话存储由我们在它外面写，设计照 `pi-durable` 和 `apps/p2` 的做法（子会话归属、父停子停、提交工具、按参数录制工具结果），清单见 `.workflow/research/pi-scaffolding.md`。
+- **Instead of:** 换 `pi-durable`：它自带 SQLite 会话、崩溃续跑、子会话、压缩和挂起等确认。
+- **Because:** durable 标明实验性，API 随版本改（1.6.0 就有不兼容改动），还要多带约 12MB 的 `chord` 和两个 wasm；我们制作时每次现拼上下文、不留对话，续跑是重跑中断的那一步，durable 最强的长对话续跑只有对话面板用得上。
+- **Decided by:** user
+- **Revisit when:** `pi-durable` 去掉实验标记。
+
+## 2026-11-21 - Schema 改用 pi-schema
+
+- **Decided:** 全项目用 `@earendil-works/pi-schema` 定义数据格式，同一份定义用于作品包检查、代码类型（`Static`）和模型输出格式与工具参数。剧本例外不变。
+- **Instead of:** 继续用 TypeBox。
+- **Because:** pi 从 1.5.0 起改用 pi-schema，`pi-agent-core` 已经依赖它，不多一个包；它零依赖、校验不用 eval，输出标准 JSON Schema。
+- **Decided by:** user
+- **Supersedes:** 2026-11-20 - Schema 用 TypeBox
+
+## 2026-11-21 - 模型临时错误重试 2 次
+
+- **Decided:** 文本和视觉模型的调用统一传 `maxRetries: 2`（在我们包的 `streamFn` 里），只用 pi-ai 自带的重试，不另写重试逻辑；重试用完就标“需要处理”。图片调用用 `openai` SDK 自带的默认重试（2 次）。
+- **Instead of:** 不传参数。
+- **Because:** 读 pi-ai 1.6.0 源码确认：它把官方 SDK 的重试关掉，自己的重试默认 0 次，`Agent` 也不传这个参数，原来“只用底座自带的重试”实际等于不重试。
+- **Decided by:** user
+- **Supersedes:** 2026-11-20 - 只有“立即停止”，临时错误交给 SDK 重试（只改重试次数，停法不变）

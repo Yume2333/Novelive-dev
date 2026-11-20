@@ -1,13 +1,13 @@
 # Research: Novelive Agent 编排
 
-Novelive Agent 的角色、编排、上下文、预设和对话面板。下面的方案已和所有者逐项确认；还没定的放在末尾“Open questions”。调研依据是 wenyi、Luker、pi 1.5.2 源码、SillyTavern，以及几个生图库和对话前端库，调研报告原文在 `refs/`。各阶段的输入输出细节见 `novelive-agent.md`，两份文件冲突时以本文为准。
+Novelive Agent 的角色、编排、上下文、预设和对话面板。下面的方案已和所有者逐项确认；还没定的放在末尾“Open questions”。调研依据是 wenyi、Luker、pi 1.5.2 源码、SillyTavern，以及几个生图库和对话前端库，调研报告原文在 `refs/`；pi 部分已按 1.6.0 复核（`pi-scaffolding.md`）。各阶段的输入输出细节见 `novelive-agent.md`，两份文件冲突时以本文为准。
 
 ## Settled & ruled out
 
 - **pi 用到哪一层**：
   - `pi-ai`：各种接口格式、流式事件（正文、思考、工具参数增量都有）、用量和费用、取消、上下文溢出检测 `isContextOverflow`、采样参数 `samplingParams`、`constrainedSampling`。
   - `pi-agent-core`：`Agent` 循环、工具执行、事件，以及 `transformContext` / `prepareRequest` / `prepareNextTurn` / `beforeToolCall` / `afterToolCall` 这几个钩子。
-- **pi 没有的、我们自己做**：会话存储、上下文压缩、子 Agent、按角色选模型、写手预设、运行记录。
+- **pi 没有的、我们自己做**：会话存储、上下文压缩、子 Agent、按角色选模型、写手预设、运行记录。`pi-durable` 有现成实现但标实验性、API 随版本改，我们照它的设计自己写（见 `decisions.md` 2026-11-21「编排继续用 pi-agent-core」）。
 - **不依赖 `pi-coding-agent` 包**：它是 CLI 的 SDK，带 `~/.pi` 目录约定、同步文件写入和一串 CLI 依赖。它是 MIT 许可，我们照着它的思路移植两样东西：
   - 压缩：按保留尾部选切点、用增量摘要提示词、上下文溢出后先压缩再重试。
   - 会话条目树：`id` / `parentId`、压缩条目、分支摘要条目。

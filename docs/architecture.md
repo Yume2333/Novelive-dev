@@ -8,7 +8,7 @@
 - **IPC 与自定义资源协议**：界面与后台之间通过 IPC 传递命令和事件；图片等资源通过自定义协议直接从 `.novelive` 作品包或工程文件夹读取。**不起本地 HTTP 服务。**
 - **模型接入与凭据**：文本模型通过 Agent 底座 pi（`@earendil-works/pi-ai`、`@earendil-works/pi-agent-core`）接入，pi 作为库直接嵌在创作端进程里；会话存储、上下文压缩、子 Agent 和按角色选模型由我们在 pi 之上实现（见 `.workflow/research/agent-orchestration.md`）。图片模型只接 OpenAI 兼容的图片接口，支持自定义地址，用 `openai` 官方 SDK 调用。API Key 简单加密后存在应用的配置文件里，方便备份和迁移；加密密钥写在程序里，只防止别人扫一眼配置文件就看到 Key。
 - **工程数据**：每个创作工程是一个独立文件夹，新建作品时由创作者选择位置（默认在 `文档/Novelive` 下），里面保存解包后的作品及创作专用数据（原文、任务记录、候选图、对话记录、用量记录）。作品内容是普通文件；任务状态、用量记录和对话记录存在工程里的一个 SQLite 数据库文件中，用 `node:sqlite` 在创作端 utility process 里读写（已在 Electron 45.4.1 实测可用，WAL 正常）。
-- **Schema**：数据格式统一用 TypeBox 定义，同一份定义用于加载作品包时的检查、代码类型和交给模型的输出格式与工具参数。剧本例外：剧本用文本剧本语言写，TypeBox 定义它解析后的结构（见[作品格式与工程](./work-format.md)）。
+- **Schema**：数据格式统一用 `@earendil-works/pi-schema`（pi-schema）定义，同一份定义用于加载作品包时的检查、代码类型和交给模型的输出格式与工具参数。剧本例外：剧本用文本剧本语言写，pi-schema 定义它解析后的结构（见[作品格式与工程](./work-format.md)）。
 
 ## 五块模块与依赖方向
 
@@ -32,7 +32,7 @@
 
 | 目录 | 内容 | 可以依赖 |
 | --- | --- | --- |
-| `packages/format` | 作品格式与编译器：TypeBox 结构、剧本解析、作品包读写 | 无 |
+| `packages/format` | 作品格式与编译器：pi-schema 结构、剧本解析、作品包读写 | 无 |
 | `packages/player` | 播放器 | `format` |
 | `packages/creator` | 创作端 | `format` |
 | `packages/ui` | 界面：页面、控件库、Tokens | `player`；`creator` 只能引用 `@novelive/creator/contract` 里的命令和事件类型 |
@@ -50,7 +50,7 @@
 | 样式 | CSS Modules 加 `tokens.css`；Stylelint 检查硬编码颜色（`tokens.css` 与播放器舞台除外） |
 | 国际化 | i18next + react-i18next，简体中文为源语言，文案按页面分命名空间；开发期只写简体中文，M5 发布前用模型翻译成繁体中文、英文、日文，再人工抽查 |
 | 字体 | fontsource 本地打包，离线可用 |
-| Schema | `typebox` |
+| Schema | `@earendil-works/pi-schema` |
 | 数据库 | `node:sqlite`（Node 24 内置，utility process 里实测可用） |
 | 图片处理 | sharp；图片模型用 `openai` 官方 SDK（多参考图编辑、透明底、生成预览流、识别审核拒绝） |
 | 对话界面 | `assistant-ui`（无样式组件，接自己的数据源）加 `streamdown`（流式 Markdown） |
@@ -66,7 +66,7 @@
 
 - 主进程建好 MessagePort 通道后，把两端分别交给界面和创作端，之后消息直连，不经主进程转发。
 - 预加载脚本用 `contextBridge` 只暴露一个有类型的 `window.novelive`，界面拿不到 Node 能力。
-- 消息分两类：命令（请求和响应）和事件（创作端主动推送），都用 TypeBox 定义，开发模式下在边界上校验。
+- 消息分两类：命令（请求和响应）和事件（创作端主动推送），都用 pi-schema 定义，开发模式下在边界上校验。
 - 主进程注册 `novelive://` 协议读取工程文件夹和作品包里的资源。
 - 浏览器开发模式下由一个开发脚本把同一套命令和事件通过 WebSocket 暴露给界面，不进正式包。
 

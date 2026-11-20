@@ -1,15 +1,15 @@
 # Research: Novelive Agent 各阶段输入输出契约
 
-Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输出契约、校验修复、持久化与停止恢复。依据 `docs/` 与 `decisions.md`；pi API 依据 1.5.2 包内 `.d.ts`（见附录）。
+Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输出契约、校验修复、持久化与停止恢复。依据 `docs/` 与 `decisions.md`；pi API 调研时依据 1.5.2 包内 `.d.ts`（见附录），已在 `pi-scaffolding.md` 对 1.6.0 复核。
 
 > 本文是各阶段的输入输出契约；角色、流程、上下文以 `agent-orchestration.md` 为准。
 
 ## Settled & ruled out
 
-- Agent 底座用 pi（`@earendil-works/pi-ai`、`@earendil-works/pi-agent-core` 1.5.x），作为库嵌在创作端 utility process 里。Schema 用 TypeBox，同一份定义给代码、校验和模型。幕后数据（任务、用量、对话记录）进 `project.db`，作品内容是普通文件。
+- Agent 底座用 pi（`@earendil-works/pi-ai`、`@earendil-works/pi-agent-core` 1.6.x），作为库嵌在创作端 utility process 里。Schema 用 `@earendil-works/pi-schema`，同一份定义给代码、校验和模型。幕后数据（任务、用量、对话记录）进 `project.db`，作品内容是普通文件。
 - 五个模型（快速、主模型、写作、视觉、图片）、九个角色（整理、主控、写手、审稿、美术导演、立绘画师、场景画师、差分画师、视觉审核），角色和模型的对应见 `agent-orchestration.md` §1。文本模型按接口格式（OpenAI Chat Completions / OpenAI Responses / Anthropic Messages）+ 地址 + 模型名 + Key 配置；图片模型只接 OpenAI 兼容图片接口。
 - 只有两个确认点：角色设定/主视觉、第一章成品。候选设定不冲突直接用、冲突不覆盖已确认。剧本是 `.nvs` 文本，ID 由应用分配，模型不写。
-- 停止只有立即停止：中断正在跑的请求，重跑被中断的任务。临时错误只靠 SDK/底座自带重试。审核拒绝改提示词再试一次。不做防御性设计：不另做并发限制、超时、阈值、自写重试。例外：出图有「同时出图数」（默认 8）和「生图失败重试次数」（默认 3）两个设置项；文本调用不限并发，并发来自角色分工和主控派出的子 Agent。
+- 停止只有立即停止：中断正在跑的请求，重跑被中断的任务。临时错误用 pi-ai 自带的重试：在我们的 `streamFn` 里统一传 `maxRetries: 2`，图片调用用 `openai` SDK 自带的默认重试；重试用完标“需要处理”。审核拒绝改提示词再试一次。不做防御性设计：不另做并发限制、超时、阈值、自写重试。例外：出图有「同时出图数」（默认 8）和「生图失败重试次数」（默认 3）两个设置项；文本调用不限并发，并发来自角色分工和主控派出的子 Agent。
 - 对话面板修改一律先列为待确认提议；聊天记录存工程；修改立即生效可撤销，Agent 重写场景先给差异列表。
 - 不在本设计内的：联网搜图、先整本翻译再制作、作品包安全模型。
 
@@ -17,9 +17,11 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
 
 - 一个 `createModels()` 持有按接口格式建的 `Provider`（`createProvider`），文本模型走 `provider.streamSimple`；图片调用绕开 pi，用 `openai` 官方 SDK，调用路径参考旧仓库 `integrations/openai-images`（补自定义地址）。
 - 调用形态分两类：
-  - **单次调用**：一个 `Agent` 实例跑一个 `prompt()`，系统提示给输出契约（TypeBox 定义原样序列化成 JSON Schema 进提示词），模型用纯文本回答 JSON；解析失败时 `prompt()` 再补一轮把错误还给模型。整理、写手、视觉审核走这种形态。
+  - **单次调用**：一个 `Agent` 实例跑一个 `prompt()`，系统提示给输出契约（pi-schema 定义原样序列化成 JSON Schema 进提示词），模型用纯文本回答 JSON；解析失败时 `prompt()` 再补一轮把错误还给模型。整理、写手、视觉审核走这种形态。
   - **工具循环**：`Agent` 挂一组 `AgentTool`，模型多轮读写工程。审稿、美术导演、三个画师和对话面板（主控）用：审稿要按需查证据（原文段落、术语出现位置、章节摘要）；美术导演要按章读剧本、插演出补丁；画师要拼提示词、调生图工具；主控操作面宽（查设定、读剧本、提提议），硬编码成一问一答会丢上下文。
-- `Agent` 实例随任务创建和销毁，不跨任务复用；停止时 `agent.abort()`，pi 的 `streamFn` 透传 `AbortSignal` 到 provider。被中断的任务在 `project.db` 里保持未完成状态，继续时整个任务重跑。
+
+- 工具循环角色通过 `submit_*` 工具交结果，工具的参数就是输出 schema；`finishTurn` 在没收到或校验没过时让循环继续，收到并通过校验才结束。单次调用角色维持文本 JSON 输出加校验。
+- `Agent` 实例随任务创建和销毁，不跨任务复用；停止时 `agent.abort()`，pi 的 `streamFn` 透传 `AbortSignal` 到 provider，会话结束调 `cleanupSessionResources(sessionId)` 清掉 pi-ai 的会话资源。被中断的任务在 `project.db` 里保持未完成状态，继续时整个任务重跑。
 - 用量：`subscribe` 里按 `turn_end`/`message_end` 收到的 `AssistantMessage.usage` 记一条 `usage` 记录，字段 `作品 ID、阶段、任务 ID、角色、模型名、input/output/cacheRead/cacheWrite/totalTokens、cost.total、时间戳`。图片调用按次记一条。
 
 ## 提示词组织
@@ -39,8 +41,8 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
 
 - **角色/模型**：整理（快速模型），单次调用。逐章一次调用，不用工具。
 - **输入**：作品语言 + 本章正文。超长章节按段落切段，段间带上一段末尾若干句做衔接；每段输出同一份 schema，代码把各段结果合并成一章的条目（拼接列表、拼接摘要为分段摘要）。
-- **输出契约**：`ChapterPreview`（TypeBox）：`chapterId`（代码填）、`summary`、`characters`、`locations`、`timelineNotes`、`foreshadowingHints`。ID 由应用从导入时的章节划分来，模型不写。
-- **校验/修复**：JSON 解析或 TypeBox 校验失败 → 把错误文本追加为下一轮 user 消息再跑一次。
+- **输出契约**：`ChapterPreview`（pi-schema）：`chapterId`（代码填）、`summary`、`characters`、`locations`、`timelineNotes`、`foreshadowingHints`。ID 由应用从导入时的章节划分来，模型不写。
+- **校验/修复**：JSON 解析或 pi-schema 校验失败 → 把错误文本追加为下一轮 user 消息再跑一次。
 - **持久化**：写 `source/preview/<章节ID>.json`。一章一个文件，写成功即任务完成；中断的章重跑。
 
 ## 按卷综合
@@ -51,7 +53,7 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
   - `VolumeSkeleton`：本卷主线概要文本 + 分章一句话进度。
   - `BiblePatch`：角色/关系/地点/时间线/伏笔/风格的条目列表；每条带 `status: "candidate" | "confirmed"`（模型建议）、`firstSeenChapter`、字段内容、`changes` 列表。
   - `GlossaryPatch`：术语条目列表（原文写法、作品写法、注音、类别、备注）。
-- **校验/修复**：TypeBox 校验；`firstSeenChapter` 必须是本卷章节 ID，引用关系（变化指向的条目 ID）由代码核对，不存在的引用当错误还给模型。
+- **校验/修复**：pi-schema 校验；`firstSeenChapter` 必须是本卷章节 ID，引用关系（变化指向的条目 ID）由代码核对，不存在的引用当错误还给模型。
 - **冲突规则在代码里**：应用侧合并时，候选条目和已确认条目同 ID 且字段冲突 → 保留已确认版本，冲突条目仍写进文件标 `candidate` 加冲突说明；不冲突的候选直接可用。模型只负责提条目，合并逻辑不在模型侧。
 - **持久化**：骨架写 `volumes/<卷>/bible/skeleton.json`；条目按层级写进 `bible/`、`glossary.json` 文件。任务粒度到卷，中断整卷重跑（产物是幂等覆盖）。
 
@@ -116,14 +118,14 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
 
 - **角色/模型**：主控（主模型），工具循环 `Agent`。创作者会连续讨论、翻设定、跨多轮攒提议。
 - **上下文**：系统提示（作品信息、改编设置摘要、可用工具列表、当前位置：编辑器/设定集页传进来的章节或条目）+ 持久化的历史消息。工具按需取数据，不把整个工程塞进上下文。
-- **工具**（每个都是 `AgentTool`，`parameters` 用 TypeBox）：
+- **工具**（每个都是 `AgentTool`，`parameters` 用 pi-schema）：
   - `read_chapter_preview` `{ chapterId }` → `ChapterPreview`
   - `read_bible` `{ scope?: "series"|"volume"|"work", chapterId?: string }` → 设定集切片（`chapterId` 用来截“截至本章”）
   - `read_glossary` `{}` → 术语表
   - `read_scene` `{ chapterId, sceneId }` → `.nvs` 文本 + 段落对照
   - `read_source_range` `{ chapterId, fromParagraph, toParagraph }` → 原文段落
   - `list_chapters` `{ workId }` → 章节列表和状态
-  - `propose` `{ kind, target, patch, reason }` → 登记一条提议，返回提议 ID。`kind` 覆盖：`update_bible_entry`（条目 ID + 字段变更）、`add_bible_entry`、`update_glossary_entry`、`add_glossary_entry`、`update_adaptation_notes`（改改编要求）、`redo_chapter`（重做章节）、`rewrite_scene`（重写场景）、`redraw_image`（重画图片）、`redo_volume_synthesis`（重新综合某卷）。`patch` 是该 kind 对应的 TypeBox 结构。
+  - `propose` `{ kind, target, patch, reason }` → 登记一条提议，返回提议 ID。`kind` 覆盖：`update_bible_entry`（条目 ID + 字段变更）、`add_bible_entry`、`update_glossary_entry`、`add_glossary_entry`、`update_adaptation_notes`（改改编要求）、`redo_chapter`（重做章节）、`rewrite_scene`（重写场景）、`redraw_image`（重画图片）、`redo_volume_synthesis`（重新综合某卷）。`patch` 是该 kind 对应的 pi-schema 结构。
   - `list_proposals` `{ status?: "pending"|"confirmed"|"rejected" }`
 - **提议模型**：提议以确认卡形式展示，存 `project.db`，字段：`id、作品、kind、target（条目 ID/章节 ID/字段路径）、patch JSON、reason、状态、对话消息 ID、创建时间`。发起工作流前先出确认卡，写清要做什么、影响哪些章节，确认后才开始；`redo_chapter` 确认后该章进制作队列。提议和修改历史挂钩：应用一条提议 = 一次可撤销的修改记录。
 - **会话持久化**：每部作品可以有多个会话。消息存成 `id`/`parentId` 条目树进 `project.db`，改写一条消息后重新发送会形成分支；超过上下文时把较早的轮次压缩成摘要条目（已有摘要就增量更新），最近若干轮保留原文。
@@ -132,8 +134,8 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
 ## 附录：依赖的 pi API
 
 - `@earendil-works/pi-agent-core`：`Agent`（`constructor`/`prompt`/`subscribe`/`abort`/`state`/`waitForIdle`）、`AgentTool`、`AgentToolResult`、`AgentEvent`（`turn_end`/`message_end`/`tool_execution_*`）、`AgentMessage`、`AgentState` — `dist/agent.d.ts`、`dist/types.d.ts`
-- `@earendil-works/pi-ai`：`createModels`/`createProvider`/`Models`/`Provider`/`Model`、`streamSimple`/`completeSimple`、`Usage`、`AssistantMessage`、`UserMessage`/`SystemMessage`/`ToolResultMessage`、`ImageContent`、`Context`、`SimpleStreamOptions`、`AssistantMessageEventStream`、`contentText` — `dist/models.d.ts`、`dist/types.d.ts`、`dist/compat.d.ts`、`dist/utils/text.d.ts`
-- `@earendil-works/pi-schema`：TypeBox 兼容 `parameters`（`AgentToolParams` 用 `Static<TParameters>`）；校验可用 pi-schema 的 `compile`/`Validator`/`ValidationError` 或 TypeBox 自带校验 — `pi-schema/dist/index.d.ts`、`validator.d.ts`、`types.d.ts`（TypeBox 1.3.27 是依赖）
+- `@earendil-works/pi-ai`：`createModels`/`createProvider`/`Models`/`Provider`/`Model`、`streamSimple`/`completeSimple`、`Usage`、`AssistantMessage`、`UserMessage`/`SystemMessage`/`ToolResultMessage`、`ImageContent`、`Context`、`SimpleStreamOptions`、`AssistantMessageEventStream`、`contentText`、`cleanupSessionResources`、`registerFauxProvider` — `dist/models.d.ts`、`dist/types.d.ts`、`dist/compat.d.ts`、`dist/utils/text.d.ts`
+- `@earendil-works/pi-schema`：`obj`/`str`/`arr`/`Static` 定义结构和推导类型，`compile`/`Validator`/`ValidationError` 校验，输出标准 JSON Schema，`AgentTool` 的 `parameters` 直接用 — `pi-schema/dist/index.d.ts`、`validator.d.ts`、`types.d.ts`
 
 ## Open questions
 

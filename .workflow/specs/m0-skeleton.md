@@ -30,7 +30,7 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 | 包 | M0 内容 |
 | --- | --- |
 | `packages/ui` | Tokens、整套控件库（从原型搬过来，行内样式改为 CSS Modules，接口和外观不变）、侧边栏外壳、书库 / 用量空状态、设置页；i18next，先只有简体中文文案 |
-| `packages/creator` | 创作端进程入口、配置读写、文本和视觉模型测试（pi）、图片模型测试（`openai` SDK）；`contract` 子路径导出命令和事件的 TypeBox 定义 |
+| `packages/creator` | 创作端进程入口、配置读写、文本和视觉模型测试（pi）、图片模型测试（`openai` SDK）；`contract` 子路径导出命令和事件的 pi-schema 定义 |
 | `apps/desktop` | Electron 主进程、预加载、utility process 管理、MessagePort 通道、`novelive://` 协议、选文件夹对话框；electron-vite 构建 |
 | `tools/dev-bridge` | 浏览器开发模式：在 Node 里跑创作端，WebSocket 转发命令和事件，HTTP 提供资源；`pickFolder()` 用一个输入框填绝对路径 |
 
@@ -40,13 +40,13 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 
 - 主进程创建 MessageChannel，一端交给创作端（utility process），一端经预加载交给界面。之后命令和事件直连，不经主进程转发。
 - 预加载用 `contextBridge` 暴露 `window.novelive`：`call(command, payload, signal?)`、`on(event, handler)`、`resourceUrl(path)`、`pickFolder()`。每次 `call` 带请求 ID，返回 Promise；`call` 可传 `AbortSignal`，取消时发一条取消消息到创作端，创作端中止对应请求（“测试进行中可以取消”走这条路）。`on` 返回取消订阅函数。界面只依赖这个接口；浏览器开发模式下由 dev-bridge 的客户端实现同一接口。
-- 命令（请求 → 响应）和事件（创作端主动推送）都由 `@novelive/creator/contract` 里的 TypeBox 定义。编解码放在 contract 里，MessagePort 和 dev-bridge 的 WebSocket 共用。开发模式下两端在收到消息时都做校验，不合法的消息记日志并返回错误。
+- 命令（请求 → 响应）和事件（创作端主动推送）都由 `@novelive/creator/contract` 里的 pi-schema 定义。编解码放在 contract 里，MessagePort 和 dev-bridge 的 WebSocket 共用。开发模式下两端在收到消息时都做校验，不合法的消息记日志并返回错误。
 - 命令失败返回 `{ code, message }`，界面按 code 显示该检查什么。M0 的 code：`network`、`auth`、`not_found`、`invalid_config`、`cancelled`、`creator_down`、`internal`。
 - M0 的命令：`config.get`、`config.update`、`model.testText`、`model.testImage`。事件：`creator.ready`（启动和重连后发一次）、`creator.down`（创作端退出时由主进程代发）。界面收到 `creator.down` 后把所有在途调用以 `creator_down` 结束；重连后旧请求的结果不再生效。
 
 **配置**
 
-- 放在 Electron `userData` 下的 `config.json`，结构由 TypeBox 定义，只由创作端读写。API Key 用写在程序里的固定密钥简单加密后存入。写入时先写临时文件再改名，避免写一半断电。开发期验收和录制用所有者的中转，地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`；开发默认模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」。
+- 放在 Electron `userData` 下的 `config.json`，结构由 pi-schema 定义，只由创作端读写。API Key 用写在程序里的固定密钥简单加密后存入。写入时先写临时文件再改名，避免写一半断电。开发期验收和录制用所有者的中转，地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`；开发默认模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」。
 - 配置文件读不出来时，界面显示文件位置和错误信息，不覆盖原文件。
 
 **模型接入**

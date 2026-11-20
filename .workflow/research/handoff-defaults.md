@@ -48,7 +48,7 @@
 - **场景头归属**：`scene` 标题和 `source` 段落范围由模型写，代码核对范围合法性不生成。（`docs/creation-pipeline.md`、`.workflow/research/novelive-agent.md`）
 - **长章分段（试验）**：写手分段约束「每段以场边界结束」，提示词写明，违规按剧本检查退回；美术导演分批时每批带本批场景+前后各一场衔接+全章图清单累积。验收：分段/分批产物无场景截断、无重复背景图。（`.workflow/research/agent-orchestration.md`、`novelive-agent.md`）
 - **对话面板数据模型（试验）**：查 `agent-orchestration.md`/`novelive-agent.md` 是否已覆盖会话条目树、确认卡、压缩策略的字段级定义；没有就以原型 `mock/chat.ts` 的 ChatNode 树 + ConfirmPart + compressedSummary 为草案补进规格。验收：project.db 会话表能存分支和压缩摘要。（`.workflow/research/`、`docs/ux.md`）
-- **运行记录持久化（试验）**：以原型 `runRecordMock`（章→步→parts/groups）为 TypeBox 草案；验证「写」步骤流式输出存原始流还是渲染后 parts、pi-agent-core 会话存储能否复用。验收：重跑后运行记录能完整回放。（`docs/ux.md`、prototype mock）
+- **运行记录持久化（试验）**：以原型 `runRecordMock`（章→步→parts/groups）为 pi-schema 草案；验证「写」步骤流式输出存原始流还是渲染后 parts、pi-agent-core 会话存储能否复用。验收：重跑后运行记录能完整回放。（`docs/ux.md`、prototype mock）
 - **propose kind 补 `add_text_marker`**：patch 装标记名+CSS+逐字开关；主控工具补 `list_assets`、`read_chapter_manifest`、`read_task_result`（查素材名、图清单、失败原因）。（`.workflow/research/novelive-agent.md`、`decisions.md` 2026-11-20）
 - **标记提议落点**：模型提议新自定义标记进编辑器顶部横幅确认，不进对话面板确认卡；`ConfirmKind` 不加 mark。（`docs/ux.md`、prototype EditorPage）
 
