@@ -4,7 +4,7 @@ Fill this in at project setup and keep it under one screen. Delete lines that do
 
 ## Project
 
-Novelive：Electron 桌面应用（Windows/macOS/Linux）。创作者导入小说（TXT/EPUB），由 Novelive Agent 改编成视觉小说并导出 `.novelive` 作品包；玩家导入作品包游玩。产品与边界见 `docs/`，旧实现只读参考在 `../Novelive-legacy`。
+Novelive：Electron 桌面应用（Windows/macOS/Linux）。创作者导入小说（TXT、EPUB、Markdown、DOCX、PDF 五种格式），由 Novelive Agent 改编成视觉小说并导出 `.novelive` 作品包；玩家导入作品包游玩。产品与边界见 `docs/`，旧实现只读参考在 `../Novelive-legacy`。
 
 ## Commands
 
