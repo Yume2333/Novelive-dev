@@ -11,9 +11,10 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 
 - **启动**：`pnpm dev` 打开 Electron 窗口，界面是原型的侧边栏外壳：全局导航（书库、用量、设置）、底部主题切换。书库和用量显示空状态；没有作品，所以侧边栏不显示作品分区和制作状态。
 - **设置页**，按原型布局：
-  - **快速模型、创作模型**：接口格式（OpenAI Chat Completions / OpenAI Responses / Anthropic Messages）、接口地址（选格式时预填官方地址，可改）、模型名、API Key。
+  - **快速、主模型、写作、视觉**：接口格式（OpenAI Chat Completions / OpenAI Responses / Anthropic Messages）、接口地址（选格式时预填官方地址，可改）、模型名、上下文长度（pi 内置模型目录里查得到就自动填）、API Key。四个文本模型可以复用同一套地址和 Key，只换模型名。
   - **图片模型**：接口地址、模型名、API Key（OpenAI 兼容图片接口）。
-  - **测试**：文本模型通过 pi 发一次最短请求，收到回复就算成功；图片模型生成一张小图，成功后在卡片里显示缩略图，缩略图经 `novelive://` 协议读取。失败时显示原因和该检查什么（地址、Key、模型名）。
+  - **测试**：文本模型通过 pi 发一次最短请求，收到回复就算成功；视觉模型额外带一张小图，要求描述图片内容；图片模型生成一张小图，成功后在卡片里显示缩略图，缩略图经 `novelive://` 协议读取。失败时显示原因和该检查什么（地址、Key、模型名）。
+  - Agent 角色的模型对应和写手预设属于 M1，M0 不做。
   - **界面**：界面语言、主题（亮 / 暗 / 跟随系统）；**工程**：默认工程位置，“更改”打开系统选文件夹对话框。
   - 所有设置写入应用配置文件，重启后保留。
 - **后台进程崩溃时**：窗口照常可用，顶部出现提示横幅；宿主自动重新拉起创作端，界面重新连上后横幅消失，设置页可以继续测试。如果创作端还没启动好就退出，横幅显示错误信息和“重新启动”按钮，不自动重试。
@@ -27,7 +28,7 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 | 包 | M0 内容 |
 | --- | --- |
 | `packages/ui` | Tokens、整套控件库（从原型搬过来，行内样式改为 CSS Modules，接口和外观不变）、侧边栏外壳、书库 / 用量空状态、设置页；i18next，先只有简体中文文案 |
-| `packages/creator` | 创作端进程入口、配置读写、文本模型测试（pi）、图片模型测试（`fetch`）；`contract` 子路径导出命令和事件的 TypeBox 定义 |
+| `packages/creator` | 创作端进程入口、配置读写、文本和视觉模型测试（pi）、图片模型测试（`openai` SDK）；`contract` 子路径导出命令和事件的 TypeBox 定义 |
 | `apps/desktop` | Electron 主进程、预加载、utility process 管理、MessagePort 通道、`novelive://` 协议、选文件夹对话框；electron-vite 构建 |
 | `tools/dev-bridge` | 浏览器开发模式：在 Node 里跑创作端，WebSocket 转发命令和事件，HTTP 提供资源 |
 
@@ -48,7 +49,7 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 **模型接入**
 
 - 文本：按接口格式构造 pi 的 `Model`（`openai-completions` / `openai-responses` / `anthropic-messages`），`baseUrl` 用用户填的地址，Key 直接传入。测试进行中可以取消。
-- 图片：`POST {地址}/images/generations`，返回 `b64_json` 或 `url` 都支持。图片存到应用缓存目录，界面经 `novelive://cache/...` 读取。
+- 图片：用 `openai` 官方 SDK 的 `images.generate`，`baseURL` 用用户填的地址。图片存到应用缓存目录，界面经 `novelive://cache/...` 读取。
 
 **资源协议**
 
@@ -88,6 +89,6 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 - **W2.** `pnpm test:e2e`：Electron 启动，设置页对本地假服务完成三种文本格式和图片测试，缩略图经 `novelive://` 显示；结束创作端进程后横幅出现，随后消失，再测试仍然成功；`node:sqlite` 冒烟通过。
 - **W3.** `pnpm dev`，在设置页填真实的 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 接口和图片接口，逐个点“测试”都显示连接成功，图片缩略图显示；退出重开后配置还在。截图存到 `.workflow/evidence/m0/`。
 - **W4.** `pnpm dev:web` 后在浏览器打开，设置页对假服务的测试成功，缩略图显示。
-- **W5.** 同一视口下分别截取正式界面和 `prototype/` 的书库空状态与设置页，并排对比：除了已决定的文本模型字段变化，布局、控件、配色一致。
+- **W5.** 同一视口下分别截取正式界面和 `prototype/` 的书库空状态与设置页，并排对比：除了已决定的模型配置变化（五个模型、接口格式字段），布局、控件、配色一致。
 - **W6.** 在 `packages/ui` 的组件 CSS 里写一个颜色字面量，`pnpm check` 失败并指出位置；去掉后通过。
 - **W7.** 推送到 `Yume2333/Novelive-dev` 后，GitHub Actions 的 `pnpm check` 通过。
