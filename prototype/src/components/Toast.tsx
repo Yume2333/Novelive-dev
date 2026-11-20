@@ -48,7 +48,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               fontSize: 13,
               fontWeight: 500,
               animation: 'fade-up 0.2s ease',
-              boxShadow: '0 6px 20px rgba(0,0,0,0.1)',
+              boxShadow: 'var(--shadow-pop)',
             }}
           >
             {t.icon ? <Icon name={t.icon} size={16} /> : null}

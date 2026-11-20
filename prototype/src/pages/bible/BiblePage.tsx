@@ -6,7 +6,7 @@ import { Chip, Drawer, Slider, Tooltip } from '../../components/Extended'
 import { EmptyState, SectionLabel, TextInput } from '../../components/Form'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
-import { getBible, type BibleCharacter, type BibleData, type BibleLocation, type Change, type Layer } from '../../mock/bible'
+import { getBible, defaultAvatar, type BibleCharacter, type BibleData, type BibleLocation, type Change, type Layer } from '../../mock/bible'
 import { findSeries, findVolume, findWork } from '../../mock/library'
 import { useShell } from '../../shell/AppShell'
 import './bible.css'
@@ -90,17 +90,14 @@ function ChangeList({ changes, n }: { changes: Change[]; n: number }) {
 // ---- 角色 ----
 
 function CharacterAvatar({ c, size = 44 }: { c: BibleCharacter; size?: number }) {
-  const hues: Record<string, [string, string]> = {
-    lin: ['#5b7a99', '#c9d6e2'], ache: ['#8a6a3f', '#e8d5b0'], weila: ['#9c5a43', '#e9c3ae'], haigui: ['#5e6e5a', '#cfd8c8'],
-  }
-  const [a, b] = hues[c.id] ?? ['#6d6a73', '#d8d5db']
+  const [a, b] = c.avatar ?? defaultAvatar
   return (
     <div
       style={{
         width: size, height: size, borderRadius: 'var(--radius-lg)', flexShrink: 0,
         background: `linear-gradient(160deg, ${a}, ${b})`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: 'rgba(255,255,255,0.9)', boxShadow: 'var(--shadow-glass)',
+        color: 'var(--color-on-primary)', boxShadow: 'var(--shadow-glass)',
       }}
     >
       <Icon name={c.reusable ? 'person' : 'person_off'} size={size * 0.55} />

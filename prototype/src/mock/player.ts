@@ -192,7 +192,7 @@ const xingxieCh1: PlayerLine[] = [
 
 export const chapterScripts: ChapterScript[] = [
   { workId: 'wugang', chapterId: 'c1', lines: wugangCh1 },
-  { workId: 'wugang', chapterId: 'c5', lines: wugangCh5, next: { title: '风暴前夜', status: 'producing', step: '出图 12/20' } },
+  { workId: 'wugang', chapterId: 'c5', lines: wugangCh5, next: { title: '风暴前夜', status: 'producing', step: '演出与出图 12/20' } },
   { workId: 'wugang', chapterId: 'c7', lines: wugangCh7, next: { title: '雾散时分', status: 'waiting' } },
   { workId: 'xiari', chapterId: 'c1', lines: wugangCh1, next: { title: '音乐教室', status: 'waiting' } },
   { workId: 'xingxie', chapterId: 'c1', lines: xingxieCh1 },

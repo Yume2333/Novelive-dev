@@ -52,7 +52,7 @@ export function Button({
       background: 'var(--color-primary)',
       color: 'var(--color-on-primary)',
       border: '1px solid var(--color-primary-container)',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      boxShadow: 'var(--shadow-raised)',
     },
     neu: { color: 'var(--color-primary)' },
     ghost: {

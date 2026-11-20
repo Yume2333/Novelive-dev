@@ -51,7 +51,12 @@ export interface BibleCharacter {
   status: EntryStatus
   layer: Layer
   extractedFrom: number
+  /** 头像占位色：CSS 渐变的起止色（确认点定下立绘前用它区分角色）；没配时页面用灰 */
+  avatar?: [string, string]
 }
+
+/** 没配占位色的角色用这个 */
+export const defaultAvatar: [string, string] = ['#6d6a73', '#d8d5db']
 
 export interface Relation {
   id: string
@@ -199,6 +204,7 @@ const wugang: BibleData = {
       status: '已确认',
       layer: '系列',
       extractedFrom: 1,
+      avatar: ['#5b7a99', '#c9d6e2'],
     },
     {
       id: 'ache',
@@ -236,6 +242,7 @@ const wugang: BibleData = {
       status: '已确认',
       layer: '作品',
       extractedFrom: 3,
+      avatar: ['#8a6a3f', '#e8d5b0'],
     },
     {
       id: 'weila',
@@ -273,6 +280,7 @@ const wugang: BibleData = {
       status: '候选',
       layer: '卷',
       extractedFrom: 5,
+      avatar: ['#9c5a43', '#e9c3ae'],
     },
     {
       id: 'haigui',
@@ -304,6 +312,7 @@ const wugang: BibleData = {
       status: '已确认',
       layer: '作品',
       extractedFrom: 2,
+      avatar: ['#5e6e5a', '#cfd8c8'],
     },
   ],
   relations: [

@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Icon } from '../../components/Button'
 import { RadioGroup, Tooltip } from '../../components/Extended'
-import { Field, TextInput } from '../../components/Form'
+import { Field, Select, TextInput } from '../../components/Form'
+import { apiFormats, defaultBaseUrl, modelSlots, type ApiFormat } from '../../mock/settings'
 import type { CSSProperties, ReactNode } from 'react'
 import { useToast } from '../../components/Toast'
 
@@ -93,25 +94,53 @@ function PathCard({ icon, title, desc, active, onClick }: {
   )
 }
 
-/** 模型配置行：名称 + 模型名 + API Key */
-function ModelRow({ label, model, key_, onModel, onKey, secret }: {
-  label: string
-  model: string
-  key_: string
-  onModel: (v: string) => void
-  onKey: (v: string) => void
-  secret?: boolean
-}) {
+/** 模型配置区：接口格式/地址/Key 一组共享，五个文本模型只填模型名，图片模型单独一组 */
+function ModelStep() {
+  const [format, setFormat] = useState<ApiFormat>('openai-chat')
+  const [base, setBase] = useState(defaultBaseUrl('openai-chat'))
+  const [key_, setKey] = useState('')
+  const [names, setNames] = useState<Record<string, string>>({ fast: '', main: '', writing: '', visual: '' })
+  const [img, setImg] = useState({ base: '', model: '', key: '' })
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr 1fr', gap: 'var(--space-3)', alignItems: 'end' }}>
-      <span className="label-caps label-caps-zh" style={{ color: 'var(--color-on-surface-variant)', paddingBottom: 11 }}>
-        {label}
-      </span>
-      <TextInput value={model} onChange={onModel} placeholder="模型名称" />
-      <TextInput value={key_} onChange={onKey} placeholder={secret ? 'API Key' : '接口地址或 Key'} type="password" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+        <Field label="接口格式">
+          <Select
+            value={format}
+            onChange={(v) => { setFormat(v as ApiFormat); setBase(defaultBaseUrl(v as ApiFormat)) }}
+            options={apiFormats.map((f) => ({ value: f.value, label: f.label }))}
+          />
+        </Field>
+        <Field label="接口地址">
+          <TextInput value={base} onChange={setBase} placeholder="https://…" />
+        </Field>
+      </div>
+      <Field label="API Key">
+        <TextInput type="password" value={key_} onChange={setKey} placeholder="sk-…" />
+      </Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+        {modelSlots.filter((s) => s.id !== 'image').map((s) => (
+          <Field key={s.id} label={s.label}>
+            <TextInput value={names[s.id]} onChange={(v) => setNames((n) => ({ ...n, [s.id]: v }))} placeholder="模型名" />
+          </Field>
+        ))}
+      </div>
+      <div style={{ borderTop: '1px solid var(--divider)', paddingTop: 'var(--space-4)', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+        <Field label="图片模型 · 接口地址">
+          <TextInput value={img.base} onChange={(v) => setImg({ ...img, base: v })} placeholder="https://…/v1" />
+        </Field>
+        <Field label="模型名">
+          <TextInput value={img.model} onChange={(v) => setImg({ ...img, model: v })} placeholder="模型名" />
+        </Field>
+        <Field label="API Key">
+          <TextInput type="password" value={img.key} onChange={(v) => setImg({ ...img, key: v })} placeholder="sk-…" />
+        </Field>
+      </div>
     </div>
   )
 }
+
 
 export function WelcomePage() {
   const navigate = useNavigate()
@@ -119,8 +148,6 @@ export function WelcomePage() {
   const [step, setStep] = useState(0)
   const [lang, setLang] = useState('zh-Hans')
   const [path, setPath] = useState<'create' | 'play'>('create')
-  const [models, setModels] = useState({ fast: '', fastKey: '', creative: '', creativeKey: '', image: '', imageKey: '' })
-  const set = (k: keyof typeof models) => (v: string) => setModels((m) => ({ ...m, [k]: v }))
 
   return (
     <div
@@ -206,11 +233,7 @@ export function WelcomePage() {
               <Icon name="info" size={15} style={{ color: 'var(--color-outline)' }} />
             </Tooltip>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <ModelRow label="快速模型" model={models.fast} key_={models.fastKey} onModel={set('fast')} onKey={set('fastKey')} secret />
-            <ModelRow label="创作模型" model={models.creative} key_={models.creativeKey} onModel={set('creative')} onKey={set('creativeKey')} secret />
-            <ModelRow label="图片模型" model={models.image} key_={models.imageKey} onModel={set('image')} onKey={set('imageKey')} />
-          </div>
+          <ModelStep />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-6)' }}>
             <Button variant="ghost" onClick={() => setStep(1)}>
               上一步

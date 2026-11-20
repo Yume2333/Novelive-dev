@@ -10,6 +10,8 @@ import { useToast } from '../../components/Toast'
 import { findSeries, findVolume, findWork } from '../../mock/library'
 import { useProduction } from '../../mock/production'
 import type { Chapter, Work } from '../../mock/types'
+import { RunRecordDrawer } from '../chat/RunRecord'
+
 
 // 过期图片占位（CSS 图形，无位图）：灰底 + 警示斜线，用 surface token 兜底
 const staleThumb =
@@ -36,15 +38,25 @@ function staleImagesOf(chapter: Chapter): StaleImage[] {
   return list
 }
 
-function ChapterRow({ work, chapter, last, onOpenStale }: {
+function ChapterRow({ work, chapter, last, onOpenStale, onOpenRuns }: {
   work: Work
   chapter: Chapter
   last: boolean
   onOpenStale: (c: Chapter) => void
+  onOpenRuns: (c: Chapter) => void
 }) {
   const navigate = useNavigate()
   const toast = useToast()
   const [priority, setPriority] = useState(!!chapter.priority)
+  // 三步进度：审稿是作品开关，关了只剩两步；出图按张算（"图 5/8"）
+  const steps = work.reviewEnabled ? ['写', '审稿', '演出与出图'] : ['写', '演出与出图']
+  // step 形如 "演出与出图 5/8"
+  const stepIdx = Math.max(
+    0,
+    steps.findIndex((s) => chapter.step?.startsWith(s)),
+  )
+  const m = chapter.step?.match(/(\d+)\s*\/\s*(\d+)/)
+  const frac = chapter.step ? (stepIdx + (m ? Math.min(1, Number(m[1]) / Math.max(1, Number(m[2]))) : 0)) / steps.length : 0
   return (
     <div
       className="hover-row"
@@ -66,7 +78,17 @@ function ChapterRow({ work, chapter, last, onOpenStale }: {
           <Icon name="keyboard_double_arrow_up" size={13} /> 优先
         </span>
       ) : null}
-      {chapter.step ? <span style={{ fontSize: 12, color: 'var(--color-primary)' }}>{chapter.step}</span> : null}
+      {chapter.step ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
+          {steps.map((s, i) => (
+            <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {i > 0 ? <Icon name="chevron_right" size={11} style={{ color: 'var(--color-outline)' }} /> : null}
+              <span style={i === stepIdx ? undefined : { color: 'var(--color-outline)', fontWeight: 400 }}>{s}</span>
+            </span>
+          ))}
+          {m ? <span>· {chapter.step.slice(chapter.step.indexOf(m[0]))}</span> : null}
+        </span>
+      ) : null}
       {chapter.staleImages ? (
         <button
           onClick={() => onOpenStale(chapter)}
@@ -77,6 +99,11 @@ function ChapterRow({ work, chapter, last, onOpenStale }: {
         </button>
       ) : null}
       <span style={{ flex: 1 }} />
+      {chapter.step ? (
+        <span style={{ width: 72, flexShrink: 0 }}>
+          <ProgressBar value={frac} height={4} />
+        </span>
+      ) : null}
       <span style={{ display: 'inline-flex', justifyContent: 'flex-end', width: 96, flexShrink: 0 }}>
         {chapter.issue ? (
           <Tooltip text={chapter.issue}>
@@ -88,7 +115,7 @@ function ChapterRow({ work, chapter, last, onOpenStale }: {
           <ChapterStatusMark status={chapter.status} spin={chapter.status === 'producing'} />
         )}
       </span>
-      <span className="row-actions" style={{ display: 'inline-flex', justifyContent: 'flex-end', alignItems: 'center', gap: 'var(--space-1)', width: 168, flexShrink: 0 }}>
+      <span className="row-actions" style={{ display: 'inline-flex', justifyContent: 'flex-end', alignItems: 'center', gap: 'var(--space-1)', minWidth: 232, flexShrink: 0 }}>
         {chapter.status === 'published' ? (
           <Button variant="ghost" icon="play_arrow" size="sm" onClick={() => navigate(`/work/${work.id}/play`)}>游玩</Button>
         ) : null}
@@ -100,6 +127,7 @@ function ChapterRow({ work, chapter, last, onOpenStale }: {
             {chapter.status === 'attention' ? '去编辑' : '编辑'}
           </Button>
         ) : null}
+        <Button variant="ghost" icon="history" size="sm" onClick={() => onOpenRuns(chapter)}>运行记录</Button>
         {chapter.status !== 'published' ? (
           <Dropdown
             trigger={
@@ -132,9 +160,10 @@ export function ProductionPage() {
   const work = findWork(id)
   const navigate = useNavigate()
   const toast = useToast()
-  const { running, queue, stop, resume } = useProduction()
+  const { running, queue, stop, resume, crashed, simulateCrash } = useProduction()
   const [staleChapter, setStaleChapter] = useState<Chapter | null>(null)
   const [confirmStop, setConfirmStop] = useState(false)
+  const [runsChapter, setRunsChapter] = useState<Chapter | null>(null)
 
   if (!work || work.kind !== 'project') {
     return (
@@ -156,27 +185,42 @@ export function ProductionPage() {
   const current = work.chapters.find((c) => c.status === 'producing')
   const attention = work.chapters.filter((c) => c.status === 'attention')
 
-  // 顶栏全局控制：只有立即停止 / 继续制作，没有暂停
-  const controls = running ? (
-    <Button
-      variant="danger"
-      icon="stop"
-      onClick={() => setConfirmStop(true)}
-    >
-      立即停止
-    </Button>
-  ) : (
-    <Button
-      variant="primary"
-      icon="play_arrow"
-      disabled={!queue.length}
-      onClick={() => {
-        resume()
-        toast('继续制作，被中断的任务会重做一遍', 'play_arrow')
-      }}
-    >
-      继续制作
-    </Button>
+  // 顶栏全局控制：只有立即停止 / 继续制作，没有暂停；“更多”里放原型演示项
+  const controls = (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+      {running ? (
+        <Button variant="danger" icon="stop" onClick={() => setConfirmStop(true)}>立即停止</Button>
+      ) : (
+        <Button
+          variant="primary"
+          icon="play_arrow"
+          disabled={!queue.length}
+          onClick={() => {
+            resume()
+            toast('继续制作，被中断的任务会重做一遍', 'play_arrow')
+          }}
+        >
+          继续制作
+        </Button>
+      )}
+      <Dropdown
+        trigger={
+          <button title="更多" style={{ display: 'flex', padding: 7, borderRadius: 'var(--radius-full)', color: 'var(--color-on-surface-variant)' }}>
+            <Icon name="more_vert" size={18} />
+          </button>
+        }
+        items={[
+          {
+            label: '模拟异常退出',
+            icon: 'warning',
+            onClick: () => {
+              simulateCrash()
+              toast('已模拟异常退出后重新打开', 'warning')
+            },
+          },
+        ]}
+      />
+    </span>
   )
 
   return (
@@ -196,6 +240,23 @@ export function ProductionPage() {
       }
       actions={controls}
     >
+      {/* 崩溃恢复：异常退出后重开，制作保持停止，等创作者确认继续 */}
+      {crashed ? (
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <Banner
+            kind="warning"
+            icon="warning"
+            action={
+              <Button variant="primary" size="sm" icon="play_arrow" onClick={() => { resume(); toast('继续制作，被中断的任务会重做一遍', 'play_arrow') }}>
+                继续制作
+              </Button>
+            }
+          >
+            上次异常退出，制作已停止
+          </Banner>
+        </div>
+      ) : null}
+
       {/* 需要处理：同类问题合成一条横幅，重试在行内操作 */}
       {attention.length ? (
         <Banner
@@ -214,7 +275,7 @@ export function ProductionPage() {
       ) : null}
 
       {/* 当前状态 */}
-      <Card style={{ padding: 'var(--space-5)', marginTop: attention.length ? 'var(--space-5)' : 0 }}>
+      <Card style={{ padding: 'var(--space-5)', marginTop: attention.length && !crashed ? 'var(--space-5)' : 0 }}>
         {work.phase === 'preview' && work.previewProgress ? (
           <div>
             <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-3)' }}>
@@ -263,6 +324,7 @@ export function ProductionPage() {
             chapter={c}
             last={i === work.chapters.length - 1}
             onOpenStale={setStaleChapter}
+            onOpenRuns={setRunsChapter}
           />
         ))}
       </Card>
@@ -295,6 +357,13 @@ export function ProductionPage() {
             : null}
         </div>
       </Drawer>
+
+      {/* 运行记录：和 Agent 面板同一套显示（另一 Agent 实现） */}
+      <RunRecordDrawer
+        chapterTitle={runsChapter ? `第 ${runsChapter.index} 章 · ${runsChapter.title}` : ''}
+        open={runsChapter !== null}
+        onClose={() => setRunsChapter(null)}
+      />
 
       <ConfirmDialog
         open={confirmStop}

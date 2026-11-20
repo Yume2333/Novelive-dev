@@ -1,9 +1,24 @@
 import { useState, type ReactNode } from 'react'
 import { Button, Icon, Spinner } from '../../components/Button'
 import { Card } from '../../components/Card'
-import { CompactSelect, Field, SectionLabel, TextInput } from '../../components/Form'
+import { RadioGroup } from '../../components/Extended'
+import { CompactSelect, Field, SectionLabel, TextInput, textareaStyle } from '../../components/Form'
+import { Modal } from '../../components/Modal'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
+import {
+  agentRoles,
+  apiFormats,
+  contextCatalog,
+  defaultBaseUrl,
+  defaultImageConfig,
+  defaultTextConfig,
+  defaultWriterPresets,
+  modelSlots,
+  type ModelSlot,
+  type TextModelConfig,
+  type WriterPreset,
+} from '../../mock/settings'
 import { useTheme, type ThemeMode } from '../../shell/theme'
 
 /** 设置行：图标 + 标题 + 右侧控件 */
@@ -39,13 +54,15 @@ function RowDivider() {
 
 type TestState = 'idle' | 'testing' | 'ok' | 'fail'
 
+const failText = '连接失败 · 检查接口地址、API Key、模型名'
+
 const testMeta: Record<Exclude<TestState, 'idle'>, { text: string; icon: string; color: string }> = {
   testing: { text: '正在测试…', icon: 'progress_activity', color: 'var(--color-on-surface-variant)' },
   ok: { text: '连接成功', icon: 'check_circle', color: 'var(--color-success)' },
-  fail: { text: '连接失败，请检查地址和密钥', icon: 'error', color: 'var(--color-on-error-container)' },
+  fail: { text: failText, icon: 'error', color: 'var(--color-on-error-container)' },
 }
 
-/** 三类模型之一：收起时只显示摘要行（图标 / 名称 / 当前模型 / 测试），点开才编辑 */
+/** 模型卡：收起时只有摘要行（图标 / 名称 / 当前模型 / 测试），点开才编辑 */
 function ModelCard({
   icon,
   title,
@@ -53,16 +70,18 @@ function ModelCard({
   configured,
   test,
   onTest,
+  result,
   children,
 }: {
   icon: string
   title: string
-  /** 收起时的一行摘要，如当前服务与模型名 */
+  /** 收起时的一行摘要，如接口地址与模型名 */
   summary: string
-  /** 已填 Key 视为已配置 */
   configured: boolean
   test: TestState
   onTest: () => void
+  /** 测试成功后显示在编辑区的内容（图片描述 / 缩略图） */
+  result?: ReactNode
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -109,7 +128,8 @@ function ModelCard({
         <Icon name={open ? 'expand_less' : 'expand_more'} size={18} style={{ color: 'var(--color-outline)' }} />
       </div>
       {open ? (
-        <div style={{ padding: '0 var(--space-5) var(--space-5)' }}>
+        <div style={{ padding: '0 var(--space-5) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          {test === 'ok' && result ? result : null}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>{children}</div>
         </div>
       ) : null}
@@ -117,84 +137,204 @@ function ModelCard({
   )
 }
 
-const textServices = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'google', label: 'Google' },
-  { value: 'qwen', label: '通义千问' },
-]
-
-const textModelsByService: Record<string, { value: string; label: string }[]> = {
-  anthropic: [
-    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-    { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
-  ],
-  openai: [
-    { value: 'gpt-5.2', label: 'GPT-5.2' },
-    { value: 'gpt-5-mini', label: 'GPT-5 mini' },
-  ],
-  google: [
-    { value: 'gemini-3-pro', label: 'Gemini 3 Pro' },
-    { value: 'gemini-3-flash', label: 'Gemini 3 Flash' },
-  ],
-  qwen: [
-    { value: 'qwen3-max', label: 'Qwen3-Max' },
-    { value: 'qwen3-flash', label: 'Qwen3-Flash' },
-  ],
+/** 视觉模型测试成功：模型对小图的描述 */
+function VisualTestResult() {
+  return (
+    <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+      <div
+        style={{
+          width: 72,
+          height: 48,
+          borderRadius: 'var(--radius-md)',
+          flexShrink: 0,
+          background: 'linear-gradient(150deg, var(--color-surface-container-highest), var(--color-primary-container))',
+        }}
+      />
+      <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', lineHeight: 1.7 }}>
+        「雾气笼罩的港口，灰蓝色水面，一艘小船亮着灯。」
+      </p>
+    </div>
+  )
 }
 
-interface TextModelConfig {
-  service: string
-  model: string
-  key: string
-  test: TestState
+/** 图片模型测试成功：返回的缩略图（渐变占位） */
+function ImageTestResult() {
+  return (
+    <div
+      style={{
+        width: 96,
+        height: 54,
+        borderRadius: 'var(--radius-md)',
+        background: 'linear-gradient(150deg, var(--color-primary-container), var(--color-surface-container-highest))',
+        border: '1px solid var(--white-60)',
+      }}
+    />
+  )
+}
+
+/** 文本模型字段；canInherit 的槽位可以一键沿用快速模型的地址和 Key */
+function TextModelFields({
+  slot,
+  config,
+  fast,
+  onChange,
+}: {
+  slot: Exclude<ModelSlot, 'image'>
+  config: TextModelConfig
+  fast: TextModelConfig
+  onChange: (c: TextModelConfig) => void
+}) {
+  const inherit = slot !== 'fast' && config.inheritFast
+  return (
+    <>
+      <Field label="接口格式">
+        <CompactSelect
+          value={config.format}
+          onChange={(v) => onChange({ ...config, format: v as TextModelConfig['format'], base: defaultBaseUrl(v as TextModelConfig['format']) })}
+          options={apiFormats.map((f) => ({ value: f.value, label: f.label }))}
+        />
+      </Field>
+      {slot !== 'fast' ? (
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <Button size="sm" icon={config.inheritFast ? 'check_box' : 'check_box_outline_blank'} onClick={() => onChange({ ...config, inheritFast: !config.inheritFast })}>
+            同快速模型
+          </Button>
+        </div>
+      ) : null}
+      <Field label="接口地址">
+        <TextInput value={inherit ? fast.base : config.base} placeholder="https://…" onChange={(v) => onChange({ ...config, base: v })} />
+      </Field>
+      <Field label="模型名">
+        <TextInput value={config.model} placeholder="模型名" onChange={(v) => onChange({ ...config, model: v })} />
+      </Field>
+      <Field label="上下文长度" hint={contextCatalog[config.model.trim()] ? undefined : '目录里没有，可以手填'}>
+        <TextInput
+          value={contextCatalog[config.model.trim()] ? String(contextCatalog[config.model.trim()]) : config.context}
+          placeholder="如 200000"
+          onChange={(v) => onChange({ ...config, context: v })}
+        />
+      </Field>
+      <Field label="API Key">
+        <TextInput type="password" value={inherit ? fast.key : config.key} placeholder="sk-…" onChange={(v) => onChange({ ...config, key: v })} />
+      </Field>
+    </>
+  )
+}
+
+/** 写手预设编辑弹窗 */
+function PresetEditor({ preset, onClose, onSave }: { preset: WriterPreset; onClose: () => void; onSave: (p: WriterPreset) => void }) {
+  const [draft, setDraft] = useState(preset)
+  const set = (patch: Partial<WriterPreset>) => setDraft((d) => ({ ...d, ...patch }))
+  return (
+    <Modal
+      open
+      title={preset.id ? `写手预设 · ${preset.name}` : '新建写手预设'}
+      onClose={onClose}
+      width={560}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>取消</Button>
+          <Button variant="primary" onClick={() => onSave(draft)}>保存</Button>
+        </>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <Field label="名称">
+          <TextInput value={draft.name} onChange={(v) => set({ name: v })} />
+        </Field>
+        <Field label="文风说明">
+          <textarea style={{ ...textareaStyle, minHeight: 72 }} value={draft.style} onChange={(e) => set({ style: e.target.value })} />
+        </Field>
+        <Field label="输出约束">
+          <textarea style={{ ...textareaStyle, minHeight: 72 }} value={draft.constraints} onChange={(e) => set({ constraints: e.target.value })} />
+        </Field>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+          <Field label="温度（可选）">
+            <TextInput value={draft.sampling.temperature} placeholder="不设" onChange={(v) => set({ sampling: { ...draft.sampling, temperature: v } })} />
+          </Field>
+          <Field label="Top-P（可选）">
+            <TextInput value={draft.sampling.topP} placeholder="不设" onChange={(v) => set({ sampling: { ...draft.sampling, topP: v } })} />
+          </Field>
+          <Field label="最大输出（可选）">
+            <TextInput value={draft.sampling.maxTokens} placeholder="不设" onChange={(v) => set({ sampling: { ...draft.sampling, maxTokens: v } })} />
+          </Field>
+        </div>
+        <Field label="输出替换规则">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {draft.replacements.map((r, i) => (
+              <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                <TextInput value={r.find} placeholder="查找" onChange={(v) => set({ replacements: draft.replacements.map((x, j) => (j === i ? { ...x, find: v } : x)) })} />
+                <Icon name="arrow_forward" size={14} style={{ color: 'var(--color-outline)', flexShrink: 0 }} />
+                <TextInput value={r.replace} placeholder="替换为" onChange={(v) => set({ replacements: draft.replacements.map((x, j) => (j === i ? { ...x, replace: v } : x)) })} />
+                <button
+                  onClick={() => set({ replacements: draft.replacements.filter((_, j) => j !== i) })}
+                  style={{ display: 'flex', padding: 5, color: 'var(--color-outline)', flexShrink: 0 }}
+                  title="删除"
+                >
+                  <Icon name="close" size={15} />
+                </button>
+              </div>
+            ))}
+            <Button size="sm" variant="neu" icon="add" style={{ alignSelf: 'flex-start' }} onClick={() => set({ replacements: [...draft.replacements, { find: '', replace: '' }] })}>
+              加一条
+            </Button>
+          </div>
+        </Field>
+      </div>
+    </Modal>
+  )
 }
 
 export function SettingsPage() {
   const toast = useToast()
   const { mode, setMode } = useTheme()
 
-  const [fast, setFast] = useState<TextModelConfig>({ service: 'qwen', model: 'qwen3-flash', key: '', test: 'idle' })
-  const [creative, setCreative] = useState<TextModelConfig>({ service: 'anthropic', model: 'claude-sonnet-4-6', key: '', test: 'idle' })
-  const [image, setImage] = useState({ base: 'https://api.openai.com/v1', model: 'gpt-image-1', key: '', test: 'idle' as TestState })
+  const [texts, setTexts] = useState<Record<Exclude<ModelSlot, 'image'>, TextModelConfig>>({
+    fast: defaultTextConfig('fast'),
+    main: defaultTextConfig('main'),
+    writing: defaultTextConfig('writing'),
+    visual: defaultTextConfig('visual'),
+  })
+  const [image, setImage] = useState(defaultImageConfig())
+  const [tests, setTests] = useState<Record<ModelSlot, TestState>>({ fast: 'idle', main: 'idle', writing: 'idle', visual: 'idle', image: 'idle' })
+  const [advanced, setAdvanced] = useState(false)
+  const [roleModel, setRoleModel] = useState<Record<string, ModelSlot>>(Object.fromEntries(agentRoles.map((r) => [r.id, r.slot])))
+  const [presets, setPresets] = useState<WriterPreset[]>(defaultWriterPresets)
+  const [editing, setEditing] = useState<WriterPreset | null>(null)
+  const [imageFormat, setImageFormat] = useState<'lossy' | 'lossless'>('lossy')
   const [lang, setLang] = useState('zh-Hans')
   const [folder] = useState('~/文档/Novelive')
 
-  const runTextTest = (config: TextModelConfig, setConfig: (fn: (c: TextModelConfig) => TextModelConfig) => void) => {
-    setConfig((c) => ({ ...c, test: 'testing' }))
-    const ok = config.key.trim().length > 0
-    setTimeout(() => setConfig((c) => ({ ...c, test: ok ? 'ok' : 'fail' })), 700)
+  const setText = (slot: Exclude<ModelSlot, 'image'>) => (c: TextModelConfig) => {
+    setTexts((t) => ({ ...t, [slot]: c }))
+    setTests((t) => ({ ...t, [slot]: 'idle' }))
   }
 
-  const runImageTest = () => {
-    setImage((c) => ({ ...c, test: 'testing' }))
-    const ok = image.key.trim().length > 0 && image.base.trim().length > 0
-    setTimeout(() => setImage((c) => ({ ...c, test: ok ? 'ok' : 'fail' })), 700)
+  const textReady = (slot: Exclude<ModelSlot, 'image'>) => {
+    const c = texts[slot]
+    const inherit = slot !== 'fast' && c.inheritFast
+    const base = inherit ? texts.fast.base : c.base
+    const key = inherit ? texts.fast.key : c.key
+    return base.trim().length > 0 && key.trim().length > 0 && c.model.trim().length > 0
   }
 
-  const textFields = (config: TextModelConfig, setConfig: (c: TextModelConfig) => void) => (
-    <>
-      <Field label="服务">
-        <CompactSelect
-          value={config.service}
-          onChange={(v) => setConfig({ ...config, service: v, model: textModelsByService[v][0].value, test: 'idle' })}
-          options={textServices}
-        />
-      </Field>
-      <Field label="模型">
-        <CompactSelect
-          value={config.model}
-          onChange={(v) => setConfig({ ...config, model: v, test: 'idle' })}
-          options={textModelsByService[config.service]}
-        />
-      </Field>
-      <div style={{ gridColumn: '1 / -1' }}>
-        <Field label="API Key">
-          <TextInput type="password" value={config.key} placeholder="sk-…" onChange={(v) => setConfig({ ...config, key: v, test: 'idle' })} />
-        </Field>
-      </div>
-    </>
-  )
+  const runTest = (slot: ModelSlot) => {
+    setTests((t) => ({ ...t, [slot]: 'testing' }))
+    const ok = slot === 'image' ? image.key.trim().length > 0 && image.base.trim().length > 0 : textReady(slot)
+    setTimeout(() => setTests((t) => ({ ...t, [slot]: ok ? 'ok' : 'fail' })), 700)
+  }
+
+  const savePreset = (p: WriterPreset) => {
+    setPresets((list) => (list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [...list, p]))
+    setEditing(null)
+    toast('写手预设已保存', 'check')
+  }
+
+  const textSummary = (slot: Exclude<ModelSlot, 'image'>) => {
+    const c = texts[slot]
+    const inherit = slot !== 'fast' && c.inheritFast
+    return `${c.model || '未填模型'} · ${apiFormats.find((f) => f.value === c.format)?.label ?? c.format}${inherit ? ' · 同快速模型' : ''}`
+  }
 
   return (
     <Page title="设置" width={760}>
@@ -202,47 +342,128 @@ export function SettingsPage() {
         <section>
           <SectionLabel>模型</SectionLabel>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            <ModelCard
-              icon="bolt"
-              title="快速模型"
-              summary={`${textServices.find((s) => s.value === fast.service)?.label ?? fast.service} · ${textModelsByService[fast.service].find((m) => m.value === fast.model)?.label ?? fast.model}`}
-              configured={fast.key.trim().length > 0}
-              test={fast.test}
-              onTest={() => runTextTest(fast, setFast)}
-            >
-              {textFields(fast, setFast)}
-            </ModelCard>
-            <ModelCard
-              icon="edit_note"
-              title="创作模型"
-              summary={`${textServices.find((s) => s.value === creative.service)?.label ?? creative.service} · ${textModelsByService[creative.service].find((m) => m.value === creative.model)?.label ?? creative.model}`}
-              configured={creative.key.trim().length > 0}
-              test={creative.test}
-              onTest={() => runTextTest(creative, setCreative)}
-            >
-              {textFields(creative, setCreative)}
-            </ModelCard>
+            {modelSlots.filter((s) => s.id !== 'image').map((s) => (
+              <ModelCard
+                key={s.id}
+                icon={s.icon}
+                title={s.label}
+                summary={textSummary(s.id as Exclude<ModelSlot, 'image'>)}
+                configured={textReady(s.id as Exclude<ModelSlot, 'image'>)}
+                test={tests[s.id]}
+                onTest={() => runTest(s.id)}
+                result={s.id === 'visual' ? <VisualTestResult /> : undefined}
+              >
+                <TextModelFields slot={s.id as Exclude<ModelSlot, 'image'>} config={texts[s.id as Exclude<ModelSlot, 'image'>]} fast={texts.fast} onChange={setText(s.id as Exclude<ModelSlot, 'image'>)} />
+              </ModelCard>
+            ))}
             <ModelCard
               icon="image"
               title="图片模型"
-              summary={image.model}
+              summary={image.model || '未填模型'}
               configured={image.key.trim().length > 0 && image.base.trim().length > 0}
-              test={image.test}
-              onTest={runImageTest}
+              test={tests.image}
+              onTest={() => runTest('image')}
+              result={<ImageTestResult />}
             >
               <Field label="接口地址">
-                <TextInput value={image.base} placeholder="https://…/v1" onChange={(v) => setImage({ ...image, base: v, test: 'idle' })} />
+                <TextInput value={image.base} placeholder="https://…/v1" onChange={(v) => { setImage({ ...image, base: v }); setTests((t) => ({ ...t, image: 'idle' })) }} />
               </Field>
-              <Field label="模型">
-                <TextInput value={image.model} onChange={(v) => setImage({ ...image, model: v, test: 'idle' })} />
+              <Field label="模型名">
+                <TextInput value={image.model} onChange={(v) => { setImage({ ...image, model: v }); setTests((t) => ({ ...t, image: 'idle' })) }} />
               </Field>
               <div style={{ gridColumn: '1 / -1' }}>
                 <Field label="API Key">
-                  <TextInput type="password" value={image.key} placeholder="sk-…" onChange={(v) => setImage({ ...image, key: v, test: 'idle' })} />
+                  <TextInput type="password" value={image.key} placeholder="sk-…" onChange={(v) => { setImage({ ...image, key: v }); setTests((t) => ({ ...t, image: 'idle' })) }} />
                 </Field>
               </div>
             </ModelCard>
           </div>
+        </section>
+
+        <section>
+          <button
+            onClick={() => setAdvanced(!advanced)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-on-surface-variant)', marginBottom: 8 }}
+          >
+            <span className="label-caps label-caps-zh">高级</span>
+            <Icon name={advanced ? 'expand_less' : 'expand_more'} size={16} />
+          </button>
+          {advanced ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <Card style={{ padding: '2px 0' }}>
+                {agentRoles.map((role, i) => (
+                  <div key={role.id}>
+                    {i ? <RowDivider /> : null}
+                    <SettingRow
+                      icon="bot"
+                      title={role.label}
+                      control={
+                        <CompactSelect
+                          value={roleModel[role.id]}
+                          onChange={(v) => setRoleModel((m) => ({ ...m, [role.id]: v as ModelSlot }))}
+                          options={modelSlots.map((s) => ({ value: s.id, label: `${s.label}${s.id === role.slot ? '（默认）' : ''}` }))}
+                        />
+                      }
+                    />
+                  </div>
+                ))}
+              </Card>
+
+              <Card style={{ padding: 'var(--space-4) var(--space-5)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+                  <span style={{ fontWeight: 700, fontSize: 13.5 }}>写手预设</span>
+                  <Button size="sm" icon="add" onClick={() => setEditing({ id: `p${Date.now()}`, name: '', isDefault: false, style: '', constraints: '', sampling: { temperature: '', topP: '', maxTokens: '' }, replacements: [] })}>
+                    新建
+                  </Button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {presets.map((p) => (
+                    <div key={p.id} className="hover-row" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minHeight: 44, padding: '0 var(--space-2)', borderRadius: 'var(--radius-md)' }}>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>
+                        {p.name}
+                        {p.isDefault ? <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--color-outline)' }}>全局默认</span> : null}
+                      </span>
+                      <span className="row-actions" style={{ display: 'flex', gap: 4 }}>
+                        {!p.isDefault ? (
+                          <Button size="sm" variant="ghost" onClick={() => setPresets((list) => list.map((x) => ({ ...x, isDefault: x.id === p.id })))}>
+                            设为默认
+                          </Button>
+                        ) : null}
+                        <Button size="sm" variant="ghost" icon="edit" onClick={() => setEditing(p)}>
+                          编辑
+                        </Button>
+                        <Button size="sm" variant="ghost" icon="description" onClick={() => setPresets((list) => [...list, { ...p, id: `p${Date.now()}`, name: `${p.name} 副本`, isDefault: false }])}>
+                          复制
+                        </Button>
+                        {!p.isDefault ? (
+                          <Button size="sm" variant="ghost" icon="delete" onClick={() => setPresets((list) => list.filter((x) => x.id !== p.id))}>
+                            删除
+                          </Button>
+                        ) : null}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card style={{ padding: '2px 0' }}>
+                <SettingRow
+                  icon="image"
+                  title="图片保存格式"
+                  control={
+                    <RadioGroup
+                      value={imageFormat}
+                      onChange={(v) => setImageFormat(v as 'lossy' | 'lossless')}
+                      options={[
+                        { value: 'lossy', label: '有损 WebP（默认）' },
+                        { value: 'lossless', label: '无损 WebP' },
+                      ]}
+                    />
+                  }
+                />
+              </Card>
+            </div>
+          ) : null}
         </section>
 
         <section>
@@ -315,6 +536,7 @@ export function SettingsPage() {
           </Card>
         </section>
       </div>
+      {editing ? <PresetEditor preset={editing} onClose={() => setEditing(null)} onSave={savePreset} /> : null}
     </Page>
   )
 }

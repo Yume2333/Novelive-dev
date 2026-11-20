@@ -25,7 +25,7 @@ export interface Chapter {
   index: number
   title: string
   status: ChapterStatus
-  /** 制作中章节当前在做的步骤，如“写剧本 3/5 场景”“出图 12/20” */
+  /** 制作中章节当前在做的步骤，如“写”“审稿”“演出与出图 12/20” */
   step?: string
   /** 需要处理的原因（用户能看懂的一句话） */
   issue?: string
@@ -65,6 +65,18 @@ export interface Work {
   previewProgress?: { done: number; total: number; stage: string }
   presets: { strength: '忠实' | '平衡' | '精简'; density: '宽松' | '标准' | '激进' }
   requirement: string
+  /** 写手预设：全局预设 id，或 "custom" 表示在默认上改了几项 */
+  writerPreset?: string
+  /** 审稿开关（默认关）：剧本定稿后先审稿一轮再演出 */
+  reviewEnabled?: boolean
+  /** 已有参考图时也停在角色设定确认点 */
+  pauseOnRefImages?: boolean
+  /** 出图放大到的分辨率（默认 2K） */
+  outputResolution?: '2K' | '4K'
+  /** 作品自定义标记：名称、逐字开关与覆盖样式 */
+  customMarks?: { id: string; name: string; perChar: boolean; css: string }[]
+  /** 本作品规则（创作者写给各角色看的硬要求） */
+  rules?: { id: string; text: string }[]
 }
 
 export interface Volume {

@@ -30,32 +30,34 @@ export const extraRefImages: SourceFile[] = [
   { name: '参考图-码头-黄昏.png', kind: 'image', size: '580 KB', state: '已就绪' },
 ]
 
-/** 章节划分核对用的模拟结果 */
+/** 章节划分核对用的模拟结果：这一份原文没有分卷，所以只有平铺的章节 */
 export interface DraftChapter {
   id: number
   title: string
-  volumeId: number
 }
 
+/** 整理角色按剧情段落建议的分卷：卷名 + 起止章（按章节数组下标，闭区间） */
 export interface DraftVolume {
   id: number
   title: string
+  from: number
+  to: number
 }
 
 export const draftVolumes: DraftVolume[] = [
-  { id: 1, title: '第一卷' },
-  { id: 2, title: '第二卷' },
+  { id: 1, title: '雾起', from: 0, to: 4 },
+  { id: 2, title: '回航', from: 5, to: 7 },
 ]
 
 export const draftChapters: DraftChapter[] = [
-  { id: 1, title: '码头的雾', volumeId: 1 },
-  { id: 2, title: '未署名的信', volumeId: 1 },
-  { id: 3, title: '灯塔看守人', volumeId: 1 },
-  { id: 4, title: '退潮之后', volumeId: 1 },
-  { id: 5, title: '旧航海图', volumeId: 1 },
-  { id: 6, title: '风暴前夜', volumeId: 2 },
-  { id: 7, title: '沉没的回声', volumeId: 2 },
-  { id: 8, title: '雾散时分', volumeId: 2 },
+  { id: 1, title: '码头的雾' },
+  { id: 2, title: '未署名的信' },
+  { id: 3, title: '灯塔看守人' },
+  { id: 4, title: '退潮之后' },
+  { id: 5, title: '旧航海图' },
+  { id: 6, title: '风暴前夜' },
+  { id: 7, title: '沉没的回声' },
+  { id: 8, title: '雾散时分' },
 ]
 
 export const detectedInfo = {

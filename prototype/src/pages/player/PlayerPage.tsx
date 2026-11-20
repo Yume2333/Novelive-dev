@@ -318,6 +318,7 @@ export function PlayerPage() {
   const [boxOpacity, setBoxOpacity] = useState(0.78)
   const [searchParams] = useSearchParams()
   const boxParam = searchParams.get('box')
+  const debug = searchParams.get('debug') === '1'
   const [boxStyle, setBoxStyle] = useState<'b' | 'c'>(boxParam === 'c' ? 'c' : 'b')
   useEffect(() => {
     if (boxParam === 'b' || boxParam === 'c') setBoxStyle(boxParam)
@@ -337,6 +338,7 @@ export function PlayerPage() {
   const [confirmExit, setConfirmExit] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [entered, setEntered] = useState(false)
+  const [showSafeZone, setShowSafeZone] = useState(false)
 
 
   const [readSet, setReadSet] = useState<Set<string>>(() => seedRead(work, readThrough))
@@ -490,17 +492,23 @@ export function PlayerPage() {
     }, 1400)
   }
 
-  /* Esc / 右键打开系统菜单 */
+  /* Esc / 右键打开系统菜单；PageUp 回滚一句、PageDown 开记录（galgame 惯例） */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setConfirmExit(false)
         setScreen((s) => (s === 'none' ? 'menu' : 'none'))
+      } else if (e.key === 'PageUp') {
+        e.preventDefault()
+        rollback()
+      } else if (e.key === 'PageDown') {
+        e.preventDefault()
+        setScreen((s) => (s === 'backlog' ? 'none' : 'backlog'))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [rollback])
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) {
@@ -605,6 +613,7 @@ export function PlayerPage() {
         if (!skip) setAuto(false)
       }, skip)}
       <span className="nl-qsep" />
+      {qbtn('rollback', '回滚', rollback)}
       {qbtn('log', '记录', () => setScreen('backlog'))}
       {qbtn('chapters', '章节', () => setScreen('chapters'))}
       {qbtn('settings', '设置', () => setScreen('settings'))}
@@ -704,8 +713,9 @@ export function PlayerPage() {
       }}
       onWheel={(e) => {
         if (screen !== 'none' || uiHidden) return
-        if (e.deltaY < 0) setScreen('backlog')
-        else if (e.deltaY > 0 && lineDone && lineIdx === 0) rollback()
+        // 滚轮向上回滚一句（galgame 惯例），向下推进；记录走按钮 / PageDown
+        if (e.deltaY < 0) rollback()
+        else if (e.deltaY > 0) advance()
       }}
     >
       {/* ======== 舞台 ======== */}
@@ -744,6 +754,12 @@ export function PlayerPage() {
                 </div>
               ) : null}
           </div>
+          {/* 4:3 安全区（?debug=1 后在设置里打开）：主体落在这个虚线框内，横屏裁切不掉 */}
+          {showSafeZone ? (
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '75%', height: '100%', border: '2px dashed rgba(238,242,246,0.6)', borderRadius: 4, pointerEvents: 'none', zIndex: 35 }}>
+              <span style={{ position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', fontSize: 11, letterSpacing: '0.2em', color: 'rgba(238,242,246,0.75)', fontFamily: SERIF, background: 'rgba(8,11,15,0.5)', padding: '2px 10px', borderRadius: 999 }}>4:3 安全区</span>
+            </div>
+          ) : null}
         </div>
 
         {/* 进场黑幕 */}
@@ -1036,23 +1052,39 @@ export function PlayerPage() {
             <>
               {screenTitle('记录', 'log')}
               <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {lines.slice(0, lineIdx + 1).map((l, i) => (
-                  <button key={i} className="nl-row" onClick={() => { setScreen('none'); goTo(i) }}>
-                    {l.kind === 'caption' ? (
-                      <span style={{ fontFamily: SERIF, fontSize: 12, color: 'var(--nl-text-dim)', letterSpacing: '0.18em' }}>字幕 · {l.caption!.title}</span>
-                    ) : (
-                      <div>
-                        {(l.charId === 'xiu' && l.name === '神秘少女' && revealed ? '凛' : l.name) ? (
-                          <div style={{ fontFamily: SERIF, fontSize: 12, fontWeight: 700, color: 'var(--nl-accent-strong)', marginBottom: 3, letterSpacing: '0.1em' }}>
-                            {l.charId === 'xiu' && l.name === '神秘少女' && revealed ? '凛' : l.name}
-                            {l.kind === 'inner' ? '（心声）' : ''}
-                          </div>
-                        ) : null}
-                        <div style={{ fontFamily: SERIF, fontSize: 14, color: 'var(--nl-text)', lineHeight: 1.8 }}>{lineText(l)}</div>
+                {/* 跨章记录：每章只列出已读的句，点一句跳回那一章那一句 */}
+                {playable.map((c) => {
+                  const sc = scriptForChapter(work.id, c.id)
+                  if (!sc) return null
+                  const readLines = sc.lines
+                    .map((l, i) => ({ l, i }))
+                    .filter(({ i }) => readSet.has(`${c.id}:${i}`) || (c.id === chapter.id && i <= lineIdx))
+                  if (!readLines.length) return null
+                  return (
+                    <div key={c.id}>
+                      <div style={{ fontFamily: SERIF, fontSize: 11, letterSpacing: '0.24em', color: 'var(--nl-text-dim)', padding: '16px 10px 8px', borderTop: c.id === playable[0]?.id ? 'none' : `1px solid ${accent}22` }}>
+                        第 {c.index} 章 · {c.title}
                       </div>
-                    )}
-                  </button>
-                ))}
+                      {readLines.map(({ l, i }) => (
+                        <button key={i} className="nl-row" onClick={() => { setScreen('none'); if (c.id === chapter.id) goTo(i); else enterChapter(c.index, i) }}>
+                          {l.kind === 'caption' ? (
+                            <span style={{ fontFamily: SERIF, fontSize: 12, color: 'var(--nl-text-dim)', letterSpacing: '0.18em' }}>字幕 · {l.caption!.title}</span>
+                          ) : (
+                            <div>
+                              {(l.charId === 'xiu' && l.name === '神秘少女' && revealed ? '凛' : l.name) ? (
+                                <div style={{ fontFamily: SERIF, fontSize: 12, fontWeight: 700, color: 'var(--nl-accent-strong)', marginBottom: 3, letterSpacing: '0.1em' }}>
+                                  {l.charId === 'xiu' && l.name === '神秘少女' && revealed ? '凛' : l.name}
+                                  {l.kind === 'inner' ? '（心声）' : ''}
+                                </div>
+                              ) : null}
+                              <div style={{ fontFamily: SERIF, fontSize: 14, color: 'var(--nl-text)', lineHeight: 1.8 }}>{lineText(l)}</div>
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })}
               </div>
             </>,
           )
@@ -1109,6 +1141,8 @@ export function PlayerPage() {
                 {([
                   ['只跳过已读', skipReadOnly, () => setSkipReadOnly((v) => !v)] as const,
                   ['全屏', isFullscreen, toggleFullscreen] as const,
+                  // 开发调试项：只有 ?debug=1 才显示
+                  ...(debug ? [['显示 4:3 安全区', showSafeZone, () => setShowSafeZone((v) => !v)] as const] : []),
                 ]).map(([label, on, fn]) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontFamily: SERIF, fontSize: 14.5, color: 'var(--nl-text)', letterSpacing: '0.12em' }}>{label}</span>

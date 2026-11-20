@@ -6,21 +6,8 @@ import { EmptyState } from '../../components/Form'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import { findSeries, findVolume, findWork } from '../../mock/library'
+import { firstChapterScenes as scenes } from '../../mock/confirm'
 
-// 第一章的占位场景缩略图：CSS 渐变，不用位图
-const sceneArts = [
-  'linear-gradient(180deg, #e8a87c 0%, #f2d3ac 55%, #f7ead2 100%)',
-  'linear-gradient(180deg, #5a6a80 0%, #8fa0b8 60%, #d4dde8 100%)',
-  'linear-gradient(160deg, #b85c48 0%, #e0926a 50%, #f2cf9e 100%)',
-  'linear-gradient(180deg, #3f4a56 0%, #6d7f8e 55%, #b8c6d0 100%)',
-]
-
-const scenes = [
-  { title: '放学后的旧教学楼', desc: '夕阳从走廊尽头照进来，澪背着书包站在音乐教室门口。', images: '2 张背景 · 1 张立绘' },
-  { title: '音乐教室', desc: '一架旧钢琴。澪推开门，琴声停了。', images: '1 张背景 · 2 张立绘' },
-  { title: '走廊', desc: '她追出去，走廊里没有人，只有蝉鸣。', images: '1 张背景 · 1 张 CG' },
-  { title: '回家路上', desc: '钢琴声在身后又响起来，她没有回头。', images: '1 张背景 · 1 张 CG' },
-]
 
 export function ConfirmFirstPage() {
   const { id } = useParams()
@@ -77,7 +64,7 @@ export function ConfirmFirstPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
         {scenes.map((s, i) => (
           <Card key={s.title} style={{ overflow: 'hidden' }}>
-            <div style={{ height: 104, background: sceneArts[i % sceneArts.length], position: 'relative' }}>
+            <div style={{ height: 104, background: s.art, position: 'relative' }}>
               <span style={{ position: 'absolute', left: 10, bottom: 8, padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--scrim)', color: 'var(--color-on-primary)', fontSize: 11 }}>
                 场景 {i + 1}
               </span>

@@ -12,8 +12,6 @@ import { useTheme, type ThemeMode } from './theme'
 const SIDEBAR_WIDTH = 248
 const LAST_WORK_KEY = 'novelive.lastWork'
 const CHAT_WIDTH = 420
-/** 面板停靠后主区域至少要留这么宽，否则改为盖在上面 */
-const MIN_DOCKED_MAIN = 760
 
 // ---- 外壳状态：Novelive Agent 面板 ----
 
@@ -341,19 +339,6 @@ export function AppShell() {
   const [chatContext, setChatContext] = useState<string | null>(null)
   const showChat = chatOpen && work?.kind === 'project'
 
-  // 主区域够宽时面板“停靠”：主区域让出面板的宽度，页面在剩下的空间里重新居中；
-  // 太窄时面板盖在上面，避免页面被挤到不能用
-  const [areaWidth, setAreaWidth] = useState(0)
-  const areaRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = areaRef.current
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => setAreaWidth(entry.contentRect.width))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-  const docked = showChat && !chatFull && areaWidth - CHAT_WIDTH - 24 >= MIN_DOCKED_MAIN
-
   // 所有页面共用一个滚动容器，换页时回到顶部
   const { pathname } = useLocation()
   const mainRef = useRef<HTMLElement>(null)
@@ -421,9 +406,9 @@ export function AppShell() {
           </div>
         </aside>
 
-        {/* 主区域；Agent 面板停靠在右侧时主区域让出宽度，窄屏或全屏时面板盖在主区域上 */}
-        <div ref={areaRef} style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-          <main ref={mainRef} style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: docked ? CHAT_WIDTH + 12 : 0, overflow: 'auto', transition: 'right 0.22s ease' }}>
+        {/* 主区域；Agent 面板盖在右侧，不挤压页面；全屏时盖住整个主区域 */}
+        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+          <main ref={mainRef} style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
             <Outlet />
           </main>
 
@@ -439,9 +424,9 @@ export function AppShell() {
                 width: chatFull ? undefined : CHAT_WIDTH,
                 maxWidth: 'calc(100% - 24px)',
                 zIndex: 50,
-                background: docked ? 'var(--panel-75)' : 'var(--veil-95)',
+                background: 'var(--veil-95)',
                 borderRadius: 'var(--radius-2xl)',
-                boxShadow: docked ? 'var(--shadow-glass)' : 'var(--shadow-glass), 0 16px 48px var(--scrim)',
+                boxShadow: 'var(--shadow-glass), 0 16px 48px var(--scrim)',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',

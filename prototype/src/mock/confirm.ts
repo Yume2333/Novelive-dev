@@ -161,3 +161,42 @@ const fallback: WorkVisualCandidates = {
 export function findVisualCandidates(work: Work): WorkVisualCandidates {
   return visualCandidates[work.id] ?? fallback
 }
+
+// ---- 确认点 2：第一章成品 ----
+
+export interface FirstChapterScene {
+  title: string
+  desc: string
+  /** 图片清单说明（如「2 张背景 · 1 张立绘」） */
+  images: string
+  /** 场景缩略图：CSS 渐变占位，成品时换成真图 */
+  art: string
+}
+
+/** 第一章的四个场景（《夏日回响》，确认点 2 页面专用） */
+export const firstChapterScenes: FirstChapterScene[] = [
+  {
+    title: '放学后的旧教学楼',
+    desc: '夕阳从走廊尽头照进来，澪背着书包站在音乐教室门口。',
+    images: '2 张背景 · 1 张立绘',
+    art: 'linear-gradient(180deg, #e8a87c 0%, #f2d3ac 55%, #f7ead2 100%)',
+  },
+  {
+    title: '音乐教室',
+    desc: '一架旧钢琴。澪推开门，琴声停了。',
+    images: '1 张背景 · 2 张立绘',
+    art: 'linear-gradient(180deg, #5a6a80 0%, #8fa0b8 60%, #d4dde8 100%)',
+  },
+  {
+    title: '走廊',
+    desc: '她追出去，走廊里没有人，只有蝉鸣。',
+    images: '1 张背景 · 1 张 CG',
+    art: 'linear-gradient(160deg, #b85c48 0%, #e0926a 50%, #f2cf9e 100%)',
+  },
+  {
+    title: '回家路上',
+    desc: '钢琴声在身后又响起来，她没有回头。',
+    images: '1 张背景 · 1 张 CG',
+    art: 'linear-gradient(180deg, #3f4a56 0%, #6d7f8e 55%, #b8c6d0 100%)',
+  },
+]

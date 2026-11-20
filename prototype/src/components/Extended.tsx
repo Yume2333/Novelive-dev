@@ -1,6 +1,7 @@
 import { useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, Icon } from './Button'
+import { IconButton } from './IconButton'
 import { Modal } from './Modal'
 
 /* 扩展控件库 — 完整产品开发用。全部遵守 DESIGN.md：tokens 变量、三种质感、克制动效 */
@@ -92,6 +93,7 @@ export function Tooltip({ text, children }: { text: string; children: ReactNode 
     </span>
   )
 }
+
 
 /** 复选框 */
 export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: () => void; label?: ReactNode }) {
@@ -199,9 +201,7 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
         }}
       />
       {value ? (
-        <button onClick={() => onChange('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', color: 'var(--color-outline)' }}>
-          <Icon name="close" size={14} />
-        </button>
+        <IconButton name="清除" icon="close" size={22} iconSize={14} onClick={() => onChange('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }} />
       ) : null}
     </div>
   )
@@ -287,9 +287,7 @@ export function Drawer({ open, title, onClose, children, width = 380 }: {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 10px' }}>
           <h4 className="headline" style={{ fontSize: 17 }}>{title}</h4>
-          <button onClick={onClose} style={{ display: 'flex', padding: 6, borderRadius: 'var(--radius-full)', color: 'var(--color-on-surface-variant)' }}>
-            <Icon name="close" size={19} />
-          </button>
+          <IconButton name="关闭" icon="close" onClick={onClose} />
         </div>
         <div style={{ flex: 1, overflow: 'auto', padding: '8px 20px 20px' }}>{children}</div>
       </div>

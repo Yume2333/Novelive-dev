@@ -15,6 +15,7 @@ import {
   fileKindIcon,
   initialSourceFiles,
   type DraftChapter,
+  type DraftVolume,
   type SourceFile,
 } from '../../mock/import'
 import { series, volumes } from '../../mock/library'
@@ -179,24 +180,38 @@ function StepReview({
   setInfo,
   chapters,
   setChapters,
+  vols,
+  setVols,
 }: {
   info: { title: string; author: string; sourceLanguage: string; workLanguage: string }
   setInfo: (i: typeof info) => void
   chapters: DraftChapter[]
   setChapters: (c: DraftChapter[]) => void
+  vols: DraftVolume[]
+  setVols: (v: DraftVolume[]) => void
 }) {
+  // 章的合并 / 拆分会让章节数组变长变短：后面每一卷的 from/to 都要跟着挪
+  const shift = (fromIdx: number, delta: number) =>
+    setVols(
+      vols
+        .map((v) => ({ ...v, from: v.from > fromIdx ? v.from + delta : v.from, to: v.to >= fromIdx ? v.to + delta : v.to }))
+        .filter((v) => v.from <= v.to),
+    )
+
   const mergeDown = (id: number) => {
     const idx = chapters.findIndex((c) => c.id === id)
     const a = chapters[idx]
     const b = chapters[idx + 1]
     const merged = { ...a, title: `${a.title} · ${b.title}` }
+    shift(idx + 1, -1)
     setChapters([...chapters.slice(0, idx), merged, ...chapters.slice(idx + 2)])
   }
   const split = (id: number) => {
     const idx = chapters.findIndex((c) => c.id === id)
     if (idx < 0) return
     const c = chapters[idx]
-    const half: DraftChapter = { id: Math.max(...chapters.map((x) => x.id)) + 1, title: `${c.title}（下）`, volumeId: c.volumeId }
+    const half: DraftChapter = { id: Math.max(...chapters.map((x) => x.id)) + 1, title: `${c.title}（下）` }
+    shift(idx, 1)
     setChapters([
       ...chapters.slice(0, idx),
       { ...c, title: `${c.title}（上）` },
@@ -206,6 +221,32 @@ function StepReview({
   }
   const rename = (id: number, title: string) => {
     setChapters(chapters.map((c) => (c.id === id ? { ...c, title } : c)))
+  }
+
+  const moveBoundary = (id: number, delta: number) => {
+    const i = vols.findIndex((v) => v.id === id)
+    const next = vols[i + 1]
+    const to = Math.min(Math.max(vols[i].to + delta, vols[i].from), (next ? next.to : chapters.length) - 1)
+    setVols(vols.map((v, j) => (j === i ? { ...v, to } : j === i + 1 ? { ...v, from: to + 1 } : v)).filter((v) => v.from <= v.to))
+  }
+  const mergeVol = (id: number) => {
+    const idx = vols.findIndex((v) => v.id === id)
+    const a = vols[idx]
+    const b = vols[idx + 1]
+    if (!b) return
+    setVols([...vols.slice(0, idx), { ...a, title: a.title, to: b.to }, ...vols.slice(idx + 2)])
+  }
+  const splitVol = (id: number) => {
+    const idx = vols.findIndex((v) => v.id === id)
+    const v = vols[idx]
+    if (v.to - v.from < 1) return
+    const mid = v.from + Math.floor((v.to - v.from) / 2)
+    setVols([
+      ...vols.slice(0, idx),
+      { ...v, to: mid },
+      { id: Math.max(...vols.map((x) => x.id)) + 1, title: `${v.title}（下）`, from: mid + 1, to: v.to },
+      ...vols.slice(idx + 1),
+    ])
   }
 
   const smallBtn: CSSProperties = { display: 'flex', padding: 5, borderRadius: 'var(--radius-md)', color: 'var(--color-on-surface-variant)' }
@@ -228,10 +269,10 @@ function StepReview({
       </div>
 
       <div>
-        <SectionLabel>{`章节划分 · ${chapters.length} 章`}</SectionLabel>
+        <SectionLabel>{`分卷 · ${vols.length} 卷 ${chapters.length} 章`}</SectionLabel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {draftVolumes.map((vol) => {
-            const inVol = chapters.filter((c) => c.volumeId === vol.id)
+          {vols.map((vol, vi) => {
+            const inVol = chapters.slice(vol.from, vol.to + 1)
             if (!inVol.length) return null
             return (
               <div
@@ -243,12 +284,41 @@ function StepReview({
                   padding: 'var(--space-3) var(--space-4)',
                 }}
               >
-                <div className="label-caps label-caps-zh" style={{ color: 'var(--color-on-surface-variant)', marginBottom: 'var(--space-2)', fontSize: 11 }}>
-                  {vol.title} · {inVol.length} 章
+                <div className="hover-row" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                  <input
+                    style={{ ...inputStyle, padding: '5px 10px', fontSize: 12, width: 140, flexShrink: 0 }}
+                    value={vol.title}
+                    onChange={(e) => setVols(vols.map((v) => (v.id === vol.id ? { ...v, title: e.target.value } : v)))}
+                  />
+                  <span className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', fontSize: 11 }}>
+                    {`第 ${vol.from + 1}–${vol.to + 1} 章 · ${inVol.length} 章`}
+                  </span>
+                  <span className="row-actions" style={{ display: 'flex', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
+                    <Tooltip text="往下挪一章">
+                      <button style={{ ...smallBtn, opacity: vol.to < (vols[vi + 1]?.to ?? chapters.length - 1) ? 1 : 0.35 }} onClick={() => moveBoundary(vol.id, 1)}>
+                        <Icon name="arrow_downward" size={15} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip text="往上收一章">
+                      <button style={{ ...smallBtn, opacity: vol.to > vol.from ? 1 : 0.35 }} onClick={() => moveBoundary(vol.id, -1)}>
+                        <Icon name="arrow_upward" size={15} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip text="拆成两卷">
+                      <button style={{ ...smallBtn, opacity: vol.to - vol.from >= 1 ? 1 : 0.35 }} onClick={() => splitVol(vol.id)}>
+                        <Icon name="call_split" size={15} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip text={vi < vols.length - 1 ? '并入下一卷' : '已经是最后一卷'}>
+                      <button style={{ ...smallBtn, opacity: vi < vols.length - 1 ? 1 : 0.35 }} onClick={() => mergeVol(vol.id)}>
+                        <Icon name="merge" size={15} />
+                      </button>
+                    </Tooltip>
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                   {chapters.map((c, i) =>
-                    c.volumeId !== vol.id ? null : (
+                    i < vol.from || i > vol.to ? null : (
                       <div key={c.id} className="hover-row" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44, paddingRight: 'var(--space-2)', borderRadius: 'var(--radius-md)' }}>
                         <span className="label-caps" style={{ width: 22, color: 'var(--color-outline)', fontSize: 11, flexShrink: 0 }}>
                           {i + 1}
@@ -348,7 +418,7 @@ function StepSettings({
         }}
         onClick={() => setPauseOnRef(!pauseOnRef)}
       >
-        <span style={{ fontSize: 13, fontWeight: 600 }}>确认角色设定时停下选定</span>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>已有参考图时也停在角色设定</span>
         <Toggle on={pauseOnRef} onChange={() => {}} />
       </label>
     </div>
@@ -370,6 +440,7 @@ export function ImportPage() {
   })
   const [info, setInfo] = useState(detectedInfo)
   const [chapters, setChapters] = useState<DraftChapter[]>(draftChapters)
+  const [vols, setVols] = useState<DraftVolume[]>(draftVolumes)
   const [strength, setStrength] = useState('平衡')
   const [density, setDensity] = useState('标准')
   const [requirement, setRequirement] = useState('')
@@ -392,7 +463,7 @@ export function ImportPage() {
         {step === 0 ? (
           <StepFiles files={files} setFiles={setFiles} folder={folder} setFolder={setFolder} placement={placement} setPlacement={setPlacement} />
         ) : step === 1 ? (
-          <StepReview info={info} setInfo={setInfo} chapters={chapters} setChapters={setChapters} />
+          <StepReview info={info} setInfo={setInfo} chapters={chapters} setChapters={setChapters} vols={vols} setVols={setVols} />
         ) : (
           <StepSettings
             strength={strength}

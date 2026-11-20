@@ -49,11 +49,14 @@ const panelStyle = {
   borderRadius: 'var(--radius-lg)',
 } as const
 
+// 舞台上压字的深色底：tokens 里没有，用 --stage-text 调出来（舞台例外之外的 UI 色走 tokens）
+const STAGE_DIM = 'color-mix(in srgb, var(--stage-text) 10%, rgba(0,0,0,0.6))'
+
 const dimBtn = {
   display: 'flex',
   padding: 6,
   borderRadius: 'var(--radius-full)',
-  background: 'rgba(13,20,28,0.6)',
+  background: STAGE_DIM,
   color: 'var(--stage-accent)',
 } as const
 
@@ -76,11 +79,11 @@ function segStyle(mark: string, base: 'stage' | 'list', customs: CustomMark[]): 
       return {
         display: 'inline-block',
         transform: 'skewX(-6deg)',
-        textShadow: '1px 0 rgba(255,96,96,0.75), -1px 0 rgba(96,180,255,0.75)',
+        textShadow: '1px 0 color-mix(in srgb, var(--color-error) 80%, transparent), -1px 0 color-mix(in srgb, var(--stage-accent) 80%, transparent)',
       }
     case 'hl':
       return {
-        background: base === 'stage' ? 'rgba(143,180,212,0.28)' : 'var(--color-tertiary-fixed)',
+        background: base === 'stage' ? 'color-mix(in srgb, var(--stage-accent) 28%, transparent)' : 'var(--color-tertiary-fixed)',
         padding: '0 3px',
         borderRadius: 'var(--radius-sm)',
       }
@@ -89,7 +92,7 @@ function segStyle(mark: string, base: 'stage' | 'list', customs: CustomMark[]): 
       if (custom) {
         // 自定义标记样式由作品定义，这里给「信件」一类标记统一的信纸感
         return {
-          background: base === 'stage' ? 'rgba(232,238,244,0.14)' : 'var(--color-secondary-container)',
+          background: base === 'stage' ? 'color-mix(in srgb, var(--stage-text) 14%, transparent)' : 'var(--color-secondary-container)',
           borderBottom: `1px dashed ${accent}`,
           padding: '0 4px',
           borderRadius: 'var(--radius-sm)',
@@ -175,7 +178,8 @@ function CastSilhouette({ name, expr, position, speaking, tint, onClick }: {
   tint: number
   onClick: () => void
 }) {
-  const tints = ['143,180,212', '150,205,190', '216,190,160']
+  // 角色 tint 走 token：主色 / 第三色 / 作品主色各借一点
+  const tints = ['var(--stage-accent)', 'var(--color-success)', 'var(--color-on-secondary-container)']
   const c = tints[tint % tints.length]
   const left = position === 'left' ? '27%' : position === 'right' ? '73%' : '50%'
   return (
@@ -191,16 +195,16 @@ function CastSilhouette({ name, expr, position, speaking, tint, onClick }: {
         height: '72%',
         padding: 0,
         background: speaking
-          ? `linear-gradient(180deg, rgba(${c},0.55), rgba(${c},0.12))`
-          : `linear-gradient(180deg, rgba(${c},0.22), rgba(${c},0.05))`,
+          ? `linear-gradient(180deg, color-mix(in srgb, ${c} 55%, transparent), color-mix(in srgb, ${c} 12%, transparent))`
+          : `linear-gradient(180deg, color-mix(in srgb, ${c} 22%, transparent), color-mix(in srgb, ${c} 5%, transparent))`,
         borderRadius: '48% 48% 0 0 / 26% 26% 0 0',
-        border: `1px solid rgba(${c},${speaking ? 0.7 : 0.28})`,
+        border: `1px solid color-mix(in srgb, ${c} ${speaking ? 70 : 28}%, transparent)`,
         filter: speaking ? 'none' : 'brightness(0.72)',
         transition: 'all 0.3s ease',
         cursor: 'pointer',
       }}
     >
-      <Icon name="person" size={30} style={{ position: 'absolute', top: '9%', left: '50%', transform: 'translateX(-50%)', color: 'rgba(232,238,244,0.5)' }} />
+      <Icon name="person" size={30} style={{ position: 'absolute', top: '9%', left: '50%', transform: 'translateX(-50%)', color: 'color-mix(in srgb, var(--stage-text) 50%, transparent)' }} />
       <span
         className="label-caps label-caps-zh"
         style={{
@@ -208,8 +212,8 @@ function CastSilhouette({ name, expr, position, speaking, tint, onClick }: {
           top: -28,
           left: '50%',
           transform: 'translateX(-50%)',
-          background: 'rgba(13,20,28,0.78)',
-          color: `rgba(${c},1)`,
+          background: STAGE_DIM,
+          color: c,
           padding: '3px 10px',
           borderRadius: 'var(--radius-full)',
           whiteSpace: 'nowrap',
@@ -279,7 +283,7 @@ export function EditorPage() {
   const shell = useShell()
   const [searchParams] = useSearchParams()
 
-  const editable = useMemo(() => (work?.chapters ?? []).filter((c) => c.status === 'published'), [work])
+  const editable = useMemo(() => (work?.chapters ?? []).filter((c) => c.status === 'published' || c.status === 'attention'), [work])
   const castChars = useMemo<EditorCharacter[]>(
     () => (work ? (workCast[work.id] ?? ['lin', 'xi']).map((cid) => findCharacter(cid)!) : []),
     [work],
@@ -775,12 +779,12 @@ export function EditorPage() {
 
               {/* 场景名 / 句子位置 */}
               <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', gap: 6 }}>
-                <span className="label-caps label-caps-zh" style={{ background: 'rgba(13,20,28,0.7)', color: 'var(--stage-accent)', padding: '4px 10px', borderRadius: 'var(--radius-md)' }}>
+                <span className="label-caps label-caps-zh" style={{ background: STAGE_DIM, color: 'var(--stage-accent)', padding: '4px 10px', borderRadius: 'var(--radius-md)' }}>
                   {scene.title}
                 </span>
               </div>
               <div style={{ position: 'absolute', top: 10, right: 10 }}>
-                <span className="label-caps" style={{ background: 'rgba(13,20,28,0.7)', color: 'var(--stage-accent)', padding: '4px 10px', borderRadius: 'var(--radius-md)', fontSize: 10 }}>
+                <span className="label-caps" style={{ background: STAGE_DIM, color: 'var(--stage-accent)', padding: '4px 10px', borderRadius: 'var(--radius-md)', fontSize: 10 }}>
                   {scene.lines.findIndex((l) => l.id === line.id) + 1} / {scene.lines.length}
                 </span>
               </div>
@@ -788,7 +792,7 @@ export function EditorPage() {
               {/* 字幕或文本框 */}
               {line.kind === 'caption' ? (
                 <div style={{ position: 'absolute', top: '38%', left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
-                  <span style={{ background: 'rgba(13,20,28,0.72)', border: '1px solid var(--stage-border)', color: 'var(--stage-text)', padding: '8px 22px', borderRadius: 'var(--radius-md)', fontSize: 16, letterSpacing: '0.2em', fontFamily: 'var(--font-display)' }}>
+                  <span style={{ background: 'color-mix(in srgb, var(--stage-text) 10%, rgba(0,0,0,0.72))', border: '1px solid var(--stage-border)', color: 'var(--stage-text)', padding: '8px 22px', borderRadius: 'var(--radius-md)', fontSize: 16, letterSpacing: '0.2em', fontFamily: 'var(--font-display)' }}>
                     <RichText src={playing ? truncateRich(curText, typedLen) : curText} base="stage" customs={marks} />
                     {playing ? <span style={{ display: 'inline-block', width: 2, height: '1em', background: 'var(--stage-accent)', verticalAlign: '-2px', marginLeft: 1, animation: 'soft-pulse 1s infinite alternate' }} /> : null}
                   </span>
@@ -1309,7 +1313,7 @@ export function EditorPage() {
       <Modal open={regenPick !== null} title={regenPick === 'portrait' ? `立绘 · ${speaker?.name ?? ''} / ${outfitLabel ?? ''} / ${exprLabel}` : `背景 · ${scene.background.name}`} onClose={() => setRegenPick(null)} width={560}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {(regenPick === 'portrait'
-            ? ['143,180,212', '150,205,190', '216,190,160'].map((c, i) => ({ g: `linear-gradient(180deg, rgba(${c},0.5), rgba(${c},0.12))`, i }))
+            ? ['var(--stage-accent)', 'var(--color-success)', 'var(--color-on-secondary-container)'].map((c, i) => ({ g: `linear-gradient(180deg, color-mix(in srgb, ${c} 50%, transparent), color-mix(in srgb, ${c} 12%, transparent))`, i }))
             : scene.background.variants.map((g, i) => ({ g, i }))
           ).map((v) => (
             <button
@@ -1325,7 +1329,7 @@ export function EditorPage() {
               {regenPick === 'portrait' ? (
                 <span style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '40%', height: '78%', background: v.g, borderRadius: '48% 48% 0 0 / 26% 26% 0 0' }} />
               ) : null}
-              <span className="label-caps" style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(13,20,28,0.7)', color: 'var(--stage-accent)', padding: '2px 8px', borderRadius: 'var(--radius-sm)', fontSize: 10 }}>
+              <span className="label-caps" style={{ position: 'absolute', top: 6, left: 6, background: STAGE_DIM, color: 'var(--stage-accent)', padding: '2px 8px', borderRadius: 'var(--radius-sm)', fontSize: 10 }}>
                 候选 {v.i + 1}
               </span>
             </button>

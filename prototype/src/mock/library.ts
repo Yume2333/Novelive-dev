@@ -44,7 +44,7 @@ export const works: Work[] = [
     workLanguage: '简体中文',
     chapters: chapters(wugangTitles, (i) => {
       if (i <= 5) return { status: 'published', staleImages: i === 3 ? 2 : undefined }
-      if (i === 6) return { status: 'producing', step: '出图 12/20' }
+      if (i === 6) return { status: 'producing', step: '演出与出图 12/20' }
       if (i === 7) return { status: 'attention', issue: '两张背景没画出来，先用了占位图' }
       if (i === 12) return { priority: true }
       return {}
@@ -53,6 +53,18 @@ export const works: Work[] = [
     version: 1,
     presets: { strength: '平衡', density: '标准' },
     requirement: '保留凛的口头禅“算了，先送信”。海边场景多用远景。',
+    writerPreset: 'default',
+    reviewEnabled: false,
+    pauseOnRefImages: true,
+    outputResolution: '2K',
+    customMarks: [
+      { id: 'letter', name: '信件', perChar: false, css: '' },
+      { id: 'tide', name: '潮声', perChar: true, css: '.mark-tide { color: #4a7f9e; } .mark-tide span { display: inline-block; }' },
+    ],
+    rules: [
+      { id: 'r1', text: '凛的口头禅只在她自己说话时出现，旁白不用。' },
+      { id: 'r2', text: '海边的戏不写晴天。' },
+    ],
   },
   {
     id: 'dengta',

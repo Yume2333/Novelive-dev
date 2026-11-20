@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import type { CSSProperties } from 'react'
 
-/* 播放器图标 — lucide-react，strokeWidth 1.5，统一大小 18 */
+/* 播放器图标 — lucide-react，strokeWidth 1.8，统一大小 18 */
 export type PlayerIconName =
   | 'quicksave' | 'quickload' | 'save' | 'load' | 'auto' | 'skip' | 'log' | 'chapters' | 'settings' | 'hide'
   | 'menu' | 'rollback' | 'fullscreen' | 'exitFullscreen' | 'edit' | 'exit' | 'close' | 'pageLeft' | 'pageRight' | 'next' | 'play' | 'back'
@@ -56,5 +56,5 @@ const map: Record<PlayerIconName, LucideIcon> = {
 
 export function PlayerIcon({ name, size = 18, style }: { name: PlayerIconName; size?: number; style?: CSSProperties }) {
   const C = map[name]
-  return <C size={size} strokeWidth={1.5} style={{ display: 'block', flexShrink: 0, ...style }} aria-hidden />
+  return <C size={size} strokeWidth={1.8} style={{ display: 'block', flexShrink: 0, ...style }} aria-hidden />
 }

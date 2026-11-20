@@ -3,7 +3,7 @@ import type { Work } from './types'
 // 用量统计的 mock 记录（页面专用）。
 // 一个桶 = 某天某作品某阶段的一次汇总；面板按作品 / 阶段 / 模型 / 天 / 月过滤聚合。
 
-export type UsageStage = '全书预览' | '综合' | '剧本' | '出图' | '对话'
+export type UsageStage = '全书预览' | '综合' | '写剧本' | '审稿' | '演出与出图' | '对话'
 
 export interface UsageBucket {
   date: string // YYYY-MM-DD
@@ -20,39 +20,45 @@ export interface UsageBucket {
   pricePerImage?: number
 }
 
-export const usageStages: UsageStage[] = ['全书预览', '综合', '剧本', '出图', '对话']
+export const usageStages: UsageStage[] = ['全书预览', '综合', '写剧本', '审稿', '演出与出图', '对话']
 
 const seed: UsageBucket[] = [
-  // 雾港来信：制作中，剧本 + 出图为主
-  { date: '2026-11-15', workId: 'wugang', stage: '剧本', model: 'Claude Sonnet 4.6', textCalls: 38, textChars: 412_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-15', workId: 'wugang', stage: '出图', model: 'gpt-image-1', textCalls: 0, textChars: 0, images: 18, pricePerImage: 0.28 },
-  { date: '2026-11-16', workId: 'wugang', stage: '剧本', model: 'Claude Sonnet 4.6', textCalls: 44, textChars: 506_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-16', workId: 'wugang', stage: '出图', model: 'gpt-image-1', textCalls: 0, textChars: 0, images: 22, pricePerImage: 0.28 },
-  { date: '2026-11-17', workId: 'wugang', stage: '剧本', model: 'Claude Sonnet 4.6', textCalls: 29, textChars: 355_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-17', workId: 'wugang', stage: '对话', model: 'Claude Sonnet 4.6', textCalls: 9, textChars: 64_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-18', workId: 'wugang', stage: '剧本', model: 'Claude Sonnet 4.6', textCalls: 51, textChars: 610_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-18', workId: 'wugang', stage: '出图', model: 'gpt-image-1', textCalls: 0, textChars: 0, images: 15, pricePerImage: 0.28 },
-  { date: '2026-11-19', workId: 'wugang', stage: '剧本', model: 'Claude Sonnet 4.6', textCalls: 33, textChars: 401_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-19', workId: 'wugang', stage: '出图', model: 'gpt-image-1', textCalls: 0, textChars: 0, images: 12, pricePerImage: 0.28 },
-  { date: '2026-11-20', workId: 'wugang', stage: '剧本', model: 'Claude Sonnet 4.6', textCalls: 12, textChars: 138_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-20', workId: 'wugang', stage: '出图', model: 'gpt-image-1', textCalls: 0, textChars: 0, images: 8, pricePerImage: 0.28 },
-  { date: '2026-11-20', workId: 'wugang', stage: '对话', model: 'Claude Sonnet 4.6', textCalls: 4, textChars: 22_000, images: 0, pricePerKChar: 0.021 },
+  // 雾港来信：制作中，写剧本 + 演出与出图为主（这部作品开了审稿）
+  { date: '2026-11-15', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 38, textChars: 412_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-15', workId: 'wugang', stage: '演出与出图', model: '主模型', textCalls: 14, textChars: 96_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-15', workId: 'wugang', stage: '演出与出图', model: '图片', textCalls: 0, textChars: 0, images: 18, pricePerImage: 0.28 },
+  { date: '2026-11-16', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 44, textChars: 506_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-16', workId: 'wugang', stage: '审稿', model: '主模型', textCalls: 12, textChars: 168_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-16', workId: 'wugang', stage: '演出与出图', model: '图片', textCalls: 0, textChars: 0, images: 22, pricePerImage: 0.28 },
+  { date: '2026-11-17', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 29, textChars: 355_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-17', workId: 'wugang', stage: '对话', model: '主模型', textCalls: 9, textChars: 64_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-18', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 51, textChars: 610_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-18', workId: 'wugang', stage: '演出与出图', model: '主模型', textCalls: 16, textChars: 104_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-18', workId: 'wugang', stage: '演出与出图', model: '图片', textCalls: 0, textChars: 0, images: 15, pricePerImage: 0.28 },
+  { date: '2026-11-19', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 33, textChars: 401_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-19', workId: 'wugang', stage: '审稿', model: '主模型', textCalls: 9, textChars: 122_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-19', workId: 'wugang', stage: '演出与出图', model: '视觉', textCalls: 6, textChars: 41_000, images: 0, pricePerKChar: 0.018 },
+  { date: '2026-11-19', workId: 'wugang', stage: '演出与出图', model: '图片', textCalls: 0, textChars: 0, images: 12, pricePerImage: 0.28 },
+  { date: '2026-11-20', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 12, textChars: 138_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-20', workId: 'wugang', stage: '演出与出图', model: '图片', textCalls: 0, textChars: 0, images: 8, pricePerImage: 0.28 },
+  { date: '2026-11-20', workId: 'wugang', stage: '对话', model: '主模型', textCalls: 4, textChars: 22_000, images: 0, pricePerKChar: 0.021 },
 
   // 潮汐手记：还在全书预览
-  { date: '2026-11-18', workId: 'chaoxi', stage: '全书预览', model: 'Qwen3-Flash', textCalls: 42, textChars: 690_000, images: 0 },
-  { date: '2026-11-19', workId: 'chaoxi', stage: '全书预览', model: 'Qwen3-Flash', textCalls: 56, textChars: 918_000, images: 0 },
-  { date: '2026-11-20', workId: 'chaoxi', stage: '全书预览', model: 'Qwen3-Flash', textCalls: 31, textChars: 474_000, images: 0 },
+  { date: '2026-11-18', workId: 'chaoxi', stage: '全书预览', model: '快速', textCalls: 42, textChars: 690_000, images: 0 },
+  { date: '2026-11-19', workId: 'chaoxi', stage: '全书预览', model: '快速', textCalls: 56, textChars: 918_000, images: 0 },
+  { date: '2026-11-20', workId: 'chaoxi', stage: '全书预览', model: '快速', textCalls: 31, textChars: 474_000, images: 0 },
 
   // 灯塔看守人：综合完成，停在确认点 1
-  { date: '2026-11-12', workId: 'dengta', stage: '全书预览', model: 'Qwen3-Flash', textCalls: 36, textChars: 588_000, images: 0 },
-  { date: '2026-11-13', workId: 'dengta', stage: '综合', model: 'Claude Sonnet 4.6', textCalls: 18, textChars: 242_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-14', workId: 'dengta', stage: '出图', model: 'gpt-image-1', textCalls: 0, textChars: 0, images: 9, pricePerImage: 0.28 },
+  { date: '2026-11-12', workId: 'dengta', stage: '全书预览', model: '快速', textCalls: 36, textChars: 588_000, images: 0 },
+  { date: '2026-11-13', workId: 'dengta', stage: '综合', model: '主模型', textCalls: 18, textChars: 242_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-14', workId: 'dengta', stage: '演出与出图', model: '主模型', textCalls: 5, textChars: 38_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-14', workId: 'dengta', stage: '演出与出图', model: '图片', textCalls: 0, textChars: 0, images: 9, pricePerImage: 0.28 },
 
   // 夏日残响：第一章做完，停在确认点 2
-  { date: '2026-11-10', workId: 'xiari', stage: '全书预览', model: 'Qwen3-Flash', textCalls: 22, textChars: 361_000, images: 0 },
-  { date: '2026-11-11', workId: 'xiari', stage: '综合', model: 'Claude Sonnet 4.6', textCalls: 15, textChars: 198_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-11', workId: 'xiari', stage: '剧本', model: 'Claude Sonnet 4.6', textCalls: 26, textChars: 302_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-12', workId: 'xiari', stage: '出图', model: 'gpt-image-1', textCalls: 0, textChars: 0, images: 14, pricePerImage: 0.28 },
+  { date: '2026-11-10', workId: 'xiari', stage: '全书预览', model: '快速', textCalls: 22, textChars: 361_000, images: 0 },
+  { date: '2026-11-11', workId: 'xiari', stage: '综合', model: '主模型', textCalls: 15, textChars: 198_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-11', workId: 'xiari', stage: '写剧本', model: '写作', textCalls: 26, textChars: 302_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-12', workId: 'xiari', stage: '演出与出图', model: '图片', textCalls: 0, textChars: 0, images: 14, pricePerImage: 0.28 },
 ]
 
 const month = (d: string) => d.slice(0, 7)
@@ -125,7 +131,8 @@ export function listUsage(f: UsageFilters, works: Work[]) {
   return { days, workIds, stages, metric, totals, titles }
 }
 
-export const usageModels = [...new Set(seed.map((b) => b.model))]
+// 五个模型槽位（应用设置里配置具体模型名）
+export const usageModels = ['快速', '主模型', '写作', '视觉', '图片']
 
 /** 给过滤器默认一个“全部”的时间段 */
 export const usageRange = (byMonth: boolean) => {

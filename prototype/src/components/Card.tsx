@@ -67,7 +67,7 @@ export function ProgressBar({ value, height = 8 }: { value: number; height?: num
         background: 'var(--color-surface-container-high)',
         borderRadius: 'var(--radius-full)',
         overflow: 'hidden',
-        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)',
+        boxShadow: 'var(--shadow-inset)',
       }}
     >
       <div

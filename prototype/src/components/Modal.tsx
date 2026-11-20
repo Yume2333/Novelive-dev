@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from './Button'
+import { IconButton } from './IconButton'
 
 export function Modal({
   open,
@@ -55,12 +56,7 @@ export function Modal({
           }}
         >
           <h4 className="headline" style={{ fontSize: 18 }}>{title}</h4>
-          <button
-            onClick={onClose}
-            style={{ display: 'flex', padding: 6, borderRadius: 'var(--radius-full)', color: 'var(--color-on-surface-variant)' }}
-          >
-            <Icon name="close" size={20} />
-          </button>
+          <IconButton name="关闭" icon="close" onClick={onClose} />
         </div>
         <div style={{ padding: '8px 24px 20px' }}>{children}</div>
         {footer ? (

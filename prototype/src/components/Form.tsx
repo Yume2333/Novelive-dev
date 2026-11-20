@@ -140,7 +140,7 @@ export function Tabs({
               padding: '8px 14px',
               borderRadius: 'var(--radius-md)',
               background: isActive ? 'var(--white-90)' : 'transparent',
-              boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              boxShadow: isActive ? 'var(--shadow-chip)' : 'none',
               color: isActive ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
               transition: 'all 0.15s ease',
             }}
@@ -180,7 +180,7 @@ export function Toggle({ on, onChange, title }: { on: boolean; onChange: () => v
           borderRadius: '50%',
           background: 'var(--color-surface-container-lowest)',
           transition: 'left 0.2s ease',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+          boxShadow: 'var(--shadow-raised)',
         }}
       />
     </button>

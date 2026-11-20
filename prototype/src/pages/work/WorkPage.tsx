@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Icon } from '../../components/Button'
 import { Card, ChapterStatusMark, ProgressBar } from '../../components/Card'
 import { Banner, Checkbox, Chip, Drawer, Pagination, RadioGroup } from '../../components/Extended'
-import { EmptyState } from '../../components/Form'
+import { EmptyState, Select, TextInput, Toggle, inputStyle, textareaStyle } from '../../components/Form'
+import { defaultWriterPresets } from '../../mock/settings'
 import { GradientCover } from '../../components/GradientCover'
 import { Dropdown, Modal } from '../../components/Modal'
 import { Page } from '../../components/Page'
@@ -247,35 +248,182 @@ function ChapterList({ work, isProject }: { work: Work; isProject: boolean }) {
   )
 }
 
-/** 作品设置抽屉：预设 + 改编要求，平时不占页面 */
+/** 作品设置抽屉：改编方式、出图、播放器样式、本作品规则；平时不占页面 */
 function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; onClose: () => void }) {
   const toast = useToast()
+  const [writerPreset, setWriterPreset] = useState(work.writerPreset ?? 'default')
+  const [review, setReview] = useState(work.reviewEnabled ?? false)
+  const [pauseOnRef, setPauseOnRef] = useState(work.pauseOnRefImages ?? true)
+  const [resolution, setResolution] = useState(work.outputResolution ?? '2K')
+  const [accent, setAccent] = useState(work.accent)
+  const [marks, setMarks] = useState(work.customMarks ?? [])
+  const [rules, setRules] = useState(work.rules ?? [])
+  const [newRule, setNewRule] = useState('')
+
+  const presetOptions = [
+    ...defaultWriterPresets.map((p) => ({ value: p.id, label: p.name })),
+    { value: 'custom', label: '在默认上改几项' },
+  ]
+
+  const panel: CSSProperties = {
+    borderRadius: 'var(--radius-lg)',
+    padding: 'var(--space-4)',
+    marginTop: 'var(--space-4)',
+  }
+  const groupLabel: CSSProperties = {
+    color: 'var(--color-on-surface-variant)',
+    marginBottom: 'var(--space-3)',
+  }
+  const smallBtn: CSSProperties = { display: 'flex', padding: 5, borderRadius: 'var(--radius-md)', color: 'var(--color-on-surface-variant)' }
+
+  const addMark = () => setMarks((m) => [...m, { id: `m${Date.now()}`, name: '新标记', perChar: false, css: '' }])
+  const addRule = () => {
+    const text = newRule.trim()
+    if (!text) return
+    setRules((r) => [...r, { id: `r${Date.now()}`, text }])
+    setNewRule('')
+  }
+
   return (
-    <Drawer open={open} title="作品设置" onClose={onClose}>
-      <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
-        <div className="label-caps label-caps-zh" style={{ color: 'var(--color-on-surface-variant)', marginBottom: 'var(--space-3)' }}>改编预设</div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-          <Chip>{`改编强度 · ${work.presets.strength}`}</Chip>
-          <Chip>{`演出密度 · ${work.presets.density}`}</Chip>
+    <Drawer open={open} title="作品设置" onClose={onClose} width={520}>
+      <div className="glass-panel" style={{ ...panel, marginTop: 0 }}>
+        <div className="label-caps label-caps-zh" style={groupLabel}>改编</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div>
+            <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-2)', fontSize: 11 }}>预设</div>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
+              <Chip>{`改编强度 · ${work.presets.strength}`}</Chip>
+              <Chip>{`演出密度 · ${work.presets.density}`}</Chip>
+              <Button variant="neu" size="sm" icon="tune" onClick={() => toast('已记录：下次制作前会再问一遍预设（演示）', 'tune')}>
+                调整
+              </Button>
+            </div>
+          </div>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', fontSize: 11 }}>改编要求</span>
+            <textarea style={{ ...textareaStyle, minHeight: 56 }} defaultValue={work.requirement} placeholder="例如：保留主角的口头禅；海边场景多用远景。" />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', fontSize: 11 }}>写手预设</span>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <Select value={writerPreset} onChange={setWriterPreset} options={presetOptions} />
+              {writerPreset === 'custom' ? (
+                <Button variant="neu" size="sm" icon="edit" onClick={() => toast('这里会打开预设编辑（演示）', 'edit')}>
+                  编辑
+                </Button>
+              ) : null}
+            </div>
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>审稿</span>
+            <Toggle on={review} onChange={() => setReview((v) => !v)} />
+          </div>
         </div>
-        <Button variant="neu" size="sm" icon="tune" style={{ marginTop: 'var(--space-4)' }} onClick={() => toast('已记录：下次制作前会再问一遍预设（演示）', 'tune')}>
-          调整预设
-        </Button>
       </div>
-      <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
-        <div className="label-caps label-caps-zh" style={{ color: 'var(--color-on-surface-variant)', marginBottom: 'var(--space-3)' }}>改编要求</div>
-        {work.requirement ? (
-          <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', lineHeight: 1.8 }}>{work.requirement}</p>
-        ) : (
-          <p style={{ fontSize: 13, color: 'var(--color-outline)' }}>没有额外要求。</p>
-        )}
-        <Button variant="neu" size="sm" icon="edit_note" style={{ marginTop: 'var(--space-4)' }} onClick={() => toast('已记录：改编要求稍后可在对话里补充（演示）', 'edit_note')}>
-          修改要求
-        </Button>
+
+      <div className="glass-panel" style={panel}>
+        <div className="label-caps label-caps-zh" style={groupLabel}>出图</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>已有参考图时也停在角色设定</span>
+            <Toggle on={pauseOnRef} onChange={() => setPauseOnRef((v) => !v)} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>输出分辨率</span>
+            <RadioGroup
+              value={resolution}
+              onChange={(v) => setResolution(v as '2K' | '4K')}
+              options={[
+                { value: '2K', label: '2K（默认）' },
+                { value: '4K', label: '4K' },
+              ]}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-panel" style={panel}>
+        <div className="label-caps label-caps-zh" style={groupLabel}>播放器</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>作品主色</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 22, height: 22, borderRadius: 'var(--radius-full)', background: accent, border: '1px solid var(--white-60)' }} />
+              <input
+                type="color"
+                value={accent}
+                onChange={(e) => setAccent(e.target.value)}
+                style={{ width: 36, height: 26, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+              />
+              {accent !== work.accent ? (
+                <Button size="sm" variant="ghost" onClick={() => setAccent(work.accent)}>
+                  还原
+                </Button>
+              ) : null}
+            </span>
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>自定义标记</span>
+              <Button size="sm" variant="neu" icon="add" onClick={addMark}>
+                新建
+              </Button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {marks.map((m, i) => (
+                <div key={m.id} style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--white-60)', padding: 'var(--space-3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                    <input
+                      style={{ ...inputStyle, padding: '6px 10px', fontSize: 13, flex: 1 }}
+                      value={m.name}
+                      onChange={(e) => setMarks(marks.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                    />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-on-surface-variant)', flexShrink: 0 }}>
+                      逐字
+                      <Toggle on={m.perChar} onChange={() => setMarks(marks.map((x, j) => (j === i ? { ...x, perChar: !x.perChar } : x)))} />
+                    </span>
+                    <button style={smallBtn} title="删除" onClick={() => setMarks(marks.filter((_, j) => j !== i))}>
+                      <Icon name="close" size={14} />
+                    </button>
+                  </div>
+                  <textarea
+                    style={{ ...textareaStyle, minHeight: 44, marginTop: 'var(--space-2)', fontSize: 12 }}
+                    value={m.css}
+                    placeholder={`.mark-${m.name || 'x'} { … }`}
+                    onChange={(e) => setMarks(marks.map((x, j) => (j === i ? { ...x, css: e.target.value } : x)))}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="glass-panel" style={panel}>
+        <div className="label-caps label-caps-zh" style={groupLabel}>本作品规则</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {rules.map((r, i) => (
+            <div key={r.id} className="hover-row" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 36, padding: '0 var(--space-2)', borderRadius: 'var(--radius-md)' }}>
+              <span style={{ flex: 1, fontSize: 13, lineHeight: 1.6 }}>{r.text}</span>
+              <span className="row-actions">
+                <button style={smallBtn} title="删除" onClick={() => setRules(rules.filter((_, j) => j !== i))}>
+                  <Icon name="close" size={14} />
+                </button>
+              </span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+            <TextInput value={newRule} placeholder="加一条规则" onChange={setNewRule} />
+            <Button size="sm" variant="neu" icon="add" onClick={addRule}>
+              添加
+            </Button>
+          </div>
+        </div>
       </div>
     </Drawer>
   )
 }
+
 
 /** 导出 .novelive：范围 + 原文选项 + 需要处理章节提醒 + 版本号 */
 function ExportModal({ work, open, onClose }: { work: Work; open: boolean; onClose: () => void }) {

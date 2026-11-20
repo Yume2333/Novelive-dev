@@ -11,6 +11,20 @@ const motifIcon: Record<Work['coverMotif'], string> = {
   moon: 'dark_mode',
 }
 
+/* 封面画面层：书脊压暗/装订线、纸面高光、细框、标题文字全是「印在封面上」的绘制内容，
+   不是界面色，不随亮暗主题变。封面主色本身在数据里（work.coverGradient）。 */
+const coverInk = {
+  spineShade: 'linear-gradient(90deg, rgba(0,0,0,0.28), rgba(0,0,0,0.05) 70%, transparent)',
+  spineLine: 'rgba(255,255,255,0.28)',
+  gloss:
+    'radial-gradient(ellipse at 30% 15%, rgba(255,255,255,0.28), transparent 55%), linear-gradient(200deg, rgba(255,255,255,0.1), transparent 40%), radial-gradient(ellipse at 80% 95%, rgba(0,0,0,0.18), transparent 55%)',
+  frame: 'rgba(255,255,255,0.35)',
+  motif: 'rgba(255,255,255,0.8)',
+  title: 'rgba(255,255,255,0.92)',
+  titleShadow: '0 1px 4px rgba(0,0,0,0.25)',
+  author: 'rgba(255,255,255,0.55)',
+}
+
 // 纯 CSS 的书籍封面：渐变底 + 书脊 + 纸面高光 + motif 图标，避免位图素材
 export function GradientCover({ work, style }: { work: Work; style?: CSSProperties }) {
   return (
@@ -29,15 +43,14 @@ export function GradientCover({ work, style }: { work: Work; style?: CSSProperti
       }}
     >
       {/* 书脊：左侧压暗条 + 装订高光线 */}
-      <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 14, background: 'linear-gradient(90deg, rgba(0,0,0,0.28), rgba(0,0,0,0.05) 70%, transparent)' }} />
-      <div style={{ position: 'absolute', top: 0, bottom: 0, left: 14, width: 1.5, background: 'rgba(255,255,255,0.28)' }} />
+      <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 14, background: coverInk.spineShade }} />
+      <div style={{ position: 'absolute', top: 0, bottom: 0, left: 14, width: 1.5, background: coverInk.spineLine }} />
       {/* 纸面光泽 */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          background:
-            'radial-gradient(ellipse at 30% 15%, rgba(255,255,255,0.28), transparent 55%), linear-gradient(200deg, rgba(255,255,255,0.1), transparent 40%), radial-gradient(ellipse at 80% 95%, rgba(0,0,0,0.18), transparent 55%)',
+          background: coverInk.gloss,
         }}
       />
       {/* 封面排版：细框 + 图标 + 竖排感标题 */}
@@ -47,7 +60,7 @@ export function GradientCover({ work, style }: { work: Work; style?: CSSProperti
           margin: '12% 14% 12% calc(14% + 8px)',
           flex: 1,
           alignSelf: 'stretch',
-          border: '1px solid rgba(255,255,255,0.35)',
+          border: `1px solid ${coverInk.frame}`,
           borderRadius: 3,
           display: 'flex',
           flexDirection: 'column',
@@ -57,10 +70,10 @@ export function GradientCover({ work, style }: { work: Work; style?: CSSProperti
           padding: 12,
         }}
       >
-        <Icon name={motifIcon[work.coverMotif]} size={34} style={{ color: 'rgba(255,255,255,0.8)' }} />
+        <Icon name={motifIcon[work.coverMotif]} size={34} style={{ color: coverInk.motif }} />
         <div
           style={{
-            color: 'rgba(255,255,255,0.92)',
+            color: coverInk.title,
             fontFamily: 'var(--font-display)',
             fontSize: 16,
             fontWeight: 600,
@@ -68,12 +81,12 @@ export function GradientCover({ work, style }: { work: Work; style?: CSSProperti
             marginRight: '-0.3em',
             textAlign: 'center',
             lineHeight: 1.6,
-            textShadow: '0 1px 4px rgba(0,0,0,0.25)',
+            textShadow: coverInk.titleShadow,
           }}
         >
           {work.title}
         </div>
-        <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 10, letterSpacing: '0.25em' }}>{work.author}</div>
+        <div style={{ color: coverInk.author, fontSize: 10, letterSpacing: '0.25em' }}>{work.author}</div>
       </div>
     </div>
   )
