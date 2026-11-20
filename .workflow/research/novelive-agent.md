@@ -81,7 +81,7 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
 
 - **角色/模型**：美术导演（主模型），工具循环。一章跑一个循环：读整章剧本，用补丁工具插入演出指令（背景、镜头、CG、粒子、滤镜），然后列出本章的图清单。
 - **输入**：整章剧本、设定集切片（本章出场的角色、地点及其已登记的造型、表情、变体）、已有素材清单、本章 CG 描述。
-- **输出契约**：演出补丁 + `ImageManifest` 图清单。清单每项含：素材名（如 `lin-xiao/uniform/angry`、`classroom/dusk`）、类型（立绘 / 背景 / CG / 表情差分 / 背景变体）、是否已有、一句画面描述、派生自哪张基准图（差分项填）。
+- **输出契约**：演出补丁 + `ImageManifest` 图清单。清单每项只填素材名（如 `lin-xiao/uniform/angry`、`classroom/dusk`）、类型（立绘 / 背景 / CG / 表情差分 / 背景变体）和一句画面描述。是否已有、派生自哪张基准图由代码按素材名和已登记素材算出，模型不填。
 - **同义表情合并**：列清单时，写手写出的未登记表情先和已有表情比对，意思相同就改用已有的表情名，不新画；确认是新表情才登记进清单。
 - **持久化**：图清单存 `project.db` 任务结果里；要新画的项进入出图队列。
 
@@ -91,15 +91,15 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
   - 立绘画师（主模型）：造型基准图，竖版透明底。
   - 场景画师（主模型）：背景基准图和 CG，16:9，主体在 4:3 安全区。
   - 差分画师（快速模型）：表情差分和背景变体，从基准图编辑派生，只改一处。
-- **输入**：图清单里的一项（素材名、一句描述、派生基准图）+ 对应的设定集字段（角色外貌和造型、地点描述）+ 风格描述。
+- **输入**：代码把一项任务需要的东西都放进上下文：图清单里的一项（素材名、类型、一句描述）、对应的设定集字段（角色外貌和造型、地点描述）、风格描述；派生图另附基准图。画师不用工具去查。
 - **提示词要素**（各画师内置提示词，按素材类型分开）：
   - 立绘/造型基准图：角色外貌 + 造型描述 + 风格 + 构图约束（膝上/半身、头顶/腰线对齐、竖版透明底）。
   - 背景：地点描述 + 变体描述 + 16:9 + 主体落在中间 4:3 安全区、上下留余量。
   - CG：`chapter.json` 里的 CG 描述 + 风格 + 同样的安全区约束。
-  - 组织成 `ImagePromptSpec`：`prompt`、`negativePrompt`（接口不支持就并到 prompt）、`size`、参考图列表（派生图用）。
-- **生图工具**：工具内部依次做三件事：出图（`openai` SDK 调图片接口）→ 本地技术检查（解码、尺寸、透明底）→ 视觉审核（视觉模型看图：主体是否完整、和角色参考是否一致、和描述是否相符）。之后把“通过”或“不通过和原因”交回调用它的画师，由它决定要不要换提示词重画；一张图最多重画「生图失败重试次数」（默认 3）次，用完还不通过就用占位图并标“需要处理”。
+  - 画师只写 `prompt` 和可选的 `negativePrompt`（接口不支持就由工具并到 prompt）。尺寸、透明底、参考图、用生成还是编辑接口，都由工具按素材类型和派生关系决定。
+- **生图工具** `draw_image { prompt, negativePrompt? }`：一次任务只画一张图，素材由代码绑定，模型不填素材名。工具内部依次做：按素材类型定尺寸和背景、取参考图（差分和变体走编辑接口）→ 出图（`openai` SDK）→ 本地技术检查（解码、尺寸、透明底）→ 视觉审核（视觉模型看图：主体是否完整、和角色参考是否一致、和描述是否相符）→ 通过就存文件。然后把“通过”或“不通过和原因”交回画师，由它决定怎么改提示词再画；重画次数由代码计数，用完「生图失败重试次数」（默认 3）就结束循环，用占位图并标“需要处理”。
 - **审核拒绝**：让画师把提示词改得含蓄一点再生成一次，还被拒才用占位图并标“需要处理”。重试这一次走新任务，不沿用旧任务状态。
-- **持久化**：每张通过检查的图立即写 `assets/...` 并本地处理（转 WebP、放大）；任务记到图粒度，停止后重跑时跳过已有的图，只补没画完的。图片默认存为有损 WebP（质量 90，保留透明通道），应用设置里的全局开关可改无损。`ImagePromptSpec` 存在 `project.db` 任务结果里（供重生成和改写时参考），不进作品文件。
+- **持久化**：每张通过检查的图立即写 `assets/...` 并本地处理（转 WebP、放大）；任务记到图粒度，停止后重跑时跳过已有的图，只补没画完的。图片默认存为有损 WebP（质量 90，保留透明通道），应用设置里的全局开关可改无损。画师写的提示词和工具补上的参数存在 `project.db` 任务结果里（供重生成和改写时参考），不进作品文件。
 
 ## 编辑器：重写场景（差异列表）
 
@@ -124,8 +124,15 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
   - `read_glossary` `{}` → 术语表
   - `read_scene` `{ chapterId, sceneId }` → `.nvs` 文本 + 段落对照
   - `read_source_range` `{ chapterId, fromParagraph, toParagraph }` → 原文段落
-  - `list_chapters` `{ workId }` → 章节列表和状态
-  - `propose` `{ kind, target, patch, reason }` → 登记一条提议，返回提议 ID。`kind` 覆盖：`update_bible_entry`（条目 ID + 字段变更）、`add_bible_entry`、`update_glossary_entry`、`add_glossary_entry`、`update_adaptation_notes`（改改编要求）、`redo_chapter`（重做章节）、`rewrite_scene`（重写场景）、`redraw_image`（重画图片）、`redo_volume_synthesis`（重新综合某卷）。`patch` 是该 kind 对应的 pi-schema 结构。
+  - `list_chapters` `{}` → 本作品的章节列表和状态（作品由会话决定，模型不填）
+  - 提议工具，一件事一个工具，模型只填要改什么和理由；条目路径、影响哪些章节、修改记录由代码算：
+    - `propose_bible_change` `{ entryId?, changes, reason }`：改设定条目，不填 `entryId` 就是新增；`changes` 是条目字段的 pi-schema 结构
+    - `propose_glossary_change` `{ term, changes, reason }`
+    - `propose_adaptation_notes` `{ text, reason }`：改改编要求
+    - `propose_redo_chapter` `{ chapterId, instruction }`
+    - `propose_rewrite_scene` `{ chapterId, sceneId, instruction }`
+    - `propose_redraw_image` `{ asset, instruction }`
+    - `propose_resynthesize_volume` `{ volumeId, instruction? }`：以上每个都登记一条提议并返回提议 ID
   - `list_proposals` `{ status?: "pending"|"confirmed"|"rejected" }`
 - **提议模型**：提议以确认卡形式展示，存 `project.db`，字段：`id、作品、kind、target（条目 ID/章节 ID/字段路径）、patch JSON、reason、状态、对话消息 ID、创建时间`。发起工作流前先出确认卡，写清要做什么、影响哪些章节，确认后才开始；`redo_chapter` 确认后该章进制作队列。提议和修改历史挂钩：应用一条提议 = 一次可撤销的修改记录。
 - **会话持久化**：每部作品可以有多个会话。消息存成 `id`/`parentId` 条目树进 `project.db`，改写一条消息后重新发送会形成分支；超过上下文时把较早的轮次压缩成摘要条目（已有摘要就增量更新），最近若干轮保留原文。

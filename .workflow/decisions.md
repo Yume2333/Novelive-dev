@@ -607,3 +607,10 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** 读 pi-ai 1.6.0 源码确认：它把官方 SDK 的重试关掉，自己的重试默认 0 次，`Agent` 也不传这个参数，原来“只用底座自带的重试”实际等于不重试。
 - **Decided by:** user
 - **Supersedes:** 2026-11-20 - 只有“立即停止”，临时错误交给 SDK 重试（只改重试次数，停法不变）
+
+## 2026-11-21 - 给模型的工具封装成一步到位的动作
+
+- **Decided:** Agent 编排与工具设计的通用原则：模型只填它擅长的内容（描述、文字、判断、理由），接口参数、尺寸、背景、参考图、路径、格式、ID、检查和重试都在工具里由代码完成；模型要填的参数里不能有代码能算出来的东西。细则在 `.workflow/research/agent-orchestration.md`「Settled & ruled out」。
+- **Instead of:** 把底层接口直接暴露给模型，让它拼参数或连续调用几个工具完成一件事。
+- **Because:** 模型拼机械参数容易错、费 token，出错后还要多轮修；封装后同一件事一次调用就完成，结果也可校验。
+- **Decided by:** user
