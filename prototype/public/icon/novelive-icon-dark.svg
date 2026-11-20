@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="512" height="512">
+  <!-- Novelive app icon · dark · v1.1 (clean) -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f2f2c"/>
+      <stop offset="1" stop-color="#181916"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.55" cy="0.46" r="0.65">
+      <stop offset="0" stop-color="#c8b8a4" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#c8b8a4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="clay" x1="0" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#bd6650"/>
+      <stop offset="1" stop-color="#93452f"/>
+    </linearGradient>
+    <linearGradient id="sand" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#f0e7d7"/>
+      <stop offset="1" stop-color="#d2c4ab"/>
+    </linearGradient>
+    <filter id="drop" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="3" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <linearGradient id="seam" gradientUnits="userSpaceOnUse" x1="101" y1="61" x2="67" y2="92">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.18" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.82" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="glyph">
+      <path d="M23 42 Q23 30 35 30 L67 30 L67 92 L35 92 Q23 92 23 80 Z"/>
+      <path d="M67 30 Q87 34 96 47 Q101 54 101 61 Q101 68 96 75 Q87 88 67 92 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="120" height="120" fill="url(#bg)"/>
+  <rect width="120" height="120" fill="url(#glow)"/>
+
+  <g filter="url(#drop)">
+    <path d="M23 42 Q23 30 35 30 L67 30 L67 92 L35 92 Q23 92 23 80 Z" fill="#faf9f7"/>
+    <path d="M67 30 Q87 34 96 47 Q101 54 101 61 Q91 68 81 74 Q72 80 67 92 Z" fill="url(#clay)"/>
+    <path d="M101 61 Q91 68 81 74 Q72 80 67 92 Q87 88 96 75 Q101 68 101 61 Z" fill="url(#sand)"/>
+  </g>
+
+  <g clip-path="url(#glyph)">
+    <path d="M101 61 Q91 68 81 74 Q72 80 67 92" fill="none" stroke="url(#seam)" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+
+  <g fill="#77746c" opacity="0.95">
+    <rect x="34" y="45" width="22" height="4" rx="2"/>
+    <rect x="34" y="55" width="15" height="4" rx="2"/>
+    <rect x="34" y="65" width="20" height="4" rx="2"/>
+    <rect x="34" y="75" width="12" height="4" rx="2"/>
+  </g>
+</svg>

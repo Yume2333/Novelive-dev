@@ -1,0 +1,19 @@
+/* 设定集随可用宽度收放（Agent 面板停靠时主区域会变窄） */
+.bible-root { container-type: inline-size; }
+
+.bible-layout { grid-template-columns: 196px minmax(0, 1fr); }
+.bible-chars { grid-template-columns: 240px minmax(0, 1fr); }
+
+/* 窄：分区导航收成图标栏，角色列表变窄 */
+@container (max-width: 960px) {
+  .bible-layout { grid-template-columns: 48px minmax(0, 1fr); }
+  .bible-nav-text { display: none; }
+  .bible-nav-item { justify-content: center; padding-left: 0 !important; padding-right: 0 !important; }
+  .bible-chars { grid-template-columns: 200px minmax(0, 1fr); }
+}
+
+/* 更窄：角色列表放到详情上面 */
+@container (max-width: 720px) {
+  .bible-chars { grid-template-columns: minmax(0, 1fr); }
+  .bible-chars-side { position: static !important; }
+}

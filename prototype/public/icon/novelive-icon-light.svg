@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="512" height="512">
+  <!-- Novelive app icon · light · v1.1 (clean) -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fdfcfa"/>
+      <stop offset="1" stop-color="#f0eeea"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#35352f"/>
+      <stop offset="1" stop-color="#1e1f1c"/>
+    </linearGradient>
+    <linearGradient id="clay" x1="0" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#b8604a"/>
+      <stop offset="1" stop-color="#8a3f2d"/>
+    </linearGradient>
+    <linearGradient id="sand" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#f0e7d7"/>
+      <stop offset="1" stop-color="#d6c9b2"/>
+    </linearGradient>
+    <filter id="drop" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="2.5" flood-color="#181916" flood-opacity="0.15"/>
+    </filter>
+    <!-- seam highlight fades out before reaching the silhouette edges -->
+    <linearGradient id="seam" gradientUnits="userSpaceOnUse" x1="101" y1="61" x2="67" y2="92">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.18" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="0.82" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <!-- keep the stroke strictly inside the glyph -->
+    <clipPath id="glyph">
+      <path d="M23 42 Q23 30 35 30 L67 30 L67 92 L35 92 Q23 92 23 80 Z"/>
+      <path d="M67 30 Q87 34 96 47 Q101 54 101 61 Q101 68 96 75 Q87 88 67 92 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="120" height="120" fill="url(#bg)"/>
+
+  <g filter="url(#drop)">
+    <path d="M23 42 Q23 30 35 30 L67 30 L67 92 L35 92 Q23 92 23 80 Z" fill="url(#ink)"/>
+    <path d="M67 30 Q87 34 96 47 Q101 54 101 61 Q91 68 81 74 Q72 80 67 92 Z" fill="url(#clay)"/>
+    <path d="M101 61 Q91 68 81 74 Q72 80 67 92 Q87 88 96 75 Q101 68 101 61 Z" fill="url(#sand)"/>
+  </g>
+
+  <!-- curl seam highlight: clipped inside, fading at both ends -->
+  <g clip-path="url(#glyph)">
+    <path d="M101 61 Q91 68 81 74 Q72 80 67 92" fill="none" stroke="url(#seam)" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+
+  <!-- text lines -->
+  <g fill="#faf9f7" opacity="0.88">
+    <rect x="34" y="45" width="22" height="4" rx="2"/>
+    <rect x="34" y="55" width="15" height="4" rx="2"/>
+    <rect x="34" y="65" width="20" height="4" rx="2"/>
+    <rect x="34" y="75" width="12" height="4" rx="2"/>
+  </g>
+</svg>
