@@ -9,11 +9,11 @@
 
 ## Open questions
 
-- [ ] Electron utility process 里能否用 `node:sqlite`，不行就用 better-sqlite3。M0 核实。
+- [x] Electron utility process 里能否用 `node:sqlite`：实测可用（Electron 45.4.1 / Node 24.22.3，不带 flag，WAL 正常）。better-sqlite3 不再需要。
 - [x] 角色长相一致：造型基准图重画、表情编辑派生，见 `character-consistency.md`。
 - [x] Novelive Agent 内部设计：编排见 `agent-orchestration.md`，各阶段细节见 `novelive-agent.md`。剩下按卷综合的分块做法（M1a）和各角色提示词正文（M1a、M1b），实现时用测试用书定。
-- [ ] 测试用书：之后和所有者单独讨论，M1a 开始前定。建议两本：一本主调用的中文书（20 到 50 章、对白多），一本几百章的长书，用来验证分卷建议、按卷综合分块和长章切段。
-- [ ] 品牌图标：发布前重新设计。
+- [ ] 测试用书：由所有者选好放到 `~/novelive-testbooks/`，不进仓库。书到之前，M1a 先用合成小样本做解析、导入和单元测试；依赖真书的部分标 `Status: blocked`（见 `owner-review.md`、`decisions.md` 2026-11-21「测试用书由所有者选」）。
+- [ ] 品牌图标：发布前重新设计，等所有者（见 `owner-review.md`）。
 
 ## 审查建议的处理结果（2026-11-21）
 

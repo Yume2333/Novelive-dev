@@ -540,3 +540,46 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** sharp、SQLite、Python 进程第一次在安装好的应用里运行最容易出问题，提前在一个平台上暴露。
 - **Decided by:** user
 - **Supersedes:** 2026-11-20 - 里程碑顺序（只提前 Linux 试打包）
+
+## 2026-11-21 - 开发期接口和模型用所有者的中转
+
+- **Decided:** 开发、录制和真实验收都用所有者的中转，地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`（文本和图片共用这一组）。三种文本格式都能调。开发默认模型：主模型和写作模型 `devin-swe-2`，快速模型 `deepseek-v4.1-flash`，视觉模型 `gemini-3.8-flash`，图片模型 `gpt-image-2.6-flare`。录制文件去掉 Key 和中转地址后进仓库。
+- **Instead of:** 所有者另给一套专用 Key。
+- **Because:** 2026-11-21 实测：三种文本格式都通，三个文本模型都能调工具，视觉模型能看图。
+- **Decided by:** user
+
+## 2026-11-21 - 开发期真实接口的花费规则
+
+- **Decided:** 不设金额上限。日常开发和测试用录制回放；调提示词先用 5 到 10 章的切片；每个里程碑用整本书真跑最多一次。
+- **Instead of:** 每个里程碑设金额上限，到了就停。
+- **Because:** 回放就是为不花钱测试建的；只有调提示词和最终验收需要真实接口。
+- **Decided by:** user
+
+## 2026-11-21 - 无人值守推进到 M5 本地安装包
+
+- **Decided:** 所有者不在时，agent 按 `.workflow` 流程从 M0 推进到 M5。每个里程碑由没参与编写的审查 agent 对照规格和原型验收，截图和日志存进 `.workflow/evidence/`，验收通过就关闭这个里程碑，进入下一个。原定由所有者手动验收的项目（如 M0 的 W3）由 agent 用开发期接口跑。M5 只做到三平台本地未签名安装包：不建正式仓库，不发公开 Release，不签名。品牌图标、签名、自动更新的发布地址和界面翻译的人工抽查，等所有者回来再做。所有者回来要看的事项记在 `.workflow/owner-review.md`。
+- **Instead of:** 做完 M4 就停；或者每个里程碑结束都停下等所有者。
+- **Because:** 所有者到 M4、M5 之前不介入；签名、发布和品牌要花钱或对外，必须由所有者决定。
+- **Decided by:** user
+
+## 2026-11-21 - M4 的 PDF 只支持能提取文字的文件
+
+- **Decided:** M4 做 EPUB、Markdown、DOCX、PDF 四种导入。PDF 只支持能提取文字的文件，扫描件提示不支持。
+- **Instead of:** M4 只做 EPUB 和 Markdown；或者 PDF 带文字识别。
+- **Because:** 保住五种格式的范围；文字识别的工作量和出错率都不值得放进第一版。
+- **Decided by:** user
+
+## 2026-11-21 - 测试用书由所有者选
+
+- **Decided:** 测试用书由所有者自己选，选好放到 `~/novelive-testbooks/`，不进仓库（仓库是公开的）。书到之前，M1a 先用合成的小样本做解析、导入和单元测试；依赖真书的部分（按卷综合的分块做法、提示词调优、质量评测集、真书验收）等书到了再做，相关任务标 `Status: blocked` 并写明在等书。
+- **Instead of:** 先用公版书（《骆驼祥子》《红楼梦》）。
+- **Because:** 所有者要自己挑。
+- **Decided by:** user
+- **Supersedes:** 2026-11-20 - 里程碑顺序（M1a 只有不依赖真书的部分能先做）
+
+## 2026-11-21 - 无人值守期的实现默认
+
+- **Decided:** 以下由 agent 按默认做，所有者没有异议：剧本指令全集和语法表在 M1a 定稿，写进 `docs/work-format.md`；质量评测集由 agent 标注；某章生成失败时整部作品暂停（写手要接上一章的结尾），重试成功后恢复；修改历史持久保存，撤销只在本次打开内有效；注册 `.novelive` 文件关联，新版本替换旧版时旧包进回收站；放大用可随包分发的二次元模型，不依赖 NVIDIA 显卡，M3 先试验再定；并行任务用 worktree 本地合并，每个任务落地后推送到 `Novelive-dev`。各里程碑写规格时要用的其他默认值见 `.workflow/research/handoff-defaults.md`。
+- **Instead of:** 每项等所有者回来再定。
+- **Because:** 都可以回改；等所有者会让无人值守停下。
+- **Decided by:** user

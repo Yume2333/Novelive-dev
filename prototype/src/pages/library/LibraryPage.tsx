@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Icon } from '../../components/Button'
 import { Card, ProgressBar } from '../../components/Card'
-import { Banner, Checkbox, Chip, ConfirmDialog } from '../../components/Extended'
+import { Banner, Chip, ConfirmDialog } from '../../components/Extended'
 import { EmptyState, Tabs } from '../../components/Form'
 import { GradientCover } from '../../components/GradientCover'
 import { Dropdown, Modal } from '../../components/Modal'
@@ -142,7 +142,6 @@ const demoPackage: ImportedPackage = { title: '星屑旅馆', author: '安溪', 
 
 function ImportPackageModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const toast = useToast()
-  const [saves, setSaves] = useState<'migrate' | 'keep'>('migrate')
   const existing = demoPackage.sameId ? works.find((w) => w.id === demoPackage.sameId) : undefined
   return (
     <Modal
@@ -182,9 +181,8 @@ function ImportPackageModal({ open, onClose }: { open: boolean; onClose: () => v
             <Banner kind="warning" icon="system_update_alt">
               书库里已有《{existing.title}》v{existing.version}，导入后会被 v{demoPackage.version} 替换。
             </Banner>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', fontSize: 13 }}>
-              <Checkbox checked={saves === 'migrate'} onChange={() => setSaves('migrate')} label="迁移存档和已读记录（按作品内 ID 对应）" />
-              <Checkbox checked={saves === 'keep'} onChange={() => setSaves('keep')} label="对不上的旧存档保留" />
+            <div style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', lineHeight: 1.7 }}>
+              存档和已读记录会按作品内 ID 自动迁移；对不上的旧存档会保留，在存档界面单独成组。
             </div>
           </>
         ) : (

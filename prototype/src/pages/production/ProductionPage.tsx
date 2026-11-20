@@ -48,7 +48,7 @@ function ChapterRow({ work, chapter, last, onOpenStale, onOpenRuns }: {
   const navigate = useNavigate()
   const toast = useToast()
   const [priority, setPriority] = useState(!!chapter.priority)
-  // 四步进度：审稿是作品开关；写下一章时上一章在出图，两章可以同时是“制作中”；出图按张算（"出图 5/8"）
+  // 三步加出图阶段：审稿是作品开关；写下一章时上一章在出图，两章可以同时是“制作中”；出图按张算（"出图 5/8"）
   const steps = work.reviewEnabled ? ['写', '审稿', '演出', '出图'] : ['写', '演出', '出图']
   // step 形如 "出图 5/8"
   const stepIdx = Math.max(

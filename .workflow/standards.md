@@ -1,6 +1,6 @@
 # Standards
 
-Fill this in at project setup and keep it under one screen. Delete lines that do not apply and replace every placeholder. This file overrides `CONVENTIONS.md` and `STYLE.md`.
+本文件优先于 `CONVENTIONS.md` 和 `STYLE.md`，保持一屏以内。
 
 ## Project
 
@@ -17,7 +17,7 @@ cd prototype && npx tsc --noEmit
 ```
 
 Real path: M0 之后启动 Electron 应用，把流程实际走一遍；在那之前用浏览器打开原型页面。
-Evidence: `.workflow/evidence/`
+Evidence: `.workflow/evidence/`（截图和日志进仓库；录制文件放 `tests/fixtures/`。仓库是公开的，Key、中转地址和测试用书原文不进仓库）
 
 ## Layout
 
@@ -27,17 +27,29 @@ Evidence: `.workflow/evidence/`
 - `.workflow/`：决策、术语、规格、任务
 - 正式代码目录见 `docs/architecture.md`「代码组织」，M0 创建
 
+## Development environment
+
+- 真实接口：地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`，文本和图片共用。开发默认模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」。
+- 花费：日常开发和测试用录制回放；调提示词用 5 到 10 章切片；每个里程碑整本真跑最多一次。
+- 测试用书：`~/novelive-testbooks/`，所有者放入；目录为空时依赖真书的任务标 `Status: blocked`（等书），其余照常推进。
+
+## Unattended runs
+
+所有者不在时按 `decisions.md` 2026-11-21「无人值守推进到 M5 本地安装包」推进 M0 到 M5，不发起提问。
+- 里程碑验收：没参与编写的审查 agent 对照规格的 W 检查和原型逐项验收，证据存进 `.workflow/evidence/<effort>/`。通过后 spec 写 `**Accepted:** <日期> by agent (unattended)`，再关闭并开下一个里程碑。
+- 等所有者的事（测试用书、签名、品牌图标、发布地址、翻译抽查）：这件事的任务标 `Status: blocked` 并写明在等什么，记入 `.workflow/owner-review.md`，然后继续做不依赖它的任务和后续里程碑。
+- 停下的条件：没有不被阻塞的任务可做。
+- agent 自己定的、改起来费事的选择记进 `decisions.md`（`Decided by: agent (<effort>/<NN>)`），并在 `owner-review.md` 留一行。
+
 ## Code conventions
 
 - 界面必须遵守 `DESIGN.md`；颜色、间距、圆角只用 Tokens。
 - 播放器包不依赖创作端；界面只通过 `@novelive/creator/contract` 引用创作端的命令和事件类型。
+- 「不做防御性设计」只管产品代码，不放宽上面的开发期规则。
 
 ## Branches and landing
 
-Landing: direct（单人开发，直接提交到 `main`；以后并行跑多个任务时改为 local-merge）
-- `direct`: commit on the current branch (solo work).
-- `local-merge`: merge task branches locally (parallel worktrees under the `Worktrees:` root).
-- `pr`: land through pull requests (shared remote).
-See CONVENTIONS §7. Name the main branch here if it is not `main` or `master`.
+Landing: local-merge（并行任务各用一个 worktree，本地合并到 `main`；每个任务落地后 `git push origin main` 推到 `Yume2333/Novelive-dev`）
+See CONVENTIONS §7.
 
 Worktrees: `.workflow/worktrees/`
