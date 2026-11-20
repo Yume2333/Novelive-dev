@@ -336,3 +336,66 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 界面沿用 Material Symbols、播放器用 lucide 的两套并存。
 - **Because:** 并排对比后 lucide 线条统一、更安静，和纸感玻璃风格更搭；Material 图标字体约 4 MB，lucide 只打包用到的 SVG。
 - **Decided by:** user
+
+## 2026-11-20 - 文本模型按接口格式配置
+
+- **Decided:** 文本模型配置为接口格式（OpenAI Chat Completions / OpenAI Responses / Anthropic Messages）+ 接口地址 + 模型名 + API Key，三种格式都要支持，地址可以自定义。
+- **Instead of:** 原型里的“服务 + 模型”下拉，只能选内置的几家供应商。
+- **Because:** 三种格式覆盖官方接口和绝大多数中转、兼容服务；pi 对三种格式都有实现，填自定义地址即可。
+- **Decided by:** user
+
+## 2026-11-20 - 开发期远程仓库
+
+- **Decided:** 开发期间使用 `https://github.com/Yume2333/Novelive-dev` 作为远程仓库，CI 用这个仓库的 GitHub Actions，M0 就配好。
+- **Instead of:** 等正式仓库建好再配远程和 CI。
+- **Because:** 有了远程仓库，CI 从 M0 起就能对每次推送跑检查。
+- **Decided by:** user
+
+## 2026-11-20 - API Key 简单加密
+
+- **Decided:** API Key 用写在程序里的固定密钥简单加密后存进应用配置文件。
+- **Instead of:** 明文存储。
+- **Because:** 防止别人扫一眼配置文件就看到 Key；密钥在开源代码里，挡不住有意读取的人。
+- **Decided by:** user
+
+## 2026-11-20 - 导入的作品和存档放哪
+
+- **Decided:** 导入的 `.novelive` 复制一份到默认工程位置旁的「导入的作品」文件夹（默认 `文档/Novelive/导入的作品`）；存档和已读记录统一放应用数据目录，按作品 ID 分开，自己工程的作品也一样。
+- **Instead of:** 作品复制到应用数据目录或原地读取；存档跟着作品或工程走。
+- **Because:** 作品图片多、体积大，不该塞进系统盘的应用数据；存档集中放，导出不会带出去，更新时只迁移一处。
+- **Decided by:** user
+
+## 2026-11-20 - 画面 16:9，图片模型能力不做检测
+
+- **Decided:** 舞台以 16:9（1920×1080）为基准，窗口比例不同时背景铺满裁切；背景和 CG 直接按 16:9 生成，立绘竖版透明底。默认图片模型支持文生图、透明底和图片编辑，不支持时由创作者自己换模型，应用不检测、不兜底。
+- **Instead of:** 按 3:2 生成再裁切；设置页测试时检查透明底和编辑能力并提示；本地抠图兜底。
+- **Because:** 现在的图片模型都支持 16:9、透明底和图片编辑。
+- **Decided by:** user
+
+## 2026-11-20 - 图片被审核拒绝时改写提示词再试一次
+
+- **Decided:** 图片被内容审核拒绝不算临时错误；让模型把提示词改得含蓄一点再试一次，还被拒才用占位图并标“需要处理”。
+- **Instead of:** 直接用占位图。
+- **Because:** 小说里打斗、伤亡、亲密场面常见，被拒的图换个写法多半能过，否则一章里可能有好几张占位图。
+- **Decided by:** user
+
+## 2026-11-20 - 品牌图标发布前重新设计
+
+- **Decided:** 品牌图标在发布前重新设计；原型里沿用旧仓库的那套只作占位。
+- **Instead of:** 沿用旧仓库的墨色书页加陶土色播放头。
+- **Decided by:** user
+- **Because:** 所有者的选择。
+
+## 2026-11-20 - 角色一致性试验和 Agent 设计稿与 M0 并行
+
+- **Decided:** 角色长相一致的两种做法用真实图片接口做对比试验，看图选定；Novelive Agent 内部设计先写设计稿，确认后 M1 照做。两项都和 M0 并行。
+- **Instead of:** M1 里边做边定。
+- **Because:** 这两项是 M1 风险最大的部分，提前定下来 M1 不会卡。
+- **Decided by:** user
+
+## 2026-11-20 - 界面翻译 M5 前做，应用从 GitHub Releases 自动更新
+
+- **Decided:** 开发期界面只写简体中文，M5 发布前用模型翻译成繁体中文、英文、日文再人工抽查；应用用 electron-builder 的自动更新，从 GitHub Releases 检查下载，用户确认后重启安装。
+- **Instead of:** 每个里程碑同步翻译；只提示新版本、手动下载。
+- **Because:** 开发中文案一直在变，太早翻译要反复改；自动更新不需要自建服务器。
+- **Decided by:** user
