@@ -4,7 +4,7 @@ import { runRecordMock } from '../../mock/chat'
 import { MessageParts } from './MessageView'
 
 /**
- * 一章的制作运行记录：写 → 审稿 → 演出与出图，三段分开看。
+ * 一章的制作运行记录：写 → 审稿 → 演出 → 出图，四段分开看；出图段按画师分组。
  * 复用对话面板那套消息渲染；这里的确认卡、工具卡都只读。
  */
 export function RunRecordDrawer({ chapterTitle, open, onClose }: {
@@ -44,6 +44,12 @@ export function RunRecordDrawer({ chapterTitle, open, onClose }: {
               <span style={{ flex: 1, height: 1, background: 'var(--divider)' }} />
             </div>
             <MessageParts parts={step.parts} nested />
+            {step.groups?.map((g) => (
+              <div key={g.title} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <span className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', fontSize: 11 }}>{g.title}</span>
+                <MessageParts parts={g.parts} nested />
+              </div>
+            ))}
           </section>
         ))}
       </div>

@@ -25,7 +25,7 @@ export interface Chapter {
   index: number
   title: string
   status: ChapterStatus
-  /** 制作中章节当前在做的步骤，如“写”“审稿”“演出与出图 12/20” */
+  /** 制作中章节当前在做的步骤，如“写”“审稿”“演出”“出图 5/8” */
   step?: string
   /** 需要处理的原因（用户能看懂的一句话） */
   issue?: string

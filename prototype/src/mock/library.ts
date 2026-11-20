@@ -44,8 +44,9 @@ export const works: Work[] = [
     workLanguage: '简体中文',
     chapters: chapters(wugangTitles, (i) => {
       if (i <= 5) return { status: 'published', staleImages: i === 3 ? 2 : undefined }
-      if (i === 6) return { status: 'producing', step: '演出与出图 12/20' }
-      if (i === 7) return { status: 'attention', issue: '两张背景没画出来，先用了占位图' }
+      if (i === 6) return { status: 'producing', step: '出图 5/8' }
+      if (i === 7) return { status: 'producing', step: '写' }
+      if (i === 8) return { status: 'attention', issue: '两张背景没画出来，先用了占位图' }
       if (i === 12) return { priority: true }
       return {}
     }),

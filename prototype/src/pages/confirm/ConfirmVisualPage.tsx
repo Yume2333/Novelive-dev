@@ -213,9 +213,9 @@ export function ConfirmVisualPage() {
         </Card>
       </section>
 
-      {/* 主要角色：一次只看一个 */}
+      {/* 第一卷主要角色：一次只看一个；其余角色第一次出场时由立绘按设定集直接画 */}
       <section style={{ marginTop: 'var(--space-7)' }}>
-        <SectionLabel>主要角色</SectionLabel>
+        <SectionLabel>第一卷主要角色</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 'var(--space-5)', marginTop: 'var(--space-3)', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
             {chars.map((c) => {

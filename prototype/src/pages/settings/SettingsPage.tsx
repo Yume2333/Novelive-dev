@@ -14,7 +14,11 @@ import {
   defaultImageConfig,
   defaultTextConfig,
   defaultWriterPresets,
+  imageCapabilitySupport,
+  imageCapabilityTests,
   modelSlots,
+  type CapabilityState,
+  type ImageCapability,
   type ModelSlot,
   type TextModelConfig,
   type WriterPreset,
@@ -157,18 +161,42 @@ function VisualTestResult() {
   )
 }
 
-/** 图片模型测试成功：返回的缩略图（渐变占位） */
-function ImageTestResult() {
+/** 图片模型测试：依次测文生图、透明底、图片编辑，三项各自显示结果 */
+function ImageTestResult({ caps }: { caps: Record<ImageCapability, CapabilityState | 'idle'> }) {
+  const meta: Record<CapabilityState, { icon: string; text: string; color: string }> = {
+    testing: { icon: 'progress_activity', text: '进行中', color: 'var(--color-on-surface-variant)' },
+    ok: { icon: 'check_circle', text: '通过', color: 'var(--color-success)' },
+    unsupported: { icon: 'error', text: '不支持', color: 'var(--color-on-error-container)' },
+    fail: { icon: 'error', text: failText, color: 'var(--color-on-error-container)' },
+  }
   return (
-    <div
-      style={{
-        width: 96,
-        height: 54,
-        borderRadius: 'var(--radius-md)',
-        background: 'linear-gradient(150deg, var(--color-primary-container), var(--color-surface-container-highest))',
-        border: '1px solid var(--white-60)',
-      }}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+        {imageCapabilityTests.map((c) => {
+          const s = caps[c.id]
+          return s === 'idle' ? null : (
+            <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: meta[s].color }}>
+              {s === 'testing' ? <Spinner size={13} /> : <Icon name={meta[s].icon} size={14} />}
+              {c.label} · {meta[s].text}
+            </span>
+          )
+        })}
+      </div>
+      {caps.transparent === 'unsupported' ? (
+        <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', lineHeight: 1.6 }}>这个模型不支持透明底，换一个支持的模型。</div>
+      ) : null}
+      {caps.t2i === 'ok' ? (
+        <div
+          style={{
+            width: 96,
+            height: 54,
+            borderRadius: 'var(--radius-md)',
+            background: 'linear-gradient(150deg, var(--color-primary-container), var(--color-surface-container-highest))',
+            border: '1px solid var(--white-60)',
+          }}
+        />
+      ) : null}
+    </div>
   )
 }
 
@@ -297,6 +325,7 @@ export function SettingsPage() {
   })
   const [image, setImage] = useState(defaultImageConfig())
   const [tests, setTests] = useState<Record<ModelSlot, TestState>>({ fast: 'idle', main: 'idle', writing: 'idle', visual: 'idle', image: 'idle' })
+  const [caps, setCaps] = useState<Record<ImageCapability, CapabilityState | 'idle'>>({ t2i: 'idle', transparent: 'idle', edit: 'idle' })
   const [advanced, setAdvanced] = useState(false)
   const [roleModel, setRoleModel] = useState<Record<string, ModelSlot>>(Object.fromEntries(agentRoles.map((r) => [r.id, r.slot])))
   const [presets, setPresets] = useState<WriterPreset[]>(defaultWriterPresets)
@@ -319,9 +348,38 @@ export function SettingsPage() {
   }
 
   const runTest = (slot: ModelSlot) => {
+    if (slot === 'image') {
+      const ok = image.key.trim().length > 0 && image.base.trim().length > 0
+      setTests((t) => ({ ...t, image: 'testing' }))
+      setCaps({ t2i: 'idle', transparent: 'idle', edit: 'idle' })
+      if (!ok) {
+        setTimeout(() => setTests((t) => ({ ...t, image: 'fail' })), 700)
+        return
+      }
+      // 依次试文生图、透明底、图片编辑，三项分别出结果
+      imageCapabilityTests.forEach((c, i) => {
+        setTimeout(() => {
+          setCaps((prev) => (prev[c.id] === 'idle' ? { ...prev, [c.id]: 'testing' } : prev))
+          setTimeout(() => {
+            const pass = imageCapabilitySupport(image.model, c.id)
+            setCaps((prev) => (prev[c.id] === 'testing' ? { ...prev, [c.id]: pass ? 'ok' : 'unsupported' } : prev))
+            if (i === imageCapabilityTests.length - 1) {
+              setTests((t) => ({ ...t, image: 'ok' }))
+            }
+          }, 500)
+        }, i * 700)
+      })
+      return
+    }
     setTests((t) => ({ ...t, [slot]: 'testing' }))
-    const ok = slot === 'image' ? image.key.trim().length > 0 && image.base.trim().length > 0 : textReady(slot)
+    const ok = textReady(slot)
     setTimeout(() => setTests((t) => ({ ...t, [slot]: ok ? 'ok' : 'fail' })), 700)
+  }
+
+  const setImageField = (patch: Partial<typeof image>) => {
+    setImage((img) => ({ ...img, ...patch }))
+    setTests((t) => ({ ...t, image: 'idle' }))
+    setCaps({ t2i: 'idle', transparent: 'idle', edit: 'idle' })
   }
 
   const savePreset = (p: WriterPreset) => {
@@ -363,17 +421,23 @@ export function SettingsPage() {
               configured={image.key.trim().length > 0 && image.base.trim().length > 0}
               test={tests.image}
               onTest={() => runTest('image')}
-              result={<ImageTestResult />}
+              result={tests.image === 'ok' ? <ImageTestResult caps={caps} /> : undefined}
             >
               <Field label="接口地址">
-                <TextInput value={image.base} placeholder="https://…/v1" onChange={(v) => { setImage({ ...image, base: v }); setTests((t) => ({ ...t, image: 'idle' })) }} />
+                <TextInput value={image.base} placeholder="https://…/v1" onChange={(v) => setImageField({ base: v })} />
               </Field>
               <Field label="模型名">
-                <TextInput value={image.model} onChange={(v) => { setImage({ ...image, model: v }); setTests((t) => ({ ...t, image: 'idle' })) }} />
+                <TextInput value={image.model} onChange={(v) => setImageField({ model: v })} />
+              </Field>
+              <Field label="同时出图数">
+                <TextInput value={image.concurrency} onChange={(v) => setImageField({ concurrency: v.replace(/\D/g, '') })} />
+              </Field>
+              <Field label="生图失败重试次数">
+                <TextInput value={image.retries} onChange={(v) => setImageField({ retries: v.replace(/\D/g, '') })} />
               </Field>
               <div style={{ gridColumn: '1 / -1' }}>
                 <Field label="API Key">
-                  <TextInput type="password" value={image.key} placeholder="sk-…" onChange={(v) => { setImage({ ...image, key: v }); setTests((t) => ({ ...t, image: 'idle' })) }} />
+                  <TextInput type="password" value={image.key} placeholder="sk-…" onChange={(v) => setImageField({ key: v })} />
                 </Field>
               </div>
             </ModelCard>

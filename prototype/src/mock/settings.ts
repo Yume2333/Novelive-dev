@@ -58,7 +58,34 @@ export const defaultTextConfig = (slot: Exclude<ModelSlot, 'image'>): TextModelC
   return { format: 'openai-chat', base: defaultBaseUrl('openai-chat'), model: seed[slot], context: '', key: '', inheritFast: slot !== 'fast' }
 }
 
-export const defaultImageConfig = () => ({ base: 'https://api.openai.com/v1', model: 'gpt-image-1', key: '' })
+export const defaultImageConfig = () => ({
+  base: 'https://api.openai.com/v1',
+  model: 'gpt-image-1',
+  key: '',
+  /** 同时出图数（默认 8） */
+  concurrency: '8',
+  /** 一张图检查不通过后最多重画几次，用完用占位图并标“需要处理”（默认 3） */
+  retries: '3',
+})
+
+/** 图片模型能力测试：文生图、透明底、图片编辑三项各给一个结果 */
+export type ImageCapability = 't2i' | 'transparent' | 'edit'
+
+export const imageCapabilityTests: { id: ImageCapability; label: string }[] = [
+  { id: 't2i', label: '文生图' },
+  { id: 'transparent', label: '透明底' },
+  { id: 'edit', label: '图片编辑' },
+]
+
+export type CapabilityState = 'testing' | 'ok' | 'unsupported' | 'fail'
+
+/** 演示：模型名带 dalle / sd / flux 的不支持透明底，带 dalle 的不支持图片编辑 */
+export const imageCapabilitySupport = (model: string, cap: ImageCapability): boolean => {
+  const m = model.toLowerCase()
+  if (cap === 'transparent') return !['dalle', 'sd', 'flux'].some((k) => m.includes(k))
+  if (cap === 'edit') return !['dalle'].some((k) => m.includes(k))
+  return true
+}
 
 // ---- 高级设置 ----
 
@@ -67,9 +94,12 @@ export const agentRoles: { id: string; label: string; slot: ModelSlot }[] = [
   { id: 'organizer', label: '整理', slot: 'fast' },
   { id: 'director', label: '主控', slot: 'main' },
   { id: 'writer', label: '写手', slot: 'writing' },
-  { id: 'artist', label: '美术导演', slot: 'main' },
-  { id: 'reviewer-visual', label: '视觉审核', slot: 'visual' },
   { id: 'reviewer-script', label: '审稿', slot: 'main' },
+  { id: 'artist', label: '美术导演', slot: 'main' },
+  { id: 'painter-portrait', label: '立绘画师', slot: 'main' },
+  { id: 'painter-scene', label: '场景画师', slot: 'main' },
+  { id: 'painter-variant', label: '差分画师', slot: 'fast' },
+  { id: 'reviewer-visual', label: '视觉审核', slot: 'visual' },
 ]
 
 /** 写手预设：文风与输出约束，作品可改选或在默认上改几项 */

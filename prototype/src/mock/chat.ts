@@ -192,23 +192,23 @@ const wugangS1: ChatSession = {
               kind: 'glossary',
               title: '「北灯」',
               before: '北灯：北方灯塔的统称',
-              after: '北灯：特指第 7 章提到的第三座灯塔',
-              affectedChapters: ['第 7 章', '第 14 章'],
+              after: '北灯：特指第 6 章提到的第三座灯塔',
+              affectedChapters: ['第 6 章', '第 14 章'],
             },
             {
               id: 'w4b-c3',
               kind: 'redo-chapter',
-              title: '第 7 章「沉没的回声」',
+              title: '第 5 章「旧航海图」',
               note: '按「凛先怀疑再求证」重新分场写剧本；重做进入制作队列。',
-              affectedChapters: ['第 7 章'],
-              confirmHint: '第 7 章已经制作完成，重做会覆盖现有剧本和演出。',
+              affectedChapters: ['第 5 章'],
+              confirmHint: '第 5 章已经制作完成，重做会覆盖现有剧本和演出。',
             },
             {
               id: 'w4b-c4',
               kind: 'redraw-image',
-              title: '第 9 章场景 2 的码头背景',
+              title: '第 4 章场景 2 的码头背景',
               note: '背景里灯塔的画法和新的「北灯」说法对不上，需要重画。',
-              affectedChapters: ['第 9 章'],
+              affectedChapters: ['第 4 章'],
               confirmHint: '这张图已生成，重画会再出一次图。',
             },
           ],
@@ -505,13 +505,14 @@ export function agentReplySteps(workTitle: string, context?: string | null): {
 // ---- 运行记录（一章的制作过程） ----
 
 export interface RunRecordData {
-  /** 三段：写 → 审稿 → 演出与出图 */
-  steps: { title: string; parts: MessagePart[] }[]
+  /** 四段：写 → 审稿 → 演出 → 出图；出图段按画师分组显示 */
+  steps: { title: string; parts: MessagePart[]; groups?: { title: string; parts: MessagePart[] }[] }[]
 }
 
 /**
  * 一章的运行记录 mock：写是一次输出；审稿是检查加一轮返修；
- * 演出与出图是一串工具调用，其中一张图检查不通过、重画一次。
+ * 演出是美术导演读剧本、插演出指令、列出图清单；
+ * 出图按画师分三组，其中一张图看图不通过、重画后通过，一张沿用之前章节画好的。
  */
 export function runRecordMock(chapterTitle: string): RunRecordData {
   return {
@@ -536,64 +537,127 @@ export function runRecordMock(chapterTitle: string): RunRecordData {
         ],
       },
       {
-        title: '演出与出图',
+        title: '演出',
         parts: [
           { kind: 'thinking', seconds: 12, text: '先定每场要几张图：场景 1 用码头全景当背景，凛的立绘两张表情……' },
-          { kind: 'tool', id: 'st-t1', title: `查看${chapterTitle}剧本`, status: 'done', args: [{ label: '章节', value: chapterTitle }], result: '共 4 场，需要 2 张背景、1 张 CG、3 张立绘差分。' },
+          { kind: 'tool', id: 'st-t1', title: `查看${chapterTitle}剧本`, status: 'done', args: [{ label: '章节', value: chapterTitle }], result: '共 4 场，插 11 条演出指令。' },
           { kind: 'tool', id: 'st-t2', title: '读取设定集', status: 'done', args: [{ label: '条目', value: '凛 · 外貌（截至本章）' }], result: '长马尾、邮差大衣、帆布包。新造型还不出现。' },
           {
-            kind: 'tool',
-            id: 'st-t3',
-            title: '生成图片',
-            status: 'done',
-            args: [{ label: '内容', value: '场景 1 背景 · 清晨的码头' }, { label: '比例', value: '16:9，主体在中间安全区' }],
-            result: '已保存到工程。',
-            imageThumb: true,
-            checks: [
-              { label: '技术检查', pass: true, note: '尺寸、通道正常' },
-              { label: '看图结论', pass: true, note: '雾的浓度、码头位置都符合场景描述' },
+            kind: 'text',
+            text: '演出补完：4 场插了 11 条演出指令。本章要用 12 张图：新画 5 张，沿用 7 张；「微笑」并入已有的「开心」。',
+          },
+          {
+            kind: 'text',
+            text: '要新画：场景 3 CG「凛在旧灯塔前」、凛立绘基准图「邮差大衣」、凛差分「怀疑」「沉默」、场景 4 背景变体「雾变浓」。',
+          },
+        ],
+      },
+      {
+        title: '出图',
+        parts: [],
+        groups: [
+          {
+            title: '立绘',
+            parts: [
+              {
+                kind: 'tool',
+                id: 'pt-l1',
+                title: '生成图片',
+                status: 'done',
+                args: [{ label: '内容', value: '凛 · 立绘基准图 · 邮差大衣' }, { label: '格式', value: '竖版，透明底' }],
+                result: '已保存到工程。',
+                imageThumb: true,
+                checks: [
+                  { label: '技术检查', pass: true, note: '透明通道正常' },
+                  { label: '看图结论', pass: true, note: '造型和角色设定图一致' },
+                ],
+              },
             ],
           },
           {
-            kind: 'tool',
-            id: 'st-t4',
-            title: '生成图片',
-            status: 'failed',
-            args: [{ label: '内容', value: '场景 3 CG · 凛在旧灯塔前' }, { label: '比例', value: '16:9，主体在中间安全区' }],
-            result: '没通过检查，已丢弃。',
-            imageThumb: true,
-            checks: [
-              { label: '技术检查', pass: true, note: '尺寸、通道正常' },
-              { label: '看图结论', pass: false, note: '灯塔画成了新造型里的第三座，时间对不上' },
+            title: '场景',
+            parts: [
+              {
+                kind: 'tool',
+                id: 'pt-s1',
+                title: '生成图片',
+                status: 'done',
+                args: [{ label: '内容', value: '场景 1 背景 · 清晨的码头' }, { label: '比例', value: '16:9，主体在中间安全区' }],
+                result: '沿用第 3 章已画的码头全景，没有重画。',
+                imageThumb: true,
+              },
+              {
+                kind: 'tool',
+                id: 'pt-s2',
+                title: '生成图片',
+                status: 'failed',
+                args: [{ label: '内容', value: '场景 3 CG · 凛在旧灯塔前' }, { label: '比例', value: '16:9，主体在中间安全区' }],
+                result: '没通过检查，已丢弃。',
+                imageThumb: true,
+                checks: [
+                  { label: '技术检查', pass: true, note: '尺寸、通道正常' },
+                  { label: '看图结论', pass: false, note: '灯塔画成了新造型里的第三座，时间对不上' },
+                ],
+              },
+              {
+                kind: 'tool',
+                id: 'pt-s3',
+                title: '生成图片',
+                status: 'done',
+                args: [{ label: '内容', value: '场景 3 CG · 凛在旧灯塔前（重画）' }, { label: '比例', value: '16:9，主体在中间安全区' }],
+                result: '已保存到工程。',
+                imageThumb: true,
+                checks: [
+                  { label: '技术检查', pass: true, note: '尺寸、通道正常' },
+                  { label: '看图结论', pass: true, note: '灯塔外观和本章时间线一致' },
+                ],
+              },
             ],
           },
           {
-            kind: 'tool',
-            id: 'st-t5',
-            title: '生成图片',
-            status: 'done',
-            args: [{ label: '内容', value: '场景 3 CG · 凛在旧灯塔前（重画）' }, { label: '比例', value: '16:9，主体在中间安全区' }],
-            result: '已保存到工程。',
-            imageThumb: true,
-            checks: [
-              { label: '技术检查', pass: true, note: '尺寸、通道正常' },
-              { label: '看图结论', pass: true, note: '灯塔外观和本章时间线一致' },
+            title: '差分',
+            parts: [
+              {
+                kind: 'tool',
+                id: 'pt-v1',
+                title: '生成图片',
+                status: 'done',
+                args: [{ label: '内容', value: '凛 · 差分 · 怀疑' }, { label: '基准', value: '凛 · 邮差大衣，只改表情' }],
+                result: '已保存到工程。',
+                imageThumb: true,
+                checks: [
+                  { label: '技术检查', pass: true, note: '透明通道正常' },
+                  { label: '看图结论', pass: true, note: '只改了表情，其余和基准图一致' },
+                ],
+              },
+              {
+                kind: 'tool',
+                id: 'pt-v2',
+                title: '生成图片',
+                status: 'done',
+                args: [{ label: '内容', value: '场景 4 背景变体 · 雾变浓' }, { label: '基准', value: '清晨的码头，只改雾的浓度' }],
+                result: '已保存到工程。',
+                imageThumb: true,
+                checks: [
+                  { label: '技术检查', pass: true, note: '尺寸、通道正常' },
+                  { label: '看图结论', pass: true, note: '只改了雾的浓度，构图不变' },
+                ],
+              },
+              {
+                kind: 'tool',
+                id: 'pt-v3',
+                title: '生成图片',
+                status: 'done',
+                args: [{ label: '内容', value: '凛 · 差分 · 沉默' }, { label: '基准', value: '凛 · 邮差大衣，只改表情' }],
+                result: '已保存到工程。',
+                imageThumb: true,
+                checks: [
+                  { label: '技术检查', pass: true, note: '透明通道正常' },
+                  { label: '看图结论', pass: true, note: '只改了表情，其余和基准图一致' },
+                ],
+              },
             ],
           },
-          {
-            kind: 'tool',
-            id: 'st-t6',
-            title: '生成图片',
-            status: 'done',
-            args: [{ label: '内容', value: '凛 · 立绘 · 怀疑（差分 1/3）' }],
-            result: '已保存到工程。',
-            imageThumb: true,
-            checks: [
-              { label: '技术检查', pass: true, note: '透明通道正常' },
-              { label: '看图结论', pass: true, note: '造型和设定集一致' },
-            ],
-          },
-          { kind: 'text', text: '演出补完：4 场插了 11 条演出指令，出图 6 张（1 张重画后通过）。这一步到此为止。' },
         ],
       },
     ],

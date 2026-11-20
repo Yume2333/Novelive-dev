@@ -48,9 +48,9 @@ function ChapterRow({ work, chapter, last, onOpenStale, onOpenRuns }: {
   const navigate = useNavigate()
   const toast = useToast()
   const [priority, setPriority] = useState(!!chapter.priority)
-  // 三步进度：审稿是作品开关，关了只剩两步；出图按张算（"图 5/8"）
-  const steps = work.reviewEnabled ? ['写', '审稿', '演出与出图'] : ['写', '演出与出图']
-  // step 形如 "演出与出图 5/8"
+  // 四步进度：审稿是作品开关；写下一章时上一章在出图，两章可以同时是“制作中”；出图按张算（"出图 5/8"）
+  const steps = work.reviewEnabled ? ['写', '审稿', '演出', '出图'] : ['写', '演出', '出图']
+  // step 形如 "出图 5/8"
   const stepIdx = Math.max(
     0,
     steps.findIndex((s) => chapter.step?.startsWith(s)),
@@ -182,8 +182,12 @@ export function ProductionPage() {
   const ser = findSeries(work.seriesId)
   const pos = queue.findIndex((w) => w.id === work.id)
   const isHead = pos === 0
-  const current = work.chapters.find((c) => c.status === 'producing')
+  const writingChapter = work.chapters.find((c) => c.status === 'producing' && !c.step?.startsWith('出图'))
+  const paintingChapter = work.chapters.find((c) => c.status === 'producing' && c.step?.startsWith('出图'))
+  const current = writingChapter ?? paintingChapter
   const attention = work.chapters.filter((c) => c.status === 'attention')
+  // 出图队列概况（假数据）：等待 9 张、正在画 5 张（上限来自设置的“同时出图数”）
+  const imageQueue = { waiting: 9, painting: 5 }
 
   // 顶栏全局控制：只有立即停止 / 继续制作，没有暂停；“更多”里放原型演示项
   const controls = (
@@ -290,7 +294,7 @@ export function ProductionPage() {
             </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
             <Icon
               name={current ? 'sync' : work.phase === 'done' ? 'check_circle' : 'schedule'}
               size={24}
@@ -298,14 +302,36 @@ export function ProductionPage() {
                 color: current ? 'var(--color-primary)' : 'var(--color-outline)',
                 animation: current && running && isHead ? 'spin 4s linear infinite' : undefined,
                 flexShrink: 0,
+                marginTop: 2,
               }}
             />
             <div style={{ flex: 1, minWidth: 220 }}>
               <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 6 }}>当前章节</div>
-              <h3 className="headline" style={{ fontSize: 20 }}>
-                {work.phase === 'done' ? '全部章节已发布' : current ? `第 ${current.index} 章 · ${current.title}` : '等待下一个章节'}
-                {current?.step ? <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>（{current.step}）</span> : null}
-              </h3>
+              {work.phase === 'done' ? (
+                <h3 className="headline" style={{ fontSize: 20 }}>全部章节已发布</h3>
+              ) : current ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {paintingChapter ? (
+                    <h3 className="headline" style={{ fontSize: 20 }}>
+                      第 {paintingChapter.index} 章 · {paintingChapter.title}
+                      <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>（{paintingChapter.step}）</span>
+                    </h3>
+                  ) : null}
+                  {writingChapter ? (
+                    <h3 className="headline" style={{ fontSize: 20 }}>
+                      第 {writingChapter.index} 章 · {writingChapter.title}
+                      <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>（{writingChapter.step ?? '写'}）</span>
+                    </h3>
+                  ) : null}
+                  {paintingChapter ? (
+                    <div style={{ fontSize: 12, color: 'var(--color-outline)', marginTop: 2 }}>
+                      出图队列：等待 {imageQueue.waiting} 张 · 正在画 {imageQueue.painting} 张
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <h3 className="headline" style={{ fontSize: 20 }}>等待下一个章节</h3>
+              )}
             </div>
             {pos > 0 ? <Chip>排在第 {pos + 1} 位</Chip> : isHead && running ? <Chip active>正在制作</Chip> : null}
           </div>
