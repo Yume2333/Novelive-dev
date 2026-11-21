@@ -84,7 +84,7 @@
 
 主视觉（确认点 1 的候选）也用同一套拼装和画风固定句生成。主视觉画得太细，碎感会传给之后所有的图：第三轮的水彩主视觉作参考画出的 CG 和背景是全场最碎的，祥子在 CG 和立绘之间也认不出是同一个人。
 
-接口参数：`quality: high`（owner 看图后定的默认值），`complexity` 不传。实测 `complexity: low` 几乎没有效果；`quality: medium` 省约 24% 输出 token，画质略降。推荐模型 `gpt-image-2.6-sunburst`：和 `gpt-image-2.6-flare` 对比，owner 看图认为 sunburst 明显更好，两者耗时和输出 token 基本相同；模型名仍是配置项。
+接口参数：`quality: high`（owner 看图后定的默认值），`complexity` 不传。实测 `complexity: low` 几乎没有效果；`quality: medium` 每张输出 1584 token，只有 high（6240）的约四分之一，耗时相近，但画面明显差一些，还会画错，不用。推荐模型 `gpt-image-2.6-sunburst`：和 `gpt-image-2.6-flare` 对比，owner 看图认为 sunburst 明显更好，两者耗时和输出 token 基本相同；模型名仍是配置项。
 
 ## 3. 生成规则与本地处理
 
