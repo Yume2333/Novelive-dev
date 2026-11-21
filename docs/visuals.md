@@ -45,7 +45,7 @@
 
 生图工具传多张参考图时，由工具按派生类型在提示词头部生成每张图的角色声明句（如“第 1 张是主视觉，只参照画法、配色和细节密度，不照搬内容；第 2 张是 `lin-xiao` 的造型基准图”），模型不写这句。提示词的完整拼装见 2.4。
 
-实测口径的成本：每张立绘约 0.049 美元、每张场景约 0.057 美元；100 章约 470–530 张图、约 23–30 美元，算上重画约 35–45 美元。单张出图耗时中位数 37 秒。
+实测口径的成本（`quality` 默认档）：每张立绘约 0.049 美元、每张场景约 0.057 美元；100 章约 470–530 张图、约 23–30 美元，算上重画约 35–45 美元。单张出图耗时中位数 37 秒。现在默认用 `quality: high`，实测输出 token 约为默认档的 2–3 倍，单张成本按此上调，准确数字待下一轮实测后更新。
 
 内容审核拒绝不算临时错误：先按降敏规则改写一次，再被拒才用占位图并标“需要处理”（见[创作流水线](./creation-pipeline.md)）。降敏规则写进画师内置提示词：去掉武器、血液、身体部位、年龄词等具象名词，改成光影、氛围、剪影描写，角色用外观特征不用年龄词；重画时由工具把固定句“上一次生成被内容审核拒绝，请收敛描写”追加到提示词尾部，不让画师自己猜往哪改。
 
@@ -68,7 +68,7 @@
    - 立绘：从头顶画到膝盖上方，腿在膝盖上方被画面底边裁断，人物居中，头顶留少量余量；透明背景，没有地面和影子；半透明边缘的颜色和相邻的衣服或皮肤一致。
    - 背景和 CG：主体在中央 4:3 区域，左右两侧只画延展配景；背景另写“空景，画面里没有人”。
    - 差分：只改一处，其余和第 1 张一致，并逐项列出 keep-list。
-7. **渲染块**（代码，固定放在最后一行）：`large simple color masses, low visual frequency, restrained edge density, clear edge hierarchy, minimal internal contour lines, broad shadow shapes, suppress micro-texture and micro-contrast, no unnecessary specular highlights`。
+7. **渲染块**（代码，固定放在最后一行）：`large simple color masses, low visual frequency, restrained edge density, clear edge hierarchy, minimal internal contour lines, broad shadow shapes, suppress micro-texture and micro-contrast, no unnecessary specular highlights`。**待定**：用画风鲜明的参考图（Torino 心海）实测时，渲染块压住了杂纹，也把参考画风压平了；最后一行用渲染块还是“画风固定句”（保留参考图的高光、渐变和色彩，只要求线条平滑连续、表面干净），正在对比，结果出来后改这一条。
 
 固定句是 `creator` 包里的英文常量；内容段、外貌、画风描述用作品语言。实测内容段的语言、渲染块的语言对结果都没有显著影响。
 
@@ -82,7 +82,7 @@
 
 主视觉（确认点 1 的候选）也用同一套拼装和渲染块生成。主视觉画得太细，碎感会传给之后所有的图：第三轮的水彩主视觉作参考画出的 CG 和背景是全场最碎的，祥子在 CG 和立绘之间也认不出是同一个人。
 
-接口参数：`quality` 用接口默认值，`complexity` 不传。实测 `complexity: low` 几乎没有效果；`quality: medium` 省约 24% 输出 token，画质略降。
+接口参数：`quality: high`（owner 看图后定的默认值），`complexity` 不传。实测 `complexity: low` 几乎没有效果；`quality: medium` 省约 24% 输出 token，画质略降。模型在 `gpt-image-2.6-flare` 和 `gpt-image-2.6-sunburst` 之间的取舍正在对比；sunburst 在 owner 的看图里明显更好，成本和默认档相近。
 
 ## 3. 生成规则与本地处理
 
@@ -119,7 +119,8 @@
 - 画师只写内容段，不写反向提示词：图片模型没有 negative prompt 参数，写成 `Avoid:` 行实测无益（见 2.4）。各家原生的 `negative_prompt` 参数第一版不用。
 - 没有 `/edits` 端点的接口，编辑请求降级为 generations + `image` 字段（Seedream、Qwen、部分中转走这条）。
 - 返回 `url` 的下载成字节归一（Seedream、Qwen、Together 默认 url，SiliconFlow 只有 url）。
-- 尺寸按声明的填法吸附到合法值：尺寸一律以像素给出，并按各家规则吸附到 16 的倍数。返回的尺寸可能和请求不同（实测编辑接口会跟着参考图的尺寸走，请求 1536×864 回来 1672×941 或 1536×1024）：宽高比差在 1% 以内就缩放到目标尺寸；超过 1% 就从中心裁成目标比例，再做安全区检查。主视觉生成后同样先裁成 16:9 再存。
+- 尺寸按声明的填法吸附到合法值：尺寸一律以像素给出，并按各家规则吸附到 16 的倍数。返回的尺寸可能和请求不同：宽高比差在 1% 以内就缩放到目标尺寸；超过 1% 就从中心裁成目标比例，再做安全区检查。主视觉生成后同样先裁成 16:9 再存。
+- **原生分辨率**：图片模型配置里多一项“原生长边上限”。走 Codex / ChatGPT 反代的中转，上游真实生成的长边不超过约 1536 像素，请求 2K、4K 时中转自己超分放大，像素多了细节没多（实测 4K 输出缩到 1080p 再放回，PSNR 48.8 dB，和 1K 图用 Lanczos 放大的 50.4 dB 同档；Codex issue #28723 也报告请求 4K 只拿到 1672×941）；编辑接口返回 1672×941、1536×1024 这类非请求尺寸，也是这个原因。所以适配层请求尺寸不超过原生上限（16:9 用 1536×864，立绘用 1024×1536），2K / 4K 一律由本地 Real-ESRGAN 放大，不让中转超分。官方 API（官转）的 2.6 系列支持原生 4K、按像素计费，以后接入时把上限改大，放大步骤相应减少。
 - Seedream 恒传 `watermark:false`（默认会加“AI 生成”水印）。
 - 声明要透明底、回来的图却没有有效 alpha，按技术检查失败拦下。
 - 第一版不开生成过程预览（`stream` 只有 OpenAI、OpenRouter 和 Seedream 老型号支持）；OpenRouter 图片接口第一版不接（不是 `/v1/images/*` 形状）。

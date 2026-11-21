@@ -781,3 +781,17 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 90 字硬上限、超出退回写手拆句；播放器不分页。
 - **Because:** 90 字是按 720p 默认样式下的中文容量定的，作品语言、窗口大小和作品自定义样式都会改变容量，按字数卡既拦不住溢出，又会误伤；它原本要防的是写手照搬原文，字数只是间接指标。句内分页不需要存新状态，回到句首即可。150 字上限没有任何实测依据。
 - **Decided by:** user
+
+## 2026-11-21 - 生图默认 quality high，所有图都过 Real-ESRGAN 后处理
+
+- **Decided:** 生图默认传 `quality: high`；所有生成图都过 Real-ESRGAN 动漫模型处理（管线里的放大步骤本来就做）。最后一行用渲染块还是画风固定句、模型用 flare 还是 sunburst，在这个前提下继续对比。
+- **Instead of:** `quality` 用接口默认值；把渲染块当成去杂纹的唯一手段。
+- **Because:** owner 看 Torino 心海参考图的实测对比：只带参考图时画风保住了，但杂纹、抖线、断线明显；渲染块压住了这些，也把画风压平了。`quality: high` 加画风固定句、换 sunburst、经过 Real-ESRGAN 处理，三者看起来都比原图好。证据在 `.workflow/evidence/spikes-r4/genshin-style/` 和 `clean-style/`（图片不进仓库）。
+- **Decided by:** user
+
+## 2026-11-21 - 生图按原生 1.5K 请求，放大一律本地做
+
+- **Decided:** 图片模型配置加“原生长边上限”；现在用的 Codex 反代中转按约 1536 处理，请求尺寸不超过它，2K / 4K 由本地 Real-ESRGAN 放大。以后接官方 API 等原生 4K 的接口时调大上限。
+- **Instead of:** 直接向中转请求 2560×1440 或 3840×2160。
+- **Because:** owner 判断中转的 2K/4K 是上游超分、内容密度只有 1080p；实测频谱往返测试与此一致，调研也确认 Codex / ChatGPT 反代原生长边不超过约 1536（Codex issue #28723、API易官逆文档）。中转超分后的图再过 Real-ESRGAN 只是重复放大。证据在 `.workflow/evidence/spikes-r4/size-probe/`。同一测试确认中转确实执行 `quality`：同一提示词 low 输出 408 token、high 6240 token，high 的细节明显更多。
+- **Decided by:** user
