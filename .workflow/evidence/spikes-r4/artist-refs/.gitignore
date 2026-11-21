@@ -1,0 +1,9 @@
+ref
+gen
+work
+contact
+compare
+node_modules
+.venv
+run.log
+__pycache__
