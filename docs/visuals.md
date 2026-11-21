@@ -45,14 +45,16 @@
 
 内容审核拒绝不算临时错误：先按降敏规则改写一次，再被拒才用占位图并标“需要处理”（见[创作流水线](./creation-pipeline.md)）。降敏规则写进画师内置提示词：去掉武器、血液、身体部位、年龄词等具象名词，改成光影、氛围、剪影描写，角色用外观特征不用年龄词；重画时由工具把固定句“上一次生成被内容审核拒绝，请收敛描写”追加到提示词尾部，不让画师自己猜往哪改。
 
-差分画师将来可以换本地或第三方编辑模型时，Qwen-Image-Edit 是备选记录（开源权重，支持多图一致性编辑），当前仍走 OpenAI 兼容图片接口。
+审核拒绝的识别按各家报错形状归成一类：OpenAI `error.code=moderation_blocked`；火山 `error.code` 为 `Input|Output{Text,Image}SensitiveContentDetected.*` 一族；阿里百炼 `invalid_request_error` + `InvalidParameter` 且 message 含敏感或审核字样；Together、SiliconFlow 的 422 safety 命中；中转透传上游的 `error.code`/`message`，按关键字匹配。审核拒绝不耗 SDK 重试（SDK 本来就只重试 429、5xx 和连接错误，400 不重试）。
+
+差分画师将来可以换本地或第三方编辑模型时，Qwen-Image-Edit 是备选记录（开源权重，支持多图一致性编辑），当前仍走 OpenAI 兼容图片接口（适配规则见「图片接口适配」一节）。
 
 ## 3. 生成规则与本地处理
 
 - **透明底**：立绘的透明底由图片模型直接输出，不做色键抠图。
 - **背景变体**：同一地点的变体（白天、夜晚、雨天）从该地点的基准图编辑派生。
 - **画面内文字**：招牌、信件等画面里的文字由图片模型直接画，不做文字识别校验。
-- **放大与降噪**：放大和降噪由一个 Python 进程负责，默认把图放大到 2560×1440（2K）并同时降噪，作品设置可选 4K，立绘按同样倍数放大；转 WebP、缩放、缩略图等其他图片处理在创作端进程里完成（进程划分见[系统架构](./architecture.md)）。
+- **放大与降噪**：由放大程序负责（ncnn-vulkan 可执行文件，由创作端启动，走标准输入输出，不依赖 CUDA，三平台都有预编译版）。默认模型 Real-ESRGAN `realesrgan-x4plus-anime`，放大时一并去噪；另带一个快速档。默认把图放大到 2560×1440（2K），作品设置可选 4K，立绘按同样倍数放大；模型只出整数倍，到不了目标分辨率时先整数倍放大、再重采样到目标尺寸；透明立绘的 RGBA 整图送进模型，不拆通道。转 WebP、缩放、缩略图等其他图片处理在创作端进程里完成（进程划分见[系统架构](./architecture.md)）。
 - **存储格式**：图片默认存为有损 WebP（质量 90，保留透明通道），应用设置里的全局开关可改无损。
 
 ## 3.1 画面规格
@@ -61,6 +63,34 @@
 - **背景和 CG**：直接按 16:9 生成，提示词要求主体落在中间的 4:3 安全区、上下留余量；铺满裁切时主体不受影响。
 - **立绘**：竖版、透明底。
 - **模型能力**：设置页测试图片模型时依次试文生图、透明底、图片编辑三项，分别显示结果；不支持时只提示，制作时不做兜底，由创作者自己换模型。
+
+## 3.2 图片接口适配
+
+生图走 OpenAI 兼容图片接口，但各家实现不一样。应用不做能力探测：图片模型配置里除地址、API Key、模型名外，用户声明四项——协议形状（OpenAI images 协议 / 其他）、能否编辑（支持 / 仅文生图 / 不确定）、能否出透明底（支持 / 不支持 / 不确定）、尺寸怎么填（任意 `WxH` / 分辨率档位 / 固定枚举）。填地址时按域名自动套预设（OpenAI、Seedream、Qwen、Gemini 兼容、SiliconFlow、通用中转）；设置页的三项能力测试核对声明，对不上就提示矛盾，不阻止保存。
+
+各家差异的精简对照：
+
+| 接口 | 编辑 | 透明底 | 尺寸 | 返回 |
+| --- | --- | --- | --- | --- |
+| OpenAI（`gpt-image-2.5/2.6-{sunburst,flare}`） | `/edits` multipart，最多 16 张参考图 | `background:transparent` | 任意 `WxH` | 恒 `b64_json` |
+| Seedream（火山方舟） | 无 `/edits`，图生图走 generations 的 `image` 字段 | 5.5 任意；5.0 图生限 1 张带 alpha 参考图 | `1K/1.5K/2K` 档或 `WxH`（有总像素区间） | 默认 `url`（24h） |
+| Qwen（阿里百炼兼容模式） | 无 `/edits`，generations 传 `image` | 2.1 系按提示词自动出 alpha | `WxH`（512²–2048²） | 默认 `url`（24h），b64 仅 3.0 系 |
+| Gemini 兼容 | 无 `/edits` | 不支持 | `extra_body.aspect_ratio` | `b64_json` |
+| SiliconFlow | 部分模型（`image`/`image2`/`image3` 字段） | 不支持 | `image_size` 固定枚举 | `images[].url`（1h，非 `data[]`） |
+| new-api / one-api 系中转 | 看渠道（透传或翻成 generations+image） | 看上游 | 透传上游语义 | 归一成 `data[]{url,b64_json}` |
+
+适配层在 `draw_image` 内部做归一化：
+
+- `negativePrompt` 默认拼进提示词尾部（`Avoid: …`）；只有声明支持 `negative_prompt` 的接口才作为参数外发。
+- 没有 `/edits` 端点的接口，编辑请求降级为 generations + `image` 字段（Seedream、Qwen、部分中转走这条）。
+- 返回 `url` 的下载成字节归一（Seedream、Qwen、Together 默认 url，SiliconFlow 只有 url）。
+- 尺寸按声明的填法吸附到合法值。
+- Seedream 恒传 `watermark:false`（默认会加“AI 生成”水印）。
+- 声明要透明底、回来的图却没有有效 alpha，按技术检查失败拦下。
+- 第一版不开生成过程预览（`stream` 只有 OpenAI、OpenRouter 和 Seedream 老型号支持）；OpenRouter 图片接口第一版不接（不是 `/v1/images/*` 形状）。
+- Gemini 可以填，但它不能编辑也不能出透明底，做不了差分和立绘画师的模型。
+
+OpenAI 自家模型换代快（`gpt-image-1` 已于 2026-10-23 关闭，当前为 `gpt-image-2.5/2.6-{sunburst,flare}`），模型名只作配置项和示例，不写死默认。
 
 ## 4. 技术检查与占位图
 

@@ -61,6 +61,8 @@ OpenClaw 只用了 `pi-tui`，不嵌 pi 的 Agent，不算先例。
 **通用层**
 
 1. **角色运行器**：按角色建 `Agent`，设模型、系统提示、工具；系统提示固定块在前、可变块在后。`streamFn` 包一层，统一记用量和运行记录（包括压缩摘要、会话标题这类不进对话的调用，omp `model_usage` journal 同款），会话结束调 `cleanupSessionResources`。
+   - **会话 ID 与缓存**：pi 调用统一传 `sessionId = work-<workId>-<role>`（同一作品同一角色跨章同 key，OpenRouter 粘路由和 OpenAI `prompt_cache_key` 靠它生效）、`cacheRetention` 默认 `short`（长间隔任务可选 `long`，注意 Kimi 和 OpenAI GPT-5.6+ 的 1h/24h 写加价）。
+   - **兼容预设**：模型设置加「兼容预设」下拉（自动 / openai / deepseek / qwen / zai / openrouter / anthropic-compat）；自定义地址（DashScope、中转）时把 `compat.thinkingFormat` / `cacheControlFormat` 写进 pi 的 `Model.compat`（约 80 行映射），否则推理开关和显式缓存标记对中转静默失效。pi 内置模型目录（`dist/providers/data/*.json`，43 个 provider，带 `contextWindow`/`cost`/`compat`）可查的模型直接读目录字段。
    - **两层重试**（决策 2026-11-21「模型调用两层重试」）：第一层在 provider 选项传 `maxRetries: 2`，管响应头到达前的失败。第二层在 `streamFn` 外再包整条消息重发，管流到一半断开、空回复、网关返回 200 后掉线，只在这条消息还没产生工具副作用时重发，最多 2 次；照 omp `ai/utils/empty-completion-retry.ts` 的 replay-safe 语义改写（未产出内容前缓冲事件，瞬时失败重发不重放），分类器换 pi-ai 的 `isRetryableAssistantError`。重试等待时间用 omp `utils/fetch-retry.ts` 的 `extractRetryHint`：中转常把限流写在正文不写 header，earendil 只认 header。
    - **流式空闲看门狗**：pi 的 `timeoutMs` 是整个 HTTP 请求超时（默认 10 分钟），管不到中转挂起流；包装层加事件级看门狗（约 60 行自写，omp `idle-iterator.ts` 581 行只参考），最新事件间隔超阈值就 abort，reason 标 `watchdog` 走瞬时重试路径。
    - **abort 归因**：抄 omp `ai/utils/abort.ts` `createAbortSourceTracker` + `ai/error/abort.ts` `callerAbortReason`（MIT，合计约 100 行）。用户取消和本地看门狗都能 abort 同一个合并 signal，不归因会把“用户取消”误当瞬时错误重发；归因后用户取消绝不进任何重试。
@@ -87,13 +89,15 @@ OpenClaw 只用了 `pi-tui`，不嵌 pi 的 Agent，不算先例。
    - **工具结果契约**：结果挂自扩展的 `details`（pi-ai 的 `AgentToolResult`/`ToolResultMessage` 类型可扩展）。查不到东西的调用（`find_term` 零命中、`read_source_range` 空段、过期快照头）标 `details.useless:true`，压缩时整对丢；形状照 omp `tool-result.ts` 的 builder（`text()/.error()/.useless()/.truncation()`）。
    - **错误文案规范**（照 omp `agent-loop.ts` 移植约 150 行）：报错都写成能照着改的说明——参数错了回完整 schema 加一个可用例子；补丁格式错了列出合法写法；引用类参数（chapterId/sceneId/asset）第一步查存在性，不存在回“该 ID 不存在 + 合法清单 + 正确调用例子”；工具名打错按后缀段匹配回 `Did you mean X?`；被跳过的工具结果写明“不要把跳过当作已完成，处理完插队内容后需要就重试”；`stop_reason:length` 截断的调用回“参数不完整不安全执行，拆成几个小调用”。
 3. **运行记录**：`project.db` 两张表，列名对齐 OTel `gen_ai.*` 去前缀后 snake_case（schema 全文见 `refs/ext-2026-11-evalops.md` §5）：
-   - `run`：一次任务/章/图一行，`kind`/`ref`/`status(running|done|needs_attention|cancelled|interrupted)`/`started_at`/`ended_at`/usage 汇总/`cost_usd`+`cost_priced`（0=未定价）/`error_*`/`meta`。
-   - `run_step`：一步一行（一次模型调用或一次工具调用），`operation_name('chat'|'execute_tool'|'generate_content')`/`role`（角色名）/`purpose`（'script'|'compaction-summary'|'image-gen' 等，转录外调用也记账）/`request_model`/`response_model`/`response_id`/`finish_reasons`/usage 五列 + `usage_reasoning`/`ttfc_ms`/`duration_ms`/`retries`/`tool_name`/`status`/`content_ref`（大内容外置引用，内容本体进会话存储）。`afterToolCall`、`onResponse` 钩子里写。
+   - `run`：一次任务/章/图一行，`kind`（`chapter`/`image`/`preview`/`synthesis`/`review`/`staging`/`redo`/`resynthesize`/`chat`/`chat-side`/`eval`）/`ref`/`status(running|done|needs_attention|cancelled|interrupted)`/`started_at`/`ended_at`/usage 汇总/`cost_usd`+`cost_priced`（0=未定价）/`error_*`/`meta`。「输入已改，需要重跑」映射 `status='needs_attention'` + `error_type='input_changed'`。
+   - `run_step`：一步一行（一次模型调用或一次工具调用），`operation_name('chat'|'execute_tool'|'generate_content')`/`role`（角色名）/`purpose`（'script'|'compaction-summary'|'image-gen' 等，转录外调用也记账）/`request_model`/`response_model`/`response_id`/`finish_reasons`/usage 五列 + `usage_reasoning`/`ttfc_ms`/`duration_ms`/`retries`/`tool_name`/`status`/`content_ref`（大内容外置引用，内容本体进会话存储）/`prompt_version`（M1b 评测基线）。模型调用步在 `subscribe` 的 `turn_end`/`message_end` 里写，工具步在 `afterToolCall` 钩子里写（pi 1.6.0 没有 `onResponse` 钩子）。
    - **崩溃回收用 claim 式**（opencode `session/execution.ts` 语义，替代裸 pid）：run 开始时同事务写 `suspended_at`，到终态清零并把 `resume_attempts` 归 0——进程启动时扫 `suspended_at IS NOT NULL` 的就是 crash signature，标中断交给“重跑被中断的任务”；`resume_attempts` 计数防无限复活；`owner_pid` 保留作辅助列。
    - **副作用状态分两态**：出图这类写文件的工具，job 记录区分“调用中”和“已落盘”（pi-durable `replay:'safe'|'never'` 语义）；interrupted 回收时先查文件是否已存在，已在标完成不重画。
    - **写入前核对输入**（决策 2026-11-21）：写剧本、综合设定、出图的任务开始时记下所用原文和设定的哈希，落盘前重算；变了不写入，标“输入已改，需要重跑”。
-4. **确认闸门**：需要确认的工具在 `beforeToolCall` 拦下，登记提议、出确认卡；确认后由代码执行，把结果作为工具结果补回会话再继续。**等待期间会话 park**：确认卡是一个可挂起的 UI 请求（帧形照 omp `RpcExtensionUIRequest method:"form"` 改写；确认点在制作槽上让位已有决策），创作者确认/拒绝后唤醒会话把结果补成工具结果。拒绝时可填理由，理由作为工具结果文本回给主控（OpenAI Agents `state.reject(item,{message})` 同款），提议表加 `feedback` 列。
-5. **派子 Agent 工具**（只给主控）：角色定义是数据；模型只填任务和背景，其余由代码注入——不加“任务开放度”字段：子 Agent 是固定角色，工作量由角色定义决定（决策 2026-11-21「调研后的取舍」）。新建 `Agent`，不传父对话；子 Agent 没有这个工具；结果放进固定信封回传，太长给预览加引用，回传前中和控制标记；父停子停。工具描述由代码动态生成、附可用角色花名册，并带两句固定文案：`DO NOT sleep, poll, or duplicate this subagent's work` 和 `include all relevant context (fresh context)`（omp/opencode 子 Agent 工具同款）。
+4. **确认闸门**：需要确认的工具在 `beforeToolCall` 拦下，登记提议、出确认卡；确认后由代码执行，把结果作为工具结果补回会话再继续。**等待期间会话 park**。确认卡用 assistant-ui 的原生工具审批：`propose_*` 的 tool-call part 挂 `approval:{id,prompt}`（`prompt` 写要做什么、影响哪些章节），消息状态 `requires-action:interrupt`，park 期间 `isRunning=false` 在制作槽上让位（确认点让位已有决策）；创作者在卡里确认/拒绝、可填理由 → `onRespondToToolApproval({approvalId, approved, reason})` 经 MessagePort 回给创作端，唤醒会话把结果补成工具结果（OpenAI Agents `state.reject(item,{message})` 同款），提议表加 `feedback` 列。UI 侧参照 `@assistant-ui/react-pi`（MIT）的 `hostUi.ts` approval 双向映射和 `messageProjection.ts` 的投影思路。
+   - **park 三态**：park 中创作者再发消息→排队，唤醒后注入；park 中应用退出→提议保持 `pending`，重开不再出卡（创作者在提议列表里处理），会话重建时把「等待已确认/已拒绝」补成工具结果；park 视同「停」→父 park 时子 Agent 停。
+   - **任务队列（M1a 规格待定）**：`run`/`run_step` 是运行记录（事实），不是队列（意图）。任务/出图队列要有自己的表：章优先级（优先章排前）、基准图→差分的依赖（基准没画完差分不开工）、多作品排队顺序和「确认后排回队首」、出图并发上限取自「同时出图数」；`propose_redo_chapter` 确认后章进队列也走这张表。M1a 规格补表结构。
+5. **派子 Agent 工具** `spawn_agent`（只给主控）：角色定义是数据；模型只填任务和背景，其余由代码注入——不加“任务开放度”字段：子 Agent 是固定角色，工作量由角色定义决定（决策 2026-11-21「调研后的取舍」）。新建 `Agent`，不传父对话；子 Agent 没有这个工具；结果放进固定信封回传，太长给预览加引用，回传前中和控制标记；父停子停。工具描述由代码动态生成、附可用角色花名册，并带两句固定文案：`DO NOT sleep, poll, or duplicate this subagent's work` 和 `include all relevant context (fresh context)`（omp/opencode 子 Agent 工具同款）。
    - **控制标记中和清单**：模型产出要进另一个模型的文本（子 Agent 回传、审稿→写手、差异列表）都过 `escapeHarnessTags`（omp `session/harness-tags.ts`，15 行正则，把清单内标签的 `<` 换成 `&lt;`）。我们自己的清单：`<system-reminder>`、`<task-result>`、确认卡标记、`<source_text>` 及其 `system-*` 变体。
 6. **上下文维护**（决策 2026-11-21「上下文维护分级」）：只用于对话面板和美术导演的长循环，约 800 行纯函数放 `agent/context/`。按代价从低到高分三级，每级做完重新计量，降到触发线的 0.8 以下就停：
    1. **清理**（每轮之间都跑，不调模型）：同一内容被再次读取后，旧的那份换成“已被更新的读取取代”；标了 `useless` 的工具结果换成一句占位；最近一段不动，省得不够多就不动。
@@ -102,7 +106,7 @@ OpenClaw 只用了 `pi-tui`，不嵌 pi 的 Agent，不算先例。
 
    接口报上下文溢出（pi 的 `isContextOverflow`）时按同样顺序处理后重发一次；还溢出标“需要处理”。
    - **触发线**：`window − max(15%·window, 16k)`（opencode `RESERVE_MIN`/`RESERVE_SHARE` 同款）；每级处理完重新计量，降到触发线的 0.8 以下才算成功，否则继续下一级。
-   - **计量**：上次响应的实测 usage（input + cache read/write + output + reasoning）作锚点，加上之后消息的字符估算；换 provider/模型/角色后实测作废退回估算（opencode `estimatePrompt`/`hasMeasuredPrompt`；omp `transcript-tokens.ts` 的锚定规则：aborted/error 轮次不算、被改写过的文本使旧实测失效）。未实测消息的估算用 **UTF-8 字节数 ÷ 4**，不用字符数 ÷ 3.5——pi-ai 的 `CHARS_PER_TOKEN=3.5` 对中文低估约 2.6 倍（1 个汉字 ≈3 字节 ≈0.7–1 token）。视觉模型图片计量用 omp `catalog/compat/image-tokenization.ts` 的四种 regime 公式（抽约 150 行），不用 earendil 的 4800 字符/图粗估。
+   - **计量**：上次响应的实测 usage（input + cache read/write + output + reasoning）作锚点，加上之后消息的估算；换 provider/模型/角色后实测作废退回估算（opencode `estimatePrompt`/`hasMeasuredPrompt`；omp `transcript-tokens.ts` 的锚定规则：aborted/error 轮次不算、被改写过的文本使旧实测失效）。未实测消息的估算用 **汉字数 × k + 其他 UTF-8 字节数 ÷ 4**，k 按 pi 内置模型目录的 provider 分档：`anthropic` 1.0、`openai` 0.91（o200k 系；cl100k 时代的老模型 1.35）、`deepseek` 0.69、`zai` 0.73、`qwen` 0.76、`moonshotai` 0.76、`google` 0.81；`openrouter` 按上游模型名再映射；查不到的 provider 按 0.95（宁高估）。实测 usage 仍覆盖估算作锚点。视觉模型图片计量用 omp `catalog/compat/image-tokenization.ts` 的四种 regime 公式（抽约 150 行），不用 earendil 的 4800 字符/图粗估。
    - **摘要提示词**：第一节写明“只总结用户和助手说过、做过的；格式说明、设定集切片这类内容由代码重新注入，不要复述”（opencode `compaction.ts` buildPrompt 第一条，治摘要器复述剧本格式说明）；八节模板加“没回答的问题原样保留”“作品和章节状态必须记”；摘要调用传 `reasoning:"off"`（支持时），输出上限保底 16k；回复没按模板返回时插一条 NUDGE（“不要调工具，按节标题返回摘要”），两次不过就算这一级失败，标“需要处理”。
    - **不吞未送达注入**：摘要插在第一条已登记未送达的注入之前；pending 条目要么进保留尾部，要么由代码在压缩后重新注入。
    - **状态重建**：进度这类状态存在工具结果的 `details` 或会话条目上（美术导演的图清单进度写进 `submit_image_manifest`/补丁工具的 `details` 或 `custom` 条目），压缩后代码从条目重建，不靠摘要器记（omp `message-cache.ts` 的符号版本号契约可抄）。
@@ -118,13 +122,14 @@ OpenClaw 只用了 `pi-tui`，不嵌 pi 的 Agent，不算先例。
 
 | 角色 | 工具 |
 | --- | --- |
-| 审稿 | `read_source_range`、`find_term`（术语出现位置）、`read_chapter_summary`、`submit_review` |
+| 审稿 | `read_source_range`、`find_term`（术语出现位置）、`read_chapter_preview`、`read_bible`、`submit_review` |
 | 美术导演 | `read_scenes`（按场景分批读）、`apply_staging_patch`（解析器校验，错了退回）、`submit_image_manifest`（每项只填素材名、类型、描述）。已有素材和设定切片由代码放进上下文 |
 | 三个画师 | 只有 `draw_image { prompt, negativePrompt? }`：素材由代码绑定，参考图和设定字段由代码放进上下文；尺寸、背景、生成还是编辑、技术检查、视觉审核、存文件、重画计数都在工具和代码里 |
-| 主控（对话面板） | `novelive-agent.md` 已列的读工具、按事拆开的 `propose_*` 提议工具、`list_proposals`，加派子 Agent |
+| 主控（对话面板） | `novelive-agent.md` 已列的读工具（含 `list_assets`/`read_chapter_manifest`/`read_task_result`）、按事拆开的 `propose_*` 提议工具、`list_proposals`、`spawn_agent`（派子 Agent，见通用层 5） |
 
 ## Open questions
 
 - [x] **编排底座**：继续 `pi-ai` + `pi-agent-core`，照 durable 和 p2 的设计自己写；durable 去掉实验标记后再评估。见 `decisions.md` 2026-11-21「编排继续用 pi-agent-core，不用 pi-durable」。
 - [x] **Schema 库**：改用 `pi-schema`。见 `decisions.md` 2026-11-21「Schema 改用 pi-schema」。
 - [x] **模型临时错误的重试**：两层重试 + 流式空闲看门狗 + 审核拒绝单独分类，见通用层 1。见 `decisions.md` 2026-11-21「模型调用两层重试，审核拒绝单独处理」。
+- [x] **批量接口（Batch API）**：第一版不做，记 M4 评估项——各厂批量接口要自写 JSONL 提交/轮询/回放（pi-ai 无 hook，约 200 行/厂），24h 窗口对逐章预览这种启动路径不友好，省额也小。

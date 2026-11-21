@@ -152,7 +152,7 @@ function WorkSection({ work, inside }: { work: Work; inside: boolean }) {
         >
           <Icon name="auto_awesome" size={18} />
           <span style={{ flex: 1, textAlign: 'left' }}>Novelive Agent</span>
-          <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-outline)' }}>Ctrl J</span>
+          <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-outline)' }}>Ctrl/⌘+J</span>
         </button>
       ) : null}
     </>

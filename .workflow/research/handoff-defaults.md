@@ -4,9 +4,9 @@
 
 ## M0
 
-- **call 取消**：`AbortSignal` 不能跨 contextBridge。preload 侧暴露 `call(cmd, payload)` 返回 promise + `cancel()`，内部维护 cancel id 映射并通知创作端；preload 同时维护 requestId→AbortController 映射，`webContents.destroyed` 时批量 abort 全部在途请求。（`docs/architecture.md`、contract 包）
-- **帧身份与事件 catch-up**：fork 创作端时主进程注入 `generation`（单调递增），命令/事件帧都带上，重连后界面丢弃 gen 不匹配的帧。事件统一 envelope `{seq, scope, scopeId, at, event}`，seq 在 scope 内单调；创作端内存保留每 scope 最近 N 条 ring buffer，contract 加 `events.list {scope, scopeId, afterSeq}` 命令补漏，ring 溢出回 `gap:true` + 最新快照让界面整体刷新。（`docs/architecture.md`、contract 包）
-- **崩溃断路器**：创作端基础设施失败连 3 次 → circuit open，不再自动拉起，转横幅加手动「重新启动」；业务 handler 错误不计入。（`docs/architecture.md`、`.workflow/specs/m0-skeleton.md`）
+- **call 取消**：`AbortSignal` 不能跨 contextBridge。preload 侧暴露 `call(cmd, payload)` 返回 promise + `cancel()`，内部维护 cancel id 映射并通知创作端；port 随窗口销毁关闭时，创作端中止该端口上的全部在途请求（`webContents.destroyed` 是主进程事件，preload 拿不到）。（`docs/architecture.md`、contract 包）
+- **帧身份与事件 catch-up**：fork 创作端时主进程注入 `generation`（单调递增），命令/事件帧都带上，重连后界面丢弃 gen 不匹配的帧。事件统一 envelope `{seq, scope, scopeId, at, event}`，seq 在 scope 内单调；scope 词表最小集 `app`/`work`（M0 先用 `app`）；创作端内存保留每 scope 最近约 500 条 ring buffer，contract 加 `events.list {scope, scopeId, afterSeq}` 命令补漏，ring 溢出回 `gap:true` + 该 scope 最新快照让界面整体刷新。（`docs/architecture.md`、contract 包）
+- **崩溃断路器**：创作端基础设施失败连 3 次 → circuit open，不再自动拉起，转横幅加手动「重新启动」；`creator.ready` 成功握手后失败计数清零；业务 handler 错误不计入。（`docs/architecture.md`、`.workflow/specs/m0-skeleton.md`）
 - **novelive:// 协议**：`novelive://cache/<相对路径>` 要 URL-decode，`path.normalize` 后拒绝 `..` 越界，MIME 按扩展名映射（webp/png/jpg/svg）。dev-bridge 下 `resourceUrl(path)` 返回 `http://localhost:8766/cache/...`，正式模式返回 `novelive://`。（`docs/architecture.md`、contract 包）
 - **dev-bridge 端口**：默认 WebSocket 8765、HTTP 资源 8766。（`tools/dev-bridge` README 或 contract）
 - **creator.ready**：由主进程代发，与 `creator.down` 对称；主进程最清楚 utility process 何时就绪。（contract 包）
@@ -36,7 +36,7 @@
 
 ## M1b
 
-- **审稿形态**：分两档（决策 2026-11-21「审稿拆成忠实度检查和文风审稿」）。忠实度检查默认开：工具循环 Agent（工具：`read_source_range`、`read_chapter_preview`、`read_glossary`/`read_scene`），只查漏段、加戏、对白改写、说话人归属错、独白降级、顺序不连贯、设定冲突，每条问题必须引用原文段落、代码核对引文确实在原文里（越界或全空白打回附邻近行提示）。文风审稿是作品开关、默认关，只评文笔。两档都不循环：写手按问题改一遍，不再复审。审稿提示词写明评什么、不评什么。（`.workflow/research/novelive-agent.md`、`agent-orchestration.md`）
+- **审稿形态**：分两档（决策 2026-11-21「审稿拆成忠实度检查和文风审稿」）。忠实度检查默认开：工具循环 Agent（工具：`read_source_range`、`find_term`、`read_chapter_preview`、`read_bible`、`submit_review`），只查漏段、加戏、对白改写、说话人归属错、独白降级、顺序不连贯、设定冲突，每条问题必须引用原文段落、代码核对引文确实在原文里（越界或全空白打回附邻近行提示）。文风审稿是作品开关、默认关，只评文笔。两档都不循环：写手按问题改一遍，不再复审。审稿提示词写明评什么、不评什么。（`.workflow/research/novelive-agent.md`、`agent-orchestration.md`）
 - **章节失败语义**：某章生成失败整部作品暂停（写手串行依赖上一章结尾），行内重试把该章排回队列头部，成功后恢复。（`docs/creation-pipeline.md`、`docs/ux.md`）
 - **重跑范围**：`redo_chapter`=写/审/演出三步全跑，出图按素材名跳过已存在文件；`rewrite_scene`（面板发起）=重写+差异列表确认卡二次确认后应用；`redraw_image`=单图重生成直接替换，旧文件进修改历史；`redo_volume_synthesis`=重跑走候选合并规则，不覆盖已确认条目。（`.workflow/research/novelive-agent.md`、`docs/ux.md`）
 - **主视觉**：由场景画师出图（横版 16:9），提示词由主控按风格描述组织；确认点 1 给 3 版候选必选，选中存 `assets/style/main-visual.webp` 写回 `bible/style.json` 参考图字段。（`docs/bible.md`、prototype ConfirmVisualPage）
@@ -63,11 +63,11 @@
 - **重写场景双入口**：编辑器内发起走差异列表勾选，对话面板发起走确认卡；同一后端工作流，差异列表=场景级确认卡的编辑器形态。（`docs/ux.md`、`docs/creation-pipeline.md`）
 
 ## M3
-
-- **放大模型选型**：Real-ESRGAN `x4plus-anime-6B` + ncnn-vulkan（BSD-3，权重可再分发，Vulkan 不依赖 NVIDIA）；降噪由超分模型内置 denoise 强度承担，不立单独模型。硬性条件：许可允许随包分发、不依赖 NVIDIA、安装包体积可接受。（`docs/architecture.md`、`docs/visuals.md`、`decisions.md` 2026-11-21）
-- **alpha 通道（试验）**：透明 PNG 拆 alpha 单独双三次放大再合成。验收：放大后 alpha 边缘不带色边。（`docs/visuals.md`、`.workflow/evidence/spike-consistency`）
+- **放大程序**：放大和降噪用 ncnn-vulkan 可执行文件（三平台都有官方预编译版），由创作端启动；输入输出走临时文件，进度和结果走标准输入输出。（`docs/architecture.md`、`decisions.md` 2026-11-21「放大降噪不用 Python」）
+- **放大模型选型**：默认 Real-ESRGAN `realesrgan-x4plus-anime`（6B，BSD-3，8.9MB；就是 Upscayl 的 `digital-art-4x`，权重逐字节相同），快速档 `realesr-animevideov3`（BSD-3，1.2MB）。程序用 `upscayl-bin`（AGPL-3.0，参数和 realesrgan-ncnn-vulkan 一致，能加载任意 ncnn 模型，自带输出重采样）。x4plus-anime 按带噪声和压缩痕迹的退化训练，放大时一并去噪，不另设降噪模型。M3 用真实生成的立绘、背景、CG 再比一次（第二轮对比图是合成的简单线稿）。不随包带 CC BY-NC 系模型（Remacri、UltraSharp、Ultramix、AnimeSharp 等）。（`decisions.md` 2026-11-21「放大默认用 Real-ESRGAN 动漫模型」、`refs/ext-2026-11-r2-upscale.md` 追加节）
+- **alpha 通道**：透明 PNG 带透明通道整图送进模型，不拆通道（实测 alpha 边缘误差 0.04/255、无白边）。（`decisions.md` 2026-11-21、`refs/ext-2026-11-r2-upscale.md`）
 - **stdio 协议**：行分隔 JSON；图片传临时文件路径不传 base64。（`docs/architecture.md`）
-- **体积与耗时（试验）**：M3 试打包时实测权重+venv 安装包体积和单图放大耗时。验收：安装包体积和 CPU 放大单图时间在 spec 写的限值内（RealESRGAN_x4plus ≈64MB 权重起步）。（`docs/architecture.md`）
+- **体积与耗时（试验）**：M3 试打包时实测二进制+权重的安装包体积和单图放大耗时。验收：安装包体积和单图放大时间在 spec 写的限值内。（`docs/architecture.md`）
 - **存量图回填**：素材另存成品+保留生成原图（或记放大状态字段）；M3 起新图走「转 WebP+放大」，旧工程存量图标「待放大」后台逐张回填，失败不阻塞。（`.workflow/research/novelive-agent.md`、`docs/visuals.md`）
 - **存档位数**：快存 1 槽、普通存档 60 槽；已读按句子 ID 集合存，主线进度记「章节 ID + 句子 ID」。（`docs/player.md`、prototype PlayerPage）
 - **播放器设置全集**：文字速度、自动播放速度、字号、对话框不透明度、只跳过已读、全屏、对话框样式全收。（`docs/player.md`、prototype）
@@ -83,7 +83,7 @@
 
 ## M5
 
-- **安装包格式**：Linux=AppImage、Windows=nsis、macOS=dmg（附 zip 供自动更新）。（`docs/architecture.md`、electron-builder）
+- **安装包格式**：Linux=AppImage、Windows=nsis、macOS=dmg（附 zip 供自动更新）。自动更新分平台：Windows（NSIS）和 Linux AppImage 用 electron-updater 自动更新；macOS 未签名包和 Linux deb 只检查新版本、提示手动下载（`decisions.md` 2026-11-21「自动更新分平台」）。（`docs/architecture.md`、electron-builder）
 - **work.json 字段**：`workId`（UUID 不可变）、`version`（int 每次导出+1）、`derivedFrom`（来源 workId+version，可选）；版本提示规则=「version > 已安装 version 才提示」；对不上的旧存档在存档界面以「旧版本存档」分组可见可删。（`docs/work-format.md`、`docs/ux.md`）
 - **界面翻译**：agent 跑机器翻译（繁中/英/日）并标注「未经人工抽查」，人工抽查留 `owner-review.md`。（`docs/architecture.md`、`.workflow/owner-review.md`）
-- **许可清单**：主依赖均为 MIT/Apache/ISC，无 copyleft 运行时依赖；M5 在应用「关于」页放第三方开源许可列表。（`docs/architecture.md`、LICENSE）
+- **许可清单**：M5 在应用「关于」页放 LICENSE 全文、第三方开源许可列表和仓库链接；`THIRD_PARTY_NOTICES` 由构建脚本生成（打包产物自带 Electron `LICENSE`/`LICENSES.chromium.html`，不删）。注意：sharp 动态加载的 libvips 是 LGPL-3.0，NOTICES 要留它的许可文本和源码指引；ncnn-vulkan 二进制和模型权重也要进清单。从上游拷贝或改写的文件，文件头保留版权行和原许可并指向 THIRD_PARTY_NOTICES（规则见 `refs/ext-2026-11-r2-licenses.md`）。（`docs/architecture.md`、LICENSE）

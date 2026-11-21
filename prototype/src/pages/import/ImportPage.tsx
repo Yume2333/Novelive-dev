@@ -149,6 +149,12 @@ function StepFiles({
       </div>
 
       {placement.mode === 'existing' ? (
+        <p style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', lineHeight: 1.6, margin: 0 }}>
+          新原文会成为该系列的下一卷；沿用系列已有的角色、设定和素材，预览时在原有设定上增量更新。
+        </p>
+      ) : null}
+
+      {placement.mode === 'existing' ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
           <Field label="系列">
             <Select

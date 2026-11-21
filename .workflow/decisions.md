@@ -672,3 +672,69 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 各条维持原设计。
 - **Because:** 14 份调研对账，缺口和证据见 `.workflow/research/gap-ledger.md`。
 - **Decided by:** user
+
+## 2026-11-21 - 放大降噪不用 Python，创作端直接调用 ncnn 程序
+
+- **Decided:** 去掉 Python 进程。放大和降噪用 ncnn-vulkan 可执行文件（不依赖 CUDA，三平台都有预编译版），由创作端启动；输入输出走临时文件，进度和结果通过标准输入输出传。默认模型等画质对比后定。透明立绘带透明通道整图送进模型，不拆通道。
+- **Instead of:** 保留 Python 进程（PyInstaller 或内嵌解释器）。
+- **Because:** 实测 ncnn 程序已满足全部需求：二次元图、无 NVIDIA、2K/4K、透明边缘干净（误差 0.04/255）；去掉 Python 后安装包小 22–105MB，也少一个解释器和一层进程。保留 Python 只是给以后可能用的 PyTorch 模型留路。透明通道的做法所有者交给 agent 定。见 `.workflow/research/refs/ext-2026-11-r2-upscale.md`。
+- **Decided by:** user
+- **Supersedes:** 2026-11-20 - 保留 Python 进程做放大和降噪；2026-11-20 - 创作端单独开后台进程，Python 走标准输入输出（只替换其中 Python 那半句）；2026-11-21 - M3 在 Linux 上试打一次安装包（“加入 Python 进程后”改为“加入放大程序后”）
+
+## 2026-11-21 - 自动更新分平台
+
+- **Decided:** Windows（NSIS）和 Linux AppImage 用 electron-updater 自动更新；macOS 未签名包和 Linux deb 只检查新版本，提示用户手动下载。
+- **Instead of:** 三平台都自动更新；三平台都只提示。
+- **Because:** 未签名的 macOS 包，Squirrel.Mac 校验签名会静默失败；deb 自动更新要搭软件仓库和 GPG 签名。
+- **Decided by:** user
+- **Supersedes:** 2026-11-20 - 界面翻译 M5 前做，应用从 GitHub Releases 自动更新（只限定其中的平台范围）
+
+## 2026-11-21 - sharp 在 Linux 上用自己打补丁的版本
+
+- **Decided:** sharp 在 Electron 的 Linux 版里一解码就崩溃（Electron#46323，glib 符号冲突，至今未修）。Linux 上由我们自己按 `@janhapke/sharp-electron` 的方法打补丁：在链接层隐藏 libvips 自带的 glib 符号，并强制加载同目录的 `.so`。补丁脚本放进仓库，sharp 每次升级都重新打；其他平台用官方 sharp。上游修好后换回官方版本。
+- **Instead of:** 直接用 `@janhapke/sharp-electron`（个人维护，只支持 linux-x64）；换 `@napi-rs/image`。
+- **Because:** 所有者的选择：不依赖个人维护的分支。
+- **Decided by:** user
+
+## 2026-11-21 - 用占位图发布的章仍算已发布
+
+- **Decided:** “需要处理”是挂在章上的标记，不是一种章状态。用占位图发布的章状态仍是“已发布”，可以玩，同时带“需要处理”标记，处理完去掉；所有章都已发布就算作品完成，带不带标记都一样。
+- **Instead of:** 两者互斥，另加一个状态词。
+- **Because:** 占位图章本来就能玩；把它踢出“已发布”，作品就永远到不了完成。
+- **Decided by:** user
+
+## 2026-11-21 - 字体：对白用思源黑体，作品包可带子集字体
+
+- **Decided:** 播放器对白默认用思源黑体，和界面统一。应用内置字体带全字库。作品可以在 `styles.css` 里引用自己的字体，导出时按正文和剧本用到的字裁成子集，随包分发。
+- **Instead of:** 对白用思源宋体；作品包不带字体；内置字体只带常用字。
+- **Because:** 所有者的选择。实测 6000 字的子集只有 3–5MB；内置字体带全字库，生僻字也不会显示成方框。
+- **Decided by:** user
+
+## 2026-11-21 - 导入时可加入已有系列，作为新的一卷
+
+- **Decided:** 导入向导保留“加入已有系列”：新原文作为该系列的新一卷，卷里一部作品，适合续作和第二部。预览和综合在系列已有设定上增量更新（走设定补丁：新增、更新、不变），已有角色的造型和素材直接复用。
+- **Instead of:** 第一版去掉，导入一律新建系列；或者为新部分单独生成一套设定。
+- **Because:** 所有者的选择；续作沿用同一套角色设定和素材，正是“同一系列共享设定和素材”的用途。
+- **Decided by:** user
+
+## 2026-11-21 - 第二轮调研后的取舍
+
+- **Decided:**
+  - 对话面板可以贴图，给主控看参考图。
+  - 忠实度检查可以关，默认开。
+  - 播放器：舞台直接用代码控制 PixiJS，不用 `@pixi/react`；对话文字用 DOM 覆盖层显示；每句存一份完整舞台快照，上限 200 条；存档里的位置对不上时保留，缺的字段补默认值，越界的位置收回到有效范围内。
+  - 剧本编辑器用 CodeMirror 6；移动的行算删掉再新增，换新 ID；M2 就做剧本语法高亮和说话人标签。
+  - 文本模型：设置加“兼容哪家”下拉；提示缓存的会话 ID 用作品加角色，保留时长用短档；批量接口放到 M4 评估；文档只给模型组合示例，不写死。上下文计量按 pi 模型目录里的服务商查每个汉字的 token 系数，查不到的按 0.95。
+  - 图片模型：设置里让用户声明接口形状、能否编辑、能否出透明底、尺寸规则这 4 项，填地址时自动套预设；`negativePrompt` 由代码拼进提示词；不开生成过程预览；OpenRouter 的图片接口第一版不接；Gemini 可以填，但写明不能编辑、不能出透明图；审核拒绝的识别扩展到各家的报错格式。
+  - 对话面板：确认卡用 assistant-ui 自带的工具审批；后台给界面推整条消息快照，每 30–50ms 推一批。
+  - 章节识别规则参考 legado 的思路自己重写，不照搬原文（原数据是 GPL-3.0，仓库已下线）；改编强度随时可改，只影响还没开始的任务。
+- **Instead of:** 各条报告里的其他选项。
+- **Because:** 第二轮 13 份调研对账，证据见 `.workflow/research/gap-ledger-r2.md`。
+- **Decided by:** user
+
+## 2026-11-21 - 放大默认用 Real-ESRGAN 动漫模型
+
+- **Decided:** 默认放大模型用 `realesrgan-x4plus-anime`（即 Upscayl 的 `digital-art-4x`），快速档用 `realesr-animevideov3`，都是 BSD-3。放大程序用 `upscayl-bin`（AGPL-3.0）。不随包带非商用许可的模型。M3 用真实生成的图再比一次。
+- **Instead of:** Real-CUGAN（更快，但立绘线稿上出现红色色晕）；Upscayl 里更锐的 Remacri、UltraSharp、Ultramix（CC BY-NC，不能随商用应用分发）；Nomos8kSC、HFA2k（CC-BY，动漫线条偏软，慢 2–4 倍）。
+- **Because:** 所有者用过 Upscayl，觉得它的动漫模型好；对比实测里这个模型线稿最干净，透明边缘干净，核显上 6–15 秒一张，内存约 0.5GB。`upscayl-bin` 和我们同为 AGPL，最新版发布于 2025-12-07，三平台都有预编译包；realesrgan-ncnn-vulkan 2022 年后没再发版。对比图见 `refs/ext-2026-11-r2-upscale.md` 追加节。
+- **Decided by:** agent

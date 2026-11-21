@@ -63,7 +63,7 @@ function PhaseCard({ work }: { work: Work }) {
 
   if (work.phase === 'producing') {
     const current = work.chapters.find((c) => c.status === 'producing')
-    const attention = work.chapters.filter((c) => c.status === 'attention').length
+    const attention = work.chapters.filter((c) => c.issue).length
     return (
       <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
@@ -199,6 +199,7 @@ function ChapterRow({ work, chapter, isProject, last }: { work: Work; chapter: C
       {chapter.step ? <span style={{ fontSize: 12, color: 'var(--color-primary)' }}>{chapter.step}</span> : null}
       {chapter.issue ? (
         <span style={{ fontSize: 12, color: 'var(--color-on-error-container)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+          <Icon name="error" size={13} style={{ verticalAlign: -2, marginRight: 3 }} />
           {chapter.issue}
         </span>
       ) : null}
@@ -208,7 +209,7 @@ function ChapterRow({ work, chapter, isProject, last }: { work: Work; chapter: C
         </span>
       ) : null}
       <span style={{ flex: 1 }} />
-      {isProject ? <ChapterStatusMark status={chapter.status} spin={chapter.status === 'producing'} /> : null}
+      {isProject ? <ChapterStatusMark status={chapter.status} spin={chapter.status === 'producing'} attention={!!chapter.issue} /> : null}
       <span className="row-actions" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
         {playable ? (
           <button
@@ -252,7 +253,8 @@ function ChapterList({ work, isProject }: { work: Work; isProject: boolean }) {
 function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; onClose: () => void }) {
   const toast = useToast()
   const [writerPreset, setWriterPreset] = useState(work.writerPreset ?? 'default')
-  const [review, setReview] = useState(work.reviewEnabled ?? false)
+  const [fidelity, setFidelity] = useState(work.fidelityCheck ?? true)
+  const [styleReview, setStyleReview] = useState(work.styleReview ?? false)
   const [pauseOnRef, setPauseOnRef] = useState(work.pauseOnRefImages ?? true)
   const [resolution, setResolution] = useState(work.outputResolution ?? '2K')
   const [accent, setAccent] = useState(work.accent)
@@ -315,8 +317,12 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
             </div>
           </label>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>审稿</span>
-            <Toggle on={review} onChange={() => setReview((v) => !v)} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>忠实度检查</span>
+            <Toggle on={fidelity} onChange={() => setFidelity((v) => !v)} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>文风审稿</span>
+            <Toggle on={styleReview} onChange={() => setStyleReview((v) => !v)} />
           </div>
         </div>
       </div>
@@ -435,7 +441,7 @@ function ExportModal({ work, open, onClose }: { work: Work; open: boolean; onClo
 
   const inScope =
     scope === 'work' ? [work] : scope === 'volume' ? works.filter((w) => w.volumeId === work.volumeId) : works.filter((w) => w.seriesId === work.seriesId)
-  const attention = inScope.flatMap((w) => w.chapters.filter((c) => c.status === 'attention').map((c) => `《${w.title}》第 ${c.index} 章`))
+  const attention = inScope.flatMap((w) => w.chapters.filter((c) => c.issue).map((c) => `《${w.title}》第 ${c.index} 章`))
 
   return (
     <Modal

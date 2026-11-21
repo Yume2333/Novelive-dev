@@ -86,7 +86,16 @@ export interface TextPart {
   text: string
 }
 
-export type MessagePart = TextPart | ThinkingPart | ToolPart | SubtaskPart | ConfirmPart
+/** 贴图：用户贴给主控看的参考图，存在会话里 */
+export interface ImagePart {
+  kind: 'image'
+  id: string
+  /** 缩略图 data URL；演示里直接用读进来的本地图 */
+  src: string
+  name: string
+}
+
+export type MessagePart = TextPart | ImagePart | ThinkingPart | ToolPart | SubtaskPart | ConfirmPart
 
 // ---- 消息树与会话 ----
 

@@ -9,15 +9,20 @@ import { useToast } from '../../components/Toast'
 import {
   agentRoles,
   apiFormats,
+  compatPresets,
   contextCatalog,
   defaultBaseUrl,
   defaultImageConfig,
   defaultTextConfig,
   defaultWriterPresets,
+  imageApiOptions,
   imageCapabilitySupport,
   imageCapabilityTests,
+  imageDeclOptions,
+  imagePresetFor,
   modelSlots,
   type CapabilityState,
+  type CompatPreset,
   type ImageCapability,
   type ModelSlot,
   type TextModelConfig,
@@ -215,6 +220,16 @@ function TextModelFields({
   const inherit = slot !== 'fast' && config.inheritFast
   return (
     <>
+      <Field label="兼容">
+        <CompactSelect
+          value={config.compat}
+          onChange={(v) => {
+            const preset = compatPresets.find((p) => p.value === v)
+            onChange({ ...config, compat: v as CompatPreset, ...(preset?.defaultBase ? { base: preset.defaultBase } : {}) })
+          }}
+          options={compatPresets.map((p) => ({ value: p.value, label: p.label }))}
+        />
+      </Field>
       <Field label="接口格式">
         <CompactSelect
           value={config.format}
@@ -423,8 +438,43 @@ export function SettingsPage() {
               onTest={() => runTest('image')}
               result={tests.image === 'ok' ? <ImageTestResult caps={caps} /> : undefined}
             >
-              <Field label="接口地址">
-                <TextInput value={image.base} placeholder="https://…/v1" onChange={(v) => setImageField({ base: v })} />
+              <Field label="接口">
+                <CompactSelect
+                  value={image.api}
+                  onChange={(v) => setImageField({ api: v })}
+                  options={imageApiOptions.map((o) => ({ value: o.value, label: o.label }))}
+                />
+              </Field>
+              <Field label="编辑">
+                <CompactSelect
+                  value={image.canEdit}
+                  onChange={(v) => setImageField({ canEdit: v })}
+                  options={imageDeclOptions.canEdit.map((o) => ({ value: o.value, label: o.label }))}
+                />
+              </Field>
+              <Field label="透明底">
+                <CompactSelect
+                  value={image.transparent}
+                  onChange={(v) => setImageField({ transparent: v })}
+                  options={imageDeclOptions.transparent.map((o) => ({ value: o.value, label: o.label }))}
+                />
+              </Field>
+              <Field label="尺寸">
+                <CompactSelect
+                  value={image.sizeRule}
+                  onChange={(v) => setImageField({ sizeRule: v })}
+                  options={imageDeclOptions.sizeRule.map((o) => ({ value: o.value, label: o.label }))}
+                />
+              </Field>
+              <Field label="接口地址" hint="填地址时自动套预设">
+                <TextInput
+                  value={image.base}
+                  placeholder="https://…/v1"
+                  onChange={(v) => {
+                    const preset = imagePresetFor(v)
+                    setImageField(preset ? { base: v, ...preset } : { base: v })
+                  }}
+                />
               </Field>
               <Field label="模型名">
                 <TextInput value={image.model} onChange={(v) => setImageField({ model: v })} />
@@ -596,6 +646,14 @@ export function SettingsPage() {
                 <div style={{ fontSize: 12, color: 'var(--color-outline)' }}>把小说改编为视觉小说并直接游玩。</div>
               </div>
               <span style={{ fontSize: 12, color: 'var(--color-outline)' }}>v0.1.0 · AGPL-3.0</span>
+            </div>
+            <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
+              <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 12, color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                第三方许可<Icon name="call_made" size={12} />
+              </a>
+              <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 12, color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                源代码<Icon name="call_made" size={12} />
+              </a>
             </div>
           </Card>
         </section>

@@ -1,7 +1,7 @@
 // 原型共享的 mock 类型：只放界面上看得到的概念。页面专用的数据放在 mock/<页面>.ts。
 
-/** 章节状态（界面用词：已发布 / 制作中 / 等待 / 需要处理） */
-export type ChapterStatus = 'published' | 'producing' | 'waiting' | 'attention'
+/** 章节状态（界面用词：已发布 / 制作中 / 等待）。「需要处理」是挂在章上的标记，不是状态。 */
+export type ChapterStatus = 'published' | 'producing' | 'waiting'
 
 /** 全局制作状态（界面用词：空闲 / 制作中 / 已停止 / 待确认） */
 export type GlobalStatus = 'idle' | 'producing' | 'stopped' | 'confirm'
@@ -27,7 +27,7 @@ export interface Chapter {
   status: ChapterStatus
   /** 制作中章节当前在做的步骤，如“写”“审稿”“演出”“出图 5/8” */
   step?: string
-  /** 需要处理的原因（用户能看懂的一句话） */
+  /** 「需要处理」的原因（用户能看懂的一句话）；有它就是标记态，章本身仍可游玩 */
   issue?: string
   /** 创作者设为优先 */
   priority?: boolean
@@ -67,8 +67,10 @@ export interface Work {
   requirement: string
   /** 写手预设：全局预设 id，或 "custom" 表示在默认上改了几项 */
   writerPreset?: string
-  /** 审稿开关（默认关）：剧本定稿后先审稿一轮再演出 */
-  reviewEnabled?: boolean
+  /** 忠实度检查（默认开）：剧本定稿后先对照原文检查一轮再演出 */
+  fidelityCheck?: boolean
+  /** 文风审稿（默认关）：忠实度检查之后再过一轮文风 */
+  styleReview?: boolean
   /** 已有参考图时也停在角色设定确认点 */
   pauseOnRefImages?: boolean
   /** 出图放大到的分辨率（默认 2K） */

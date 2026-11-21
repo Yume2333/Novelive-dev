@@ -24,6 +24,8 @@ interface SessionUi {
   sel: Record<string, string>
   /** 确认卡里每条的确认状态：itemId → 状态 */
   cards: Record<string, CardStatus>
+  /** 拒绝理由：itemId → 一句话 */
+  reasons: Record<string, string>
 }
 
 interface WorkChat {
@@ -35,7 +37,7 @@ interface WorkChat {
 const chatStore = new Map<string, WorkChat>()
 
 function sessionUi(session: ChatSession): SessionUi {
-  return { session, sel: {}, cards: {} }
+  return { session, sel: {}, cards: {}, reasons: {} }
 }
 
 function loadWorkChat(workId: string): WorkChat {
@@ -109,6 +111,9 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
   const path = branchPath(session.nodes, ui.sel)
 
   const [input, setInput] = useState('')
+  // 待发送的贴图：缩略图 chips，随下一条消息发出
+  const [pendingImages, setPendingImages] = useState<{ id: string; src: string; name: string }[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
   const [ctxOverride, setCtxOverride] = useState<string | null | undefined>(undefined)
   const attached = ctxOverride === undefined ? context : ctxOverride
   useEffect(() => setCtxOverride(undefined), [context])
@@ -227,8 +232,11 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
     })
   }
 
-  const send = (text: string, parentId: string | null) => {
-    const mine = appendNode(parentId, 'user', [{ kind: 'text', text }])
+  const send = (text: string, parentId: string | null, images: { id: string; src: string; name: string }[] = []) => {
+    const mine = appendNode(parentId, 'user', [
+      ...images.map((img) => ({ kind: 'image' as const, id: img.id, src: img.src, name: img.name })),
+      { kind: 'text' as const, text },
+    ])
     // 第一条消息自动生成会话标题
     if (session.title === '新会话') session.title = sessionTitleFrom(text)
     setCtxOverride(null)
@@ -236,12 +244,23 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
     runReply(mine)
   }
 
+  const addImages = (files: Iterable<File>) => {
+    for (const f of files) {
+      if (!f.type.startsWith('image/')) continue
+      const reader = new FileReader()
+      reader.onload = () => setPendingImages((list) => [...list, { id: newNodeId(), src: String(reader.result), name: f.name || '贴图' }])
+      reader.readAsDataURL(f)
+    }
+  }
+
   const onSend = () => {
     const text = input.trim()
-    if (!text || running) return
+    if ((!text && !pendingImages.length) || running) return
     setInput('')
-    const body = attached ? `【${attached}】${text}` : text
-    send(body, path.length ? path[path.length - 1].id : null)
+    const imgs = pendingImages
+    setPendingImages([])
+    const body = `${attached ? `【${attached}】` : ''}${text || '（看图）'}`
+    send(body, path.length ? path[path.length - 1].id : null, imgs)
   }
 
   const resendEdit = () => {
@@ -280,11 +299,15 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
 
   const confirmCtx: ConfirmCtx = {
     statusOf,
+    reasonOf: (itemId) => ui.reasons[itemId] ?? '',
     onConfirm: (item) => {
       if (item.confirmHint) setConfirmItem(item)
       else applyStatus(item, 'confirmed')
     },
-    onReject: (item) => applyStatus(item, 'rejected'),
+    onReject: (item, reason) => {
+      ui.reasons[item.id] = reason
+      applyStatus(item, 'rejected')
+    },
     onReset: (item) => {
       ui.cards[item.id] = 'pending'
       rerender()
@@ -393,7 +416,37 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
           </Chip>
         </div>
       ) : null}
+      {pendingImages.length ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+          {pendingImages.map((img) => (
+            <span key={img.id} style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+              <img src={img.src} alt={img.name} title={img.name} style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-md)', border: '1px solid var(--white-60)', display: 'block' }} />
+              <button
+                onClick={() => setPendingImages((list) => list.filter((x) => x.id !== img.id))}
+                title="移除"
+                style={{ position: 'absolute', top: -6, right: -6, width: 16, height: 16, borderRadius: 'var(--radius-full)', background: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface-variant)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--divider)', padding: 0 }}
+              >
+                <Icon name="close" size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          if (e.target.files) addImages(e.target.files)
+          e.target.value = ''
+        }}
+      />
       <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end' }}>
+        <Tooltip text="贴图给 Agent 看">
+          <Button variant="ghost" icon="image" onClick={() => fileRef.current?.click()} style={{ padding: '9px 10px' }} />
+        </Tooltip>
         <textarea
           rows={2}
           value={input}
@@ -402,6 +455,13 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
               onSend()
+            }
+          }}
+          onPaste={(e) => {
+            const files = Array.from(e.clipboardData?.files ?? [])
+            if (files.some((f) => f.type.startsWith('image/'))) {
+              e.preventDefault()
+              addImages(files)
             }
           }}
           placeholder="和 Agent 聊聊设定、改编要求，或让它重做某章…"
@@ -424,7 +484,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
           </Tooltip>
         ) : (
           <Tooltip text="发送">
-            <Button variant="primary" icon="send" onClick={onSend} disabled={!input.trim()} style={{ padding: '9px 14px' }} />
+            <Button variant="primary" icon="send" onClick={onSend} disabled={!input.trim() && !pendingImages.length} style={{ padding: '9px 14px' }} />
           </Tooltip>
         )}
       </div>

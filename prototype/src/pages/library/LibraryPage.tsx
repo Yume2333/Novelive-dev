@@ -22,7 +22,7 @@ function statusLine(w: Work): { text: string; icon: string } {
       return { text: '第一章等你过目', icon: 'rate_review' }
     case 'producing': {
       const published = w.chapters.filter((c) => c.status === 'published').length
-      const attention = w.chapters.filter((c) => c.status === 'attention').length
+      const attention = w.chapters.filter((c) => c.issue).length
       return { text: `已发布 ${published}/${w.chapters.length} 章${attention ? ` · ${attention} 需处理` : ''}`, icon: 'autorenew' }
     }
     case 'done':
@@ -62,7 +62,7 @@ function CoverBox({ work, badge }: { work: Work; badge?: ReactNode }) {
 
 function CardBody({ work, menu }: { work: Work; menu?: ReactNode }) {
   const line = statusLine(work)
-  const attention = work.chapters.some((c) => c.status === 'attention')
+  const attention = work.chapters.some((c) => c.issue)
   const color = attention ? 'var(--color-on-error-container)' : lineColor[work.phase] ?? 'var(--color-on-surface-variant)'
   const published = work.chapters.filter((c) => c.status === 'published').length
   const producing = work.chapters.find((c) => c.status === 'producing')

@@ -283,7 +283,7 @@ export function EditorPage() {
   const shell = useShell()
   const [searchParams] = useSearchParams()
 
-  const editable = useMemo(() => (work?.chapters ?? []).filter((c) => c.status === 'published' || c.status === 'attention'), [work])
+  const editable = useMemo(() => (work?.chapters ?? []).filter((c) => c.status === 'published'), [work])
   const castChars = useMemo<EditorCharacter[]>(
     () => (work ? (workCast[work.id] ?? ['lin', 'xi']).map((cid) => findCharacter(cid)!) : []),
     [work],

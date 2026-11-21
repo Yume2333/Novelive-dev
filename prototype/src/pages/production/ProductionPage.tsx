@@ -48,8 +48,8 @@ function ChapterRow({ work, chapter, last, onOpenStale, onOpenRuns }: {
   const navigate = useNavigate()
   const toast = useToast()
   const [priority, setPriority] = useState(!!chapter.priority)
-  // 三步加出图阶段：审稿是作品开关；写下一章时上一章在出图，两章可以同时是“制作中”；出图按张算（"出图 5/8"）
-  const steps = work.reviewEnabled ? ['写', '审稿', '演出', '出图'] : ['写', '演出', '出图']
+  // 固定四步：写 → 审稿 → 演出 → 出图；写下一章时上一章在出图，两章可以同时是“制作中”；出图按张算（"出图 5/8"）
+  const steps = ['写', '审稿', '演出', '出图']
   // step 形如 "出图 5/8"
   const stepIdx = Math.max(
     0,
@@ -104,11 +104,11 @@ function ChapterRow({ work, chapter, last, onOpenStale, onOpenRuns }: {
           <ProgressBar value={frac} height={4} />
         </span>
       ) : null}
-      <span style={{ display: 'inline-flex', justifyContent: 'flex-end', width: 96, flexShrink: 0 }}>
+      <span style={{ display: 'inline-flex', justifyContent: 'flex-end', flexShrink: 0 }}>
         {chapter.issue ? (
           <Tooltip text={chapter.issue}>
             <span style={{ display: 'inline-flex' }}>
-              <ChapterStatusMark status={chapter.status} spin={chapter.status === 'producing'} />
+              <ChapterStatusMark status={chapter.status} spin={chapter.status === 'producing'} attention />
             </span>
           </Tooltip>
         ) : (
@@ -119,12 +119,12 @@ function ChapterRow({ work, chapter, last, onOpenStale, onOpenRuns }: {
         {chapter.status === 'published' ? (
           <Button variant="ghost" icon="play_arrow" size="sm" onClick={() => navigate(`/work/${work.id}/play`)}>游玩</Button>
         ) : null}
-        {chapter.status === 'attention' ? (
+        {chapter.issue ? (
           <Button variant="ghost" icon="refresh" size="sm" onClick={() => toast(`已重试第 ${chapter.index} 章`, 'refresh')}>重试</Button>
         ) : null}
-        {chapter.status === 'published' || chapter.status === 'attention' ? (
+        {chapter.status === 'published' ? (
           <Button variant="ghost" icon="edit_note" size="sm" onClick={() => navigate(`/work/${work.id}/edit`)}>
-            {chapter.status === 'attention' ? '去编辑' : '编辑'}
+            {chapter.issue ? '去编辑' : '编辑'}
           </Button>
         ) : null}
         <Button variant="ghost" icon="history" size="sm" onClick={() => onOpenRuns(chapter)}>运行记录</Button>
@@ -185,7 +185,7 @@ export function ProductionPage() {
   const writingChapter = work.chapters.find((c) => c.status === 'producing' && !c.step?.startsWith('出图'))
   const paintingChapter = work.chapters.find((c) => c.status === 'producing' && c.step?.startsWith('出图'))
   const current = writingChapter ?? paintingChapter
-  const attention = work.chapters.filter((c) => c.status === 'attention')
+  const attention = work.chapters.filter((c) => c.issue)
   // 出图队列概况（假数据）：等待 9 张、正在画 5 张（上限来自设置的“同时出图数”）
   const imageQueue = { waiting: 9, painting: 5 }
 

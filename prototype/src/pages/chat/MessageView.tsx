@@ -18,8 +18,10 @@ export type CardStatus = 'pending' | 'confirmed' | 'rejected'
 
 export interface ConfirmCtx {
   statusOf: (itemId: string) => CardStatus
+  /** 拒绝理由：itemId → 一句话 */
+  reasonOf?: (itemId: string) => string
   onConfirm: (item: ConfirmItem) => void
-  onReject: (item: ConfirmItem) => void
+  onReject: (item: ConfirmItem, reason: string) => void
   onReset: (item: ConfirmItem) => void
 }
 
@@ -163,10 +165,19 @@ function ThinkingBlock({ seconds, text }: { seconds: number; text: string }) {
   )
 }
 
-/** 确认卡里的一条：修改类显示改前/改后，工作流类写清做什么、影响哪些章节 */
+/** 确认卡里的一条：修改类显示改前/改后，工作流类写清做什么、影响哪些章节；
+    拒绝时先问一句理由再置为已拒绝。 */
 function ConfirmCard({ item, ctx }: { item: ConfirmItem; ctx?: ConfirmCtx }) {
   const meta = confirmKindMeta[item.kind]
   const status = ctx?.statusOf(item.id) ?? 'pending'
+  const reason = ctx?.reasonOf?.(item.id)
+  const [rejecting, setRejecting] = useState(false)
+  const [reasonText, setReasonText] = useState('')
+  const doReject = () => {
+    ctx?.onReject(item, reasonText.trim())
+    setRejecting(false)
+    setReasonText('')
+  }
   return (
     <div
       className="glass-panel"
@@ -194,12 +205,43 @@ function ConfirmCard({ item, ctx }: { item: ConfirmItem; ctx?: ConfirmCtx }) {
           <span>{item.affectedChapters.join('、')}</span>
         </div>
       ) : null}
+      {status === 'rejected' && reason ? (
+        <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--color-on-surface-variant)', lineHeight: 1.55 }}>拒绝理由：{reason}</div>
+      ) : null}
       {ctx ? (
         status === 'pending' ? (
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', justifyContent: 'flex-end' }}>
-            <Button size="sm" variant="primary" onClick={() => ctx.onConfirm(item)}>确认</Button>
-            <Button size="sm" variant="ghost" onClick={() => ctx.onReject(item)}>拒绝</Button>
-          </div>
+          rejecting ? (
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', alignItems: 'center' }}>
+              <input
+                autoFocus
+                value={reasonText}
+                onChange={(e) => setReasonText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') doReject()
+                  if (e.key === 'Escape') { setRejecting(false); setReasonText('') }
+                }}
+                placeholder="拒绝理由（可留空），Agent 会照着调整"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  border: '1px solid var(--white-80)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--white-60)',
+                  padding: '7px 10px',
+                  fontSize: 12.5,
+                  outline: 'none',
+                  color: 'var(--color-on-surface)',
+                }}
+              />
+              <Button size="sm" variant="danger" onClick={doReject}>拒绝</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setRejecting(false); setReasonText('') }}>取消</Button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', justifyContent: 'flex-end' }}>
+              <Button size="sm" variant="primary" onClick={() => ctx.onConfirm(item)}>确认</Button>
+              <Button size="sm" variant="ghost" onClick={() => setRejecting(true)}>拒绝</Button>
+            </div>
+          )
         ) : (
           <div style={{ display: 'flex', marginTop: 7 }}>
             <button
@@ -240,7 +282,16 @@ export function MessageParts({ parts, ctx, nested }: { parts: MessagePart[]; ctx
                 ))}
               </div>
             )
-          case 'text':
+          case 'image':
+            return (
+              <img
+                key={p.id}
+                src={p.src}
+                alt={p.name}
+                title={p.name}
+                style={{ maxWidth: 220, maxHeight: 160, borderRadius: 'var(--radius-md)', border: '1px solid var(--white-60)', display: 'block' }}
+              />
+            )
           default:
             return nested || ctx === undefined ? (
               <div key={i} style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--color-on-surface)' }}>{p.text}</div>
@@ -279,9 +330,23 @@ export function MessageRow({ node, ctx, controls, streaming }: {
 }) {
   const mine = node.role === 'user'
   const text = node.parts.filter((p): p is Extract<MessagePart, { kind: 'text' }> => p.kind === 'text')
+  const images = node.parts.filter((p): p is Extract<MessagePart, { kind: 'image' }> => p.kind === 'image')
   if (mine) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+        {images.length ? (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {images.map((p) => (
+              <img
+                key={p.id}
+                src={p.src}
+                alt={p.name}
+                title={p.name}
+                style={{ maxWidth: 160, maxHeight: 110, borderRadius: 'var(--radius-md)', border: '1px solid var(--white-60)', display: 'block' }}
+              />
+            ))}
+          </div>
+        ) : null}
         <div
           style={{
             maxWidth: '88%',

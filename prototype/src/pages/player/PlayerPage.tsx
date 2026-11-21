@@ -1,5 +1,7 @@
-import '@fontsource/noto-serif-sc/chinese-simplified-500.css'
-import '@fontsource/noto-serif-sc/chinese-simplified-600.css'
+import '@fontsource/noto-sans-sc/chinese-simplified-400.css'
+import '@fontsource/noto-sans-sc/chinese-simplified-500.css'
+import '@fontsource/noto-sans-sc/chinese-simplified-600.css'
+import '@fontsource/noto-sans-sc/chinese-simplified-700.css'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { EmptyState } from '../../components/Form'
@@ -12,7 +14,7 @@ import './player.css'
 
 /* ================= 舞台美术（游戏皮肤 / 舞台例外，可用字面量颜色） ================= */
 
-const SERIF = "'Noto Serif SC','Source Han Serif SC','Songti SC','SimSun',serif"
+const SERIF = "var(--font-body)"
 
 interface CastMember { pos: Pos; expr: Expr }
 
@@ -287,7 +289,7 @@ export function PlayerPage() {
   const navigate = useNavigate()
   const toast = useToast()
 
-  const playable = useMemo(() => (work ? work.chapters.filter((c) => c.status === 'published' || c.status === 'attention') : []), [work])
+  const playable = useMemo(() => (work ? work.chapters.filter((c) => c.status === 'published') : []), [work])
   const readThrough = work?.reading?.chapter ?? 0
 
   const initialChapter = useMemo(() => {
@@ -309,7 +311,7 @@ export function PlayerPage() {
   const [screen, setScreen] = useState<Screen>('none')
   const [auto, setAuto] = useState(false)
   const [skip, setSkip] = useState(false)
-  const [skipReadOnly, setSkipReadOnly] = useState(true)
+  /* 跳过固定只跳已读句，读到没读过的地方自动停 */
   const [uiHidden, setUiHidden] = useState(false)
   const [revisit, setRevisit] = useState(false)
   const [charDelay, setCharDelay] = useState(26)
@@ -428,7 +430,7 @@ export function PlayerPage() {
   useEffect(() => {
     if (mode !== 'story' || screen !== 'none' || uiHidden || !lineDone || !line || !entered) return
     if (skip) {
-      if (skipReadOnly && !readSet.has(`${chapter?.id}:${lineIdx}`)) {
+      if (!readSet.has(`${chapter?.id}:${lineIdx}`)) {
         setSkip(false)
         return
       }
@@ -690,7 +692,7 @@ export function PlayerPage() {
     const bgs: Bg[] = ['harborNight', 'harborDawn', 'lighthouse', 'letterCg']
     const bg = bgs[i % bgs.length]!
     return (
-      <div style={{ width: 128, height: 72, borderRadius: 9, overflow: 'hidden', position: 'relative', flexShrink: 0, background: bgArt[bg].base, border: `1px solid ${accent}30`, opacity: status === 'published' || status === 'attention' ? 1 : 0.35 }}>
+      <div style={{ width: 128, height: 72, borderRadius: 9, overflow: 'hidden', position: 'relative', flexShrink: 0, background: bgArt[bg].base, border: `1px solid ${accent}30`, opacity: status === 'published' ? 1 : 0.35 }}>
         <div style={{ position: 'absolute', inset: 0 }}>{bgArt[bg].deco}</div>
       </div>
     )
@@ -896,7 +898,7 @@ export function PlayerPage() {
           >
             <div style={{ fontFamily: SERIF, fontSize: 12, letterSpacing: '0.32em', color: 'var(--nl-accent-strong)', marginBottom: 14 }}>本章结束</div>
             <div style={{ fontFamily: SERIF, fontSize: 20, color: 'var(--nl-text)', marginBottom: 16, letterSpacing: '0.05em' }}>
-              下一章「{next.title}」{next.status === 'producing' ? '制作中' : next.status === 'attention' ? '需要处理' : '等待'}
+              下一章「{next.title}」{next.status === 'producing' ? '制作中' : '等待'}
             </div>
             {next.status === 'producing' ? (
               <div style={{ fontFamily: SERIF, fontSize: 13.5, color: 'var(--nl-text-dim)', lineHeight: 1.9 }}>
@@ -906,8 +908,6 @@ export function PlayerPage() {
                 </div>
                 <div style={{ marginTop: 6 }}>做完会自动载入开头</div>
               </div>
-            ) : next.status === 'attention' ? (
-              <div style={{ fontFamily: SERIF, fontSize: 13.5, color: 'var(--nl-text-dim)', lineHeight: 1.9 }}>图片没画出来，会用占位图发布，做完后自动载入。</div>
             ) : (
               <div style={{ fontFamily: SERIF, fontSize: 13.5, color: 'var(--nl-text-dim)', lineHeight: 1.9 }}>还在排队等待，做完后会自动载入开头。</div>
             )}
@@ -1097,7 +1097,7 @@ export function PlayerPage() {
               {screenTitle('章节', 'chapters')}
               <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {work.chapters.map((c) => {
-                  const isPlayable = c.status === 'published' || c.status === 'attention'
+                  const isPlayable = c.status === 'published'
                   const isRead = c.index <= readThrough
                   return (
                     <button key={c.id} className="nl-row" disabled={!isPlayable} onClick={() => isPlayable && enterChapter(c.index)} style={{ opacity: isPlayable ? 1 : 0.4, alignItems: 'center' }}>
@@ -1107,7 +1107,7 @@ export function PlayerPage() {
                           第 {c.index} 章 · {c.title}
                         </div>
                         <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                          <span style={{ fontSize: 11, color: 'var(--nl-text-dim)', letterSpacing: '0.14em' }}>{c.status === 'published' ? '已发布' : c.status === 'attention' ? '需要处理' : c.status === 'producing' ? '制作中' : '等待'}</span>
+                          <span style={{ fontSize: 11, color: 'var(--nl-text-dim)', letterSpacing: '0.14em' }}>{c.status === 'published' ? '已发布' : c.status === 'producing' ? '制作中' : '等待'}{c.issue ? ' · 需要处理' : ''}</span>
                           {isRead && isPlayable ? <span style={{ fontSize: 11, color: 'var(--nl-accent-strong)', letterSpacing: '0.14em' }}>已读</span> : null}
                         </div>
                       </div>
@@ -1139,7 +1139,6 @@ export function PlayerPage() {
                   </div>
                 ))}
                 {([
-                  ['只跳过已读', skipReadOnly, () => setSkipReadOnly((v) => !v)] as const,
                   ['全屏', isFullscreen, toggleFullscreen] as const,
                   // 开发调试项：只有 ?debug=1 才显示
                   ...(debug ? [['显示 4:3 安全区', showSafeZone, () => setShowSafeZone((v) => !v)] as const] : []),

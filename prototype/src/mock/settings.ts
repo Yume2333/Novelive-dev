@@ -11,6 +11,19 @@ export const apiFormats: { value: ApiFormat; label: string; defaultBase: string 
 
 export const defaultBaseUrl = (format: ApiFormat) => apiFormats.find((f) => f.value === format)?.defaultBase ?? ''
 
+/** 文本模型「兼容哪家」：决定请求形状；「自动」按接口地址猜 */
+export type CompatPreset = 'auto' | 'openai' | 'deepseek' | 'qwen' | 'zhipu' | 'openrouter' | 'anthropic-compat'
+
+export const compatPresets: { value: CompatPreset; label: string; defaultBase: string }[] = [
+  { value: 'auto', label: '自动', defaultBase: '' },
+  { value: 'openai', label: 'OpenAI', defaultBase: 'https://api.openai.com/v1' },
+  { value: 'deepseek', label: 'DeepSeek', defaultBase: 'https://api.deepseek.com/v1' },
+  { value: 'qwen', label: 'Qwen', defaultBase: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  { value: 'zhipu', label: '智谱', defaultBase: 'https://open.bigmodel.cn/api/paas/v4' },
+  { value: 'openrouter', label: 'OpenRouter', defaultBase: 'https://openrouter.ai/api/v1' },
+  { value: 'anthropic-compat', label: 'Anthropic 兼容', defaultBase: 'https://api.anthropic.com' },
+]
+
 /** 五个模型位 */
 export type ModelSlot = 'fast' | 'main' | 'writing' | 'visual' | 'image'
 
@@ -24,8 +37,10 @@ export const modelSlots: { id: ModelSlot; label: string; icon: string }[] = [
 
 export const modelSlotLabel = (slot: ModelSlot) => modelSlots.find((s) => s.id === slot)?.label ?? slot
 
-/** 文本模型配置；接口格式决定地址怎么拼、上下文长度可以从内置目录自动填 */
+/** 文本模型配置；「兼容」决定请求形状，接口格式决定地址怎么拼、上下文长度可以从内置目录自动填 */
 export interface TextModelConfig {
+  /** 兼容哪家（默认自动） */
+  compat: CompatPreset
   format: ApiFormat
   base: string
   model: string
@@ -55,18 +70,59 @@ export const defaultTextConfig = (slot: Exclude<ModelSlot, 'image'>): TextModelC
     writing: 'claude-sonnet-4-6',
     visual: 'gemini-3-flash',
   }
-  return { format: 'openai-chat', base: defaultBaseUrl('openai-chat'), model: seed[slot], context: '', key: '', inheritFast: slot !== 'fast' }
+  return { compat: 'auto', format: 'openai-chat', base: defaultBaseUrl('openai-chat'), model: seed[slot], context: '', key: '', inheritFast: slot !== 'fast' }
 }
 
 export const defaultImageConfig = () => ({
   base: 'https://api.openai.com/v1',
-  model: 'gpt-image-1',
+  model: 'gpt-image-2.6-flare',
   key: '',
   /** 同时出图数（默认 8） */
   concurrency: '8',
   /** 一张图检查不通过后最多重画几次，用完用占位图并标“需要处理”（默认 3） */
   retries: '3',
+  /** 接口形状：填地址时按预设自动套 */
+  api: 'openai-images',
+  /** 能不能图片编辑 / 出透明底（用户声明，影响测试预期和可用功能） */
+  canEdit: 'yes',
+  transparent: 'yes',
+  /** 尺寸规则：自由 / 固定档位 */
+  sizeRule: 'free',
 })
+
+/** 图片模型 4 项声明的选项；填地址命中预设时自动填 */
+export const imageApiOptions = [
+  { value: 'openai-images', label: 'OpenAI Images' },
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'seedream', label: 'Seedream（火山）' },
+  { value: 'qwen-image', label: 'Qwen 图像' },
+  { value: 'sd-compatible', label: 'SD 兼容' },
+]
+
+export const imageDeclOptions = {
+  canEdit: [
+    { value: 'yes', label: '能编辑' },
+    { value: 'no', label: '不能编辑' },
+  ],
+  transparent: [
+    { value: 'yes', label: '能出透明底' },
+    { value: 'no', label: '不出透明底' },
+  ],
+  sizeRule: [
+    { value: 'free', label: '任意尺寸' },
+    { value: 'tiers', label: '固定档位' },
+  ],
+}
+
+/** 按接口地址猜预设：命中时同时给 4 项声明（演示） */
+export const imagePresetFor = (base: string): { api: string; canEdit: string; transparent: string; sizeRule: string } | null => {
+  const b = base.toLowerCase()
+  if (b.includes('openai.com')) return { api: 'openai-images', canEdit: 'yes', transparent: 'yes', sizeRule: 'tiers' }
+  if (b.includes('googleapis.com') || b.includes('generativelanguage')) return { api: 'gemini', canEdit: 'no', transparent: 'no', sizeRule: 'tiers' }
+  if (b.includes('volces.com') || b.includes('ark.cn')) return { api: 'seedream', canEdit: 'yes', transparent: 'no', sizeRule: 'free' }
+  if (b.includes('dashscope')) return { api: 'qwen-image', canEdit: 'yes', transparent: 'no', sizeRule: 'tiers' }
+  return null
+}
 
 /** 图片模型能力测试：文生图、透明底、图片编辑三项各给一个结果 */
 export type ImageCapability = 't2i' | 'transparent' | 'edit'

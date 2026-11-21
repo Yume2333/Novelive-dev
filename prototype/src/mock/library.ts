@@ -46,7 +46,7 @@ export const works: Work[] = [
       if (i <= 5) return { status: 'published', staleImages: i === 3 ? 2 : undefined }
       if (i === 6) return { status: 'producing', step: '出图 5/8' }
       if (i === 7) return { status: 'producing', step: '写' }
-      if (i === 8) return { status: 'attention', issue: '两张背景没画出来，先用了占位图' }
+      if (i === 8) return { status: 'published', issue: '两张背景没画出来，先用了占位图' }
       if (i === 12) return { priority: true }
       return {}
     }),
@@ -55,7 +55,7 @@ export const works: Work[] = [
     presets: { strength: '平衡', density: '标准' },
     requirement: '保留凛的口头禅“算了，先送信”。海边场景多用远景。',
     writerPreset: 'default',
-    reviewEnabled: false,
+    fidelityCheck: true,
     pauseOnRefImages: true,
     outputResolution: '2K',
     customMarks: [

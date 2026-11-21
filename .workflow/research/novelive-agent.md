@@ -21,7 +21,7 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
   - **工具循环**：`Agent` 挂一组 `AgentTool`，模型多轮读写工程。审稿、美术导演、三个画师和对话面板（主控）用：审稿要按需查证据（原文段落、术语出现位置、章节摘要）；美术导演要按章读剧本、插演出补丁；画师要拼提示词、调生图工具；主控操作面宽（查设定、读剧本、提提议），硬编码成一问一答会丢上下文。
 
 - 工具循环角色通过 `submit_*` 工具交结果，工具的参数就是输出 schema；`finishTurn` 在没收到或校验没过时让循环继续，收到并通过校验才结束。单次调用角色维持文本 JSON 输出加校验。
-- `Agent` 实例随任务创建和销毁，不跨任务复用；停止时 `agent.abort()`，pi 的 `streamFn` 透传 `AbortSignal` 到 provider，会话结束调 `cleanupSessionResources(sessionId)` 清掉 pi-ai 的会话资源。被中断的任务在 `project.db` 里保持未完成状态，继续时整个任务重跑。
+- `Agent` 实例随任务创建和销毁，不跨任务复用；停止时 `agent.abort()`，pi 的 `streamFn` 透传 `AbortSignal` 到 provider，会话结束调 `cleanupSessionResources(sessionId)` 清掉 pi-ai 的会话资源。被中断的任务在 `project.db` 里保持未完成状态，继续时重跑被中断的那一步（产物中途落盘的从已落盘进度续跑，见「按卷综合」「出图」）。
 - 用量：`subscribe` 里按 `turn_end`/`message_end` 收到的 `AssistantMessage.usage` 记一条 `usage` 记录，字段 `作品 ID、阶段、任务 ID、角色、模型名、input/output/cacheRead/cacheWrite/totalTokens、cost.total、时间戳`。图片调用按次记一条。
 - 写入前核对输入：写剧本、综合设定、出图这类任务开始时记下所用原文和设定的哈希，落盘前重新算一遍；变了就不写入，标“输入已改，需要重跑”。
 - 工具的引用类参数（chapterId、sceneId、asset 等）第一步查存在性；不存在时错误文本回“该 ID 不存在 + 合法清单（或提示用哪个工具列出合法 ID）+ 一个正确调用例子”，教模型照着改。
@@ -60,7 +60,7 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
 - **校验/修复**：pi-schema 校验；`firstSeenChapter` 必须是本卷章节 ID，引用关系（变化指向的条目 ID）由代码核对，不存在的引用当错误还给模型。
 - **冲突规则在代码里**：应用侧合并时，候选条目和已确认条目同 ID 且“固定”字段冲突 → 保留已确认版本，冲突条目仍写进文件标 `candidate` 加冲突说明；“会变”字段出现不同值记成变化、不阻塞也不覆盖；不冲突的候选直接可用。模型只负责提条目，合并逻辑不在模型侧。
 - **别名合并在代码里**：同一章内先按规则挡（字符子串包含、姓氏+单名规则、章窗口、称谓停用词、候选唯一，全满足才并）；规则挡不下的跨章变体交模型裁决，默认不合并。身份类（马甲/转世/真名揭示）不合并成一条，记成带 `revealedChapter` 的“同一人”关系，设定集切片按章决定显示哪个名字。
-- **持久化**：骨架写 `volumes/<卷>/bible/skeleton.json`；条目按层级写进 `bible/`、`glossary.json` 文件。任务粒度到卷，中断整卷重跑（产物是幂等覆盖）。
+- **持久化**：骨架写 `volumes/<卷>/bible/skeleton.json`；条目按层级写进 `bible/`、`glossary.json` 文件。任务粒度到卷，产物中途落盘，中断后从已落盘进度续跑、不整卷重头（流式抽取做法下已抽的事件列表就是进度）。
 
 ## 确认点 1：角色设定候选
 
@@ -115,7 +115,7 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
 - **输入**：当前 `.nvs` 全文（带行尾句子 ID）、创作者指令、本场原文范围对应的原文、设定集切片、改编设置、本场涉及素材名清单。
 - **输出契约**：整场 `.nvs` 新文本（不是 patch）。按 `decisions.md`「剧本 ID 与素材命名」，模型改写已有行时保留原行尾 ID，新写的行不带 ID。应用按句子 ID 比对新旧两版生成差异列表（ID 相同的标“修改”，旧 ID 消失的标“删除”，没有 ID 的标“新增”），给创作者勾选；勾选的行写入文件，新增行保存时补 ID。
 - **校验/修复**：新文本解析失败，或出现原场景里没有的 ID、重复 ID → 错误还给模型，同写剧本。
-- **持久化**：直接写 `.nvs`；修改历史记到 `project.db`（原文快照 + 新内容），撤销按历史回放。
+- **持久化**：直接写 `.nvs`；修改历史记到 `project.db` 的持久条目清单（何时改了哪句、改成什么），不持久快照；撤销只在本次打开内有效，按逆操作回放。
 
 ## 编辑器：按选中原文修改
 
@@ -132,7 +132,9 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
   - `read_glossary` `{}` → 术语表
   - `read_scene` `{ chapterId, sceneId }` → `.nvs` 文本 + 段落对照
   - `read_source_range` `{ chapterId, fromParagraph, toParagraph }` → 原文段落
-  - `list_chapters` `{}` → 本作品的章节列表和状态（作品由会话决定，模型不填）
+  - `list_assets` `{}` → 已登记素材清单（查素材名用）
+  - `read_chapter_manifest` `{ chapterId }` → 该章图清单（已有/新画、状态）
+  - `read_task_result` `{ taskId }` → 任务结果和失败原因
   - 提议工具，一件事一个工具，模型只填要改什么和理由；条目路径、影响哪些章节、修改记录由代码算：
     - `propose_bible_change` `{ entryId?, changes, reason }`：改设定条目，不填 `entryId` 就是新增；`changes` 是条目字段的 pi-schema 结构
     - `propose_glossary_change` `{ term, changes, reason }`
@@ -141,8 +143,8 @@ Novelive Agent 各阶段的内部结构：调用形态、上下文组装、输�
     - `propose_rewrite_scene` `{ chapterId, sceneId, instruction }`
     - `propose_redraw_image` `{ asset, instruction }`
     - `propose_resynthesize_volume` `{ volumeId, instruction? }`：以上每个都登记一条提议并返回提议 ID
-  - `list_proposals` `{ status?: "pending"|"confirmed"|"rejected" }`
-- **提议模型**：提议以确认卡形式展示，存 `project.db`，字段：`id、作品、kind、target（条目 ID/章节 ID/字段路径）、patch JSON、reason、feedback、状态、对话消息 ID、创建时间`。发起工作流前先出确认卡，写清要做什么、影响哪些章节，确认后才开始；`redo_chapter` 确认后该章进制作队列。提议和修改历史挂钩：应用一条提议 = 一次可撤销的修改记录。创作者拒绝时可填理由写进 `feedback`，作为工具结果文本回给主控，让它知道为什么被拒而不是换个说法再提一遍。
+  - `spawn_agent` `{ role, task, context }`：派子 Agent（角色从可用花名册里选，见 `pi-scaffolding.md` 通用层 5）
+- **提议模型**：提议以确认卡形式展示，存 `project.db`，字段：`id、作品、kind、target（条目 ID/章节 ID/字段路径）、patch JSON、reason、feedback、状态、对话消息 ID（可空——确认点 1 的候选提议不走对话）、创建时间`。发起工作流前先出确认卡，写清要做什么、影响哪些章节，确认后才开始；`redo_chapter` 确认后该章进制作队列。提议和修改历史挂钩：应用一条提议 = 一次可撤销的修改记录。创作者拒绝时可填理由写进 `feedback`，作为工具结果文本回给主控，让它知道为什么被拒而不是换个说法再提一遍。`kind` 除 `propose_*` 各值和 `add_text_marker`（编辑器横幅确认，不进面板）外，还有 `pick_character_design` / `pick_main_visual`——确认点 1 的角色设定和主视觉候选也借提议表存。
 - **会话持久化**：每部作品可以有多个会话。消息存成 `id`/`parentId` 条目树进 `project.db`，改写一条消息后重新发送会形成分支；超过上下文时把较早的轮次压缩成摘要条目（已有摘要就增量更新），最近若干轮保留原文。
 - **停止/恢复**：面板消息不进制作队列的停止语义；创作者中途关面板，下次打开从 `project.db` 重建 `Agent` 状态接着聊。
 
