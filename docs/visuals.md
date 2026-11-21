@@ -39,11 +39,11 @@
 - **场景画师**（主模型）：背景基准图和 CG，16:9，主体在 4:3 安全区。画黑暗场景（暴力、死亡）时默认用光影、剪影、留白表现，直白的描写交给剧本文字；降敏改写仍是审核被拒后的兜底。
 - **差分画师**（快速模型）：表情差分和背景变体，从基准图编辑派生，只改一处。
 
-所有画师调用都带上 `bible/style.json` 里的主视觉作参考图（统一画风，不能只存着不用），内置提示词里写明“必须参照参考图”。场景画师画 CG 时再加上出场角色的造型基准图和该地点的地点基准图（若有），提示词里写上角色外貌；CG 的参考图最多（主视觉 + 地点基准 + 各角色造型基准）约 4–6 张，在接口上限内。
+所有画师调用都带上 `bible/style.json` 里的画风参考作参考图（主视觉，加最多 2 张补充参考，见 2.5；统一画风，不能只存着不用），内置提示词里写明“必须参照参考图”。场景画师画 CG 时再加上出场角色的造型基准图和该地点的地点基准图（若有），提示词里写上角色外貌；CG 的参考图最多（画风参考 1–3 张 + 地点基准 + 各角色造型基准）约 4–8 张，在接口上限（16 张）内。
 
 要新画的图进入出图队列：同一张图只画一次，基准图画完它的差分才开始画，同时画的图不超过「同时出图数」（默认 8）。
 
-生图工具传多张参考图时，由工具按派生类型在提示词头部生成每张图的角色声明句（如“第 1 张是主视觉，只参照画法、配色和细节密度，不照搬内容；第 2 张是 `lin-xiao` 的造型基准图”），模型不写这句。提示词的完整拼装见 2.4。
+生图工具传多张参考图时，由工具按派生类型在提示词头部生成每张图的角色声明句（如“第 1–3 张是画风参考，只参照画法，不照搬里面的人物；第 4 张是 `lin-xiao` 的造型基准图”；画风参考的声明原文见 2.5），模型不写这句。提示词的完整拼装见 2.4。
 
 实测口径的成本（`quality` 默认档）：每张立绘约 0.049 美元、每张场景约 0.057 美元；100 章约 470–530 张图、约 23–30 美元，算上重画约 35–45 美元。单张出图耗时中位数 37 秒。现在默认用 `quality: high`，实测输出 token 约为默认档的 2–3 倍，单张成本按此上调，准确数字待下一轮实测后更新。
 
@@ -59,7 +59,7 @@
 
 拼装顺序如下，拼成一段连续文字，不用 `Scene:`、`Subject:` 这类标签行（实测标签格式约束不了画风）：
 
-1. **参考图声明**（代码）：逐张写明角色，见 2.3。
+1. **参考图声明**（代码）：逐张写明角色，见 2.3；画风参考的排序和声明见 2.5。
 2. **素材类型句**（代码）：立绘、背景、CG、表情差分、背景变体各一句固定说明。
 3. **内容段**（画师）：规则见下。视觉审核的 `feedback` 和审核拒绝的固定句由工具接在内容段之后。
 4. **角色外貌**（代码）：立绘和 CG 从设定集外貌字段原文拼入，含锚点特征，画师不转述。
@@ -68,7 +68,7 @@
    - 立绘：从头顶画到膝盖上方，腿在膝盖上方被画面底边裁断，人物居中，头顶留少量余量；透明背景，没有地面和影子；半透明边缘的颜色和相邻的衣服或皮肤一致。
    - 背景和 CG：主体在中央 4:3 区域，左右两侧只画延展配景；背景另写“空景，画面里没有人”。
    - 差分：只改一处，其余和第 1 张一致，并逐项列出 keep-list。
-7. **画风固定句**（代码，固定放在最后一行）：`Finish this as a final, fully cleaned-up illustration: inked line art with no sketch lines, stray hairs or broken strokes; flat base colors with smooth airbrushed gradients; highlights placed as a few clean, deliberate shapes, as in Image 1. Put fine detail only on the face, eyes, hair ornaments and the main object of the scene; keep clothing folds, background and secondary areas simpler, with fewer lines. Every outline is one clean stroke, not several sketchy ones; hair strands end in clean tapered points; lines never break or wobble. large simple color masses, low visual frequency, restrained edge density, clear edge hierarchy, minimal internal contour lines, broad shadow shapes, suppress micro-texture and micro-contrast, no unnecessary specular highlights, except that hair highlights, eyes, the gradients, and the brushwork and stroke texture of Image 1 stay exactly as in Image 1.`
+7. **画风固定句**（代码，固定放在最后一行；立绘和 CG 在它前面紧接一句颜色锁定句，见 2.5）：`Finish this as a final, fully cleaned-up illustration: inked line art with no sketch lines, stray hairs or broken strokes; flat base colors with smooth airbrushed gradients; highlights placed as a few clean, deliberate shapes, as in Image 1. Put fine detail only on the face, eyes, hair ornaments and the main object of the scene; keep clothing folds, background and secondary areas simpler, with fewer lines. Every outline is one clean stroke, not several sketchy ones; hair strands end in clean tapered points; lines never break or wobble. large simple color masses, low visual frequency, restrained edge density, clear edge hierarchy, minimal internal contour lines, broad shadow shapes, suppress micro-texture and micro-contrast, no unnecessary specular highlights, except that hair highlights, eyes, the gradients, and the brushwork and stroke texture of Image 1 stay exactly as in Image 1.`
 
    依次是成稿措辞、细节分主次、线条收尾、渲染块和例外句。渲染块单独用会压掉参考图的高光和渐变，加上例外句后画风基本保住，同时最能压住布料和大面上分层的鱼鳞状涂抹；只写“压表面纹理”或直接点名鱼鳞纹都弱于它。例外句里加上“笔触和线条质感”后，厚涂、颗粒感这类画风的笔触保留得明显更好，代价是鱼鳞纹略多一点。另外两种写法也测过，owner 看图后没有选：再加一句区分“媒介质感”和“鱼鳞状涂抹”；把“平涂底色加喷枪渐变”换成“用和图 1 相同的媒介”。已在柔和动漫风、黑白厚涂、galgame 三种参考图上看过。
 
@@ -85,6 +85,31 @@
 主视觉（确认点 1 的候选）也用同一套拼装和画风固定句生成。主视觉画得太细，碎感会传给之后所有的图：第三轮的水彩主视觉作参考画出的 CG 和背景是全场最碎的，祥子在 CG 和立绘之间也认不出是同一个人。
 
 接口参数：`quality: high`（owner 看图后定的默认值），`complexity` 不传。实测 `complexity: low` 几乎没有效果；`quality: medium` 每张输出 1584 token，只有 high（6240）的约四分之一，耗时相近，但画面明显差一些，还会画错，不用。推荐模型 `gpt-image-2.6-sunburst`：和 `gpt-image-2.6-flare` 对比，owner 看图认为 sunburst 明显更好，两者耗时和输出 token 基本相同；模型名仍是配置项。
+
+### 2.5 画风参考
+
+画风参考只决定“怎么画”，不决定“画谁”。2026-11-22 的实测里，只给一张人物参考图、声明句里写着 `coloring`，借画风画新角色时，新角色的发色和裙长被参考图里的人物带走了（证据在 `.workflow/evidence/spikes-r4/style-transfer/`）。下面的策略据此写成，**还没有实测**。
+
+**什么算画风**：线条、上色和明暗的方式、笔触和媒介质感、细节密度、光线处理、整体色调，包括画面是彩色还是黑白（owner 定：黑白算画风，黑白参考画出来也是黑白，角色的固有色用深浅表现）。**不算画风**：参考图里人物的脸、发型、发色、瞳色、服装款式和颜色、配饰、姿势和构图，这些只从设定集来。
+
+**给几张**：主视觉 1 张，再加最多 2 张补充参考，存在 `bible/style.json`。补充参考要求和主视觉是同一画师或同一画风，尽量画的是不同角色（发色、服装差别大），最好有一张带场景。几张图里共同的东西才是画风，模型就不容易把某一个人的特征当成画风。补充参考来自创作者提供的参考图或 EPUB 插图，在确认点 1 和主视觉一起选定；没有就只用主视觉。不从本作品已经画好的造型基准图里自动挑。
+
+**怎么给**：
+
+- 每张单独传，不拼成一张：拼图会被缩小、丢笔触，格子边框和多人排版也可能被当成画风。
+- 画风参考排在最前面（图 1 到图 N），角色造型基准图、地点基准图排在后面。差分调用例外：基准图放图 1，画风参考跟在后面。
+- 固定句里写的是 `Image 1`，由工具换成画风参考实际的编号（一张时 `Image 1`，三张时 `Images 1–3`）。
+- 不对参考图去色，也不裁掉里面的人物：会连画风里的配色和人物画法一起丢掉。
+
+**画风参考的声明句**（代码，英文常量，一张时把复数改成单数）：`Images 1–3 are style references only. Match how they are drawn: line quality, coloring and shading method, brushwork, level of detail, lighting and overall color treatment, including whether they are in color or monochrome. Do not copy the people in them: face, hairstyle, hair and eye color, outfit and accessories come only from the description below.`
+
+**颜色锁定句**（代码，立绘和 CG 用，紧接在画风固定句前面）：从设定集外貌的 `keyColors`（见[设定集与术语表](./bible.md)）拼出，CG 里每个出场角色一句：`{name}: {keyColors}. These colors come from the description, not from the style references; in a monochrome style, show them as tones.` 写在后面，是因为越靠后的句子对结果影响越大，而固定句里反复出现 `as in Image 1`。
+
+**审核兜底**：视觉审核的 `anchors` 一项同时逐项核对 `keyColors`，颜色画偏就不通过，`feedback` 写明哪一项偏了。
+
+**风险最集中的地方**：串色主要发生在一个角色的第一张图，也就是造型基准图。之后画 CG 和差分都带着基准图，颜色应以基准图为准（推测，未单独验证）。最容易出问题的是两种情况：一是没有设定图、只按文字画基准图的角色；二是主视觉来自 EPUB 插图，插图里画的就是书里的主角，拿它去画其他角色。
+
+待实测（沿用 style-transfer 的角色和场景，固定句用 FXB）：一张参考加新声明句；一张参考加新声明句和颜色锁定句；三张同画师、不同角色的参考加新声明句和颜色锁定句。
 
 ## 3. 生成规则与本地处理
 
@@ -147,7 +172,7 @@ OpenAI 自家模型换代快（`gpt-image-1` 已于 2026-10-23 关闭，当前�
 视觉审核在生图工具里执行，对照参考图和描述判断，输出结构化结果 `{pass, failedChecks, feedback}`：`failedChecks` 取 `identity`（画成别人）、`anchors`（锚点特征丢了）、`description`（和描述不符）、`style`（画风漂移）、`artifacts`（画面瑕疵）中的若干项，每项单独打分、单独定阈值，不合成总分。不通过时 `feedback` 由工具追加到画师重画提示词的尾部，让画师知道改哪里。
 
 - `identity`：CG 拿去比对它所含角色的造型基准图（玩家看到的是立绘脸），不比对设定图。
-- `anchors`：锚点特征（`anchorFeatures`，2–3 个）逐项核对；表情差分审核先核锚点在不在，再看整体。
+- `anchors`：锚点特征（`anchorFeatures`，2–3 个）和主色（`keyColors`）逐项核对；表情差分审核先核锚点在不在，再看整体。
 - `description`：核对剧本要点有没有画到——模型可能不拒绝但悄悄改掉关键内容（例如把“上吊”画成“蹲坐的女子”），画面合法但要素丢了也算不通过。
 
 图片最终失败的章节用占位图也能玩，并标“需要处理”。占位图分三类，由代码生成（sharp 画 SVG 转 WebP，灰底 + 图标 + “需要处理”字样）：**背景**和 **CG** 1920×1080，**角色** 1024×1536 竖版透明。导出 `.novelive` 作品包时会列出这些章节提醒创作者，但不阻止导出。

@@ -824,3 +824,10 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** owner 在黑白厚涂、galgame 两张参考图上，画原角色和只借画风画新角色各看了一轮，FXB 鱼鳞纹略多一点，但画面质感明显更好。证据在 `.workflow/evidence/spikes-r4/brushwork/` 和 `style-transfer/`。
 - **Decided by:** user
 - **Supersedes:** 2026-11-21 画风固定句定为 F+X（只改例外句）
+
+## 2026-11-22 - 画风参考只借画法：黑白算画风，参考图最多 3 张，加颜色锁定句
+
+- **Decided:** 写入 `docs/visuals.md` 2.5，尚未实测：黑白算画风，黑白参考画出来也是黑白；画风参考为主视觉加最多 2 张同画风、尽量不同角色的补充参考，每张单独传、排在最前，固定句里的 `Image 1` 换成实际编号；声明句不再写“配色”，写明人物的脸、发型、发色、瞳色、服装只从设定集来；外貌新增 `keyColors`，立绘和 CG 在固定句前加颜色锁定句，视觉审核 `anchors` 一并核对。
+- **Instead of:** 只给一张主视觉、声明句写“参照画法、配色和细节密度”（实测新角色的发色、裙长被参考图带走）；把多张参考拼成一张；对参考图去色或裁掉人物。
+- **Because:** style-transfer 一轮里 C 的新角色画成了参考图里人物的棕发和短裙；owner 认可黑白属于画风，并让先把策略写下、不测。具体策略由 Main 提出。证据在 `.workflow/evidence/spikes-r4/style-transfer/`，三组待测见 `docs/visuals.md` 2.5 末尾。
+- **Decided by:** user
