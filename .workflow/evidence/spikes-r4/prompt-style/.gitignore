@@ -2,3 +2,4 @@ gen/
 node_modules/
 .venv/
 run.log
+__pycache__/
