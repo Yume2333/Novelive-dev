@@ -1,14 +1,15 @@
-// spikes-r4/model-prompt post-process: every gen/<asset>--<arm>.png raw output
-// gets two Real-ESRGAN variants, written next to the raw file:
+// spikes-r4 post-process: every gen/<asset>--<arm>.png raw output gets one
+// Real-ESRGAN variant, written next to the raw file:
 //   -D1 = realesrgan-x4plus-anime x4 then Lanczos3 back to the raw size
-//   -D2 = realesr-animevideov3-x4 x4 then Lanczos3 back to the raw size
+// (D2 = realesr-animevideov3-x4 was dropped: owner chose D1, the two differ little.)
+// The x4 intermediate in work/ is deleted after each image.
 // Binary+models come from env ONLY (no defaults):
 //   REALESRGAN_BIN    path to realesrgan-ncnn-vulkan
 //   REALESRGAN_MODELS path to its models dir
 // Alpha: RGBA input is upscaled as RGBA -> alpha preserved (checked + logged).
 // Usage: REALESRGAN_BIN=... REALESRGAN_MODELS=... node src/postproc.mjs [name ...]
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, statSync, readdirSync } from 'node:fs'
+import { mkdirSync, statSync, readdirSync, rmSync } from 'node:fs'
 import sharp from 'sharp'
 import { rec } from './api.mjs'
 
@@ -24,10 +25,7 @@ if (!BIN || !MODELS) {
   process.exit(1)
 }
 
-const VARIANTS = [
-  ['D1', 'realesrgan-x4plus-anime'],
-  ['D2', 'realesr-animevideov3-x4'],
-]
+const VARIANTS = [['D1', 'realesrgan-x4plus-anime']]
 
 // names = raw outputs only (exclude -D1/-D2 derivatives)
 let names = readdirSync(G)
@@ -63,6 +61,8 @@ for (const name of names.sort()) {
       bad++
       rec({ kind: 'postproc_error', name, variant: suf, model, err: String(e).slice(0, 300) })
       console.log(`FAIL ${name}-${suf} ${model}: ${String(e).slice(0, 200)}`)
+    } finally {
+      rmSync(up, { force: true })
     }
   }
 }
