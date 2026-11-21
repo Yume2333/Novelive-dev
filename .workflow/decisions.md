@@ -763,3 +763,14 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 剧本和出图各起各的名字；用文字描述锁画风；让视觉模型判断构图；美术导演默认分批；只看 HTTP 状态码；把任务队列和运行记录混在一张表；用 chardet；只选命中最多的一条章节规则。
 - **Because:** 第三轮用真书、真图片接口和真模型调用实测，每一条的证据见 `.workflow/research/gap-ledger-r3.md`。
 - **Decided by:** agent
+
+## 2026-11-21 - 生图提示词由工具拼装，画师只写内容段
+
+- **Decided:**
+  - `draw_image` 改为 `{ content }`：画师只写看得见的内容（陈述句，不超过 150 字），工具按固定顺序拼上参考图声明、素材类型句、设定集外貌原文、`style.json` 画风描述、构图与输出约束，最后一行固定放渲染块（owner 给的反破碎描述原文）。
+  - 不用标签格式，不写否定句和 `Avoid:` 行，删掉 `negativePrompt`；工具查禁词（画质词、画风词、画师名）和长度，不过就退回画师。
+  - 主视觉候选也用同一套拼装和渲染块生成；返回尺寸和请求不同时按宽高比缩放或中心裁切。
+  - `quality` 用默认值，`complexity` 不传。
+- **Instead of:** 画师自由写整段提示词；照搬 Codex imagegen 的标签格式；在尾部加 `Avoid:` 行；用 `complexity: low` 或 `quality: medium` 压细节。
+- **Because:** 两轮共 98 次真实调用实测：加渲染块后边缘密度减半、碎片少 55–60%，盲评碎感、微纹理、AI 味三项都最低；标签格式单独用和基线一样碎；`Avoid:` 行让一张 CG 丢了要点；`complexity: low` 几乎无效。细节过密的主视觉会把碎感带给所有图。证据见 `.workflow/research/gap-ledger-r4.md`。
+- **Decided by:** agent

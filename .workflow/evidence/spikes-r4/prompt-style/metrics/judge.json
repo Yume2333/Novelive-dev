@@ -1,0 +1,182 @@
+[
+ {
+  "subject": "s1-cg-first-rain",
+  "variant": "V0",
+  "code": "E",
+  "frag": 1.45,
+  "micro": 1.26,
+  "ai": 1.98,
+  "shape": 2.05,
+  "vn": 0.99
+ },
+ {
+  "subject": "s1-cg-first-rain",
+  "variant": "V1",
+  "code": "D",
+  "frag": 1.44,
+  "micro": 1.23,
+  "ai": 1.89,
+  "shape": 2.04,
+  "vn": 1.17
+ },
+ {
+  "subject": "s1-cg-first-rain",
+  "variant": "V2",
+  "code": "F",
+  "frag": 1.31,
+  "micro": 1.24,
+  "ai": 1.86,
+  "shape": 2.04,
+  "vn": 1.02
+ },
+ {
+  "subject": "s1-cg-first-rain",
+  "variant": "V3",
+  "code": "C",
+  "frag": 1.51,
+  "micro": 1.29,
+  "ai": 1.91,
+  "shape": 1.98,
+  "vn": 1.27
+ },
+ {
+  "subject": "s1-cg-first-rain",
+  "variant": "V4",
+  "code": "A",
+  "frag": 1.44,
+  "micro": 1.25,
+  "ai": 1.97,
+  "shape": 2.05,
+  "vn": 1.07
+ },
+ {
+  "subject": "s1-cg-first-rain",
+  "variant": "V5",
+  "code": "B",
+  "frag": 1.45,
+  "micro": 1.25,
+  "ai": 1.79,
+  "shape": 1.99,
+  "vn": 1.12
+ },
+ {
+  "subject": "s2-beiping-street",
+  "variant": "V0",
+  "code": "F",
+  "frag": 1.66,
+  "micro": 1.26,
+  "ai": 1.85,
+  "shape": 1.94,
+  "vn": 1.91
+ },
+ {
+  "subject": "s2-beiping-street",
+  "variant": "V1",
+  "code": "D",
+  "frag": 1.6,
+  "micro": 1.27,
+  "ai": 1.91,
+  "shape": 1.92,
+  "vn": 1.97
+ },
+ {
+  "subject": "s2-beiping-street",
+  "variant": "V2",
+  "code": "E",
+  "frag": 1.25,
+  "micro": 1.2,
+  "ai": 1.84,
+  "shape": 1.91,
+  "vn": 1.91
+ },
+ {
+  "subject": "s2-beiping-street",
+  "variant": "V3",
+  "code": "B",
+  "frag": 1.73,
+  "micro": 1.28,
+  "ai": 1.94,
+  "shape": 1.88,
+  "vn": 1.85
+ },
+ {
+  "subject": "s2-beiping-street",
+  "variant": "V4",
+  "code": "C",
+  "frag": 1.44,
+  "micro": 1.23,
+  "ai": 1.84,
+  "shape": 1.89,
+  "vn": 1.82
+ },
+ {
+  "subject": "s2-beiping-street",
+  "variant": "V5",
+  "code": "A",
+  "frag": 1.54,
+  "micro": 1.26,
+  "ai": 1.93,
+  "shape": 1.94,
+  "vn": 1.99
+ },
+ {
+  "subject": "s3-xiangzi-puller",
+  "variant": "V0",
+  "code": "E",
+  "frag": 0.87,
+  "micro": 0.56,
+  "ai": 1.79,
+  "shape": 2.34,
+  "vn": 1.18
+ },
+ {
+  "subject": "s3-xiangzi-puller",
+  "variant": "V1",
+  "code": "C",
+  "frag": 0.83,
+  "micro": 0.56,
+  "ai": 1.8,
+  "shape": 2.38,
+  "vn": 1.14
+ },
+ {
+  "subject": "s3-xiangzi-puller",
+  "variant": "V2",
+  "code": "A",
+  "frag": 0.8,
+  "micro": 0.56,
+  "ai": 1.82,
+  "shape": 2.4,
+  "vn": 1.1
+ },
+ {
+  "subject": "s3-xiangzi-puller",
+  "variant": "V3",
+  "code": "D",
+  "frag": 0.86,
+  "micro": 0.61,
+  "ai": 1.78,
+  "shape": 2.38,
+  "vn": 1.24
+ },
+ {
+  "subject": "s3-xiangzi-puller",
+  "variant": "V4",
+  "code": "F",
+  "frag": 0.88,
+  "micro": 0.54,
+  "ai": 1.78,
+  "shape": 2.35,
+  "vn": 1.16
+ },
+ {
+  "subject": "s3-xiangzi-puller",
+  "variant": "V5",
+  "code": "B",
+  "frag": 0.83,
+  "micro": 0.58,
+  "ai": 1.83,
+  "shape": 2.4,
+  "vn": 1.25
+ }
+]

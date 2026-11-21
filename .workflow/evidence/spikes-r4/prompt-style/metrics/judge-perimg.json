@@ -1,0 +1,3318 @@
+{
+ "per_image": {
+  "s1-cg-first-rain|V1|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.23,
+    "confidence": 0.63,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.07,
+     "1": 0.64,
+     "2": 0.28,
+     "3": 0.01
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1,
+    "confidence": 0.45,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.27,
+     "1": 0.47,
+     "2": 0.24,
+     "3": 0.02
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.63,
+    "confidence": 0.15,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.17,
+     "1": 0.27,
+     "2": 0.32,
+     "3": 0.24
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.48,
+    "confidence": 0.48,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.04,
+     "2": 0.44,
+     "3": 0.52
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.53,
+    "confidence": 0.53,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.1,
+     "2": 0.24,
+     "3": 0.65
+    }
+   }
+  },
+  "s1-cg-first-rain|V1|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.21,
+    "confidence": 0.63,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.08,
+     "1": 0.64,
+     "2": 0.27,
+     "3": 0.01
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.15,
+    "confidence": 0.41,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.22,
+     "1": 0.45,
+     "2": 0.29,
+     "3": 0.04
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.54,
+    "confidence": 0.08,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.18,
+     "1": 0.3,
+     "2": 0.3,
+     "3": 0.22
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.39,
+    "confidence": 0.5,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.05,
+     "2": 0.5,
+     "3": 0.45
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.51,
+    "confidence": 0.52,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.11,
+     "2": 0.23,
+     "3": 0.65
+    }
+   }
+  },
+  "s1-cg-first-rain|V5|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.46,
+    "confidence": 0.47,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.04,
+     "1": 0.49,
+     "2": 0.45,
+     "3": 0.02
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.6,
+    "confidence": 0.43,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.08,
+     "1": 0.33,
+     "2": 0.51,
+     "3": 0.08
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 2.39,
+    "confidence": 0.4,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.09,
+     "2": 0.36,
+     "3": 0.53
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.51,
+    "confidence": 0.53,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.03,
+     "2": 0.41,
+     "3": 0.56
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.55,
+    "confidence": 0.54,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.1,
+     "2": 0.2,
+     "3": 0.68
+    }
+   }
+  },
+  "s2-beiping-street|V1|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.16,
+    "confidence": 0.64,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.1,
+     "1": 0.65,
+     "2": 0.24,
+     "3": 0.01
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 0.86,
+    "confidence": 0.52,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.3,
+     "1": 0.53,
+     "2": 0.16,
+     "3": 0.01
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 0.91,
+    "confidence": 0.09,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.48,
+     "1": 0.25,
+     "2": 0.15,
+     "3": 0.12
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 1.92,
+    "confidence": 0.54,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.23,
+     "2": 0.56,
+     "3": 0.19
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.54,
+    "confidence": 0.53,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.09,
+     "2": 0.26,
+     "3": 0.64
+    }
+   }
+  },
+  "s1-cg-first-rain|V0|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.54,
+    "confidence": 0.47,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.03,
+     "1": 0.43,
+     "2": 0.5,
+     "3": 0.04
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.59,
+    "confidence": 0.38,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.1,
+     "1": 0.32,
+     "2": 0.48,
+     "3": 0.1
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 2.4,
+    "confidence": 0.4,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.09,
+     "2": 0.36,
+     "3": 0.53
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.45,
+    "confidence": 0.45,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.04,
+     "2": 0.47,
+     "3": 0.49
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.52,
+    "confidence": 0.53,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.11,
+     "2": 0.22,
+     "3": 0.66
+    }
+   }
+  },
+  "s1-cg-first-rain|V0|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.44,
+    "confidence": 0.48,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.04,
+     "1": 0.5,
+     "2": 0.44,
+     "3": 0.02
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.63,
+    "confidence": 0.47,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.06,
+     "1": 0.33,
+     "2": 0.53,
+     "3": 0.08
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 2.04,
+    "confidence": 0.34,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.06,
+     "1": 0.19,
+     "2": 0.4,
+     "3": 0.35
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.3,
+    "confidence": 0.55,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.07,
+     "2": 0.55,
+     "3": 0.38
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.56,
+    "confidence": 0.57,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.09,
+     "2": 0.22,
+     "3": 0.68
+    }
+   }
+  },
+  "s3-xiangzi-puller|V0|s1": {
+   "frag": {
+    "type": "score",
+    "score": 0.82,
+    "confidence": 0.63,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.28,
+     "1": 0.63,
+     "2": 0.09,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.72,
+    "confidence": 0.57,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.03,
+     "1": 0.29,
+     "2": 0.6,
+     "3": 0.08
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.75,
+    "confidence": 0.25,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.13,
+     "1": 0.24,
+     "2": 0.38,
+     "3": 0.25
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.75,
+    "confidence": 0.77,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.02,
+     "2": 0.19,
+     "3": 0.79
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.35,
+    "confidence": 0.33,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.14,
+     "2": 0.36,
+     "3": 0.49
+    }
+   }
+  },
+  "s2-beiping-street|V0|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.63,
+    "confidence": 0.55,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.37,
+     "2": 0.57,
+     "3": 0.04
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.38,
+    "confidence": 0.37,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.13,
+     "1": 0.42,
+     "2": 0.4,
+     "3": 0.05
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.84,
+    "confidence": 0,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.17,
+     "1": 0.2,
+     "2": 0.25,
+     "3": 0.38
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 1.96,
+    "confidence": 0.55,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.21,
+     "2": 0.57,
+     "3": 0.2
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.52,
+    "confidence": 0.52,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.1,
+     "2": 0.25,
+     "3": 0.64
+    }
+   }
+  },
+  "s1-cg-first-rain|V5|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.35,
+    "confidence": 0.55,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.57,
+     "2": 0.36,
+     "3": 0.02
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.43,
+    "confidence": 0.34,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.12,
+     "1": 0.41,
+     "2": 0.4,
+     "3": 0.07
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 2.4,
+    "confidence": 0.4,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.09,
+     "2": 0.36,
+     "3": 0.53
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.48,
+    "confidence": 0.48,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.05,
+     "2": 0.42,
+     "3": 0.53
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.54,
+    "confidence": 0.54,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.11,
+     "2": 0.21,
+     "3": 0.67
+    }
+   }
+  },
+  "s3-xiangzi-puller|V0|s2": {
+   "frag": {
+    "type": "score",
+    "score": 0.87,
+    "confidence": 0.66,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.24,
+     "1": 0.66,
+     "2": 0.1,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.82,
+    "confidence": 0.66,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.22,
+     "2": 0.68,
+     "3": 0.08
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.55,
+    "confidence": 0.2,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.16,
+     "1": 0.31,
+     "2": 0.36,
+     "3": 0.17
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.75,
+    "confidence": 0.75,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.02,
+     "2": 0.21,
+     "3": 0.77
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.27,
+    "confidence": 0.26,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.15,
+     "2": 0.41,
+     "3": 0.43
+    }
+   }
+  },
+  "s3-xiangzi-puller|V1|s1": {
+   "frag": {
+    "type": "score",
+    "score": 0.58,
+    "confidence": 0.49,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.47,
+     "1": 0.49,
+     "2": 0.04,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 0.92,
+    "confidence": 0.51,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.28,
+     "1": 0.52,
+     "2": 0.19,
+     "3": 0.01
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.08,
+    "confidence": 0.27,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.33,
+     "1": 0.35,
+     "2": 0.24,
+     "3": 0.08
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.63,
+    "confidence": 0.62,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.03,
+     "2": 0.29,
+     "3": 0.67
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.23,
+    "confidence": 0.42,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.16,
+     "2": 0.43,
+     "3": 0.4
+    }
+   }
+  },
+  "s3-xiangzi-puller|V2|s2": {
+   "frag": {
+    "type": "score",
+    "score": 0.94,
+    "confidence": 0.65,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.2,
+     "1": 0.66,
+     "2": 0.13,
+     "3": 0.01
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 2.09,
+    "confidence": 0.63,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.12,
+     "2": 0.64,
+     "3": 0.23
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.76,
+    "confidence": 0.2,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.14,
+     "1": 0.24,
+     "2": 0.34,
+     "3": 0.28
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.79,
+    "confidence": 0.81,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.01,
+     "2": 0.17,
+     "3": 0.82
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.36,
+    "confidence": 0.36,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.12,
+     "2": 0.37,
+     "3": 0.5
+    }
+   }
+  },
+  "s2-beiping-street|V0|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.49,
+    "confidence": 0.43,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.04,
+     "1": 0.46,
+     "2": 0.47,
+     "3": 0.03
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.28,
+    "confidence": 0.44,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.14,
+     "1": 0.46,
+     "2": 0.38,
+     "3": 0.02
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.22,
+    "confidence": 0,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.36,
+     "1": 0.26,
+     "2": 0.18,
+     "3": 0.2
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 1.97,
+    "confidence": 0.52,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.21,
+     "2": 0.54,
+     "3": 0.23
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.51,
+    "confidence": 0.5,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.1,
+     "2": 0.27,
+     "3": 0.62
+    }
+   }
+  },
+  "s2-beiping-street|V3|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.29,
+    "confidence": 0.57,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.07,
+     "1": 0.58,
+     "2": 0.34,
+     "3": 0.01
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 0.99,
+    "confidence": 0.47,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.27,
+     "1": 0.49,
+     "2": 0.22,
+     "3": 0.02
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.48,
+    "confidence": 0,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.26,
+     "1": 0.25,
+     "2": 0.23,
+     "3": 0.26
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.04,
+    "confidence": 0.58,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.17,
+     "2": 0.59,
+     "3": 0.23
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.52,
+    "confidence": 0.52,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.1,
+     "2": 0.25,
+     "3": 0.64
+    }
+   }
+  },
+  "s3-xiangzi-puller|V3|s1": {
+   "frag": {
+    "type": "score",
+    "score": 0.75,
+    "confidence": 0.6,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.33,
+     "1": 0.6,
+     "2": 0.07,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.37,
+    "confidence": 0.41,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.11,
+     "1": 0.44,
+     "2": 0.42,
+     "3": 0.03
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.81,
+    "confidence": 0.33,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.1,
+     "1": 0.23,
+     "2": 0.43,
+     "3": 0.24
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.77,
+    "confidence": 0.79,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.01,
+     "2": 0.19,
+     "3": 0.8
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.47,
+    "confidence": 0.47,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.1,
+     "2": 0.3,
+     "3": 0.59
+    }
+   }
+  },
+  "s2-beiping-street|V2|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.71,
+    "confidence": 0.59,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.31,
+     "2": 0.61,
+     "3": 0.06
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.46,
+    "confidence": 0.35,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.11,
+     "1": 0.37,
+     "2": 0.46,
+     "3": 0.06
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.79,
+    "confidence": 0,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.17,
+     "1": 0.21,
+     "2": 0.26,
+     "3": 0.36
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.09,
+    "confidence": 0.56,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.15,
+     "2": 0.57,
+     "3": 0.27
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.48,
+    "confidence": 0.48,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.11,
+     "2": 0.27,
+     "3": 0.61
+    }
+   }
+  },
+  "s3-xiangzi-puller|V1|s2": {
+   "frag": {
+    "type": "score",
+    "score": 0.65,
+    "confidence": 0.55,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.4,
+     "1": 0.55,
+     "2": 0.05,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 0.61,
+    "confidence": 0.4,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.49,
+     "1": 0.42,
+     "2": 0.09,
+     "3": 0
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.17,
+    "confidence": 0.24,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.29,
+     "1": 0.35,
+     "2": 0.25,
+     "3": 0.11
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.61,
+    "confidence": 0.63,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.03,
+     "2": 0.31,
+     "3": 0.66
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.26,
+    "confidence": 0.26,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.15,
+     "2": 0.41,
+     "3": 0.43
+    }
+   }
+  },
+  "s3-xiangzi-puller|V2|s1": {
+   "frag": {
+    "type": "score",
+    "score": 0.94,
+    "confidence": 0.66,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.2,
+     "1": 0.67,
+     "2": 0.12,
+     "3": 0.01
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 2.18,
+    "confidence": 0.62,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.08,
+     "2": 0.63,
+     "3": 0.28
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.89,
+    "confidence": 0.3,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.09,
+     "1": 0.22,
+     "2": 0.39,
+     "3": 0.3
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.8,
+    "confidence": 0.82,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.01,
+     "2": 0.16,
+     "3": 0.83
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.45,
+    "confidence": 0.45,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.1,
+     "2": 0.32,
+     "3": 0.57
+    }
+   }
+  },
+  "s3-xiangzi-puller|V4|s1": {
+   "frag": {
+    "type": "score",
+    "score": 0.72,
+    "confidence": 0.6,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.34,
+     "1": 0.6,
+     "2": 0.06,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.2,
+    "confidence": 0.48,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.16,
+     "1": 0.5,
+     "2": 0.32,
+     "3": 0.02
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.61,
+    "confidence": 0.2,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.16,
+     "1": 0.28,
+     "2": 0.36,
+     "3": 0.2
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.78,
+    "confidence": 0.78,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.02,
+     "2": 0.18,
+     "3": 0.8
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.42,
+    "confidence": 0.41,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.11,
+     "2": 0.34,
+     "3": 0.54
+    }
+   }
+  },
+  "s3-xiangzi-puller|V4|s2": {
+   "frag": {
+    "type": "score",
+    "score": 0.7,
+    "confidence": 0.58,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.36,
+     "1": 0.58,
+     "2": 0.06,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 0.74,
+    "confidence": 0.44,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.41,
+     "1": 0.45,
+     "2": 0.13,
+     "3": 0.01
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.17,
+    "confidence": 0.23,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.3,
+     "1": 0.34,
+     "2": 0.25,
+     "3": 0.11
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.73,
+    "confidence": 0.74,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.02,
+     "2": 0.22,
+     "3": 0.76
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.28,
+    "confidence": 0.28,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.15,
+     "2": 0.39,
+     "3": 0.45
+    }
+   }
+  },
+  "s2-beiping-street|V5|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.57,
+    "confidence": 0.5,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.03,
+     "1": 0.4,
+     "2": 0.53,
+     "3": 0.04
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.5,
+    "confidence": 0.37,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.1,
+     "1": 0.36,
+     "2": 0.47,
+     "3": 0.07
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.72,
+    "confidence": 0,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.19,
+     "1": 0.23,
+     "2": 0.27,
+     "3": 0.31
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 1.92,
+    "confidence": 0.55,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.23,
+     "2": 0.57,
+     "3": 0.18
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.5,
+    "confidence": 0.48,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.11,
+     "2": 0.27,
+     "3": 0.61
+    }
+   }
+  },
+  "s3-xiangzi-puller|V5|s1": {
+   "frag": {
+    "type": "score",
+    "score": 0.85,
+    "confidence": 0.66,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.25,
+     "1": 0.66,
+     "2": 0.09,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.75,
+    "confidence": 0.6,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.03,
+     "1": 0.26,
+     "2": 0.63,
+     "3": 0.08
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.43,
+    "confidence": 0.14,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.21,
+     "1": 0.31,
+     "2": 0.31,
+     "3": 0.17
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.7,
+    "confidence": 0.72,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.02,
+     "2": 0.24,
+     "3": 0.74
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.21,
+    "confidence": 0.42,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.17,
+     "2": 0.43,
+     "3": 0.39
+    }
+   }
+  },
+  "s2-beiping-street|V4|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.39,
+    "confidence": 0.48,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.06,
+     "1": 0.5,
+     "2": 0.42,
+     "3": 0.02
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.13,
+    "confidence": 0.5,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.19,
+     "1": 0.51,
+     "2": 0.29,
+     "3": 0.01
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 0.97,
+    "confidence": 0.03,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.47,
+     "1": 0.23,
+     "2": 0.16,
+     "3": 0.14
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2,
+    "confidence": 0.53,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.19,
+     "2": 0.55,
+     "3": 0.24
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.52,
+    "confidence": 0.51,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.09,
+     "2": 0.28,
+     "3": 0.62
+    }
+   }
+  },
+  "s3-xiangzi-puller|V3|s2": {
+   "frag": {
+    "type": "score",
+    "score": 0.66,
+    "confidence": 0.56,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.39,
+     "1": 0.56,
+     "2": 0.05,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 0.38,
+    "confidence": 0.61,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.68,
+     "1": 0.26,
+     "2": 0.05,
+     "3": 0.01
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.7,
+    "confidence": 0.28,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.13,
+     "1": 0.25,
+     "2": 0.41,
+     "3": 0.21
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.66,
+    "confidence": 0.66,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.03,
+     "2": 0.28,
+     "3": 0.69
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.04,
+    "confidence": 0.42,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.25,
+     "2": 0.43,
+     "3": 0.31
+    }
+   }
+  },
+  "s3-xiangzi-puller|V5|s2": {
+   "frag": {
+    "type": "score",
+    "score": 0.91,
+    "confidence": 0.68,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.21,
+     "1": 0.68,
+     "2": 0.11,
+     "3": 0
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.86,
+    "confidence": 0.68,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.19,
+     "2": 0.7,
+     "3": 0.09
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.38,
+    "confidence": 0.08,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.24,
+     "1": 0.29,
+     "2": 0.32,
+     "3": 0.15
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.65,
+    "confidence": 0.67,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.03,
+     "2": 0.27,
+     "3": 0.7
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.26,
+    "confidence": 0.26,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.15,
+     "2": 0.41,
+     "3": 0.43
+    }
+   }
+  },
+  "s2-beiping-street|V3|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.35,
+    "confidence": 0.53,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.06,
+     "1": 0.55,
+     "2": 0.37,
+     "3": 0.02
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.1,
+    "confidence": 0.48,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.21,
+     "1": 0.5,
+     "2": 0.27,
+     "3": 0.02
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.63,
+    "confidence": 0,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.22,
+     "1": 0.23,
+     "2": 0.25,
+     "3": 0.3
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 1.97,
+    "confidence": 0.56,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.2,
+     "2": 0.58,
+     "3": 0.2
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.5,
+    "confidence": 0.5,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.1,
+     "2": 0.27,
+     "3": 0.62
+    }
+   }
+  },
+  "s2-beiping-street|V1|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.13,
+    "confidence": 0.65,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.11,
+     "1": 0.66,
+     "2": 0.22,
+     "3": 0.01
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 0.66,
+    "confidence": 0.49,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.43,
+     "1": 0.49,
+     "2": 0.08,
+     "3": 0
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 0.69,
+    "confidence": 0.3,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.58,
+     "1": 0.22,
+     "2": 0.12,
+     "3": 0.08
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.09,
+    "confidence": 0.57,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.15,
+     "2": 0.58,
+     "3": 0.26
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.58,
+    "confidence": 0.57,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.08,
+     "2": 0.24,
+     "3": 0.67
+    }
+   }
+  },
+  "s2-beiping-street|V5|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.55,
+    "confidence": 0.49,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.03,
+     "1": 0.42,
+     "2": 0.52,
+     "3": 0.03
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.44,
+    "confidence": 0.34,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.12,
+     "1": 0.37,
+     "2": 0.46,
+     "3": 0.05
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.6,
+    "confidence": 0,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.23,
+     "1": 0.23,
+     "2": 0.24,
+     "3": 0.3
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.1,
+    "confidence": 0.56,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.15,
+     "2": 0.57,
+     "3": 0.27
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.51,
+    "confidence": 0.5,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.09,
+     "2": 0.29,
+     "3": 0.61
+    }
+   }
+  },
+  "s1-cg-first-rain|V4|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.38,
+    "confidence": 0.51,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.53,
+     "2": 0.4,
+     "3": 0.02
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.25,
+    "confidence": 0.38,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.18,
+     "1": 0.43,
+     "2": 0.34,
+     "3": 0.05
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.85,
+    "confidence": 0.28,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.1,
+     "1": 0.23,
+     "2": 0.38,
+     "3": 0.29
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.31,
+    "confidence": 0.56,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.06,
+     "2": 0.56,
+     "3": 0.38
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.47,
+    "confidence": 0.48,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.12,
+     "2": 0.25,
+     "3": 0.62
+    }
+   }
+  },
+  "s1-cg-first-rain|V3|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.32,
+    "confidence": 0.58,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.59,
+     "2": 0.35,
+     "3": 0.01
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.29,
+    "confidence": 0.39,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.16,
+     "1": 0.44,
+     "2": 0.35,
+     "3": 0.05
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.72,
+    "confidence": 0.2,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.14,
+     "1": 0.26,
+     "2": 0.34,
+     "3": 0.26
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.45,
+    "confidence": 0.47,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.04,
+     "2": 0.45,
+     "3": 0.51
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.5,
+    "confidence": 0.48,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.12,
+     "2": 0.22,
+     "3": 0.64
+    }
+   }
+  },
+  "s1-cg-first-rain|V4|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.43,
+    "confidence": 0.48,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.04,
+     "1": 0.5,
+     "2": 0.44,
+     "3": 0.02
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.12,
+    "confidence": 0.43,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.22,
+     "1": 0.46,
+     "2": 0.29,
+     "3": 0.03
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 2.08,
+    "confidence": 0.34,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.06,
+     "1": 0.17,
+     "2": 0.4,
+     "3": 0.37
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.47,
+    "confidence": 0.47,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.04,
+     "2": 0.45,
+     "3": 0.51
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.52,
+    "confidence": 0.5,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.12,
+     "2": 0.2,
+     "3": 0.66
+    }
+   }
+  },
+  "s1-cg-first-rain|V2|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.48,
+    "confidence": 0.47,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.03,
+     "1": 0.49,
+     "2": 0.46,
+     "3": 0.02
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.4,
+    "confidence": 0.36,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.13,
+     "1": 0.41,
+     "2": 0.41,
+     "3": 0.05
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 2.16,
+    "confidence": 0.39,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.04,
+     "1": 0.14,
+     "2": 0.43,
+     "3": 0.39
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.44,
+    "confidence": 0.45,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.04,
+     "2": 0.47,
+     "3": 0.49
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.48,
+    "confidence": 0.48,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.12,
+     "2": 0.22,
+     "3": 0.64
+    }
+   }
+  },
+  "s1-cg-first-rain|V3|s1": {
+   "frag": {
+    "type": "score",
+    "score": 1.31,
+    "confidence": 0.58,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.06,
+     "1": 0.59,
+     "2": 0.34,
+     "3": 0.01
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.02,
+    "confidence": 0.44,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.27,
+     "1": 0.46,
+     "2": 0.25,
+     "3": 0.02
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.95,
+    "confidence": 0.32,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.08,
+     "1": 0.21,
+     "2": 0.4,
+     "3": 0.31
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.41,
+    "confidence": 0.51,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.04,
+     "2": 0.51,
+     "3": 0.45
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.47,
+    "confidence": 0.47,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.12,
+     "2": 0.23,
+     "3": 0.63
+    }
+   }
+  },
+  "s1-cg-first-rain|V2|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.5,
+    "confidence": 0.44,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.04,
+     "1": 0.45,
+     "2": 0.48,
+     "3": 0.03
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.62,
+    "confidence": 0.43,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.08,
+     "1": 0.31,
+     "2": 0.51,
+     "3": 0.1
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 2.61,
+    "confidence": 0.61,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.04,
+     "2": 0.28,
+     "3": 0.67
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.43,
+    "confidence": 0.43,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0,
+     "1": 0.05,
+     "2": 0.47,
+     "3": 0.48
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.51,
+    "confidence": 0.52,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.12,
+     "2": 0.18,
+     "3": 0.68
+    }
+   }
+  },
+  "s2-beiping-street|V2|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.71,
+    "confidence": 0.59,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.02,
+     "1": 0.31,
+     "2": 0.61,
+     "3": 0.06
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.6,
+    "confidence": 0.44,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.08,
+     "1": 0.31,
+     "2": 0.52,
+     "3": 0.09
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.94,
+    "confidence": 0,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.14,
+     "1": 0.19,
+     "2": 0.28,
+     "3": 0.39
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 1.9,
+    "confidence": 0.5,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.03,
+     "1": 0.24,
+     "2": 0.53,
+     "3": 0.2
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.46,
+    "confidence": 0.48,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.12,
+     "2": 0.25,
+     "3": 0.62
+    }
+   }
+  },
+  "s2-beiping-street|V4|s2": {
+   "frag": {
+    "type": "score",
+    "score": 1.39,
+    "confidence": 0.51,
+    "legend": {
+     "0": "very clean large masses",
+     "1": "mostly clean",
+     "2": "noticeably busy edges",
+     "3": "severely fragmented"
+    },
+    "probabilities": {
+     "0": 0.05,
+     "1": 0.53,
+     "2": 0.4,
+     "3": 0.02
+    }
+   },
+   "micro": {
+    "type": "score",
+    "score": 1.02,
+    "confidence": 0.47,
+    "legend": {
+     "0": "flat clean shading",
+     "1": "slight texture",
+     "2": "visible micro-texture",
+     "3": "heavy noisy micro-texture"
+    },
+    "probabilities": {
+     "0": 0.26,
+     "1": 0.48,
+     "2": 0.25,
+     "3": 0.01
+    }
+   },
+   "ai": {
+    "type": "score",
+    "score": 1.29,
+    "confidence": 0,
+    "legend": {
+     "0": "natural flat VN look",
+     "1": "mild",
+     "2": "noticeable plastic shine",
+     "3": "strong AI look"
+    },
+    "probabilities": {
+     "0": 0.34,
+     "1": 0.25,
+     "2": 0.19,
+     "3": 0.22
+    }
+   },
+   "shape": {
+    "type": "score",
+    "score": 2.22,
+    "confidence": 0.52,
+    "legend": {
+     "0": "muddled",
+     "1": "somewhat readable",
+     "2": "clear",
+     "3": "very clear"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.11,
+     "2": 0.53,
+     "3": 0.35
+    }
+   },
+   "vn": {
+    "type": "score",
+    "score": 2.54,
+    "confidence": 0.53,
+    "legend": {
+     "0": "unusable",
+     "1": "needs rework",
+     "2": "usable with minor fixes",
+     "3": "usable as-is"
+    },
+    "probabilities": {
+     "0": 0.01,
+     "1": 0.09,
+     "2": 0.26,
+     "3": 0.64
+    }
+   }
+  }
+ },
+ "agg": [
+  {
+   "subject": "s1-cg-first-rain",
+   "variant": "V0",
+   "n": 2,
+   "frag": 1.49,
+   "micro": 1.61,
+   "ai": 2.22,
+   "shape": 2.38,
+   "vn": 2.54
+  },
+  {
+   "subject": "s1-cg-first-rain",
+   "variant": "V1",
+   "n": 2,
+   "frag": 1.22,
+   "micro": 1.07,
+   "ai": 1.58,
+   "shape": 2.44,
+   "vn": 2.52
+  },
+  {
+   "subject": "s1-cg-first-rain",
+   "variant": "V2",
+   "n": 2,
+   "frag": 1.49,
+   "micro": 1.51,
+   "ai": 2.38,
+   "shape": 2.44,
+   "vn": 2.5
+  },
+  {
+   "subject": "s1-cg-first-rain",
+   "variant": "V3",
+   "n": 2,
+   "frag": 1.31,
+   "micro": 1.16,
+   "ai": 1.83,
+   "shape": 2.43,
+   "vn": 2.49
+  },
+  {
+   "subject": "s1-cg-first-rain",
+   "variant": "V4",
+   "n": 2,
+   "frag": 1.4,
+   "micro": 1.19,
+   "ai": 1.97,
+   "shape": 2.39,
+   "vn": 2.5
+  },
+  {
+   "subject": "s1-cg-first-rain",
+   "variant": "V5",
+   "n": 2,
+   "frag": 1.41,
+   "micro": 1.52,
+   "ai": 2.4,
+   "shape": 2.5,
+   "vn": 2.54
+  },
+  {
+   "subject": "s2-beiping-street",
+   "variant": "V0",
+   "n": 2,
+   "frag": 1.56,
+   "micro": 1.33,
+   "ai": 1.53,
+   "shape": 1.96,
+   "vn": 2.51
+  },
+  {
+   "subject": "s2-beiping-street",
+   "variant": "V1",
+   "n": 2,
+   "frag": 1.15,
+   "micro": 0.76,
+   "ai": 0.8,
+   "shape": 2,
+   "vn": 2.56
+  },
+  {
+   "subject": "s2-beiping-street",
+   "variant": "V2",
+   "n": 2,
+   "frag": 1.71,
+   "micro": 1.53,
+   "ai": 1.86,
+   "shape": 1.99,
+   "vn": 2.47
+  },
+  {
+   "subject": "s2-beiping-street",
+   "variant": "V3",
+   "n": 2,
+   "frag": 1.32,
+   "micro": 1.04,
+   "ai": 1.55,
+   "shape": 2,
+   "vn": 2.51
+  },
+  {
+   "subject": "s2-beiping-street",
+   "variant": "V4",
+   "n": 2,
+   "frag": 1.39,
+   "micro": 1.07,
+   "ai": 1.13,
+   "shape": 2.11,
+   "vn": 2.53
+  },
+  {
+   "subject": "s2-beiping-street",
+   "variant": "V5",
+   "n": 2,
+   "frag": 1.56,
+   "micro": 1.47,
+   "ai": 1.66,
+   "shape": 2.01,
+   "vn": 2.5
+  },
+  {
+   "subject": "s3-xiangzi-puller",
+   "variant": "V0",
+   "n": 2,
+   "frag": 0.84,
+   "micro": 1.77,
+   "ai": 1.65,
+   "shape": 2.75,
+   "vn": 2.31
+  },
+  {
+   "subject": "s3-xiangzi-puller",
+   "variant": "V1",
+   "n": 2,
+   "frag": 0.61,
+   "micro": 0.77,
+   "ai": 1.13,
+   "shape": 2.62,
+   "vn": 2.25
+  },
+  {
+   "subject": "s3-xiangzi-puller",
+   "variant": "V2",
+   "n": 2,
+   "frag": 0.94,
+   "micro": 2.13,
+   "ai": 1.82,
+   "shape": 2.79,
+   "vn": 2.41
+  },
+  {
+   "subject": "s3-xiangzi-puller",
+   "variant": "V3",
+   "n": 2,
+   "frag": 0.71,
+   "micro": 0.88,
+   "ai": 1.75,
+   "shape": 2.71,
+   "vn": 2.25
+  },
+  {
+   "subject": "s3-xiangzi-puller",
+   "variant": "V4",
+   "n": 2,
+   "frag": 0.71,
+   "micro": 0.97,
+   "ai": 1.39,
+   "shape": 2.75,
+   "vn": 2.35
+  },
+  {
+   "subject": "s3-xiangzi-puller",
+   "variant": "V5",
+   "n": 2,
+   "frag": 0.88,
+   "micro": 1.81,
+   "ai": 1.4,
+   "shape": 2.67,
+   "vn": 2.23
+  }
+ ]
+}
