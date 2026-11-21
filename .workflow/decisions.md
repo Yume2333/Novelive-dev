@@ -816,3 +816,11 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** `quality: medium`。
 - **Because:** 同一套提示词下 medium 每张输出 1584 token，只有 high 的约四分之一，但 owner 看图认为明显差一些，还会画错；对鱼鳞纹没有改善。证据在 `.workflow/evidence/spikes-r4/texture/`（round2）。
 - **Decided by:** user
+
+## 2026-11-22 - 画风固定句的例外句加上笔触（F+X 改为 FXB）
+
+- **Decided:** 例外句从“头发高光、眼睛、渐变保持图 1 原样”扩成“头发高光、眼睛、渐变、笔触和线条质感保持图 1 原样”，其余不变（原文见 `docs/visuals.md` 2.4 第 7 条）。
+- **Instead of:** F+X 原样（笔触被压平）；再加媒介句区分媒介质感和鱼鳞状涂抹（FXBM）；再把“平涂底色加喷枪渐变”换成“用和图 1 相同的媒介”（NXBM）。
+- **Because:** owner 在黑白厚涂、galgame 两张参考图上，画原角色和只借画风画新角色各看了一轮，FXB 鱼鳞纹略多一点，但画面质感明显更好。证据在 `.workflow/evidence/spikes-r4/brushwork/` 和 `style-transfer/`。
+- **Decided by:** user
+- **Supersedes:** 2026-11-21 画风固定句定为 F+X（只改例外句）
