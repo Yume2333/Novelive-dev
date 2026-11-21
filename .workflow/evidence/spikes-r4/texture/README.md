@@ -44,6 +44,7 @@ source <env-file>            # NL_IMAGE_BASE_URL / NL_IMAGE_API_KEY
 export REALESRGAN_BIN=<path-to>/realesrgan-ncnn-vulkan
 export REALESRGAN_MODELS=<path-to>/models
 node src/run.mjs             # 32 次 edit -> gen/<scene>--<arm>--r{1,2}.png（OLD->--OLD--）
+
 node src/postproc.mjs        # -> -D1.png，删 work/ 中间文件
 .venv/bin/python src/contact.py
 ```
@@ -56,3 +57,14 @@ node src/postproc.mjs        # -> -D1.png，删 work/ 中间文件
 - `contact/T{n}.png`：臂列 × 2 行（T1 多一列 OLD），标 `中文标题 + 实际尺寸`
 - `contact/T{n}/`：D1 图查看顺序 `01-F-1 …`；`contact/T{n}-raw/`：同名 raw 图
 - `contact/ref.png`
+
+## Round 2（补跑）
+
+首版之上追加 T1/T3：`F+X` 两次（`--r3`/`--r4`，与上轮 r1/r2 区分）与新臂
+`F+X+N` 两次（`--r1`/`--r2`）。`F+X+N` 末行 = F + ` ` + X + ` ` + N
+（N 全文见上表）。对照页 `contact/round2-T{n}.png`（一行 6 格：F+X 上轮
+两次、F+X 本轮两次、F+X+N 两次，全 D1，原像素）；翻页目录
+`contact/round2-T{n}/`（D1）与 `contact/round2-T{n}-raw/`（raw）。
+复跑命令：`node src/run.mjs 'F+X' 'T1,T3' 'r3,r4'` 与
+`node src/run.mjs 'F+X+N' 'T1,T3' 'r1,r2'`，再 `node src/postproc.mjs`、
+`.venv/bin/python src/contact_round2.py`。

@@ -70,6 +70,8 @@ const LASTLINE = {
   'F+N': F + ' ' + N,
   'F+X': F + ' ' + X,
   'F+R+N': F + ' ' + R + ' ' + N,
+  'F+X+N': F + ' ' + X + ' ' + N,
+  'F+X-med': F + ' ' + X,   // same text as F+X, quality:"medium" (see call())
 }
 
 const ARMS = process.argv[2] ? process.argv[2].split(',') : ['F', 'F+R', 'F+N', 'F+X', 'F+R+N']
@@ -108,9 +110,10 @@ async function call(skey, arm, run, opts = {}) {
   const s = SCENES[skey]
   const name = opts.old ? `${skey}--OLD--${run}` : `${skey}--${arm}--${run}`
   const prompt = promptFor(skey, arm, opts)
+  const quality = arm === 'F+X-med' ? 'medium' : 'high'
   const extra = {
-    quality: 'high', model: MODEL,
-    meta: { scene: skey, arm: opts.old ? 'OLD' : arm, run, model: MODEL, req_size: s.size, transparent: !!s.sprite, nameRemoved: !!opts.nameRemoved, prompt },
+    quality, model: MODEL,
+    meta: { scene: skey, arm: opts.old ? 'OLD' : arm, run, model: MODEL, quality, req_size: s.size, transparent: !!s.sprite, nameRemoved: !!opts.nameRemoved, prompt },
   }
   if (s.sprite) extra.background = 'transparent'
   return { name, r: await edit([REF], prompt, s.size, extra) }
