@@ -6,3 +6,5 @@ node_modules
 .venv
 run.log
 __pycache__
+contact-hires
+compare
