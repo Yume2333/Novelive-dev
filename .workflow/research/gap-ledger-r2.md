@@ -1,5 +1,7 @@
 # Research: 第二轮 13 份调研与现有设计对账
 
+> **历史档案：** 本文为第二轮调研对账记录，部分取舍后续已被推翻或细化（如 A2 Real-CUGAN 已被 `2026-11-21 - 放大默认用 Real-ESRGAN 动漫模型` 改为 `realesrgan-x4plus-anime`、A5 已改自打补丁、C2 已改用思源黑体、C23 已保留「加入已有系列」、B24/C11 `negativePrompt` 已被 `2026-11-21 - 生图提示词由工具拼装，画师只写内容段` 删除）；当前有效方案以 `.workflow/decisions.md` 和 `docs/*.md` 为准。
+
 2026-11-21。输入：13 份 R2 调研/审查报告（`local://r2-*.md`）+ `docs/*.md`、`DESIGN.md`、`.workflow/decisions.md`（含 Supersedes 链，最新 wins）、`.workflow/glossary.md`、`.workflow/research/*.md`（含 round-1 `gap-ledger.md`）、`.workflow/specs/m0-skeleton.md`、`.workflow/owner-review.md`、`prototype/src/`。
 
 核实方法：每条先回读所引文档原文（path:line）判 `已覆盖`/`误读`/`属实`；6 项争议声明另用一手来源独立复核——`openai@7.62.0` npm tarball `images.d.ts`、OpenAI deprecations 页、Electron#46323 issue、electron-updater v26 官方文档、各 ncnn-vulkan 仓 LICENSE、pi-ai 1.6.0 `dist/providers/data/*.json`（43 个 provider、~1000 模型）逐字段查。round-1 `gap-ledger.md` 已列条目不重复列，除非 round 2 改了它。

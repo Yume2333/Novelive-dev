@@ -18,10 +18,10 @@ export const compatPresets: { value: CompatPreset; label: string; defaultBase: s
   { value: 'auto', label: '自动', defaultBase: '' },
   { value: 'openai', label: 'OpenAI', defaultBase: 'https://api.openai.com/v1' },
   { value: 'deepseek', label: 'DeepSeek', defaultBase: 'https://api.deepseek.com/v1' },
-  { value: 'qwen', label: 'Qwen', defaultBase: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  { value: 'qwen', label: '通义千问', defaultBase: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
   { value: 'zhipu', label: '智谱', defaultBase: 'https://open.bigmodel.cn/api/paas/v4' },
   { value: 'openrouter', label: 'OpenRouter', defaultBase: 'https://openrouter.ai/api/v1' },
-  { value: 'anthropic-compat', label: 'Anthropic 兼容', defaultBase: 'https://api.anthropic.com' },
+  { value: 'anthropic-compat', label: '兼容 Anthropic', defaultBase: 'https://api.anthropic.com' },
 ]
 
 /** 五个模型位 */
@@ -46,7 +46,7 @@ export interface TextModelConfig {
   model: string
   context: string
   key: string
-  /** 主模型 / 写作 / 视觉可以一键沿用快速模型的地址和 Key */
+  /** 主模型 / 写作 / 视觉可以一键沿用快速模型的格式、兼容、地址和 Key */
   inheritFast: boolean
 }
 
@@ -73,55 +73,101 @@ export const defaultTextConfig = (slot: Exclude<ModelSlot, 'image'>): TextModelC
   return { compat: 'auto', format: 'openai-chat', base: defaultBaseUrl('openai-chat'), model: seed[slot], context: '', key: '', inheritFast: slot !== 'fast' }
 }
 
-export const defaultImageConfig = () => ({
-  base: 'https://api.openai.com/v1',
-  model: 'gpt-image-2.6-flare',
-  key: '',
+export type ImageApiShape = 'openai-images' | 'other'
+export type ImageEditSupport = 'yes' | 'no' | 'unknown'
+export type ImageTransparentSupport = 'yes' | 'no' | 'unknown'
+export type ImageSizeRule = 'free' | 'tiers' | 'enum'
+export type ImageQuality = 'high' | 'medium' | 'low'
+export type UpscaleTier = 'anime' | 'fast'
+
+export interface ImageModelConfig {
+  base: string
+  model: string
+  key: string
   /** 同时出图数（默认 8） */
-  concurrency: '8',
+  concurrency: string
   /** 一张图检查不通过后最多重画几次，用完用占位图并标“需要处理”（默认 3） */
-  retries: '3',
-  /** 接口形状：填地址时按预设自动套 */
-  api: 'openai-images',
+  retries: string
+  /** 生图质量：高 / 中 / 低（默认高；协议形状为 OpenAI images 时发送） */
+  quality: ImageQuality
+  /** 原生长边上限（像素，默认 1536） */
+  nativeMaxEdge: string
+  /** 协议形状：填地址时按预设自动套 */
+  api: ImageApiShape
   /** 能不能图片编辑 / 出透明底（用户声明，影响测试预期和可用功能） */
+  canEdit: ImageEditSupport
+  transparent: ImageTransparentSupport
+  /** 尺寸规则 */
+  sizeRule: ImageSizeRule
+  /** 后处理（放大降噪）开关 */
+  postProcess: boolean
+  /** 放大档位 */
+  upscaleTier: UpscaleTier
+}
+
+export const defaultImageConfig = (): ImageModelConfig => ({
+  base: 'https://api.openai.com/v1',
+  model: 'gpt-image-2.6-sunburst',
+  key: '',
+  concurrency: '8',
+  retries: '3',
+  quality: 'high',
+  nativeMaxEdge: '1536',
+  api: 'openai-images',
   canEdit: 'yes',
   transparent: 'yes',
-  /** 尺寸规则：自由 / 固定档位 */
   sizeRule: 'free',
+  postProcess: true,
+  upscaleTier: 'anime',
 })
 
-/** 图片模型 4 项声明的选项；填地址命中预设时自动填 */
-export const imageApiOptions = [
-  { value: 'openai-images', label: 'OpenAI Images' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'seedream', label: 'Seedream（火山）' },
-  { value: 'qwen-image', label: 'Qwen 图像' },
-  { value: 'sd-compatible', label: 'SD 兼容' },
+/** 图片模型 4 项声明与质量/放大选项 */
+export const imageApiOptions: { value: ImageApiShape; label: string }[] = [
+  { value: 'openai-images', label: 'OpenAI images 协议' },
+  { value: 'other', label: '其他' },
 ]
 
 export const imageDeclOptions = {
   canEdit: [
-    { value: 'yes', label: '能编辑' },
-    { value: 'no', label: '不能编辑' },
-  ],
+    { value: 'yes', label: '支持' },
+    { value: 'no', label: '仅文生图' },
+    { value: 'unknown', label: '不确定' },
+  ] as { value: ImageEditSupport; label: string }[],
   transparent: [
-    { value: 'yes', label: '能出透明底' },
-    { value: 'no', label: '不出透明底' },
-  ],
+    { value: 'yes', label: '支持' },
+    { value: 'no', label: '不支持' },
+    { value: 'unknown', label: '不确定' },
+  ] as { value: ImageTransparentSupport; label: string }[],
   sizeRule: [
-    { value: 'free', label: '任意尺寸' },
-    { value: 'tiers', label: '固定档位' },
-  ],
+    { value: 'free', label: '任意 WxH' },
+    { value: 'tiers', label: '分辨率档位' },
+    { value: 'enum', label: '固定枚举' },
+  ] as { value: ImageSizeRule; label: string }[],
 }
 
-/** 按接口地址猜预设：命中时同时给 4 项声明（演示） */
-export const imagePresetFor = (base: string): { api: string; canEdit: string; transparent: string; sizeRule: string } | null => {
-  const b = base.toLowerCase()
-  if (b.includes('openai.com')) return { api: 'openai-images', canEdit: 'yes', transparent: 'yes', sizeRule: 'tiers' }
-  if (b.includes('googleapis.com') || b.includes('generativelanguage')) return { api: 'gemini', canEdit: 'no', transparent: 'no', sizeRule: 'tiers' }
-  if (b.includes('volces.com') || b.includes('ark.cn')) return { api: 'seedream', canEdit: 'yes', transparent: 'no', sizeRule: 'free' }
-  if (b.includes('dashscope')) return { api: 'qwen-image', canEdit: 'yes', transparent: 'no', sizeRule: 'tiers' }
-  return null
+export const imageQualityOptions: { value: ImageQuality; label: string }[] = [
+  { value: 'high', label: '高' },
+  { value: 'medium', label: '中' },
+  { value: 'low', label: '低' },
+]
+
+export const upscaleTierOptions: { value: UpscaleTier; label: string }[] = [
+  { value: 'anime', label: '动漫模型（默认）' },
+  { value: 'fast', label: '快速档' },
+]
+
+/** 按接口地址域名自动套预设；认不出的域名回退到通用 OpenAI 兼容声明 */
+export const imagePresetFor = (
+  base: string,
+): { api: ImageApiShape; canEdit: ImageEditSupport; transparent: ImageTransparentSupport; sizeRule: ImageSizeRule } | null => {
+  const b = base.trim().toLowerCase()
+  if (!b) return null
+  if (b.includes('openai.com')) return { api: 'openai-images', canEdit: 'yes', transparent: 'yes', sizeRule: 'free' }
+  if (b.includes('volces.com') || b.includes('ark.cn')) return { api: 'other', canEdit: 'yes', transparent: 'unknown', sizeRule: 'tiers' }
+  if (b.includes('dashscope') || b.includes('aliyuncs.com')) return { api: 'other', canEdit: 'yes', transparent: 'unknown', sizeRule: 'free' }
+  if (b.includes('googleapis.com') || b.includes('generativelanguage')) return { api: 'other', canEdit: 'no', transparent: 'no', sizeRule: 'tiers' }
+  if (b.includes('siliconflow')) return { api: 'other', canEdit: 'unknown', transparent: 'no', sizeRule: 'enum' }
+  return { api: 'openai-images', canEdit: 'unknown', transparent: 'unknown', sizeRule: 'free' }
 }
 
 /** 图片模型能力测试：文生图、透明底、图片编辑三项各给一个结果 */

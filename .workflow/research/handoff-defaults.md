@@ -12,10 +12,10 @@
 - **creator.ready**：由主进程代发，与 `creator.down` 对称；主进程最清楚 utility process 何时就绪。（contract 包）
 - **端口重建（试验）**：creator 崩溃重启后 MessagePort 失效，重连要重新建 channel。验收：W2 e2e 覆盖「杀掉 creator → 自动重启 → UI 恢复调用」。（`.workflow/specs/m0-skeleton.md` W2）
 - **图片录制格式（试验）**：回放对 `images.generate` 录完整 `b64_json` 响应，支持注入 `moderation_blocked`、断线等错误。验收：定义出录制文件 schema，回放能复现成功和两类失败。录制格式同下条 cassette；`body` 超 256KB 外置 `cassette-files/<sha>`。（`.workflow/specs/m0-skeleton.md` 录制回放、character-consistency 试验记录）
-- **录制文件（cassette schema）**：JSONL 一行一交互 `{key, method, path, reqHash, status, headers, body(b64), recordedAt, case, tags}`，`key = sha256(method+path+canonicalBody)` 前 16 hex；录制时剥 `authorization` 头、baseURL 重写为占位符；`record/replay/strict` 三模式；注入故障（midcut/disconnect/cancel/http500/bad-image）由回放层按参数触发、不进 cassette；`delayMs` 支持慢流取消用例。单元测试主力是 fetch 注入式回放（openai/Anthropic SDK 都有 `fetch` 选项，pi 侧在 `streamFn` 包装层注入）；本地假服务保留给 e2e。M0 先用开发期中转录制，再写回放测试；录制文件放 `tests/fixtures/` 进仓库，缺了就算测试失败，不跳过。（`.workflow/specs/m0-skeleton.md`、`pnpm check`、`pi-scaffolding.md` 通用层 7）
-- **CI 范围**：CI 只跑 `pnpm check`；e2e 只本地跑 `pnpm test:e2e`，不在 CI 加 xvfb。（`.github/workflows`、package.json scripts）
+- **录制文件（cassette schema）**：JSONL 一行一交互 `{key, method, path, reqHash, status, headers, body(b64), recordedAt, case, tags}`，`key = sha256(method+path+canonicalBody)` 前 16 hex；录制时剥 `authorization` 头、baseURL 重写为占位符；`record/replay/strict` 三模式；注入故障（midcut/disconnect/cancel/http500/bad-image）由回放层按参数触发、不进 cassette；`delayMs` 支持慢流取消用例。单元测试主力是 fetch 注入式回放（openai/Anthropic SDK 都有 `fetch` 选项，pi 侧在 `streamFn` 包装层注入）；端到端用 `registerFauxProvider` 包装的假模型加 fetch 注入式 HTTP cassette 回放（不起本地 HTTP 服务）。M0 先用开发期中转录制，再写回放测试；录制文件放 `tests/fixtures/` 进仓库，缺了就算测试失败，不跳过。（`.workflow/specs/m0-skeleton.md`、`pnpm check`、`pi-scaffolding.md` 通用层 7）
+- **CI 范围**：CI 跑 `pnpm check` 加 Linux Electron sharp 解码一张图的冒烟测试（xvfb 下先跑 `tools/patch-sharp.mjs`）；完整 `pnpm test:e2e` 只本地跑。（`.github/workflows`、package.json scripts）
 - **e2e 脚本**：`test:e2e` 先跑 `pnpm build` 再启 Electron。（package.json scripts）
-- **崩溃横幅**：用 DESIGN.md 的 warning banner 全局置顶，文案「创作端已停止，日志在 <路径>」+ 重新启动按钮；原型没有这个形态，按新增写。（`docs/ux.md`、DESIGN.md）
+- **崩溃横幅**：用 DESIGN.md 的 warning banner 全局置顶，说明文字放前面（如连续 3 次握手失败说明），日志路径收进「日志」按钮打开 `userData/logs/`，加「重新启动」按钮；原型没有这个形态，按新增写。（`docs/ux.md`、DESIGN.md）
 - **日志**：`<process>-<YYYY-MM-DD>.log` 纯文本行，当日单文件不 rotate；横幅点击用 `shell.openPath` 打开 `userData/logs/`。（`docs/ux.md`）
 - **config.json**：存 `app.getPath('userData')/config.json`；API Key 用 AES-256-GCM 加密，密钥是源码常量（只防扫一眼）；备份迁移=用户自己拷文件，不做导入导出 UI。`config.get` 返回 `apiKeyMasked`（`••••` 哨兵），界面不持有明文 Key；`config.update` 收到哨兵或空串时保留旧值。（`.workflow/specs/m0-skeleton.md`、`decisions.md` 2026-11-20）
 - **模型配置继承**：「沿用快速模型的地址和 Key」整组继承接口格式+地址+Key，模型名和上下文长度自己填；五个槽位都可独立改。（`docs/ux.md`、prototype settings）
@@ -39,8 +39,8 @@
 - **审稿形态**：分两档（决策 2026-11-21「审稿拆成忠实度检查和文风审稿」）。忠实度检查默认开：工具循环 Agent（工具：`read_source_range`、`find_term`、`read_chapter_preview`、`read_bible`、`submit_review`），只查漏段、加戏、对白改写、说话人归属错、独白降级、顺序不连贯、设定冲突，每条问题必须引用原文段落、代码核对引文确实在原文里（越界或全空白打回附邻近行提示）。文风审稿是作品开关、默认关，只评文笔。两档都不循环：写手按问题改一遍，不再复审。审稿提示词写明评什么、不评什么。（`.workflow/research/novelive-agent.md`、`agent-orchestration.md`）
 - **章节失败语义**：某章生成失败整部作品暂停（写手串行依赖上一章结尾），行内重试把该章排回队列头部，成功后恢复。（`docs/creation-pipeline.md`、`docs/ux.md`）
 - **重跑范围**：`redo_chapter`=写/审/演出三步全跑，出图按素材名跳过已存在文件；`rewrite_scene`（面板发起）=重写+差异列表确认卡二次确认后应用；`redraw_image`=单图重生成直接替换，旧文件进修改历史；`redo_volume_synthesis`=重跑走候选合并规则，不覆盖已确认条目。（`.workflow/research/novelive-agent.md`、`docs/ux.md`）
-- **主视觉**：由场景画师出图（横版 16:9），提示词由主控按风格描述组织；确认点 1 给 3 版候选必选，选中存 `assets/style/main-visual.webp` 写回 `bible/style.json` 参考图字段。主视觉存好后，所有画师调用都把它列为参考图之一（R3 实测：只传风格文字三类图画风一致度 0.33–0.41，带主视觉参考 0.85–0.91）。（`docs/bible.md`、prototype ConfirmVisualPage）
-- **质量评测集**：由 agent 自动标注，作回归对比基线；标注候选存仓库，所有者回归后抽查。评分形态：多维评分 + 检查清单 + 机械指标；judge 用快速模型槽、与被测模型分开，经 `submit_*` 交 `{score, reasons[], failedChecks[]}`；失败分类固定（原文忠实度/设定一致性含 knows/伏笔/演出可拍性/量化指标）；runner 自写（`data/task/scorer` 约 150 行，不装框架），统计口径 decided-trials-only。（`decisions.md` 2026-11-21「调研后的取舍」、`.workflow/standards.md`、`agent-harness.md`）
+- **主视觉**：由场景画师出图（横版 16:9），提示词用同套工具拼装出图（风格描述由代码从设定集原文拼入）；确认点 1 给 3 版候选必选，选中存 `assets/style/main-visual.webp` 写回 `bible/style.json` 参考图字段。主视觉存好后，所有画师调用都把画风参考（主视觉加最多 2 张补充参考）带上（R3 实测：只传风格文字三类图画风一致度 0.33–0.41，带主视觉参考 0.85–0.91）。（`docs/bible.md`、prototype ConfirmVisualPage）
+- **质量评测集**：由 agent 标注，作回归对比基线，标注集存仓库。评分形态：多维评分 + 检查清单 + 机械指标；judge 用快速模型槽、与被测模型分开，经 `submit_*` 交 `{score, reasons[], failedChecks[]}`；失败分类固定（原文忠实度/设定一致性含 knows/伏笔/演出可拍性/量化指标）；runner 自写（`data/task/scorer` 约 150 行，不装框架），统计口径 decided-trials-only。（`decisions.md` 2026-11-21「调研后的取舍」、`.workflow/standards.md`、`pi-scaffolding.md` 通用层 7）
 - **确认点 1**：默认停；「已有参考图」仅指创作者在向导里提供的图，EPUB 插图筛出的候选永远要人挑；角色每套造型候选默认 3 版。（`decisions.md` 2026-11-21、`docs/ux.md`）
 - **美术导演读法（R3 实测）**：默认一次读整章；分批的输入 token 是整章的 4.1 倍、补丁格式冒出 8 种写法、素材名前后不一。分批只在整章放不进上下文时兜底，并配一层补丁格式规范化。（`docs/creation-pipeline.md`、`.workflow/research/agent-orchestration.md`）
 - **主要角色名单**：BiblePatch 角色条目加 `major: boolean`（主控综合时判断）；确认点 1 只列第一卷 `firstSeenChapter` 在本卷且 `major` 的角色。（`.workflow/research/novelive-agent.md`）
@@ -48,7 +48,7 @@
 - **作品 phase 枚举**：`preview / confirm-visual / confirm-first / producing / done / imported`；「第一卷综合完、后续卷还在预览」归 producing，制作面板显示「第 N 卷综合中」。（prototype types、`docs/ux.md`）
 - **第一章状态**：过确认点 2 前第一章按「已发布」显示（能玩），作品级 `confirm-first` 表达停顿；确认点信息由作品状态承担。（prototype、`docs/ux.md`）
 - **占位图**：程序生成三张（sharp 画 SVG→WebP，灰底+图标+「需要处理」）：背景 1920×1080、立绘 1024×1536 竖版透明、CG 1920×1080；资源随 creator 包进仓库。（`docs/creation-pipeline.md`、`docs/visuals.md`）
-- **CG 参考图（R3 实测）**：场景画师画 CG 时提示词写外貌，参考图带出场角色的造型基准图 + 地点基准图（若有）+ 主视觉；纯文字描述会把角色画成别人（identity 0.07–0.12）。视觉审核 `identity` 项拿 CG 比对所含角色的造型基准图，不比对设定图。（`docs/visuals.md`）
+- **CG 参考图（R3 实测）**：场景画师画 CG 时，由工具代码把出场角色的外貌原文和颜色锁定句拼入提示词（画师只写内容段），参考图带画风参考（主视觉加最多 2 张补充参考，排在最前）+ 出场角色的造型基准图 + 地点基准图（若有）；纯文字描述会把角色画成别人（identity 0.07–0.12）。视觉审核 `identity` 项拿 CG 比对所含角色的造型基准图，不比对设定图。（`docs/visuals.md`）
 - **场景头归属**：`scene` 标题和 `source` 段落范围由模型写，代码核对范围合法性不生成。（`docs/creation-pipeline.md`、`.workflow/research/novelive-agent.md`）
 - **长章分段（试验）**：写手分段约束「每段以场边界结束」，提示词写明，违规按剧本检查退回；美术导演兜底分批时每批带本批场景+前后各一场衔接+全章图清单累积。验收：分段/分批产物无场景截断、无重复背景图。（`.workflow/research/agent-orchestration.md`、`novelive-agent.md`）
 - **对话面板数据模型（试验）**：查 `agent-orchestration.md`/`novelive-agent.md` 是否已覆盖会话条目树、确认卡、压缩策略的字段级定义；没有就以原型 `mock/chat.ts` 的 ChatNode 树 + ConfirmPart + compressedSummary 为草案补进规格。验收：project.db 会话表能存分支和压缩摘要。（`.workflow/research/`、`docs/ux.md`）
@@ -56,6 +56,8 @@
 - **powerSaveBlocker**：宿主按「有活跃 run」启停 `powerSaveBlocker` 防系统休眠（制作/出图长跑数小时），`will-quit` 时清理。（`docs/architecture.md`）
 - **propose kind 补 `add_text_marker`**：patch 装标记名+CSS+逐字开关；主控工具补 `list_assets`、`read_chapter_manifest`、`read_task_result`（查素材名、图清单、失败原因）。（`.workflow/research/novelive-agent.md`、`decisions.md` 2026-11-20）
 - **标记提议落点**：模型提议新自定义标记进编辑器顶部横幅确认，不进对话面板确认卡；`ConfirmKind` 不加 mark。（`docs/ux.md`、prototype EditorPage）
+- **画风参考三组对比（试验，2026-11-22 延后至 M1b）**：M1b 出图实现时一并实测 `docs/visuals.md` 2.5 策略（固定句用 FXB，沿用 style-transfer 角色与场景）：① 一张参考 + 新声明句；② 一张参考 + 新声明句 + 颜色锁定句；③ 三张同画师不同角色参考 + 新声明句 + 颜色锁定句。（`docs/visuals.md` 2.5、`decisions.md` 2026-11-22「补记未写明的取代关系」）
+- **图片设置从 M1b 起生效**：M0 在设置页和 `config.json` 落齐「生图质量」（高/中/低，默认高，接口形状声明为 OpenAI images 时传 `quality`）、「原生长边上限」（整数像素，默认 1536，请求尺寸不超过它）、「后处理」开关（默认开）和「放大档位」（默认 `realesrgan-x4plus-anime` / 快速档 `realesr-animevideov3` 注明低性能机用、画质下降）；生图质量与原生长边上限从 M1b 出图管线起使用，后处理开关与放大档位在 M3 放大器接入后控制 Real-ESRGAN（关闭时用 sharp Lanczos 缩放到目标尺寸，不去噪）。（`decisions.md` 2026-11-22「图片设置加生图质量、原生长边上限和后处理开关」）
 
 ## M2
 

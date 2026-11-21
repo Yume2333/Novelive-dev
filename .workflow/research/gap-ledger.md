@@ -1,5 +1,7 @@
 # Research: 14 份调研与现有设计对账
 
+> **历史档案：** 本文为第一轮调研对账记录，部分取舍后续已被推翻或细化；当前有效方案以 `.workflow/decisions.md` 和 `docs/*.md` 为准。
+
 2026-11-21。输入：14 份调研报告（13 份研究 + `omp-agent-core.md`）+ `.workflow/decisions.md`、`.workflow/research/*.md`、`.workflow/specs/m0-skeleton.md`、`docs/*.md`。每条先对照文档原文核实再给判定：`已覆盖`（文档已写，引行为证）/`误读`（报告读错文档或决策）/`属实`（真缺口）。`omp-agent-core.md` 的关键声明已对 `/tmp/pi16` 的 earendil pi-ai 1.6.0 dist 逐条实测复核（`estimate.js`、`provider-retry.js`、`retry.js`、`types.d.ts`）。
 
 分类：A 与已定决策冲突（需所有者拍板）｜B 确定缺口直接补｜C 需要取舍的新设计｜D 可拷代码/提示词资产清单｜E 不要（附理由）。
@@ -119,7 +121,7 @@
 - **B13. 压缩触发常量未定**
   - 来源：research-agent-harnesses §4.1。
   - 证据：`agent-orchestration.md:79` 只写「接近模型上限时…压成摘要」无数值；opencode `compaction.ts:131-138`：`RESERVE_MIN=16000`/`RESERVE_SHARE=0.15`/`SUMMARY_OUTPUT_FLOOR=32000`。
-  - 补什么：通用层 6 常量 = `window − max(15%·window, 16k)`；摘要输出保底 32k；溢出重试按 `SHRINK_STEPS=[0.85,0.7,0.5,0.35]`。
+  - 补什么：通用层 6 常量 = `window − max(15%·window, 16k)`；摘要输出保底 32k（注：在 `pi-scaffolding.md` 通用层 6 实际落成 16k，见 `decisions.md` 2026-11-21「编排继续用 pi-agent-core，不用 pi-durable」）；溢出重试按 `SHRINK_STEPS=[0.85,0.7,0.5,0.35]`。
 
 - **B14. 上下文估算没用实测值**
   - 来源：research-agent-harnesses §4.2。
@@ -474,7 +476,7 @@
 | `stripWriteContent`/`prefixesEvidenced`（剥 `N:`/`N|`/`>>N:` 前缀与头行，≥2 编号行证据才剥） | omp `write-content.ts:114`（MIT） | 直接拷贝 → `apply_staging_patch` 输入清洗 |
 | hashline 子集（节解析+op 降维+apply+tag 校验+seen-lines，JS 重写 ~500 行，已实测 bit 一致） | omp `crates/edit`（MIT，napi 引擎需重写） | 移植改写 → `apply_staging_patch` |
 | `hashline.md`/`hashline-compact.md` 语法卡 | omp `crates/edit/prompts/hashline.md`+`edit/hashline-compact.md`（MIT） | 直接拷贝（syntax block/decorator 换 .nvs 语义） |
-| `draw_image` 内部 prompt 组装（subject/scene/text 分字段拼）+尺寸映射+跳过理由链+只回 `Generated: path (WxH)` | omp `image-gen`/`generate_image`（MIT） | 移植改写（工具表面维持 `{prompt,negativePrompt?}` 两字段） |
+| `draw_image` 内部 prompt 组装（subject/scene/text 分字段拼）+尺寸映射+跳过理由链+只回 `Generated: path (WxH)` | omp `image-gen`/`generate_image`（MIT） | 移植改写（工具表面原定维持 `{prompt,negativePrompt?}`；已被 `decisions.md` 2026-11-21「生图提示词由工具拼装，画师只写内容段」推翻，改为 `draw_image { content }`，删掉 `negativePrompt`） |
 | ask 表单协议（单 `html` 参数+预选=超时默认+`timedOut` 非错误+取消交已填+`recoverAskHtml` 旧 questions[] 形状+auto "Other" 行+禁 `<script>`/`button`） | omp `tools/ask.ts`+`prompts/tools/ask.md`（MIT） | 移植改写 → `propose_*` 工具说明 |
 | `todo` op-union `{op,list,task,phase,items}`+verbatim 寻址+单 in-progress+`formatSummary` 重渲+`NEVER takes a turn of its own` | omp `tools/todo.ts`+`prompts/tools/todo.md`（MIT） | 移植改写 → `propose_plan`（若做计划工具） |
 | `isAwaitingUserAnswer`（正则集判 assistant 收尾在等回答→不发提醒） | omp `session/todo-tracker.ts:495`（MIT） | 直接拷贝思路 → 确认卡 pending 时不打断 |

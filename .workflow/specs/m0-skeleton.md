@@ -9,75 +9,94 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 
 ## What it does
 
-- **启动**：`pnpm dev` 打开 Electron 窗口，界面是原型的侧边栏外壳：全局导航（书库、用量、设置）、底部主题切换。书库和用量显示空状态；没有作品，所以侧边栏不显示作品分区和制作状态。崩溃横幅把说明文字放前面（长日志路径会挤掉「连续 3 次」的说明），日志路径放进「日志」按钮，点了打开 `userData/logs/`。
+- **启动**：`pnpm dev` 打开 Electron 窗口，界面是原型的侧边栏外壳：全局导航（书库、用量、设置）、底部主题切换。书库和用量显示空状态；M0 没有作品与导入流程，因此侧边栏不显示最近作品分区和全局制作状态，书库空状态不显示「我的工程 / 导入的作品」标签页及新建、导入、重看首次引导按钮。崩溃横幅把说明文字放前面（长日志路径会挤掉「连续 3 次」的说明），提供「日志」按钮（打开 `userData/logs/`）和「重新启动」按钮。
 - **设置页**，按原型布局：
-  - **快速、主模型、写作、视觉**：接口格式（OpenAI Chat Completions / OpenAI Responses / Anthropic Messages）、「兼容哪家」下拉（自动 / OpenAI / DeepSeek / 通义千问 / 智谱 / OpenRouter / 兼容 Anthropic）、接口地址（选格式时预填官方地址，可改）、模型名、上下文长度（pi 内置模型目录里查得到就自动填，查不到手填，目录命中优先于手填默认值；整数 tokens、最小 4096）、API Key。自定义地址时把对应 compat 写进 pi 的 `Model`。四个文本模型可以复用同一套地址和 Key，只换模型名。
-  - **图片模型**：接口地址、模型名、API Key（OpenAI 兼容图片接口）、同时出图数（默认 8）、生图失败重试次数（默认 3）。另按 `docs/visuals.md`「图片接口适配」一节存四项用户声明（接口形状 / 能否编辑 / 能否出透明底 / 尺寸规则），填地址时按域名自动套预设。M0 只存不用。
-  - **测试**：文本模型通过 pi 发一次最短请求，收到回复就算成功；视觉模型额外带一张小图，要求描述图片内容；图片模型依次试文生图、透明底、图片编辑三项，三项分别显示结果，成功项显示缩略图，缩略图经 `novelive://` 协议读取。失败时显示原因和该检查什么（地址、Key、模型名）。
+  - **快速、主模型、写作、视觉**：接口格式（OpenAI Chat Completions / OpenAI Responses / Anthropic Messages）、「兼容哪家」下拉（自动 / OpenAI / DeepSeek / 通义千问 / 智谱 / OpenRouter / 兼容 Anthropic）、接口地址（切换格式或将「兼容哪家」切到非「自动」预设时预填对应官方地址，可改）、「同快速模型」开关（除快速槽外可用；开启时整组继承快速模型的接口格式、兼容哪家、接口地址和 API Key 四项，模型名与上下文长度按槽位各自填写，五个槽位均可独立修改）、模型名（默认空串）、上下文长度（整数 tokens、最小 4096；从 pi 内置模型目录按 compat/format 对应 vendor 优先匹配，目录命中自动填入但保持可编辑，查不到时手填，placeholder 提示填写模型上下文窗口 tokens）、API Key。自定义地址时把对应 compat 写进 pi 的 `Model`。
+  - **图片模型**：接口地址、模型名（默认空串）、API Key、同时出图数（默认 8）、生图失败重试次数（默认 3）、生图质量（高 / 中 / 低，默认高；对应 OpenAI `quality: high | medium | low`，仅声明协议形状为 OpenAI images 协议时发送）、原生长边上限（整数 px，默认 1536；请求尺寸不超过该上限，2K/4K 由本地放大）、后处理开关（Real-ESRGAN 放大降噪，默认开）与放大档位（默认 `realesrgan-x4plus-anime` / 快速档 `realesr-animevideov3`，快速档标注「低性能机用，画质下降」；关闭后处理时仅用 sharp Lanczos 缩放到目标尺寸、不做降噪）、四项用户声明（枚举和域名预设以 `docs/visuals.md`「图片接口适配」为准：协议形状 `OpenAI images 协议 / 其他`、能否编辑 `支持 / 仅文生图 / 不确定`、能否出透明底 `支持 / 不支持 / 不确定`、尺寸规则 `任意 WxH / 分辨率档位 / 固定枚举`；填地址时按域名自动套预设，认不出的域名回退到通用 OpenAI 兼容声明）。M0 的图片测试已使用生图质量；原生长边上限、后处理开关与放大档位在 M0 只写入配置，出图管线从 M1b 使用，放大程序在 M3 加入（见 `decisions.md` 2026-11-22「图片设置加生图质量、原生长边上限和后处理开关」）。
+  - **测试**：文本模型通过 pi 发一次最短请求，收到回复就算成功；视觉模型额外带一张小图，要求描述图片内容；图片模型依次试文生图（`images.generate`）、透明底（`images.generate` 后用 `sharp` 检查存在 alpha 通道且全透明像素占比 ≥ 0.5%）、图片编辑（`images.edit`，用内置小测试图输入，文生图失败不阻塞编辑项），三项分别显示结果和各自成功项的缩略图，缩略图经 `novelive://` 协议读取；实测结果与四项声明矛盾时显示警告提示，但仍允许保存（见 `docs/ux.md`）。失败时显示原因和该检查什么（地址、Key、模型名）。
   - 高级设置（角色模型、写手预设）和图片保存格式属于 M1b，M0 不做。
-  - **界面**：界面语言、主题（亮 / 暗 / 跟随系统）；**工程**：默认工程位置，“更改”打开系统选文件夹对话框。
+  - **界面**：界面语言（M5 翻译前只提供「简体中文」选项）、主题（亮 / 暗 / 跟随系统）；**工程**：默认工程位置，“更改”打开系统选文件夹对话框；末段**关于**区：显示应用名、版本号、AGPL-3.0 声明及第三方许可 / 源代码入口占位。
   - 所有设置写入应用配置文件，重启后保留。
-- **后台进程崩溃时**：窗口照常可用，顶部出现提示横幅；宿主自动重新拉起创作端，界面重新连上后横幅消失，设置页可以继续测试。如果创作端还没启动好就退出，横幅显示错误信息和“重新启动”按钮，不自动重试。
+- **后台进程崩溃时**：窗口照常可用，顶部出现提示横幅；宿主自动重新拉起创作端，界面重新连上后横幅消失，设置页可以继续测试。如果创作端还没启动好就退出，或连续失败触发断路器，横幅显示错误信息、「日志」按钮和「重新启动」按钮，不再自动重试。
 - **浏览器开发模式**：`pnpm dev:web` 在普通浏览器里打开同一套界面，连接同一份创作端代码，设置测试同样可用。
-- **质量工具**：`pnpm check` 一条命令跑完各包类型检查、Biome、Stylelint 和 Vitest 单元测试（约 14 秒）；`pnpm test:e2e` 用 Playwright 启动 Electron 跑冒烟用例。推到 `Yume2333/Novelive-dev` 后 GitHub Actions 跑 `pnpm check`。
-- **pnpm 配置**：用 pnpm 12 时 `onlyBuiltDependencies` 和 `overrides` 写在 `pnpm-workspace.yaml` 里（`package.json` 的 `pnpm` 字段被忽略）。
-- **日志**：创作端和主进程各自写 `userData/logs/` 下的日志文件；创作端崩溃时横幅显示日志位置。
-- **CI**：交付物包含 `.github/workflows/ci.yml`：ubuntu、Node 24、pnpm，跑 `pnpm install --frozen-lockfile && pnpm check`；Linux 上另跑一条 Electron 解码一张图的 sharp 冒烟（先跑 `tools/patch-sharp.mjs`）。
+- **质量工具**：`pnpm check` 一条命令跑完各包类型检查、Biome、Stylelint 和 Vitest 单元测试；`pnpm test:e2e` 先执行 `pnpm build`，再用 Playwright 启动 Electron 跑冒烟用例。推到 `Yume2333/Novelive-dev` 后 GitHub Actions 跑 `pnpm check` 与 Linux sharp 冒烟。
+- **pnpm 配置**：根目录 `.npmrc` 配置 `node-linker=hoisted` 和 `shamefully-hoist=true`；pnpm 12 的 `onlyBuiltDependencies`（列出 `electron`、`esbuild`、`sharp`）和 `overrides` 写在 `pnpm-workspace.yaml` 里（`package.json` 的 `pnpm` 字段被忽略）。
+- **日志**：创作端和主进程各自写 `userData/logs/<process>-<YYYY-MM-DD>.log`（纯文本行，当日单文件不 rotate）；创作端崩溃时横幅提供「日志」按钮打开 `userData/logs/`。
+- **CI**：交付物包含 `.github/workflows/ci.yml`：ubuntu、Node 24、pnpm 12，apt 安装 `patchelf`、`binutils`、Electron 运行库和 `xvfb`，跑 `pnpm install --frozen-lockfile && pnpm check`，再在 `xvfb-run` 下启动真实 Electron 解码一张图完成 sharp 冒烟（`postinstall` 已运行幂等的 `tools/patch-sharp.mjs`）。完整 `pnpm test:e2e` 仅在本地运行。
 
 ## How it is built
 
 **目录**（pnpm workspaces，Node 24，全部 ESM，TypeScript 严格模式）：
 
-| 包 | M0 内容 |
-| --- | --- |
-| `packages/ui` | Tokens、整套控件库（从原型搬过来，行内样式改为 CSS Modules，接口和外观不变）、侧边栏外壳、书库 / 用量空状态、设置页；i18next，先只有简体中文文案 |
-| `packages/creator` | 创作端进程入口、配置读写、文本和视觉模型测试（pi）、图片模型测试（`openai` SDK）；`contract` 子路径导出命令和事件的 pi-schema 定义 |
-| `apps/desktop` | Electron 主进程、预加载、utility process 管理、MessagePort 通道、`novelive://` 协议、选文件夹对话框；electron-vite 构建 |
-| `tools/dev-bridge` | 浏览器开发模式：在 Node 里跑创作端，WebSocket 转发命令和事件（默认端口 8765），HTTP 提供资源（默认 8766）；`pickFolder()` 用一个输入框填绝对路径。dev-bridge 跨不过去的接口：选文件夹对话框、`novelive://` 资源协议 |
+| 包 | 包名 | M0 内容 |
+| --- | --- | --- |
+| `packages/ui` | `@novelive/ui` | Tokens、整套控件库（从原型搬过来，行内样式改为 CSS Modules，接口和外观不变）、侧边栏外壳、书库 / 用量空状态、设置页（含关于区，仅简体中文）；依赖 `react-router`（`HashRouter`）、`zustand`、`lucide-react`、`i18next`（含 `react-i18next`）与本地打包的 `@fontsource/noto-sans-sc` |
+| `packages/creator` | `@novelive/creator` | 创作端进程入口、配置读写、文本和视觉模型测试（pi）、图片模型测试（`openai` SDK）；`contract` 子路径导出命令和事件的 pi-schema 定义；`peerDependencies` 声明 `sharp` 供类型与导入解析 |
+| `apps/desktop` | `@novelive/desktop` | Electron 主进程、预加载、utility process 管理、MessagePort 通道、`novelive://` 协议、选文件夹对话框；electron-vite 构建；`dependencies` 声明 `sharp` 并挂 `postinstall` |
+| `tools/dev-bridge` | `@novelive/dev-bridge` | 浏览器开发模式：在 Node 里跑创作端，WebSocket 转发命令和事件（默认端口 8765），HTTP 提供资源（默认端口 8766）；`pickFolder()` 用输入框填绝对路径，`host.openLogDir()` 打印日志目录，`host.restartCreator()` 重启 Node 内创作端，`resourceUrl()` 返回 `http://localhost:8766/cache/...` |
 
-sharp 必须写在 `apps/desktop` 的 dependencies 里，由 electron-vite 的 externalize 排除，不能打包进创作端入口脚本（libvips 动态库被打进 bundle 会找不到、进程直接崩）。
+`sharp` 写在 `apps/desktop` 的 `dependencies` 并挂 `postinstall` 运行 `tools/patch-sharp.mjs`；`packages/creator` 在 `peerDependencies` 声明 `sharp` 满足 workspace 类型检查；`electron-vite` main 构建（含创作端入口）将 `sharp` 设为 external，不打进 bundle（libvips 动态库被打进 bundle 会找不到、进程直接崩）。
 
 `packages/format` 在 M1a、`packages/player` 在 M1b、`bin/upscale/`（放大程序）在 M3 有实际内容时再建。
 
 **通信**
 
 - 主进程创建 MessageChannel，fork 创作端后**立刻**把一端 `postMessage` 发过去（先等 ready 再发会互相等死），另一端经预加载交给界面。之后命令和事件直连，不经主进程转发。
-- 预加载用 `contextBridge` 暴露 `window.novelive`：`call(command, payload)`、`on(event, handler)`、`resourceUrl(path)`、`pickFolder()`。`call` 返回 `{ promise, cancel }`：`promise` 成功时 resolve 为命令结果，失败时 reject 为 `{code, message}`；`cancel()` 是取消句柄（AbortSignal 不能跨 contextBridge 传递），取消时预加载发一条取消消息到创作端，创作端中止对应请求（“测试进行中可以取消”走这条路）。`on` 返回取消订阅函数。界面只依赖这个接口；浏览器开发模式下由 dev-bridge 的客户端实现同一接口。预加载维护 requestId→取消的映射；port 随窗口销毁关闭时，创作端中止该端口上的全部在途请求（`webContents.destroyed` 是主进程事件，预加载拿不到）。
-- **帧身份**：fork 创作端时主进程注入单调递增的 `generation`，命令和事件帧都带上；重连后界面丢弃 generation 不匹配的帧——“重连后旧请求的结果不再生效”由换 port + generation 双重实现。
-- **事件**：统一 envelope `{seq, scope, scopeId, at, event}`，`seq` 在 scope 内单调；scope 词表最小集 `app`/`work`，M0 的事件都在 `app` scope。创作端为每个 scope 保留最近约 500 条内存 ring buffer。命令加 `events.list {scope, scopeId, afterSeq}` 供界面断线补漏；ring 溢出时响应带 `gap:true` 和该 scope 的最新快照（`app` scope 快照=创作端当前状态：是否就绪、generation），界面整体刷新该 scope。
+- 预加载用 `contextBridge` 暴露 `window.novelive`：
+  - `call(command, payload)`：返回 `{ promise, cancel }`，`promise` 成功时 resolve 为命令结果，失败时 reject 为 `{ code, message }`；`cancel()` 是取消句柄（`AbortSignal` 不能跨 `contextBridge` 传递），取消时预加载发一条取消消息到创作端，创作端中止对应请求。预加载维护 `requestId` → 取消映射；port 随窗口销毁关闭时，创作端中止该端口上的全部在途请求（`webContents.destroyed` 是主进程事件，预加载拿不到）。
+  - `on(event, handler)`：返回取消订阅函数。
+  - `resourceUrl(path)`：正式模式返回 `novelive://cache/<相对路径>`；`dev-bridge` 返回 `http://localhost:8766/cache/<相对路径>`。
+  - `pickFolder()`：打开系统选文件夹对话框（`dev-bridge` 用输入框）。
+  - `host.openLogDir()`：主进程调用 `shell.openPath` 打开 `userData/logs/`（`dev-bridge` 打印日志路径）。
+  - `host.restartCreator()`：手动拉起创作端并重置断路器失败计数（`dev-bridge` 重启 Node 内创作端）。
+  - `host.appState()`：返回 `{ creator: 'starting' | 'ready' | 'down' | 'failed', generation, breakerOpen, logDir }`，供界面挂载和重连后读取宿主当前状态。
+  界面只依赖 `window.novelive`；浏览器开发模式下由 `@novelive/dev-bridge` 客户端实现同一接口。
+- **帧身份与双通道事件**：fork 创作端时主进程注入单调递增的 `generation`，命令、创作端事件和宿主事件帧都带上；重连后界面丢弃 `generation` 不匹配的帧——“重连后旧请求的结果不再生效”由换 port + `generation` 双重实现。
+  - **宿主生命周期事件**（`creator.ready`、`creator.down`）：由主进程通过独立宿主 IPC 通道直发界面（不经过创作端 MessagePort，不带创作端 `seq`、不进创作端 ring buffer），携带 `generation`；界面挂起或重连后通过 `host.appState()` 获取当前就绪态。界面收到 `creator.down` 后把所有在途调用以 `creator_down` 结束；`creator.down` 发出时创作端丢弃该端口全部在途请求，拉起后经新 port 接收调用。
+  - **创作端事件**：统一 envelope `{ seq, scope, scopeId, at, event }`，`seq` 在 scope 内单调；scope 词表最小集 `app`/`work`，M0 先用 `app`。创作端为每个 scope 保留最近约 500 条内存 ring buffer，经 `events.list { scope, scopeId, afterSeq }` 供界面断线补漏；ring 溢出时响应带 `gap: true` 和该 scope 的最新快照（`app` scope 快照含 `{ ready, generation }`），界面整体刷新该 scope。
 - 命令（请求 → 响应）和事件（创作端主动推送）都由 `@novelive/creator/contract` 里的 pi-schema 定义。编解码放在 contract 里，MessagePort 和 dev-bridge 的 WebSocket 共用。开发模式下两端在收到消息时都做校验，不合法的消息记日志并返回错误。
-- 命令失败返回 `{ code, message }`，界面按 code 显示该检查什么。M0 的 code：`network`、`auth`、`not_found`、`invalid_config`、`cancelled`、`creator_down`、`moderation`、`internal`。
-- M0 的命令：`config.get`、`config.update`、`model.testText`、`model.testImage`、`events.list`。事件：`creator.ready`、`creator.down`（创作端退出时发，带 `generation`），两者都由主进程代发（主进程最清楚 utility process 何时就绪）。界面收到 `creator.down` 后把所有在途调用以 `creator_down` 结束；`creator.down` 发出时创作端丢弃该端口全部在途请求，拉起后经新 port 接收调用。
+- 命令失败返回 `{ code, message }`，界面按 code 显示该检查什么。M0 的 8 个 error code 与映射规则：
+  - `auth`：HTTP `401` / `403` 等鉴权失败。
+  - `not_found`：HTTP `404` 或模型不存在（如 `model_not_found`）。
+  - `network`：HTTP `429` / `5xx`、响应体临时错误码（`service_unavailable`、`overloaded`、`rate_limit` 等）、请求或流式看门狗超时、连接断开（两层重试耗尽后）。
+  - `moderation`：内容审核拒绝（响应体或 pi-ai `stopReason` / `rawStopReason` 拒审标记）。
+  - `invalid_config`：配置缺失、参数校验失败，或处于 `configError` 未重置状态发起 `config.update`。
+  - `cancelled`：用户主动调用 `cancel()` 取消。
+  - `creator_down`：创作端进程退出导致的在途调用中断。
+  - `internal`：其余未归类异常。
+- M0 业务命令：`config.get`、`config.update`、`config.reset`、`model.testText`、`model.testImage`、`events.list`。调试命令 `debug.sqliteSmoke` 和 `debug.sharpSmoke` 仅在环境变量 `NL_E2E=1` 时注册，正式运行不暴露。
 
 **配置**
 
-- 放在 Electron `userData` 下的 `config.json`，结构由 pi-schema 定义，只由创作端读写。API Key 用写在程序里的固定密钥简单加密后存入；`config.get` 返回 `apiKeyMasked`（`••••` 哨兵），界面不持有明文 Key；`config.update` 按字段合并，收到哨兵或空串时保留旧值。写入时先写临时文件再改名，避免写一半断电。开发期验收和录制用所有者的中转，地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`（文本和图片测试同读这一组）；开发默认模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」。
-- 配置文件读不出来、校验失败或 Key 解密失败时，`config.get` 返回 `{configError: {path, reason}}`，界面在设置页顶部显示文件位置和错误信息，不覆盖原文件，不用哨兵顶替。
+- 放在 Electron `userData` 下的 `config.json`，结构由 pi-schema 定义（包含各模型槽位、图片四项声明、原生长边上限、生图质量、后处理开关与放大档位、界面主题/语言、默认工程目录），只由创作端读写。API Key 用 **AES-256-GCM** 加密后存入（密钥为源码常量，只防扫一眼）；未设置 Key 时 `config.get` 返回空串 `""`（避免界面误判「已配置」），已设置 Key 时返回 `apiKeyMasked`（`••••` 哨兵），界面不持有明文 Key；`config.update` 按字段合并，收到哨兵或空串时保留旧值。写入时先写临时文件再改名，避免写一半断电。开发期验收和录制用所有者的中转，地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`（文本和图片共用）；开发默认文本模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」（主模型和写作模型 `devin-swe-2`，快速模型 `deepseek-v4.1-flash`，视觉模型 `gemini-3.8-flash`），默认图片模型为 `gpt-image-2.6-sunburst`。
+- 配置文件读不出来、校验失败或 Key 解密失败时，`config.get` 返回 `{ configError: { path, reason } }`，界面在设置页顶部显示文件位置、错误信息和「重置配置」按钮，不覆盖原文件，不用哨兵顶替。`configError` 存在期间 `config.update` 拒绝写入并返回 `invalid_config`，直到用户点击「重置配置」（调用 `config.reset` 将坏文件备份为 `config.json.bak-<timestamp>` 后写回默认空配置）。
 
 **模型接入**
 
-- 文本：按接口格式构造 pi 的 `Model`（`openai-completions` / `openai-responses` / `anthropic-messages`），`baseUrl` 用用户填的地址，Key 直接传入。上下文长度：pi 内置模型目录（pi-ai `dist/providers/data/*.json`，43 个 provider）里查得到就自动填，目录命中优先级高于手填默认值，查不到由用户手填。测试进行中可以取消。
-- 图片：用 `openai` 官方 SDK 的 `images.generate`，`baseURL` 用用户填的地址。测试依次跑三项：文生图、透明底（要求输出带 alpha）、图片编辑（用内置小测试图做输入，文生图失败不阻塞编辑项），`model.testImage` 的返回带三项各自的结果（通过 / 失败原因）；审核拒绝归 `moderation`。图片存到应用缓存目录，界面经 `novelive://cache/...` 读取。
+- 文本：按接口格式构造 pi 的 `Model`（`openai-completions` / `openai-responses` / `anthropic-messages`），`baseUrl` 用用户填的地址，Key 直接传入，按「兼容哪家」写入 `compat`。上下文长度：从 pi-ai 内置模型目录（`dist/providers/data/*.json`，43 个 provider）按当前 `compat` / `format` 对应 vendor 优先匹配模型名，命中即自动填入但保留可编辑性，查不到由用户手填（最小 4096）。M0 在创作端实现 pi `streamFn` 包装层（对齐 `decisions.md` 2026-11-21「模型调用两层重试，审核拒绝单独处理」）：第一层传 SDK `maxRetries: 2` 处理响应头前的失败；第二层外包整条消息重发，处理流中途断开、空回复、200 后掉线（未产生工具副作用时最多重发 2 次）；流式空闲看门狗（默认 90 秒无事件触发 abort）；abort 归因区分用户取消（直转 `cancelled`、绝不重试）与看门狗（标 `watchdog` 走重试、耗尽转 `network`）；错误分类先检查响应体错误代码（如 4xx 带 `service_unavailable` / `overloaded` / `rate_limit` 按临时错误处理）与审核拒绝字段。测试进行中可以取消。
+- 图片：用 `openai` 官方 SDK；声明协议形状为 OpenAI images 时传 `quality`（来自设置项 `生图质量`，默认 `high`）。测试依次跑三项独立能力：文生图（`images.generate`）、透明底（`images.generate` 后用 `sharp` 检查存在 alpha 通道且全透明像素占比 ≥ 0.5%）、图片编辑（`images.edit`，用内置小测试图输入，文生图失败不阻塞编辑项）；`model.testImage` 返回三项各自的结果、成功项缓存路径及与四项声明矛盾的警告列表；审核拒绝归 `moderation`。图片存到应用缓存目录，界面经 `novelive://cache/...` 读取。
 
 **资源协议**
 
-- 主进程注册 `novelive://`，M0 只映射应用缓存目录（`novelive://cache/<相对路径>`），只保证 `<img>` 和 CSS 引用可读；界面里的 `fetch()` 不支持。工程文件夹在 M1a 加入，作品包在 M5 加入。
+- 主进程注册 `novelive://`，M0 只映射应用缓存目录（`novelive://cache/<相对路径>`），处理时先做 URL-decode，`path.normalize` 后拒绝 `..` 越界，按扩展名映射 MIME（`webp` / `png` / `jpg` / `svg`），只保证 `<img>` 和 CSS 引用可读；界面里的 `fetch()` 不支持。工程文件夹在 M1a 加入，作品包在 M5 加入。
 
 **崩溃恢复**
 
-- 主进程监听 utility process 退出：已经发过 `creator.ready` 的进程退出就向界面发 `creator.down` 并立即重启；启动阶段就退出的，不自动重启，交给横幅里的“重新启动”按钮。**断路器**：基础设施失败（进程退出、端口握手失败）连续 3 次没能完成 ready 握手才打开，不再自动拉起，转横幅加手动“重新启动”；`creator.ready` 成功握手一次失败计数就清零；手动点“重新启动”也清零并重试拉起；业务 handler 返回的错误不计入。
+- 主进程监听 utility process 退出：已经发过 `creator.ready` 的进程退出就向界面发 `creator.down` 并立即重启；启动阶段就退出的，不自动重启，交给横幅里的「日志」和「重新启动」按钮。**断路器**：基础设施失败（进程退出、端口握手失败）连续 3 次没能完成 ready 握手才打开，不再自动拉起，转横幅加「日志」和手动「重新启动」；`creator.ready` 成功握手一次失败计数就清零；手动点「重新启动」（`host.restartCreator()`）也清零并重试拉起；业务 handler 返回的错误不计入。
 
-- **sharp 补丁（Linux）**：`apps/desktop` 安装后跑 `tools/patch-sharp.mjs`（挂 postinstall），已打过补丁就跳过（幂等）；需要 patchelf 和 objcopy。CI 的 Linux 冒烟测试要实际启动 Electron 解码一张图。
+- **sharp 补丁（Linux）**：`apps/desktop` 安装后跑 `tools/patch-sharp.mjs`（挂 `postinstall`），已打过补丁就跳过（幂等）；需要 `patchelf` 和 `objcopy`。CI 的 Linux 冒烟测试在 `xvfb-run` 下实际启动 Electron 解码一张图。
 
 **SQLite**
 
-- `node:sqlite` 在 Electron 45.4.1（Node 24.22.3）的 utility process 里实测可用，不带 flag，WAL 正常（spike 已过）。M0 保留一个端到端冒烟用例：在 utility process 里用 `node:sqlite` 建库、写入、读回。M0 的业务功能不使用数据库。
+- `node:sqlite` 在 Electron 45.4.1（Node 24.22.3）的 utility process 里可用，不带 flag，WAL 正常。M0 业务功能不使用数据库，仅在 `NL_E2E=1` 时注册 `debug.sqliteSmoke`（utility process 内建库、写入、读回）与 `debug.sharpSmoke`（解码内置测试图），供 e2e 冒烟调用。
 
 **测试**
 
-- **录制回放**：回放有 `record`/`replay`/`strict` 三种模式，单测和 CI 用 `strict`；注入故障名 `midcut`/`disconnect`/`cancel`/`http500`/`bad-image`。单测主力是 fetch 注入式回放（openai/Anthropic SDK 都有 `fetch` 选项，pi 侧在我们的 `streamFn` 包装层注入）；端到端用 `registerFauxProvider` 包装的假模型加 fetch 注入式 HTTP cassette 回放。两者共用同一种 JSONL cassette：一行一交互 `{key, method, path, reqHash, status, headers, body(b64), recordedAt, case, tags}`，key = `sha256(method+path+canonicalBody)` 前 16 hex，录制时剥 `authorization` 头、baseURL 重写为占位符，响应头只录白名单（`content-type`、`retry-after`）；`body` 超 256KB 外置 `cassette-files/<sha>`；回放层按参数注入取消、截断、断线（`delayMs` 支持慢流取消用例），注入故障不录进 cassette。录制文件在 W3 用环境变量里的中转跑真实接口时录下，去掉 Key 和中转地址后进仓库；单元测试和端到端测试都改用回放。所以 M0 先接通真实接口并录制，再写回放测试。
-- 单元测试（Vitest）：配置读写、契约校验、三种文本格式和图片接口各对 cassette 回放的成功 / 失败。
-- 端到端（Playwright Electron）：启动应用，设置页用 `registerFauxProvider` 假模型加 fetch 注入回放完成三种文本格式和图片三项能力测试，缩略图经协议加载；结束创作端进程后界面恢复；SQLite 冒烟。
+- **回放开关与模式**：回放由环境变量 `NL_REPLAY=record|replay|strict`（未设置时走真实网络）和 `NL_CASSETTE_DIR`（默认 `tests/fixtures/cassettes/`）控制，`pnpm dev`、`pnpm dev:web`、`pnpm test:e2e` 与单测均识别；单测、CI 和 W2/W4 运行在 `NL_REPLAY=strict`（缺失对应 cassette 直接失败）。
+- **L3 fetch 注入式 HTTP cassette 回放**：三种文本格式和图片测试（含单测与 e2e）全部走 L3——`openai`/Anthropic SDK 通过 `fetch` 选项注入，pi 侧在 `streamFn` 包装层注入。使用 JSONL cassette：一行一交互 `{ key, method, path, reqHash, status, headers, body(b64), recordedAt, case, tags }`，`key = sha256(method + path + canonicalBody)` 前 16 hex；录制时剥 `authorization` 头、baseURL 重写为占位符，响应头只录白名单（`content-type`、`retry-after`）；`body` 超 256KB 外置 `cassette-files/<sha>`；回放层按参数注入 `midcut`/`disconnect`/`cancel`/`http500`/`bad-image`/`delayMs`（支持慢流取消用例），注入故障不录进 cassette。录制文件在 W3 用开发期中转跑真实接口时录下，去掉 Key 和中转地址后进仓库。
+- **L1 `registerFauxProvider`**：仅用于需要驱动 Agent 工具循环的单元/集成测试（如 W2 的“工具执行中取消”用例），不用于替代三种文本协议的 HTTP 格式测试。
+- 单元测试（Vitest）：配置读写与加密/掩码/`configError`、契约校验、三种文本格式和图片接口的 L3 cassette 回放（成功/重试/失败与 error code 映射）、L1 工具循环取消。
+- 端到端（Playwright Electron）：`pnpm test:e2e` 先运行 `pnpm build`，再以 `NL_E2E=1 NL_REPLAY=strict` 启动 Electron，验证设置页用 L3 cassette 回放完成三种文本格式和图片三项能力测试、缩略图经 `novelive://` 加载、杀掉创作端进程后横幅与重启恢复、`debug.sqliteSmoke` 和 `debug.sharpSmoke`。
 - 测试不访问真实模型。
 
 ## What it must not do
@@ -86,7 +105,7 @@ sharp 必须写在 `apps/desktop` 的 dependencies 里，由 electron-vite 的 e
 - M0 不做打包和安装包；M3 在 Linux 上试打一次安装包（见 `decisions.md` 2026-11-21「M3 在 Linux 上试打一次安装包」），三平台安装包在 M5。M0 只在开发模式下跑，只测 Linux。
 - 不起本地 HTTP 服务，dev-bridge 只用于浏览器开发模式，不进正式包。
 - 不建空包：`format`、`player`、`bin/upscale/` 有内容时再建。
-- 不内置供应商和模型清单，模型名由用户填写。
+- 不内置供应商和模型清单，槽位模型名默认为空串，由用户填写。
 
 ## What was considered and rejected
 
@@ -97,11 +116,11 @@ sharp 必须写在 `apps/desktop` 的 dependencies 里，由 electron-vite 的 e
 ## How we will know it works
 
 - **W1.** 全新克隆后执行 `pnpm install && pnpm check`：类型检查、Biome、Stylelint、单元测试全部通过。
-- **W2.** `pnpm test:e2e`：Electron 启动，设置页用 `registerFauxProvider` 假模型加 fetch 注入回放完成三种文本格式和图片三项能力测试，缩略图经 `novelive://` 显示；回放注入取消时这次测试被中止；回放注入断线时这次测试以错误结束；另一次测试进行中结束创作端进程，这次测试以错误结束，重连后再测成功；`node:sqlite` 冒烟通过。单测覆盖：`config.get` 返回的 Key 是掩码、界面发回掩码后 `config.update` 不丢旧值；`events.list` 在 `afterSeq` 之后能补回遗漏事件；取消覆盖三个时序（请求发出前、工具执行中、慢流 `delayMs` 中途）。
-- **W3.** `pnpm dev`，在设置页填真实接口（经 `NL_IMAGE_BASE_URL`/`NL_IMAGE_API_KEY` 走中转）：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 和图片接口，逐个点“测试”都显示连接成功，图片三项能力分别显示结果；测真实接口时录下流式响应和错误作为回放录制文件，去掉 Key 和中转地址后进仓库；退出重开后配置还在。截图存到 `.workflow/evidence/m0/`。本条由 agent 用开发期中转验收。
-- **W4.** `pnpm dev:web` 后在浏览器打开，设置页用同一套注入回放的测试成功，缩略图显示。
-- **W5.** 同一视口下分别截取正式界面和 `prototype/` 的书库空状态与设置页，并排对比：原型已更新到最新决定，除 M1b 才做的高级设置（角色模型、写手预设）和图片保存格式外，布局、控件、配色一致。本条由审查 agent 对照截图验收。
+- **W2.** `NL_REPLAY=strict pnpm test:e2e`（内部先执行 `pnpm build`，以 `NL_E2E=1` 启动 Electron）：设置页通过 L3 fetch 注入式 HTTP cassette 回放完成三种文本格式和图片三项能力测试，缩略图经 `novelive://` 显示；回放注入取消时这次测试被中止；回放注入断线时重试耗尽并以 `network` 错误结束；另一次测试进行中结束创作端进程，界面显示崩溃横幅、在途测试以 `creator_down` 结束，自动重启或点「重新启动」重连后再测成功；`debug.sqliteSmoke` 和 `debug.sharpSmoke` 通过。单测覆盖：未设 Key 时 `config.get` 返回 `""`、已设 Key 返回掩码且 `config.update` 发回掩码/空串保留旧值、`configError` 期间 `config.update` 拒绝并返回 `invalid_config`、「重置配置」备份 `config.json.bak-<timestamp>`；`events.list` 在 `afterSeq` 后补回遗漏事件及 ring 溢出返回 `gap: true`；取消覆盖三时序（请求发出前、L1 `registerFauxProvider` 工具执行中、L3 `delayMs` 慢流中途）；`streamFn` 两层重试、看门狗 abort 归因及 error code 映射。
+- **W3.** `NL_REPLAY=record pnpm dev`（带 `NL_IMAGE_BASE_URL`/`NL_IMAGE_API_KEY`）：在设置页填开发默认模型（图片用 `gpt-image-2.6-sunburst`），测试 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 和图片接口，逐个点“测试”都显示连接成功，图片三项能力分别显示结果与缩略图；另刻意用错误 Key 录一条 `auth` 错误 cassette，用触发审核拦截的提示词录一条 `moderation` 错误 cassette（若中转未拦截则注入等价 `moderation` cassette）；所有录制文件剥离 Key 和中转地址后进仓库 `tests/fixtures/cassettes/`；退出重开后配置保留。截图存到 `.workflow/evidence/m0/`。本条由 agent 用开发期中转验收。
+- **W4.** `NL_REPLAY=strict pnpm dev:web` 后在浏览器打开，设置页用同一套 L3 cassette 回放测试成功，缩略图经 dev-bridge 资源地址显示，`host.openLogDir()` 与 `host.restartCreator()` 可用。
+- **W5.** 同一视口下分别截取正式界面和 `prototype/` 的书库空状态与设置页，并排对比（原型已含生图质量、原生长边上限、后处理开关与放大档位）。M0 相对原型的刻意差异为：侧边栏无最近作品分区和全局制作状态；书库空状态不显示「我的工程 / 导入的作品」标签页与新建、导入、重看首次引导按钮；界面语言只有「简体中文」；不渲染 M1b 的高级设置和图片保存格式。除上述差异外，布局、控件、配色一致。本条由未参与编写的审查 agent 对照截图验收。
 - **W6.** 在 `packages/ui` 的组件 CSS 里写一个颜色字面量，`pnpm check` 失败并指出位置；去掉后通过。
-- **W7.** 推送到 `Yume2333/Novelive-dev` 后，GitHub Actions 的 `pnpm check` 通过。
+- **W7.** 推送到 `Yume2333/Novelive-dev` 后，GitHub Actions（`.github/workflows/ci.yml`）安装依赖与系统工具后跑通 `pnpm check` 和 `xvfb-run` Electron sharp 解码冒烟。
 
 **版本锁定**见 `docs/architecture.md`「版本锁定」（2026-11-21）。

@@ -28,21 +28,24 @@ export function TextInput({
   onChange,
   placeholder,
   readOnly,
+  disabled,
   type = 'text',
 }: {
   value: string
   onChange?: (v: string) => void
   placeholder?: string
   readOnly?: boolean
+  disabled?: boolean
   type?: 'text' | 'password'
 }) {
   return (
     <input
       type={type}
-      style={inputStyle}
+      style={disabled ? { ...inputStyle, opacity: 0.6, cursor: 'not-allowed' } : inputStyle}
       value={value}
       placeholder={placeholder}
       readOnly={readOnly}
+      disabled={disabled}
       onChange={(e) => onChange?.(e.target.value)}
     />
   )
@@ -192,10 +195,12 @@ export function CompactSelect({
   value,
   onChange,
   options,
+  disabled,
 }: {
   value: string
   onChange: (v: string) => void
   options: { value: string; label: string }[]
+  disabled?: boolean
 }) {
   return (
     <select
@@ -207,8 +212,10 @@ export function CompactSelect({
         fontSize: 13,
         color: 'var(--color-on-surface)',
         outline: 'none',
+        ...(disabled ? { opacity: 0.6, cursor: 'not-allowed' } : null),
       }}
       value={value}
+      disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
     >
       {options.map((o) => (

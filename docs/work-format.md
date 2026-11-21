@@ -135,7 +135,7 @@ lin-xiao as 神秘少女: 你终于来了。 #d77e
   source/                    原文与导入产物：
                              original.<ext> 原始文件、chapters/<章节 ID>.txt 分段纯文本、
                              chapters/<章节 ID>.notes.txt 章附注（导入时剔除的注释、脚注、版权页等非正文段）、
-                             preview/ 全书预览结果、images/ EPUB 插图（EPUB 在 M4）
+                             preview/ 全书预览结果、images/ EPUB 插图（EPUB 在 M4）、导入报告文件（M1a 写入核对与分卷建议，供向导读取）
   candidates/                候选图
   series.json                系列信息
   bible/  glossary.json  styles.css  assets/        系列级共享（assets 内含素材登记表 asset-registry.json，见下）
@@ -154,12 +154,15 @@ lin-xiao as 神秘少女: 你终于来了。 #d77e
 
 ```text
 assets/
+  asset-registry.json        素材登记表
+  style/                     画风参考图：main-visual.webp（主视觉）及最多 2 张补充参考（路径与风格描述记于 bible/style.json）
+  fonts/                     作品自定义字体（woff2）
   characters/<角色>/<造型>/<表情>.webp
   locations/<地点>/<变体>.webp
   cg/<CG>.webp
 ```
 
-`assets/asset-registry.json` 是素材登记表，系列内逐级共享、按 ID 整条覆盖（同“系列共享与覆盖”）：地点 `place/variant`、角色 `character/costume/expression`、CG `cg-<id>` 每条登记成一行，含 ID、类型、文件路径、状态（已画 / 待画 / 占位）；同义表情合并登记的别名（[视觉管线](./visuals.md) §2.1）也写在这张表里，按别名查到同一素材。说话人 ID 不在这张表，查设定集角色表。字段说明见[设定集](./bible.md)。
+`assets/asset-registry.json` 是素材登记表，系列内逐级共享、按 ID 整条覆盖（同“系列共享与覆盖”）：地点 `place/variant`、角色 `character/costume/expression`、CG `cg-<id>` 每条登记成一行，含 ID、类型、文件路径、状态（已画 / 待画 / 占位）；同义表情合并登记的别名（[视觉管线](./visuals.md) §2.1）也写在这张表里，按别名查到同一素材。说话人 ID 不在这张表，查设定集角色表。字段说明见[设定集与术语表](./bible.md)。
 
 图片默认存为有损 WebP（质量 90，保留透明通道），应用设置里的全局开关可改无损；由创作端在出图后转换（见[视觉管线](./visuals.md)）。
 
@@ -213,3 +216,13 @@ assets/
 ## 系列共享与覆盖
 
 同一系列的作品共享系列级的设定集、术语表、标记样式和素材。下级的卷或作品有同 ID 的条目时，整条替换上级的；没有的就沿用上级。
+
+## 相关文档
+
+- [Novelive 产品概述](./product.md)
+- [设定集与术语表](./bible.md)
+- [视觉管线](./visuals.md)
+- [创作流水线](./creation-pipeline.md)
+- [播放器](./player.md)
+- [界面与流程](./ux.md)
+- [系统架构](./architecture.md)

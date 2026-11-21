@@ -68,7 +68,7 @@ OpenClaw 只用了 `pi-tui`，不嵌 pi 的 Agent，不算先例。
    - **流式空闲看门狗**：pi 的 `timeoutMs` 是整个 HTTP 请求超时（默认 10 分钟），管不到中转挂起流；包装层加事件级看门狗（约 60 行自写，omp `idle-iterator.ts` 581 行只参考），最新事件间隔超阈值就 abort，reason 标 `watchdog` 走瞬时重试路径。阈值默认 90 秒，M1b 用真实长章校准。
    - **abort 归因**：抄 omp `ai/utils/abort.ts` `createAbortSourceTracker` + `ai/error/abort.ts` `callerAbortReason`（MIT，合计约 100 行）。用户取消和本地看门狗都能 abort 同一个合并 signal，不归因会把“用户取消”误当瞬时错误重发；归因后用户取消绝不进任何重试。
    - **内容审核拒绝单独分类**：pi-ai 1.6.0 把 Anthropic refusal、OpenAI content_filter、Gemini SAFETY 统一映射成 `stopReason:"error"` + `errorMessage`/`rawStopReason`，包装层据此把审核类错误从临时错误里拆出：不算临时错误、不消耗重试次数；写手那章先按降敏规则改写重试一次，还被拒才标“需要处理”，和图片侧同款（决策 2026-11-21）。
-   - **请求次数软预算**（决策 2026-11-21「工具循环按请求次数设软预算」）：美术导演、审稿、主控、子 Agent 的工具循环按角色设请求次数预算（数值在角色定义里，用测试用书校准；画师照旧只数重画次数）。超预算时单独插一条系统提醒；到 1.5 倍停掉当前轮次、只留提交工具，再插强制收尾提醒；之后 5 次请求内还没交就中止标“需要处理”。写法照 omp `task/executor.ts` `buildBudgetNotice` 和 `prompts/system/subagent-yield-reminder.md` 的 `budgetStop` 分支。两条英文提醒文本：
+   - **请求次数软预算**（决策 2026-11-21「工具循环按请求次数设软预算」）：美术导演、审稿、主控、子 Agent 的工具循环按角色设请求次数预算（占位默认：美术导演 30、审稿 20、主控 40、子 Agent 15，待测试用书到后校准；画师照旧只数重画次数）。超预算时单独插一条系统提醒；到 1.5 倍停掉当前轮次、只留提交工具，再插强制收尾提醒；之后 5 次请求内还没交就中止标“需要处理”。写法照 omp `task/executor.ts` `buildBudgetNotice` 和 `prompts/system/subagent-yield-reminder.md` 的 `budgetStop` 分支。两条英文提醒文本：
 
      ```text
      [budget notice] You have used {requests} requests in this run (soft budget: {budget}). Wrap up now: finish the current step and deliver your final report. At {ceil(budget*1.5)} requests the run is force-stopped and you will be asked to report whatever you have.
@@ -140,8 +140,8 @@ OpenClaw 只用了 `pi-tui`，不嵌 pi 的 Agent，不算先例。
 | 角色 | 工具 |
 | --- | --- |
 | 审稿 | `read_source_range`、`find_term`（术语出现位置）、`read_chapter_preview`、`read_bible`、`submit_review` |
-| 美术导演 | `read_scenes`（按场景分批读）、`apply_staging_patch`（解析器校验，错了退回）、`submit_image_manifest`（每项只填素材名、类型、描述）。已有素材和设定切片由代码放进上下文 |
-| 三个画师 | 只有 `draw_image { prompt, negativePrompt? }`：素材由代码绑定，参考图和设定字段由代码放进上下文；尺寸、背景、生成还是编辑、技术检查、视觉审核、存文件、重画计数都在工具和代码里 |
+| 美术导演 | 整章剧本直塞上下文（超窗时兜底用 `read_scenes` 按场景分批读）、`apply_staging_patch`（解析器校验，错了退回）、`submit_image_manifest`（每项只填素材名、类型、描述）。已有素材和设定切片由代码放进上下文 |
+| 三个画师 | 只有 `draw_image { content }`：素材由代码绑定，参考图和设定字段由代码放进上下文；尺寸、背景、生成还是编辑、技术检查、视觉审核、存文件、重画计数都在工具和代码里 |
 | 主控（对话面板） | `novelive-agent.md` 已列的读工具（含 `list_assets`/`read_chapter_manifest`/`read_task_result`）、按事拆开的 `propose_*` 提议工具、`list_proposals`、`spawn_agent`（派子 Agent，见通用层 5） |
 
 ## Open questions

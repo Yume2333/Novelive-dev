@@ -8,6 +8,8 @@ Novelive：Electron 桌面应用（Windows/macOS/Linux）。创作者导入小�
 
 ## Commands
 
+环境前提：Node 24（24.22.3）、pnpm 12（12.21.0）、Electron 45.4.1（完整锁定表见 `docs/architecture.md`「版本锁定」）。
+
 M0 搭好 pnpm workspaces 骨架后填写安装、运行、测试、类型检查命令。在那之前只有原型：
 
 ```sh
@@ -17,7 +19,7 @@ cd prototype && npx tsc --noEmit
 ```
 
 Real path: M0 之后启动 Electron 应用，把流程实际走一遍；在那之前用浏览器打开原型页面。
-Evidence: `.workflow/evidence/`（截图和日志进仓库；录制文件放 `tests/fixtures/`。仓库是公开的，Key、中转地址和测试用书原文不进仓库）
+Evidence: `.workflow/evidence/`（界面验收截图和日志进仓库；生图对比试验图片按目录 `.gitignore` 排除；录制文件放 `tests/fixtures/`。仓库是公开的，Key、中转地址和测试用书原文不进仓库）
 
 ## Layout
 
@@ -25,11 +27,11 @@ Evidence: `.workflow/evidence/`（截图和日志进仓库；录制文件放 `te
 - `DESIGN.md`：界面设计指南
 - `prototype/`：界面原型（假数据），只作参考；控件库和 Tokens 由正式代码复用
 - `.workflow/`：决策、术语、规格、任务
-- 正式代码目录见 `docs/architecture.md`「代码组织」，M0 创建
+- 正式代码目录见 `docs/architecture.md`「代码组织」（M0 只建 `packages/ui`、`packages/creator`、`apps/desktop`、`tools/dev-bridge`，不建空包）
 
 ## Development environment
 
-- 真实接口：地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`，文本和图片共用。开发默认模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」。
+- 真实接口：地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`，文本和图片共用。开发默认模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」，其中图片模型已改为 `gpt-image-2.6-sunburst`（见 2026-11-22「补记未写明的取代关系」）。
 - 花费：日常开发和测试用录制回放；调提示词用 5 到 10 章切片；每个里程碑整本真跑最多一次。
 - 测试用书：`~/novelive-testbooks/`，所有者放入；目录为空时依赖真书的任务标 `Status: blocked`（等书），其余照常推进。
 

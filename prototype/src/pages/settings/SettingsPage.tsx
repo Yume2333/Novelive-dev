@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Button, Icon, Spinner } from '../../components/Button'
 import { Card } from '../../components/Card'
-import { RadioGroup } from '../../components/Extended'
-import { CompactSelect, Field, SectionLabel, TextInput, textareaStyle } from '../../components/Form'
+import { Banner, RadioGroup } from '../../components/Extended'
+import { CompactSelect, Field, SectionLabel, TextInput, Toggle, textareaStyle } from '../../components/Form'
 import { Modal } from '../../components/Modal'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
@@ -20,12 +20,21 @@ import {
   imageCapabilityTests,
   imageDeclOptions,
   imagePresetFor,
+  imageQualityOptions,
   modelSlots,
+  upscaleTierOptions,
   type CapabilityState,
   type CompatPreset,
+  type ImageApiShape,
   type ImageCapability,
+  type ImageEditSupport,
+  type ImageModelConfig,
+  type ImageQuality,
+  type ImageSizeRule,
+  type ImageTransparentSupport,
   type ModelSlot,
   type TextModelConfig,
+  type UpscaleTier,
   type WriterPreset,
 } from '../../mock/settings'
 import { useTheme, type ThemeMode } from '../../shell/theme'
@@ -138,7 +147,7 @@ function ModelCard({
       </div>
       {open ? (
         <div style={{ padding: '0 var(--space-5) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {test === 'ok' && result ? result : null}
+          {result ?? null}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>{children}</div>
         </div>
       ) : null}
@@ -166,46 +175,124 @@ function VisualTestResult() {
   )
 }
 
-/** 图片模型测试：依次测文生图、透明底、图片编辑，三项各自显示结果 */
-function ImageTestResult({ caps }: { caps: Record<ImageCapability, CapabilityState | 'idle'> }) {
+/** 图片模型测试：依次测文生图、透明底、图片编辑，三项各自显示结果和缩略图，并核对声明 */
+function ImageTestResult({
+  caps,
+  config,
+}: {
+  caps: Record<ImageCapability, CapabilityState | 'idle'>
+  config: ImageModelConfig
+}) {
+  const active = imageCapabilityTests.some((c) => caps[c.id] !== 'idle')
+  if (!active) return null
+
   const meta: Record<CapabilityState, { icon: string; text: string; color: string }> = {
     testing: { icon: 'progress_activity', text: '进行中', color: 'var(--color-on-surface-variant)' },
     ok: { icon: 'check_circle', text: '通过', color: 'var(--color-success)' },
     unsupported: { icon: 'error', text: '不支持', color: 'var(--color-on-error-container)' },
     fail: { icon: 'error', text: failText, color: 'var(--color-on-error-container)' },
   }
+
+  const warnings: string[] = []
+  if (config.transparent === 'yes' && caps.transparent === 'unsupported') {
+    warnings.push('声明透明底「支持」，但测试未检测到透明通道（不影响保存）')
+  } else if (config.transparent === 'no' && caps.transparent === 'ok') {
+    warnings.push('声明透明底「不支持」，但测试返回了透明图（不影响保存）')
+  }
+  if (config.canEdit === 'yes' && caps.edit === 'unsupported') {
+    warnings.push('声明能否编辑「支持」，但测试不支持图片编辑（不影响保存）')
+  } else if (config.canEdit === 'no' && caps.edit === 'ok') {
+    warnings.push('声明能否编辑「仅文生图」，但测试支持图片编辑（不影响保存）')
+  }
+
+  const thumb = (cap: ImageCapability) => {
+    const baseStyle = {
+      width: '100%',
+      height: 60,
+      borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--white-60)',
+    }
+    if (cap === 't2i') {
+      return (
+        <div
+          style={{
+            ...baseStyle,
+            background: 'linear-gradient(150deg, var(--color-primary-container), var(--color-surface-container-highest))',
+          }}
+        />
+      )
+    }
+    if (cap === 'transparent') {
+      return (
+        <div
+          style={{
+            ...baseStyle,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'var(--color-surface-container-lowest)',
+            backgroundImage:
+              'linear-gradient(45deg, var(--color-surface-container-highest) 25%, transparent 25%), linear-gradient(-45deg, var(--color-surface-container-highest) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--color-surface-container-highest) 75%), linear-gradient(-45deg, transparent 75%, var(--color-surface-container-highest) 75%)',
+            backgroundSize: '12px 12px',
+            backgroundPosition: '0 0, 0 6px, 6px -6px, -6px 0',
+          }}
+        >
+          <div
+            style={{
+              width: 24,
+              height: 36,
+              borderRadius: 'var(--radius-full)',
+              background: 'var(--color-primary-container)',
+              opacity: 0.85,
+            }}
+          />
+        </div>
+      )
+    }
+    return (
+      <div
+        style={{
+          ...baseStyle,
+          background: 'linear-gradient(135deg, var(--color-secondary-container), var(--color-primary-container))',
+        }}
+      />
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-      <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)' }}>
         {imageCapabilityTests.map((c) => {
           const s = caps[c.id]
-          return s === 'idle' ? null : (
-            <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: meta[s].color }}>
-              {s === 'testing' ? <Spinner size={13} /> : <Icon name={meta[s].icon} size={14} />}
-              {c.label} · {meta[s].text}
-            </span>
+          if (s === 'idle') return null
+          return (
+            <div
+              key={c.id}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--space-2)',
+                padding: 'var(--space-3)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--white-40)',
+                border: '1px solid var(--white-60)',
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: meta[s].color }}>
+                {s === 'testing' ? <Spinner size={13} /> : <Icon name={meta[s].icon} size={14} />}
+                {c.label} · {meta[s].text}
+              </span>
+              {s === 'ok' ? thumb(c.id) : null}
+            </div>
           )
         })}
       </div>
-      {caps.transparent === 'unsupported' ? (
-        <div style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', lineHeight: 1.6 }}>这个模型不支持透明底，换一个支持的模型。</div>
-      ) : null}
-      {caps.t2i === 'ok' ? (
-        <div
-          style={{
-            width: 96,
-            height: 54,
-            borderRadius: 'var(--radius-md)',
-            background: 'linear-gradient(150deg, var(--color-primary-container), var(--color-surface-container-highest))',
-            border: '1px solid var(--white-60)',
-          }}
-        />
-      ) : null}
+      {warnings.length > 0 ? <Banner kind="warning">{warnings.join('；')}</Banner> : null}
     </div>
   )
 }
 
-/** 文本模型字段；canInherit 的槽位可以一键沿用快速模型的地址和 Key */
+/** 文本模型字段；canInherit 的槽位可以一键沿用快速模型的格式、兼容、地址和 Key */
 function TextModelFields({
   slot,
   config,
@@ -220,19 +307,25 @@ function TextModelFields({
   const inherit = slot !== 'fast' && config.inheritFast
   return (
     <>
-      <Field label="兼容">
+      <Field label="兼容哪家">
         <CompactSelect
-          value={config.compat}
+          value={inherit ? fast.compat : config.compat}
+          disabled={inherit}
           onChange={(v) => {
             const preset = compatPresets.find((p) => p.value === v)
-            onChange({ ...config, compat: v as CompatPreset, ...(preset?.defaultBase ? { base: preset.defaultBase } : {}) })
+            onChange({
+              ...config,
+              compat: v as CompatPreset,
+              ...(preset && preset.value !== 'auto' ? { base: preset.defaultBase } : {}),
+            })
           }}
           options={compatPresets.map((p) => ({ value: p.value, label: p.label }))}
         />
       </Field>
       <Field label="接口格式">
         <CompactSelect
-          value={config.format}
+          value={inherit ? fast.format : config.format}
+          disabled={inherit}
           onChange={(v) => onChange({ ...config, format: v as TextModelConfig['format'], base: defaultBaseUrl(v as TextModelConfig['format']) })}
           options={apiFormats.map((f) => ({ value: f.value, label: f.label }))}
         />
@@ -245,7 +338,7 @@ function TextModelFields({
         </div>
       ) : null}
       <Field label="接口地址">
-        <TextInput value={inherit ? fast.base : config.base} placeholder="https://…" onChange={(v) => onChange({ ...config, base: v })} />
+        <TextInput value={inherit ? fast.base : config.base} disabled={inherit} placeholder="https://…" onChange={(v) => onChange({ ...config, base: v })} />
       </Field>
       <Field label="模型名">
         <TextInput value={config.model} placeholder="模型名" onChange={(v) => onChange({ ...config, model: v })} />
@@ -258,7 +351,7 @@ function TextModelFields({
         />
       </Field>
       <Field label="API Key">
-        <TextInput type="password" value={inherit ? fast.key : config.key} placeholder="sk-…" onChange={(v) => onChange({ ...config, key: v })} />
+        <TextInput type="password" value={inherit ? fast.key : config.key} disabled={inherit} placeholder="sk-…" onChange={(v) => onChange({ ...config, key: v })} />
       </Field>
     </>
   )
@@ -364,7 +457,7 @@ export function SettingsPage() {
 
   const runTest = (slot: ModelSlot) => {
     if (slot === 'image') {
-      const ok = image.key.trim().length > 0 && image.base.trim().length > 0
+      const ok = image.key.trim().length > 0 && image.base.trim().length > 0 && image.model.trim().length > 0
       setTests((t) => ({ ...t, image: 'testing' }))
       setCaps({ t2i: 'idle', transparent: 'idle', edit: 'idle' })
       if (!ok) {
@@ -406,7 +499,8 @@ export function SettingsPage() {
   const textSummary = (slot: Exclude<ModelSlot, 'image'>) => {
     const c = texts[slot]
     const inherit = slot !== 'fast' && c.inheritFast
-    return `${c.model || '未填模型'} · ${apiFormats.find((f) => f.value === c.format)?.label ?? c.format}${inherit ? ' · 同快速模型' : ''}`
+    const format = inherit ? texts.fast.format : c.format
+    return `${c.model || '未填模型'} · ${apiFormats.find((f) => f.value === format)?.label ?? format}${inherit ? ' · 同快速模型' : ''}`
   }
 
   return (
@@ -424,7 +518,7 @@ export function SettingsPage() {
                 configured={textReady(s.id as Exclude<ModelSlot, 'image'>)}
                 test={tests[s.id]}
                 onTest={() => runTest(s.id)}
-                result={s.id === 'visual' ? <VisualTestResult /> : undefined}
+                result={tests[s.id] === 'ok' && s.id === 'visual' ? <VisualTestResult /> : undefined}
               >
                 <TextModelFields slot={s.id as Exclude<ModelSlot, 'image'>} config={texts[s.id as Exclude<ModelSlot, 'image'>]} fast={texts.fast} onChange={setText(s.id as Exclude<ModelSlot, 'image'>)} />
               </ModelCard>
@@ -433,39 +527,11 @@ export function SettingsPage() {
               icon="image"
               title="图片模型"
               summary={image.model || '未填模型'}
-              configured={image.key.trim().length > 0 && image.base.trim().length > 0}
+              configured={image.key.trim().length > 0 && image.base.trim().length > 0 && image.model.trim().length > 0}
               test={tests.image}
               onTest={() => runTest('image')}
-              result={tests.image === 'ok' ? <ImageTestResult caps={caps} /> : undefined}
+              result={tests.image !== 'idle' ? <ImageTestResult caps={caps} config={image} /> : undefined}
             >
-              <Field label="接口">
-                <CompactSelect
-                  value={image.api}
-                  onChange={(v) => setImageField({ api: v })}
-                  options={imageApiOptions.map((o) => ({ value: o.value, label: o.label }))}
-                />
-              </Field>
-              <Field label="编辑">
-                <CompactSelect
-                  value={image.canEdit}
-                  onChange={(v) => setImageField({ canEdit: v })}
-                  options={imageDeclOptions.canEdit.map((o) => ({ value: o.value, label: o.label }))}
-                />
-              </Field>
-              <Field label="透明底">
-                <CompactSelect
-                  value={image.transparent}
-                  onChange={(v) => setImageField({ transparent: v })}
-                  options={imageDeclOptions.transparent.map((o) => ({ value: o.value, label: o.label }))}
-                />
-              </Field>
-              <Field label="尺寸">
-                <CompactSelect
-                  value={image.sizeRule}
-                  onChange={(v) => setImageField({ sizeRule: v })}
-                  options={imageDeclOptions.sizeRule.map((o) => ({ value: o.value, label: o.label }))}
-                />
-              </Field>
               <Field label="接口地址" hint="填地址时自动套预设">
                 <TextInput
                   value={image.base}
@@ -479,15 +545,86 @@ export function SettingsPage() {
               <Field label="模型名">
                 <TextInput value={image.model} onChange={(v) => setImageField({ model: v })} />
               </Field>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Field label="API Key">
+                  <TextInput type="password" value={image.key} placeholder="sk-…" onChange={(v) => setImageField({ key: v })} />
+                </Field>
+              </div>
+              <Field label="协议形状">
+                <CompactSelect
+                  value={image.api}
+                  onChange={(v) => setImageField({ api: v as ImageApiShape })}
+                  options={imageApiOptions}
+                />
+              </Field>
+              <Field label="能否编辑">
+                <CompactSelect
+                  value={image.canEdit}
+                  onChange={(v) => setImageField({ canEdit: v as ImageEditSupport })}
+                  options={imageDeclOptions.canEdit}
+                />
+              </Field>
+              <Field label="透明底">
+                <CompactSelect
+                  value={image.transparent}
+                  onChange={(v) => setImageField({ transparent: v as ImageTransparentSupport })}
+                  options={imageDeclOptions.transparent}
+                />
+              </Field>
+              <Field label="尺寸">
+                <CompactSelect
+                  value={image.sizeRule}
+                  onChange={(v) => setImageField({ sizeRule: v as ImageSizeRule })}
+                  options={imageDeclOptions.sizeRule}
+                />
+              </Field>
+              <Field label="生图质量">
+                <CompactSelect
+                  value={image.quality}
+                  onChange={(v) => setImageField({ quality: v as ImageQuality })}
+                  options={imageQualityOptions}
+                />
+              </Field>
+              <Field label="原生长边上限" hint="2K / 4K 由本地放大生成">
+                <TextInput
+                  value={image.nativeMaxEdge}
+                  placeholder="1536"
+                  onChange={(v) => setImageField({ nativeMaxEdge: v.replace(/\D/g, '') })}
+                />
+              </Field>
               <Field label="同时出图数">
                 <TextInput value={image.concurrency} onChange={(v) => setImageField({ concurrency: v.replace(/\D/g, '') })} />
               </Field>
               <Field label="生图失败重试次数">
                 <TextInput value={image.retries} onChange={(v) => setImageField({ retries: v.replace(/\D/g, '') })} />
               </Field>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <Field label="API Key">
-                  <TextInput type="password" value={image.key} placeholder="sk-…" onChange={(v) => setImageField({ key: v })} />
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  borderTop: '1px solid var(--divider)',
+                  paddingTop: 'var(--space-4)',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 'var(--space-4)',
+                  alignItems: 'start',
+                }}
+              >
+                <Field label="后处理（放大降噪）">
+                  <div style={{ display: 'flex', alignItems: 'center', height: 34 }}>
+                    <Toggle
+                      on={image.postProcess}
+                      onChange={() => setImageField({ postProcess: !image.postProcess })}
+                      title="开启放大降噪后处理"
+                    />
+                  </div>
+                </Field>
+                <Field label="放大档位" hint="快速档：低性能机用，画质下降">
+                  <CompactSelect
+                    value={image.upscaleTier}
+                    disabled={!image.postProcess}
+                    onChange={(v) => setImageField({ upscaleTier: v as UpscaleTier })}
+                    options={upscaleTierOptions}
+                  />
                 </Field>
               </div>
             </ModelCard>

@@ -19,3 +19,9 @@ Precedence: user instruction → `standards.md` and repo conventions → `CONVEN
 4. Leave pre-existing dirty files alone unless asked. Give parallel tasks separate worktrees under the `Worktrees:` root in `.workflow/standards.md` (CONVENTIONS §7).
 5. Reuse before writing: repo → stdlib → platform → installed dependency. No guards for impossible cases, no unrequested wrappers (CONVENTIONS §8). Reply in the user's language; lead with the answer or outcome and stop when done or end with one concrete next step; deliverables carry no trial-and-error notes or AI signatures (`STYLE.md`).
 <!-- workflow:end -->
+
+## Project orientation
+- 产品范围、里程碑与工作流：`docs/product.md`；系统架构、目录与版本锁定：`docs/architecture.md`。
+- 所有界面改动必须遵守 `DESIGN.md`（Tokens、排版、控件规格）；界面原型位于 `prototype/src/`（`components/`、`pages/`、`shell/`、`mock/`、`styles/`）。
+- 里程碑规格在 `.workflow/specs/`（当前待拆解：`m0-skeleton.md`）。
+- 已定决策查 `.workflow/decisions.md`；待所有者回来处理或复核的事项见 `.workflow/owner-review.md`。
