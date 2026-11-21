@@ -73,11 +73,8 @@ export const defaultTextConfig = (slot: Exclude<ModelSlot, 'image'>): TextModelC
   return { compat: 'auto', format: 'openai-chat', base: defaultBaseUrl('openai-chat'), model: seed[slot], context: '', key: '', inheritFast: slot !== 'fast' }
 }
 
-export type ImageApiShape = 'openai-images' | 'other'
-export type ImageEditSupport = 'yes' | 'no' | 'unknown'
-export type ImageTransparentSupport = 'yes' | 'no' | 'unknown'
-export type ImageSizeRule = 'free' | 'tiers' | 'enum'
 export type ImageQuality = 'high' | 'medium' | 'low'
+export type PostProcessMode = 'off' | 'single' | 'double'
 export type UpscaleTier = 'anime' | 'fast'
 
 export interface ImageModelConfig {
@@ -88,19 +85,12 @@ export interface ImageModelConfig {
   concurrency: string
   /** 一张图检查不通过后最多重画几次，用完用占位图并标“需要处理”（默认 3） */
   retries: string
-  /** 生图质量：高 / 中 / 低（默认高；协议形状为 OpenAI images 时发送） */
+  /** 生图质量：高 / 中 / 低（默认高） */
   quality: ImageQuality
   /** 原生长边上限（像素，默认 1536） */
-  nativeMaxEdge: string
-  /** 协议形状：填地址时按预设自动套 */
-  api: ImageApiShape
-  /** 能不能图片编辑 / 出透明底（用户声明，影响测试预期和可用功能） */
-  canEdit: ImageEditSupport
-  transparent: ImageTransparentSupport
-  /** 尺寸规则 */
-  sizeRule: ImageSizeRule
-  /** 后处理（放大降噪）开关 */
-  postProcess: boolean
+  nativeMaxEdge: number
+  /** 后处理：关 / 放大降噪 / 双重放大降噪 */
+  postProcess: PostProcessMode
   /** 放大档位 */
   upscaleTier: UpscaleTier
 }
@@ -112,63 +102,36 @@ export const defaultImageConfig = (): ImageModelConfig => ({
   concurrency: '8',
   retries: '3',
   quality: 'high',
-  nativeMaxEdge: '1536',
-  api: 'openai-images',
-  canEdit: 'yes',
-  transparent: 'yes',
-  sizeRule: 'free',
-  postProcess: true,
+  nativeMaxEdge: 1536,
+  postProcess: 'single',
   upscaleTier: 'anime',
 })
 
-/** 图片模型 4 项声明与质量/放大选项 */
-export const imageApiOptions: { value: ImageApiShape; label: string }[] = [
-  { value: 'openai-images', label: 'OpenAI images 协议' },
-  { value: 'other', label: '其他' },
-]
-
-export const imageDeclOptions = {
-  canEdit: [
-    { value: 'yes', label: '支持' },
-    { value: 'no', label: '仅文生图' },
-    { value: 'unknown', label: '不确定' },
-  ] as { value: ImageEditSupport; label: string }[],
-  transparent: [
-    { value: 'yes', label: '支持' },
-    { value: 'no', label: '不支持' },
-    { value: 'unknown', label: '不确定' },
-  ] as { value: ImageTransparentSupport; label: string }[],
-  sizeRule: [
-    { value: 'free', label: '任意 WxH' },
-    { value: 'tiers', label: '分辨率档位' },
-    { value: 'enum', label: '固定枚举' },
-  ] as { value: ImageSizeRule; label: string }[],
-}
-
+/** 生图质量、原生长边上限与后处理选项 */
 export const imageQualityOptions: { value: ImageQuality; label: string }[] = [
   { value: 'high', label: '高' },
   { value: 'medium', label: '中' },
   { value: 'low', label: '低' },
 ]
 
+export const nativeMaxEdgeOptions: { value: string; label: string }[] = [
+  { value: '1536', label: '1536 · Codex 渠道' },
+  { value: '2048', label: '2048' },
+  { value: '2560', label: '2560 · OpenAI 官方 API' },
+  { value: '2816', label: '2816 · Seedream 5.x' },
+  { value: '3840', label: '3840 · 4K（OpenAI 实验 / Seedream 4.5）' },
+]
+
+export const postProcessOptions: { value: PostProcessMode; label: string }[] = [
+  { value: 'off', label: '关' },
+  { value: 'single', label: '放大降噪（默认）' },
+  { value: 'double', label: '双重放大降噪' },
+]
+
 export const upscaleTierOptions: { value: UpscaleTier; label: string }[] = [
   { value: 'anime', label: '动漫模型（默认）' },
   { value: 'fast', label: '快速档' },
 ]
-
-/** 按接口地址域名自动套预设；认不出的域名回退到通用 OpenAI 兼容声明 */
-export const imagePresetFor = (
-  base: string,
-): { api: ImageApiShape; canEdit: ImageEditSupport; transparent: ImageTransparentSupport; sizeRule: ImageSizeRule } | null => {
-  const b = base.trim().toLowerCase()
-  if (!b) return null
-  if (b.includes('openai.com')) return { api: 'openai-images', canEdit: 'yes', transparent: 'yes', sizeRule: 'free' }
-  if (b.includes('volces.com') || b.includes('ark.cn')) return { api: 'other', canEdit: 'yes', transparent: 'unknown', sizeRule: 'tiers' }
-  if (b.includes('dashscope') || b.includes('aliyuncs.com')) return { api: 'other', canEdit: 'yes', transparent: 'unknown', sizeRule: 'free' }
-  if (b.includes('googleapis.com') || b.includes('generativelanguage')) return { api: 'other', canEdit: 'no', transparent: 'no', sizeRule: 'tiers' }
-  if (b.includes('siliconflow')) return { api: 'other', canEdit: 'unknown', transparent: 'no', sizeRule: 'enum' }
-  return { api: 'openai-images', canEdit: 'unknown', transparent: 'unknown', sizeRule: 'free' }
-}
 
 /** 图片模型能力测试：文生图、透明底、图片编辑三项各给一个结果 */
 export type ImageCapability = 't2i' | 'transparent' | 'edit'
@@ -181,14 +144,23 @@ export const imageCapabilityTests: { id: ImageCapability; label: string }[] = [
 
 export type CapabilityState = 'testing' | 'ok' | 'unsupported' | 'fail'
 
-/** 演示：模型名带 dalle / sd / flux 的不支持透明底，带 dalle 的不支持图片编辑 */
-export const imageCapabilitySupport = (model: string, cap: ImageCapability): boolean => {
-  const m = model.toLowerCase()
-  if (cap === 'transparent') return !['dalle', 'sd', 'flux'].some((k) => m.includes(k))
-  if (cap === 'edit') return !['dalle'].some((k) => m.includes(k))
-  return true
+export interface CapabilityResult {
+  state: CapabilityState | 'idle'
+  reason?: string
 }
 
+/** 演示：模型名带 dalle / sd / flux 的不支持透明底，带 dalle 的不支持图片编辑，带 fail 的演示失败原因 */
+export const imageCapabilityOutcome = (model: string, cap: ImageCapability): CapabilityResult => {
+  const m = model.toLowerCase()
+  if (m.includes('fail') && cap === 'edit') return { state: 'fail', reason: '图片编辑请求超时' }
+  if (cap === 'transparent' && ['dalle', 'sd', 'flux'].some((k) => m.includes(k))) {
+    return { state: 'unsupported', reason: '返回图无透明通道' }
+  }
+  if (cap === 'edit' && ['dalle'].some((k) => m.includes(k))) {
+    return { state: 'unsupported', reason: '接口不支持图片编辑' }
+  }
+  return { state: 'ok' }
+}
 // ---- 高级设置 ----
 
 /** Agent 角色（这里可以出现在界面上） */

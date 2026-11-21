@@ -57,7 +57,7 @@
 - **propose kind 补 `add_text_marker`**：patch 装标记名+CSS+逐字开关；主控工具补 `list_assets`、`read_chapter_manifest`、`read_task_result`（查素材名、图清单、失败原因）。（`.workflow/research/novelive-agent.md`、`decisions.md` 2026-11-20）
 - **标记提议落点**：模型提议新自定义标记进编辑器顶部横幅确认，不进对话面板确认卡；`ConfirmKind` 不加 mark。（`docs/ux.md`、prototype EditorPage）
 - **画风参考三组对比（试验，2026-11-22 延后至 M1b）**：M1b 出图实现时一并实测 `docs/visuals.md` 2.5 策略（固定句用 FXB，沿用 style-transfer 角色与场景）：① 一张参考 + 新声明句；② 一张参考 + 新声明句 + 颜色锁定句；③ 三张同画师不同角色参考 + 新声明句 + 颜色锁定句。（`docs/visuals.md` 2.5、`decisions.md` 2026-11-22「补记未写明的取代关系」）
-- **图片设置从 M1b 起生效**：M0 在设置页和 `config.json` 落齐「生图质量」（高/中/低，默认高，接口形状声明为 OpenAI images 时传 `quality`）、「原生长边上限」（整数像素，默认 1536，请求尺寸不超过它）、「后处理」开关（默认开）和「放大档位」（默认 `realesrgan-x4plus-anime` / 快速档 `realesr-animevideov3` 注明低性能机用、画质下降）；生图质量与原生长边上限从 M1b 出图管线起使用，后处理开关与放大档位在 M3 放大器接入后控制 Real-ESRGAN（关闭时用 sharp Lanczos 缩放到目标尺寸，不去噪）。（`decisions.md` 2026-11-22「图片设置加生图质量、原生长边上限和后处理开关」）
+- **图片设置从 M1b 起生效**：M0 在设置页和 `config.json` 落齐「生图质量」（高/中/低，默认高）、「原生长边上限」（档位 1536/2048/2560/2816/3840，默认 1536）、「后处理」（关 / 放大降噪 / 双重放大降噪，默认放大降噪）和「放大档位」（默认 `realesrgan-x4plus-anime` / 快速档 `realesr-animevideov3` 注明低性能机用、画质下降）；生图质量与原生长边上限从 M1b 出图管线起使用，后处理在 M3 放大程序接入后生效（关闭时用 sharp Lanczos 缩放到目标尺寸，不降噪）。M1b 出图时遇到接口不支持的能力按 `docs/visuals.md` 3.2「接口不支持时报错」处理：不重试、整部作品暂停并报错。（`decisions.md` 2026-11-22「图片能力不声明，用到不支持时报错；长边档位和双重后处理」）
 
 ## M2
 

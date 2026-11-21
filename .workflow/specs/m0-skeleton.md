@@ -12,8 +12,8 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 - **启动**：`pnpm dev` 打开 Electron 窗口，界面是原型的侧边栏外壳：全局导航（书库、用量、设置）、底部主题切换。书库和用量显示空状态；M0 没有作品与导入流程，因此侧边栏不显示最近作品分区和全局制作状态，书库空状态不显示「我的工程 / 导入的作品」标签页及新建、导入、重看首次引导按钮。崩溃横幅把说明文字放前面（长日志路径会挤掉「连续 3 次」的说明），提供「日志」按钮（打开 `userData/logs/`）和「重新启动」按钮。
 - **设置页**，按原型布局：
   - **快速、主模型、写作、视觉**：接口格式（OpenAI Chat Completions / OpenAI Responses / Anthropic Messages）、「兼容哪家」下拉（自动 / OpenAI / DeepSeek / 通义千问 / 智谱 / OpenRouter / 兼容 Anthropic）、接口地址（切换格式或将「兼容哪家」切到非「自动」预设时预填对应官方地址，可改）、「同快速模型」开关（除快速槽外可用；开启时整组继承快速模型的接口格式、兼容哪家、接口地址和 API Key 四项，模型名与上下文长度按槽位各自填写，五个槽位均可独立修改）、模型名（默认空串）、上下文长度（整数 tokens、最小 4096；从 pi 内置模型目录按 compat/format 对应 vendor 优先匹配，目录命中自动填入但保持可编辑，查不到时手填，placeholder 提示填写模型上下文窗口 tokens）、API Key。自定义地址时把对应 compat 写进 pi 的 `Model`。
-  - **图片模型**：接口地址、模型名（默认空串）、API Key、同时出图数（默认 8）、生图失败重试次数（默认 3）、生图质量（高 / 中 / 低，默认高；对应 OpenAI `quality: high | medium | low`，仅声明协议形状为 OpenAI images 协议时发送）、原生长边上限（整数 px，默认 1536；请求尺寸不超过该上限，2K/4K 由本地放大）、后处理开关（Real-ESRGAN 放大降噪，默认开）与放大档位（默认 `realesrgan-x4plus-anime` / 快速档 `realesr-animevideov3`，快速档标注「低性能机用，画质下降」；关闭后处理时仅用 sharp Lanczos 缩放到目标尺寸、不做降噪）、四项用户声明（枚举和域名预设以 `docs/visuals.md`「图片接口适配」为准：协议形状 `OpenAI images 协议 / 其他`、能否编辑 `支持 / 仅文生图 / 不确定`、能否出透明底 `支持 / 不支持 / 不确定`、尺寸规则 `任意 WxH / 分辨率档位 / 固定枚举`；填地址时按域名自动套预设，认不出的域名回退到通用 OpenAI 兼容声明）。M0 的图片测试已使用生图质量；原生长边上限、后处理开关与放大档位在 M0 只写入配置，出图管线从 M1b 使用，放大程序在 M3 加入（见 `decisions.md` 2026-11-22「图片设置加生图质量、原生长边上限和后处理开关」）。
-  - **测试**：文本模型通过 pi 发一次最短请求，收到回复就算成功；视觉模型额外带一张小图，要求描述图片内容；图片模型依次试文生图（`images.generate`）、透明底（`images.generate` 后用 `sharp` 检查存在 alpha 通道且全透明像素占比 ≥ 0.5%）、图片编辑（`images.edit`，用内置小测试图输入，文生图失败不阻塞编辑项），三项分别显示结果和各自成功项的缩略图，缩略图经 `novelive://` 协议读取；实测结果与四项声明矛盾时显示警告提示，但仍允许保存（见 `docs/ux.md`）。失败时显示原因和该检查什么（地址、Key、模型名）。
+  - **图片模型**：接口地址、模型名（默认空串）、API Key、同时出图数（默认 8）、生图失败重试次数（默认 3）、生图质量（高 / 中 / 低，默认高；按 `quality: high | medium | low` 发送，适配层认出接口没有这个字段时不发）、原生长边上限（档位 `1536`「Codex 渠道」默认 / `2048` / `2560`「OpenAI 官方 API」/ `2816`「Seedream 5.x」/ `3840`「4K（OpenAI 实验 / Seedream 4.5）」；请求尺寸长边不超过它，超出部分由本地放大）、后处理（关 / 放大降噪（默认）/ 双重放大降噪）与放大档位（默认 `realesrgan-x4plus-anime` / 快速档 `realesr-animevideov3`，快速档标注「低性能机用，画质下降」；后处理为关时禁用）。不设能力声明：编辑、透明底、尺寸是否支持由测试和实际调用的结果判断。M0 的图片测试使用生图质量和原生长边上限；后处理在 M0 只写入配置，出图管线从 M1b 使用，放大程序在 M3 加入（见 `decisions.md` 2026-11-22「图片能力不声明，用到不支持时报错；长边档位和双重后处理」）。
+  - **测试**：文本模型通过 pi 发一次最短请求，收到回复就算成功；视觉模型额外带一张小图，要求描述图片内容；图片模型依次试文生图（`images.generate`，尺寸取原生长边上限档位下的 16:9）、透明底（`images.generate` 带 `background: transparent` 后用 `sharp` 检查存在 alpha 通道且全透明像素占比 ≥ 0.5%）、图片编辑（`images.edit`，用内置小测试图输入，文生图失败不阻塞编辑项），三项分别显示结果和各自成功项的缩略图，缩略图经 `novelive://` 协议读取。失败时显示原因和该检查什么：鉴权、网络类失败指向地址、Key、模型名；接口不支持某项（`unsupported`）写明哪项能力不支持，建议换模型或调低原生长边上限。
   - 高级设置（角色模型、写手预设）和图片保存格式属于 M1b，M0 不做。
   - **界面**：界面语言（M5 翻译前只提供「简体中文」选项）、主题（亮 / 暗 / 跟随系统）；**工程**：默认工程位置，“更改”打开系统选文件夹对话框；末段**关于**区：显示应用名、版本号、AGPL-3.0 声明及第三方许可 / 源代码入口占位。
   - 所有设置写入应用配置文件，重启后保留。
@@ -55,9 +55,10 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
   - **宿主生命周期事件**（`creator.ready`、`creator.down`）：由主进程通过独立宿主 IPC 通道直发界面（不经过创作端 MessagePort，不带创作端 `seq`、不进创作端 ring buffer），携带 `generation`；界面挂起或重连后通过 `host.appState()` 获取当前就绪态。界面收到 `creator.down` 后把所有在途调用以 `creator_down` 结束；`creator.down` 发出时创作端丢弃该端口全部在途请求，拉起后经新 port 接收调用。
   - **创作端事件**：统一 envelope `{ seq, scope, scopeId, at, event }`，`seq` 在 scope 内单调；scope 词表最小集 `app`/`work`，M0 先用 `app`。创作端为每个 scope 保留最近约 500 条内存 ring buffer，经 `events.list { scope, scopeId, afterSeq }` 供界面断线补漏；ring 溢出时响应带 `gap: true` 和该 scope 的最新快照（`app` scope 快照含 `{ ready, generation }`），界面整体刷新该 scope。
 - 命令（请求 → 响应）和事件（创作端主动推送）都由 `@novelive/creator/contract` 里的 pi-schema 定义。编解码放在 contract 里，MessagePort 和 dev-bridge 的 WebSocket 共用。开发模式下两端在收到消息时都做校验，不合法的消息记日志并返回错误。
-- 命令失败返回 `{ code, message }`，界面按 code 显示该检查什么。M0 的 8 个 error code 与映射规则：
+- 命令失败返回 `{ code, message }`，界面按 code 显示该检查什么。M0 的 9 个 error code 与映射规则：
   - `auth`：HTTP `401` / `403` 等鉴权失败。
-  - `not_found`：HTTP `404` 或模型不存在（如 `model_not_found`）。
+  - `not_found`：模型不存在（如 `model_not_found`），或文生图、文本请求返回 `404`（地址或模型名不对）。
+  - `unsupported`：图片接口不支持某项能力：编辑端点 `404` / `405`；`400` 且错误指向 `size`、`background`、`quality` 等参数；要求透明底却返回没有 alpha 通道的图。`message` 写明哪项能力。
   - `network`：HTTP `429` / `5xx`、响应体临时错误码（`service_unavailable`、`overloaded`、`rate_limit` 等）、请求或流式看门狗超时、连接断开（两层重试耗尽后）。
   - `moderation`：内容审核拒绝（响应体或 pi-ai `stopReason` / `rawStopReason` 拒审标记）。
   - `invalid_config`：配置缺失、参数校验失败，或处于 `configError` 未重置状态发起 `config.update`。
@@ -68,13 +69,13 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 
 **配置**
 
-- 放在 Electron `userData` 下的 `config.json`，结构由 pi-schema 定义（包含各模型槽位、图片四项声明、原生长边上限、生图质量、后处理开关与放大档位、界面主题/语言、默认工程目录），只由创作端读写。API Key 用 **AES-256-GCM** 加密后存入（密钥为源码常量，只防扫一眼）；未设置 Key 时 `config.get` 返回空串 `""`（避免界面误判「已配置」），已设置 Key 时返回 `apiKeyMasked`（`••••` 哨兵），界面不持有明文 Key；`config.update` 按字段合并，收到哨兵或空串时保留旧值。写入时先写临时文件再改名，避免写一半断电。开发期验收和录制用所有者的中转，地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`（文本和图片共用）；开发默认文本模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」（主模型和写作模型 `devin-swe-2`，快速模型 `deepseek-v4.1-flash`，视觉模型 `gemini-3.8-flash`），默认图片模型为 `gpt-image-2.6-sunburst`。
+- 放在 Electron `userData` 下的 `config.json`，结构由 pi-schema 定义（包含各模型槽位、图片生图质量、原生长边上限档位、后处理档与放大档位、界面主题/语言、默认工程目录），只由创作端读写。API Key 用 **AES-256-GCM** 加密后存入（密钥为源码常量，只防扫一眼）；未设置 Key 时 `config.get` 返回空串 `""`（避免界面误判「已配置」），已设置 Key 时返回 `apiKeyMasked`（`••••` 哨兵），界面不持有明文 Key；`config.update` 按字段合并，收到哨兵或空串时保留旧值。写入时先写临时文件再改名，避免写一半断电。开发期验收和录制用所有者的中转，地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`（文本和图片共用）；开发默认文本模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」（主模型和写作模型 `devin-swe-2`，快速模型 `deepseek-v4.1-flash`，视觉模型 `gemini-3.8-flash`），默认图片模型为 `gpt-image-2.6-sunburst`。
 - 配置文件读不出来、校验失败或 Key 解密失败时，`config.get` 返回 `{ configError: { path, reason } }`，界面在设置页顶部显示文件位置、错误信息和「重置配置」按钮，不覆盖原文件，不用哨兵顶替。`configError` 存在期间 `config.update` 拒绝写入并返回 `invalid_config`，直到用户点击「重置配置」（调用 `config.reset` 将坏文件备份为 `config.json.bak-<timestamp>` 后写回默认空配置）。
 
 **模型接入**
 
 - 文本：按接口格式构造 pi 的 `Model`（`openai-completions` / `openai-responses` / `anthropic-messages`），`baseUrl` 用用户填的地址，Key 直接传入，按「兼容哪家」写入 `compat`。上下文长度：从 pi-ai 内置模型目录（`dist/providers/data/*.json`，43 个 provider）按当前 `compat` / `format` 对应 vendor 优先匹配模型名，命中即自动填入但保留可编辑性，查不到由用户手填（最小 4096）。M0 在创作端实现 pi `streamFn` 包装层（对齐 `decisions.md` 2026-11-21「模型调用两层重试，审核拒绝单独处理」）：第一层传 SDK `maxRetries: 2` 处理响应头前的失败；第二层外包整条消息重发，处理流中途断开、空回复、200 后掉线（未产生工具副作用时最多重发 2 次）；流式空闲看门狗（默认 90 秒无事件触发 abort）；abort 归因区分用户取消（直转 `cancelled`、绝不重试）与看门狗（标 `watchdog` 走重试、耗尽转 `network`）；错误分类先检查响应体错误代码（如 4xx 带 `service_unavailable` / `overloaded` / `rate_limit` 按临时错误处理）与审核拒绝字段。测试进行中可以取消。
-- 图片：用 `openai` 官方 SDK；声明协议形状为 OpenAI images 时传 `quality`（来自设置项 `生图质量`，默认 `high`）。测试依次跑三项独立能力：文生图（`images.generate`）、透明底（`images.generate` 后用 `sharp` 检查存在 alpha 通道且全透明像素占比 ≥ 0.5%）、图片编辑（`images.edit`，用内置小测试图输入，文生图失败不阻塞编辑项）；`model.testImage` 返回三项各自的结果、成功项缓存路径及与四项声明矛盾的警告列表；审核拒绝归 `moderation`。图片存到应用缓存目录，界面经 `novelive://cache/...` 读取。
+- 图片：用 `openai` 官方 SDK（Seedream 等走同一 SDK 的 generations，带参考图时用 `image` 字段代替 `images.edit`，按地址识别），传 `quality`（来自设置项 `生图质量`，默认 `high`；Seedream 不传），尺寸按原生长边上限档位计算，再按接口的像素范围吸附（两边 16 的倍数；OpenAI 总像素不超过 3840×2160；Seedream 按 `docs/visuals.md` 3.2 的各型号范围，低于下限向上取）。Seedream 的固定参数（`watermark:false`、`response_format:b64_json`、透明底时 `output_format:png`）和错误码归类见 `docs/visuals.md` 3.2。测试依次跑三项独立能力：文生图（`images.generate`）、透明底（`images.generate` 后用 `sharp` 检查存在 alpha 通道且全透明像素占比 ≥ 0.5%）、图片编辑（`images.edit`，用内置小测试图输入，文生图失败不阻塞编辑项）；`model.testImage` 返回三项各自的结果（通过 / 错误码与原因）和成功项缓存路径；审核拒绝归 `moderation`，接口不支持归 `unsupported`。图片存到应用缓存目录，界面经 `novelive://cache/...` 读取。
 
 **资源协议**
 
@@ -116,10 +117,10 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 ## How we will know it works
 
 - **W1.** 全新克隆后执行 `pnpm install && pnpm check`：类型检查、Biome、Stylelint、单元测试全部通过。
-- **W2.** `NL_REPLAY=strict pnpm test:e2e`（内部先执行 `pnpm build`，以 `NL_E2E=1` 启动 Electron）：设置页通过 L3 fetch 注入式 HTTP cassette 回放完成三种文本格式和图片三项能力测试，缩略图经 `novelive://` 显示；回放注入取消时这次测试被中止；回放注入断线时重试耗尽并以 `network` 错误结束；另一次测试进行中结束创作端进程，界面显示崩溃横幅、在途测试以 `creator_down` 结束，自动重启或点「重新启动」重连后再测成功；`debug.sqliteSmoke` 和 `debug.sharpSmoke` 通过。单测覆盖：未设 Key 时 `config.get` 返回 `""`、已设 Key 返回掩码且 `config.update` 发回掩码/空串保留旧值、`configError` 期间 `config.update` 拒绝并返回 `invalid_config`、「重置配置」备份 `config.json.bak-<timestamp>`；`events.list` 在 `afterSeq` 后补回遗漏事件及 ring 溢出返回 `gap: true`；取消覆盖三时序（请求发出前、L1 `registerFauxProvider` 工具执行中、L3 `delayMs` 慢流中途）；`streamFn` 两层重试、看门狗 abort 归因及 error code 映射。
+- **W2.** `NL_REPLAY=strict pnpm test:e2e`（内部先执行 `pnpm build`，以 `NL_E2E=1` 启动 Electron）：设置页通过 L3 fetch 注入式 HTTP cassette 回放完成三种文本格式和图片三项能力测试，缩略图经 `novelive://` 显示；回放注入取消时这次测试被中止；回放注入断线时重试耗尽并以 `network` 错误结束；另一次测试进行中结束创作端进程，界面显示崩溃横幅、在途测试以 `creator_down` 结束，自动重启或点「重新启动」重连后再测成功；`debug.sqliteSmoke` 和 `debug.sharpSmoke` 通过。单测覆盖：未设 Key 时 `config.get` 返回 `""`、已设 Key 返回掩码且 `config.update` 发回掩码/空串保留旧值、`configError` 期间 `config.update` 拒绝并返回 `invalid_config`、「重置配置」备份 `config.json.bak-<timestamp>`；`events.list` 在 `afterSeq` 后补回遗漏事件及 ring 溢出返回 `gap: true`；取消覆盖三时序（请求发出前、L1 `registerFauxProvider` 工具执行中、L3 `delayMs` 慢流中途）；`streamFn` 两层重试、看门狗 abort 归因及 error code 映射；图片编辑端点 `404`、尺寸参数 `400`、透明底返回无 alpha、Seedream `InvalidParameter.UnsupportedParameter` 四种回放各自以 `unsupported` 结束且 `message` 写明能力；五个原生长边档位在 OpenAI、Seedream 5.5、Seedream 4.5 规则下算出的 16:9 和立绘尺寸都是 16 的倍数且落在各自像素范围内（OpenAI 不超过 3840×2160；Seedream 5.5 为 921600–4624220；Seedream 4.5 为 3686400–16777216，低档位向上吸附）。
 - **W3.** `NL_REPLAY=record pnpm dev`（带 `NL_IMAGE_BASE_URL`/`NL_IMAGE_API_KEY`）：在设置页填开发默认模型（图片用 `gpt-image-2.6-sunburst`），测试 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 和图片接口，逐个点“测试”都显示连接成功，图片三项能力分别显示结果与缩略图；另刻意用错误 Key 录一条 `auth` 错误 cassette，用触发审核拦截的提示词录一条 `moderation` 错误 cassette（若中转未拦截则注入等价 `moderation` cassette）；所有录制文件剥离 Key 和中转地址后进仓库 `tests/fixtures/cassettes/`；退出重开后配置保留。截图存到 `.workflow/evidence/m0/`。本条由 agent 用开发期中转验收。
 - **W4.** `NL_REPLAY=strict pnpm dev:web` 后在浏览器打开，设置页用同一套 L3 cassette 回放测试成功，缩略图经 dev-bridge 资源地址显示，`host.openLogDir()` 与 `host.restartCreator()` 可用。
-- **W5.** 同一视口下分别截取正式界面和 `prototype/` 的书库空状态与设置页，并排对比（原型已含生图质量、原生长边上限、后处理开关与放大档位）。M0 相对原型的刻意差异为：侧边栏无最近作品分区和全局制作状态；书库空状态不显示「我的工程 / 导入的作品」标签页与新建、导入、重看首次引导按钮；界面语言只有「简体中文」；不渲染 M1b 的高级设置和图片保存格式。除上述差异外，布局、控件、配色一致。本条由未参与编写的审查 agent 对照截图验收。
+- **W5.** 同一视口下分别截取正式界面和 `prototype/` 的书库空状态与设置页，并排对比（原型图片模型卡已含生图质量、原生长边上限档位、后处理三档与放大档位，没有能力声明）。M0 相对原型的刻意差异为：侧边栏无最近作品分区和全局制作状态；书库空状态不显示「我的工程 / 导入的作品」标签页与新建、导入、重看首次引导按钮；界面语言只有「简体中文」；不渲染 M1b 的高级设置和图片保存格式。除上述差异外，布局、控件、配色一致。本条由未参与编写的审查 agent 对照截图验收。
 - **W6.** 在 `packages/ui` 的组件 CSS 里写一个颜色字面量，`pnpm check` 失败并指出位置；去掉后通过。
 - **W7.** 推送到 `Yume2333/Novelive-dev` 后，GitHub Actions（`.github/workflows/ci.yml`）安装依赖与系统工具后跑通 `pnpm check` 和 `xvfb-run` Electron sharp 解码冒烟。
 

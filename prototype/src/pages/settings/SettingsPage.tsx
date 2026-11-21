@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Button, Icon, Spinner } from '../../components/Button'
 import { Card } from '../../components/Card'
-import { Banner, RadioGroup } from '../../components/Extended'
-import { CompactSelect, Field, SectionLabel, TextInput, Toggle, textareaStyle } from '../../components/Form'
+import { RadioGroup } from '../../components/Extended'
+import { CompactSelect, Field, SectionLabel, TextInput, textareaStyle } from '../../components/Form'
 import { Modal } from '../../components/Modal'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
@@ -15,24 +15,20 @@ import {
   defaultImageConfig,
   defaultTextConfig,
   defaultWriterPresets,
-  imageApiOptions,
-  imageCapabilitySupport,
+  imageCapabilityOutcome,
   imageCapabilityTests,
-  imageDeclOptions,
-  imagePresetFor,
   imageQualityOptions,
   modelSlots,
+  nativeMaxEdgeOptions,
+  postProcessOptions,
   upscaleTierOptions,
+  type CapabilityResult,
   type CapabilityState,
   type CompatPreset,
-  type ImageApiShape,
   type ImageCapability,
-  type ImageEditSupport,
-  type ImageModelConfig,
   type ImageQuality,
-  type ImageSizeRule,
-  type ImageTransparentSupport,
   type ModelSlot,
+  type PostProcessMode,
   type TextModelConfig,
   type UpscaleTier,
   type WriterPreset,
@@ -175,34 +171,20 @@ function VisualTestResult() {
   )
 }
 
-/** 图片模型测试：依次测文生图、透明底、图片编辑，三项各自显示结果和缩略图，并核对声明 */
+/** 图片模型测试：依次测文生图、透明底、图片编辑，三项各自显示结果、缩略图或失败原因 */
 function ImageTestResult({
   caps,
-  config,
 }: {
-  caps: Record<ImageCapability, CapabilityState | 'idle'>
-  config: ImageModelConfig
+  caps: Record<ImageCapability, CapabilityResult>
 }) {
-  const active = imageCapabilityTests.some((c) => caps[c.id] !== 'idle')
+  const active = imageCapabilityTests.some((c) => caps[c.id].state !== 'idle')
   if (!active) return null
 
   const meta: Record<CapabilityState, { icon: string; text: string; color: string }> = {
     testing: { icon: 'progress_activity', text: '进行中', color: 'var(--color-on-surface-variant)' },
     ok: { icon: 'check_circle', text: '通过', color: 'var(--color-success)' },
     unsupported: { icon: 'error', text: '不支持', color: 'var(--color-on-error-container)' },
-    fail: { icon: 'error', text: failText, color: 'var(--color-on-error-container)' },
-  }
-
-  const warnings: string[] = []
-  if (config.transparent === 'yes' && caps.transparent === 'unsupported') {
-    warnings.push('声明透明底「支持」，但测试未检测到透明通道（不影响保存）')
-  } else if (config.transparent === 'no' && caps.transparent === 'ok') {
-    warnings.push('声明透明底「不支持」，但测试返回了透明图（不影响保存）')
-  }
-  if (config.canEdit === 'yes' && caps.edit === 'unsupported') {
-    warnings.push('声明能否编辑「支持」，但测试不支持图片编辑（不影响保存）')
-  } else if (config.canEdit === 'no' && caps.edit === 'ok') {
-    warnings.push('声明能否编辑「仅文生图」，但测试支持图片编辑（不影响保存）')
+    fail: { icon: 'error', text: '失败', color: 'var(--color-on-error-container)' },
   }
 
   const thumb = (cap: ImageCapability) => {
@@ -260,34 +242,36 @@ function ImageTestResult({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)' }}>
-        {imageCapabilityTests.map((c) => {
-          const s = caps[c.id]
-          if (s === 'idle') return null
-          return (
-            <div
-              key={c.id}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--space-2)',
-                padding: 'var(--space-3)',
-                borderRadius: 'var(--radius-md)',
-                background: 'var(--white-40)',
-                border: '1px solid var(--white-60)',
-              }}
-            >
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: meta[s].color }}>
-                {s === 'testing' ? <Spinner size={13} /> : <Icon name={meta[s].icon} size={14} />}
-                {c.label} · {meta[s].text}
-              </span>
-              {s === 'ok' ? thumb(c.id) : null}
-            </div>
-          )
-        })}
-      </div>
-      {warnings.length > 0 ? <Banner kind="warning">{warnings.join('；')}</Banner> : null}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-3)' }}>
+      {imageCapabilityTests.map((c) => {
+        const { state: s, reason } = caps[c.id]
+        if (s === 'idle') return null
+        const fallbackReason = s === 'unsupported' ? '当前模型不支持此项' : s === 'fail' ? '请求失败' : undefined
+        const detail = reason ?? fallbackReason
+        return (
+          <div
+            key={c.id}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-2)',
+              padding: 'var(--space-3)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--white-40)',
+              border: '1px solid var(--white-60)',
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: meta[s].color }}>
+              {s === 'testing' ? <Spinner size={13} /> : <Icon name={meta[s].icon} size={14} />}
+              {c.label} · {meta[s].text}
+            </span>
+            {s === 'ok' ? thumb(c.id) : null}
+            {(s === 'fail' || s === 'unsupported') && detail ? (
+              <span style={{ fontSize: 12, color: 'var(--color-on-error-container)', lineHeight: 1.5 }}>{detail}</span>
+            ) : null}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -433,7 +417,11 @@ export function SettingsPage() {
   })
   const [image, setImage] = useState(defaultImageConfig())
   const [tests, setTests] = useState<Record<ModelSlot, TestState>>({ fast: 'idle', main: 'idle', writing: 'idle', visual: 'idle', image: 'idle' })
-  const [caps, setCaps] = useState<Record<ImageCapability, CapabilityState | 'idle'>>({ t2i: 'idle', transparent: 'idle', edit: 'idle' })
+  const [caps, setCaps] = useState<Record<ImageCapability, CapabilityResult>>({
+    t2i: { state: 'idle' },
+    transparent: { state: 'idle' },
+    edit: { state: 'idle' },
+  })
   const [advanced, setAdvanced] = useState(false)
   const [roleModel, setRoleModel] = useState<Record<string, ModelSlot>>(Object.fromEntries(agentRoles.map((r) => [r.id, r.slot])))
   const [presets, setPresets] = useState<WriterPreset[]>(defaultWriterPresets)
@@ -459,7 +447,7 @@ export function SettingsPage() {
     if (slot === 'image') {
       const ok = image.key.trim().length > 0 && image.base.trim().length > 0 && image.model.trim().length > 0
       setTests((t) => ({ ...t, image: 'testing' }))
-      setCaps({ t2i: 'idle', transparent: 'idle', edit: 'idle' })
+      setCaps({ t2i: { state: 'idle' }, transparent: { state: 'idle' }, edit: { state: 'idle' } })
       if (!ok) {
         setTimeout(() => setTests((t) => ({ ...t, image: 'fail' })), 700)
         return
@@ -467,10 +455,10 @@ export function SettingsPage() {
       // 依次试文生图、透明底、图片编辑，三项分别出结果
       imageCapabilityTests.forEach((c, i) => {
         setTimeout(() => {
-          setCaps((prev) => (prev[c.id] === 'idle' ? { ...prev, [c.id]: 'testing' } : prev))
+          setCaps((prev) => (prev[c.id].state === 'idle' ? { ...prev, [c.id]: { state: 'testing' } } : prev))
           setTimeout(() => {
-            const pass = imageCapabilitySupport(image.model, c.id)
-            setCaps((prev) => (prev[c.id] === 'testing' ? { ...prev, [c.id]: pass ? 'ok' : 'unsupported' } : prev))
+            const outcome = imageCapabilityOutcome(image.model, c.id)
+            setCaps((prev) => (prev[c.id].state === 'testing' ? { ...prev, [c.id]: outcome } : prev))
             if (i === imageCapabilityTests.length - 1) {
               setTests((t) => ({ ...t, image: 'ok' }))
             }
@@ -487,7 +475,7 @@ export function SettingsPage() {
   const setImageField = (patch: Partial<typeof image>) => {
     setImage((img) => ({ ...img, ...patch }))
     setTests((t) => ({ ...t, image: 'idle' }))
-    setCaps({ t2i: 'idle', transparent: 'idle', edit: 'idle' })
+    setCaps({ t2i: { state: 'idle' }, transparent: { state: 'idle' }, edit: { state: 'idle' } })
   }
 
   const savePreset = (p: WriterPreset) => {
@@ -530,16 +518,13 @@ export function SettingsPage() {
               configured={image.key.trim().length > 0 && image.base.trim().length > 0 && image.model.trim().length > 0}
               test={tests.image}
               onTest={() => runTest('image')}
-              result={tests.image !== 'idle' ? <ImageTestResult caps={caps} config={image} /> : undefined}
+              result={tests.image !== 'idle' ? <ImageTestResult caps={caps} /> : undefined}
             >
-              <Field label="接口地址" hint="填地址时自动套预设">
+              <Field label="接口地址">
                 <TextInput
                   value={image.base}
                   placeholder="https://…/v1"
-                  onChange={(v) => {
-                    const preset = imagePresetFor(v)
-                    setImageField(preset ? { base: v, ...preset } : { base: v })
-                  }}
+                  onChange={(v) => setImageField({ base: v })}
                 />
               </Field>
               <Field label="模型名">
@@ -550,34 +535,6 @@ export function SettingsPage() {
                   <TextInput type="password" value={image.key} placeholder="sk-…" onChange={(v) => setImageField({ key: v })} />
                 </Field>
               </div>
-              <Field label="协议形状">
-                <CompactSelect
-                  value={image.api}
-                  onChange={(v) => setImageField({ api: v as ImageApiShape })}
-                  options={imageApiOptions}
-                />
-              </Field>
-              <Field label="能否编辑">
-                <CompactSelect
-                  value={image.canEdit}
-                  onChange={(v) => setImageField({ canEdit: v as ImageEditSupport })}
-                  options={imageDeclOptions.canEdit}
-                />
-              </Field>
-              <Field label="透明底">
-                <CompactSelect
-                  value={image.transparent}
-                  onChange={(v) => setImageField({ transparent: v as ImageTransparentSupport })}
-                  options={imageDeclOptions.transparent}
-                />
-              </Field>
-              <Field label="尺寸">
-                <CompactSelect
-                  value={image.sizeRule}
-                  onChange={(v) => setImageField({ sizeRule: v as ImageSizeRule })}
-                  options={imageDeclOptions.sizeRule}
-                />
-              </Field>
               <Field label="生图质量">
                 <CompactSelect
                   value={image.quality}
@@ -585,11 +542,11 @@ export function SettingsPage() {
                   options={imageQualityOptions}
                 />
               </Field>
-              <Field label="原生长边上限" hint="2K / 4K 由本地放大生成">
-                <TextInput
-                  value={image.nativeMaxEdge}
-                  placeholder="1536"
-                  onChange={(v) => setImageField({ nativeMaxEdge: v.replace(/\D/g, '') })}
+              <Field label="原生长边上限" hint="超出部分由本地放大">
+                <CompactSelect
+                  value={String(image.nativeMaxEdge)}
+                  onChange={(v) => setImageField({ nativeMaxEdge: Number(v) })}
+                  options={nativeMaxEdgeOptions}
                 />
               </Field>
               <Field label="同时出图数">
@@ -609,19 +566,20 @@ export function SettingsPage() {
                   alignItems: 'start',
                 }}
               >
-                <Field label="后处理（放大降噪）">
-                  <div style={{ display: 'flex', alignItems: 'center', height: 34 }}>
-                    <Toggle
-                      on={image.postProcess}
-                      onChange={() => setImageField({ postProcess: !image.postProcess })}
-                      title="开启放大降噪后处理"
-                    />
-                  </div>
+                <Field
+                  label="后处理"
+                  hint={image.postProcess === 'double' ? '放大降噪后缩回，再放大降噪一次，更干净也更慢' : undefined}
+                >
+                  <CompactSelect
+                    value={image.postProcess}
+                    onChange={(v) => setImageField({ postProcess: v as PostProcessMode })}
+                    options={postProcessOptions}
+                  />
                 </Field>
                 <Field label="放大档位" hint="快速档：低性能机用，画质下降">
                   <CompactSelect
                     value={image.upscaleTier}
-                    disabled={!image.postProcess}
+                    disabled={image.postProcess === 'off'}
                     onChange={(v) => setImageField({ upscaleTier: v as UpscaleTier })}
                     options={upscaleTierOptions}
                   />
