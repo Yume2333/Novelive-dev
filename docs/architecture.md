@@ -6,7 +6,7 @@
 
 - **桌面宿主**：Novelive 是基于 Electron 的桌面应用，支持 Windows、macOS、Linux。正式版只提供 Electron 桌面应用，不做网页播放器。
 - **IPC 与自定义资源协议**：界面与后台之间通过 IPC 传递命令和事件；图片等资源通过自定义协议直接从 `.novelive` 作品包或工程文件夹读取。**不起本地 HTTP 服务。**
-- **模型接入与凭据**：文本模型通过 Agent 底座 pi（`@earendil-works/pi-ai`、`@earendil-works/pi-agent-core`）接入，pi 作为库直接嵌在创作端进程里；会话存储、上下文压缩、子 Agent 和按角色选模型由我们在 pi 之上实现（见 `.workflow/research/agent-orchestration.md`）。图片模型只接 OpenAI 兼容的图片接口，支持自定义地址，用 `openai` 官方 SDK 调用。API Key 简单加密后存在应用的配置文件里，方便备份和迁移；加密密钥写在程序里，只防止别人扫一眼配置文件就看到 Key。
+- **模型接入与凭据**：文本模型通过 Agent 底座 pi（`@earendil-works/pi-ai`、`@earendil-works/pi-agent-core`）接入，pi 作为库直接嵌在创作端进程里；会话存储、上下文维护、子 Agent 和按角色选模型由我们在 pi 之上实现（见 `.workflow/research/agent-orchestration.md` 和 `.workflow/research/pi-scaffolding.md`）。图片模型只接 OpenAI 兼容的图片接口，支持自定义地址，用 `openai` 官方 SDK 调用。API Key 简单加密后存在应用的配置文件里，方便备份和迁移；加密密钥写在程序里，只防止别人扫一眼配置文件就看到 Key。界面不持有明文 Key：配置查询返回掩码哨兵，发回哨兵或空串时保留旧值。
 - **工程数据**：每个创作工程是一个独立文件夹，新建作品时由创作者选择位置（默认在 `文档/Novelive` 下），里面保存解包后的作品及创作专用数据（原文、任务记录、候选图、对话记录、用量记录）。作品内容是普通文件；任务状态、用量记录和对话记录存在工程里的一个 SQLite 数据库文件中，用 `node:sqlite` 在创作端 utility process 里读写（已在 Electron 45.4.1 实测可用，WAL 正常）。
 - **Schema**：数据格式统一用 `@earendil-works/pi-schema`（pi-schema）定义，同一份定义用于加载作品包时的检查、代码类型和交给模型的输出格式与工具参数。剧本例外：剧本用文本剧本语言写，pi-schema 定义它解析后的结构（见[作品格式与工程](./work-format.md)）。
 
@@ -64,10 +64,11 @@
 
 **进程通信细节**
 
-- 主进程建好 MessagePort 通道后，把两端分别交给界面和创作端，之后消息直连，不经主进程转发。
+- 主进程建好 MessagePort 通道后，把两端分别交给界面和创作端，之后消息直连，不经主进程转发。fork 创作端时主进程注入单调递增的 generation，命令和事件帧都带上，重连后界面丢弃 generation 不匹配的帧。
 - 预加载脚本用 `contextBridge` 只暴露一个有类型的 `window.novelive`，界面拿不到 Node 能力。
-- 消息分两类：命令（请求和响应）和事件（创作端主动推送），都用 pi-schema 定义，开发模式下在边界上校验。
+- 消息分两类：命令（请求和响应）和事件（创作端主动推送），都用 pi-schema 定义，开发模式下在边界上校验。事件用统一 envelope `{seq, scope, scopeId, at, event}`，seq 在 scope 内单调；创作端为每个 scope 保留最近 N 条内存 ring buffer，`events.list` 命令让界面断线后补漏，ring 溢出时返回 `gap` 加最新快照。预加载维护 requestId→AbortController 映射，窗口销毁时批量取消在途请求。
 - 主进程注册 `novelive://` 协议读取工程文件夹和作品包里的资源。
+- 创作端基础设施失败（进程退出、端口握手失败）连续 3 次后不再自动拉起，转崩溃横幅加手动重启；业务命令的错误不计入。制作长跑期间宿主按“有活跃 run”启停 `powerSaveBlocker` 防系统休眠，退出时清理。系统通知的标题和正文在主进程侧校验类型与长度并剥掉 HTML——通知文本来自模型输出。
 - 浏览器开发模式下由一个开发脚本把同一套命令和事件通过 WebSocket 暴露给界面，不进正式包。
 
 界面和播放器统一用 lucide 图标，按需打包。

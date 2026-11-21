@@ -39,14 +39,16 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 **通信**
 
 - 主进程创建 MessageChannel，一端交给创作端（utility process），一端经预加载交给界面。之后命令和事件直连，不经主进程转发。
-- 预加载用 `contextBridge` 暴露 `window.novelive`：`call(command, payload, signal?)`、`on(event, handler)`、`resourceUrl(path)`、`pickFolder()`。每次 `call` 带请求 ID，返回 Promise；`call` 可传 `AbortSignal`，取消时发一条取消消息到创作端，创作端中止对应请求（“测试进行中可以取消”走这条路）。`on` 返回取消订阅函数。界面只依赖这个接口；浏览器开发模式下由 dev-bridge 的客户端实现同一接口。
+- 预加载用 `contextBridge` 暴露 `window.novelive`：`call(command, payload, signal?)`、`on(event, handler)`、`resourceUrl(path)`、`pickFolder()`。每次 `call` 带请求 ID，返回 Promise；`call` 可传 `AbortSignal`，取消时发一条取消消息到创作端，创作端中止对应请求（“测试进行中可以取消”走这条路）。`on` 返回取消订阅函数。界面只依赖这个接口；浏览器开发模式下由 dev-bridge 的客户端实现同一接口。预加载维护 requestId→AbortController 映射，窗口 `webContents.destroyed` 时批量 abort 全部在途请求。
+- **帧身份**：fork 创作端时主进程注入单调递增的 `generation`，命令和事件帧都带上；重连后界面丢弃 generation 不匹配的帧——“重连后旧请求的结果不再生效”由换 port + generation 双重实现。
+- **事件**：统一 envelope `{seq, scope, scopeId, at, event}`，`seq` 在 scope 内单调；创作端为每个 scope 保留最近 N 条内存 ring buffer。命令加 `events.list {scope, scopeId, afterSeq}` 供界面断线补漏；ring 溢出时响应带 `gap:true` 和最新快照，界面整体刷新该 scope。
 - 命令（请求 → 响应）和事件（创作端主动推送）都由 `@novelive/creator/contract` 里的 pi-schema 定义。编解码放在 contract 里，MessagePort 和 dev-bridge 的 WebSocket 共用。开发模式下两端在收到消息时都做校验，不合法的消息记日志并返回错误。
 - 命令失败返回 `{ code, message }`，界面按 code 显示该检查什么。M0 的 code：`network`、`auth`、`not_found`、`invalid_config`、`cancelled`、`creator_down`、`internal`。
-- M0 的命令：`config.get`、`config.update`、`model.testText`、`model.testImage`。事件：`creator.ready`（启动和重连后发一次）、`creator.down`（创作端退出时由主进程代发）。界面收到 `creator.down` 后把所有在途调用以 `creator_down` 结束；重连后旧请求的结果不再生效。
+- M0 的命令：`config.get`、`config.update`、`model.testText`、`model.testImage`、`events.list`。事件：`creator.ready`（启动和重连后发一次）、`creator.down`（创作端退出时由主进程代发，带 `generation`）。界面收到 `creator.down` 后把所有在途调用以 `creator_down` 结束。
 
 **配置**
 
-- 放在 Electron `userData` 下的 `config.json`，结构由 pi-schema 定义，只由创作端读写。API Key 用写在程序里的固定密钥简单加密后存入。写入时先写临时文件再改名，避免写一半断电。开发期验收和录制用所有者的中转，地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`；开发默认模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」。
+- 放在 Electron `userData` 下的 `config.json`，结构由 pi-schema 定义，只由创作端读写。API Key 用写在程序里的固定密钥简单加密后存入；`config.get` 返回 `apiKeyMasked`（`••••` 哨兵），界面不持有明文 Key，`config.update` 收到哨兵或空串时保留旧值。写入时先写临时文件再改名，避免写一半断电。开发期验收和录制用所有者的中转，地址和 Key 读环境变量 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`；开发默认模型见 `decisions.md` 2026-11-21「开发期接口和模型用所有者的中转」。
 - 配置文件读不出来时，界面显示文件位置和错误信息，不覆盖原文件。
 
 **模型接入**
@@ -60,7 +62,7 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 
 **崩溃恢复**
 
-- 主进程监听 utility process 退出：已经发过 `creator.ready` 的进程退出就向界面发 `creator.down` 并立即重启；启动阶段就退出的，不自动重启，交给横幅里的“重新启动”按钮。
+- 主进程监听 utility process 退出：已经发过 `creator.ready` 的进程退出就向界面发 `creator.down` 并立即重启；启动阶段就退出的，不自动重启，交给横幅里的“重新启动”按钮。**断路器**：基础设施失败（进程退出、端口握手失败）连续 3 次后不再自动拉起，转横幅加手动“重新启动”；业务 handler 返回的错误不计入。
 
 **SQLite**
 
@@ -68,8 +70,8 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 
 **测试**
 
-- **录制回放的假服务**：本地假服务按录制文件回放真实接口的流式响应和错误，并可注入取消、截断、断线。录制文件在 W3 用环境变量里的中转跑真实接口时录下，去掉 Key 和中转地址后进仓库；单元测试和端到端测试都改用回放。所以 M0 先接通真实接口并录制，再写回放测试。
-- 单元测试（Vitest）：配置读写、契约校验、三种文本格式和图片接口各对假服务回放的成功 / 失败。
+- **录制回放**：单测主力是 fetch 注入式回放（openai/Anthropic SDK 都有 `fetch` 选项，pi 侧在我们的 `streamFn` 包装层注入），本地假服务保留给端到端；两者共用同一种 JSONL cassette：一行一交互 `{key, method, path, reqHash, status, headers, body(b64), recordedAt, case}`，key = `sha256(method+path+canonicalBody)` 前 16 hex，录制时剥 `authorization` 头、baseURL 重写为占位符；`body` 超 256KB 外置 `cassette-files/<sha>`；回放层按参数注入取消、截断、断线（`delayMs` 支持慢流取消用例），注入故障不录进 cassette。录制文件在 W3 用环境变量里的中转跑真实接口时录下，去掉 Key 和中转地址后进仓库；单元测试和端到端测试都改用回放。所以 M0 先接通真实接口并录制，再写回放测试。
+- 单元测试（Vitest）：配置读写、契约校验、三种文本格式和图片接口各对 cassette 回放的成功 / 失败。
 - 端到端（Playwright Electron）：启动应用，设置页对假服务回放完成三种文本格式和图片三项能力测试，缩略图经协议加载；结束创作端进程后界面恢复；SQLite 冒烟。
 - 测试不访问真实模型。
 
@@ -90,7 +92,7 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 ## How we will know it works
 
 - **W1.** 全新克隆后执行 `pnpm install && pnpm check`：类型检查、Biome、Stylelint、单元测试全部通过。
-- **W2.** `pnpm test:e2e`：Electron 启动，设置页对假服务回放完成三种文本格式和图片三项能力测试，缩略图经 `novelive://` 显示；回放注入取消时这次测试被中止；回放注入断线时这次测试以错误结束；另一次测试进行中结束创作端进程，这次测试以错误结束，重连后再测成功；`node:sqlite` 冒烟通过。
+- **W2.** `pnpm test:e2e`：Electron 启动，设置页对假服务回放完成三种文本格式和图片三项能力测试，缩略图经 `novelive://` 显示；回放注入取消时这次测试被中止；回放注入断线时这次测试以错误结束；另一次测试进行中结束创作端进程，这次测试以错误结束，重连后再测成功；`node:sqlite` 冒烟通过。单测覆盖：`config.get` 返回的 Key 是掩码、界面发回掩码后 `config.update` 不丢旧值；`events.list` 在 `afterSeq` 之后能补回遗漏事件；取消覆盖三个时序（请求发出前、工具执行中、慢流 `delayMs` 中途）。
 - **W3.** `pnpm dev`，在设置页填真实接口（经 `NL_IMAGE_BASE_URL`/`NL_IMAGE_API_KEY` 走中转）：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 和图片接口，逐个点“测试”都显示连接成功，图片三项能力分别显示结果；测真实接口时录下流式响应和错误作为回放录制文件，去掉 Key 和中转地址后进仓库；退出重开后配置还在。截图存到 `.workflow/evidence/m0/`。本条由 agent 用开发期中转验收。
 - **W4.** `pnpm dev:web` 后在浏览器打开，设置页对假服务的测试成功，缩略图显示。
 - **W5.** 同一视口下分别截取正式界面和 `prototype/` 的书库空状态与设置页，并排对比：原型已更新到最新决定，除 M1b 才做的高级设置（角色模型、写手预设）和图片保存格式外，布局、控件、配色一致。本条由审查 agent 对照截图验收。
