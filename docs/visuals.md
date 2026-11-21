@@ -68,7 +68,9 @@
    - 立绘：从头顶画到膝盖上方，腿在膝盖上方被画面底边裁断，人物居中，头顶留少量余量；透明背景，没有地面和影子；半透明边缘的颜色和相邻的衣服或皮肤一致。
    - 背景和 CG：主体在中央 4:3 区域，左右两侧只画延展配景；背景另写“空景，画面里没有人”。
    - 差分：只改一处，其余和第 1 张一致，并逐项列出 keep-list。
-7. **画风固定句**（代码，固定放在最后一行）：要求保留参考图的头发高光、渐变和色彩，同时线条平滑连续、发束成束、皮肤和布料表面干净。措辞正在优化，定稿后把英文原文写在这里。原来的渲染块（`large simple color masses, low visual frequency, …`）压住了杂纹，也把参考画风压平了，不再使用。
+7. **画风固定句**（代码，固定放在最后一行）：`Finish this as a final, fully cleaned-up illustration: inked line art with no sketch lines, stray hairs or broken strokes; flat base colors with smooth airbrushed gradients; highlights placed as a few clean, deliberate shapes, as in Image 1. Put fine detail only on the face, eyes, hair ornaments and the main object of the scene; keep clothing folds, background and secondary areas simpler, with fewer lines. Every outline is one clean stroke, not several sketchy ones; hair strands end in clean tapered points; lines never break or wobble. large simple color masses, low visual frequency, restrained edge density, clear edge hierarchy, minimal internal contour lines, broad shadow shapes, suppress micro-texture and micro-contrast, no unnecessary specular highlights, except that hair highlights, eyes and the gradients of Image 1 stay exactly as in Image 1.`
+
+   依次是成稿措辞、细节分主次、线条收尾、渲染块和例外句。渲染块单独用会压掉参考图的高光和渐变，加上例外句后画风基本保住，同时最能压住布料和大面上分层的鱼鳞状涂抹；只写“压表面纹理”或直接点名鱼鳞纹都弱于它。目前只在一张柔和动漫风参考图上验证过。
 
 固定句是 `creator` 包里的英文常量；内容段、外貌、画风描述用作品语言。实测内容段的语言、渲染块的语言对结果都没有显著影响。
 

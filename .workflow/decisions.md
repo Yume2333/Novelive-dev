@@ -802,3 +802,10 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** flare；渲染块；`realesr-animevideov3`。
 - **Because:** owner 看完 2 个模型 × 2 种结尾 × 10 张素材的对比，sunburst + 画风固定句 + x4plus-anime（SS-D1）最好；两个模型耗时和 token 基本相同。证据在 `.workflow/evidence/spikes-r4/model-prompt/`。
 - **Decided by:** user
+
+## 2026-11-21 - 画风固定句定为“成稿措辞 + 细节分主次 + 线条收尾 + 渲染块 + 例外句”
+
+- **Decided:** 生图提示词最后一行用 F+X（原文见 `docs/visuals.md` 2.4 第 7 条）。“按 1080p 屏幕尺度”那句不加：图片模型不按像素理解尺寸，输出 token 固定，这句只起“少画细节”的作用，和细节分主次重复。
+- **Instead of:** 只用画风固定句（鱼鳞纹压不住）；只用渲染块（画风被压平）；只在大面上压纹理（F+R，无效）；直接点名鱼鳞纹（F+N、F+R+N，略有效但弱于 F+X）。
+- **Because:** owner 在单参考图 × 三场景 × 每组两次的对比里看，F+X 压鱼鳞状涂抹最明显，画风保持也可以；其余写法之间差别不明显。证据在 `.workflow/evidence/spikes-r4/single-ref/` 和 `texture/`。
+- **Decided by:** user
