@@ -34,19 +34,19 @@ BAR = 34
 CROP = 512
 FW, FH = 420, 560                            # full-image cell size in per-asset sheet
 
-# (x, y, w, h) relative to each image's own size; crop region is chosen on the
-# FS raw per asset (same relative box mapped to every arm/version).
+# (x, y, w, h) relative to each image's own size; box picked on the FS raw
+# per asset (hair+face of the main character; K8 = detail-rich shrine corner).
 CROP_REL = {
-    'K1': (0.30, 0.04, 0.40, 0.40),
-    'K4': (0.30, 0.00, 0.32, 0.42),
-    'K6': (0.25, 0.02, 0.23, 0.38),
-    'K7': (0.30, 0.00, 0.40, 0.45),
-    'K8': (0.30, 0.20, 0.40, 0.45),
-    'C1': (0.32, 0.05, 0.40, 0.40),
-    'C2': (0.30, 0.05, 0.40, 0.40),
-    'C3': (0.32, 0.01, 0.40, 0.40),
-    'C5': (0.30, 0.04, 0.40, 0.40),
-    'G2': (0.63, 0.00, 0.31, 0.48),
+    'K1': (0.28, 0.00, 0.44, 0.35),   # Kokomi sprite head
+    'K4': (0.30, 0.00, 0.20, 0.40),   # seated Kokomi head
+    'K6': (0.28, 0.00, 0.29, 0.48),   # Kokomi head under umbrella
+    'K7': (0.28, 0.02, 0.22, 0.33),   # Kokomi head, battle CG
+    'K8': (0.00, 0.00, 0.30, 0.40),   # shrine detail corner (no people)
+    'C1': (0.23, 0.00, 0.46, 0.32),   # Raiden head/hair
+    'C2': (0.34, 0.00, 0.40, 0.38),   # Nahida head (excl. far ponytail)
+    'C3': (0.25, 0.02, 0.50, 0.31),   # Furina head+hat
+    'C5': (0.18, 0.02, 0.57, 0.31),   # Hu Tao head+hat
+    'G2': (0.68, 0.03, 0.26, 0.40),   # Furina (right girl) head+hat
 }
 
 def load(path):
