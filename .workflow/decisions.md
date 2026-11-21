@@ -795,3 +795,10 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 直接向中转请求 2560×1440 或 3840×2160。
 - **Because:** owner 判断中转的 2K/4K 是上游超分、内容密度只有 1080p；实测频谱往返测试与此一致，调研也确认 Codex / ChatGPT 反代原生长边不超过约 1536（Codex issue #28723、API易官逆文档）。中转超分后的图再过 Real-ESRGAN 只是重复放大。证据在 `.workflow/evidence/spikes-r4/size-probe/`。同一测试确认中转确实执行 `quality`：同一提示词 low 输出 408 token、high 6240 token，high 的细节明显更多。
 - **Decided by:** user
+
+## 2026-11-21 - 生图用 sunburst + 画风固定句，后处理用 x4plus-anime
+
+- **Decided:** 推荐模型 `gpt-image-2.6-sunburst`；提示词最后一行用画风固定句（保留参考图的高光、渐变和色彩，只要求线条和表面干净），不再用渲染块；Real-ESRGAN 后处理用 `realesrgan-x4plus-anime`。固定句的措辞接着优化。
+- **Instead of:** flare；渲染块；`realesr-animevideov3`。
+- **Because:** owner 看完 2 个模型 × 2 种结尾 × 10 张素材的对比，sunburst + 画风固定句 + x4plus-anime（SS-D1）最好；两个模型耗时和 token 基本相同。证据在 `.workflow/evidence/spikes-r4/model-prompt/`。
+- **Decided by:** user

@@ -68,7 +68,7 @@
    - 立绘：从头顶画到膝盖上方，腿在膝盖上方被画面底边裁断，人物居中，头顶留少量余量；透明背景，没有地面和影子；半透明边缘的颜色和相邻的衣服或皮肤一致。
    - 背景和 CG：主体在中央 4:3 区域，左右两侧只画延展配景；背景另写“空景，画面里没有人”。
    - 差分：只改一处，其余和第 1 张一致，并逐项列出 keep-list。
-7. **渲染块**（代码，固定放在最后一行）：`large simple color masses, low visual frequency, restrained edge density, clear edge hierarchy, minimal internal contour lines, broad shadow shapes, suppress micro-texture and micro-contrast, no unnecessary specular highlights`。**待定**：用画风鲜明的参考图（Torino 心海）实测时，渲染块压住了杂纹，也把参考画风压平了；最后一行用渲染块还是“画风固定句”（保留参考图的高光、渐变和色彩，只要求线条平滑连续、表面干净），正在对比，结果出来后改这一条。
+7. **画风固定句**（代码，固定放在最后一行）：要求保留参考图的头发高光、渐变和色彩，同时线条平滑连续、发束成束、皮肤和布料表面干净。措辞正在优化，定稿后把英文原文写在这里。原来的渲染块（`large simple color masses, low visual frequency, …`）压住了杂纹，也把参考画风压平了，不再使用。
 
 固定句是 `creator` 包里的英文常量；内容段、外貌、画风描述用作品语言。实测内容段的语言、渲染块的语言对结果都没有显著影响。
 
@@ -80,9 +80,9 @@
 - 不添加描述和设定集里没有的人物、物件和情节。
 - 重画时只改内容段里和 `feedback` 有关的那一句，其余原样保留；固定句每次由工具重新拼，画师改不到。
 
-主视觉（确认点 1 的候选）也用同一套拼装和渲染块生成。主视觉画得太细，碎感会传给之后所有的图：第三轮的水彩主视觉作参考画出的 CG 和背景是全场最碎的，祥子在 CG 和立绘之间也认不出是同一个人。
+主视觉（确认点 1 的候选）也用同一套拼装和画风固定句生成。主视觉画得太细，碎感会传给之后所有的图：第三轮的水彩主视觉作参考画出的 CG 和背景是全场最碎的，祥子在 CG 和立绘之间也认不出是同一个人。
 
-接口参数：`quality: high`（owner 看图后定的默认值），`complexity` 不传。实测 `complexity: low` 几乎没有效果；`quality: medium` 省约 24% 输出 token，画质略降。模型在 `gpt-image-2.6-flare` 和 `gpt-image-2.6-sunburst` 之间的取舍正在对比；sunburst 在 owner 的看图里明显更好，成本和默认档相近。
+接口参数：`quality: high`（owner 看图后定的默认值），`complexity` 不传。实测 `complexity: low` 几乎没有效果；`quality: medium` 省约 24% 输出 token，画质略降。推荐模型 `gpt-image-2.6-sunburst`：和 `gpt-image-2.6-flare` 对比，owner 看图认为 sunburst 明显更好，两者耗时和输出 token 基本相同；模型名仍是配置项。
 
 ## 3. 生成规则与本地处理
 
