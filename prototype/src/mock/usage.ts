@@ -3,7 +3,7 @@ import type { Work } from './types'
 // 用量统计的 mock 记录（页面专用）。
 // 一个桶 = 某天某作品某阶段的一次汇总；面板按作品 / 阶段 / 模型 / 天 / 月过滤聚合。
 
-export type UsageStage = '全书预览' | '综合' | '写剧本' | '审稿' | '演出' | '出图' | '对话'
+export type UsageStage = '全书预览' | '综合' | '写' | '审稿' | '演出' | '出图' | '对话'
 
 export interface UsageBucket {
   date: string // YYYY-MM-DD
@@ -20,37 +20,37 @@ export interface UsageBucket {
   pricePerImage?: number
 }
 
-export const usageStages: UsageStage[] = ['全书预览', '综合', '写剧本', '审稿', '演出', '出图', '对话']
+export const usageStages: UsageStage[] = ['全书预览', '综合', '写', '审稿', '演出', '出图', '对话']
 
 const seed: UsageBucket[] = [
-  // 雾港来信：制作中，写剧本 + 出图为主（这部作品开了审稿）
+  // 雾港来信：制作中，写 + 出图为主（这部作品开了审稿）
   // 出图阶段：画师写提示词用主模型和快速，看图用视觉，生图用图片
-  { date: '2026-11-15', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 38, textChars: 412_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-15', workId: 'wugang', stage: '写', model: '写作', textCalls: 38, textChars: 412_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-15', workId: 'wugang', stage: '演出', model: '主模型', textCalls: 14, textChars: 96_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-15', workId: 'wugang', stage: '出图', model: '主模型', textCalls: 6, textChars: 38_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-15', workId: 'wugang', stage: '出图', model: '快速', textCalls: 11, textChars: 22_000, images: 0 },
   { date: '2026-11-15', workId: 'wugang', stage: '出图', model: '视觉', textCalls: 18, textChars: 9_000, images: 0, pricePerKChar: 0.018 },
   { date: '2026-11-15', workId: 'wugang', stage: '出图', model: '图片', textCalls: 0, textChars: 0, images: 18, pricePerImage: 0.28 },
-  { date: '2026-11-16', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 44, textChars: 506_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-16', workId: 'wugang', stage: '写', model: '写作', textCalls: 44, textChars: 506_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-16', workId: 'wugang', stage: '审稿', model: '主模型', textCalls: 12, textChars: 168_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-16', workId: 'wugang', stage: '出图', model: '快速', textCalls: 14, textChars: 30_000, images: 0 },
   { date: '2026-11-16', workId: 'wugang', stage: '出图', model: '视觉', textCalls: 22, textChars: 11_000, images: 0, pricePerKChar: 0.018 },
   { date: '2026-11-16', workId: 'wugang', stage: '出图', model: '图片', textCalls: 0, textChars: 0, images: 22, pricePerImage: 0.28 },
-  { date: '2026-11-17', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 29, textChars: 355_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-17', workId: 'wugang', stage: '写', model: '写作', textCalls: 29, textChars: 355_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-17', workId: 'wugang', stage: '对话', model: '主模型', textCalls: 9, textChars: 64_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-18', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 51, textChars: 610_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-18', workId: 'wugang', stage: '写', model: '写作', textCalls: 51, textChars: 610_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-18', workId: 'wugang', stage: '演出', model: '主模型', textCalls: 16, textChars: 104_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-18', workId: 'wugang', stage: '出图', model: '主模型', textCalls: 5, textChars: 31_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-18', workId: 'wugang', stage: '出图', model: '快速', textCalls: 10, textChars: 19_000, images: 0 },
   { date: '2026-11-18', workId: 'wugang', stage: '出图', model: '视觉', textCalls: 15, textChars: 8_000, images: 0, pricePerKChar: 0.018 },
   { date: '2026-11-18', workId: 'wugang', stage: '出图', model: '图片', textCalls: 0, textChars: 0, images: 15, pricePerImage: 0.28 },
-  { date: '2026-11-19', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 33, textChars: 401_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-19', workId: 'wugang', stage: '写', model: '写作', textCalls: 33, textChars: 401_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-19', workId: 'wugang', stage: '审稿', model: '主模型', textCalls: 9, textChars: 122_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-19', workId: 'wugang', stage: '出图', model: '主模型', textCalls: 4, textChars: 24_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-19', workId: 'wugang', stage: '出图', model: '快速', textCalls: 8, textChars: 17_000, images: 0 },
   { date: '2026-11-19', workId: 'wugang', stage: '出图', model: '视觉', textCalls: 12, textChars: 6_000, images: 0, pricePerKChar: 0.018 },
   { date: '2026-11-19', workId: 'wugang', stage: '出图', model: '图片', textCalls: 0, textChars: 0, images: 12, pricePerImage: 0.28 },
-  { date: '2026-11-20', workId: 'wugang', stage: '写剧本', model: '写作', textCalls: 12, textChars: 138_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-20', workId: 'wugang', stage: '写', model: '写作', textCalls: 12, textChars: 138_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-20', workId: 'wugang', stage: '出图', model: '快速', textCalls: 5, textChars: 10_000, images: 0 },
   { date: '2026-11-20', workId: 'wugang', stage: '出图', model: '视觉', textCalls: 8, textChars: 4_000, images: 0, pricePerKChar: 0.018 },
   { date: '2026-11-20', workId: 'wugang', stage: '出图', model: '图片', textCalls: 0, textChars: 0, images: 8, pricePerImage: 0.28 },
@@ -71,7 +71,7 @@ const seed: UsageBucket[] = [
   // 夏日残响：第一章做完，停在确认点 2
   { date: '2026-11-10', workId: 'xiari', stage: '全书预览', model: '快速', textCalls: 22, textChars: 361_000, images: 0 },
   { date: '2026-11-11', workId: 'xiari', stage: '综合', model: '主模型', textCalls: 15, textChars: 198_000, images: 0, pricePerKChar: 0.021 },
-  { date: '2026-11-11', workId: 'xiari', stage: '写剧本', model: '写作', textCalls: 26, textChars: 302_000, images: 0, pricePerKChar: 0.021 },
+  { date: '2026-11-11', workId: 'xiari', stage: '写', model: '写作', textCalls: 26, textChars: 302_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-11', workId: 'xiari', stage: '演出', model: '主模型', textCalls: 7, textChars: 46_000, images: 0, pricePerKChar: 0.021 },
   { date: '2026-11-12', workId: 'xiari', stage: '出图', model: '快速', textCalls: 9, textChars: 20_000, images: 0 },
   { date: '2026-11-12', workId: 'xiari', stage: '出图', model: '视觉', textCalls: 14, textChars: 7_000, images: 0, pricePerKChar: 0.018 },
