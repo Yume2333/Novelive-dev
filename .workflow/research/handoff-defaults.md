@@ -39,16 +39,18 @@
 - **审稿形态**：分两档（决策 2026-11-21「审稿拆成忠实度检查和文风审稿」）。忠实度检查默认开：工具循环 Agent（工具：`read_source_range`、`find_term`、`read_chapter_preview`、`read_bible`、`submit_review`），只查漏段、加戏、对白改写、说话人归属错、独白降级、顺序不连贯、设定冲突，每条问题必须引用原文段落、代码核对引文确实在原文里（越界或全空白打回附邻近行提示）。文风审稿是作品开关、默认关，只评文笔。两档都不循环：写手按问题改一遍，不再复审。审稿提示词写明评什么、不评什么。（`.workflow/research/novelive-agent.md`、`agent-orchestration.md`）
 - **章节失败语义**：某章生成失败整部作品暂停（写手串行依赖上一章结尾），行内重试把该章排回队列头部，成功后恢复。（`docs/creation-pipeline.md`、`docs/ux.md`）
 - **重跑范围**：`redo_chapter`=写/审/演出三步全跑，出图按素材名跳过已存在文件；`rewrite_scene`（面板发起）=重写+差异列表确认卡二次确认后应用；`redraw_image`=单图重生成直接替换，旧文件进修改历史；`redo_volume_synthesis`=重跑走候选合并规则，不覆盖已确认条目。（`.workflow/research/novelive-agent.md`、`docs/ux.md`）
-- **主视觉**：由场景画师出图（横版 16:9），提示词由主控按风格描述组织；确认点 1 给 3 版候选必选，选中存 `assets/style/main-visual.webp` 写回 `bible/style.json` 参考图字段。（`docs/bible.md`、prototype ConfirmVisualPage）
+- **主视觉**：由场景画师出图（横版 16:9），提示词由主控按风格描述组织；确认点 1 给 3 版候选必选，选中存 `assets/style/main-visual.webp` 写回 `bible/style.json` 参考图字段。主视觉存好后，所有画师调用都把它列为参考图之一（R3 实测：只传风格文字三类图画风一致度 0.33–0.41，带主视觉参考 0.85–0.91）。（`docs/bible.md`、prototype ConfirmVisualPage）
 - **质量评测集**：由 agent 自动标注，作回归对比基线；标注候选存仓库，所有者回归后抽查。评分形态：多维评分 + 检查清单 + 机械指标；judge 用快速模型槽、与被测模型分开，经 `submit_*` 交 `{score, reasons[], failedChecks[]}`；失败分类固定（原文忠实度/设定一致性含 knows/伏笔/演出可拍性/量化指标）；runner 自写（`data/task/scorer` 约 150 行，不装框架），统计口径 decided-trials-only。（`decisions.md` 2026-11-21「调研后的取舍」、`.workflow/standards.md`、`agent-harness.md`）
 - **确认点 1**：默认停；「已有参考图」仅指创作者在向导里提供的图，EPUB 插图筛出的候选永远要人挑；角色每套造型候选默认 3 版。（`decisions.md` 2026-11-21、`docs/ux.md`）
+- **美术导演读法（R3 实测）**：默认一次读整章；分批的输入 token 是整章的 4.1 倍、补丁格式冒出 8 种写法、素材名前后不一。分批只在整章放不进上下文时兜底，并配一层补丁格式规范化。（`docs/creation-pipeline.md`、`.workflow/research/agent-orchestration.md`）
 - **主要角色名单**：BiblePatch 角色条目加 `major: boolean`（主控综合时判断）；确认点 1 只列第一卷 `firstSeenChapter` 在本卷且 `major` 的角色。（`.workflow/research/novelive-agent.md`）
 - **CG 描述**：由美术导演在图清单 CG 项的「一句描述」产出，代码聚合写进 `chapter.json`；写手不出 CG 描述。（`docs/bible.md`、`.workflow/research/novelive-agent.md`）
 - **作品 phase 枚举**：`preview / confirm-visual / confirm-first / producing / done / imported`；「第一卷综合完、后续卷还在预览」归 producing，制作面板显示「第 N 卷综合中」。（prototype types、`docs/ux.md`）
 - **第一章状态**：过确认点 2 前第一章按「已发布」显示（能玩），作品级 `confirm-first` 表达停顿；确认点信息由作品状态承担。（prototype、`docs/ux.md`）
 - **占位图**：程序生成三张（sharp 画 SVG→WebP，灰底+图标+「需要处理」）：背景 1920×1080、立绘 1024×1536 竖版透明、CG 1920×1080；资源随 creator 包进仓库。（`docs/creation-pipeline.md`、`docs/visuals.md`）
+- **CG 参考图（R3 实测）**：场景画师画 CG 时提示词写外貌，参考图带出场角色的造型基准图 + 地点基准图（若有）+ 主视觉；纯文字描述会把角色画成别人（identity 0.07–0.12）。视觉审核 `identity` 项拿 CG 比对所含角色的造型基准图，不比对设定图。（`docs/visuals.md`）
 - **场景头归属**：`scene` 标题和 `source` 段落范围由模型写，代码核对范围合法性不生成。（`docs/creation-pipeline.md`、`.workflow/research/novelive-agent.md`）
-- **长章分段（试验）**：写手分段约束「每段以场边界结束」，提示词写明，违规按剧本检查退回；美术导演分批时每批带本批场景+前后各一场衔接+全章图清单累积。验收：分段/分批产物无场景截断、无重复背景图。（`.workflow/research/agent-orchestration.md`、`novelive-agent.md`）
+- **长章分段（试验）**：写手分段约束「每段以场边界结束」，提示词写明，违规按剧本检查退回；美术导演兜底分批时每批带本批场景+前后各一场衔接+全章图清单累积。验收：分段/分批产物无场景截断、无重复背景图。（`.workflow/research/agent-orchestration.md`、`novelive-agent.md`）
 - **对话面板数据模型（试验）**：查 `agent-orchestration.md`/`novelive-agent.md` 是否已覆盖会话条目树、确认卡、压缩策略的字段级定义；没有就以原型 `mock/chat.ts` 的 ChatNode 树 + ConfirmPart + compressedSummary 为草案补进规格。验收：project.db 会话表能存分支和压缩摘要。（`.workflow/research/`、`docs/ux.md`）
 - **运行记录持久化（试验）**：以原型 `runRecordMock`（章→步→parts/groups）为 pi-schema 草案；验证「写」步骤流式输出存原始流还是渲染后 parts、pi-agent-core 会话存储能否复用。存储落 `run`/`run_step` 两表（schema 见 `pi-scaffolding.md` 通用层 3）：run 带 `suspended_at`+`resume_attempts` claim 式崩溃回收，启动扫 `suspended_at IS NOT NULL` 标中断。验收：重跑后运行记录能完整回放。（`docs/ux.md`、prototype mock）
 - **powerSaveBlocker**：宿主按「有活跃 run」启停 `powerSaveBlocker` 防系统休眠（制作/出图长跑数小时），`will-quit` 时清理。（`docs/architecture.md`）
@@ -66,6 +68,7 @@
 - **放大程序**：放大和降噪用 ncnn-vulkan 可执行文件（三平台都有官方预编译版），由创作端启动；输入输出走临时文件，进度和结果走标准输入输出。（`docs/architecture.md`、`decisions.md` 2026-11-21「放大降噪不用 Python」）
 - **放大模型选型**：默认 Real-ESRGAN `realesrgan-x4plus-anime`（6B，BSD-3，8.9MB；就是 Upscayl 的 `digital-art-4x`，权重逐字节相同），快速档 `realesr-animevideov3`（BSD-3，1.2MB）。程序用 `upscayl-bin`（AGPL-3.0，参数和 realesrgan-ncnn-vulkan 一致，能加载任意 ncnn 模型，自带输出重采样）。x4plus-anime 按带噪声和压缩痕迹的退化训练，放大时一并去噪，不另设降噪模型。M3 用真实生成的立绘、背景、CG 再比一次（第二轮对比图是合成的简单线稿）。不随包带 CC BY-NC 系模型（Remacri、UltraSharp、Ultramix、AnimeSharp 等）。（`decisions.md` 2026-11-21「放大默认用 Real-ESRGAN 动漫模型」、`refs/ext-2026-11-r2-upscale.md` 追加节）
 - **alpha 通道**：透明 PNG 带透明通道整图送进模型，不拆通道（实测 alpha 边缘误差 0.04/255、无白边）。（`decisions.md` 2026-11-21、`refs/ext-2026-11-r2-upscale.md`）
+- **放大目标尺寸（R3 实测）**：背景和 CG 放大到 2560×1440（可选 4K）；立绘放大到宽约 2048 像素（1024×1536 → 2048×3072），不按背景倍数；差分和它的基准图必须用同一个放大模型，换档清晰度会跳变。设置页快速档文案写「低性能机用，画质下降」。（`docs/visuals.md`、`decisions.md` 2026-11-21）
 - **stdio 协议**：行分隔 JSON；图片传临时文件路径不传 base64。（`docs/architecture.md`）
 - **体积与耗时（试验）**：M3 试打包时实测二进制+权重的安装包体积和单图放大耗时。验收：安装包体积和单图放大时间在 spec 写的限值内。（`docs/architecture.md`）
 - **存量图回填**：素材另存成品+保留生成原图（或记放大状态字段）；M3 起新图走「转 WebP+放大」，旧工程存量图标「待放大」后台逐张回填，失败不阻塞。（`.workflow/research/novelive-agent.md`、`docs/visuals.md`）

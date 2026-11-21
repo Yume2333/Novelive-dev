@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  html,body{margin:0;padding:0;background:#1a1d24;overflow:hidden;}
+  #stage{position:absolute;inset:0;}
+  #dombox{
+    position:absolute; left:6%; right:6%; bottom:6%; 
+    background:rgba(16,24,33,0.82); border:1px solid rgba(148,180,209,0.35);
+    border-radius:12px; padding:1.2em 1.6em;
+    font-family:'Noto Serif CJK SC','Noto Sans CJK SC',serif;
+    color:#e8eef4; font-size:28px; line-height:1.9;
+    line-break:strict; word-break:break-word;
+    text-spacing-trim:space-first; text-autospace:normal;
+    text-shadow:0 1px 2px rgba(0,0,0,.8), 0 0 6px rgba(0,0,0,.5);
+  }
+  #domname{position:absolute;left:8%;bottom:calc(6% + 6.8em);background:rgba(16,24,33,.9);
+    border:1px solid rgba(148,180,209,.4);border-radius:8px;padding:.3em 1em;
+    font-family:'Noto Serif CJK SC',serif;color:#8fb4d4;font-size:26px;}
+  .w{width:0;overflow:hidden;}
+  .w,.s{display:inline;white-space:normal;}
+  .s{visibility:hidden;}
+  /* per-grapheme reveal with stable layout */
+  .c{opacity:0;}.c.on{opacity:1;}
+  rt{font-size:.48em;color:#9fc4e8;}
+  .em{color:#ffd166;font-style:normal;font-weight:600;}
+</style></head><body>
+<div id="stage"></div>
+<div id="domname">林小雨</div>
+<div id="dombox"><span id="dw" class="w"><span class="s" id="dstable"></span><span id="dlive"></span></span><span id="drest" class="s"></span></div>
+<script type="module">
+const TEXT=window.TEXT_FULL='“你说什么？”他猛地抬起头，声音在发抖——「不可能，绝对不可能！」她沉默了很久，才慢慢说：“我早就知道了。从东京来的信，三月十四日就到了，一共 7 封，你一封都没有看。”他忽然笑起来，笑得像哭：“原来你什么都知道……那我算什么？一个傻瓜，一个彻头彻尾的傻瓜！可是 Alice 说过，春天来的时候，一切都会好的。骗谁呢？骗谁呢……”雨点打在玻璃上，噼里啪啦，像无数只手在敲门。他想：如果那天我没有回头，如果那封信我看了，如果……可是没有如果。窗外，最后一班电车开走了，带走整个春天。';
+// DOM overlay: per-grapheme reveal, layout computed once (stable text = ghost, live text appended in hidden-width container? no—simplest stable: hidden full text + visible prefix overlay)
+// Approach: ghost full text keeps layout; live copy absolutely positioned on top revealing chars.
+const dlive=document.getElementById('dlive'), dstable=document.getElementById('dstable');
+const segs=[...new Intl.Segmenter('zh',{granularity:'grapheme'}).segment(TEXT)].map(s=>s.segment);
+dstable.textContent=TEXT; // hidden, reserves layout
+// build char spans
+let spans=segs.map(g=>{const s=document.createElement('span');s.className='c';s.textContent=g;dlive.appendChild(s);return s;});
+let i=0;
+window.domStep=()=>{if(i<spans.length){spans[i].classList.add('on');i++;}};
+window.domDone=()=>spans.every(s=>s.classList.contains('on'));
+window.domRevealAll=()=>spans.forEach(s=>s.classList.add('on'));
+window.graphemes=segs.length;
+
+// Pixi side
+import('/node_modules/pixi.js/dist/pixi.mjs').then(async (PIXI)=>{
+  const app=new PIXI.Application();
+  await app.init({background:0x1a1d24,resizeTo:window,antialias:true,resolution:window.devicePixelRatio||1,autoDensity:true});
+  document.getElementById('stage').appendChild(app.canvas);
+  const style=new PIXI.TextStyle({fontFamily:'Noto Serif CJK SC',fontSize:28,fill:0xe8eef4,
+    lineHeight:28*1.9,wordWrap:true,wordWrapWidth:0,breakWords:true,
+    stroke:{color:0x000000,width:4,join:'round'},dropShadow:{color:0x000000,blur:4,distance:2,alpha:.6}});
+  const boxW=window.innerWidth*0.88;
+  style.wordWrapWidth=boxW;
+  const pt=new PIXI.Text({text:'',style});
+  pt.x=window.innerWidth*0.06; pt.y=window.innerHeight*0.72;
+  app.stage.addChild(pt);
+  let j=0;
+  window.pixiStep=()=>{if(j<=segs.length){pt.text=segs.slice(0,j).join('');j++;}};
+  window.pixiDone=()=>j>segs.length;
+  window.pixiRevealAll=()=>{pt.text=TEXT;j=segs.length+1;};
+  window.pixiWidth=boxW;
+  // measure line count over time
+  window.pixiLines=()=>pt.height;
+  window.app=app;
+  window.PIXI=PIXI;
+  document.getElementById('ready').textContent='1';
+});
+</script><div id="ready" hidden></div>
+</body></html>

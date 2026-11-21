@@ -1,0 +1,486 @@
+/* 控件库样式（由 prototype 行内样式改为 CSS Modules；视觉不变） */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  transition: all 0.2s ease;
+}
+.btnSm {
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btnPrimary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border: 1px solid var(--color-primary-container);
+  box-shadow: var(--shadow-raised);
+}
+.btnGhost {
+  color: var(--color-on-surface-variant);
+  border: 1px solid transparent;
+}
+.btnDanger {
+  background: var(--color-error-container);
+  color: var(--color-on-error-container);
+  border: 1px solid
+    color-mix(in srgb, var(--color-on-error-container) 20%, transparent);
+}
+
+.iconWrap {
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.spinner {
+  display: inline-flex;
+  animation: spin 1.2s linear infinite;
+}
+
+.card {
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+}
+
+.input {
+  width: 100%;
+  background: var(--white-60);
+  border: 1px solid var(--white-80);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--color-on-surface);
+  outline: none;
+  box-shadow: var(--shadow-glass);
+}
+
+.compactSelect {
+  background: var(--white-60);
+  border: 1px solid var(--white-80);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--color-on-surface);
+  outline: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fieldLabel {
+  color: var(--color-on-surface-variant);
+}
+.fieldHint {
+  font-size: 12px;
+  color: var(--color-outline);
+}
+.sectionLabel {
+  color: var(--color-on-surface-variant);
+  margin-bottom: 8px;
+}
+
+.textarea {
+  width: 100%;
+  border: 1px solid var(--white-80);
+  border-radius: var(--radius-md);
+  background: var(--white-60);
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  color: var(--color-on-surface);
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 72px 24px;
+  text-align: center;
+  gap: 8px;
+}
+.emptyIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-on-surface-variant);
+  margin-bottom: 12px;
+}
+.emptyDesc {
+  color: var(--color-on-surface-variant);
+  max-width: 420px;
+  line-height: 1.6;
+}
+.emptyActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.page {
+  margin: 0 auto;
+  padding: var(--space-7) var(--space-7) var(--space-8);
+}
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  margin-bottom: var(--space-7);
+}
+.pageTitle {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+.pageEyebrow {
+  color: var(--color-outline);
+  margin-bottom: 10px;
+}
+.pageSubtitle {
+  margin-top: var(--space-3);
+  color: var(--color-on-surface-variant);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.pageActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.toastStack {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius-full);
+  background: var(--veil-95);
+  font-size: 13px;
+  font-weight: 500;
+  animation: fade-up 0.2s ease;
+  box-shadow: var(--shadow-pop);
+}
+
+/* 侧边栏外壳 */
+.sidebar {
+  width: 248px;
+  flex-shrink: 0;
+  margin: 12px;
+  margin-right: 0;
+  border-radius: var(--radius-2xl);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 12px 14px;
+  overflow: auto;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 12px 14px;
+}
+.brandName {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.12em;
+}
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-on-surface-variant);
+  transition: all 0.15s ease;
+}
+.navItem:hover {
+  background: var(--white-50);
+}
+.navItemActive {
+  background: var(--white-80);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-chip);
+}
+.sidebarBottom {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.themeSwitch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: var(--white-40);
+  border: 1px solid var(--white-60);
+}
+.themeOpt {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 5px;
+  border-radius: var(--radius-full);
+  color: var(--color-outline);
+}
+.themeOptActive {
+  background: var(--white-90);
+  color: var(--color-primary);
+}
+
+/* 崩溃横幅（warning banner 全局置顶，DESIGN.md 形态） */
+.banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: var(--radius-full);
+  background: var(--color-error-container);
+  color: var(--color-on-error-container);
+  box-shadow: var(--shadow-pop);
+  font-size: 13px;
+  max-width: min(720px, calc(100% - 48px));
+}
+.bannerText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bannerBtn {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  background: var(--color-on-error-container);
+  color: var(--color-error-container);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 设置页 */
+.settingRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+}
+.settingIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-on-surface-variant);
+  flex-shrink: 0;
+}
+.settingTitle {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.rowDivider {
+  height: 1px;
+  background: var(--divider);
+  margin: 0 18px;
+}
+.modelCardHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  padding: var(--space-4) var(--space-5);
+  min-height: 52px;
+  cursor: pointer;
+}
+.modelCardIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+}
+.modelCardTitle {
+  flex: 1;
+  min-width: 0;
+}
+.modelCardName {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+.modelCardSummary {
+  font-size: 12px;
+  color: var(--color-outline);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.configuredOk {
+  font-size: 12px;
+  color: var(--color-success);
+  white-space: nowrap;
+}
+.configuredNo {
+  font-size: 12px;
+  color: var(--color-outline);
+  white-space: nowrap;
+}
+.testStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.modelCardBody {
+  padding: 0 var(--space-5) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.modelGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.capRow {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.capItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.thumb {
+  width: 96px;
+  height: 54px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--white-60);
+  object-fit: cover;
+  background: var(--color-surface-container-high);
+}
+.thumbRow {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.advancedToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-on-surface-variant);
+  margin-bottom: 8px;
+}
+.aboutCard {
+  padding: 14px 18px;
+}
+.aboutRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.aboutName {
+  font-weight: 700;
+  font-size: 14px;
+}
+.aboutDesc {
+  font-size: 12px;
+  color: var(--color-outline);
+}
+.aboutVersion {
+  font-size: 12px;
+  color: var(--color-outline);
+}
+.aboutLinks {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+}
+.aboutLink {
+  font-size: 12px;
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.settingsCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+}
+.modelCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.dirRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dirText {
+  font-size: 13px;
+  color: var(--color-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+.configErr {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-error-container);
+  color: var(--color-on-error-container);
+  font-size: 12px;
+}

@@ -1,0 +1,2051 @@
+{
+ "file": "ch23.nvs",
+ "scenes": [
+  {
+   "title": "街头遇老马",
+   "source": [
+    1,
+    4
+   ],
+   "line": 1,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "bg",
+     "line": 4,
+     "args": [
+      "street-chaokou",
+      "fade",
+      "1.5"
+     ],
+     "step": 0
+    },
+    {
+     "type": "cmd",
+     "cmd": "caption",
+     "line": 5,
+     "text": "北平街头",
+     "duration": 1.2,
+     "wait": false,
+     "step": 1
+    },
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 6,
+     "args": [
+      "xiangzi/ragged-white-jacket/plain",
+      "left"
+     ],
+     "step": 2
+    },
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 7,
+     "args": [
+      "xiaoma-grandpa/default/plain",
+      "right"
+     ],
+     "step": 3
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子在街上丧胆游魂的走，遇见了小马儿的祖父。老头子已不拉车，身上的衣裳比以前更薄更破，扛着根柳木棍子，前头挂着个大瓦壶，后面悬着个破筐子，筐子里有些烧饼油鬼和一大块砖头。他还认得祥子。",
+     "segs": [
+      {
+       "text": "祥子在街上丧胆游魂的走，遇见了小马儿的祖父。老头子已不拉车，身上的衣裳比以前更薄更破，扛着根柳木棍子，前头挂着个大瓦壶，后面悬着个破筐子，筐子里有些烧饼油鬼和一大块砖头。他还认得祥子。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "af6d",
+     "cont": false,
+     "line": 8,
+     "step": 4
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "说起话来，祥子才知道小马儿已死了半年多，老人把那辆破车卖掉，天天就弄壶茶和些烧饼果子在车口儿上卖。老人还是那么和气可爱，可是腰弯了许多，眼睛迎风流泪，老红着眼皮象刚哭完似的。",
+     "segs": [
+      {
+       "text": "说起话来，祥子才知道小马儿已死了半年多，老人把那辆破车卖掉，天天就弄壶茶和些烧饼果子在车口儿上卖。老人还是那么和气可爱，可是腰弯了许多，眼睛迎风流泪，老红着眼皮象刚哭完似的。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "878e",
+     "cont": false,
+     "line": 9,
+     "step": 5
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子喝了他一碗茶，把心中的委屈也对他略略说了几句。",
+     "segs": [
+      {
+       "text": "祥子喝了他一碗茶，把心中的委屈也对他略略说了几句。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "f50d",
+     "cont": false,
+     "line": 10,
+     "step": 6
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "老人评断着祥子的话。",
+     "segs": [
+      {
+       "text": "老人评断着祥子的话。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "52a8",
+     "cont": false,
+     "line": 11,
+     "step": 7
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "你想独自混好？谁不是那么想呢？可是谁又混好了呢？cont",
+     "segs": [
+      {
+       "text": "你想独自混好？谁不是那么想呢？可是谁又混好了呢？cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "0bd3",
+     "cont": false,
+     "line": 12,
+     "step": 8
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "当初，我的身子骨儿好，心眼好，一直混到如今了，我落到现在的样儿！身子好？铁打的人也逃不出去我们这个天罗地网。cont",
+     "segs": [
+      {
+       "text": "当初，我的身子骨儿好，心眼好，一直混到如今了，我落到现在的样儿！身子好？铁打的人也逃不出去我们这个天罗地网。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "6911",
+     "cont": false,
+     "line": 13,
+     "step": 9
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "心眼好？有什么用呢！{em}善有善报，恶有恶报，并没有这么八宗事！{/em}我当年轻的时候，真叫作热心肠儿，拿别人的事当自己的作。有用没有？没有！cont",
+     "segs": [
+      {
+       "text": "心眼好？有什么用呢！",
+       "marks": [],
+       "speed": 1
+      },
+      {
+       "text": "善有善报，恶有恶报，并没有这么八宗事！我当年轻的时候，真叫作热心肠儿，拿别人的事当自己的作。有用没有？没有！cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "b937",
+     "cont": false,
+     "line": 14,
+     "step": 10
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "我还救过人命呢，跳河的，上吊的，我都救过，有报应没有？没有！cont",
+     "segs": [
+      {
+       "text": "我还救过人命呢，跳河的，上吊的，我都救过，有报应没有？没有！cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "4b0f",
+     "cont": false,
+     "line": 15,
+     "step": 11
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "告诉你，我不定哪天就冻死。我算是明白了，干苦活儿的打算独自一个人混好，比登天还难。cont",
+     "segs": [
+      {
+       "text": "告诉你，我不定哪天就冻死。我算是明白了，干苦活儿的打算独自一个人混好，比登天还难。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "0dd8",
+     "cont": false,
+     "line": 16,
+     "step": 12
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "一个人能有什么蹦儿？看见过蚂蚱吧？独自一个儿也蹦得怪远的，可是教个小孩子逮住，用线儿拴上，连飞也飞不起来。赶到成了群，打成阵，哼，一阵就把整顷的庄稼吃净，谁也没法儿治它们！你说是不是？cont",
+     "segs": [
+      {
+       "text": "一个人能有什么蹦儿？看见过蚂蚱吧？独自一个儿也蹦得怪远的，可是教个小孩子逮住，用线儿拴上，连飞也飞不起来。赶到成了群，打成阵，哼，一阵就把整顷的庄稼吃净，谁也没法儿治它们！你说是不是？cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "989f",
+     "cont": false,
+     "line": 17,
+     "step": 13
+    },
+    {
+     "type": "cmd",
+     "cmd": "face",
+     "line": 18,
+     "args": [
+      "xiaoma-grandpa/sad"
+     ],
+     "step": 14
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "我的心眼倒好呢，连个小孙子都守不住。他病了，没钱给他买好药，眼看着他死在我的怀里！甭说了，什么也甭说了！——",
+     "segs": [
+      {
+       "text": "我的心眼倒好呢，连个小孙子都守不住。他病了，没钱给他买好药，眼看着他死在我的怀里！甭说了，什么也甭说了！——",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "2e98",
+     "cont": false,
+     "line": 19,
+     "step": 15
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "老人顿了顿，扬声吆喝起来。",
+     "segs": [
+      {
+       "text": "老人顿了顿，扬声吆喝起来。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "85b0",
+     "cont": false,
+     "line": 20,
+     "step": 16
+    },
+    {
+     "type": "cmd",
+     "cmd": "face",
+     "line": 21,
+     "args": [
+      "xiaoma-grandpa/plain"
+     ],
+     "step": 17
+    },
+    {
+     "type": "cmd",
+     "cmd": "shake",
+     "line": 22,
+     "args": [
+      "0.4"
+     ],
+     "step": 18
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "茶来！谁喝碗热的？",
+     "segs": [
+      {
+       "text": "茶来！谁喝碗热的？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "bbc0",
+     "cont": false,
+     "line": 23,
+     "step": 19
+    }
+   ]
+  },
+  {
+   "title": "独自一个儿的蚂蚱",
+   "source": [
+    5,
+    9
+   ],
+   "line": 25,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子真明白了：刘四，杨太太，孙侦探——并不能因为他的咒骂就得了恶报；他自己，也不能因为要强就得了好处。",
+     "segs": [
+      {
+       "text": "祥子真明白了：刘四，杨太太，孙侦探——并不能因为他的咒骂就得了恶报；他自己，也不能因为要强就得了好处。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "5586",
+     "cont": false,
+     "line": 28,
+     "step": 20
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "自己，专仗着自己，真象老人所说的，就是被小孩子用线拴上的蚂蚱，有翅膀又怎样呢？",
+     "segs": [
+      {
+       "text": "自己，专仗着自己，真象老人所说的，就是被小孩子用线拴上的蚂蚱，有翅膀又怎样呢？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "b61d",
+     "cont": false,
+     "line": 29,
+     "step": 21
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "上曹宅去？一上曹宅，我就得要强，要强有什么用呢？就这么大大咧咧的瞎混吧：没饭吃呢，就把车拉出去；够吃一天的呢，就歇一天，明天再说明天的。",
+     "segs": [
+      {
+       "text": "上曹宅去？一上曹宅，我就得要强，要强有什么用呢？就这么大大咧咧的瞎混吧：没饭吃呢，就把车拉出去；够吃一天的呢，就歇一天，明天再说明天的。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "7211",
+     "cont": false,
+     "line": 30,
+     "step": 22
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "这不但是个办法，而且是唯一的办法。攒钱，买车，都给别人预备着来抢，何苦呢？何不得乐且乐呢？",
+     "segs": [
+      {
+       "text": "这不但是个办法，而且是唯一的办法。攒钱，买车，都给别人预备着来抢，何苦呢？何不得乐且乐呢？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "a8c9",
+     "cont": false,
+     "line": 31,
+     "step": 23
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "再说，设若找到了小福子，我也还应该去努力——不为自己，还不为她吗？既然找不到她，正象这老人死了孙子，为谁混呢？",
+     "segs": [
+      {
+       "text": "再说，设若找到了小福子，我也还应该去努力——不为自己，还不为她吗？既然找不到她，正象这老人死了孙子，为谁混呢？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "7232",
+     "cont": false,
+     "line": 32,
+     "step": 24
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他把小福子的事也告诉了老人，他把老人当作了真的朋友。",
+     "segs": [
+      {
+       "text": "他把小福子的事也告诉了老人，他把老人当作了真的朋友。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "63ea",
+     "cont": false,
+     "line": 33,
+     "step": 25
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "谁喝碗热的？",
+     "segs": [
+      {
+       "text": "谁喝碗热的？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "7a91",
+     "cont": false,
+     "line": 34,
+     "step": 26
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "老人先吆喝了声，而后替祥子来想。",
+     "segs": [
+      {
+       "text": "老人先吆喝了声，而后替祥子来想。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "cd26",
+     "cont": false,
+     "line": 35,
+     "step": 27
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "大概据我这么猜呀，出不去两条道儿：不是教二强子卖给人家当小啊，就是押在了白房子。哼，多半是下了白房子！cont",
+     "segs": [
+      {
+       "text": "大概据我这么猜呀，出不去两条道儿：不是教二强子卖给人家当小啊，就是押在了白房子。哼，多半是下了白房子！cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "7417",
+     "cont": false,
+     "line": 36,
+     "step": 28
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "怎么说呢？小福子既是，象你刚才告诉我的，嫁过人，就不容易再有人要；人家买姨太的要整货。那么，大概有八成，她是下了白房子。cont",
+     "segs": [
+      {
+       "text": "怎么说呢？小福子既是，象你刚才告诉我的，嫁过人，就不容易再有人要；人家买姨太的要整货。那么，大概有八成，她是下了白房子。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "665b",
+     "cont": false,
+     "line": 37,
+     "step": 29
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "我快六十岁了，见过的事多了去啦：拉车的壮实小伙子要是有个一两天不到街口上来，你去找吧，不是拉上包月，准在白房子爬着呢；我们拉车人的姑娘媳妇要是忽然不见了，总有七八成也是上那儿去了。cont",
+     "segs": [
+      {
+       "text": "我快六十岁了，见过的事多了去啦：拉车的壮实小伙子要是有个一两天不到街口上来，你去找吧，不是拉上包月，准在白房子爬着呢；我们拉车人的姑娘媳妇要是忽然不见了，总有七八成也是上那儿去了。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "fc4d",
+     "cont": false,
+     "line": 38,
+     "step": 30
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiaoma-grandpa",
+     "alias": null,
+     "inner": false,
+     "text": "我们卖汗，我们的女人卖肉，我明白，我知道！你去上那里找找看吧，不盼着她真在那里，不过，——茶来！谁喝碗热的？！",
+     "segs": [
+      {
+       "text": "我们卖汗，我们的女人卖肉，我明白，我知道！你去上那里找找看吧，不盼着她真在那里，不过，——茶来！谁喝碗热的？！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "b60c",
+     "cont": false,
+     "line": 39,
+     "step": 31
+    }
+   ]
+  },
+  {
+   "title": "西直门外",
+   "source": [
+    10,
+    14
+   ],
+   "line": 41,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "bg",
+     "line": 44,
+     "args": [
+      "xizhimen-wasteland",
+      "dissolve",
+      "1.5"
+     ],
+     "step": 32
+    },
+    {
+     "type": "cmd",
+     "cmd": "caption",
+     "line": 45,
+     "text": "西直门外",
+     "duration": 1.2,
+     "wait": false,
+     "step": 33
+    },
+    {
+     "type": "cmd",
+     "cmd": "hide",
+     "line": 46,
+     "args": [
+      "xiaoma-grandpa"
+     ],
+     "step": 34
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子一气跑到西直门外。",
+     "segs": [
+      {
+       "text": "祥子一气跑到西直门外。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "0ed6",
+     "cont": false,
+     "line": 47,
+     "step": 35
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "一出了关厢，马上觉出空旷。树木削瘦的立在路旁，枝上连只鸟也没有。灰色的树木，灰色的土地，灰色的房屋，都静静的立在灰黄色的天下；从这一片灰色望过去，看见那荒寒的西山。",
+     "segs": [
+      {
+       "text": "一出了关厢，马上觉出空旷。树木削瘦的立在路旁，枝上连只鸟也没有。灰色的树木，灰色的土地，灰色的房屋，都静静的立在灰黄色的天下；从这一片灰色望过去，看见那荒寒的西山。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "0e4d",
+     "cont": false,
+     "line": 48,
+     "step": 36
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "铁道北，一片树林，林外几间矮屋——祥子算计着，这大概就是白房子了。远近都这么安静，他怀疑这是否那个出名的白房子。",
+     "segs": [
+      {
+       "text": "铁道北，一片树林，林外几间矮屋——祥子算计着，这大概就是白房子了。远近都这么安静，他怀疑这是否那个出名的白房子。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "8f0f",
+     "cont": false,
+     "line": 49,
+     "step": 37
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他大着胆往屋子那边走，屋门上都挂着草帘子，新挂上的，黄黄的有些光泽。他听人讲究过，这里的妇人夏天都赤着背坐在屋外，招呼行人；那来照顾的，还老远的要唱着窑调，显出自己不是外行。为什么现在这么安静呢？难道冬天此地都不作买卖了么？",
+     "segs": [
+      {
+       "text": "他大着胆往屋子那边走，屋门上都挂着草帘子，新挂上的，黄黄的有些光泽。他听人讲究过，这里的妇人夏天都赤着背坐在屋外，招呼行人；那来照顾的，还老远的要唱着窑调，显出自己不是外行。为什么现在这么安静呢？难道冬天此地都不作买卖了么？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "f1c9",
+     "cont": false,
+     "line": 50,
+     "step": 38
+    },
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 51,
+     "args": [
+      "baimian-koudai/default/plain",
+      "right"
+     ],
+     "step": 39
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他正在这么猜疑，靠边那一间的草帘子动了一下，露出个女人头来。祥子吓了一跳——那个头，猛一看，非常象虎妞的。",
+     "segs": [
+      {
+       "text": "他正在这么猜疑，靠边那一间的草帘子动了一下，露出个女人头来。祥子吓了一跳——那个头，猛一看，非常象虎妞的。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "84b2",
+     "cont": false,
+     "line": 52,
+     "step": 40
+    },
+    {
+     "type": "cmd",
+     "cmd": "shake",
+     "line": 53,
+     "args": [
+      "0.5"
+     ],
+     "step": 41
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "来找小福子，要是找到了虎妞，才真算见鬼！",
+     "segs": [
+      {
+       "text": "来找小福子，要是找到了虎妞，才真算见鬼！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "6325",
+     "cont": false,
+     "line": 54,
+     "step": 42
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "进来吧，傻乖乖！",
+     "segs": [
+      {
+       "text": "进来吧，傻乖乖！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "b045",
+     "cont": false,
+     "line": 55,
+     "step": 43
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "语音可不象虎妞的；嗓子哑着，很象他常在天桥听见的那个卖野药的老头子，哑而显着急切。",
+     "segs": [
+      {
+       "text": "语音可不象虎妞的；嗓子哑着，很象他常在天桥听见的那个卖野药的老头子，哑而显着急切。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "e4fb",
+     "cont": false,
+     "line": 56,
+     "step": 44
+    },
+    {
+     "type": "cmd",
+     "cmd": "bg",
+     "line": 57,
+     "args": [
+      "baifangzi-room",
+      "fade",
+      "1.0"
+     ],
+     "step": 45
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "屋里什么也没有，只有那妇人和一铺小炕。炕上没有席，炕里烧着点火，臭气烘烘的。妇人有四十来岁，蓬着头，还没洗脸，下边一条夹裤，上面一件青布小棉袄，没系钮扣。祥子大低头才对付着走进去，一进门就被她搂住了。",
+     "segs": [
+      {
+       "text": "屋里什么也没有，只有那妇人和一铺小炕。炕上没有席，炕里烧着点火，臭气烘烘的。妇人有四十来岁，蓬着头，还没洗脸，下边一条夹裤，上面一件青布小棉袄，没系钮扣。祥子大低头才对付着走进去，一进门就被她搂住了。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "b2f4",
+     "cont": false,
+     "line": 58,
+     "step": 46
+    }
+   ]
+  },
+  {
+   "title": "小嫩肉的下落",
+   "source": [
+    15,
+    21
+   ],
+   "line": 60,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子坐在了炕沿上——立着便不能伸直脖子。他心中很喜欢遇上了她：眼前这个女人胸前鼓着两个大奶，常听人说，白房子有个“白面口袋”，这必定是她——“白面口袋”这个外号，正来自她那两个大奶。他开门见山问她看见小福子没有，她不晓得。祥子把小福子的模样形容了一番，她想起来了。",
+     "segs": [
+      {
+       "text": "祥子坐在了炕沿上——立着便不能伸直脖子。他心中很喜欢遇上了她：眼前这个女人胸前鼓着两个大奶，常听人说，白房子有个“白面口袋”，这必定是她——“白面口袋”这个外号，正来自她那两个大奶。他开门见山问她看见小福子没有，她不晓得。祥子把小福子的模样形容了一番，她想起来了。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "bab1",
+     "cont": false,
+     "line": 63,
+     "step": 47
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "有，有这么个人！年纪不大，好露出几个白牙，对，我们都管她叫小嫩肉。",
+     "segs": [
+      {
+       "text": "有，有这么个人！年纪不大，好露出几个白牙，对，我们都管她叫小嫩肉。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "293c",
+     "cont": false,
+     "line": 64,
+     "step": 48
+    },
+    {
+     "type": "cmd",
+     "cmd": "face",
+     "line": 65,
+     "args": [
+      "xiangzi/angry"
+     ],
+     "step": 49
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "她在哪屋里呢？",
+     "segs": [
+      {
+       "text": "她在哪屋里呢？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "70e0",
+     "cont": false,
+     "line": 66,
+     "step": 50
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "她？早完了！",
+     "segs": [
+      {
+       "text": "她？早完了！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "344d",
+     "cont": false,
+     "line": 67,
+     "step": 51
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "“白面口袋”向外一指。",
+     "segs": [
+      {
+       "text": "“白面口袋”向外一指。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "7425",
+     "cont": false,
+     "line": 68,
+     "step": 52
+    },
+    {
+     "type": "cmd",
+     "cmd": "cg",
+     "line": 69,
+     "args": [
+      "hanging-woods"
+     ],
+     "step": 53
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "{b}吊死在树林里了！{/b}",
+     "segs": [
+      {
+       "text": "吊死在树林里了！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "f0ae",
+     "cont": false,
+     "line": 70,
+     "step": 54
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "怎么？",
+     "segs": [
+      {
+       "text": "怎么？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "64b6",
+     "cont": false,
+     "line": 71,
+     "step": 55
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "小嫩肉到这儿以后，人缘很好。她可是有点受不了，身子挺单薄。cont",
+     "segs": [
+      {
+       "text": "小嫩肉到这儿以后，人缘很好。她可是有点受不了，身子挺单薄。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "aceb",
+     "cont": false,
+     "line": 72,
+     "step": 56
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "有一天，掌灯的时候——我还记得真真的，因为我同着两三个娘们正在门口坐着呢——唉，就是这么个时候，来了个逛的，一直奔了她屋里去。cont",
+     "segs": [
+      {
+       "text": "有一天，掌灯的时候——我还记得真真的，因为我同着两三个娘们正在门口坐着呢——唉，就是这么个时候，来了个逛的，一直奔了她屋里去。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "68a3",
+     "cont": false,
+     "line": 73,
+     "step": 57
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "她不爱同我们坐在门口，刚一来的时候还为这个挨过打；后来她有了名，大伙儿也就让她独自个儿在屋里，好在来逛她的决不去找别人。cont",
+     "segs": [
+      {
+       "text": "她不爱同我们坐在门口，刚一来的时候还为这个挨过打；后来她有了名，大伙儿也就让她独自个儿在屋里，好在来逛她的决不去找别人。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "f71e",
+     "cont": false,
+     "line": 74,
+     "step": 58
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "待了有一顿饭的工夫吧，客人走了，一直就奔了那个树林去。我们什么也没看出来，也没人到屋里去看她。cont",
+     "segs": [
+      {
+       "text": "待了有一顿饭的工夫吧，客人走了，一直就奔了那个树林去。我们什么也没看出来，也没人到屋里去看她。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "00fa",
+     "cont": false,
+     "line": 75,
+     "step": 59
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "赶到老叉杆跟她去收账的时候，才看见屋里躺着个男人，赤身露体，睡得才香呢——他原来是喝醉了。小嫩肉把客人的衣裳剥下来，自己穿上，逃了。她真有心眼！要不是天黑了，要命她也逃不出去。cont",
+     "segs": [
+      {
+       "text": "赶到老叉杆跟她去收账的时候，才看见屋里躺着个男人，赤身露体，睡得才香呢——他原来是喝醉了。小嫩肉把客人的衣裳剥下来，自己穿上，逃了。她真有心眼！要不是天黑了，要命她也逃不出去。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "f57d",
+     "cont": false,
+     "line": 76,
+     "step": 60
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "天黑，她又女扮男装，把大伙儿都给蒙了。马上老叉杆派人四处去找，哼，一进树林，她就在那里挂着呢。cont",
+     "segs": [
+      {
+       "text": "天黑，她又女扮男装，把大伙儿都给蒙了。马上老叉杆派人四处去找，哼，一进树林，她就在那里挂着呢。cont",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "b021",
+     "cont": false,
+     "line": 77,
+     "step": 61
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "baimian-koudai",
+     "alias": null,
+     "inner": false,
+     "text": "摘下来，她已断了气，可是舌头并没吐出多少，脸上也不难看——到死的时候她还讨人喜欢呢！这么几个月了，树林里到晚上一点事也没有，她不出来唬吓人，多么仁义！……",
+     "segs": [
+      {
+       "text": "摘下来，她已断了气，可是舌头并没吐出多少，脸上也不难看——到死的时候她还讨人喜欢呢！这么几个月了，树林里到晚上一点事也没有，她不出来唬吓人，多么仁义！……",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "2b68",
+     "cont": false,
+     "line": 78,
+     "step": 62
+    }
+   ]
+  },
+  {
+   "title": "乱死岗子",
+   "source": [
+    22,
+    23
+   ],
+   "line": 80,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "bg",
+     "line": 83,
+     "args": [
+      "graveyard-pines",
+      "fade",
+      "2.0"
+     ],
+     "step": 63
+    },
+    {
+     "type": "cmd",
+     "cmd": "caption",
+     "line": 84,
+     "text": "乱死岗子",
+     "duration": 1.5,
+     "wait": false,
+     "step": 64
+    },
+    {
+     "type": "cmd",
+     "cmd": "hide",
+     "line": 85,
+     "args": [
+      "baimian-koudai"
+     ],
+     "step": 65
+    },
+    {
+     "type": "cmd",
+     "cmd": "face",
+     "line": 86,
+     "args": [
+      "xiangzi/sad"
+     ],
+     "step": 66
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子没等她说完，就晃晃悠悠的走出来。走到一块坟地，四四方方的种着些松树，树当中有十几个坟头。阳光本来很微弱，松林中就更暗淡。他坐在地上，地上有些干草与松花。",
+     "segs": [
+      {
+       "text": "祥子没等她说完，就晃晃悠悠的走出来。走到一块坟地，四四方方的种着些松树，树当中有十几个坟头。阳光本来很微弱，松林中就更暗淡。他坐在地上，地上有些干草与松花。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "3d64",
+     "cont": false,
+     "line": 87,
+     "step": 67
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "什么声音也没有，只有树上的几个山喜鹊扯着长声悲叫。",
+     "segs": [
+      {
+       "text": "什么声音也没有，只有树上的几个山喜鹊扯着长声悲叫。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "c6ee",
+     "cont": false,
+     "line": 88,
+     "step": 68
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "这绝不会是小福子的坟，他知道，可是他的泪一串一串的往下落。",
+     "segs": [
+      {
+       "text": "这绝不会是小福子的坟，他知道，可是他的泪一串一串的往下落。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "660d",
+     "cont": false,
+     "line": 89,
+     "step": 69
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "什么也没有了，连小福子也入了土！他是要强的，小福子是要强的；他只剩下些没有作用的泪，她已作了吊死鬼！",
+     "segs": [
+      {
+       "text": "什么也没有了，连小福子也入了土！他是要强的，小福子是要强的；他只剩下些没有作用的泪，她已作了吊死鬼！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "f4c0",
+     "cont": false,
+     "line": 90,
+     "step": 70
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "一领席，埋在乱死岗子——{em}这就是努力一世的下场头！{/em}",
+     "segs": [
+      {
+       "text": "一领席，埋在乱死岗子——",
+       "marks": [],
+       "speed": 1
+      },
+      {
+       "text": "这就是努力一世的下场头！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "5b67",
+     "cont": false,
+     "line": 91,
+     "step": 71
+    }
+   ]
+  },
+  {
+   "title": "变成了走兽",
+   "source": [
+    24,
+    32
+   ],
+   "line": 93,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "bg",
+     "line": 96,
+     "args": [
+      "hutong-winter",
+      "dissolve",
+      "1.5"
+     ],
+     "step": 72
+    },
+    {
+     "type": "cmd",
+     "cmd": "caption",
+     "line": 97,
+     "text": "冬去春来",
+     "duration": 1.5,
+     "wait": false,
+     "step": 73
+    },
+    {
+     "type": "cmd",
+     "cmd": "face",
+     "line": 98,
+     "args": [
+      "xiangzi/plain"
+     ],
+     "step": 74
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "回到车厂，他懊睡了两天。决不想上曹宅去了，连个信儿也不必送——曹先生救不了祥子的命。",
+     "segs": [
+      {
+       "text": "回到车厂，他懊睡了两天。决不想上曹宅去了，连个信儿也不必送——曹先生救不了祥子的命。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "de2b",
+     "cont": false,
+     "line": 99,
+     "step": 75
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "睡了两天，他把车拉出去。心中完全是块空白，不再想什么，不再希望什么，只为肚子才出来受罪，肚子饱了就去睡，还用想呢，还用希望呢？",
+     "segs": [
+      {
+       "text": "睡了两天，他把车拉出去。心中完全是块空白，不再想什么，不再希望什么，只为肚子才出来受罪，肚子饱了就去睡，还用想呢，还用希望呢？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "aa3f",
+     "cont": false,
+     "line": 100,
+     "step": 76
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "看着一条瘦得出了棱的狗在白薯挑子旁边等着吃点皮和须子，他明白了自己就跟这条狗一样：一天的动作只为捡些白薯皮和须子吃。将就着活下去是一切，什么也无须乎想了。",
+     "segs": [
+      {
+       "text": "看着一条瘦得出了棱的狗在白薯挑子旁边等着吃点皮和须子，他明白了自己就跟这条狗一样：一天的动作只为捡些白薯皮和须子吃。将就着活下去是一切，什么也无须乎想了。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "2c6a",
+     "cont": false,
+     "line": 101,
+     "step": 77
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "人把自己从野兽中提拔出，可是到现在，人还把自己的同类驱逐到野兽里去。祥子还在那文化之城，可是变成了走兽。",
+     "segs": [
+      {
+       "text": "人把自己从野兽中提拔出，可是到现在，人还把自己的同类驱逐到野兽里去。祥子还在那文化之城，可是变成了走兽。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "caab",
+     "cont": false,
+     "line": 102,
+     "step": 78
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "一点也不是他自己的过错。他停止住思想，所以就是杀了人，他也不负什么责任。他不再有希望，就那么迷迷忽忽的往下坠，坠入那无底的深坑。",
+     "segs": [
+      {
+       "text": "一点也不是他自己的过错。他停止住思想，所以就是杀了人，他也不负什么责任。他不再有希望，就那么迷迷忽忽的往下坠，坠入那无底的深坑。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "ed23",
+     "cont": false,
+     "line": 103,
+     "step": 79
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他吃，他喝，他嫖，他赌，他懒，他狡猾——他没了心，他的心被人家摘了去。他只剩下那个高大的肉架子，等着溃烂，预备着到乱死岗子去。",
+     "segs": [
+      {
+       "text": "他吃，他喝，他嫖，他赌，他懒，他狡猾——他没了心，他的心被人家摘了去。他只剩下那个高大的肉架子，等着溃烂，预备着到乱死岗子去。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "cd82",
+     "cont": false,
+     "line": 104,
+     "step": 80
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "冬天过去了，春天的阳光是自然给一切人的衣服，他把棉衣卷巴卷巴全卖了。他要吃口好的，喝口好的，不必存着冬衣，更不准备再看见冬天——今天快活一天，明天就死！管什么冬天不冬天呢！不幸，到了冬天自己还活着，那就再说吧。",
+     "segs": [
+      {
+       "text": "冬天过去了，春天的阳光是自然给一切人的衣服，他把棉衣卷巴卷巴全卖了。他要吃口好的，喝口好的，不必存着冬衣，更不准备再看见冬天——今天快活一天，明天就死！管什么冬天不冬天呢！不幸，到了冬天自己还活着，那就再说吧。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "2b7a",
+     "cont": false,
+     "line": 105,
+     "step": 81
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "原先，他一思索，便想到一辈子的事；现在，他只顾眼前。经验告诉他，明天只是今天的继续，明天承继着今天的委屈。卖了棉衣，拿着现钱做什么不好呢，何必留着等那个一阵风便噎死人的冬天呢？",
+     "segs": [
+      {
+       "text": "原先，他一思索，便想到一辈子的事；现在，他只顾眼前。经验告诉他，明天只是今天的继续，明天承继着今天的委屈。卖了棉衣，拿着现钱做什么不好呢，何必留着等那个一阵风便噎死人的冬天呢？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "5155",
+     "cont": false,
+     "line": 106,
+     "step": 82
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "慢慢的，凡是暂时不用的东西他都马上出手。他喜欢看自己的东西变成钱，被自己花了——自己花用了，就落不到别人手中，这最保险。脸不洗，牙不刷，不但省钱，而且省事；体面给谁看呢？穿着破衣，把烙饼卷酱肉吃在肚中，这是真的！",
+     "segs": [
+      {
+       "text": "慢慢的，凡是暂时不用的东西他都马上出手。他喜欢看自己的东西变成钱，被自己花了——自己花用了，就落不到别人手中，这最保险。脸不洗，牙不刷，不但省钱，而且省事；体面给谁看呢？穿着破衣，把烙饼卷酱肉吃在肚中，这是真的！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "570a",
+     "cont": false,
+     "line": 107,
+     "step": 83
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "多么体面的祥子，变成个又瘦又脏的低等车夫。拉上买卖，稍微有点甜头，他就中途倒出去；坐车的不答应，他会瞪眼，打起架来，到警区去住两天才不算一回事！",
+     "segs": [
+      {
+       "text": "多么体面的祥子，变成个又瘦又脏的低等车夫。拉上买卖，稍微有点甜头，他就中途倒出去；坐车的不答应，他会瞪眼，打起架来，到警区去住两天才不算一回事！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "410b",
+     "cont": false,
+     "line": 108,
+     "step": 84
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "独自拉着车，他走得很慢，他心疼自己的汗。及至走上帮儿车，要是高兴的话，他还肯跑一气，专为把别人落在后边。",
+     "segs": [
+      {
+       "text": "独自拉着车，他走得很慢，他心疼自己的汗。及至走上帮儿车，要是高兴的话，他还肯跑一气，专为把别人落在后边。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "0e1a",
+     "cont": false,
+     "line": 109,
+     "step": 85
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "原先他以为拉车是拉着条人命，一不小心便有摔死人的危险；现在，他故意的要坏——什么横切别的车，故意拐硬弯，别扭着后面的车，抽冷子搡前面的车一把，他都会。摔死谁也没大关系，人都该死！",
+     "segs": [
+      {
+       "text": "原先他以为拉车是拉着条人命，一不小心便有摔死人的危险；现在，他故意的要坏——什么横切别的车，故意拐硬弯，别扭着后面的车，抽冷子搡前面的车一把，他都会。摔死谁也没大关系，人都该死！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "4d63",
+     "cont": false,
+     "line": 110,
+     "step": 86
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他又恢复了他的静默寡言。除了讲价儿，他一天到晚老闭着口；连喝醉了他都不出声，他会坐在僻静的地方去哭。几乎每次喝醉，他必到小福子吊死的树林里去落泪；哭完，他就在白房子里住下。",
+     "segs": [
+      {
+       "text": "他又恢复了他的静默寡言。除了讲价儿，他一天到晚老闭着口；连喝醉了他都不出声，他会坐在僻静的地方去哭。几乎每次喝醉，他必到小福子吊死的树林里去落泪；哭完，他就在白房子里住下。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "ee42",
+     "cont": false,
+     "line": 111,
+     "step": 87
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "酒醒过来，钱净了手，身上中了病。",
+     "segs": [
+      {
+       "text": "酒醒过来，钱净了手，身上中了病。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "4ad7",
+     "cont": false,
+     "line": 112,
+     "step": 88
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他并不后悔。假若他也有后悔的时候，他是后悔当初他干吗那么要强，那么谨慎，那么老实。该后悔的全过去了，现在没有了可悔的事。",
+     "segs": [
+      {
+       "text": "他并不后悔。假若他也有后悔的时候，他是后悔当初他干吗那么要强，那么谨慎，那么老实。该后悔的全过去了，现在没有了可悔的事。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "f2de",
+     "cont": false,
+     "line": 113,
+     "step": 89
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "现在，怎能占点便宜，他就怎办。他占了便宜，别人就吃了亏——对，这是一种报复！慢慢的，他学会跟朋友们借钱，借了不想还。",
+     "segs": [
+      {
+       "text": "现在，怎能占点便宜，他就怎办。他占了便宜，别人就吃了亏——对，这是一种报复！慢慢的，他学会跟朋友们借钱，借了不想还。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "b368",
+     "cont": false,
+     "line": 114,
+     "step": 90
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "初一上来，大家一点也不怀疑他，都知道他是好体面讲信用的人，所以他一张嘴，就把钱借到。他利用着点人格的残馀到处去借，借着手便顺手儿花去；逼急了他可以撒无赖，人家要债，他会作出极可怜的样子去央求宽限；这样还不成，他便去再借二毛钱，还上一毛五的债，剩下五分先喝了酒再说。",
+     "segs": [
+      {
+       "text": "初一上来，大家一点也不怀疑他，都知道他是好体面讲信用的人，所以他一张嘴，就把钱借到。他利用着点人格的残馀到处去借，借着手便顺手儿花去；逼急了他可以撒无赖，人家要债，他会作出极可怜的样子去央求宽限；这样还不成，他便去再借二毛钱，还上一毛五的债，剩下五分先喝了酒再说。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "4fd3",
+     "cont": false,
+     "line": 115,
+     "step": 91
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "一来二去，他连一个铜子也借不出了，他开始去骗钱花。",
+     "segs": [
+      {
+       "text": "一来二去，他连一个铜子也借不出了，他开始去骗钱花。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "4310",
+     "cont": false,
+     "line": 116,
+     "step": 92
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "凡是以前他所混过的宅门，他都去访问，见面编一套谎，骗几个钱；没有钱，他央求赏给点破衣服，衣服到手也变了钱，钱马上变了烟酒。",
+     "segs": [
+      {
+       "text": "凡是以前他所混过的宅门，他都去访问，见面编一套谎，骗几个钱；没有钱，他央求赏给点破衣服，衣服到手也变了钱，钱马上变了烟酒。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "0af4",
+     "cont": false,
+     "line": 117,
+     "step": 93
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他低着头思索，想坏主意；想好一个主意就能进比拉一天车还多的钱，省了力气，而且进钱，他觉得非常的上算。",
+     "segs": [
+      {
+       "text": "他低着头思索，想坏主意；想好一个主意就能进比拉一天车还多的钱，省了力气，而且进钱，他觉得非常的上算。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "074a",
+     "cont": false,
+     "line": 118,
+     "step": 94
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他甚至于去找曹宅的高妈——远远的等着她出来买东西，看见她出来，他几乎一步便赶过去，极动人的叫她一声高大嫂。",
+     "segs": [
+      {
+       "text": "他甚至于去找曹宅的高妈——远远的等着她出来买东西，看见她出来，他几乎一步便赶过去，极动人的叫她一声高大嫂。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "349e",
+     "cont": false,
+     "line": 119,
+     "step": 95
+    }
+   ]
+  },
+  {
+   "title": "天桥之前",
+   "source": [
+    33,
+    41
+   ],
+   "line": 121,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "bg",
+     "line": 124,
+     "args": [
+      "tianqiao",
+      "fade",
+      "1.2"
+     ],
+     "step": 96
+    },
+    {
+     "type": "cmd",
+     "cmd": "caption",
+     "line": 125,
+     "text": "天桥",
+     "duration": 1.2,
+     "wait": false,
+     "step": 97
+    },
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 126,
+     "args": [
+      "gao-ma/default/surprised",
+      "right"
+     ],
+     "step": 98
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "gao-ma",
+     "alias": null,
+     "inner": false,
+     "text": "哟！吓死我了！我当是谁呢？祥子啊！你怎这么样了？",
+     "segs": [
+      {
+       "text": "哟！吓死我了！我当是谁呢？祥子啊！你怎这么样了？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "474b",
+     "cont": false,
+     "line": 127,
+     "step": 99
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "高妈把眼都睁得圆了，象看见一个怪物。",
+     "segs": [
+      {
+       "text": "高妈把眼都睁得圆了，象看见一个怪物。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "de1c",
+     "cont": false,
+     "line": 128,
+     "step": 100
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "甭提了！",
+     "segs": [
+      {
+       "text": "甭提了！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "63bd",
+     "cont": false,
+     "line": 129,
+     "step": 101
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子低下头去。",
+     "segs": [
+      {
+       "text": "祥子低下头去。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "6c0d",
+     "cont": false,
+     "line": 130,
+     "step": 102
+    },
+    {
+     "type": "cmd",
+     "cmd": "face",
+     "line": 131,
+     "args": [
+      "gao-ma/plain"
+     ],
+     "step": 103
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "gao-ma",
+     "alias": null,
+     "inner": false,
+     "text": "你不是跟先生都说好了吗？怎么一去不回头了？我还和老程打听你呢，他说没看见你，你到底上哪儿啦？先生和太太都直不放心！",
+     "segs": [
+      {
+       "text": "你不是跟先生都说好了吗？怎么一去不回头了？我还和老程打听你呢，他说没看见你，你到底上哪儿啦？先生和太太都直不放心！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "0e55",
+     "cont": false,
+     "line": 132,
+     "step": 104
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子把早已编好的话，简单的，动人的，说出。",
+     "segs": [
+      {
+       "text": "祥子把早已编好的话，简单的，动人的，说出。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "80f0",
+     "cont": false,
+     "line": 133,
+     "step": 105
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "病了一大场，差点死了！你和先生说说，帮我一步，等我好利落了再来上工！",
+     "segs": [
+      {
+       "text": "病了一大场，差点死了！你和先生说说，帮我一步，等我好利落了再来上工！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "6cf1",
+     "cont": false,
+     "line": 134,
+     "step": 106
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "gao-ma",
+     "alias": null,
+     "inner": false,
+     "text": "先生没在家，你进来见见太太好不好？",
+     "segs": [
+      {
+       "text": "先生没在家，你进来见见太太好不好？",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "95ff",
+     "cont": false,
+     "line": 135,
+     "step": 107
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "甭啦！我这个样儿！你给说说吧！",
+     "segs": [
+      {
+       "text": "甭啦！我这个样儿！你给说说吧！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "7b27",
+     "cont": false,
+     "line": 136,
+     "step": 108
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "高妈给他拿出两块钱来。",
+     "segs": [
+      {
+       "text": "高妈给他拿出两块钱来。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "a6e8",
+     "cont": false,
+     "line": 137,
+     "step": 109
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "gao-ma",
+     "alias": null,
+     "inner": false,
+     "text": "太太给你的，嘱咐你快吃点药！",
+     "segs": [
+      {
+       "text": "太太给你的，嘱咐你快吃点药！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "84cb",
+     "cont": false,
+     "line": 138,
+     "step": 110
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "是了！谢谢太太！",
+     "segs": [
+      {
+       "text": "是了！谢谢太太！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "d688",
+     "cont": false,
+     "line": 139,
+     "step": 111
+    },
+    {
+     "type": "cmd",
+     "cmd": "hide",
+     "line": 140,
+     "args": [
+      "gao-ma"
+     ],
+     "step": 112
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子接过钱来，心里盘算着上哪儿开发了它。高妈刚一转脸，他奔了天桥，足玩了一天。",
+     "segs": [
+      {
+       "text": "祥子接过钱来，心里盘算着上哪儿开发了它。高妈刚一转脸，他奔了天桥，足玩了一天。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "431c",
+     "cont": false,
+     "line": 141,
+     "step": 113
+    }
+   ]
+  },
+  {
+   "title": "打旗子的祥子",
+   "source": [
+    42,
+    43
+   ],
+   "line": 143,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "bg",
+     "line": 146,
+     "args": [
+      "demo-street",
+      "dissolve",
+      "1.2"
+     ],
+     "step": 114
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "慢慢的把宅门都串净，他又串了个第二回，这次可就已经不很灵验了。这条路子不能靠长，得另想主意——得想比拉车容易赚钱的主意。",
+     "segs": [
+      {
+       "text": "慢慢的把宅门都串净，他又串了个第二回，这次可就已经不很灵验了。这条路子不能靠长，得另想主意——得想比拉车容易赚钱的主意。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "1f2e",
+     "cont": false,
+     "line": 147,
+     "step": 115
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "现在，他讨厌拉车。只要有一法子能暂时对付三餐，他便不肯去摸车把。他的身子懒，而耳朵很尖，有个消息，他就跑到前面去。",
+     "segs": [
+      {
+       "text": "现在，他讨厌拉车。只要有一法子能暂时对付三餐，他便不肯去摸车把。他的身子懒，而耳朵很尖，有个消息，他就跑到前面去。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "b523",
+     "cont": false,
+     "line": 148,
+     "step": 116
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "什么公民团咧，什么请愿团咧，凡是有人出钱的事，他全干。三毛也好，两毛也好，他乐意去打一天旗子，随着人群乱走——赚钱不多，可是不用卖力气呢。",
+     "segs": [
+      {
+       "text": "什么公民团咧，什么请愿团咧，凡是有人出钱的事，他全干。三毛也好，两毛也好，他乐意去打一天旗子，随着人群乱走——赚钱不多，可是不用卖力气呢。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "ea94",
+     "cont": false,
+     "line": 149,
+     "step": 117
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "打着面小旗，他低着头，嘴里叼着烟卷，似笑非笑的随着大家走，一声也不出。到非喊叫几声不可的时候，他会张开大嘴，而完全没声——他爱惜自己的喉咙。",
+     "segs": [
+      {
+       "text": "打着面小旗，他低着头，嘴里叼着烟卷，似笑非笑的随着大家走，一声也不出。到非喊叫几声不可的时候，他会张开大嘴，而完全没声——他爱惜自己的喉咙。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "d75c",
+     "cont": false,
+     "line": 150,
+     "step": 118
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "对什么事他也不想用力，因为以前卖过力气而并没有分毫的好处。",
+     "segs": [
+      {
+       "text": "对什么事他也不想用力，因为以前卖过力气而并没有分毫的好处。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "42f3",
+     "cont": false,
+     "line": 151,
+     "step": 119
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "设若遇见点什么危险，他头一个先跑开，而且跑得很快。他的命可以毁在自己手里，再也不为任何人牺牲什么。",
+     "segs": [
+      {
+       "text": "设若遇见点什么危险，他头一个先跑开，而且跑得很快。他的命可以毁在自己手里，再也不为任何人牺牲什么。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "4dbd",
+     "cont": false,
+     "line": 152,
+     "step": 120
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "{em}为个人努力的也知道怎样毁灭个人，这是个人主义的两端。{/em}",
+     "segs": [
+      {
+       "text": "为个人努力的也知道怎样毁灭个人，这是个人主义的两端。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "0993",
+     "cont": false,
+     "line": 153,
+     "step": 121
+    },
+    {
+     "type": "cmd",
+     "cmd": "wait",
+     "line": 154,
+     "args": [],
+     "step": 122
+    }
+   ]
+  },
+  {
+   "title": "注释",
+   "source": [
+    44,
+    46
+   ],
+   "line": 156,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "{dim}注一：蹦儿，本领，前途的意思。{/dim}",
+     "segs": [
+      {
+       "text": "注一：蹦儿，本领，前途的意思。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "e158",
+     "cont": false,
+     "line": 159,
+     "step": 123
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "{dim}注二：窑调，在妓院里流行的小调。{/dim}",
+     "segs": [
+      {
+       "text": "注二：窑调，在妓院里流行的小调。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "5dc0",
+     "cont": false,
+     "line": 160,
+     "step": 124
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "{dim}注三：叉杆，即娼主。{/dim}",
+     "segs": [
+      {
+       "text": "注三：叉杆，即娼主。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": "0203",
+     "cont": false,
+     "line": 161,
+     "step": 125
+    }
+   ]
+  }
+ ]
+}

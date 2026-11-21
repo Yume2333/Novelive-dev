@@ -87,7 +87,20 @@
 
 ### 风格
 
-画风描述和风格参考图（即主视觉），以及旁白语气。
+画风描述和风格参考图（即主视觉），以及旁白语气。主视觉不是只存着：所有画师调用都把它作为参考图带上（见[视觉素材](./visuals.md)）。
+
+### 素材登记表
+
+一张表登记作品里全部视觉素材的 ID，写手、美术导演、画师、编译器、播放器都只认这张表。文件是 `assets/asset-registry.json`，位置和 ID 写法见[作品格式与工程](./work-format.md)：
+
+| 字段 | 内容 |
+| --- | --- |
+| ID | 素材名：地点 `place/variant`，角色 `character/costume/expression`，CG `cg-<id>` |
+| 类型 | 立绘 / 背景 / CG / 表情差分 / 背景变体 |
+| 状态 | 已画 / 待画 / 占位 |
+| 同义合并 | 表情同义合并（见[视觉素材](./visuals.md)）的归并结果也登记在这里 |
+
+校验时分两头查：说话人 ID 查设定集的角色表，舞台素材 ID 查这张登记表。
 
 ### 不放进设定集的内容
 
@@ -116,7 +129,7 @@ CG 不放进设定集。一张 CG 一般只在一个场景里用，描述记在�
 
 ```text
 bible/
-  style.json                 风格
+  style.json                 风格（含主视觉）
   characters/<角色>.json
   relations.json
   locations/<地点>.json
@@ -126,6 +139,8 @@ glossary.json
 ```
 
 这套结构在系列、卷、作品三层都可以有。剧情骨架按卷存在 `volumes/<卷 ID>/bible/skeleton.json`。
+
+卷摘要（digest）存 `volumes/<卷 ID>/bible/digest.json`；全书梗概由各卷 digest 现拼，不单独存。
 
 ## 全书预览结果
 

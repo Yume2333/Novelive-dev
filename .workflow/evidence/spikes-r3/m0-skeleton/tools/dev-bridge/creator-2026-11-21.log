@@ -1,0 +1,14 @@
+2026-11-21T06:53:26.147Z command.recv {"requestId":"w1","command":"config.get","generation":0}
+2026-11-21T06:53:26.149Z command.done {"requestId":"w1","ok":true}
+2026-11-21T06:53:36.606Z command.recv {"requestId":"w2","command":"config.update","generation":1}
+2026-11-21T06:53:36.608Z command.done {"requestId":"w2","ok":true}
+2026-11-21T06:53:39.651Z command.recv {"requestId":"w3","command":"model.testText","generation":1}
+2026-11-21T06:53:39.684Z command.done {"requestId":"w3","ok":true}
+2026-11-21T06:53:49.250Z command.recv {"requestId":"w4","command":"model.testText","generation":1}
+2026-11-21T06:53:49.254Z command.done {"requestId":"w4","ok":true}
+2026-11-21T06:54:05.621Z command.recv {"requestId":"w5","command":"config.get","generation":1}
+2026-11-21T06:54:05.622Z command.done {"requestId":"w5","ok":true}
+2026-11-21T06:54:10.780Z command.recv {"requestId":"w6","command":"config.update","generation":1}
+2026-11-21T06:54:10.780Z command.done {"requestId":"w6","ok":false}
+2026-11-21T06:54:10.782Z command.recv {"requestId":"w7","command":"model.testText","generation":1}
+2026-11-21T06:54:10.786Z command.done {"requestId":"w7","ok":true}

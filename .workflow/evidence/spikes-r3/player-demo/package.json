@@ -1,0 +1,25 @@
+{
+  "name": "r3-player-demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5419 --strictPort",
+    "build": "vite build",
+    "compile": "node tools/compile.mjs",
+    "assets": "node tools/prepare-assets.mjs"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  },
+  "dependencies": {
+    "pixi-filters": "^6.1.5",
+    "pixi.js": "^8.23.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sharp": "^0.35.5"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "novelive",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@12.21.0",
+  "scripts": {
+    "dev": "pnpm --filter @novelive/desktop dev",
+    "dev:web": "pnpm run dev:bridge & pnpm run dev:ui",
+    "dev:ui": "pnpm --filter @novelive/ui dev",
+    "dev:bridge": "pnpm --filter @novelive/dev-bridge dev",
+    "build": "pnpm --filter @novelive/desktop build",
+    "check": "pnpm -r --workspace-concurrency=1 run check:types && biome check . && stylelint \"packages/**/*.css\" && vitest run",
+    "test": "vitest run",
+    "test:e2e": "pnpm build && playwright test",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@types/node": "24.10.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "playwright": "1.65.1",
+    "stylelint": "18.1.0",
+    "typescript": "5.9.3",
+    "vitest": "5.1.1"
+  }
+}

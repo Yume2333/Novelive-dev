@@ -1,0 +1,17 @@
+4x_NMKD-Superscale-SP_178000_G	bg_gen1024.png	rc=0	20.612773811s	peakRSS_KB=983908
+upscayl-standard-4x	bg_gen1024.png	rc=0	15.196592865s	peakRSS_KB=976688
+upscayl-standard-4x	bg_gen1024.png	rc=0	23.692299402s	peakRSS_KB=1018276
+976688
+digital-art-4x	sprite_hd_1024x1280.png	rc=0	13.730327897s	peakRSS_KB=517660
+realesrgan-x4plus-anime	sprite_hd_1024x1280.png	rc=0	14.885786101s	peakRSS_KB=517516
+4xNomos8kSC	sprite_hd_1024x1280.png	rc=0	48.456880393s	peakRSS_KB=1129248
+4x_NMKD-Siax_200k	bg_gen1024.png	rc=0	1.105288848s	peakRSS_KB=182780
+digital-art-4x	input2.jpg	rc=0	5.294695237s	peakRSS_KB=352084
+realesrgan-x4plus-anime	input2.jpg	rc=0	4.504821641s	peakRSS_KB=351932
+4xNomos8kSC	input2.jpg	rc=0	14.961418114s	peakRSS_KB=948960
+4xHFA2k	input2.jpg	rc=0	11.609248437s	peakRSS_KB=954624
+4x_NMKD-Siax_200k	input2.jpg	rc=0	.229803367s	peakRSS_KB=129784
+4xHFA2k	sprite_hd_1024x1280.png	rc=0	45.129965202s	peakRSS_KB=
+upscayl-standard-4x	input2.jpg	rc=0	26.986538114s	peakRSS_KB=955064
+4x_NMKD-Superscale-SP_178000_G	sprite_hd_1024x1280.png	rc=0	65.251167259s	peakRSS_KB=1117864
+upscayl-standard-4x	sprite_hd_1024x1280.png	rc=0	43.840717806s	peakRSS_KB=1126952

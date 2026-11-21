@@ -177,16 +177,16 @@
 | `realcugan-ncnn-vulkan` 可执行+`models-se`（up2x/3x/4x×n0/n3/cons） | `bin/realcugan/…20220728-ubuntu/` | MIT | 二进制 9.7MB+每档~2.5MB | 放大子进程默认模型（A1/A2），随包 |
 | `realesrgan-ncnn-vulkan`+`realesrgan-x4plus-anime` | `bin/realesrgan/` | MIT（权重 BSD-3） | 二进制 11.4MB+anime 8.9MB | 锐利优先备选档（A2） |
 | `waifu2x-ncnn-vulkan`+`models-cunet` | `bin/waifu2x/…20250915-linux/` | MIT | 二进制 8.3MB+cunet ~24MB | 可选第三模型（A2 若不选可不拷） |
-| trial 骨架（pnpm workspace+electron-vite 多入口+MessagePort+extraResources python+electron-builder.yml） | `/tmp/nl-r2/R2ElectronShell/trial` | 自写 | ~400 行 | `apps/desktop` M0 照抄配置，utility-index.ts 握手样板 |
+| trial 骨架（pnpm workspace+electron-vite 多入口+MessagePort+extraResources python+electron-builder.yml） | `.workflow/evidence/spikes-r2/electron-shell/trial` | 自写 | ~400 行 | `apps/desktop` M0 照抄配置，utility-index.ts 握手样板 |
 | `electron-builder.yml`：`extraResources`+`asarUnpack["**/*.node","**/*.so*","node_modules/sharp/**","node_modules/@img/**"]` | trial | 自写 | — | M3/M5 打包配置 |
 | `.npmrc`：`node-linker=hoisted`、`shamefully-hoist=true` | trial | 自写 | — | M0 pnpm 配置 |
-| 行 ID `StateField`（seed/assign/death-check/re-anchor/dedupe，~45 行） | `/tmp/nl-r2/script-editor/idtrack5.mjs` | 自写 | — | M2 `.nvs` 编辑器行 ID 跟踪 |
-| `parseScript`（剥 `#id`→区间集）+speaker chip widget+ID gutter+`unifiedMergeView` 配置 | `script-editor/{idtrack5,app,unified-app}.mjs` | 自写 | ~100 行 | M2 编辑器 |
+| 行 ID `StateField`（seed/assign/death-check/re-anchor/dedupe，~45 行） | `.workflow/evidence/spikes-r2/script-editor/idtrack5.mjs` | 自写 | — | M2 `.nvs` 编辑器行 ID 跟踪 |
+| `parseScript`（剥 `#id`→区间集）+speaker chip widget+ID gutter+`unifiedMergeView` 配置 | `.workflow/evidence/spikes-r2/script-editor/{idtrack5,app,unified-app}.mjs` | 自写 | ~100 行 | M2 编辑器 |
 | `@assistant-ui/react-pi` 的 `messageProjection.ts`（~920 行取 ~300-400 思路）+`hostUi.ts`（170 行 approval 双向映射）+`threadState.ts`（442 行 reducer） | `aui-repo/packages/react-pi/src/runtime/` | MIT | ~1500 行 | 对话面板 transcript→ThreadMessageLike 投影、propose_*↔approval 映射 |
 | `thread.aui.tsx`/`tool-fallback.aui.tsx` minimal 模板 | `aui-repo/templates/minimal/` | MIT | ~1000 行 | 面板组件组装参考（剥 Tailwind 改 CSS Modules） |
-| FakeCreatorBackend（id/parentId 树+park 语义+ExternalStoreRuntime 接线+ProposalCard，~400 行） | `/tmp/nl-r2/ChatPanel/trial/` | 我方 | ~400 行 | `packages/ui` 面板骨架演化起点 |
+| FakeCreatorBackend（id/parentId 树+park 语义+ExternalStoreRuntime 接线+ProposalCard，~400 行） | `.workflow/evidence/spikes-r2/chat-panel/` | 我方 | ~400 行 | `packages/ui` 面板骨架演化起点 |
 | pi-ai 分档 k 表 `{default:0.95, anthropic:1.0, openai_o200k:0.91, openai_cl100k:1.35, qwen:0.76, kimi:0.76, deepseek:0.69, glm:0.73, llama:0.93, gemini_proxy:0.81}` | r2-zh-tokens §4 | 自产数据 | — | `packages/creator/src/agent/context/tokens.ts`（B40） |
-| zh-tokens 测试夹具 `{nvs_sample.nvs, bible_big.json, prompt_en.txt, chapter_3k.txt}` | `/tmp/nl-r2/zh-tokens/` | 自写/公有领域 | ~小 | 估算器单测输入 |
+| zh-tokens 测试夹具 `{nvs_sample.nvs, bible_big.json, prompt_en.txt, chapter_3k.txt}` | `.workflow/evidence/spikes-r2/zh-tokens/corpus/`（`chapter_3k.txt` 未拷，重测见该目录 README） | 自写/公有领域 | ~小 | 估算器单测输入 |
 | `normalizePackagePath`（83 行 NFC/越界校验） | `Novelive-legacy/packages/package-kit/src/path.ts` | 自家 MIT→AGPL | 83 行 | 导出端写路径断言（yauzl 已挡，此管 NFC/空段） |
 | `MEDIA_STORE_EXTENSIONS`+`isStoreEntry`+确定性 ZIP（排序+固定 mtime） | `Novelive-legacy/packages/publisher/src/export/zip-writer.ts` | 同上 | — | 导出器，扩展名集换 `{webp}` |
 | `ArchiveFingerprint`（size+中央目录 sha256+buildId+mtime） | `Novelive-legacy/packages/package-kit/src/fingerprint.ts` | 同上 | — | M5 导入列表「库→包」绑定 |

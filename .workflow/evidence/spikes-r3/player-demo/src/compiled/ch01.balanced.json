@@ -1,0 +1,1103 @@
+{
+ "file": "ch01.balanced.nvs",
+ "scenes": [
+  {
+   "title": "骆驼与祥子",
+   "source": [
+    1,
+    1
+   ],
+   "line": 1,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "我们所要介绍的是祥子，不是骆驼——“骆驼”只是个外号。那么，就先说说祥子，随手儿把他与骆驼那点关系交代过去，也就算了。",
+     "segs": [
+      {
+       "text": "我们所要介绍的是祥子，不是骆驼——“骆驼”只是个外号。那么，就先说说祥子，随手儿把他与骆驼那点关系交代过去，也就算了。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 4,
+     "step": 0
+    }
+   ]
+  },
+  {
+   "title": "洋车夫的派别",
+   "source": [
+    2,
+    6
+   ],
+   "line": 6,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "北平的洋车夫有许多派。年轻力壮、腿脚灵利的，讲究赁漂亮的车，拉“整天儿”，爱什么时候出车收车都有自由。",
+     "segs": [
+      {
+       "text": "北平的洋车夫有许多派。年轻力壮、腿脚灵利的，讲究赁漂亮的车，拉“整天儿”，爱什么时候出车收车都有自由。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": true,
+     "line": 9,
+     "step": 1
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "弄好了，一下能弄个一块两块；白耗一天也不在乎。这一派的希望大概有两个：拉上包车，或者自己买上一辆车。",
+     "segs": [
+      {
+       "text": "弄好了，一下能弄个一块两块；白耗一天也不在乎。这一派的希望大概有两个：拉上包车，或者自己买上一辆车。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 10,
+     "step": 2
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "岁数稍大、跑得差点劲的，多拉八成新的车，要价时还能保住几分尊严；不论冬夏，常常“拉晚儿”。",
+     "segs": [
+      {
+       "text": "岁数稍大、跑得差点劲的，多拉八成新的车，要价时还能保住几分尊严；不论冬夏，常常“拉晚儿”。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 11,
+     "step": 3
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "四十以上、二十以下的，就难在前两派里有个地位了：车破，跑得慢，只能早早出车，多走路，少要钱。",
+     "segs": [
+      {
+       "text": "四十以上、二十以下的，就难在前两派里有个地位了：车破，跑得慢，只能早早出车，多走路，少要钱。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 12,
+     "step": 4
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "最苦的，是那些卖无可卖、当无可当，才咬着牙、含着泪抄起车把的人——生命最鲜壮的时期已经卖掉，如今再把血汗滴在马路上。",
+     "segs": [
+      {
+       "text": "最苦的，是那些卖无可卖、当无可当，才咬着牙、含着泪抄起车把的人——生命最鲜壮的时期已经卖掉，如今再把血汗滴在马路上。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 13,
+     "step": 5
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "还有东交民巷拉洋买卖的车夫：会说外国话，白褂肥裤，干净利落，带着与世无争的神气。别的车夫见了，连座都不敢争。",
+     "segs": [
+      {
+       "text": "还有东交民巷拉洋买卖的车夫：会说外国话，白褂肥裤，干净利落，带着与世无争的神气。别的车夫见了，连座都不敢争。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 14,
+     "step": 6
+    }
+   ]
+  },
+  {
+   "title": "高等车夫",
+   "source": [
+    7,
+    8
+   ],
+   "line": 16,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 19,
+     "args": [
+      "xiangzi/new-outfit/plain",
+      "center"
+     ],
+     "step": 7
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "有了这点分析，再说祥子的地位，就像说机器上的一颗钉子那么准确了。在与“骆驼”这外号发生关系以前，他属于年轻力壮、自己有车的那一类——",
+     "segs": [
+      {
+       "text": "有了这点分析，再说祥子的地位，就像说机器上的一颗钉子那么准确了。在与“骆驼”这外号发生关系以前，他属于年轻力壮、自己有车的那一类——",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 21,
+     "step": 8
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "自己的车，自己的生活，都在自己手里：{b}高等车夫{/b}。",
+     "segs": [
+      {
+       "text": "自己的车，自己的生活，都在自己手里：",
+       "marks": [],
+       "speed": 1
+      },
+      {
+       "text": "高等车夫。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 22,
+     "step": 9
+    }
+   ]
+  },
+  {
+   "title": "那辆车",
+   "source": [
+    9,
+    10
+   ],
+   "line": 24,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "这绝不是件容易的事。一年，二年，至少三四年；一滴汗，两滴汗，不知多少万滴汗，才挣出那辆车。",
+     "segs": [
+      {
+       "text": "这绝不是件容易的事。一年，二年，至少三四年；一滴汗，两滴汗，不知多少万滴汗，才挣出那辆车。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 27,
+     "step": 10
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "那辆车是他一切挣扎与困苦的总结果与报酬，像身经百战的武士的一枚徽章。",
+     "segs": [
+      {
+       "text": "那辆车是他一切挣扎与困苦的总结果与报酬，像身经百战的武士的一枚徽章。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 28,
+     "step": 11
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "赁人家车的时候，他从早到晚，由东到西，像被人家抽着转的陀螺，没有自己。可是他的眼没有花，心没有乱。",
+     "segs": [
+      {
+       "text": "赁人家车的时候，他从早到晚，由东到西，像被人家抽着转的陀螺，没有自己。可是他的眼没有花，心没有乱。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 29,
+     "step": 12
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "我老想着远远的一辆车。有了自己的车，就不再受拴车人的气；有自己的力气与洋车，睁开眼就可以有饭吃。",
+     "segs": [
+      {
+       "text": "我老想着远远的一辆车。有了自己的车，就不再受拴车人的气；有自己的力气与洋车，睁开眼就可以有饭吃。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 30,
+     "step": 13
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他生长在乡间，失去了父母与几亩薄田，十八岁便跑到城里来。凡是以卖力气就能吃饭的事，他几乎全作过了；不久他看出来，拉车更容易挣钱。",
+     "segs": [
+      {
+       "text": "他生长在乡间，失去了父母与几亩薄田，十八岁便跑到城里来。凡是以卖力气就能吃饭的事，他几乎全作过了；不久他看出来，拉车更容易挣钱。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 31,
+     "step": 14
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "我有力气，年纪正轻。只要试个十天半月，再赁辆新车，说不定很快拉上包车；省吃俭用一年二年，即使三四年，必能自己打上一辆车——顶漂亮的车！",
+     "segs": [
+      {
+       "text": "我有力气，年纪正轻。只要试个十天半月，再赁辆新车，说不定很快拉上包车；省吃俭用一年二年，即使三四年，必能自己打上一辆车——顶漂亮的车！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 32,
+     "step": 15
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "这只是时间的问题，绝不是梦想！",
+     "segs": [
+      {
+       "text": "这只是时间的问题，绝不是梦想！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 33,
+     "step": 16
+    }
+   ]
+  },
+  {
+   "title": "一棵树",
+   "source": [
+    11,
+    13
+   ],
+   "line": 35,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "二十来的岁，他已经很大很高，身量与筋肉都发展到年岁前边去，脸上身上还带着天真淘气的样子。",
+     "segs": [
+      {
+       "text": "二十来的岁，他已经很大很高，身量与筋肉都发展到年岁前边去，脸上身上还带着天真淘气的样子。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 38,
+     "step": 17
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "杀好了腰，再穿上肥腿白裤，露出那对“出号”的大脚——我无疑可以成为最出色的车夫！",
+     "segs": [
+      {
+       "text": "杀好了腰，再穿上肥腿白裤，露出那对“出号”的大脚——我无疑可以成为最出色的车夫！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 39,
+     "step": 18
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "想到这儿，他傻子似的自己笑了。",
+     "segs": [
+      {
+       "text": "想到这儿，他傻子似的自己笑了。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 40,
+     "step": 19
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他没什么模样，可爱的是脸上的精神：圆眼，肉鼻子，两条眉又短又粗，头上永远剃得发亮；颧骨与右耳之间一块不小的疤——小时候在树下睡觉，被驴啃了一口。",
+     "segs": [
+      {
+       "text": "他没什么模样，可爱的是脸上的精神：圆眼，肉鼻子，两条眉又短又粗，头上永远剃得发亮；颧骨与右耳之间一块不小的疤——小时候在树下睡觉，被驴啃了一口。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 41,
+     "step": 20
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他确乎有点像一棵树：坚壮，沉默，而又有生气。嘴常闲着，他便有工夫去思想；主意一打定，就顺着心里开出的那条路走。走不通，他能一两天不出一声，咬着牙，好似咬着自己的心。",
+     "segs": [
+      {
+       "text": "他确乎有点像一棵树：坚壮，沉默，而又有生气。嘴常闲着，他便有工夫去思想；主意一打定，就顺着心里开出的那条路走。走不通，他能一两天不出一声，咬着牙，好似咬着自己的心。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 42,
+     "step": 21
+    }
+   ]
+  },
+  {
+   "title": "练腿",
+   "source": [
+    14,
+    18
+   ],
+   "line": 44,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 47,
+     "args": [
+      "xiangzi/ragged-white-jacket/plain",
+      "center"
+     ],
+     "step": 22
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他决定去拉车，就拉车去了。赁了辆破车，先练练腿。",
+     "segs": [
+      {
+       "text": "他决定去拉车，就拉车去了。赁了辆破车，先练练腿。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 49,
+     "step": 23
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "头一天没拉着什么钱；第二天生意不错，可是躺了两天——脚脖子肿得像两条瓠子，再也抬不起来。他忍受着。他知道，这是拉车必须经过的一关。",
+     "segs": [
+      {
+       "text": "头一天没拉着什么钱；第二天生意不错，可是躺了两天——脚脖子肿得像两条瓠子，再也抬不起来。他忍受着。他知道，这是拉车必须经过的一关。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 50,
+     "step": 24
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "脚好了之后，他敢跑了。地名熟，力气足；他有自己的主意：多留神，少争胜。讲价争座弄不过那些老油子，他干脆不大到车口上去——哪里没车，他放在哪里。",
+     "segs": [
+      {
+       "text": "脚好了之后，他敢跑了。地名熟，力气足；他有自己的主意：多留神，少争胜。讲价争座弄不过那些老油子，他干脆不大到车口上去——哪里没车，他放在哪里。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 51,
+     "step": 25
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "在僻静地方，他可以从容讲价，有时候干脆不肯要价。",
+     "segs": [
+      {
+       "text": "在僻静地方，他可以从容讲价，有时候干脆不肯要价。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 52,
+     "step": 26
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "坐上吧，瞧着给！",
+     "segs": [
+      {
+       "text": "坐上吧，瞧着给！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 53,
+     "step": 27
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他样子那么诚实，脸上那么简单可爱，人们好象只好信任他。即使疑心，也只当他是新进城、不识路的乡下老儿。",
+     "segs": [
+      {
+       "text": "他样子那么诚实，脸上那么简单可爱，人们好象只好信任他。即使疑心，也只当他是新进城、不识路的乡下老儿。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 54,
+     "step": 28
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "及至人们问到“认识呀？”他就又像装傻、又像耍俏地一笑，使人不知怎样才好。",
+     "segs": [
+      {
+       "text": "及至人们问到“认识呀？”他就又像装傻、又像耍俏地一笑，使人不知怎样才好。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 55,
+     "step": 29
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "两三个星期的工夫，他把腿溜出来了。腿长步大，腰里非常稳，跑起来没有多少响声；说站住，不论跑得多快，大脚在地上轻蹭两蹭，就站住了。",
+     "segs": [
+      {
+       "text": "两三个星期的工夫，他把腿溜出来了。腿长步大，腰里非常稳，跑起来没有多少响声；说站住，不论跑得多快，大脚在地上轻蹭两蹭，就站住了。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 56,
+     "step": 30
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "脊背微俯，双手松松拢住车把——快，而没有危险。就是在拉包车的里面，这也得算很名贵的。",
+     "segs": [
+      {
+       "text": "脊背微俯，双手松松拢住车把——快，而没有危险。就是在拉包车的里面，这也得算很名贵的。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 57,
+     "step": 31
+    }
+   ]
+  },
+  {
+   "title": "一千天",
+   "source": [
+    19,
+    22
+   ],
+   "line": 59,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他换了新车。从一换车那天就打听明白：那样一辆车值一百出头。大概的说，他只要有一百块钱，就能弄一辆车。",
+     "segs": [
+      {
+       "text": "他换了新车。从一换车那天就打听明白：那样一辆车值一百出头。大概的说，他只要有一百块钱，就能弄一辆车。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 62,
+     "step": 32
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "一天要是能剩一角，一百元就是一千天。一千天……可是一千天、一万天也好，我非买车不可！",
+     "segs": [
+      {
+       "text": "一天要是能剩一角，一百元就是一千天。一千天……可是一千天、一万天也好，我非买车不可！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 63,
+     "step": 33
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "第一步，他想好了，去拉包车。他不吃烟，不喝酒，不赌钱，没有任何嗜好，没有家庭的累赘；他对自己起下了誓：一年半的工夫，非打成自己的车不可！",
+     "segs": [
+      {
+       "text": "第一步，他想好了，去拉包车。他不吃烟，不喝酒，不赌钱，没有任何嗜好，没有家庭的累赘；他对自己起下了誓：一年半的工夫，非打成自己的车不可！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 64,
+     "step": 34
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他真拉上了包月。可是事实并不完全帮助希望：东家不定三两个月，还是十天八天，就吹了；他得一边找事，一边拉散座，心中不痛快，便有点楞头磕脑。",
+     "segs": [
+      {
+       "text": "他真拉上了包月。可是事实并不完全帮助希望：东家不定三两个月，还是十天八天，就吹了；他得一边找事，一边拉散座，心中不痛快，便有点楞头磕脑。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 65,
+     "step": 35
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "皮轮子放过炮，碰过行人，甚至把车轴盖碰丢过；碰坏了车要赔钱，他焦躁得有时懊睡一整天，醒来又后悔，自恨。病也舍不得买药，硬挺着，结果歇得更久。",
+     "segs": [
+      {
+       "text": "皮轮子放过炮，碰过行人，甚至把车轴盖碰丢过；碰坏了车要赔钱，他焦躁得有时懊睡一整天，醒来又后悔，自恨。病也舍不得买药，硬挺着，结果歇得更久。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 66,
+     "step": 36
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "这些困难使他更咬牙努力，可是买车的钱数一点不因此加快凑足。整整三年，他凑足了一百块钱！",
+     "segs": [
+      {
+       "text": "这些困难使他更咬牙努力，可是买车的钱数一点不因此加快凑足。整整三年，他凑足了一百块钱！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 67,
+     "step": 37
+    }
+   ]
+  },
+  {
+   "title": "买车",
+   "source": [
+    23,
+    25
+   ],
+   "line": 69,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 72,
+     "args": [
+      "xiangzi/new-outfit/plain",
+      "left"
+     ],
+     "step": 38
+    },
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 74,
+     "args": [
+      "rickshaw-shop-owner/default/plain",
+      "right"
+     ],
+     "step": 39
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "不能再等了。恰巧有辆刚打好、定作而没钱取货的车，跟祥子所期望的差不甚多；本值一百多，车铺愿意少要一点。",
+     "segs": [
+      {
+       "text": "不能再等了。恰巧有辆刚打好、定作而没钱取货的车，跟祥子所期望的差不甚多；本值一百多，车铺愿意少要一点。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 76,
+     "step": 40
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子的脸通红，手哆嗦着，拍出九十六块钱来。",
+     "segs": [
+      {
+       "text": "祥子的脸通红，手哆嗦着，拍出九十六块钱来。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 77,
+     "step": 41
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "我要这辆车！",
+     "segs": [
+      {
+       "text": "我要这辆车！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 78,
+     "step": 42
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "铺主把他的车拉出去又拉进来，支开棚子又放下，按按喇叭，最后还在钢轮条上踢了两脚。",
+     "segs": [
+      {
+       "text": "铺主把他的车拉出去又拉进来，支开棚子又放下，按按喇叭，最后还在钢轮条上踢了两脚。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 79,
+     "step": 43
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "rickshaw-shop-owner",
+     "alias": null,
+     "inner": false,
+     "text": "听听声儿吧，铃铛似的！你就是把车拉碎了，要是钢条软了一根，拿回来，摔在我脸上！一百块，少一分我们吹！",
+     "segs": [
+      {
+       "text": "听听声儿吧，铃铛似的！你就是把车拉碎了，要是钢条软了一根，拿回来，摔在我脸上！一百块，少一分我们吹！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 80,
+     "step": 44
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子把钱又数了一遍。",
+     "segs": [
+      {
+       "text": "祥子把钱又数了一遍。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 81,
+     "step": 45
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "我要这辆车，九十六！",
+     "segs": [
+      {
+       "text": "我要这辆车，九十六！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 82,
+     "step": 46
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "铺主知道是遇见了一个心眼的人，看看钱，看看祥子，叹了口气。",
+     "segs": [
+      {
+       "text": "铺主知道是遇见了一个心眼的人，看看钱，看看祥子，叹了口气。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 83,
+     "step": 47
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "rickshaw-shop-owner",
+     "alias": null,
+     "inner": false,
+     "text": "交个朋友，车算你的了。保六个月：除非你把大箱碰碎，我都白给修理。保单，拿着！",
+     "segs": [
+      {
+       "text": "交个朋友，车算你的了。保六个月：除非你把大箱碰碎，我都白给修理。保单，拿着！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 84,
+     "step": 48
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子揣起保单，拉起车，几乎要哭出来。拉到个僻静地方，他细细端详自己的车，在漆板上试着照照自己的脸——越看越可爱。",
+     "segs": [
+      {
+       "text": "祥子揣起保单，拉起车，几乎要哭出来。拉到个僻静地方，他细细端详自己的车，在漆板上试着照照自己的脸——越看越可爱。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 85,
+     "step": 49
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他坐在新脚垫儿上，看着车把上发亮的黄铜喇叭，忽然想起来：今年二十二岁。父母死得早，他连生日是哪一天都忘了。",
+     "segs": [
+      {
+       "text": "他坐在新脚垫儿上，看着车把上发亮的黄铜喇叭，忽然想起来：今年二十二岁。父母死得早，他连生日是哪一天都忘了。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 86,
+     "step": 50
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "好吧，今天买上了新车，就算是生日吧。人的也是车的，好记——车既是自己的心血，简直没什么不可以把人与车算在一块的地方。",
+     "segs": [
+      {
+       "text": "好吧，今天买上了新车，就算是生日吧。人的也是车的，好记——车既是自己的心血，简直没什么不可以把人与车算在一块的地方。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 87,
+     "step": 51
+    }
+   ]
+  },
+  {
+   "title": "双寿",
+   "source": [
+    26,
+    27
+   ],
+   "line": 89,
+   "items": [
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "这头一个买卖，必须拉个穿得体面的人，绝对不能是个女的。最好是拉到前门，其次是东安市场。",
+     "segs": [
+      {
+       "text": "这头一个买卖，必须拉个穿得体面的人，绝对不能是个女的。最好是拉到前门，其次是东安市场。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 92,
+     "step": 52
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "拉到了，在最好的饭摊上吃顿饭——热烧饼夹爆羊肉之类。吃完，有好买卖就再拉一两个；没有呢，就收车。这是生日！",
+     "segs": [
+      {
+       "text": "拉到了，在最好的饭摊上吃顿饭——热烧饼夹爆羊肉之类。吃完，有好买卖就再拉一两个；没有呢，就收车。这是生日！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 93,
+     "step": 53
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "从有了这辆车，他的生活过得越来越起劲了。包月也好，散座也好，拉多少钱全是自己的；心里舒服，对人更和气，买卖也就更顺心。",
+     "segs": [
+      {
+       "text": "从有了这辆车，他的生活过得越来越起劲了。包月也好，散座也好，拉多少钱全是自己的；心里舒服，对人更和气，买卖也就更顺心。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 94,
+     "step": 54
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "拉了半年，他的希望更大了：照这样下去，至多二年，他就又可以买一辆车——一辆，两辆……他也可以开车厂子了！",
+     "segs": [
+      {
+       "text": "拉了半年，他的希望更大了：照这样下去，至多二年，他就又可以买一辆车——一辆，两辆……他也可以开车厂子了！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 95,
+     "step": 55
+    }
+   ]
+  },
+  {
+   "title": "希望的落空",
+   "source": [
+    28,
+    28
+   ],
+   "line": 97,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "可是，希望多半落空。{wait 0.6}祥子的，也非例外。",
+     "segs": [
+      {
+       "text": "可是，希望多半落空。",
+       "marks": [],
+       "speed": 1
+      },
+      {
+       "wait": 0.6
+      },
+      {
+       "text": "祥子的，也非例外。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 100,
+     "step": 56
+    }
+   ]
+  },
+  {
+   "title": "注释",
+   "source": [
+    29,
+    38
+   ],
+   "line": 102,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "{dim}车口：停车处。拉晚儿：下午四点以后出车，拉到天亮以前。嚼谷：吃用。{/dim}",
+     "segs": [
+      {
+       "text": "车口：停车处。拉晚儿：下午四点以后出车，拉到天亮以前。嚼谷：吃用。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 105,
+     "step": 57
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "{dim}东交民巷：从前外国驻华使馆所在。胶皮团：指拉车这一行。{/dim}",
+     "segs": [
+      {
+       "text": "东交民巷：从前外国驻华使馆所在。胶皮团：指拉车这一行。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 106,
+     "step": 58
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "{dim}杀进腰：把腰部勒得细一些。主儿：包车的主人。饭局：宴会。吹：散了，完了。{/dim}",
+     "segs": [
+      {
+       "text": "杀进腰：把腰部勒得细一些。主儿：包车的主人。饭局：宴会。吹：散了，完了。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 107,
+     "step": 59
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1735 @@
+{
+ "script": "ch01.nvs",
+ "viewport": "1920x1080",
+ "rows": [
+  {
+   "gidx": 2,
+   "kind": "narration",
+   "len": 154,
+   "text": "北平的洋车夫有许多派。年轻力壮、腿脚灵利的，讲究赁漂亮的车，",
+   "overflow": true,
+   "gh": 194,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 416,
+   "sprites": [],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": {
+    "name": "sepia",
+    "value": 0.4
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 3,
+   "kind": "narration",
+   "len": 117,
+   "text": "比这一派岁数稍大的，或因身体跑得稍差点劲，或因家庭不敢白耗一",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 379,
+   "sprites": [],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": {
+    "name": "sepia",
+    "value": 0.4
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 4,
+   "kind": "narration",
+   "len": 110,
+   "text": "年纪在四十以上、二十以下的，恐怕就不易在前两派里有地位了。他",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 372,
+   "sprites": [],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": {
+    "name": "sepia",
+    "value": 0.4
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 5,
+   "kind": "narration",
+   "len": 151,
+   "text": "二十岁以下的——有的从十一二岁就干这行儿——很少能在二十岁以",
+   "overflow": true,
+   "gh": 194,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 413,
+   "sprites": [],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": {
+    "name": "sepia",
+    "value": 0.4
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 6,
+   "kind": "narration",
+   "len": 190,
+   "text": "最苦的是另一些四十上下的车夫：被撤差的巡警或校役，把本钱吃光",
+   "overflow": true,
+   "gh": 243,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 452,
+   "sprites": [],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": {
+    "name": "sepia",
+    "value": 0.4
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 7,
+   "kind": "narration",
+   "len": 76,
+   "text": "此外，因环境与知识的特异又另成派别：生于西苑海甸的走西山、燕",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 338,
+   "sprites": [],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": {
+    "name": "sepia",
+    "value": 0.4
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 8,
+   "kind": "narration",
+   "len": 181,
+   "text": "而东交民巷专拉洋买卖的车夫气儿最长，大半因为他们会说外国话。",
+   "overflow": true,
+   "gh": 194,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 443,
+   "sprites": [],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": {
+    "name": "sepia",
+    "value": 0.4
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 7,
+   "kind": "narration",
+   "len": 76,
+   "text": "此外，因环境与知识的特异又另成派别：生于西苑海甸的走西山、燕",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 338,
+   "sprites": [],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": {
+    "name": "sepia",
+    "value": 0.4
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 10,
+   "kind": "narration",
+   "len": 24,
+   "text": "自己的车，自己的生活，都在自己手里——高等车夫。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 333,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 11,
+   "kind": "narration",
+   "len": 106,
+   "text": "这可绝不是件容易的事。一年，二年，至少三四年；一滴汗，两滴汗",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 415,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 12,
+   "kind": "narration",
+   "len": 97,
+   "text": "在他赁人家车的时候，从早到晚，由东到西，由南到北，像被人家抽",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 406,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 13,
+   "kind": "inner",
+   "len": 49,
+   "text": "有了自己的车，就可以不再受拴车的人们的气，也无须敷衍别人；有",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 359,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 14,
+   "kind": "narration",
+   "len": 125,
+   "text": "他不怕吃苦，也没有一般洋车夫可以原谅而不便效法的恶习，他的聪",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 434,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 15,
+   "kind": "narration",
+   "len": 125,
+   "text": "生长在乡间，失去了父母与几亩薄田，十八岁便跑到城里来。带着乡",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 434,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 16,
+   "kind": "narration",
+   "len": 45,
+   "text": "自然，他也晓得这样的机遇不完全出于偶然，必须人与车都漂亮精神",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 354,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 17,
+   "kind": "inner",
+   "len": 49,
+   "text": "想了一想，他相信自己有那个资格：他有力气，年纪正轻；所差的是",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 359,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 18,
+   "kind": "narration",
+   "len": 74,
+   "text": "但这不是不能胜过的困难。有他的身体与力气作基础，只要试验个十",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 383,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 19,
+   "kind": "inner",
+   "len": 75,
+   "text": "即使是三四年，我必能自己打上一辆车，顶漂亮的车！{wait ",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 388,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1.08
+  },
+  {
+   "gidx": 18,
+   "kind": "narration",
+   "len": 74,
+   "text": "但这不是不能胜过的困难。有他的身体与力气作基础，只要试验个十",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 386,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1.08
+  },
+  {
+   "gidx": 21,
+   "kind": "narration",
+   "len": 92,
+   "text": "看着那高等的车夫，他计划着怎样杀进腰去，好更显出铁扇面似的胸",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 403,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "hutong-courtyard",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 20,
+   "kind": "narration",
+   "len": 76,
+   "text": "他的身量与筋肉都发展到年岁前边去；二十来的岁，已经很大很高，",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 387,
+   "sprites": [
+    "xiangzi/ragged-white-jacket/plain"
+   ],
+   "bg": "hutong-courtyard",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 23,
+   "kind": "narration",
+   "len": 114,
+   "text": "他没有什么模样，使他可爱的是脸上的精神。头不很大，圆眼，肉鼻",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 405,
+   "sprites": [
+    "xiangzi/happy"
+   ],
+   "bg": "hutong-courtyard",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 24,
+   "kind": "narration",
+   "len": 99,
+   "text": "他不甚注意他的模样，爱自己的脸正如同爱自己的身体，都那么结实",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 390,
+   "sprites": [
+    "xiangzi/happy"
+   ],
+   "bg": "hutong-courtyard",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 23,
+   "kind": "narration",
+   "len": 114,
+   "text": "他没有什么模样，使他可爱的是脸上的精神。头不很大，圆眼，肉鼻",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 405,
+   "sprites": [
+    "xiangzi/happy"
+   ],
+   "bg": "hutong-courtyard",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 26,
+   "kind": "narration",
+   "len": 74,
+   "text": "祥子是乡下人，口齿没有城里人那么灵便；设若口齿灵利是出于天赋",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 365,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "hutong-courtyard",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 27,
+   "kind": "narration",
+   "len": 81,
+   "text": "因为嘴常闲着，他有工夫去思想，他的眼仿佛是老看着自己的心。只",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 372,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "hutong-courtyard",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 26,
+   "kind": "narration",
+   "len": 74,
+   "text": "祥子是乡下人，口齿没有城里人那么灵便；设若口齿灵利是出于天赋",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 365,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "hutong-courtyard",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 29,
+   "kind": "narration",
+   "len": 98,
+   "text": "第一天没拉着什么钱。第二天生意不错，可是躺了两天——脚脖子肿",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 387,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 30,
+   "kind": "narration",
+   "len": 105,
+   "text": "脚好了之后，他敢跑了，这使他非常痛快：地名他很熟习，即使绕点",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 394,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 31,
+   "kind": "narration",
+   "len": 56,
+   "text": "至于讲价争座，他的嘴慢气盛，弄不过那些老油子们。知道这个短处",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 345,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 32,
+   "kind": "narration",
+   "len": 28,
+   "text": "在这僻静的地点，他可以从容地讲价，有时候甚至不肯要价——",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 317,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 33,
+   "kind": "narration",
+   "len": 28,
+   "text": "在这僻静的地点，他可以从容地讲价，有时候甚至不肯要价——",
+   "overflow": null,
+   "gh": 0,
+   "ghh": 0,
+   "gw": 0,
+   "gww": 0,
+   "snapBytes": 317,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 34,
+   "kind": "dialogue",
+   "len": 8,
+   "text": "坐上吧，瞧着给！",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 301,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 35,
+   "kind": "narration",
+   "len": 97,
+   "text": "他的样子那么诚实，脸上那么简单可爱，人们好像只好信任他，不敢",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 386,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 34,
+   "kind": "dialogue",
+   "len": 8,
+   "text": "坐上吧，瞧着给！",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 301,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 35,
+   "kind": "narration",
+   "len": 97,
+   "text": "他的样子那么诚实，脸上那么简单可爱，人们好像只好信任他，不敢",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 384,
+   "sprites": [
+    "xiangzi/sly"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 38,
+   "kind": "narration",
+   "len": 151,
+   "text": "那撇着脚、像一对蒲扇在地上扇乎的，无疑是刚由乡间上来的新手；",
+   "overflow": true,
+   "gh": 194,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 440,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 39,
+   "kind": "narration",
+   "len": 149,
+   "text": "他的腿长步大，腰里非常的稳，跑起来没有多少响声，步步都有些伸",
+   "overflow": true,
+   "gh": 194,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 438,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 38,
+   "kind": "narration",
+   "len": 151,
+   "text": "那撇着脚、像一对蒲扇在地上扇乎的，无疑是刚由乡间上来的新手；",
+   "overflow": true,
+   "gh": 194,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 440,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 41,
+   "kind": "inner",
+   "len": 25,
+   "text": "一天要是能剩一角的话，一百元就是一千天——一千天！",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 320,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/dusk",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 42,
+   "kind": "inner",
+   "len": 25,
+   "text": "一天要是能剩一角的话，一百元就是一千天——一千天！",
+   "overflow": null,
+   "gh": 0,
+   "ghh": 0,
+   "gw": 0,
+   "gww": 0,
+   "snapBytes": 320,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/dusk",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 43,
+   "kind": "narration",
+   "len": 23,
+   "text": "把一千天堆到一块，他几乎算不过来这该有多么远。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 317,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/dusk",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 44,
+   "kind": "narration",
+   "len": 124,
+   "text": "但是，他下了决心：一千天，一万天也好，他得买车！第一步，他想",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 418,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/dusk",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 45,
+   "kind": "narration",
+   "len": 46,
+   "text": "他不吃烟，不喝酒，不赌钱，没有任何嗜好，没有家庭的累赘，只要",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 340,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/dusk",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 46,
+   "kind": "inner",
+   "len": 47,
+   "text": "他对自己起下了誓：一年半的工夫，他——祥子——非打成自己的车",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 342,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/dusk",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 45,
+   "kind": "narration",
+   "len": 46,
+   "text": "他不吃烟，不喝酒，不赌钱，没有任何嗜好，没有家庭的累赘，只要",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 340,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/dusk",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 48,
+   "kind": "narration",
+   "len": 119,
+   "text": "他真拉上了包月。可是，事实并不完全帮助希望。不错，他确是咬了",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 470,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/rain",
+   "cg": null,
+   "particle": {
+    "name": "rain",
+    "intensity": 0.6
+   },
+   "filter": {
+    "name": "brightness",
+    "value": 0.75
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 49,
+   "kind": "narration",
+   "len": 78,
+   "text": "他得另去找事。自然，一边儿找事，还得一边儿拉散座；骑马找马，",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 429,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/rain",
+   "cg": null,
+   "particle": {
+    "name": "rain",
+    "intensity": 0.6
+   },
+   "filter": {
+    "name": "brightness",
+    "value": 0.75
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 50,
+   "kind": "narration",
+   "len": 48,
+   "text": "可是强打精神永远不是件妥当的事：拉起车来不能专心一志，好像老",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 399,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/rain",
+   "cg": null,
+   "particle": {
+    "name": "rain",
+    "intensity": 0.6
+   },
+   "filter": {
+    "name": "brightness",
+    "value": 0.75
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 51,
+   "kind": "inner",
+   "len": 36,
+   "text": "假若老这么下去，几时才能买上车呢？为什么这样呢？难道自己还算",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 388,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/rain",
+   "cg": null,
+   "particle": {
+    "name": "rain",
+    "intensity": 0.6
+   },
+   "filter": {
+    "name": "brightness",
+    "value": 0.75
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 52,
+   "kind": "narration",
+   "len": 111,
+   "text": "在这么乱想的时候，他忘了素日的谨慎。皮轮子上了碎铜烂磁片，放",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 462,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/rain",
+   "cg": null,
+   "particle": {
+    "name": "rain",
+    "intensity": 0.6
+   },
+   "filter": {
+    "name": "brightness",
+    "value": 0.75
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 53,
+   "kind": "narration",
+   "len": 68,
+   "text": "碰坏了车，自然要赔钱；这更使他焦躁，火上加了油。为怕惹出更大",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 419,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/rain",
+   "cg": null,
+   "particle": {
+    "name": "rain",
+    "intensity": 0.6
+   },
+   "filter": {
+    "name": "brightness",
+    "value": 0.75
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 54,
+   "kind": "narration",
+   "len": 109,
+   "text": "还有呢，越着急便越自苦，吃喝越没规则；他以为自己是铁作的，可",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 460,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/rain",
+   "cg": null,
+   "particle": {
+    "name": "rain",
+    "intensity": 0.6
+   },
+   "filter": {
+    "name": "brightness",
+    "value": 0.75
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 53,
+   "kind": "narration",
+   "len": 68,
+   "text": "碰坏了车，自然要赔钱；这更使他焦躁，火上加了油。为怕惹出更大",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 419,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street/rain",
+   "cg": null,
+   "particle": {
+    "name": "rain",
+    "intensity": 0.6
+   },
+   "filter": {
+    "name": "brightness",
+    "value": 0.75
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 56,
+   "kind": "narration",
+   "len": 15,
+   "text": "整整的三年，他凑足了一百块钱！",
+   "overflow": null,
+   "gh": 0,
+   "ghh": 0,
+   "gw": 0,
+   "gww": 0,
+   "snapBytes": 309,
+   "sprites": [
+    "xiangzi/happy"
+   ],
+   "bg": "beijing-street/dusk",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 55,
+   "kind": "narration",
+   "len": 15,
+   "text": "整整的三年，他凑足了一百块钱！",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 309,
+   "sprites": [
+    "xiangzi/happy"
+   ],
+   "bg": "beijing-street/dusk",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 56,
+   "kind": "narration",
+   "len": 116,
+   "text": "他不能再等了。原来的计划是买辆最完全最新式最可心的车，现在只",
+   "overflow": null,
+   "gh": 0,
+   "ghh": 0,
+   "gw": 0,
+   "gww": 0,
+   "snapBytes": 404,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 57,
+   "kind": "narration",
+   "len": 116,
+   "text": "他不能再等了。原来的计划是买辆最完全最新式最可心的车，现在只",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 404,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 58,
+   "kind": "narration",
+   "len": 21,
+   "text": "祥子的脸通红，手哆嗦着，拍出九十六块钱来。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 378,
+   "sprites": [
+    "xiangzi/plain",
+    "rickshaw-shop-owner/default/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 59,
+   "kind": "narration",
+   "len": 21,
+   "text": "祥子的脸通红，手哆嗦着，拍出九十六块钱来。",
+   "overflow": null,
+   "gh": 0,
+   "ghh": 0,
+   "gw": 0,
+   "gww": 0,
+   "snapBytes": 378,
+   "sprites": [
+    "xiangzi/plain",
+    "rickshaw-shop-owner/default/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 60,
+   "kind": "dialogue",
+   "len": 6,
+   "text": "我要这辆车！",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 367,
+   "sprites": [
+    "xiangzi/plain",
+    "rickshaw-shop-owner/default/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 61,
+   "kind": "narration",
+   "len": 74,
+   "text": "铺主打算挤到个整数，说了不知多少话，把他的车拉出去又拉进来，",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 431,
+   "sprites": [
+    "xiangzi/plain",
+    "rickshaw-shop-owner/default/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 62,
+   "kind": "dialogue",
+   "len": 57,
+   "text": "听听声儿吧，铃铛似的！拉去吧，你就是把车拉碎了，要是钢条软了",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 430,
+   "sprites": [
+    "xiangzi/plain",
+    "rickshaw-shop-owner/default/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 63,
+   "kind": "narration",
+   "len": 10,
+   "text": "祥子把钱又数了一遍。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 367,
+   "sprites": [
+    "xiangzi/plain",
+    "rickshaw-shop-owner/default/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 64,
+   "kind": "dialogue",
+   "len": 10,
+   "text": "我要这辆车，九十六！",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 371,
+   "sprites": [
+    "xiangzi/plain",
+    "rickshaw-shop-owner/default/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 65,
+   "kind": "narration",
+   "len": 29,
+   "text": "铺主知道是遇见了一个心眼的人，看看钱，看看祥子，叹了口气。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 386,
+   "sprites": [
+    "xiangzi/plain",
+    "rickshaw-shop-owner/default/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 66,
+   "kind": "dialogue",
+   "len": 38,
+   "text": "交个朋友，车算你的了；保六个月：除非你把大箱碰碎，我都白给修",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 411,
+   "sprites": [
+    "xiangzi/plain",
+    "rickshaw-shop-owner/default/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 67,
+   "kind": "narration",
+   "len": 96,
+   "text": "祥子的手哆嗦得更厉害了，揣起保单，拉起车，几乎要哭出来。拉到",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 402,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": "xiangzi-new-rickshaw",
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 68,
+   "kind": "narration",
+   "len": 43,
+   "text": "把车看得似乎暂时可以休息会儿了，他坐在了水簸箕的新脚垫儿上，",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 349,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": "xiangzi-new-rickshaw",
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 69,
+   "kind": "inner",
+   "len": 106,
+   "text": "他忽然想起来，今年是二十二岁。因为父母死得早，他忘了生日在哪",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 413,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": "xiangzi-new-rickshaw",
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 70,
+   "kind": "narration",
+   "len": 113,
+   "text": "怎样过这个“双寿”呢？祥子有主意：头一个买卖必须拉个穿得体面",
+   "overflow": true,
+   "gh": 146,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 419,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "rickshaw-shop",
+   "cg": "xiangzi-new-rickshaw",
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 71,
+   "kind": "narration",
+   "len": 76,
+   "text": "从有了这辆车，他的生活过得越来越起劲了。拉包月也好，拉散座也",
+   "overflow": true,
+   "gh": 97,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 365,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 72,
+   "kind": "narration",
+   "len": 56,
+   "text": "拉了半年，他的希望更大了：照这样下去，干上二年，至多二年，他",
+   "overflow": false,
+   "gh": 97,
+   "ghh": 97,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 345,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 73,
+   "kind": "narration",
+   "len": 18,
+   "text": "可是，希望多半落空，祥子的也非例外。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 337,
+   "sprites": [
+    "xiangzi/plain"
+   ],
+   "bg": "beijing-street",
+   "cg": null,
+   "particle": null,
+   "filter": {
+    "name": "brightness",
+    "value": 0.85
+   },
+   "zoom": 1
+  },
+  {
+   "gidx": 74,
+   "kind": "narration",
+   "len": 9,
+   "text": "①车口，即停车处。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 245,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 75,
+   "kind": "narration",
+   "len": 22,
+   "text": "②拉晚儿，是下午四点以后出车，拉到天亮以前。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 258,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 76,
+   "kind": "narration",
+   "len": 8,
+   "text": "③嚼谷，即吃用。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 244,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 77,
+   "kind": "narration",
+   "len": 16,
+   "text": "④从前外国驻华使馆都在东交民巷。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 252,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 78,
+   "kind": "narration",
+   "len": 12,
+   "text": "⑤胶皮团，指拉车这一行。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 248,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 79,
+   "kind": "narration",
+   "len": 14,
+   "text": "⑥杀进腰，把腰部勒得细一些。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 250,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 80,
+   "kind": "narration",
+   "len": 10,
+   "text": "⑦一边儿，即同样的。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 246,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 81,
+   "kind": "narration",
+   "len": 13,
+   "text": "⑧主儿，即是指包车的主人。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 249,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 82,
+   "kind": "narration",
+   "len": 8,
+   "text": "⑨饭局，即宴会。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 244,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  },
+  {
+   "gidx": 83,
+   "kind": "narration",
+   "len": 14,
+   "text": "⑩吹，就是散了，完了的意思。",
+   "overflow": false,
+   "gh": 87,
+   "ghh": 87,
+   "gw": 1430,
+   "gww": 1430,
+   "snapBytes": 250,
+   "sprites": [],
+   "bg": "notes-paper",
+   "cg": null,
+   "particle": null,
+   "filter": null,
+   "zoom": 1
+  }
+ ],
+ "consoleErrors": "## Console messages\n<no console messages found>\n"
+}

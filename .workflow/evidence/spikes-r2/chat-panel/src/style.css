@@ -1,0 +1,22 @@
+body { margin: 0; font-family: system-ui, "Noto Sans CJK SC", sans-serif; background: #1c1c1e; color: #e8e8ea; }
+.nl-panel { height: 100vh; display: flex; flex-direction: column; max-width: 720px; margin: 0 auto; }
+.nl-thread { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.nl-msg { padding: 10px 14px; margin: 4px 12px; border-radius: 10px; }
+.nl-user { background: #2d4a6f; align-self: flex-end; }
+.nl-assistant { background: #26262a; }
+.nl-msg-footer { display: flex; gap: 8px; align-items: center; font-size: 12px; opacity: .8; }
+.nl-branch button, .nl-actions button { background: none; border: 1px solid #555; color: inherit; border-radius: 4px; cursor: pointer; margin: 0 2px; }
+.nl-composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #333; }
+.nl-composer textarea, .nl-edit textarea { flex: 1; background: #2a2a2e; color: inherit; border: 1px solid #444; border-radius: 8px; padding: 8px; }
+.nl-composer button, .nl-edit button { border-radius: 8px; border: 1px solid #555; background: #3a3a40; color: inherit; padding: 6px 14px; cursor: pointer; }
+.nl-tool-card { border: 1px solid #444; border-radius: 8px; padding: 6px 10px; margin: 6px 0; font-size: 13px; }
+.nl-tool-card pre { white-space: pre-wrap; font-size: 12px; color: #aaa; }
+.nl-proposal { border: 1px solid #8a6d3b; border-radius: 10px; padding: 10px 14px; margin: 8px 0; background: #2e2a22; }
+.nl-proposal-title { font-weight: 600; margin-bottom: 4px; }
+.nl-proposal-args { font-size: 12px; color: #bbb; white-space: pre-wrap; }
+.nl-proposal-actions { display: flex; gap: 8px; margin-top: 8px; }
+.nl-proposal-actions button { border-radius: 6px; border: 1px solid #777; padding: 4px 12px; cursor: pointer; background: #3a3a40; color: inherit; }
+.nl-proposal-actions input { flex: 1; background: #222; border: 1px solid #555; color: inherit; border-radius: 6px; padding: 4px 8px; }
+.nl-proposal-result { margin-top: 6px; font-size: 13px; opacity: .85; }
+.nl-reasoning { border-left: 3px solid #555; padding-left: 10px; margin: 6px 0; font-size: 13px; color: #aaa; }
+[data-streamdown] { line-height: 1.7; }

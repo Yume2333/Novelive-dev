@@ -1,0 +1,24 @@
+{
+  "name": "nl-shell-trial",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter desktop dev",
+    "build": "pnpm --filter desktop build",
+    "pack": "pnpm --filter desktop pack"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "sharp",
+      "@swc/core",
+      "electron-winstaller"
+    ],
+    "overrides": {
+      "sharp": "npm:@janhapke/sharp-electron@0.35.4-electron.1"
+    }
+  }
+}

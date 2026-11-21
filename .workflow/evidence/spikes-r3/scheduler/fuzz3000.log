@@ -1,0 +1,25 @@
+SEED 26 VIOLATIONS:
+  327:stop paused work still running chapter task
+SEED 30 VIOLATIONS:
+  379:stop paused work still running chapter task
+  drain paused work still running chapter task
+SEED 46 VIOLATIONS:
+  368:stop paused work still running chapter task
+SEED 59 VIOLATIONS:
+  347:stop paused work still running chapter task
+SEED 74 VIOLATIONS:
+  361:stop paused work still running chapter task
+  drain paused work still running chapter task
+SEED 81 VIOLATIONS:
+  234:stop paused work still running chapter task
+  drain paused work still running chapter task
+SEED 141 VIOLATIONS:
+  384:stop paused work still running chapter task
+  drain paused work still running chapter task
+SEED 174 VIOLATIONS:
+  334:stop paused work still running chapter task
+SEED 232 VIOLATIONS:
+  311:stop paused work still running chapter task
+SEED 262 VIOLATIONS:
+  346:stop paused work still running chapter task
+DONE 262 seeds in 128501ms, 10 with violations

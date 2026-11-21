@@ -1,0 +1,783 @@
+{
+ "script": "ch23.nvs",
+ "viewport": "1280x1080",
+ "fontSize": 30,
+ "rows": [
+  {
+   "idx": 4,
+   "kind": "narration",
+   "len": 92,
+   "h": 146,
+   "lines": 3,
+   "text": "祥子在街上丧胆游魂的走，遇见了小马儿的祖父。老头"
+  },
+  {
+   "idx": 5,
+   "kind": "narration",
+   "len": 87,
+   "h": 146,
+   "lines": 3,
+   "text": "说起话来，祥子才知道小马儿已死了半年多，老人把那"
+  },
+  {
+   "idx": 6,
+   "kind": "narration",
+   "len": 25,
+   "h": 49,
+   "lines": 1,
+   "text": "祥子喝了他一碗茶，把心中的委屈也对他略略说了几句"
+  },
+  {
+   "idx": 7,
+   "kind": "narration",
+   "len": 10,
+   "h": 49,
+   "lines": 1,
+   "text": "老人评断着祥子的话。"
+  },
+  {
+   "idx": 8,
+   "kind": "dialogue",
+   "len": 28,
+   "h": 49,
+   "lines": 1,
+   "text": "你想独自混好？谁不是那么想呢？可是谁又混好了呢？"
+  },
+  {
+   "idx": 9,
+   "kind": "dialogue",
+   "len": 58,
+   "h": 97,
+   "lines": 2,
+   "text": "当初，我的身子骨儿好，心眼好，一直混到如今了，我"
+  },
+  {
+   "idx": 10,
+   "kind": "dialogue",
+   "len": 77,
+   "h": 146,
+   "lines": 3,
+   "text": "心眼好？有什么用呢！{em}善有善报，恶有恶报，"
+  },
+  {
+   "idx": 11,
+   "kind": "dialogue",
+   "len": 34,
+   "h": 97,
+   "lines": 2,
+   "text": "我还救过人命呢，跳河的，上吊的，我都救过，有报应"
+  },
+  {
+   "idx": 12,
+   "kind": "dialogue",
+   "len": 45,
+   "h": 97,
+   "lines": 2,
+   "text": "告诉你，我不定哪天就冻死。我算是明白了，干苦活儿"
+  },
+  {
+   "idx": 13,
+   "kind": "dialogue",
+   "len": 96,
+   "h": 194,
+   "lines": 4,
+   "text": "一个人能有什么蹦儿？看见过蚂蚱吧？独自一个儿也蹦"
+  },
+  {
+   "idx": 15,
+   "kind": "dialogue",
+   "len": 54,
+   "h": 97,
+   "lines": 2,
+   "text": "我的心眼倒好呢，连个小孙子都守不住。他病了，没钱"
+  },
+  {
+   "idx": 16,
+   "kind": "narration",
+   "len": 13,
+   "h": 49,
+   "lines": 1,
+   "text": "老人顿了顿，扬声吆喝起来。"
+  },
+  {
+   "idx": 19,
+   "kind": "dialogue",
+   "len": 9,
+   "h": 49,
+   "lines": 1,
+   "text": "茶来！谁喝碗热的？"
+  },
+  {
+   "idx": 20,
+   "kind": "narration",
+   "len": 51,
+   "h": 97,
+   "lines": 2,
+   "text": "祥子真明白了：刘四，杨太太，孙侦探——并不能因为"
+  },
+  {
+   "idx": 21,
+   "kind": "inner",
+   "len": 39,
+   "h": 97,
+   "lines": 2,
+   "text": "自己，专仗着自己，真象老人所说的，就是被小孩子用"
+  },
+  {
+   "idx": 22,
+   "kind": "inner",
+   "len": 68,
+   "h": 146,
+   "lines": 3,
+   "text": "上曹宅去？一上曹宅，我就得要强，要强有什么用呢？"
+  },
+  {
+   "idx": 23,
+   "kind": "inner",
+   "len": 45,
+   "h": 97,
+   "lines": 2,
+   "text": "这不但是个办法，而且是唯一的办法。攒钱，买车，都"
+  },
+  {
+   "idx": 24,
+   "kind": "inner",
+   "len": 55,
+   "h": 97,
+   "lines": 2,
+   "text": "再说，设若找到了小福子，我也还应该去努力——不为"
+  },
+  {
+   "idx": 25,
+   "kind": "narration",
+   "len": 26,
+   "h": 49,
+   "lines": 1,
+   "text": "他把小福子的事也告诉了老人，他把老人当作了真的朋"
+  },
+  {
+   "idx": 26,
+   "kind": "dialogue",
+   "len": 6,
+   "h": 49,
+   "lines": 1,
+   "text": "谁喝碗热的？"
+  },
+  {
+   "idx": 27,
+   "kind": "narration",
+   "len": 16,
+   "h": 49,
+   "lines": 1,
+   "text": "老人先吆喝了声，而后替祥子来想。"
+  },
+  {
+   "idx": 28,
+   "kind": "dialogue",
+   "len": 55,
+   "h": 97,
+   "lines": 2,
+   "text": "大概据我这么猜呀，出不去两条道儿：不是教二强子卖"
+  },
+  {
+   "idx": 29,
+   "kind": "dialogue",
+   "len": 64,
+   "h": 146,
+   "lines": 3,
+   "text": "怎么说呢？小福子既是，象你刚才告诉我的，嫁过人，"
+  },
+  {
+   "idx": 30,
+   "kind": "dialogue",
+   "len": 94,
+   "h": 146,
+   "lines": 3,
+   "text": "我快六十岁了，见过的事多了去啦：拉车的壮实小伙子"
+  },
+  {
+   "idx": 31,
+   "kind": "dialogue",
+   "len": 55,
+   "h": 97,
+   "lines": 2,
+   "text": "我们卖汗，我们的女人卖肉，我明白，我知道！你去上"
+  },
+  {
+   "idx": 35,
+   "kind": "narration",
+   "len": 11,
+   "h": 49,
+   "lines": 1,
+   "text": "祥子一气跑到西直门外。"
+  },
+  {
+   "idx": 36,
+   "kind": "narration",
+   "len": 82,
+   "h": 146,
+   "lines": 3,
+   "text": "一出了关厢，马上觉出空旷。树木削瘦的立在路旁，枝"
+  },
+  {
+   "idx": 37,
+   "kind": "narration",
+   "len": 56,
+   "h": 97,
+   "lines": 2,
+   "text": "铁道北，一片树林，林外几间矮屋——祥子算计着，这"
+  },
+  {
+   "idx": 38,
+   "kind": "narration",
+   "len": 112,
+   "h": 194,
+   "lines": 4,
+   "text": "他大着胆往屋子那边走，屋门上都挂着草帘子，新挂上"
+  },
+  {
+   "idx": 40,
+   "kind": "narration",
+   "len": 53,
+   "h": 97,
+   "lines": 2,
+   "text": "他正在这么猜疑，靠边那一间的草帘子动了一下，露出"
+  },
+  {
+   "idx": 42,
+   "kind": "inner",
+   "len": 20,
+   "h": 49,
+   "lines": 1,
+   "text": "来找小福子，要是找到了虎妞，才真算见鬼！"
+  },
+  {
+   "idx": 43,
+   "kind": "dialogue",
+   "len": 8,
+   "h": 49,
+   "lines": 1,
+   "text": "进来吧，傻乖乖！"
+  },
+  {
+   "idx": 44,
+   "kind": "narration",
+   "len": 41,
+   "h": 97,
+   "lines": 2,
+   "text": "语音可不象虎妞的；嗓子哑着，很象他常在天桥听见的"
+  },
+  {
+   "idx": 46,
+   "kind": "narration",
+   "len": 100,
+   "h": 194,
+   "lines": 4,
+   "text": "屋里什么也没有，只有那妇人和一铺小炕。炕上没有席"
+  },
+  {
+   "idx": 47,
+   "kind": "narration",
+   "len": 132,
+   "h": 243,
+   "lines": 5,
+   "text": "祥子坐在了炕沿上——立着便不能伸直脖子。他心中很"
+  },
+  {
+   "idx": 48,
+   "kind": "dialogue",
+   "len": 33,
+   "h": 97,
+   "lines": 2,
+   "text": "有，有这么个人！年纪不大，好露出几个白牙，对，我"
+  },
+  {
+   "idx": 50,
+   "kind": "dialogue",
+   "len": 7,
+   "h": 49,
+   "lines": 1,
+   "text": "她在哪屋里呢？"
+  },
+  {
+   "idx": 51,
+   "kind": "dialogue",
+   "len": 6,
+   "h": 49,
+   "lines": 1,
+   "text": "她？早完了！"
+  },
+  {
+   "idx": 52,
+   "kind": "narration",
+   "len": 11,
+   "h": 49,
+   "lines": 1,
+   "text": "“白面口袋”向外一指。"
+  },
+  {
+   "idx": 54,
+   "kind": "dialogue",
+   "len": 15,
+   "h": 49,
+   "lines": 1,
+   "text": "{b}吊死在树林里了！{/b}"
+  },
+  {
+   "idx": 55,
+   "kind": "dialogue",
+   "len": 3,
+   "h": 49,
+   "lines": 1,
+   "text": "怎么？"
+  },
+  {
+   "idx": 56,
+   "kind": "dialogue",
+   "len": 33,
+   "h": 97,
+   "lines": 2,
+   "text": "小嫩肉到这儿以后，人缘很好。她可是有点受不了，身"
+  },
+  {
+   "idx": 57,
+   "kind": "dialogue",
+   "len": 67,
+   "h": 146,
+   "lines": 3,
+   "text": "有一天，掌灯的时候——我还记得真真的，因为我同着"
+  },
+  {
+   "idx": 58,
+   "kind": "dialogue",
+   "len": 64,
+   "h": 146,
+   "lines": 3,
+   "text": "她不爱同我们坐在门口，刚一来的时候还为这个挨过打"
+  },
+  {
+   "idx": 59,
+   "kind": "dialogue",
+   "len": 51,
+   "h": 97,
+   "lines": 2,
+   "text": "待了有一顿饭的工夫吧，客人走了，一直就奔了那个树"
+  },
+  {
+   "idx": 60,
+   "kind": "dialogue",
+   "len": 92,
+   "h": 146,
+   "lines": 3,
+   "text": "赶到老叉杆跟她去收账的时候，才看见屋里躺着个男人"
+  },
+  {
+   "idx": 61,
+   "kind": "dialogue",
+   "len": 51,
+   "h": 97,
+   "lines": 2,
+   "text": "天黑，她又女扮男装，把大伙儿都给蒙了。马上老叉杆"
+  },
+  {
+   "idx": 62,
+   "kind": "dialogue",
+   "len": 77,
+   "h": 146,
+   "lines": 3,
+   "text": "摘下来，她已断了气，可是舌头并没吐出多少，脸上也"
+  },
+  {
+   "idx": 67,
+   "kind": "narration",
+   "len": 78,
+   "h": 146,
+   "lines": 3,
+   "text": "祥子没等她说完，就晃晃悠悠的走出来。走到一块坟地"
+  },
+  {
+   "idx": 68,
+   "kind": "narration",
+   "len": 25,
+   "h": 49,
+   "lines": 1,
+   "text": "什么声音也没有，只有树上的几个山喜鹊扯着长声悲叫"
+  },
+  {
+   "idx": 69,
+   "kind": "narration",
+   "len": 29,
+   "h": 49,
+   "lines": 1,
+   "text": "这绝不会是小福子的坟，他知道，可是他的泪一串一串"
+  },
+  {
+   "idx": 70,
+   "kind": "narration",
+   "len": 50,
+   "h": 97,
+   "lines": 2,
+   "text": "什么也没有了，连小福子也入了土！他是要强的，小福"
+  },
+  {
+   "idx": 71,
+   "kind": "narration",
+   "len": 33,
+   "h": 49,
+   "lines": 1,
+   "text": "一领席，埋在乱死岗子——{em}这就是努力一世的"
+  },
+  {
+   "idx": 75,
+   "kind": "narration",
+   "len": 42,
+   "h": 97,
+   "lines": 2,
+   "text": "回到车厂，他懊睡了两天。决不想上曹宅去了，连个信"
+  },
+  {
+   "idx": 76,
+   "kind": "narration",
+   "len": 63,
+   "h": 146,
+   "lines": 3,
+   "text": "睡了两天，他把车拉出去。心中完全是块空白，不再想"
+  },
+  {
+   "idx": 77,
+   "kind": "narration",
+   "len": 77,
+   "h": 146,
+   "lines": 3,
+   "text": "看着一条瘦得出了棱的狗在白薯挑子旁边等着吃点皮和"
+  },
+  {
+   "idx": 78,
+   "kind": "narration",
+   "len": 52,
+   "h": 97,
+   "lines": 2,
+   "text": "人把自己从野兽中提拔出，可是到现在，人还把自己的"
+  },
+  {
+   "idx": 79,
+   "kind": "narration",
+   "len": 64,
+   "h": 146,
+   "lines": 3,
+   "text": "一点也不是他自己的过错。他停止住思想，所以就是杀"
+  },
+  {
+   "idx": 80,
+   "kind": "narration",
+   "len": 63,
+   "h": 146,
+   "lines": 3,
+   "text": "他吃，他喝，他嫖，他赌，他懒，他狡猾——他没了心"
+  },
+  {
+   "idx": 81,
+   "kind": "narration",
+   "len": 105,
+   "h": 194,
+   "lines": 4,
+   "text": "冬天过去了，春天的阳光是自然给一切人的衣服，他把"
+  },
+  {
+   "idx": 82,
+   "kind": "narration",
+   "len": 88,
+   "h": 146,
+   "lines": 3,
+   "text": "原先，他一思索，便想到一辈子的事；现在，他只顾眼"
+  },
+  {
+   "idx": 83,
+   "kind": "narration",
+   "len": 106,
+   "h": 194,
+   "lines": 4,
+   "text": "慢慢的，凡是暂时不用的东西他都马上出手。他喜欢看"
+  },
+  {
+   "idx": 84,
+   "kind": "narration",
+   "len": 72,
+   "h": 146,
+   "lines": 3,
+   "text": "多么体面的祥子，变成个又瘦又脏的低等车夫。拉上买"
+  },
+  {
+   "idx": 85,
+   "kind": "narration",
+   "len": 52,
+   "h": 97,
+   "lines": 2,
+   "text": "独自拉着车，他走得很慢，他心疼自己的汗。及至走上"
+  },
+  {
+   "idx": 86,
+   "kind": "narration",
+   "len": 89,
+   "h": 146,
+   "lines": 3,
+   "text": "原先他以为拉车是拉着条人命，一不小心便有摔死人的"
+  },
+  {
+   "idx": 87,
+   "kind": "narration",
+   "len": 86,
+   "h": 146,
+   "lines": 3,
+   "text": "他又恢复了他的静默寡言。除了讲价儿，他一天到晚老"
+  },
+  {
+   "idx": 88,
+   "kind": "narration",
+   "len": 16,
+   "h": 49,
+   "lines": 1,
+   "text": "酒醒过来，钱净了手，身上中了病。"
+  },
+  {
+   "idx": 89,
+   "kind": "narration",
+   "len": 60,
+   "h": 97,
+   "lines": 2,
+   "text": "他并不后悔。假若他也有后悔的时候，他是后悔当初他"
+  },
+  {
+   "idx": 90,
+   "kind": "narration",
+   "len": 58,
+   "h": 97,
+   "lines": 2,
+   "text": "现在，怎能占点便宜，他就怎办。他占了便宜，别人就"
+  },
+  {
+   "idx": 91,
+   "kind": "narration",
+   "len": 132,
+   "h": 243,
+   "lines": 5,
+   "text": "初一上来，大家一点也不怀疑他，都知道他是好体面讲"
+  },
+  {
+   "idx": 92,
+   "kind": "narration",
+   "len": 25,
+   "h": 49,
+   "lines": 1,
+   "text": "一来二去，他连一个铜子也借不出了，他开始去骗钱花"
+  },
+  {
+   "idx": 93,
+   "kind": "narration",
+   "len": 61,
+   "h": 97,
+   "lines": 2,
+   "text": "凡是以前他所混过的宅门，他都去访问，见面编一套谎"
+  },
+  {
+   "idx": 94,
+   "kind": "narration",
+   "len": 50,
+   "h": 97,
+   "lines": 2,
+   "text": "他低着头思索，想坏主意；想好一个主意就能进比拉一"
+  },
+  {
+   "idx": 95,
+   "kind": "narration",
+   "len": 53,
+   "h": 97,
+   "lines": 2,
+   "text": "他甚至于去找曹宅的高妈——远远的等着她出来买东西"
+  },
+  {
+   "idx": 99,
+   "kind": "dialogue",
+   "len": 24,
+   "h": 49,
+   "lines": 1,
+   "text": "哟！吓死我了！我当是谁呢？祥子啊！你怎这么样了？"
+  },
+  {
+   "idx": 100,
+   "kind": "narration",
+   "len": 18,
+   "h": 49,
+   "lines": 1,
+   "text": "高妈把眼都睁得圆了，象看见一个怪物。"
+  },
+  {
+   "idx": 101,
+   "kind": "dialogue",
+   "len": 4,
+   "h": 49,
+   "lines": 1,
+   "text": "甭提了！"
+  },
+  {
+   "idx": 102,
+   "kind": "narration",
+   "len": 7,
+   "h": 49,
+   "lines": 1,
+   "text": "祥子低下头去。"
+  },
+  {
+   "idx": 104,
+   "kind": "dialogue",
+   "len": 57,
+   "h": 97,
+   "lines": 2,
+   "text": "你不是跟先生都说好了吗？怎么一去不回头了？我还和"
+  },
+  {
+   "idx": 105,
+   "kind": "narration",
+   "len": 21,
+   "h": 49,
+   "lines": 1,
+   "text": "祥子把早已编好的话，简单的，动人的，说出。"
+  },
+  {
+   "idx": 106,
+   "kind": "dialogue",
+   "len": 34,
+   "h": 97,
+   "lines": 2,
+   "text": "病了一大场，差点死了！你和先生说说，帮我一步，等"
+  },
+  {
+   "idx": 107,
+   "kind": "dialogue",
+   "len": 17,
+   "h": 49,
+   "lines": 1,
+   "text": "先生没在家，你进来见见太太好不好？"
+  },
+  {
+   "idx": 108,
+   "kind": "dialogue",
+   "len": 15,
+   "h": 49,
+   "lines": 1,
+   "text": "甭啦！我这个样儿！你给说说吧！"
+  },
+  {
+   "idx": 109,
+   "kind": "narration",
+   "len": 11,
+   "h": 49,
+   "lines": 1,
+   "text": "高妈给他拿出两块钱来。"
+  },
+  {
+   "idx": 110,
+   "kind": "dialogue",
+   "len": 14,
+   "h": 49,
+   "lines": 1,
+   "text": "太太给你的，嘱咐你快吃点药！"
+  },
+  {
+   "idx": 111,
+   "kind": "dialogue",
+   "len": 8,
+   "h": 49,
+   "lines": 1,
+   "text": "是了！谢谢太太！"
+  },
+  {
+   "idx": 113,
+   "kind": "narration",
+   "len": 39,
+   "h": 97,
+   "lines": 2,
+   "text": "祥子接过钱来，心里盘算着上哪儿开发了它。高妈刚一"
+  },
+  {
+   "idx": 115,
+   "kind": "narration",
+   "len": 60,
+   "h": 97,
+   "lines": 2,
+   "text": "慢慢的把宅门都串净，他又串了个第二回，这次可就已"
+  },
+  {
+   "idx": 116,
+   "kind": "narration",
+   "len": 57,
+   "h": 97,
+   "lines": 2,
+   "text": "现在，他讨厌拉车。只要有一法子能暂时对付三餐，他"
+  },
+  {
+   "idx": 117,
+   "kind": "narration",
+   "len": 69,
+   "h": 146,
+   "lines": 3,
+   "text": "什么公民团咧，什么请愿团咧，凡是有人出钱的事，他"
+  },
+  {
+   "idx": 118,
+   "kind": "narration",
+   "len": 70,
+   "h": 146,
+   "lines": 3,
+   "text": "打着面小旗，他低着头，嘴里叼着烟卷，似笑非笑的随"
+  },
+  {
+   "idx": 119,
+   "kind": "narration",
+   "len": 29,
+   "h": 49,
+   "lines": 1,
+   "text": "对什么事他也不想用力，因为以前卖过力气而并没有分"
+  },
+  {
+   "idx": 120,
+   "kind": "narration",
+   "len": 49,
+   "h": 97,
+   "lines": 2,
+   "text": "设若遇见点什么危险，他头一个先跑开，而且跑得很快"
+  },
+  {
+   "idx": 121,
+   "kind": "narration",
+   "len": 35,
+   "h": 49,
+   "lines": 1,
+   "text": "{em}为个人努力的也知道怎样毁灭个人，这是个人"
+  },
+  {
+   "idx": 123,
+   "kind": "narration",
+   "len": 26,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}注一：蹦儿，本领，前途的意思。{/di"
+  },
+  {
+   "idx": 124,
+   "kind": "narration",
+   "len": 27,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}注二：窑调，在妓院里流行的小调。{/d"
+  },
+  {
+   "idx": 125,
+   "kind": "narration",
+   "len": 21,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}注三：叉杆，即娼主。{/dim}"
+  }
+ ]
+}

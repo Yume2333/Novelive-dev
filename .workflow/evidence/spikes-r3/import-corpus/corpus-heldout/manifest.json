@@ -1,0 +1,58 @@
+[
+ {
+  "file": "h-sanguo.txt",
+  "style": "序+凡例+第N回 回目",
+  "source": "wikisource 三國演義",
+  "expectedCh": 8
+ },
+ {
+  "file": "h-rulin.txt",
+  "style": "第N回 回目",
+  "source": "wikisource 儒林外史",
+  "expectedCh": 8
+ },
+ {
+  "file": "h-fengshen.txt",
+  "style": "第N回 题名",
+  "source": "wikisource 封神演義 (卷NNN pages)",
+  "expectedCh": 10
+ },
+ {
+  "file": "h-xixiang.txt",
+  "style": "第N本 + 楔子 + 第N折",
+  "source": "wikisource 西廂記",
+  "expectedV": 5,
+  "expectedCh": 26
+ },
+ {
+  "file": "h-jingshi.txt",
+  "style": "序 + 第N卷 (卷=story)",
+  "source": "wikisource 警世通言",
+  "expectedCh": 5,
+  "note": "三言式卷=故事集"
+ },
+ {
+  "file": "h-tocblock.txt",
+  "style": "目录块+第N章",
+  "source": "synthetic luotuo",
+  "expectedCh": 24
+ },
+ {
+  "file": "h-wrapped.txt",
+  "style": "第N章+换行标题",
+  "source": "synthetic luotuo",
+  "expectedCh": 24
+ },
+ {
+  "file": "h-fullwidth.txt",
+  "style": "第Ｎ章 全角数字",
+  "source": "synthetic luotuo",
+  "expectedCh": 24
+ },
+ {
+  "file": "h-ads-inline.txt",
+  "style": "正文插广告行",
+  "source": "synthetic luotuo",
+  "expectedCh": 24
+ }
+]

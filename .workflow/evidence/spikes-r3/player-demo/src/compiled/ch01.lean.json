@@ -1,0 +1,1050 @@
+{
+ "file": "ch01.lean.nvs",
+ "scenes": [
+  {
+   "title": "洋车夫的派别",
+   "source": [
+    1,
+    6
+   ],
+   "line": 1,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "北平的洋车夫分许多派。",
+     "segs": [
+      {
+       "text": "北平的洋车夫分许多派。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 4,
+     "step": 0
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "年轻力壮、赁漂亮车拉整天儿的，是顶自由的一等。",
+     "segs": [
+      {
+       "text": "年轻力壮、赁漂亮车拉整天儿的，是顶自由的一等。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 5,
+     "step": 1
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "年纪太大太小的，只能拉破车、赶早市，挣一份嚼谷。",
+     "segs": [
+      {
+       "text": "年纪太大太小的，只能拉破车、赶早市，挣一份嚼谷。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 6,
+     "step": 2
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "还有些半路抄起车把的——被撤差的巡警、亏本的小贩、失业的工匠，",
+     "segs": [
+      {
+       "text": "还有些半路抄起车把的——被撤差的巡警、亏本的小贩、失业的工匠，",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 7,
+     "step": 3
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "咬着牙含着泪，把血汗一滴一滴洒在马路上。",
+     "segs": [
+      {
+       "text": "咬着牙含着泪，把血汗一滴一滴洒在马路上。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 8,
+     "step": 4
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "东交民巷另有专拉洋买卖的，会说外国话，自成一个行业。",
+     "segs": [
+      {
+       "text": "东交民巷另有专拉洋买卖的，会说外国话，自成一个行业。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 9,
+     "step": 5
+    }
+   ]
+  },
+  {
+   "title": "祥子的志愿",
+   "source": [
+    7,
+    10
+   ],
+   "line": 11,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "在和“骆驼”这个外号发生关系以前，祥子属于头一派——",
+     "segs": [
+      {
+       "text": "在和“骆驼”这个外号发生关系以前，祥子属于头一派——",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 14,
+     "step": 6
+    },
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 15,
+     "args": [
+      "xiangzi/ragged-white-jacket/plain",
+      "center"
+     ],
+     "step": 7
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "年轻，有力气，是自己的车，高等车夫。",
+     "segs": [
+      {
+       "text": "年轻，有力气，是自己的车，高等车夫。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 16,
+     "step": 8
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "自己的车，自己的生活，都在自己手里。",
+     "segs": [
+      {
+       "text": "自己的车，自己的生活，都在自己手里。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 17,
+     "step": 9
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "那辆车，是他三四年里千万滴汗挣来的，像身经百战的武士的徽章。",
+     "segs": [
+      {
+       "text": "那辆车，是他三四年里千万滴汗挣来的，像身经百战的武士的徽章。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 18,
+     "step": 10
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "有了自己的车，就不再受气，睁开眼就有饭吃。",
+     "segs": [
+      {
+       "text": "有了自己的车，就不再受气，睁开眼就有饭吃。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 19,
+     "step": 11
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他生在乡间，失了父母与几亩薄田，十八岁进城，卖力气的事几乎全干过。",
+     "segs": [
+      {
+       "text": "他生在乡间，失了父母与几亩薄田，十八岁进城，卖力气的事几乎全干过。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 20,
+     "step": 12
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "不久他看出来：拉车更容易挣钱，更多变化与机会。",
+     "segs": [
+      {
+       "text": "不久他看出来：拉车更容易挣钱，更多变化与机会。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 21,
+     "step": 13
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "我有力气，年纪正轻。买上顶漂亮的车——这是志愿，绝不是梦！",
+     "segs": [
+      {
+       "text": "我有力气，年纪正轻。买上顶漂亮的车——这是志愿，绝不是梦！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 22,
+     "step": 14
+    }
+   ]
+  },
+  {
+   "title": "一棵树",
+   "source": [
+    11,
+    13
+   ],
+   "line": 24,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "二十来岁，他已长得很大很高，铁扇面似的胸，直硬的背，宽宽的肩。",
+     "segs": [
+      {
+       "text": "二十来岁，他已长得很大很高，铁扇面似的胸，直硬的背，宽宽的肩。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 27,
+     "step": 15
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "圆眼，肉鼻，粗眉，颧骨与右耳之间一块不小的疤——小时候被驴啃的。",
+     "segs": [
+      {
+       "text": "圆眼，肉鼻，粗眉，颧骨与右耳之间一块不小的疤——小时候被驴啃的。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 28,
+     "step": 16
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他确乎有点像一棵树，坚壮，沉默，而又有生气。",
+     "segs": [
+      {
+       "text": "他确乎有点像一棵树，坚壮，沉默，而又有生气。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 29,
+     "step": 17
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "车夫们的委屈是公众的话料，祥子却天生不愿多说话。",
+     "segs": [
+      {
+       "text": "车夫们的委屈是公众的话料，祥子却天生不愿多说话。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 30,
+     "step": 18
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "我的事我自己知道，不喜欢和别人讨论。",
+     "segs": [
+      {
+       "text": "我的事我自己知道，不喜欢和别人讨论。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 31,
+     "step": 19
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "主意打定，他就照心里那条路走；走不通，能一两天不出一声，咬着牙。",
+     "segs": [
+      {
+       "text": "主意打定，他就照心里那条路走；走不通，能一两天不出一声，咬着牙。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 32,
+     "step": 20
+    }
+   ]
+  },
+  {
+   "title": "练腿",
+   "source": [
+    14,
+    18
+   ],
+   "line": 34,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他决定去拉车，赁了辆破车，先练练腿。",
+     "segs": [
+      {
+       "text": "他决定去拉车，赁了辆破车，先练练腿。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 37,
+     "step": 21
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "第二天生意不错，脚脖子却肿得像两条瓠子，躺了两天。",
+     "segs": [
+      {
+       "text": "第二天生意不错，脚脖子却肿得像两条瓠子，躺了两天。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 38,
+     "step": 22
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "这是拉车必经的一关，熬过去才能放胆地跑。",
+     "segs": [
+      {
+       "text": "这是拉车必经的一关，熬过去才能放胆地跑。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 39,
+     "step": 23
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "脚好后他敢跑了。他嘴慢气盛，讲价争座弄不过老油子们，",
+     "segs": [
+      {
+       "text": "脚好后他敢跑了。他嘴慢气盛，讲价争座弄不过老油子们，",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 40,
+     "step": 24
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "干脆不大到车口儿上去——哪里没车，他放在哪里。",
+     "segs": [
+      {
+       "text": "干脆不大到车口儿上去——哪里没车，他放在哪里。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 41,
+     "step": 25
+    },
+    {
+     "type": "cmd",
+     "cmd": "face",
+     "line": 42,
+     "args": [
+      "xiangzi/ragged-white-jacket/happy"
+     ],
+     "step": 26
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "坐上吧，瞧着给！",
+     "segs": [
+      {
+       "text": "坐上吧，瞧着给！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 43,
+     "step": 27
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "人问他认识路么，他就又装傻又耍俏地一笑，叫人不知怎样才好。",
+     "segs": [
+      {
+       "text": "人问他认识路么，他就又装傻又耍俏地一笑，叫人不知怎样才好。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 44,
+     "step": 28
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "两三个星期，他把腿溜出来了：腿长步大，腰稳，快而没有危险，",
+     "segs": [
+      {
+       "text": "两三个星期，他把腿溜出来了：腿长步大，腰稳，快而没有危险，",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 45,
+     "step": 29
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "就是在拉包车的里面，这也得算很名贵的。",
+     "segs": [
+      {
+       "text": "就是在拉包车的里面，这也得算很名贵的。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 46,
+     "step": 30
+    }
+   ]
+  },
+  {
+   "title": "一百块钱",
+   "source": [
+    19,
+    24
+   ],
+   "line": 48,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他换了赁来的新车，打听明白：那样的车，一百块便能打住。",
+     "segs": [
+      {
+       "text": "他换了赁来的新车，打听明白：那样的车，一百块便能打住。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 51,
+     "step": 31
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "一天剩一角，一百元就是一千天，一千天……",
+     "segs": [
+      {
+       "text": "一天剩一角，一百元就是一千天，一千天……",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 52,
+     "step": 32
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "一千天，一万天也好，我非买上自己的车不可！",
+     "segs": [
+      {
+       "text": "一千天，一万天也好，我非买上自己的车不可！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 53,
+     "step": 33
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "他拉上包月，不吃烟不喝酒，咬牙积储；可东家说吹就吹，",
+     "segs": [
+      {
+       "text": "他拉上包月，不吃烟不喝酒，咬牙积储；可东家说吹就吹，",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 54,
+     "step": 34
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "散座时节错儿不断，碰了车赔钱，病了也舍不得买药。",
+     "segs": [
+      {
+       "text": "散座时节错儿不断，碰了车赔钱，病了也舍不得买药。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 55,
+     "step": 35
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "整整的三年，他凑足了一百块钱。",
+     "segs": [
+      {
+       "text": "整整的三年，他凑足了一百块钱。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 56,
+     "step": 36
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "车铺里正巧有辆定作而没钱取货的新车，铺主愿意少要一点。",
+     "segs": [
+      {
+       "text": "车铺里正巧有辆定作而没钱取货的新车，铺主愿意少要一点。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 57,
+     "step": 37
+    },
+    {
+     "type": "cmd",
+     "cmd": "show",
+     "line": 58,
+     "args": [
+      "rickshaw-shop-owner/default/plain",
+      "right"
+     ],
+     "step": 38
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "祥子脸通红，手哆嗦着，拍出九十六块钱来。",
+     "segs": [
+      {
+       "text": "祥子脸通红，手哆嗦着，拍出九十六块钱来。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 59,
+     "step": 39
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "我要这辆车！",
+     "segs": [
+      {
+       "text": "我要这辆车！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 60,
+     "step": 40
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "rickshaw-shop-owner",
+     "alias": null,
+     "inner": false,
+     "text": "听听声儿吧，铃铛似的！你就是把车拉碎了，钢条软了一根，摔在我脸上！",
+     "segs": [
+      {
+       "text": "听听声儿吧，铃铛似的！你就是把车拉碎了，钢条软了一根，摔在我脸上！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 61,
+     "step": 41
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "rickshaw-shop-owner",
+     "alias": null,
+     "inner": false,
+     "text": "一百块，少一分咱们吹！",
+     "segs": [
+      {
+       "text": "一百块，少一分咱们吹！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 62,
+     "step": 42
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": false,
+     "text": "我要这辆车，九十六！",
+     "segs": [
+      {
+       "text": "我要这辆车，九十六！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 63,
+     "step": 43
+    },
+    {
+     "type": "cmd",
+     "cmd": "face",
+     "line": 64,
+     "args": [
+      "rickshaw-shop-owner/default/plain"
+     ],
+     "step": 44
+    },
+    {
+     "type": "line",
+     "kind": "dialogue",
+     "speaker": "rickshaw-shop-owner",
+     "alias": null,
+     "inner": false,
+     "text": "交个朋友，车算你的了；保六个月，保单拿着！",
+     "segs": [
+      {
+       "text": "交个朋友，车算你的了；保六个月，保单拿着！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 65,
+     "step": 45
+    }
+   ]
+  },
+  {
+   "title": "双寿",
+   "source": [
+    25,
+    26
+   ],
+   "line": 67,
+   "items": [
+    {
+     "type": "cmd",
+     "cmd": "face",
+     "line": 70,
+     "args": [
+      "xiangzi/ragged-white-jacket/happy"
+     ],
+     "step": 46
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "揣起保单，拉起车，祥子几乎要哭出来。",
+     "segs": [
+      {
+       "text": "揣起保单，拉起车，祥子几乎要哭出来。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 71,
+     "step": 47
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "拉到僻静处，他细细端详自己的车，在漆板上照着脸，越看越可爱。",
+     "segs": [
+      {
+       "text": "拉到僻静处，他细细端详自己的车，在漆板上照着脸，越看越可爱。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 72,
+     "step": 48
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "今年二十二岁。生日早忘了——今天买上新车，就算生日吧！",
+     "segs": [
+      {
+       "text": "今年二十二岁。生日早忘了——今天买上新车，就算生日吧！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 73,
+     "step": 49
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "人的也是车的，好记。",
+     "segs": [
+      {
+       "text": "人的也是车的，好记。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 74,
+     "step": 50
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "头一个买卖，必须拉个穿得体面的男客，最好是前门。",
+     "segs": [
+      {
+       "text": "头一个买卖，必须拉个穿得体面的男客，最好是前门。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 75,
+     "step": 51
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "拉到了，在最好的饭摊上吃热烧饼夹爆羊肉——这是生日！",
+     "segs": [
+      {
+       "text": "拉到了，在最好的饭摊上吃热烧饼夹爆羊肉——这是生日！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 76,
+     "step": 52
+    }
+   ]
+  },
+  {
+   "title": "希望",
+   "source": [
+    27,
+    28
+   ],
+   "line": 78,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "从有了这辆车，他的日子越过越起劲，拉多少钱全是自己的。",
+     "segs": [
+      {
+       "text": "从有了这辆车，他的日子越过越起劲，拉多少钱全是自己的。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 81,
+     "step": 53
+    },
+    {
+     "type": "line",
+     "kind": "inner",
+     "speaker": "xiangzi",
+     "alias": null,
+     "inner": true,
+     "text": "照这样干上二年，一辆，两辆……我也可以开车厂子了！",
+     "segs": [
+      {
+       "text": "照这样干上二年，一辆，两辆……我也可以开车厂子了！",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 82,
+     "step": 54
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "可是，希望多半落空——祥子的也非例外。",
+     "segs": [
+      {
+       "text": "可是，希望多半落空——祥子的也非例外。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 83,
+     "step": 55
+    }
+   ]
+  },
+  {
+   "title": "行话附注",
+   "source": [
+    29,
+    38
+   ],
+   "line": 85,
+   "items": [
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "车口，停车处；拉晚儿，下午四点后出车，拉到天亮以前。",
+     "segs": [
+      {
+       "text": "车口，停车处；拉晚儿，下午四点后出车，拉到天亮以前。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 88,
+     "step": 56
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "嚼谷是吃用；东交民巷是从前使馆所在；胶皮团指拉车这一行。",
+     "segs": [
+      {
+       "text": "嚼谷是吃用；东交民巷是从前使馆所在；胶皮团指拉车这一行。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 89,
+     "step": 57
+    },
+    {
+     "type": "line",
+     "kind": "narration",
+     "text": "杀进腰，把腰部勒细；主儿是包车主人；饭局是宴会；吹，是散了、完了。",
+     "segs": [
+      {
+       "text": "杀进腰，把腰部勒细；主儿是包车主人；饭局是宴会；吹，是散了、完了。",
+       "marks": [],
+       "speed": 1
+      }
+     ],
+     "id": null,
+     "cont": false,
+     "line": 90,
+     "step": 58
+    }
+   ]
+  }
+ ]
+}

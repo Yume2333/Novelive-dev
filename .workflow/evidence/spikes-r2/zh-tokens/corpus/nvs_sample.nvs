@@ -1,0 +1,45 @@
+scene 教室的黄昏
+source p0012-p0018
+
+@bg classroom/dusk fade 1.5
+@show lin-xiao/uniform/angry left
+lin-xiao: {whisper}其实……{/whisper}{wait 0.6}我一直在等你。 #a3f9
+lin-xiao (inner): 为什么偏偏是今天。 #b81c
+: 窗外的蝉声停了。 #c02d
+@caption 七月十四日 傍晚
+@shake strong 0.4
+lin-xiao as 神秘少女: 你终于来了。 #d77e
+@particles rain heavy 60
+@move lin-xiao right ease-out 0.8
+lin-xiao: 别以为我不知道你在想什么。{speed 0.5}那句话，收回还来得及。{/speed} #e110
+: 雨点砸在窗玻璃上，把走廊的灯影揉碎了。 #f204
+zhou-yan: {dim}我没有要收回。{/dim} #05ab
+lin-xiao (inner): 他说得太平淡了，平淡得像早就排练过。 #19cf
+@show zhou-yan/coat/neutral right
+zhou-yan: 我来，是想问你一个问题。 #2ad0
+@bgm stop fade 2.0
+lin-xiao: {b}问。{/b} #33be
+zhou-yan: 十年前在天台，推我的人——是不是你？ #4aa2
+@shake medium 0.6
+lin-xiao: {glitch}你凭什么现在才问。{/glitch} #51f7
+: 蝉声彻底停了，只剩下雨。 #6d11
+@cg rooftop/night wipe-up
+@wait
+lin-xiao: {whisper}是我。{/whisper} #77e0
+@cg none fade 1.0
+zhou-yan: 我等这句话，等了十年。 #8b9c
+lin-xiao (inner): 原来他早就知道。 #9a45
+@caption 三天后
+lin-xiao: 那你为什么还要来。 #aa02
+zhou-yan: 因为我想听你亲口说。 #bc17
+: 她别过脸去，看着被雨打湿的国旗。 #cd28
+lin-xiao: {shout}说完了！你满意了吗！{/shout} #de39
+zhou-yan (inner): 她的眼泪在第七句台词的位置，准时落下。 #ef4a
+@move zhou-yan center linear 1.2
+zhou-yan: 不满意。但我原谅你。 #f05b
+lin-xiao: 谁要你原谅。 #016c
+: 雨小了。天边的云裂开一道缝，露出傍晚最后一点光。 #127d
+@bg schoolgate/sunset dissolve 2.0
+lin-xiao: {wait 1.0}走吧。 #238e
+zhou-yan: 去哪。 #349f
+lin-xiao: 去吃十年前没吃成的那碗面。 #45b0

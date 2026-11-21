@@ -1,0 +1,11 @@
+  faulty …200, fails=0, 44777ms
+  faulty …400, fails=0, 79602ms
+  faulty …600, fails=0, 123055ms
+  faulty …800, fails=0, 164697ms
+  faulty …1000, fails=0, 205505ms
+  faulty …1200, fails=0, 247550ms
+  faulty …1400, fails=0, 293609ms
+  faulty …1600, fails=0, 336665ms
+  faulty …1800, fails=0, 381799ms
+  faulty …2000, fails=0, 426490ms
+FAULTY: 2000 seeds attempted, fails=0

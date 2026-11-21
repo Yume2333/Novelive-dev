@@ -1,0 +1,87 @@
+[
+ {
+  "asset": "xiangzi/new-outfit",
+  "type": "sprite",
+  "description": "青年车夫祥子精神挺拔，穿干净利落的新车夫装。"
+ },
+ {
+  "asset": "xiangzi/new-outfit/happy",
+  "type": "expression-diff",
+  "description": "眉眼舒展、憋不住得意的笑。"
+ },
+ {
+  "asset": "xiangzi/ragged-white-jacket",
+  "type": "sprite",
+  "description": "祥子日常落魄车夫造型，半旧白布小褂，肩背宽阔。"
+ },
+ {
+  "asset": "xiangzi/ragged-white-jacket/plain",
+  "type": "expression-diff",
+  "description": "沉着脸打量局势，警惕而克制。"
+ },
+ {
+  "asset": "xiangzi/ragged-white-jacket/happy",
+  "type": "expression-diff",
+  "description": "被“大个子”一夸后露出朴实笑意。"
+ },
+ {
+  "asset": "xiangzi/ragged-white-jacket/sad",
+  "type": "expression-diff",
+  "description": "屈辱压着眼眶，强忍泪水与恨意。"
+ },
+ {
+  "asset": "xiangzi/ragged-white-jacket/surprised",
+  "type": "expression-diff",
+  "description": "黑暗中听见骆驼哀叫，猛地一震。"
+ },
+ {
+  "asset": "bald-rickshawman/default",
+  "type": "sprite",
+  "description": "年轻光头矮个车夫，胆大带点楞劲。"
+ },
+ {
+  "asset": "bald-rickshawman/default/plain",
+  "type": "expression-diff",
+  "description": "嘴上逞强、心里发虚的平静脸。"
+ },
+ {
+  "asset": "beiping/street-day",
+  "type": "background",
+  "description": "北平白日街道，车流路口，适合新车飞跑。"
+ },
+ {
+  "asset": "beiping/street-day/tense",
+  "type": "background-variant",
+  "description": "同一白日街景变紧张：铺户上门、军警站街。"
+ },
+ {
+  "asset": "beiping/west-street",
+  "type": "background",
+  "description": "西城新街口一带车口，冷清中藏着危险。"
+ },
+ {
+  "asset": "beiping/xizhimen-gate",
+  "type": "background",
+  "description": "西直门城洞阴影深重，行人稀少。"
+ },
+ {
+  "asset": "beiping/outside-road",
+  "type": "background",
+  "description": "城外空旷土路与高亮桥方向，四野无人。"
+ },
+ {
+  "asset": "army-camp/night",
+  "type": "background",
+  "description": "夜里兵营营盘，寒冷杂乱，俘役气息重。"
+ },
+ {
+  "asset": "mountain-camp/night",
+  "type": "background",
+  "description": "山根营盘夜景，可见远处平地与星空。"
+ },
+ {
+  "asset": "mountain-camp/night/shellfire",
+  "type": "background-variant",
+  "description": "同营盘夜色被远处炮火映红，秩序崩乱。"
+ }
+]

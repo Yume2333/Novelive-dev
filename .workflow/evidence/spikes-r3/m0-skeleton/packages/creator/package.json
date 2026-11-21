@@ -1,0 +1,19 @@
+{
+  "name": "@novelive/creator",
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./entry": "./src/entry.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.6.0",
+    "@earendil-works/pi-schema": "1.6.0",
+    "openai": "7.62.0",
+    "sharp": "0.35.5"
+  },
+  "scripts": {
+    "check:types": "tsc --noEmit -p tsconfig.json"
+  }
+}

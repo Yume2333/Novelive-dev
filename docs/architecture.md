@@ -23,7 +23,7 @@
 ## 进程划分
 
 - **创作端**单独运行在一个后台进程（Electron utility process）里。创作端卡住或崩溃时，窗口和托盘照常可用，创作端可以重新拉起。
-- **放大与降噪**由一个放大程序负责：ncnn-vulkan 可执行文件（不依赖 CUDA，三平台都有预编译版），由创作端启动；输入输出走临时文件，进度和结果通过标准输入输出传，不开网络端口。默认把图放大到 2560×1440（2K）并同时降噪，作品设置可选 4K，立绘按同样倍数放大；透明立绘带透明通道整图送进模型，不拆通道。
+- **放大与降噪**由一个放大程序负责：ncnn-vulkan 可执行文件（不依赖 CUDA，三平台都有预编译版），由创作端启动；输入输出走临时文件，进度和结果通过标准输入输出传，不开网络端口。默认把背景和 CG 放大到 2560×1440（2K）并同时降噪，作品设置可选 4K；立绘放大到宽约 2048 像素（见[视觉素材](./visuals.md)），差分和它的基准图用同一个放大模型；透明立绘带透明通道整图送进模型，不拆通道。
 - **其他图片处理**（缩放、转 WebP（有损或无损）、缩略图、技术检查）在创作端进程里用 sharp 完成。放大程序只负责需要模型的放大和降噪。
 
 ## 代码组织
@@ -67,21 +67,42 @@
 
 - 主进程建好 MessagePort 通道后，把两端分别交给界面和创作端，之后消息直连，不经主进程转发。fork 创作端时主进程注入单调递增的 generation，命令和事件帧都带上，重连后界面丢弃 generation 不匹配的帧。
 - 预加载脚本用 `contextBridge` 只暴露一个有类型的 `window.novelive`，界面拿不到 Node 能力。
-- 消息分两类：命令（请求和响应）和事件（创作端主动推送），都用 pi-schema 定义，开发模式下在边界上校验。事件用统一 envelope `{seq, scope, scopeId, at, event}`，seq 在 scope 内单调；scope 词表最小集 `app`/`work`（M0 先用 `app`）。创作端为每个 scope 保留最近约 500 条内存 ring buffer，`events.list` 命令让界面断线后补漏，ring 溢出时返回 `gap` 加最新快照。预加载维护 requestId→AbortController 映射；port 随窗口销毁关闭时，创作端中止该端口上的在途请求。
+- 消息分两类：命令（请求和响应）和事件（创作端主动推送），都用 pi-schema 定义，开发模式下在边界上校验。事件用统一 envelope `{seq, scope, scopeId, at, event}`，seq 在 scope 内单调；scope 词表最小集 `app`/`work`（M0 先用 `app`）。创作端为每个 scope 保留最近约 500 条内存 ring buffer，`events.list` 命令让界面断线后补漏，响应为 `{events[], latestSeq, gap, snapshot?}`；ring 溢出时返回 `gap` 加最新快照（`app` scope 快照含 `{ready, generation}`）。
 - 创作端给对话面板推送时，载荷是投影后的整条 assistant 消息快照加 headId，每 30–50ms 合一批；界面不自攒 delta，断线重放就是重放最近的快照帧。
 - 主进程注册 `novelive://` 协议读取工程文件夹和作品包里的资源。
-- 创作端基础设施失败（进程退出、端口握手失败）连续 3 次后不再自动拉起，转崩溃横幅加手动重启；业务命令的错误不计入。制作长跑期间宿主按“有活跃 run”启停 `powerSaveBlocker` 防系统休眠，退出时清理。系统通知的标题和正文在主进程侧校验类型与长度并剥掉 HTML——通知文本来自模型输出。
+- 创作端基础设施失败（进程退出、端口握手失败）连续 3 次后不再自动拉起，转崩溃横幅加手动重启；业务命令的错误不计入。制作长跑期间宿主按“有活跃 run”启停 `powerSaveBlocker` 防系统休眠，退出时清理。系统通知的标题和正文在主进程侧校验类型与长度并剥掉 HTML——通知文本来自模型输出；标题=事件，正文=作品名+章/阶段，正文长度上限 1000 字符。
 - 浏览器开发模式下由一个开发脚本把同一套命令和事件通过 WebSocket 暴露给界面，不进正式包。
 
 界面和播放器统一用 lucide 图标，按需打包。
 
 **打包注意**
 
-- Electron 版本在 `package.json` 里写死（不带 `^`）；pnpm 用 `node-linker=hoisted` + `shamefully-hoist`，`onlyBuiltDependencies` 列 electron、esbuild、sharp。
+- Electron 版本在 `package.json` 里写死（不带 `^`）；pnpm 用 `node-linker=hoisted` + `shamefully-hoist`，`onlyBuiltDependencies` 列 electron、esbuild、sharp。pnpm ≥12 时 `onlyBuiltDependencies` 和 `overrides` 写在 `pnpm-workspace.yaml` 里（`package.json` 的 `pnpm` 字段被忽略）。
 - `sandbox:false` + `contextIsolation:true`：`sandbox:true` 下 preload 不能是 ESM（实测报 `Cannot use import statement`）；隔离靠 contextBridge 只暴露 `window.novelive`。
 - `asarUnpack` 必须同时覆盖 `**/*.node` 和 `**/*.so*`（libvips-cpp.so 留在 asar 里 dlopen 失败），sharp 相关目录一并 unpack。
-- sharp 在 Electron 的 Linux 版里一解码就崩（Electron#46323，glib 符号冲突，上游未修）：Linux 版用仓库里的补丁脚本自己打——链接层隐藏 libvips 内嵌 glib 符号并强制加载同目录 `.so`，sharp 每次升级重新打，跟踪 Electron#46323，上游修好后换回官方 sharp；其他平台用官方 sharp。
+- sharp 在 Electron 的 Linux 版里一解码就崩（Electron#46323，glib 符号冲突，上游未修）：Linux 版用仓库里的补丁脚本（`tools/patch-sharp.mjs`）自己打——链接层隐藏 libvips 内嵌 glib 符号并强制加载同目录 `.so`；脚本是幂等的，已打过补丁就跳过，需要 patchelf 和 objcopy。sharp 每次升级重新打，跟踪 Electron#46323，上游修好后换回官方 sharp；其他平台用官方 sharp。CI 的 Linux 冒烟测试要实际启动 Electron 解码一张图，守住补丁和 sharp 升级。
 - 打包产物自带 Electron `LICENSE` 和 `LICENSES.chromium.html`（含 FFmpeg LGPL-2.1 等组件通知），不删；`THIRD_PARTY_NOTICES` 由构建脚本生成。从上游拷贝或改写的文件，文件头保留版权行和原许可并指向 THIRD_PARTY_NOTICES（规则见 `.workflow/research/refs/ext-2026-11-r2-licenses.md`）。
+
+**版本锁定**（2026-11-21 实测定稿）：
+
+| 包 | 版本 |
+| --- | --- |
+| electron | 45.4.1（内置 Node 24.22.3，`node:sqlite` 不需要开关） |
+| electron-vite | 6.0.0 |
+| vite | 7.2.7 |
+| @vitejs/plugin-react | 5.1.1 |
+| typescript | 5.9.3 |
+| react | 19.3.1 |
+| pnpm | 12.21.0 |
+| pi-ai / pi-agent-core / pi-schema | 1.6.0 |
+| sharp | 0.35.5 |
+| openai | 7.62.0 |
+| vitest | 5.1.1 |
+| playwright | 1.65.1 |
+| biome | 2.6.8 |
+| stylelint | 18.1.0 |
+
+不上 vite 8 和 plugin-react 6：plugin-react 6 强制要求 vite 8，electron-vite 6 还没在 vite 8 上验证过；TypeScript 7 太新。
 
 
 ## 开发模式与开发顺序

@@ -1,0 +1,975 @@
+{
+ "script": "ch01.faithful.nvs",
+ "viewport": "1920x1080",
+ "fontSize": 30,
+ "rows": [
+  {
+   "idx": 0,
+   "kind": "narration",
+   "len": 61,
+   "h": 97,
+   "lines": 2,
+   "text": "我们所要介绍的是祥子，不是骆驼，因为“骆驼”只是"
+  },
+  {
+   "idx": 1,
+   "kind": "narration",
+   "len": 52,
+   "h": 97,
+   "lines": 2,
+   "text": "北平的洋车夫有许多派：年轻力壮，腿脚灵利的，讲究"
+  },
+  {
+   "idx": 2,
+   "kind": "narration",
+   "len": 73,
+   "h": 97,
+   "lines": 2,
+   "text": "拉出车来，在固定的“车口”或宅门一放，专等坐快车"
+  },
+  {
+   "idx": 3,
+   "kind": "narration",
+   "len": 60,
+   "h": 97,
+   "lines": 2,
+   "text": "这一派哥儿们的希望大概有两个：或是拉包车；或是自"
+  },
+  {
+   "idx": 4,
+   "kind": "narration",
+   "len": 55,
+   "h": 97,
+   "lines": 2,
+   "text": "比这一派岁数稍大的，或因身体的关系而跑得稍有点劲"
+  },
+  {
+   "idx": 5,
+   "kind": "narration",
+   "len": 54,
+   "h": 97,
+   "lines": 2,
+   "text": "人与车都有相当的漂亮，所以在要价儿的时候也还能保"
+  },
+  {
+   "idx": 6,
+   "kind": "narration",
+   "len": 63,
+   "h": 97,
+   "lines": 2,
+   "text": "在后者的情形下，因为还有相当的精气神，所以无论冬"
+  },
+  {
+   "idx": 7,
+   "kind": "narration",
+   "len": 84,
+   "h": 97,
+   "lines": 2,
+   "text": "年纪在四十以上，二十以下的，恐怕就不易在前两派里"
+  },
+  {
+   "idx": 8,
+   "kind": "narration",
+   "len": 52,
+   "h": 97,
+   "lines": 2,
+   "text": "他们的车破，跑得慢，所以得多走路，少要钱。到瓜市"
+  },
+  {
+   "idx": 9,
+   "kind": "narration",
+   "len": 61,
+   "h": 97,
+   "lines": 2,
+   "text": "在这里，二十岁以下的——有的从十一二岁就干这行儿"
+  },
+  {
+   "idx": 10,
+   "kind": "narration",
+   "len": 79,
+   "h": 97,
+   "lines": 2,
+   "text": "他们也许拉一辈子洋车，而一辈子连拉车也没出过风头"
+  },
+  {
+   "idx": 11,
+   "kind": "narration",
+   "len": 53,
+   "h": 97,
+   "lines": 2,
+   "text": "他们的拉车姿式，讲价时的随机应变，走路的抄近绕远"
+  },
+  {
+   "idx": 12,
+   "kind": "narration",
+   "len": 69,
+   "h": 97,
+   "lines": 2,
+   "text": "可是这点光荣毫无不能减少将来的黑暗，他们自己也因"
+  },
+  {
+   "idx": 13,
+   "kind": "narration",
+   "len": 45,
+   "h": 49,
+   "lines": 1,
+   "text": "这一些是以前决没想到自己能与洋车发生关系，而到了"
+  },
+  {
+   "idx": 14,
+   "kind": "narration",
+   "len": 60,
+   "h": 97,
+   "lines": 2,
+   "text": "被撤差的巡警或校役，把本钱吃光的小贩，或是失业的"
+  },
+  {
+   "idx": 15,
+   "kind": "narration",
+   "len": 66,
+   "h": 97,
+   "lines": 2,
+   "text": "这些人，生命最鲜壮的时期已经卖掉，现在再把窝窝头"
+  },
+  {
+   "idx": 16,
+   "kind": "narration",
+   "len": 53,
+   "h": 97,
+   "lines": 2,
+   "text": "他们拉最破的车，皮带不定一天泄多少次气；一边拉著"
+  },
+  {
+   "idx": 17,
+   "kind": "narration",
+   "len": 77,
+   "h": 97,
+   "lines": 2,
+   "text": "此外，因环境与知识的特异，又使一部分车夫另成派别"
+  },
+  {
+   "idx": 18,
+   "kind": "narration",
+   "len": 85,
+   "h": 97,
+   "lines": 2,
+   "text": "这是跑长趟的，不愿拉零座；因为拉一趟便是一趟，不"
+  },
+  {
+   "idx": 19,
+   "kind": "narration",
+   "len": 86,
+   "h": 97,
+   "lines": 2,
+   "text": "气长也还算小事，一般车夫万不能争这项生意的原因，"
+  },
+  {
+   "idx": 20,
+   "kind": "narration",
+   "len": 70,
+   "h": 97,
+   "lines": 2,
+   "text": "他们自己有一套外国话，不传授给别人。他们的跑法也"
+  },
+  {
+   "idx": 21,
+   "kind": "narration",
+   "len": 71,
+   "h": 97,
+   "lines": 2,
+   "text": "因为拉著洋人，他们可以不穿号坎，而一律的是长袖小"
+  },
+  {
+   "idx": 22,
+   "kind": "narration",
+   "len": 37,
+   "h": 49,
+   "lines": 1,
+   "text": "一见这样的服装，别的车夫再也不会过来争座与赛车，"
+  },
+  {
+   "idx": 23,
+   "kind": "narration",
+   "len": 47,
+   "h": 49,
+   "lines": 1,
+   "text": "有了这点简单的分析，我们再说祥子的地位，就象说—"
+  },
+  {
+   "idx": 24,
+   "kind": "narration",
+   "len": 57,
+   "h": 97,
+   "lines": 2,
+   "text": "祥子，在与“骆驼”这个外号发生关系以前，是个较比"
+  },
+  {
+   "idx": 25,
+   "kind": "narration",
+   "len": 32,
+   "h": 49,
+   "lines": 1,
+   "text": "自己的车，自己的生活，都在自己手里，{em}高等"
+  },
+  {
+   "idx": 26,
+   "kind": "narration",
+   "len": 73,
+   "h": 97,
+   "lines": 2,
+   "text": "这可绝不是件容易的事。一年，二年，至少有三四年；"
+  },
+  {
+   "idx": 27,
+   "kind": "narration",
+   "len": 35,
+   "h": 49,
+   "lines": 1,
+   "text": "那辆车是他的一切挣扎与困苦的总结果与报酬，像身经"
+  },
+  {
+   "idx": 28,
+   "kind": "narration",
+   "len": 44,
+   "h": 49,
+   "lines": 1,
+   "text": "在他赁人家的车的时候，他从早到晚，由东到西，由南"
+  },
+  {
+   "idx": 29,
+   "kind": "narration",
+   "len": 56,
+   "h": 97,
+   "lines": 2,
+   "text": "可是在这种旋转之中，他的眼并没有花，心并没有乱，"
+  },
+  {
+   "idx": 30,
+   "kind": "narration",
+   "len": 49,
+   "h": 97,
+   "lines": 2,
+   "text": "有了自己的车，他可以不再受拴车的人们的气，也无须"
+  },
+  {
+   "idx": 32,
+   "kind": "narration",
+   "len": 48,
+   "h": 97,
+   "lines": 2,
+   "text": "他不怕吃苦，也没有一般洋车夫的可以原谅而不便效法"
+  },
+  {
+   "idx": 33,
+   "kind": "narration",
+   "len": 53,
+   "h": 97,
+   "lines": 2,
+   "text": "假若他的环境好一些，或多受著点教育，他一定不会落"
+  },
+  {
+   "idx": 34,
+   "kind": "narration",
+   "len": 49,
+   "h": 97,
+   "lines": 2,
+   "text": "不幸，他必须拉洋车；好，在这个营生里他也证明出他"
+  },
+  {
+   "idx": 35,
+   "kind": "narration",
+   "len": 64,
+   "h": 97,
+   "lines": 2,
+   "text": "生长在乡间，失去了父母与几亩薄田，十八岁的时候便"
+  },
+  {
+   "idx": 36,
+   "kind": "narration",
+   "len": 74,
+   "h": 97,
+   "lines": 2,
+   "text": "可是，不久他就看出来，拉车是件更容易挣钱的事；作"
+  },
+  {
+   "idx": 37,
+   "kind": "narration",
+   "len": 46,
+   "h": 49,
+   "lines": 1,
+   "text": "自然，他也晓得这样的机遇不完全出于偶然，而必须人"
+  },
+  {
+   "idx": 38,
+   "kind": "inner",
+   "len": 49,
+   "h": 97,
+   "lines": 2,
+   "text": "想了一想，我相信自己有那个资格：我有力气，年纪正"
+  },
+  {
+   "idx": 39,
+   "kind": "inner",
+   "len": 54,
+   "h": 97,
+   "lines": 2,
+   "text": "但这不是不能胜过的困难，有我的身体与力气作基础，"
+  },
+  {
+   "idx": 40,
+   "kind": "inner",
+   "len": 48,
+   "h": 97,
+   "lines": 2,
+   "text": "说不定很快就能拉上包车，然后省吃俭用的一年二年，"
+  },
+  {
+   "idx": 41,
+   "kind": "inner",
+   "len": 41,
+   "h": 49,
+   "lines": 1,
+   "text": "看著自己的青年的肌肉，这只是时间的问题，这是必能"
+  },
+  {
+   "idx": 42,
+   "kind": "narration",
+   "len": 79,
+   "h": 97,
+   "lines": 2,
+   "text": "他的身量与筋肉都发展到年岁前边去；二十来的岁，他"
+  },
+  {
+   "idx": 43,
+   "kind": "narration",
+   "len": 59,
+   "h": 97,
+   "lines": 2,
+   "text": "看著那高等的车夫，他计划著怎样杀进他的腰去，好更"
+  },
+  {
+   "idx": 44,
+   "kind": "narration",
+   "len": 37,
+   "h": 49,
+   "lines": 1,
+   "text": "杀好了腰，再穿上肥腿的白裤，裤脚用鸡肠子带儿系住"
+  },
+  {
+   "idx": 46,
+   "kind": "narration",
+   "len": 28,
+   "h": 49,
+   "lines": 1,
+   "text": "是的，他无疑的可以成为最出色的车夫；傻子似的他自"
+  },
+  {
+   "idx": 48,
+   "kind": "narration",
+   "len": 49,
+   "h": 97,
+   "lines": 2,
+   "text": "他没有什么模样，使他可爱的是脸上的精神。头不很大"
+  },
+  {
+   "idx": 49,
+   "kind": "narration",
+   "len": 67,
+   "h": 97,
+   "lines": 2,
+   "text": "腮上没有多馀的肉，脖子可是几乎与头一边儿粗；脸上"
+  },
+  {
+   "idx": 50,
+   "kind": "narration",
+   "len": 54,
+   "h": 97,
+   "lines": 2,
+   "text": "他不甚注意他的模样，他爱自己的脸正如同他爱自己的"
+  },
+  {
+   "idx": 51,
+   "kind": "narration",
+   "len": 52,
+   "h": 97,
+   "lines": 2,
+   "text": "是的，到城里以后，他还能头朝下，倒著立半天。这样"
+  },
+  {
+   "idx": 52,
+   "kind": "narration",
+   "len": 44,
+   "h": 49,
+   "lines": 1,
+   "text": "他确乎有点象一棵树，坚壮，沉默，而又有生气。他有"
+  },
+  {
+   "idx": 53,
+   "kind": "narration",
+   "len": 81,
+   "h": 97,
+   "lines": 2,
+   "text": "在洋车夫里，个人的委屈与困难是公众的话料，“车口"
+  },
+  {
+   "idx": 54,
+   "kind": "narration",
+   "len": 58,
+   "h": 97,
+   "lines": 2,
+   "text": "祥子是乡下人，口齿没有城里人那么灵便；设若口齿灵"
+  },
+  {
+   "idx": 55,
+   "kind": "narration",
+   "len": 47,
+   "h": 49,
+   "lines": 1,
+   "text": "他的事他知道，不喜欢和别人讨论。因为嘴常闲著，所"
+  },
+  {
+   "idx": 56,
+   "kind": "narration",
+   "len": 56,
+   "h": 97,
+   "lines": 2,
+   "text": "只要他的主意打定，他便随著心中所开开的那条路儿走"
+  },
+  {
+   "idx": 57,
+   "kind": "narration",
+   "len": 25,
+   "h": 49,
+   "lines": 1,
+   "text": "他决定去拉车，就拉车去了。赁了辆破车，他先练练腿"
+  },
+  {
+   "idx": 58,
+   "kind": "narration",
+   "len": 48,
+   "h": 97,
+   "lines": 2,
+   "text": "第一天没拉著什么钱。第二天的生意不错，可是躺了两"
+  },
+  {
+   "idx": 59,
+   "kind": "narration",
+   "len": 54,
+   "h": 97,
+   "lines": 2,
+   "text": "他忍受著，不管是怎样的疼痛。他知道这是不可避免的"
+  },
+  {
+   "idx": 60,
+   "kind": "narration",
+   "len": 63,
+   "h": 97,
+   "lines": 2,
+   "text": "脚好了之后，他敢跑了。这使他非常的痛快，因为别的"
+  },
+  {
+   "idx": 61,
+   "kind": "narration",
+   "len": 43,
+   "h": 49,
+   "lines": 1,
+   "text": "拉车的方法，以他干过的那些推，拉，扛，挑的经验来"
+  },
+  {
+   "idx": 62,
+   "kind": "inner",
+   "len": 18,
+   "h": 49,
+   "lines": 1,
+   "text": "多留神，少争胜，大概总不会出了毛病。"
+  },
+  {
+   "idx": 63,
+   "kind": "narration",
+   "len": 56,
+   "h": 97,
+   "lines": 2,
+   "text": "至于讲价争座，他的嘴慢气盛，弄不过那些老油子们。"
+  },
+  {
+   "idx": 64,
+   "kind": "narration",
+   "len": 31,
+   "h": 49,
+   "lines": 1,
+   "text": "在这僻静的地点，他可以从容的讲价，而且有时候不肯"
+  },
+  {
+   "idx": 65,
+   "kind": "dialogue",
+   "len": 8,
+   "h": 49,
+   "lines": 1,
+   "text": "坐上吧，瞧著给！"
+  },
+  {
+   "idx": 66,
+   "kind": "narration",
+   "len": 45,
+   "h": 49,
+   "lines": 1,
+   "text": "他的样子是那么诚实，脸上是那么简单可爱，人们好象"
+  },
+  {
+   "idx": 67,
+   "kind": "narration",
+   "len": 41,
+   "h": 49,
+   "lines": 1,
+   "text": "即使人们疑心，也只能怀疑他是新到城里来的乡下老儿"
+  },
+  {
+   "idx": 68,
+   "kind": "narration",
+   "len": 13,
+   "h": 49,
+   "lines": 1,
+   "text": "及至人们问到，“认识呀？”"
+  },
+  {
+   "idx": 70,
+   "kind": "narration",
+   "len": 27,
+   "h": 49,
+   "lines": 1,
+   "text": "他就又象装傻，又象耍俏的那么一笑，使人们不知怎样"
+  },
+  {
+   "idx": 72,
+   "kind": "narration",
+   "len": 44,
+   "h": 49,
+   "lines": 1,
+   "text": "两三个星期的工夫，他把腿溜出来了。他晓得自己的跑"
+  },
+  {
+   "idx": 73,
+   "kind": "narration",
+   "len": 75,
+   "h": 97,
+   "lines": 2,
+   "text": "那撇著脚，象一对蒲扇在地上扇乎的，无疑的是刚由乡"
+  },
+  {
+   "idx": 74,
+   "kind": "narration",
+   "len": 90,
+   "h": 97,
+   "lines": 2,
+   "text": "那经验十足而没什么力气的却另有一种方法：胸向内含"
+  },
+  {
+   "idx": 75,
+   "kind": "narration",
+   "len": 62,
+   "h": 97,
+   "lines": 2,
+   "text": "祥子当然决不采取这几种姿态。他的腿长步大，腰里非"
+  },
+  {
+   "idx": 76,
+   "kind": "narration",
+   "len": 46,
+   "h": 49,
+   "lines": 1,
+   "text": "说站住，不论在跑得多么快的时候，大脚在地上轻蹭两"
+  },
+  {
+   "idx": 77,
+   "kind": "narration",
+   "len": 61,
+   "h": 97,
+   "lines": 2,
+   "text": "脊背微俯，双手松松拢住车把，他活动，利落，准确；"
+  },
+  {
+   "idx": 78,
+   "kind": "narration",
+   "len": 82,
+   "h": 97,
+   "lines": 2,
+   "text": "他换了新车。从一换车那天，他就打听明白了，象他赁"
+  },
+  {
+   "idx": 79,
+   "kind": "narration",
+   "len": 22,
+   "h": 49,
+   "lines": 1,
+   "text": "大概的说吧，他只要有一百块钱，就能弄一辆车。"
+  },
+  {
+   "idx": 80,
+   "kind": "inner",
+   "len": 47,
+   "h": 49,
+   "lines": 1,
+   "text": "一天要是能剩一角的话，一百元就是一千天，一千天！"
+  },
+  {
+   "idx": 81,
+   "kind": "narration",
+   "len": 41,
+   "h": 49,
+   "lines": 1,
+   "text": "但是，他下了决心，一千天，一万天也好，他得买车！"
+  },
+  {
+   "idx": 82,
+   "kind": "narration",
+   "len": 74,
+   "h": 97,
+   "lines": 2,
+   "text": "遇上交际多，饭局多的主儿，平均一月有上十来个饭局"
+  },
+  {
+   "idx": 83,
+   "kind": "narration",
+   "len": 60,
+   "h": 97,
+   "lines": 2,
+   "text": "这样，他的希望就近便多多了。他不吃烟，不喝酒，不"
+  },
+  {
+   "idx": 84,
+   "kind": "inner",
+   "len": 47,
+   "h": 49,
+   "lines": 1,
+   "text": "他对自己起下了誓：一年半的工夫，我——祥子——非"
+  },
+  {
+   "idx": 85,
+   "kind": "narration",
+   "len": 48,
+   "h": 97,
+   "lines": 2,
+   "text": "他真拉上了包月。可是，事实并不完全帮助希望。不错"
+  },
+  {
+   "idx": 86,
+   "kind": "narration",
+   "len": 72,
+   "h": 97,
+   "lines": 2,
+   "text": "包车确是拉上了，而且谨慎小心的看著事情；不幸，世"
+  },
+  {
+   "idx": 87,
+   "kind": "narration",
+   "len": 52,
+   "h": 97,
+   "lines": 2,
+   "text": "他得另去找事。自然，他得一边儿找事，还得一边儿拉"
+  },
+  {
+   "idx": 88,
+   "kind": "narration",
+   "len": 83,
+   "h": 97,
+   "lines": 2,
+   "text": "他还强打著精神，不专为混一天的嚼谷，而且要继续著"
+  },
+  {
+   "idx": 89,
+   "kind": "inner",
+   "len": 35,
+   "h": 49,
+   "lines": 1,
+   "text": "假若老这么下去，几时才能买上车呢？为什么这样呢？"
+  },
+  {
+   "idx": 90,
+   "kind": "narration",
+   "len": 73,
+   "h": 97,
+   "lines": 2,
+   "text": "在这么乱想的时候，他忘了素日的谨慎。皮轮子上了碎"
+  },
+  {
+   "idx": 91,
+   "kind": "narration",
+   "len": 84,
+   "h": 97,
+   "lines": 2,
+   "text": "设若他是拉著包车，这些错儿绝不能发生；一搁下了事"
+  },
+  {
+   "idx": 92,
+   "kind": "narration",
+   "len": 70,
+   "h": 97,
+   "lines": 2,
+   "text": "及至睁开眼，一天的工夫已白白过去，他又后悔，自恨"
+  },
+  {
+   "idx": 93,
+   "kind": "narration",
+   "len": 78,
+   "h": 97,
+   "lines": 2,
+   "text": "病了，他舍不得钱去买药，自己硬挺著；结果，病越来"
+  },
+  {
+   "idx": 94,
+   "kind": "narration",
+   "len": 15,
+   "h": 49,
+   "lines": 1,
+   "text": "整整的三年，他凑足了一百块钱！"
+  },
+  {
+   "idx": 96,
+   "kind": "narration",
+   "len": 59,
+   "h": 97,
+   "lines": 2,
+   "text": "他不能再等了。原来的计划是买辆最完全最新式最可心"
+  },
+  {
+   "idx": 97,
+   "kind": "narration",
+   "len": 57,
+   "h": 97,
+   "lines": 2,
+   "text": "恰巧有辆刚打好的车（定作而没钱取货的）跟他所期望"
+  },
+  {
+   "idx": 99,
+   "kind": "narration",
+   "len": 21,
+   "h": 49,
+   "lines": 1,
+   "text": "祥子的脸通红，手哆嗦著，拍出九十六块钱来："
+  },
+  {
+   "idx": 100,
+   "kind": "dialogue",
+   "len": 6,
+   "h": 49,
+   "lines": 1,
+   "text": "我要这辆车！"
+  },
+  {
+   "idx": 101,
+   "kind": "narration",
+   "len": 75,
+   "h": 97,
+   "lines": 2,
+   "text": "铺主打算挤到个整数，说了不知多少话，把他的车拉出"
+  },
+  {
+   "idx": 102,
+   "kind": "dialogue",
+   "len": 57,
+   "h": 97,
+   "lines": 2,
+   "text": "听听声儿吧，铃铛似的！拉去吧，你就是把车拉碎了，"
+  },
+  {
+   "idx": 103,
+   "kind": "narration",
+   "len": 10,
+   "h": 49,
+   "lines": 1,
+   "text": "祥子把钱又数了一遍："
+  },
+  {
+   "idx": 104,
+   "kind": "dialogue",
+   "len": 10,
+   "h": 49,
+   "lines": 1,
+   "text": "我要这辆车，九十六！"
+  },
+  {
+   "idx": 105,
+   "kind": "narration",
+   "len": 29,
+   "h": 49,
+   "lines": 1,
+   "text": "铺主知道是遇见了一个心眼的人，看看钱，看看祥子，"
+  },
+  {
+   "idx": 106,
+   "kind": "dialogue",
+   "len": 38,
+   "h": 49,
+   "lines": 1,
+   "text": "交个朋友，车算你的了；保六个月：除非你把大箱碰碎"
+  },
+  {
+   "idx": 107,
+   "kind": "narration",
+   "len": 58,
+   "h": 97,
+   "lines": 2,
+   "text": "祥子的手哆嗦得更厉害了，揣起保单，拉起车，几乎要"
+  },
+  {
+   "idx": 108,
+   "kind": "narration",
+   "len": 39,
+   "h": 49,
+   "lines": 1,
+   "text": "越看越可爱，就是那不尽合自己的理想的地方也都可以"
+  },
+  {
+   "idx": 109,
+   "kind": "narration",
+   "len": 44,
+   "h": 49,
+   "lines": 1,
+   "text": "把车看得似乎暂时可以休息会儿了，他坐在了水簸箕的"
+  },
+  {
+   "idx": 110,
+   "kind": "narration",
+   "len": 48,
+   "h": 97,
+   "lines": 2,
+   "text": "他忽然想起来，今年是二十二岁。因为父母死得早，他"
+  },
+  {
+   "idx": 111,
+   "kind": "inner",
+   "len": 59,
+   "h": 97,
+   "lines": 2,
+   "text": "好吧，今天买上了新车，就算是生日吧，人的也是车的"
+  },
+  {
+   "idx": 112,
+   "kind": "narration",
+   "len": 42,
+   "h": 49,
+   "lines": 1,
+   "text": "怎样过这个“双寿”呢？祥子有主意：头一个买卖必须"
+  },
+  {
+   "idx": 113,
+   "kind": "narration",
+   "len": 48,
+   "h": 97,
+   "lines": 2,
+   "text": "最好是拉到前门，其次是东安市场。拉到了，他应该在"
+  },
+  {
+   "idx": 114,
+   "kind": "narration",
+   "len": 28,
+   "h": 49,
+   "lines": 1,
+   "text": "吃完，有好买卖呢就再拉一两个；没有呢，就收车；这"
+  },
+  {
+   "idx": 115,
+   "kind": "narration",
+   "len": 57,
+   "h": 97,
+   "lines": 2,
+   "text": "从有了这辆车，他的生活过得越来越起劲了。拉包月也"
+  },
+  {
+   "idx": 116,
+   "kind": "narration",
+   "len": 75,
+   "h": 97,
+   "lines": 2,
+   "text": "心里舒服，对人就更和气，买卖也就更顺心。拉了半年"
+  },
+  {
+   "idx": 118,
+   "kind": "narration",
+   "len": 18,
+   "h": 49,
+   "lines": 1,
+   "text": "可是，希望多半落空，祥子的也非例外。"
+  },
+  {
+   "idx": 119,
+   "kind": "narration",
+   "len": 20,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}①车口，即停车处。{/dim}"
+  },
+  {
+   "idx": 120,
+   "kind": "narration",
+   "len": 33,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}②拉晚儿，是下午四点以后出车，拉到天亮"
+  },
+  {
+   "idx": 121,
+   "kind": "narration",
+   "len": 19,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}③嚼谷，即吃用。{/dim}"
+  },
+  {
+   "idx": 122,
+   "kind": "narration",
+   "len": 27,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}④从前外国驻华使馆都在东交民巷。{/d"
+  },
+  {
+   "idx": 123,
+   "kind": "narration",
+   "len": 23,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}⑤胶皮团，指拉车这一行。{/dim}"
+  },
+  {
+   "idx": 124,
+   "kind": "narration",
+   "len": 25,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}⑥杀进腰，把腰部勒得细一些。{/dim"
+  },
+  {
+   "idx": 125,
+   "kind": "narration",
+   "len": 21,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}⑦一边儿，即同样的。{/dim}"
+  },
+  {
+   "idx": 126,
+   "kind": "narration",
+   "len": 24,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}⑧主儿，即是指包车的主人。{/dim}"
+  },
+  {
+   "idx": 127,
+   "kind": "narration",
+   "len": 19,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}⑨饭局，即宴会。{/dim}"
+  },
+  {
+   "idx": 128,
+   "kind": "narration",
+   "len": 25,
+   "h": 49,
+   "lines": 1,
+   "text": "{dim}⑩吹，就是散了，完了的意思。{/dim"
+  }
+ ]
+}

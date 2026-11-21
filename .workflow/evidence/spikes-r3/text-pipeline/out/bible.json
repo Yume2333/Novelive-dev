@@ -1,0 +1,3556 @@
+{
+ "style": {
+  "visualStyle": "写实的老北平市井画卷：灰黄城郭、城门洞、大杂院与车口儿，战乱烟尘与京西山村黎明交替呈现",
+  "narrativeTone": "京味儿浓郁的全知叙述，冷静幽默中带悲悯，常用反讽与议论点透人物命运"
+ },
+ "characters": {
+  "xiangzi": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "xiangzi",
+   "name": "祥子",
+   "originalName": "祥子",
+   "aliases": [
+    "骆驼祥子",
+    "驼祥子",
+    "大个子",
+    "骆驼"
+   ],
+   "addressedAs": [
+    "祥子",
+    "骆驼祥子"
+   ],
+   "identity": "北平人力车夫，乡间出身、父母双亡，十八岁进城，赁住人和车厂",
+   "personality": "坚壮沉默、吃苦耐劳、节俭固执、自尊要强；失车后变得急切，不惜抢同行买卖",
+   "speechStyle": "话少，心里转念头多；愤懑时会喊'凭什么'",
+   "appearance": "高大结实、肩宽腰硬的壮汉；颧骨与右耳之间有一道小时候被驴啃的疤",
+   "anchorFeatures": [
+    "高大个子",
+    "颧骨右耳间的疤",
+    "沉默寡言"
+   ],
+   "costumes": [
+    {
+     "id": "ragged-white-jacket",
+     "description": "卖骆驼的老者所赠的破白小褂，逃亡时穿用",
+     "fromChapter": "ch03"
+    },
+    {
+     "id": "new-outfit",
+     "description": "海甸病愈后花二元二角新置的裤褂、鞋袜与草帽",
+     "fromChapter": "ch04"
+    },
+    {
+     "id": "wedding-clothes",
+     "description": "天桥新买衣物的成婚穿戴",
+     "fromChapter": "ch15"
+    }
+   ],
+   "major": true,
+   "firstSeenChapter": "ch01",
+   "revealedChapter": "ch01",
+   "knows": [
+    {
+     "chapter": "ch01",
+     "fact": "自己父母早亡、记不得生日，把买车日当作人与车的生日"
+    },
+    {
+     "chapter": "ch03",
+     "fact": "三匹骆驼只卖得三十五元，离再买一辆洋车还差得远"
+    },
+    {
+     "chapter": "ch04",
+     "fact": "自己昏迷时说漏了骆驼的事，'骆驼祥子'的外号已经传开"
+    },
+    {
+     "chapter": "ch06",
+     "fact": "自己与虎妞发生关系，且存款由刘四爷保管"
+    },
+    {
+     "chapter": "ch07",
+     "fact": "曹宅待遇安稳，翻车事故源于补路石块未设红灯"
+    },
+    {
+     "chapter": "ch08",
+     "fact": "高妈懂得放债和起会，方家曾使用邮局储金折子"
+    },
+    {
+     "chapter": "ch09",
+     "fact": "虎妞声称怀孕，要求他在二十七日给刘四爷拜寿，并已交还三十多块钱"
+    },
+    {
+     "chapter": "ch10",
+     "fact": "老车夫与小马儿虽有自有破车，仍陷入老来孤贫、无钱买煤的绝境"
+    },
+    {
+     "chapter": "ch11",
+     "fact": "曹先生遭侦探尾随而避往左宅，自己的全部积蓄被孙侦探抢走"
+    },
+    {
+     "chapter": "ch12",
+     "fact": "曹宅不能再回，自己只剩曹先生给的五块钱，需另谋生路"
+    },
+    {
+     "chapter": "ch13",
+     "fact": "曹先生夫妇已乘早车离京，丢钱无处申诉"
+    },
+    {
+     "chapter": "ch15",
+     "fact": "虎妞假怀孕骗婚的真相"
+    },
+    {
+     "chapter": "ch17",
+     "fact": "人和厂已被刘四爷变卖、其下落不明"
+    },
+    {
+     "chapter": "ch20",
+     "fact": "自觉养不起小福子一家，狠心搬走"
+    },
+    {
+     "chapter": "ch21",
+     "fact": "自己染上性病且未除根；虎妞已死并当面告知刘四爷"
+    },
+    {
+     "chapter": "ch22",
+     "fact": "曹先生愿让他拉包月，并设想收留小福子帮高妈，但须曹太太同意"
+    },
+    {
+     "chapter": "ch23",
+     "fact": "小马儿已死半年；小福子被卖入白房子后自缢林中"
+    },
+    {
+     "chapter": "ch24",
+     "fact": "阮明因自己六十元告发而被枪毙，鬼影般追随他"
+    }
+   ],
+   "changes": [
+    {
+     "fromChapter": "ch02",
+     "field": "身份",
+     "to": "被乱兵掳去的随军苦力"
+    },
+    {
+     "fromChapter": "ch03",
+     "field": "身份",
+     "to": "逃回的自由身车夫，卖驼得款三十五元"
+    },
+    {
+     "fromChapter": "ch04",
+     "field": "外号",
+     "to": "因昏迷泄露骆驼来历，人称'骆驼祥子'"
+    },
+    {
+     "fromChapter": "ch05",
+     "field": "职位",
+     "to": "在杨宅拉包月四天后愤而辞工"
+    },
+    {
+     "fromChapter": "ch06",
+     "field": "雇佣状态",
+     "to": "辞别杨家，约定到曹宅拉包月"
+    },
+    {
+     "fromChapter": "ch07",
+     "field": "雇佣状态",
+     "to": "翻车伤主后羞愤欲辞，最终继续留在曹宅"
+    },
+    {
+     "fromChapter": "ch08",
+     "field": "积蓄保管方式",
+     "to": "拒绝放债、起会和储金折子，把钱藏进闷葫芦罐"
+    },
+    {
+     "fromChapter": "ch09",
+     "field": "积蓄",
+     "to": "虎妞交还刘四爷代存的三十多块钱"
+    },
+    {
+     "fromChapter": "ch11",
+     "field": "积蓄",
+     "to": "全部积蓄被孙侦探抢走"
+    },
+    {
+     "fromChapter": "ch12",
+     "field": "生计",
+     "to": "只剩五块钱，曹宅不能再回，决定次日另找事"
+    },
+    {
+     "fromChapter": "ch14",
+     "field": "境遇",
+     "to": "被刘四爷当众赶出人和厂"
+    },
+    {
+     "fromChapter": "ch15",
+     "field": "身份",
+     "to": "与虎妞成婚，成了'被养着的'丈夫"
+    },
+    {
+     "fromChapter": "ch18",
+     "field": "身体",
+     "to": "暴雨拉车后大病，自认'祥子完了'"
+    },
+    {
+     "fromChapter": "ch20",
+     "field": "身份",
+     "to": "卖车葬妻、鳏居，转赴夏宅拉包月，染上烟瘾"
+    },
+    {
+     "fromChapter": "ch21",
+     "field": "identity",
+     "to": "染病后懒散耍横的'刺儿头'车夫"
+    },
+    {
+     "fromChapter": "ch23",
+     "field": "identity",
+     "to": "骗钱混日、嫖赌借贷的低等车夫"
+    },
+    {
+     "fromChapter": "ch24",
+     "field": "identity",
+     "to": "病重拉不动车、靠红白喜事打旗举挽联混饭的'死鬼'"
+    }
+   ]
+  },
+  "liu-siye": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "liu-siye",
+   "name": "刘四爷",
+   "originalName": "刘四爷",
+   "aliases": [
+    "刘老头子",
+    "刘四"
+   ],
+   "addressedAs": [
+    "刘四爷",
+    "刘老头子"
+   ],
+   "identity": "西安门大街人和车厂厂主，年近七十，虎妞之父",
+   "personality": "精明强硬、讲'号子'重排场，对祥子另有青眼；因顾忌女儿而对祥子忍气吞声",
+   "speechStyle": "老江湖口吻，半开玩笑地试探人",
+   "appearance": "年近七十的老者（细貌未详）",
+   "anchorFeatures": [
+    "年近七十",
+    "人和厂厂主"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch04"
+    }
+   ],
+   "major": true,
+   "firstSeenChapter": "ch04",
+   "revealedChapter": "ch04",
+   "knows": [
+    {
+     "chapter": "ch04",
+     "fact": "祥子被兵拉走、牵骆驼卖了钱的经过；替祥子保管三十元"
+    },
+    {
+     "chapter": "ch05",
+     "fact": "女儿虎妞对祥子'未必没那个意思'，因此不敢撵走祥子"
+    },
+    {
+     "chapter": "ch06",
+     "fact": "保管着祥子的三十多块钱积蓄"
+    },
+    {
+     "chapter": "ch14",
+     "fact": "点破虎妞与祥子的关系并当众赶人"
+    },
+    {
+     "chapter": "ch21",
+     "fact": "从祥子口中得知女儿虎妞已死，连坟也找不到"
+    }
+   ],
+   "changes": [
+    {
+     "fromChapter": "ch06",
+     "field": "行踪",
+     "to": "赴南苑给姑妈做寿，需耽误两三天"
+    },
+    {
+     "fromChapter": "ch14",
+     "field": "家庭关系",
+     "to": "与虎妞决裂，'只当没生过这女儿'"
+    },
+    {
+     "fromChapter": "ch17",
+     "field": "身份",
+     "to": "变卖人和厂离京，称去天津或上海，实下落不明"
+    }
+   ]
+  },
+  "huniu": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "huniu",
+   "name": "虎妞",
+   "originalName": "虎妞",
+   "aliases": [
+    "虎姑娘",
+    "刘姑娘"
+   ],
+   "addressedAs": [
+    "虎姑娘",
+    "虎妞"
+   ],
+   "identity": "刘四爷之女，三十七八岁，帮父亲管理人和车厂",
+   "personality": "泼辣爽快、能干利落；对祥子格外亲近爱护，屡次劝他爱惜身体",
+   "speechStyle": "爽直泼辣，爱跟祥子说话、半真半假地打趣",
+   "appearance": "三十七八岁（细貌本卷未详）",
+   "anchorFeatures": [
+    "刘四爷之女",
+    "泼辣",
+    "对祥子格外亲近"
+   ],
+   "costumes": [
+    {
+     "id": "bridal-gown",
+     "description": "自订花轿与红绸上轿衣",
+     "fromChapter": "ch15"
+    }
+   ],
+   "major": true,
+   "firstSeenChapter": "ch04",
+   "revealedChapter": "ch04",
+   "knows": [
+    {
+     "chapter": "ch05",
+     "fact": "祥子带病拼命拉车日渐消瘦，警告他'吐了血可是你自己的事'"
+    },
+    {
+     "chapter": "ch06",
+     "fact": "祥子有三十多块钱存在刘四爷手里"
+    },
+    {
+     "chapter": "ch09",
+     "fact": "刘四爷生日在二十七日，可作为让祥子登门的契机"
+    },
+    {
+     "chapter": "ch09",
+     "fact": "乔二新近死去且无亲无故，可被用作顶名胎儿父亲的人"
+    },
+    {
+     "chapter": "ch09",
+     "fact": "刘四爷若另娶小媳妇，可能把自己赶出人和车厂"
+    },
+    {
+     "chapter": "ch15",
+     "fact": "手中尚余四百来块，拟日后回人和厂服软继承家产"
+    },
+    {
+     "chapter": "ch17",
+     "fact": "父亲卖厂离京，继承落空，只能做车夫老婆"
+    }
+   ],
+   "changes": [
+    {
+     "fromChapter": "ch06",
+     "field": "与祥子的关系",
+     "to": "灌醉祥子并与他发生关系，随后倒锁房门不肯了断"
+    },
+    {
+     "fromChapter": "ch09",
+     "field": "对祥子的要挟",
+     "to": "声称怀孕，要求祥子拜寿、认干爹并娶自己"
+    },
+    {
+     "fromChapter": "ch09",
+     "field": "对积蓄的控制",
+     "to": "交还祥子三十多块钱，同时以「别忘恩负义」继续牵制"
+    },
+    {
+     "fromChapter": "ch14",
+     "field": "家庭关系",
+     "to": "与刘四爷当众决裂、被逐出家门"
+    },
+    {
+     "fromChapter": "ch15",
+     "field": "身份",
+     "to": "毛家湾大杂院自立门户、嫁祥子"
+    },
+    {
+     "fromChapter": "ch18",
+     "field": "身体",
+     "to": "真正怀孕"
+    },
+    {
+     "fromChapter": "ch19",
+     "field": "生死",
+     "to": "难产三昼夜，夜里十二点带死孩子断气"
+    },
+    {
+     "fromChapter": "ch21",
+     "field": "identity",
+     "to": "已故"
+    }
+   ]
+  },
+  "bald-rickshawman": {
+   "op": "add",
+   "status": "candidate",
+   "id": "bald-rickshawman",
+   "name": "年轻光头的矮子",
+   "originalName": "年轻光头的矮子",
+   "aliases": [],
+   "addressedAs": [],
+   "identity": "北平同行洋车夫",
+   "personality": "胆大泼辣，敢接去清华的险买卖",
+   "speechStyle": "亲热地喊祥子'大个子'，以'是福不是祸'鼓动同行",
+   "appearance": "年轻、光头、个子矮",
+   "anchorFeatures": [
+    "光头",
+    "矮个子"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch02"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch02",
+   "revealedChapter": "ch02",
+   "knows": [],
+   "changes": []
+  },
+  "camel-keeper": {
+   "op": "add",
+   "status": "candidate",
+   "id": "camel-keeper",
+   "name": "养驼老者",
+   "originalName": "老者",
+   "aliases": [],
+   "addressedAs": [
+    "老者"
+   ],
+   "identity": "京西某村养过三把儿驼的财主",
+   "personality": "和善悯人，几经恳求后怜恤祥子",
+   "speechStyle": "老人絮叨，感叹'这年头不是养驼的年头了'",
+   "appearance": "六十多岁的老人",
+   "anchorFeatures": [
+    "六十多岁",
+    "曾养三把儿驼"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch03"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch03",
+   "revealedChapter": "ch03",
+   "knows": [
+    {
+     "chapter": "ch03",
+     "fact": "以三十五元买下祥子牵来的三匹脱毛骆驼，赠他破白小褂与干粮"
+    }
+   ],
+   "changes": []
+  },
+  "yang-xiansheng": {
+   "op": "add",
+   "status": "candidate",
+   "id": "yang-xiansheng",
+   "name": "杨先生",
+   "originalName": "杨先生",
+   "aliases": [],
+   "addressedAs": [
+    "杨先生"
+   ],
+   "identity": "杨宅主人，上海人，上衙门办公",
+   "personality": "家里仆人三五天一换，对下人苛刻",
+   "speechStyle": "（本卷直接言语少，经仆人转述使唤）",
+   "appearance": "（未详）",
+   "anchorFeatures": [
+    "上海人",
+    "衙门当差"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch05"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch05",
+   "revealedChapter": "ch05",
+   "knows": [],
+   "changes": []
+  },
+  "yang-taitai": {
+   "op": "add",
+   "status": "candidate",
+   "id": "yang-taitai",
+   "name": "杨大太太",
+   "originalName": "杨太太（大太太）",
+   "aliases": [
+    "大太太"
+   ],
+   "addressedAs": [
+    "大太太",
+    "杨太太"
+   ],
+   "identity": "杨宅大太太，天津人",
+   "personality": "吝啬苛刻，把包月车夫当奴才使唤；牌局后只赏一毛钱",
+   "speechStyle": "支使与辱骂下人",
+   "appearance": "（未详）",
+   "anchorFeatures": [
+    "天津人",
+    "吝啬"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch05"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch05",
+   "revealedChapter": "ch05",
+   "knows": [
+    {
+     "chapter": "ch05",
+     "fact": "被祥子把一毛钱摔在脸上、讨回四天工钱"
+    }
+   ],
+   "changes": []
+  },
+  "yang-second-wife": {
+   "op": "add",
+   "status": "candidate",
+   "id": "yang-second-wife",
+   "name": "杨二太太",
+   "originalName": "杨二太太",
+   "aliases": [
+    "二太太"
+   ],
+   "addressedAs": [
+    "二太太"
+   ],
+   "identity": "杨宅二太太，苏州人，与大太太不和",
+   "personality": "同样支使辱骂下人",
+   "speechStyle": "（未详）",
+   "appearance": "（未详）",
+   "anchorFeatures": [
+    "苏州人"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch05"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch05",
+   "revealedChapter": "ch05",
+   "knows": [],
+   "changes": []
+  },
+  "zhang-ma": {
+   "op": "add",
+   "status": "candidate",
+   "id": "zhang-ma",
+   "name": "张妈",
+   "originalName": "张妈",
+   "aliases": [],
+   "addressedAs": [
+    "张妈"
+   ],
+   "identity": "杨宅女仆，江北大脚婆子，已在杨家干了五六年",
+   "personality": "敢骂主家，泼辣直率",
+   "speechStyle": "敢当面骂主家",
+   "appearance": "大脚婆子",
+   "anchorFeatures": [
+    "大脚",
+    "江北人",
+    "干了五六年"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch05"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch05",
+   "revealedChapter": "ch05",
+   "knows": [],
+   "changes": []
+  },
+  "rickshaw-shop-owner": {
+   "op": "add",
+   "status": "candidate",
+   "id": "rickshaw-shop-owner",
+   "name": "铺主",
+   "originalName": "铺主",
+   "aliases": [],
+   "addressedAs": [
+    "铺主"
+   ],
+   "identity": "车铺老板",
+   "personality": "生意人",
+   "speechStyle": "（未详）",
+   "appearance": "（未详）",
+   "anchorFeatures": [
+    "车铺老板"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch01"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch01",
+   "revealedChapter": "ch01",
+   "knows": [
+    {
+     "chapter": "ch01",
+     "fact": "把一辆定作而无人取货的新车以九十六元卖给祥子，保六个月"
+    }
+   ],
+   "changes": []
+  },
+  "cao-xiansheng": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "cao-xiansheng",
+   "name": "曹先生",
+   "originalName": "曹先生",
+   "aliases": [],
+   "addressedAs": [
+    "曹先生"
+   ],
+   "identity": "大学教师，祥子的旧主人和现任包月雇主",
+   "personality": "温和讲理、宽厚和善，自居社会主义者兼唯美主义者",
+   "speechStyle": "平静讲理，不在事故中苛责下人",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "北长街曹宅的主人",
+    "因言论被调查而举家避往左宅"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch06"
+    }
+   ],
+   "major": true,
+   "firstSeenChapter": "ch06",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch07",
+     "fact": "祥子翻车并非有意犯错，因而不责怪他"
+    },
+    {
+     "chapter": "ch11",
+     "fact": "自己遭侦探尾随，不能回曹宅，需避往左宅并转移家眷"
+    },
+    {
+     "chapter": "ch12",
+     "fact": "自己因被指宣传过激思想而受调查，须暂避并疏通关系"
+    }
+   ],
+   "changes": [
+    {
+     "fromChapter": "ch11",
+     "field": "居所与处境",
+     "to": "因遭侦探尾随而临时避往黄化门左宅"
+    },
+    {
+     "fromChapter": "ch12",
+     "field": "被调查原因",
+     "to": "阮明因考试不及格怀恨，向党部告发其宣传过激思想"
+    }
+   ]
+  },
+  "cao-taitai": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "cao-taitai",
+   "name": "曹太太",
+   "originalName": "曹太太",
+   "aliases": [],
+   "addressedAs": [
+    "曹太太"
+   ],
+   "identity": "曹先生之妻",
+   "personality": "规矩和善，对祥子心存照顾",
+   "speechStyle": "温声低语，处事稳妥",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "车祸后替曹先生裹手上药",
+    "给祥子三黄宝蜡养伤"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch07"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch07",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch11",
+     "fact": "曹宅遭侦探威胁，家眷需转往左宅"
+    }
+   ],
+   "changes": [
+    {
+     "fromChapter": "ch12",
+     "field": "居所",
+     "to": "随曹先生连夜逃往左宅"
+    }
+   ]
+  },
+  "gao-ma": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "gao-ma",
+   "name": "高妈",
+   "originalName": "高妈",
+   "aliases": [
+    "小老妈儿"
+   ],
+   "addressedAs": [
+    "高妈",
+    "小老妈儿"
+   ],
+   "identity": "曹宅女仆，三十二三岁的寡妇",
+   "personality": "干净麻利、精明泼辣，吃过债务之苦后很会替自己打算",
+   "speechStyle": "健谈利落，话多如留声机片，常用亲身经历劝人",
+   "appearance": "干净麻利",
+   "anchorFeatures": [
+    "靠放三分利债贴补生活",
+    "多次向祥子传授放债、起会等理财门路",
+    "曹家避祸时留守并替人传话"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch07"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch07",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch08",
+     "fact": "放三分利债和民间起会的门路，也知道穷年月里起会可能「哗啦」"
+    },
+    {
+     "chapter": "ch11",
+     "fact": "曹先生安排家眷撤往左宅，曹宅面临侦探威胁"
+    },
+    {
+     "chapter": "ch12",
+     "fact": "祥子要她转告曹先生快跑，她随后赶往左宅"
+    },
+    {
+     "chapter": "ch23",
+     "fact": "被祥子编造的'病了一大场'骗去两块钱"
+    }
+   ],
+   "changes": []
+  },
+  "xiao-wen": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "xiao-wen",
+   "name": "小文",
+   "originalName": "小文",
+   "aliases": [
+    "少爷"
+   ],
+   "addressedAs": [
+    "小文",
+    "少爷"
+   ],
+   "identity": "曹家小男孩",
+   "personality": "天真亲近祥子",
+   "speechStyle": "孩子气，把小绿夜壶叫作「小茶壶」",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "喜欢祥子送的小绿夜壶"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch08"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch08",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": [
+    {
+     "fromChapter": "ch12",
+     "field": "居所",
+     "to": "随曹太太连夜避往左宅"
+    }
+   ]
+  },
+  "fang-taitai": {
+   "op": "add",
+   "status": "candidate",
+   "id": "fang-taitai",
+   "name": "方太太",
+   "originalName": "方太太",
+   "aliases": [],
+   "addressedAs": [
+    "方太太"
+   ],
+   "identity": "祥子回忆中的旧雇主",
+   "personality": "热心替家人安排邮局储金",
+   "speechStyle": "曾劝祥子立储金折子",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "劝祥子到邮局存钱"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch08"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch08",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "fang-da-xiaojie": {
+   "op": "add",
+   "status": "candidate",
+   "id": "fang-da-xiaojie",
+   "name": "方大小姐",
+   "originalName": "方大小姐",
+   "aliases": [],
+   "addressedAs": [
+    "方大小姐"
+   ],
+   "identity": "方家大小姐",
+   "personality": "不详",
+   "speechStyle": "未直接出场",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "曾让祥子去邮局放进十块钱"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch08"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch08",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "wang-liu": {
+   "op": "add",
+   "status": "candidate",
+   "id": "wang-liu",
+   "name": "王六",
+   "originalName": "王六",
+   "aliases": [],
+   "addressedAs": [
+    "王六"
+   ],
+   "identity": "方家厨子",
+   "personality": "不详",
+   "speechStyle": "未直接出场",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "拥有邮局储金折子"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch08"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch08",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "qin-ma": {
+   "op": "add",
+   "status": "candidate",
+   "id": "qin-ma",
+   "name": "秦妈",
+   "originalName": "秦妈",
+   "aliases": [],
+   "addressedAs": [
+    "秦妈"
+   ],
+   "identity": "方家奶妈子",
+   "personality": "不详",
+   "speechStyle": "未直接出场",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "拥有邮局储金折子"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch08"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch08",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "qiao-er": {
+   "op": "add",
+   "status": "candidate",
+   "id": "qiao-er",
+   "name": "乔二",
+   "originalName": "乔二",
+   "aliases": [],
+   "addressedAs": [
+    "乔二"
+   ],
+   "identity": "新近死去的杠房二掌柜，无亲无故",
+   "personality": "不详",
+   "speechStyle": "未出场",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "葬在东直门外义地",
+    "被虎妞选作将来顶名胎儿父亲的人"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch09"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch09",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "old-rickshaw-man": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "old-rickshaw-man",
+   "name": "老车夫",
+   "originalName": "老车夫",
+   "aliases": [],
+   "addressedAs": [
+    "老车夫"
+   ],
+   "identity": "五十五岁的贫苦人力车夫，小马儿的爷爷",
+   "personality": "困顿坚忍，靠一辆极破的自有车维持祖孙生计",
+   "speechStyle": "虚弱质朴",
+   "appearance": "五十五岁，又冷又饿，进门后晕倒",
+   "anchorFeatures": [
+    "自有破车",
+    "在茶馆饿晕后被众人救醒",
+    "家中明早无钱买煤"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch10"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch10",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch10",
+     "fact": "儿子当兵一去不回，媳妇也走了，只能和孙子靠破车苦混"
+    }
+   ],
+   "changes": []
+  },
+  "xiao-maer": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "xiao-maer",
+   "name": "小马儿",
+   "originalName": "小马儿",
+   "aliases": [],
+   "addressedAs": [
+    "小马儿"
+   ],
+   "identity": "老车夫十二三岁的孙子",
+   "personality": "懂事，惦记家中没钱买煤，想拉爷爷回家",
+   "speechStyle": "稚气朴实",
+   "appearance": "十二三岁",
+   "anchorFeatures": [
+    "替爷爷看车",
+    "吃祥子买的羊肉馅包子"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch10"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch10",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch10",
+     "fact": "祖孙俩明早无钱买煤，只能去赊煤球"
+    }
+   ],
+   "changes": []
+  },
+  "teahouse-owner": {
+   "op": "add",
+   "status": "candidate",
+   "id": "teahouse-owner",
+   "name": "茶馆掌柜的",
+   "originalName": "茶馆掌柜的",
+   "aliases": [],
+   "addressedAs": [
+    "掌柜的"
+   ],
+   "identity": "包月车夫聚集的小茶馆掌柜",
+   "personality": "见惯了车夫饥寒，处理突发状况很有经验",
+   "speechStyle": "急促指挥，先叫人拿白糖水救人",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "救醒晕倒的老车夫"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch10"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch10",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "middle-aged-rickshaw-man": {
+   "op": "add",
+   "status": "candidate",
+   "id": "middle-aged-rickshaw-man",
+   "name": "中年车夫",
+   "originalName": "拿碗酒的中年车夫",
+   "aliases": [],
+   "addressedAs": [
+    "中年车夫"
+   ],
+   "identity": "在小茶馆候客的包月车夫",
+   "personality": "同情同行，也对自身晚境感到惶恐",
+   "speechStyle": "感慨直率",
+   "appearance": "自称四十望外",
+   "anchorFeatures": [
+    "请晕倒的老车夫喝二两酒",
+    "自认再过二三年可能同样潦倒"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch10"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch10",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "zuo-xiansheng": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "zuo-xiansheng",
+   "name": "左先生",
+   "originalName": "左先生",
+   "aliases": [],
+   "addressedAs": [
+    "左先生"
+   ],
+   "identity": "曹先生的好友，住在黄化门",
+   "personality": "可靠，有关系有人脉",
+   "speechStyle": "稳妥干练",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "接应曹先生避难",
+    "帮忙打电话叫汽车",
+    "建议花钱疏通"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch11"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch11",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch11",
+     "fact": "曹先生遭侦探尾随，需临时避难"
+    },
+    {
+     "chapter": "ch12",
+     "fact": "曹先生可以借左宅躲避，并通过人脉花钱疏通"
+    }
+   ],
+   "changes": []
+  },
+  "sun-zhentan": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "sun-zhentan",
+   "name": "孙侦探",
+   "originalName": "孙侦探",
+   "aliases": [
+    "孙排长"
+   ],
+   "addressedAs": [
+    "孙排长",
+    "孙侦探"
+   ],
+   "identity": "追捕曹先生的侦探，也是当年参与把祥子拉到西山的兵丁",
+   "personality": "狡诈狠毒，惯于借政治追捕敲诈弱者",
+   "speechStyle": "先以旧识套近乎，随即用逮捕、下狱和开枪威吓",
+   "appearance": "未见具体外貌描写；能凭祥子脸上的疤认出他",
+   "anchorFeatures": [
+    "认出祥子的脸疤",
+    "砸开闷葫芦罐抢走全部积蓄",
+    "连被褥也不许祥子带走"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch11"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch11",
+   "revealedChapter": "ch11",
+   "knows": [
+    {
+     "chapter": "ch11",
+     "fact": "曹先生被指为乱党并受到追捕"
+    },
+    {
+     "chapter": "ch11",
+     "fact": "祥子的全部积蓄藏在闷葫芦罐里"
+    },
+    {
+     "chapter": "ch11",
+     "fact": "祥子脸上的疤和当年被抓到西山的经历"
+    }
+   ],
+   "changes": [
+    {
+     "fromChapter": "ch11",
+     "field": "身份",
+     "to": "由当年抓祥子的兵丁转为侦探"
+    }
+   ]
+  },
+  "lao-cheng": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "lao-cheng",
+   "name": "老程",
+   "originalName": "老程",
+   "aliases": [],
+   "addressedAs": [
+    "老程"
+   ],
+   "identity": "王家的车夫，三十多岁",
+   "personality": "朴实可靠，愿收留同行",
+   "speechStyle": "不多言",
+   "appearance": "三十多岁",
+   "anchorFeatures": [
+    "让祥子在自己屋里过夜",
+    "深夜被叫醒为祥子的清白作证"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch12"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch12",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch12",
+     "fact": "祥子过夜时只带铺盖、衣裳和五块钱，没拿曹家一草一木"
+    }
+   ],
+   "changes": []
+  },
+  "ruan-ming": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "ruan-ming",
+   "name": "阮明",
+   "originalName": "阮明",
+   "aliases": [],
+   "addressedAs": [
+    "阮明"
+   ],
+   "identity": "曹先生的学生",
+   "personality": "记仇，因考试不及格而挟私报复",
+   "speechStyle": "未直接出场说话",
+   "appearance": "未见具体外貌描写",
+   "anchorFeatures": [
+    "把曹先生的言论告到党部"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch12"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch12",
+   "revealedChapter": "ch12",
+   "knows": [
+    {
+     "chapter": "ch12",
+     "fact": "曹先生没有给他及格，他可借告发泄愤"
+    }
+   ],
+   "changes": [
+    {
+     "fromChapter": "ch24",
+     "field": "identity",
+     "to": "因祥子六十元告发而被判枪毙，游街至天桥处决"
+    }
+   ]
+  },
+  "xiaofuzi": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "xiaofuzi",
+   "name": "小福子",
+   "originalName": "小福子",
+   "aliases": [
+    "小嫩肉"
+   ],
+   "addressedAs": [
+    "小福子"
+   ],
+   "identity": "二强子之女，被卖与军官后遭弃，被迫卖身养两个弟弟",
+   "personality": "善良隐忍、忍辱负重，对祥子暗怀托付之心",
+   "speechStyle": "低婉含蓄，红着脸说话",
+   "appearance": "十九岁被卖时年轻单薄，回院后昼伏夜出",
+   "anchorFeatures": [
+    "卖身养活两个弟弟",
+    "虎妞死后收拾祥子屋子并含蓄表白"
+   ],
+   "costumes": [
+    {
+     "id": "male-disguise",
+     "description": "趁夜逃出白房子时所穿的男人装束",
+     "fromChapter": "ch23"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch17",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch20",
+     "fact": "愿跟祥子过日子却被祥子婉拒"
+    }
+   ],
+   "changes": [
+    {
+     "fromChapter": "ch17",
+     "field": "境遇",
+     "to": "被军官抛弃回院，为养弟弟被逼卖身"
+    },
+    {
+     "fromChapter": "ch19",
+     "field": "境遇",
+     "to": "被虎妞逼走后贱价接客，又下跪求和"
+    },
+    {
+     "fromChapter": "ch23",
+     "field": "identity",
+     "to": "被二强子卖入白房子，女扮男装出逃失败后吊死林中"
+    }
+   ]
+  },
+  "erqiangzi": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "erqiangzi",
+   "name": "二强子",
+   "originalName": "二强子",
+   "aliases": [],
+   "addressedAs": [
+    "二强子"
+   ],
+   "identity": "大杂院车夫",
+   "personality": "混账无赖，酗酒卖女、打妻致死，醉酒时回来逼女儿要钱",
+   "speechStyle": "醉骂撒泼、自我开脱",
+   "appearance": "",
+   "anchorFeatures": [
+    "卖女得二百块又败家",
+    "那辆黑漆白铜'不吉祥'的车",
+    "与祥子结'外头见'的碴儿"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch17"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch17",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "erqiang-sao": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "erqiang-sao",
+   "name": "二强嫂",
+   "originalName": "二强嫂",
+   "aliases": [],
+   "addressedAs": [
+    "二强嫂"
+   ],
+   "identity": "二强子之妻（已故）",
+   "personality": "",
+   "speechStyle": "",
+   "appearance": "全院最矮最丑的妇人",
+   "anchorFeatures": [
+    "被丈夫醉酒踹伤，腊月初三死去"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch17"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch17",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "wang-er": {
+   "op": "add",
+   "status": "candidate",
+   "id": "wang-er",
+   "name": "王二",
+   "originalName": "王二",
+   "aliases": [],
+   "addressedAs": [
+    "王二"
+   ],
+   "identity": "左宅看房人",
+   "personality": "",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [
+    "来报曹先生夫妇清早出走"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch13"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch13",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch13",
+     "fact": "曹家乘七点四十分火车去了天津或上海"
+    }
+   ],
+   "changes": []
+  },
+  "feng-xiansheng": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "feng-xiansheng",
+   "name": "冯先生",
+   "originalName": "冯先生",
+   "aliases": [],
+   "addressedAs": [
+    "冯先生"
+   ],
+   "identity": "天顺煤铺管账/掌柜，山西人",
+   "personality": "谨慎怕事，碍于情面帮忙",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [
+    "写寿字红笺与喜字",
+    "收留祥子婚前暂住"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch13"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch13",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch13",
+     "fact": "知刘四爷厉害不敢应牌局"
+    }
+   ],
+   "changes": []
+  },
+  "gao-gezi": {
+   "op": "add",
+   "status": "candidate",
+   "id": "gao-gezi",
+   "name": "高个子",
+   "originalName": "高个子",
+   "aliases": [],
+   "addressedAs": [
+    "高个子"
+   ],
+   "identity": "四十多岁老车夫",
+   "personality": "过来人式苦口婆心",
+   "speechStyle": "痛陈成家毁身的苦经",
+   "appearance": "高个子，腰腿已垮，养五个孩子",
+   "anchorFeatures": [
+    "劝同行别成家"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch16"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch16",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "guma": {
+   "op": "add",
+   "status": "candidate",
+   "id": "guma",
+   "name": "姑妈",
+   "originalName": "姑妈",
+   "aliases": [],
+   "addressedAs": [
+    "姑妈"
+   ],
+   "identity": "虎妞的姑妈，住南苑",
+   "personality": "",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [
+    "转述刘四爷正月十二来辞行、欲往天津或上海"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch17"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch17",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch17",
+     "fact": "刘四爷离京去向并不确实"
+    }
+   ],
+   "changes": []
+  },
+  "ding-si": {
+   "op": "add",
+   "status": "candidate",
+   "id": "ding-si",
+   "name": "丁四",
+   "originalName": "丁四",
+   "aliases": [],
+   "addressedAs": [
+    "丁四"
+   ],
+   "identity": "车夫",
+   "personality": "",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [
+    "祥子病中赁拉他的车"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch19"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch19",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "shousheng-po": {
+   "op": "add",
+   "status": "candidate",
+   "id": "shousheng-po",
+   "name": "收生婆",
+   "originalName": "收生婆",
+   "aliases": [],
+   "addressedAs": [
+    "收生婆"
+   ],
+   "identity": "接生婆",
+   "personality": "经验老到但手段有限",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [
+    "断言虎妞恐横生逆产，劝送医院"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch19"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch19",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "chen-ernainai": {
+   "op": "add",
+   "status": "candidate",
+   "id": "chen-ernainai",
+   "name": "陈二奶奶",
+   "originalName": "陈二奶奶",
+   "aliases": [
+    "虾蟆大仙"
+   ],
+   "addressedAs": [
+    "陈二奶奶"
+   ],
+   "identity": "顶着'虾蟆大仙'的神婆",
+   "personality": "装神弄鬼骗钱",
+   "speechStyle": "借'童儿'传大仙言语",
+   "appearance": "",
+   "anchorFeatures": [
+    "收五块钱画催生符给药丸，作法无效后偷偷溜走"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch19"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch19",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "tong-er": {
+   "op": "add",
+   "status": "candidate",
+   "id": "tong-er",
+   "name": "童儿",
+   "originalName": "童儿",
+   "aliases": [],
+   "addressedAs": [
+    "童儿"
+   ],
+   "identity": "陈二奶奶的助手",
+   "personality": "",
+   "speechStyle": "传达大仙言语",
+   "appearance": "四十来岁黄脸大汉",
+   "anchorFeatures": [],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch19"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch19",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "xia-xiansheng": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "xia-xiansheng",
+   "name": "夏先生",
+   "originalName": "夏先生",
+   "aliases": [],
+   "addressedAs": [
+    "夏先生"
+   ],
+   "identity": "五十多岁衙门职员，祥子的新雇主",
+   "personality": "吝啬猥琐，瞒着保定原配另纳姨太太",
+   "speechStyle": "",
+   "appearance": "五十多岁，服药后短暂精神旋即萎顿",
+   "anchorFeatures": [
+    "定期到大药房买不明药物",
+    "原配与十二个儿女在保定"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch20"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch20",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "xia-taitai": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "xia-taitai",
+   "name": "夏太太",
+   "originalName": "夏太太",
+   "aliases": [],
+   "addressedAs": [
+    "夏太太"
+   ],
+   "identity": "夏先生新娶的年轻姨太太",
+   "personality": "气派老到，让祥子想起虎妞而心生畏惧",
+   "speechStyle": "",
+   "appearance": "二十二三岁，时髦",
+   "anchorFeatures": [
+    "常去东安市场、中山公园",
+    "神似虎妞的气派"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch20"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch20",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "jun-guan": {
+   "op": "add",
+   "status": "candidate",
+   "id": "jun-guan",
+   "name": "军官",
+   "originalName": "军官",
+   "aliases": [],
+   "addressedAs": [
+    "军官"
+   ],
+   "identity": "小福子曾被卖给的军人",
+   "personality": "始乱终弃，调遣即撒手不管",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [
+    "花一二百安置年轻姑娘"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch17"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch17",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "xiaofuzi-brothers": {
+   "op": "add",
+   "status": "candidate",
+   "id": "xiaofuzi-brothers",
+   "name": "小福子的两个弟弟",
+   "originalName": "小福子的两个弟弟",
+   "aliases": [],
+   "addressedAs": [],
+   "identity": "二强子之子，十三岁与十一岁",
+   "personality": "挨饿懂事",
+   "speechStyle": "",
+   "appearance": "面黄肌瘦",
+   "anchorFeatures": [
+    "靠拾荒打执事觅食",
+    "虎妞出殡时撒纸钱"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch17"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch17",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "mrs-xia": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "mrs-xia",
+   "name": "夏太太",
+   "originalName": "夏太太",
+   "aliases": [],
+   "addressedAs": [
+    "夏太太"
+   ],
+   "identity": "夏宅女主人，祥子包月雇主之妻",
+   "personality": "轻佻风骚、刻薄精明，辞人果决",
+   "speechStyle": "柔中带命令，善以笑意与眼色勾引人",
+   "appearance": "衣饰艳丽、洒香水、对镜擦粉，笑容令祥子想起虎妞",
+   "anchorFeatures": [
+    "香水气味",
+    "艳丽衣饰"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch21"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch21",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "mr-xia": {
+   "op": "add",
+   "status": "candidate",
+   "id": "mr-xia",
+   "name": "夏先生",
+   "originalName": "夏先生",
+   "aliases": [
+    "老瘦猴"
+   ],
+   "addressedAs": [
+    "夏先生"
+   ],
+   "identity": "祥子的包月雇主",
+   "personality": "瘦弱沉闷，被祥子厌恶",
+   "speechStyle": "",
+   "appearance": "瘦",
+   "anchorFeatures": [
+    "瘦猴似的身形"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch21"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch21",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "yang-ma": {
+   "op": "add",
+   "status": "candidate",
+   "id": "yang-ma",
+   "name": "杨妈",
+   "originalName": "杨妈",
+   "aliases": [],
+   "addressedAs": [
+    "杨妈"
+   ],
+   "identity": "夏宅女仆，乡间出身",
+   "personality": "泼辣敢骂，不肯受气",
+   "speechStyle": "对骂利落",
+   "appearance": "",
+   "anchorFeatures": [],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch21"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch21",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch21",
+     "fact": "因摔坏花盆与夏太太互骂后被辞退"
+    }
+   ],
+   "changes": []
+  },
+  "mr-cao": {
+   "op": "update",
+   "status": "confirmed",
+   "id": "mr-cao",
+   "name": "曹先生",
+   "originalName": "曹先生",
+   "aliases": [],
+   "addressedAs": [
+    "曹先生",
+    "圣人"
+   ],
+   "identity": "教书先生，祥子最敬重的旧雇主",
+   "personality": "温和善良、体恤下人，是祥子眼中最后的'圣人'",
+   "speechStyle": "平和商量式",
+   "appearance": "",
+   "anchorFeatures": [],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch22"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch22",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch22",
+     "fact": "听完祥子进城以来的血泪史，答应让他拉包月并愿安置小福子"
+    }
+   ],
+   "changes": []
+  },
+  "mrs-cao": {
+   "op": "add",
+   "status": "candidate",
+   "id": "mrs-cao",
+   "name": "曹太太",
+   "originalName": "曹太太",
+   "aliases": [],
+   "addressedAs": [
+    "曹太太",
+    "太太"
+   ],
+   "identity": "曹先生之妻，临近生产",
+   "personality": "",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch22"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch22",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "er-qiangzi": {
+   "op": "update",
+   "status": "candidate",
+   "id": "er-qiangzi",
+   "name": "二强子",
+   "originalName": "二强子",
+   "aliases": [],
+   "addressedAs": [
+    "二强子"
+   ],
+   "identity": "小福子之父",
+   "personality": "被疑卖女偿债的潦倒汉子",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch22"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch22",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  },
+  "xiaoma-grandpa": {
+   "op": "add",
+   "status": "candidate",
+   "id": "xiaoma-grandpa",
+   "name": "小马儿的祖父",
+   "originalName": "小马儿的祖父",
+   "aliases": [],
+   "addressedAs": [
+    "老人"
+   ],
+   "identity": "前车夫，孙子死后卖车改在车口儿卖茶果",
+   "personality": "看透苦命的宿命论者，慈祥而绝望",
+   "speechStyle": "以蚂蚱作喻，絮絮道尽苦人天命",
+   "appearance": "老迈",
+   "anchorFeatures": [
+    "车口儿的茶摊"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch23"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch23",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch23",
+     "fact": "小马儿已死半年多；猜小福子不是被卖作小就是押进白房子"
+    }
+   ],
+   "changes": []
+  },
+  "xiaoma-er": {
+   "op": "add",
+   "status": "candidate",
+   "id": "xiaoma-er",
+   "name": "小马儿",
+   "originalName": "小马儿",
+   "aliases": [],
+   "addressedAs": [
+    "小马儿"
+   ],
+   "identity": "已故；小马儿祖父之孙",
+   "personality": "",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch23"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch23",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": [
+    {
+     "fromChapter": "ch23",
+     "field": "identity",
+     "to": "已故（死了半年多）"
+    }
+   ]
+  },
+  "baimian-koudai": {
+   "op": "add",
+   "status": "candidate",
+   "id": "baimian-koudai",
+   "name": "白面口袋",
+   "originalName": "白面口袋",
+   "aliases": [],
+   "addressedAs": [
+    "白面口袋"
+   ],
+   "identity": "白房子妇人",
+   "personality": "见惯生死，叙述平直",
+   "speechStyle": "口吻粗俗直接",
+   "appearance": "因一对大奶得此外号，探头时猛看像虎妞",
+   "anchorFeatures": [
+    "一对大奶"
+   ],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch23"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch23",
+   "revealedChapter": null,
+   "knows": [
+    {
+     "chapter": "ch23",
+     "fact": "向祥子复述小福子被卖、男装夜逃与林中自缢的经过"
+    }
+   ],
+   "changes": []
+  },
+  "lao-chagan": {
+   "op": "add",
+   "status": "candidate",
+   "id": "lao-chagan",
+   "name": "老叉杆",
+   "originalName": "老叉杆",
+   "aliases": [],
+   "addressedAs": [
+    "老叉杆"
+   ],
+   "identity": "白房子娼主",
+   "personality": "收账看场、派人搜寻逃妓",
+   "speechStyle": "",
+   "appearance": "",
+   "anchorFeatures": [],
+   "costumes": [
+    {
+     "id": "default",
+     "description": "日常装束",
+     "fromChapter": "ch23"
+    }
+   ],
+   "major": false,
+   "firstSeenChapter": "ch23",
+   "revealedChapter": null,
+   "knows": [],
+   "changes": []
+  }
+ },
+ "relations": [
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "liu-siye",
+   "relation": "赁车的厂主与车夫；祥子把积蓄交刘四爷代存，刘对祥子另有青眼",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "liu-siye",
+   "b": "huniu",
+   "relation": "父女；虎妞帮父亲管理人和车厂",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "huniu",
+   "relation": "虎妞对祥子格外亲近爱护，厂里人猜测刘四爷有意招祥子做'招门纳婿'的丈夫",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "bald-rickshawman",
+   "relation": "同行车夫；光头矮子招呼祥子同拉去清华的险买卖，一同被兵捉去",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "camel-keeper",
+   "relation": "卖驼与买驼的偶遇；老者以三十五元收下祥子牵来的三匹驼并赠衣赠食",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "yang-xiansheng",
+   "relation": "雇主与包月车夫；祥子在杨宅拉包月四天受尽使唤后摔钱辞工",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "yang-xiansheng",
+   "b": "yang-taitai",
+   "relation": "夫妻（大太太）",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "yang-xiansheng",
+   "b": "yang-second-wife",
+   "relation": "夫妻（二太太，与大太太不和）",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "zhang-ma",
+   "b": "yang-taitai",
+   "relation": "主仆；张妈在杨家干五六年，敢骂主家",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "huniu",
+   "relation": "被迫纠缠的男女关系；发生关系后，虎妞以怀孕和刘四爷的势力逼婚",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "huniu",
+   "b": "liu-siye",
+   "relation": "父女；虎妞借父亲的生日和威势设计婚事，也担心父亲另娶后赶走自己",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "liu-siye",
+   "relation": "存款人与保管人；祥子顾忌刘四爷而迟迟不敢讨钱，婚事又使二人潜成翁婿冲突",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "cao-xiansheng",
+   "relation": "包月车夫与雇主；曹先生宽厚，祥子敬重他并在追捕中冒险报信",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "cao-xiansheng",
+   "b": "cao-taitai",
+   "relation": "夫妻",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "cao-xiansheng",
+   "b": "xiao-wen",
+   "relation": "父子",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "cao-xiansheng",
+   "b": "gao-ma",
+   "relation": "雇主与女仆；曹家出事时高妈留守并负责传话",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "gao-ma",
+   "relation": "同在曹宅的下人与劝解者；高妈常给祥子出理财和处世主意",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "xiao-wen",
+   "relation": "受孩子亲近的车夫；祥子送小文小绿夜壶",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "fang-taitai",
+   "relation": "旧雇主与旧车夫；方太太曾劝祥子立储金折子",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "huniu",
+   "b": "qiao-er",
+   "relation": "利用关系；虎妞计划把腹中孩子的父亲之名推给已死且死无对证的乔二",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "cao-xiansheng",
+   "b": "zuo-xiansheng",
+   "relation": "好友；左先生在曹先生遭追捕时提供住所和人脉",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "cao-xiansheng",
+   "b": "ruan-ming",
+   "relation": "师生关系转为告发者与被控者；阮明因不及格怀恨告发曹先生",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "cao-xiansheng",
+   "b": "sun-zhentan",
+   "relation": "被追捕者与执行追捕敲诈的侦探",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "sun-zhentan",
+   "relation": "旧受害关系与敲诈关系；孙侦探凭祥子的脸疤认出他，并抢走全部积蓄",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "old-rickshaw-man",
+   "b": "xiao-maer",
+   "relation": "祖孙；儿子出走后，老人与孙子靠一辆破车相依为命",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "old-rickshaw-man",
+   "relation": "同行；老车夫像镜像一样让祥子看见自己的过去与可能的将来",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "lao-cheng",
+   "relation": "相邻同行；老程收留祥子过夜并为他的清白作证",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "huniu",
+   "relation": "夫妻（假孕逼婚、女掌钱财，冲突不断）",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "huniu",
+   "b": "liu-siye",
+   "relation": "父女，寿宴当众决裂、分文不给",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "liu-siye",
+   "relation": "旧雇主与车夫→准女婿→被逐结怨",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "xiaofuzi",
+   "relation": "杂院邻居，互有情意；祥子留话'等我混好了我来'",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "erqiangzi",
+   "b": "xiaofuzi",
+   "relation": "父女；卖女、逼女儿卖身要钱",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "erqiangzi",
+   "b": "erqiang-sao",
+   "relation": "夫妻；醉酒踹伤致其死亡",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiaofuzi",
+   "b": "xiaofuzi-brothers",
+   "relation": "姐弟，卖身抚养",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "huniu",
+   "b": "xiaofuzi",
+   "relation": "邻居；先借房收利后嫉妒逼走，难产时仍受其帮忙",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "feng-xiansheng",
+   "relation": "受庇护与帮办婚事之恩",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "xia-xiansheng",
+   "relation": "雇佣，包月车夫与雇主",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xia-xiansheng",
+   "b": "xia-taitai",
+   "relation": "瞒着原配新纳的姨太太",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "erqiangzi",
+   "relation": "同院车夫；结'外头见'的碴儿",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "mrs-xia",
+   "relation": "仆佣与女主人，发生暧昧并使祥子染上性病",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "liu-siye",
+   "relation": "翁婿旧怨、互相仇视；祥子以告知虎妞死讯作为报复",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "liu-siye",
+   "b": "huniu",
+   "relation": "父女；女儿死后刘四爷连坟也找不到",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "xiaofuzi",
+   "relation": "相爱欲娶之人；她的死使祥子彻底心死",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "er-qiangzi",
+   "b": "xiaofuzi",
+   "relation": "父女；疑将女儿卖入白房子",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "mr-cao",
+   "relation": "旧主仆、最后的依靠；祥子最终认定'曹先生救不了祥子的命'",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "mr-cao",
+   "b": "gao-ma",
+   "relation": "主仆",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiaoma-grandpa",
+   "b": "xiaoma-er",
+   "relation": "祖孙；孙子死后老人卖车卖茶",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "xiangzi",
+   "b": "ruan-ming",
+   "relation": "出卖者与被出卖者：祥子为六十元告发阮明",
+   "changes": []
+  },
+  {
+   "op": "add",
+   "a": "baimian-koudai",
+   "b": "xiaofuzi",
+   "relation": "白房子同命女子，向祥子证实其死讯",
+   "changes": []
+  }
+ ],
+ "locations": {
+  "beiping": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "beiping",
+   "name": "北平",
+   "originalName": "北平",
+   "description": "故事发生的老城，祥子视作唯一的朋友和谋生之地；本卷中战争谣言四起、物价飞涨、铺户关门",
+   "variants": [
+    {
+     "id": "walled-city",
+     "description": "城墙环绕的老城，西直门等城门洞人流拥挤"
+    },
+    {
+     "id": "dongjiaominxiang",
+     "description": "东交民巷使馆区，当地车夫专拉洋买卖、会说外国话"
+    },
+    {
+     "id": "rickshaw-stands-teahouses",
+     "description": "车口儿、小茶馆、大杂院——车夫停车等座、闲谈诉苦的场所"
+    }
+   ],
+   "firstSeenChapter": "ch01",
+   "changes": []
+  },
+  "renhe-yard": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "renhe-yard",
+   "name": "人和车厂",
+   "originalName": "人和车厂",
+   "description": "西安门大街刘四爷经营的洋车厂，常住二十来个车夫；无家的祥子长期寄住并把积蓄交厂主代存",
+   "variants": [
+    {
+     "id": "street-front",
+     "description": "临街三间铺面和带车门的大院"
+    },
+    {
+     "id": "dormitory",
+     "description": "车夫宿舍与存车处"
+    },
+    {
+     "id": "huniu-room",
+     "description": "虎妞深夜备酒留住祥子并倒锁门的屋子"
+    },
+    {
+     "id": "birthday-shed",
+     "description": "院内可罩全院的暖棚/喜棚，挂三国战景彩屏（刘四爷扬言宁可烧掉）"
+    },
+    {
+     "id": "shou-tang",
+     "description": "设长坂坡挂屏的寿堂"
+    }
+   ],
+   "firstSeenChapter": "ch04",
+   "changes": []
+  },
+  "xiangzi-village": {
+   "op": "add",
+   "status": "candidate",
+   "id": "xiangzi-village",
+   "name": "乡间",
+   "originalName": "乡间",
+   "description": "祥子的故乡；他失去父母与几亩薄田后十八岁进城",
+   "variants": [],
+   "firstSeenChapter": "ch01",
+   "changes": []
+  },
+  "xizhimen": {
+   "op": "add",
+   "status": "candidate",
+   "id": "xizhimen",
+   "name": "西直门",
+   "originalName": "西直门",
+   "description": "城西关口；祥子由此冒险出城被兵掳去，病愈后又穿过拥挤的城门洞回北平",
+   "variants": [],
+   "firstSeenChapter": "ch02",
+   "changes": []
+  },
+  "gaoliang-bridge": {
+   "op": "add",
+   "status": "candidate",
+   "id": "gaoliang-bridge",
+   "name": "高亮桥",
+   "originalName": "高亮桥",
+   "description": "西直门外途中地点；祥子出城时在桥边张望，回城时又在桥西河岸歇息吃老豆腐",
+   "variants": [],
+   "firstSeenChapter": "ch02",
+   "changes": []
+  },
+  "moshikou": {
+   "op": "add",
+   "status": "candidate",
+   "id": "moshikou",
+   "name": "磨石口",
+   "originalName": "磨石口",
+   "description": "京西平地，祥子凭骆驼判断的所在；往东北可回西山，南可奔长辛店、丰台",
+   "variants": [],
+   "firstSeenChapter": "ch02",
+   "changes": []
+  },
+  "miaofeng-mountains": {
+   "op": "add",
+   "status": "candidate",
+   "id": "miaofeng-mountains",
+   "name": "妙峰山一带",
+   "originalName": "妙峰山",
+   "description": "兵们退兵绕行的山区，祥子被裹随军爬山；时值开庙进香时节、夜里仍寒冷",
+   "variants": [],
+   "firstSeenChapter": "ch02",
+   "changes": []
+  },
+  "haidian": {
+   "op": "add",
+   "status": "candidate",
+   "id": "haidian",
+   "name": "海甸",
+   "originalName": "海甸",
+   "description": "西北郊小镇；祥子逃回后在小店病卧三天，'骆驼祥子'的故事由此传进城里",
+   "variants": [
+    {
+     "id": "haidian-inn",
+     "description": "祥子病卧三天、吃馄饨恢复并重新置办衣装的小店"
+    }
+   ],
+   "firstSeenChapter": "ch04",
+   "changes": []
+  },
+  "yang-residence": {
+   "op": "add",
+   "status": "candidate",
+   "id": "yang-residence",
+   "name": "杨宅",
+   "originalName": "杨宅",
+   "description": "祥子拉包月的雇主家，一先生两太太一群孩子，仆人受苛待、三五天一换",
+   "variants": [
+    {
+     "id": "gatehouse",
+     "description": "祥子住的门房小屋：一间隔成两半，又潮又臭，铺板短得睡不下，与张妈各住一边"
+    }
+   ],
+   "firstSeenChapter": "ch05",
+   "changes": []
+  },
+  "xi-anmen-street": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "xi-anmen-street",
+   "name": "西安门大街",
+   "originalName": "西安门大街",
+   "description": "人和车厂所在的街道；祥子夜归、拉车绕行和遇见曹先生的活动区域。",
+   "variants": [],
+   "firstSeenChapter": "ch06",
+   "changes": []
+  },
+  "beichang-street": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "beichang-street",
+   "name": "北长街",
+   "originalName": "北长街",
+   "description": "曹先生迁居后的住处附近；红墙和槐林遮黑路面，祥子在此附近撞上未设红灯的补路石块翻车。",
+   "variants": [],
+   "firstSeenChapter": "ch06",
+   "changes": []
+  },
+  "nanyuan": {
+   "op": "add",
+   "status": "candidate",
+   "id": "nanyuan",
+   "name": "南苑",
+   "originalName": "南苑",
+   "description": "刘四爷给姑妈做寿的去处，需耽误两三天；本卷只被提及。",
+   "variants": [],
+   "firstSeenChapter": "ch06",
+   "changes": []
+  },
+  "cao-residence": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "cao-residence",
+   "name": "曹宅",
+   "originalName": "曹宅",
+   "description": "曹先生一家居住的干净四合院，祥子拉包月并借住；初被祥子视为安稳的「小绿洲」，后因追捕而不再安全。",
+   "variants": [
+    {
+     "id": "gatehouse",
+     "description": "门洞与门房，祥子守候、住宿并遭孙侦探敲诈的地方"
+    },
+    {
+     "id": "study",
+     "description": "曹先生书房，翻车后祥子请辞并洗伤上药的地方"
+    },
+    {
+     "id": "xiangzi-room",
+     "description": "祥子在宅中居住、数钱和藏闷葫芦罐的屋子"
+    },
+    {
+     "id": "backyard-wall",
+     "description": "曹宅与王家相邻的后院墙，危急时可以翻墙暂避"
+    },
+    {
+     "id": "cao-study",
+     "description": "曹先生接待祥子长谈的书房"
+    }
+   ],
+   "firstSeenChapter": "ch07",
+   "changes": [
+    {
+     "fromChapter": "ch12",
+     "field": "安全状态",
+     "to": "曹家逃往左宅，高妈短暂留守，孙侦探仍可能回来"
+    }
+   ]
+  },
+  "dazayuan": {
+   "op": "add",
+   "status": "candidate",
+   "id": "dazayuan",
+   "name": "大杂院",
+   "originalName": "大杂院",
+   "description": "祥子想象中的穷苦同行栖身处，男人拉车、女人缝穷、孩子捡煤核。",
+   "variants": [],
+   "firstSeenChapter": "ch07",
+   "changes": []
+  },
+  "fang-residence": {
+   "op": "add",
+   "status": "candidate",
+   "id": "fang-residence",
+   "name": "方家",
+   "originalName": "方家",
+   "description": "祥子曾拉车的旧宅门，全家使用邮局储金折子；只出现在回忆中。",
+   "variants": [],
+   "firstSeenChapter": "ch08",
+   "changes": []
+  },
+  "post-office": {
+   "op": "add",
+   "status": "candidate",
+   "id": "post-office",
+   "name": "邮局",
+   "originalName": "邮局",
+   "description": "方家存钱、办理储金折子的所在；祥子因不信任而觉得它像一家猜不透的老字号买卖。",
+   "variants": [],
+   "firstSeenChapter": "ch08",
+   "changes": []
+  },
+  "imperial-river": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "imperial-river",
+   "name": "御河",
+   "originalName": "御河",
+   "description": "冬夜已经冻结的河面，灰亮平坦地托着禁城城墙。",
+   "variants": [],
+   "firstSeenChapter": "ch09",
+   "changes": []
+  },
+  "forbidden-city": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "forbidden-city",
+   "name": "禁城",
+   "originalName": "禁城",
+   "description": "夜间寂静无声的旧皇城，角楼、牌坊、城门和景山亭阁构成冷寂景象。",
+   "variants": [],
+   "firstSeenChapter": "ch09",
+   "changes": []
+  },
+  "jinao-yudong-bridge": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "jinao-yudong-bridge",
+   "name": "金鳌玉𬟽",
+   "originalName": "金鳌玉𬟽",
+   "description": "御河上的大白石桥；虎妞在这里继续游说并交还三十多块钱，寒景令祥子产生投冰自尽的念头。",
+   "variants": [],
+   "firstSeenChapter": "ch09",
+   "changes": []
+  },
+  "tuancheng": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "tuancheng",
+   "name": "团城",
+   "originalName": "团城",
+   "description": "祥子逃离虎妞时匆忙跑到的地点，几乎撞上城墙。",
+   "variants": [],
+   "firstSeenChapter": "ch09",
+   "changes": []
+  },
+  "south-side-shop": {
+   "op": "add",
+   "status": "candidate",
+   "id": "south-side-shop",
+   "name": "南边的小铺",
+   "originalName": "南边的小铺",
+   "description": "深夜已上门板、只从窗洞交易的小店，祥子在此买白干和落花生。",
+   "variants": [],
+   "firstSeenChapter": "ch09",
+   "changes": []
+  },
+  "dongzhimen-charity-ground": {
+   "op": "add",
+   "status": "candidate",
+   "id": "dongzhimen-charity-ground",
+   "name": "东直门外义地",
+   "originalName": "东直门外义地",
+   "description": "乔二的埋葬处，虎妞认为他葬在此处且无亲无故、死无对证。",
+   "variants": [],
+   "firstSeenChapter": "ch09",
+   "changes": []
+  },
+  "small-teahouse": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "small-teahouse",
+   "name": "小茶馆",
+   "originalName": "小茶馆",
+   "description": "包月车夫夜间聚集的小店，门窗紧闭，充满煤气、汗味与烟味；老车夫在此饿晕。",
+   "variants": [],
+   "firstSeenChapter": "ch10",
+   "changes": []
+  },
+  "movie-theater": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "movie-theater",
+   "name": "电影园",
+   "originalName": "电影园",
+   "description": "曹先生同朋友看夜场电影的地方，祥子在门外等候并独自思量。",
+   "variants": [],
+   "firstSeenChapter": "ch10",
+   "changes": []
+  },
+  "luoquan-hutong": {
+   "op": "add",
+   "status": "candidate",
+   "id": "luoquan-hutong",
+   "name": "罗圈胡同",
+   "originalName": "罗圈胡同",
+   "description": "祥子初拉车时曾误抄近路又绕回原街的胡同，被用来比喻眼前进退同果的处境。",
+   "variants": [],
+   "firstSeenChapter": "ch10",
+   "changes": []
+  },
+  "tianjin": {
+   "op": "add",
+   "status": "candidate",
+   "id": "tianjin",
+   "name": "天津",
+   "originalName": "天津",
+   "description": "祥子设想拿几十块钱坐火车逃去改行的远处，并未真正前往。",
+   "variants": [],
+   "firstSeenChapter": "ch10",
+   "changes": []
+  },
+  "zuo-residence": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "zuo-residence",
+   "name": "左宅",
+   "originalName": "黄化门左宅（左宅）",
+   "description": "左先生在黄化门的宅子，曹先生摆脱尾随者后临时避难并安排家眷会合的地方。",
+   "variants": [],
+   "firstSeenChapter": "ch11",
+   "changes": []
+  },
+  "wang-residence": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "wang-residence",
+   "name": "王家",
+   "originalName": "王家",
+   "description": "与曹宅相邻的宅子；曹先生安排祥子遇险时翻墙暂避，祥子后来在老程屋里过夜。",
+   "variants": [
+    {
+     "id": "lao-cheng-room",
+     "description": "王家的车夫老程居住的屋子，祥子雪夜借宿处"
+    }
+   ],
+   "firstSeenChapter": "ch11",
+   "changes": []
+  },
+  "zhonghai-bridge": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "zhonghai-bridge",
+   "name": "中海桥",
+   "originalName": "中海桥",
+   "description": "雪夜空旷无人的桥上，祥子被敲诈后在此茫然伫立，随后决定回曹宅传话。",
+   "variants": [],
+   "firstSeenChapter": "ch12",
+   "changes": []
+  },
+  "lao-cheng-house": {
+   "op": "add",
+   "status": "candidate",
+   "id": "lao-cheng-house",
+   "name": "老程住处",
+   "originalName": "老程家",
+   "description": "祥子雪夜借宿之处，外院、屋中与门洞，清晨扫雪吃粥商量去处",
+   "variants": [],
+   "firstSeenChapter": "ch13",
+   "changes": []
+  },
+  "zuo-zhai": {
+   "op": "add",
+   "status": "candidate",
+   "id": "zuo-zhai",
+   "name": "左宅（曹宅）",
+   "originalName": "左宅",
+   "description": "曹先生宅邸，大门紧锁，主人夫妇已乘早车离京，由左先生嘱王二看房",
+   "variants": [],
+   "firstSeenChapter": "ch13",
+   "changes": []
+  },
+  "tianshun-coal": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "tianshun-coal",
+   "name": "天顺煤厂",
+   "originalName": "天顺煤铺",
+   "description": "冯先生的煤铺，祥子婚前暂住之地",
+   "variants": [],
+   "firstSeenChapter": "ch13",
+   "changes": []
+  },
+  "maojiawan-dazayuan": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "maojiawan-dazayuan",
+   "name": "毛家湾大杂院",
+   "originalName": "毛家湾大杂院",
+   "description": "七八户贫民聚居的破败脏臭杂院，虎妞租两间小北房作新房；祥子、虎妞、二强子一家与小福子同住，虎妞难产死于此",
+   "variants": [
+    {
+     "id": "new-room",
+     "description": "糊得雪白贴红喜字的两间小北房"
+    },
+    {
+     "id": "xiaofuzi-room",
+     "description": "小福子被迫低价接客的破旧小屋"
+    }
+   ],
+   "firstSeenChapter": "ch15",
+   "changes": []
+  },
+  "tianqiao": {
+   "op": "add",
+   "status": "candidate",
+   "id": "tianqiao",
+   "name": "天桥",
+   "originalName": "天桥",
+   "description": "祥子曾最爱的热闹所在，婚后次日独自买衣、彷徨之地",
+   "variants": [],
+   "firstSeenChapter": "ch15",
+   "changes": []
+  },
+  "niangniang-miao": {
+   "op": "add",
+   "status": "candidate",
+   "id": "niangniang-miao",
+   "name": "娘娘庙",
+   "originalName": "娘娘庙",
+   "description": "祥子昏睡不醒时虎妞求香灰神方之地",
+   "variants": [],
+   "firstSeenChapter": "ch19",
+   "changes": []
+  },
+  "chengwai-fendi": {
+   "op": "add",
+   "status": "candidate",
+   "id": "chengwai-fendi",
+   "name": "城外坟地",
+   "originalName": "城外坟地",
+   "description": "虎妞落葬之处，送殡者仅祥子与小福子两个弟弟",
+   "variants": [],
+   "firstSeenChapter": "ch20",
+   "changes": []
+  },
+  "xia-zhai": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "xia-zhai",
+   "name": "夏宅",
+   "originalName": "夏宅",
+   "description": "雍和宫附近六间房的小院，南墙根有半大小枣树；夏先生瞒着原配另组的小家庭",
+   "variants": [],
+   "firstSeenChapter": "ch20",
+   "changes": []
+  },
+  "xia-residence": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "xia-residence",
+   "name": "夏宅",
+   "originalName": "夏宅",
+   "description": "祥子拉包月的宅门；杨妈被逐、祥子帮厨及与夏太太暧昧都发生在此",
+   "variants": [
+    {
+     "id": "xia-kitchen",
+     "description": "夏太太亲自做饭、祥子剥皮洗菜的厨房"
+    },
+    {
+     "id": "xiangzi-room",
+     "description": "祥子在夏宅的住处，夏太太叫他去送栗子的屋子"
+    }
+   ],
+   "firstSeenChapter": "ch21",
+   "changes": []
+  },
+  "gulou-front": {
+   "op": "add",
+   "status": "candidate",
+   "id": "gulou-front",
+   "name": "鼓楼前",
+   "originalName": "鼓楼前",
+   "description": "冬夜灯下祥子抢到刘四爷这个座儿的地方",
+   "variants": [],
+   "firstSeenChapter": "ch21",
+   "changes": []
+  },
+  "daza-yard": {
+   "op": "update",
+   "status": "confirmed",
+   "id": "daza-yard",
+   "name": "大杂院",
+   "originalName": "大杂院",
+   "description": "小福子原住的贫民杂院，破门破墙、门楼干草；她的小屋已换住陌生妇人",
+   "variants": [
+    {
+     "id": "xiaofuzi-room",
+     "description": "小福子的小屋，祥子赶到时已人去屋空"
+    }
+   ],
+   "firstSeenChapter": "ch22",
+   "changes": []
+  },
+  "white-house": {
+   "op": "add",
+   "status": "confirmed",
+   "id": "white-house",
+   "name": "白房子",
+   "originalName": "白房子",
+   "description": "西直门外铁道北林外几间矮屋组成的最下等妓院；冬挂草帘异常安静，夏日妇人赤背坐门外招客；也是祥子逃避恐惧的麻醉去处",
+   "variants": [
+    {
+     "id": "white-house-woods",
+     "description": "白房子旁的树林，小福子自缢之处，祥子后来常来此落泪"
+    }
+   ],
+   "firstSeenChapter": "ch23",
+   "changes": []
+  },
+  "jishui-bank": {
+   "op": "add",
+   "status": "candidate",
+   "id": "jishui-bank",
+   "name": "积水滨",
+   "originalName": "积水滨",
+   "description": "德胜门城根外清静的湖边；行刑日祥子藏身看鱼蝌蚪、数钞票的黑暗角落",
+   "variants": [],
+   "firstSeenChapter": "ch24",
+   "changes": []
+  }
+ },
+ "timeline": [
+  {
+   "event": "祥子十八岁从乡间进城，做过各种卖力气的活后改拉洋车",
+   "storyTime": "本卷前数年",
+   "chapter": "ch01"
+  },
+  {
+   "event": "赁破车练腿，脚脖子肿得躺了两天，两三个星期后练出漂亮跑法",
+   "storyTime": "进城初期",
+   "chapter": "ch01"
+  },
+  {
+   "event": "苦干三年凑足一百块钱，花九十六元买下新车，把买车日当作生日",
+   "storyTime": "祥子二十二岁",
+   "chapter": "ch01"
+  },
+  {
+   "event": "买车满半年；战乱谣言流传十来天，祥子贪两块钱拉客出西直门，连人带车被兵掳去",
+   "storyTime": "春末（麦子需春雨时节）",
+   "chapter": "ch02"
+  },
+  {
+   "event": "祥子被裹随军在山中做苦力多日，一夜炮声起趁乱牵三匹骆驼逃走",
+   "storyTime": "妙峰山开庙时节（初夏）",
+   "chapter": "ch02"
+  },
+  {
+   "event": "祥子连夜拉驼东行，黎明时在村里把三匹驼以三十五元卖给养驼老者",
+   "storyTime": "初夏牲口脱毛时节，一个黎明",
+   "chapter": "ch03"
+  },
+  {
+   "event": "祥子在海甸小店病卧三天，昏迷中泄露骆驼来历，得'骆驼祥子'外号",
+   "storyTime": "逃回后数日",
+   "chapter": "ch04"
+  },
+  {
+   "event": "病愈当天花二元二角置办衣装，徒步回城，天黑前到人和厂，把三十元交刘四爷代存",
+   "storyTime": "同日傍晚",
+   "chapter": "ch04"
+  },
+  {
+   "event": "祥子拼命拉散座攒钱、抢买卖得罪同行；后到杨宅拉包月，第四天牌局后摔一毛钱辞工",
+   "storyTime": "回城后又过些日子",
+   "chapter": "ch05"
+  },
+  {
+   "event": "祥子的车在上年秋初买入、一年多后被夺，只剩存在刘四爷手里的三十多块钱",
+   "storyTime": "去年秋初至本年初秋（倒叙）",
+   "chapter": "ch07"
+  },
+  {
+   "event": "祥子从杨家辞工，深夜回到人和车厂，被虎妞灌醉后发生关系",
+   "storyTime": "初秋深夜",
+   "chapter": "ch06"
+  },
+  {
+   "event": "祥子次日羞悔彷徨，傍晚遇见曹先生并谈妥后天上曹宅拉包月",
+   "storyTime": "次日清晨至傍晚",
+   "chapter": "ch06"
+  },
+  {
+   "event": "刘四爷赴南苑给姑妈做寿，预计耽误两三天",
+   "storyTime": "祥子回厂后的数日",
+   "chapter": "ch06"
+  },
+  {
+   "event": "祥子拉曹先生夜归，在北长街附近撞上未设红灯的补路石块，车损人伤",
+   "storyTime": "中秋后十余日的一个晚上",
+   "chapter": "ch07"
+  },
+  {
+   "event": "祥子羞愤请辞并愿留工钱修车，经曹先生、曹太太和高妈劝解后继续留下",
+   "storyTime": "翻车当夜",
+   "chapter": "ch07"
+  },
+  {
+   "event": "祥子拒绝高妈的放债、起会建议，也不信邮局储金折子，改把钱藏入闷葫芦罐",
+   "storyTime": "初冬渐冷",
+   "chapter": "ch08"
+  },
+  {
+   "event": "祥子给小文买小绿夜壶，感到自己在曹家头一次被看重",
+   "storyTime": "初冬",
+   "chapter": "ch08"
+  },
+  {
+   "event": "年关将近，祥子盘算借送礼向刘四爷要回存款，虎妞却先找上门",
+   "storyTime": "腊八前后至年底将近",
+   "chapter": "ch08"
+  },
+  {
+   "event": "虎妞声称怀孕，要求祥子二十七日给刘四爷拜寿、年后认干爹，并计划让乔二顶名",
+   "storyTime": "冬夜、年底将近",
+   "chapter": "ch09"
+  },
+  {
+   "event": "虎妞在金鳌玉𬟽交还祥子的三十多块钱；祥子绝望后深夜买白干浇愁",
+   "storyTime": "同一冬夜",
+   "chapter": "ch09"
+  },
+  {
+   "event": "曹先生看夜场电影时，祥子在小茶馆目睹老车夫饿晕，并与车夫们救助他们祖孙",
+   "storyTime": "虎妞上门后的第三天夜里",
+   "chapter": "ch10"
+  },
+  {
+   "event": "老车夫祖孙的赤贫处境击碎祥子买车自立、清白成家的希望，他转而不再抗拒虎妞",
+   "storyTime": "同一冬夜",
+   "chapter": "ch10"
+  },
+  {
+   "event": "祭灶夜落雪，祥子拉曹先生回家时遭骑车侦探尾随，曹先生改往黄化门左宅",
+   "storyTime": "祭灶当夜约九点",
+   "chapter": "ch11"
+  },
+  {
+   "event": "祥子乘汽车回曹宅报信，被孙侦探砸开闷葫芦罐并抢走全部积蓄",
+   "storyTime": "祭灶深夜，积雪寸余",
+   "chapter": "ch11"
+  },
+  {
+   "event": "祥子让高妈转告曹先生快跑，随后锁门、翻墙到王家，在老程屋里借宿",
+   "storyTime": "同一雪夜三更左右",
+   "chapter": "ch12"
+  },
+  {
+   "event": "倒叙揭示阮明因考试不及格告发曹先生，侦探趁寒假调查逮捕",
+   "storyTime": "考试后至寒假期间（倒叙）",
+   "chapter": "ch12"
+  },
+  {
+   "event": "祥子压下潜入曹宅拿东西补偿的念头，叫醒老程证明自己只带铺盖、衣裳和五块钱",
+   "storyTime": "雪夜后半夜",
+   "chapter": "ch12"
+  },
+  {
+   "event": "雪夜丢钱后祥子投老程家，天明扫雪灭迹；曹先生夫妇乘七点四十分火车离京",
+   "storyTime": "大年底下、瑞雪后清晨",
+   "chapter": "ch13"
+  },
+  {
+   "event": "祥子回人和厂，当日搭棚备寿，跑腿至夜里十一点",
+   "storyTime": "二十五前后",
+   "chapter": "ch13"
+  },
+  {
+   "event": "刘四爷六十九岁'庆九'寿宴，晚间父女决裂、祥子被逐",
+   "storyTime": "腊月二十七",
+   "chapter": "ch14"
+  },
+  {
+   "event": "祥子与虎妞成亲，婚夕揭穿假怀孕；次日祥子出走复归",
+   "storyTime": "大年初六至初七",
+   "chapter": "ch15"
+  },
+  {
+   "event": "祥子重拉车，听高个子苦经；夜见人和厂招牌'人'变'仁'",
+   "storyTime": "正月十七起",
+   "chapter": "ch16"
+  },
+  {
+   "event": "证实人和厂已变卖、刘四爷正月十二辞行后失踪；买二强子的车；小福子回院被逼卖身",
+   "storyTime": "正月至四月半",
+   "chapter": "ch17"
+  },
+  {
+   "event": "酷暑转暴雨，祥子午后挣命拉车，回家病倒；大杂院塌墙漏水",
+   "storyTime": "六月十五",
+   "chapter": "ch18"
+  },
+  {
+   "event": "祥子病加痢疾，八月十五复业；次年灯节后虎妞难产三昼夜，夜里十二点带死孩子断气",
+   "storyTime": "六月病后至次年二月底",
+   "chapter": "ch19"
+  },
+  {
+   "event": "卖车葬虎妞、别小福子搬离杂院；混过月余，近立秋赴夏宅拉包月",
+   "storyTime": "春末至近立秋",
+   "chapter": "ch20"
+  },
+  {
+   "event": "菊花下市时节，杨妈摔花盆与夏太太互骂被逐；祥子帮厨并与夏太太发生暧昧",
+   "storyTime": "秋末",
+   "chapter": "ch21"
+  },
+  {
+   "event": "祥子带铺盖回车厂，暴露性病，治病花十几元未除根",
+   "storyTime": "秋末入冬前",
+   "chapter": "ch21"
+  },
+  {
+   "event": "冬夜祥子在鼓楼前拉到刘四爷，小胡同中告知虎妞已死并与之冲突",
+   "storyTime": "冬日傍晚至天黑",
+   "chapter": "ch21"
+  },
+  {
+   "event": "祥子自认战胜刘四爷，当夜戒绝烟酒拉车至深夜一点，立志重做要强的自己",
+   "storyTime": "同一冬夜",
+   "chapter": "ch22"
+  },
+  {
+   "event": "次日请假赴北长街曹宅倾诉，曹先生应允包月并设想收留小福子",
+   "storyTime": "冬季晴日约十一点",
+   "chapter": "ch22"
+  },
+  {
+   "event": "祥子赶至大杂院发现小福子失踪，遍寻二强子无果，当夜复近烟酒",
+   "storyTime": "同日下午至晚上",
+   "chapter": "ch22"
+  },
+  {
+   "event": "街遇小马儿祖父得知小马儿已死半年；寻至白房子证实小福子自缢，回厂懊睡两日",
+   "storyTime": "冬日",
+   "chapter": "ch23"
+  },
+  {
+   "event": "春到即卖棉衣不再备冬；此后卖骗嫖赌、打旗混饭，一路下滑",
+   "storyTime": "冬去春后数月",
+   "chapter": "ch23"
+  },
+  {
+   "event": "朝顶进香时节阮明被判枪毙，九点游街，民众一路跟至天桥观刑",
+   "storyTime": "夏初暴热",
+   "chapter": "ch24"
+  },
+  {
+   "event": "祥子怀揣六十元赃款独避积水滨至日暮，夜里溜出西直门去白房子",
+   "storyTime": "行刑当日",
+   "chapter": "ch24"
+  },
+  {
+   "event": "入秋后祥子病重拉不动车、租不到车，只靠红白喜事打旗举挽联混十几个铜子等死",
+   "storyTime": "入秋",
+   "chapter": "ch24"
+  }
+ ],
+ "foreshadowing": [
+  {
+   "content": "'骆驼'只是个外号，第一章未交代祥子与骆驼的关系，留待后文揭晓",
+   "plantedChapter": "ch01",
+   "resolvedChapter": "ch04",
+   "open": false,
+   "volume": "买车与骆驼"
+  },
+  {
+   "content": "结尾'希望多半落空，祥子的也非例外'，预示他刚买的车与希望将遭挫折",
+   "plantedChapter": "ch01",
+   "resolvedChapter": "ch02",
+   "open": false,
+   "volume": "买车与骆驼"
+  },
+  {
+   "content": "光头矮子说'是福不是祸'，未说出的下半句'是祸躲不过'暗示此行凶险",
+   "plantedChapter": "ch02",
+   "resolvedChapter": "ch02",
+   "open": false,
+   "volume": "买车与骆驼"
+  },
+  {
+   "content": "三十五块钱离再买一辆车还差得远，祥子把全部希望寄托在'回到城里就有办法'",
+   "plantedChapter": "ch03",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "买车与骆驼"
+  },
+  {
+   "content": "车夫们猜测刘四爷想让祥子给虎妞做'招门纳婿'的丈夫，虎妞对祥子异乎寻常的亲近暗藏纠葛",
+   "plantedChapter": "ch04",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "买车与骆驼"
+  },
+  {
+   "content": "祥子带病拼命日渐消瘦，虎妞警告'吐了血可是你自己的事'，埋下身体隐患",
+   "plantedChapter": "ch05",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "买车与骆驼"
+  },
+  {
+   "content": "祥子不顾同行情面抢买卖、名声变坏，'我们走著瞧吧'暗示冲突未了",
+   "plantedChapter": "ch05",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "买车与骆驼"
+  },
+  {
+   "content": "虎妞可能算准祥子回厂，刘四爷是否知情以及祥子是否会背黑锅仍未明。",
+   "plantedChapter": "ch06",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "祥子存在刘四爷手里的三十多块钱不知何时、以何种代价取回。",
+   "plantedChapter": "ch06",
+   "resolvedChapter": "ch09",
+   "open": false,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "祥子预想自己最后或许只能舍脸娶虎姑娘、咽下屈辱，暗示婚事压力将不断逼近。",
+   "plantedChapter": "ch07",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "门口「像大黑塔」的小姐身份未明，祥子一见便预感事情要坏。",
+   "plantedChapter": "ch08",
+   "resolvedChapter": "ch09",
+   "open": false,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "老弱车夫在寒风中冻饿挣扎，与祥子坚信自己能逃出去形成对照，暗示个人奋斗的脆弱。",
+   "plantedChapter": "ch08",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "虎妞声称「我有啦」，但没有任何旁人或事实证明她确实怀孕。",
+   "plantedChapter": "ch09",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "二十七日刘四爷生日、年后认干爹及让乔二顶名的连环设计是否会被揭穿仍悬而未决。",
+   "plantedChapter": "ch09",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "老车夫与小马儿像镜像般预示祥子的过去和将来：自有车也无法免于孤贫。",
+   "plantedChapter": "ch10",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "祥子决定不再反抗虎妞、只想「享几天现成的福」，婚事逼近且心态开始转向。",
+   "plantedChapter": "ch10",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "孙侦探称曹先生是乱党，但曹先生究竟为何被追捕尚未交代。",
+   "plantedChapter": "ch11",
+   "resolvedChapter": "ch12",
+   "open": false,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "曹宅已暴露，孙侦探可能再回来，曹家众人和留守者的安全仍有威胁。",
+   "plantedChapter": "ch11",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "祥子只剩五块钱并决定明天另找事，生计和买车希望均无着落。",
+   "plantedChapter": "ch12",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "祥子一度产生拿曹宅东西补偿损失的念头，虽压下作贼之心，却显露穷途中的道德挣扎。",
+   "plantedChapter": "ch12",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "虎妞逼婚与积蓄尽失"
+  },
+  {
+   "content": "曹先生仓促出走、侦探拿枪与丢钱经过只被回述，赔偿与曹宅责任悬空",
+   "plantedChapter": "ch13",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "虎妞暗称'我们的事有盼望'，借寿桃干儿子之说拉拢祥子",
+   "plantedChapter": "ch13",
+   "resolvedChapter": "ch15",
+   "open": false,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "祥子暗立念头不再老实要强、要学做无赖车夫",
+   "plantedChapter": "ch14",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "虎妞当众宣称'我已经有了，祥子的'，真假存疑",
+   "plantedChapter": "ch14",
+   "resolvedChapter": "ch15",
+   "open": false,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "虎妞尚有四百来块，计划回人和厂服软继承家产",
+   "plantedChapter": "ch15",
+   "resolvedChapter": "ch17",
+   "open": false,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "祥子对虎妞动了'掐死她再抹脖子'的恶念",
+   "plantedChapter": "ch15",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "人和厂招牌'人'字变'仁'、东西屋无灯，疑已倒出",
+   "plantedChapter": "ch16",
+   "resolvedChapter": "ch17",
+   "open": false,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "刘四爷携财消失，真出京还是藏身他处无人确知",
+   "plantedChapter": "ch17",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "黑漆白铜车被叫'小寡妇'，祥子总觉像拉棺材、不吉祥",
+   "plantedChapter": "ch17",
+   "resolvedChapter": "ch20",
+   "open": false,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "祥子惊觉身体垮掉，预感'祥子完了'、会变成二强子",
+   "plantedChapter": "ch18",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "虎妞真正怀孕，收生婆断言恐横生逆产",
+   "plantedChapter": "ch18",
+   "resolvedChapter": "ch19",
+   "open": false,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "祥子起誓若再病倒就去跳河",
+   "plantedChapter": "ch19",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "小福子自忖'死一个而救活俩'、'最伟大的忍辱是预备反抗'",
+   "plantedChapter": "ch19",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "祥子对小福子许诺'等我混好了，我来！一定来！'",
+   "plantedChapter": "ch20",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "夏先生频去大药房买不明药物、夏太太气派酷似虎妞令祥子恐惧",
+   "plantedChapter": "ch20",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "成婚与家破"
+  },
+  {
+   "content": "祥子的性病未除根，阴天或换季骨节仍痛，旧疾持续纠缠",
+   "plantedChapter": "ch21",
+   "resolvedChapter": "ch24",
+   "open": false,
+   "volume": "沉沦"
+  },
+  {
+   "content": "祥子残存戒烟酒、攒钱买车并看望小福子的念头，屡被眼前享乐冲散",
+   "plantedChapter": "ch21",
+   "resolvedChapter": "ch23",
+   "open": false,
+   "volume": "沉沦"
+  },
+  {
+   "content": "小福子下落不明：或搬、或死、或被二强子卖到极远地方",
+   "plantedChapter": "ch22",
+   "resolvedChapter": "ch23",
+   "open": false,
+   "volume": "沉沦"
+  },
+  {
+   "content": "曹先生收留小福子以'跟太太商议'为条件；祥子此后再未回曹宅，许诺悬空",
+   "plantedChapter": "ch22",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "沉沦"
+  },
+  {
+   "content": "老人'独个儿的蚂蚱被线拴着'的判词与祥子'不准备再过冬''到乱死岗子去'的自白，预设其自毁终点",
+   "plantedChapter": "ch23",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "沉沦"
+  },
+  {
+   "content": "腰间六十元钞票'不敢见阳光'，阮明的鬼影无时无刻不追随祥子",
+   "plantedChapter": "ch24",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "沉沦"
+  },
+  {
+   "content": "'等着吸那最后的一口气''还有口气的死鬼'，预示祥子的死亡结局",
+   "plantedChapter": "ch24",
+   "resolvedChapter": null,
+   "open": true,
+   "volume": "沉沦"
+  }
+ ],
+ "volumes": [
+  {
+   "endChapter": "ch05",
+   "name": "买车与骆驼",
+   "reason": "一起一落：祥子苦干买得新车却被大兵掳走，牵回三匹骆驼得绰号，回北平重新攒钱。",
+   "startChapter": "ch01"
+  },
+  {
+   "endChapter": "ch12",
+   "name": "虎妞逼婚与积蓄尽失",
+   "reason": "二起二落：祥子在曹宅拉包月重燃希望，却被虎妞以怀孕逼婚纠缠，全部积蓄又遭孙侦探敲诈一空。",
+   "startChapter": "ch06"
+  },
+  {
+   "endChapter": "ch20",
+   "name": "成婚与家破",
+   "reason": "三起三落：刘四爷寿宴父女决裂，祥子与虎妞成婚后买车再拉，虎妞难产而死，只得卖车葬妻。",
+   "startChapter": "ch13"
+  },
+  {
+   "endChapter": "ch24",
+   "name": "沉沦",
+   "reason": "彻底堕落：小福子上吊、最后一丝指望破灭，祥子为六十块钱出卖阮明，沦为麻木苟活的行尸走肉。",
+   "startChapter": "ch21"
+  }
+ ]
+}
