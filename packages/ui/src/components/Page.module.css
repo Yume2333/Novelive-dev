@@ -22,6 +22,20 @@
 	margin: 0;
 }
 
+.emptyCard {
+	margin-top: var(--space-7);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-2xl);
+	background: var(--panel-70);
+	box-shadow: var(--shadow-glass);
+}
+
+.emptyCard h2 {
+	margin: 0;
+	color: var(--color-on-surface);
+	font: 700 20px var(--font-display);
+}
+
 .icon {
 	display: grid;
 	place-items: center;
@@ -31,4 +45,8 @@
 	border-radius: var(--radius-xl);
 	background: var(--panel-70);
 	box-shadow: var(--shadow-glass);
+}
+
+.emptyCard .icon {
+	border-radius: var(--radius-full);
 }

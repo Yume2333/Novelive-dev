@@ -96,7 +96,13 @@ test('M0 settings saves five slots and runs recorded text and vision requests', 
 				await expect(region.getByRole('status')).toHaveText('连接成功')
 			}
 
-			await page
+			const appearance = page.getByRole('region', { name: '界面', exact: true })
+			await expect(
+				appearance
+					.getByRole('combobox', { name: '界面语言' })
+					.locator('option'),
+			).toHaveText(['简体中文'])
+			await appearance
 				.getByRole('combobox', { name: '主题', exact: true })
 				.selectOption('dark')
 			await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
@@ -200,15 +206,29 @@ test('M0 settings shows recorded image capabilities and loads their protocol thu
 			const image = card(page, '图片模型')
 			const smoke = imageSmokeConfig(baseUrl, placeholder)
 			await image.getByRole('button', { name: '图片模型' }).click()
+			const sizeHint = page
+				.getByRole('tooltip')
+				.filter({ hasText: '超出部分由本地放大' })
+			await expect(sizeHint).toBeHidden()
+			await image.getByRole('button', { name: '原生长边上限说明' }).hover()
+			await expect(sizeHint).toBeVisible()
+			await page.keyboard.press('Escape')
+			await expect(sizeHint).toBeHidden()
+			const tier = image.getByLabel('放大档位', { exact: true })
+			await tier.selectOption('fast')
+			await image.getByRole('button', { name: '放大档位说明' }).focus()
+			await expect(page.getByRole('tooltip')).toHaveText('低性能机用，画质下降')
+			await page.keyboard.press('Escape')
+			await tier.selectOption('anime')
 			await image.getByLabel('接口地址').fill(smoke.baseUrl)
 			await image.getByLabel('模型名').fill(smoke.model)
 			await image.getByLabel('API Key').fill(smoke.apiKey)
 			await image.getByLabel('生图质量').selectOption(smoke.quality)
 			await image
-				.getByLabel('原生长边上限')
+				.getByLabel('原生长边上限', { exact: true })
 				.selectOption(String(smoke.nativeMaxEdge))
 			await image.getByLabel('后处理').selectOption('off')
-			await expect(image.getByLabel('放大档位')).toBeDisabled()
+			await expect(tier).toBeDisabled()
 			await testButton(image).click()
 			await expect(image.getByRole('status')).toHaveText('连接成功')
 			for (const capability of ['文生图', '透明底', '图片编辑']) {

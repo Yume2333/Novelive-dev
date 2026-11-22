@@ -4,6 +4,7 @@ import type {
 	TextSlot,
 } from '@novelive/creator/contract'
 import { useRef, useState } from 'react'
+import { InfoTooltip } from '../../components/InfoTooltip'
 import styles from './SettingsPage.module.css'
 
 type Models = MaskedConfig['models']
@@ -16,8 +17,8 @@ export type ModelDraft = {
 }
 
 export const themes = [
-	['light', '亮色'],
-	['dark', '暗色'],
+	['light', '亮'],
+	['dark', '暗'],
 	['system', '跟随系统'],
 ] as const
 
@@ -318,22 +319,12 @@ export function useImageFields(
 					placeholder="模型名"
 					onChange={(event) => change({ model: event.target.value })}
 				/>
-				<ApiKeyInput
-					value={draft.apiKey}
-					onChange={(apiKey) => change({ apiKey })}
-				/>
-				<Input
-					label="同时出图数"
-					inputMode="numeric"
-					value={draft.concurrency}
-					onChange={(event) => change({ concurrency: event.target.value })}
-				/>
-				<Input
-					label="生图失败重试次数"
-					inputMode="numeric"
-					value={draft.retries}
-					onChange={(event) => change({ retries: event.target.value })}
-				/>
+				<div className={styles.fullField}>
+					<ApiKeyInput
+						value={draft.apiKey}
+						onChange={(apiKey) => change({ apiKey })}
+					/>
+				</div>
 				<div className={styles.field}>
 					<span>生图质量</span>
 					<Select
@@ -348,46 +339,75 @@ export function useImageFields(
 					/>
 				</div>
 				<div className={styles.field}>
-					<span>原生长边上限</span>
+					<span className={styles.fieldLabel}>
+						原生长边上限
+						<InfoTooltip label="原生长边上限说明" text="超出部分由本地放大" />
+					</span>
 					<Select
 						label="原生长边上限"
 						value={draft.nativeMaxEdge}
 						options={[
-							[1536, '1536（Codex 渠道）'],
+							[1536, '1536 · Codex 渠道'],
 							[2048, '2048'],
-							[2560, '2560（OpenAI 官方 API）'],
-							[2816, '2816（Seedream 5.x）'],
+							[2560, '2560 · OpenAI 官方 API'],
+							[2816, '2816 · Seedream 5.x'],
 							[3840, '3840 · 4K（OpenAI 实验 / Seedream 4.5）'],
 						]}
 						onChange={(nativeMaxEdge) => change({ nativeMaxEdge })}
 					/>
 				</div>
-				<div className={styles.field}>
-					<span>后处理</span>
-					<Select
-						label="后处理"
-						value={draft.postProcess}
-						options={[
-							['off', '关'],
-							['single', '放大降噪'],
-							['double', '双重放大降噪'],
-						]}
-						onChange={(postProcess) => change({ postProcess })}
-					/>
-				</div>
-				<div className={styles.field}>
-					<span>放大档位</span>
-					<Select
-						label="放大档位"
-						value={draft.upscaleTier}
-						disabled={draft.postProcess === 'off'}
-						options={[
-							['anime', '动漫'],
-							['fast', '快速（低性能机用，画质下降）'],
-							['detail', '保留细节（少改原画，保留纹理细节）'],
-						]}
-						onChange={(upscaleTier) => change({ upscaleTier })}
-					/>
+				<Input
+					label="同时出图数"
+					inputMode="numeric"
+					value={draft.concurrency}
+					onChange={(event) => change({ concurrency: event.target.value })}
+				/>
+				<Input
+					label="生图失败重试次数"
+					inputMode="numeric"
+					value={draft.retries}
+					onChange={(event) => change({ retries: event.target.value })}
+				/>
+				<div className={styles.postProcess}>
+					<div className={styles.field}>
+						<span>后处理</span>
+						<Select
+							label="后处理"
+							value={draft.postProcess}
+							options={[
+								['off', '关'],
+								['single', '放大降噪（默认）'],
+								['double', '双重放大降噪'],
+							]}
+							onChange={(postProcess) => change({ postProcess })}
+						/>
+					</div>
+					<div className={styles.field}>
+						<span className={styles.fieldLabel}>
+							放大档位
+							{draft.upscaleTier !== 'anime' && (
+								<InfoTooltip
+									label="放大档位说明"
+									text={
+										draft.upscaleTier === 'fast'
+											? '低性能机用，画质下降'
+											: '少改原画，保留纹理细节'
+									}
+								/>
+							)}
+						</span>
+						<Select
+							label="放大档位"
+							value={draft.upscaleTier}
+							disabled={draft.postProcess === 'off'}
+							options={[
+								['anime', '动漫（默认）'],
+								['fast', '快速'],
+								['detail', '保留细节'],
+							]}
+							onChange={(upscaleTier) => change({ upscaleTier })}
+						/>
+					</div>
 				</div>
 			</>
 		),
