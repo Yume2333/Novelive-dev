@@ -130,7 +130,7 @@ export const changes = [
 	{
 		kind: 'character',
 		op: 'update',
-		entry: { ...confirmed, firstSeenChapter: 'c2', identity: 'Captain' },
+		entry: { ...confirmed, identity: 'Captain' },
 	},
 ]
 

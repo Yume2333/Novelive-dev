@@ -190,6 +190,16 @@ test('a hard stop persists exactly one event and resumes after reopening without
 		expect(fetch).toHaveBeenCalledTimes(2)
 		expect(result.biblePatch).toHaveLength(3)
 		expect(result.conflicts).toHaveLength(1)
+		expect(
+			await project.read(projectFiles.character(scope, 'ada')),
+		).toMatchObject({
+			entries: [
+				{
+					...confirmed,
+					changes: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
+				},
+			],
+		})
 		expect(await project.read(files.checkpoint)).toMatchObject({
 			applied: true,
 			events: [{ is_last: false }, { is_last: true }],

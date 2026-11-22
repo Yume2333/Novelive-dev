@@ -11,6 +11,7 @@ import {
 	str,
 } from '@earendil-works/pi-schema'
 import {
+	type BiblePatch,
 	biblePatchSchema,
 	entityId,
 	formatVersion,
@@ -364,7 +365,35 @@ ${packets[packet]}`,
 
 	const parts = state.whole ? [state.whole] : state.events
 	const skeleton = combine(volumeId, chapterIds, parts)
-	const biblePatch = unique(parts.flatMap((part) => part.biblePatch))
+	const observations = new Map<BiblePatch[number], string>()
+	const proposals = new Map<string, BiblePatch[number]>()
+	let packetIndex = 0
+	for (const part of parts) {
+		const packetIds = state.whole
+			? chapterIds
+			: [...(packets[packetIndex] ?? '').matchAll(/^Chapter ([\w-]+):$/gm)].map(
+					([, id]) => id,
+				)
+		const affected = unique(
+			part.chapters
+				.map(({ chapterId }) => chapterId)
+				.filter((id) => packetIds.includes(id)),
+		)
+		const observed =
+			affected.length === 1
+				? affected[0]
+				: new Set(packetIds).size === 1
+					? packetIds[0]
+					: undefined
+		for (const item of part.biblePatch) {
+			const key = JSON.stringify(item)
+			if (proposals.has(key)) continue
+			proposals.set(key, item)
+			if (observed) observations.set(item, observed)
+		}
+		if ('is_last' in part && part.is_last) packetIndex++
+	}
+	const biblePatch = [...proposals.values()]
 	const glossaryPatch = unique(parts.flatMap((part) => part.glossaryPatch))
 	options.signal?.throwIfAborted()
 	if (
@@ -391,6 +420,7 @@ ${packets[packet]}`,
 					biblePatch,
 					glossaryPatch,
 					chapterSet,
+					observations,
 				)
 			: {
 					conflicts: biblePatch

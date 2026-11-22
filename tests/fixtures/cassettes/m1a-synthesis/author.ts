@@ -53,7 +53,19 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 				: lastPacket
 					? changes.slice(2)
 					: []
-			: changes,
+			: changes.map((item) =>
+					item.entry.identity === 'Captain'
+						? {
+								...item,
+								entry: {
+									...item.entry,
+									changes: [
+										{ chapterId: 'c2', field: 'identity', value: 'Captain' },
+									],
+								},
+							}
+						: item,
+				),
 		glossaryPatch: !packet || eventIndex === 0 ? glossaryChanges : [],
 		...(packet
 			? {

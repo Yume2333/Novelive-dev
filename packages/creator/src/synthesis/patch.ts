@@ -219,6 +219,7 @@ function merge<T extends Entry>(
 	current: T | undefined,
 	raw: T,
 	kind: keyof Bible,
+	observedChapter?: string,
 ) {
 	const { conflict: _conflict, ...fields } = raw
 	const candidate = { ...fields, status: 'candidate' } as T
@@ -235,20 +236,25 @@ function merge<T extends Entry>(
 	const changes = Array.isArray(incoming.changes)
 		? [...(incoming.changes as Change[])]
 		: []
-	const anchor = candidate.firstSeenChapter
-	if (
-		temporal &&
-		anchor &&
-		typeof incoming[temporal] === 'string' &&
-		before[temporal] !== undefined &&
-		incoming[temporal] !== before[temporal]
-	) {
-		changes.push({
-			chapterId: anchor,
-			field: temporal,
-			value: incoming[temporal],
-		})
-		delete incoming[temporal]
+	let unscopedChange = false
+	if (temporal) {
+		const value = incoming[temporal]
+		if (
+			typeof value === 'string' &&
+			before[temporal] !== undefined &&
+			value !== before[temporal]
+		) {
+			if (
+				!changes.some(
+					(change) => change.field === temporal && change.value === value,
+				)
+			) {
+				if (observedChapter)
+					changes.push({ chapterId: observedChapter, field: temporal, value })
+				else unscopedChange = true
+			}
+			delete incoming[temporal]
+		}
 	}
 	const metadata = new Set([
 		'status',
@@ -265,14 +271,16 @@ function merge<T extends Entry>(
 				([key, value]) =>
 					!metadata.has(key) && !isDeepStrictEqual(before[key], value),
 			))
-	if (hasConflict)
+	if (hasConflict || unscopedChange)
 		return {
 			entry: current,
 			conflict: {
 				...candidate,
 				...fields,
 				status: 'candidate',
-				conflict: difference,
+				conflict: unscopedChange
+					? 'Temporal change has no observed chapter'
+					: difference,
 			} as T,
 		}
 	if (current.status !== 'confirmed') Object.assign(after, incoming)
@@ -301,6 +309,7 @@ export async function applyPatches(
 	patch: BiblePatch,
 	glossary: GlossaryPatch,
 	chapters: ReadonlySet<string>,
+	observations: ReadonlyMap<Patch, string> = new Map(),
 ): Promise<{ conflicts: BiblePatch; glossaryConflicts: GlossaryPatch }> {
 	const conflicts: BiblePatch = []
 	const glossaryConflicts: GlossaryPatch = []
@@ -342,7 +351,12 @@ export async function applyPatches(
 				}
 				continue
 			}
-			const { entry, conflict } = merge<E>(current, item.entry as E, kind)
+			const { entry, conflict } = merge<E>(
+				current,
+				item.entry as E,
+				kind,
+				observations.get(item),
+			)
 			if (conflict) conflicts.push({ ...item, entry: conflict } as Patch)
 			if (!isDeepStrictEqual(current, entry)) {
 				entries.set(entry.id, entry)
@@ -427,6 +441,7 @@ export async function applyPatches(
 			allowed,
 			glossary,
 			chapters,
+			observations,
 		)
 		return { ...result, conflicts: [...rejected, ...result.conflicts] }
 	}
