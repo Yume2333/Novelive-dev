@@ -116,6 +116,13 @@ function clean(text: string) {
 type Writer = ReturnType<typeof writingModel>
 const rawScenes = (script: string) =>
 	script.split(/\n(?=[^\S\n]*scene(?:\s|$))/)
+function sourceBounds(chunk: string, paragraphs: readonly SourceParagraph[]) {
+	const range = chunk.match(/^\s*source\s+(p\d+)(?:-(p\d+))?\s*$/m)
+	return [
+		paragraphs.findIndex(({ id }) => id === range?.[1]),
+		paragraphs.findIndex(({ id }) => id === (range?.[2] ?? range?.[1])),
+	]
+}
 function ask(model: Writer, prompt: string) {
 	if (Buffer.byteLength(prompt) > model.inputLimit)
 		throw new Error('Writer input exceeds its configured context window')
@@ -151,11 +158,13 @@ async function validate(
 		const errors = compiled.diagnostics.filter(
 			({ line }) => line >= start && line <= offset,
 		)
-		const range = chunks[index].match(/^\s*source\s+(p\d+)(?:-(p\d+))?\s*$/m)
-		const from = paragraphs.findIndex(({ id }) => id === range?.[1])
-		const to = paragraphs.findIndex(
-			({ id }) => id === (range?.[2] ?? range?.[1]),
-		)
+		const [from, to] = sourceBounds(chunks[index], paragraphs)
+		const coverage = errors.some(({ code }) => code === 'E_SOURCE_COVERAGE')
+		const previousEnd =
+			index > 0 ? sourceBounds(chunks[index - 1], paragraphs)[1] : -1
+		const startOfGap = coverage ? Math.min(previousEnd + 1, from) : from
+		const endOfGap =
+			coverage && index === chunks.length - 1 ? paragraphs.length - 1 : to
 		const repair = await ask(
 			model,
 			[
@@ -163,8 +172,8 @@ async function validate(
 				'Repair only the supplied scene. Return exactly one complete scene, keeping its narrative and valid IDs.',
 				`Diagnostics: ${JSON.stringify(errors)}`,
 				`Valid paragraph IDs: ${paragraphs.map(({ id }) => id).join(', ')}`,
-				...(from >= 0 && to >= from
-					? [source(paragraphs.slice(from, to + 1))]
+				...(startOfGap >= 0 && endOfGap >= startOfGap
+					? [source(paragraphs.slice(startOfGap, endOfGap + 1))]
 					: []),
 				chunks[index],
 				instructions.end,

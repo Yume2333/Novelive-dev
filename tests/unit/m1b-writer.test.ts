@@ -319,4 +319,28 @@ describe('M1b writer', () => {
 		expect(ids[2]).toBe(draft.scenes[1].scene.id)
 		expect(new Set(ids).size).toBe(3)
 	})
+
+	test('includes the actual missing source before and after the final scene', async () => {
+		const input = {
+			...chapter,
+			paragraphs: [
+				...chapter.paragraphs,
+				{ id: 'p0002', text: 'A lantern went out.' },
+				{ id: 'p0003', text: 'An owl called.' },
+				{ id: 'p0004', text: 'Morning arrived.' },
+			],
+		}
+		const gap = 'scene Night\nsource p0003\n: An owl called.'
+		const fixed =
+			'scene Night\nsource p0002-p0004\n: A lantern went out, an owl called, and morning arrived.'
+		const { options, requests } = responses(`${scene}\n${gap}`, fixed)
+		const result = await writeChapter(input, options)
+		expect(result.scenes[1].scene.source).toMatchObject({
+			from: 'p0002',
+			to: 'p0004',
+		})
+		expect(requests[1]).toContain('p0002: A lantern went out.')
+		expect(requests[1]).toContain('p0004: Morning arrived.')
+		expect(requests[1]).not.toContain('p0001: At dusk')
+	})
 })
