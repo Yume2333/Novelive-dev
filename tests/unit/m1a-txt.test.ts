@@ -209,6 +209,18 @@ test('BOM-less UTF-16 can be sniffed from Chinese punctuation without ASCII', ()
 	expect(decodeTxt(Buffer.from(le).swap16()).encoding).toBe('utf-16be')
 })
 
+test.each(['utf-16le', 'utf-16be'] as const)(
+	'compares both byte orders before selecting BOM-less %s',
+	(encoding) => {
+		const text = '第一章\n一人走来。\n'
+		const bytes = Buffer.from(text, 'utf16le')
+		if (encoding === 'utf-16be') bytes.swap16()
+		const decoded = decodeTxt(bytes)
+		expect(decoded.encoding).toBe(encoding)
+		expect(decoded.text).toBe(text)
+	},
+)
+
 test('the shared paragraph contract accepts IDs beyond four digits but not zero', () => {
 	expect(compile(paragraphId).check('p10000')).toBe(true)
 	expect(compile(paragraphId).check('p00000')).toBe(false)

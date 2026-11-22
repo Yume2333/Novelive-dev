@@ -95,10 +95,13 @@ export function detectTxtEncoding(bytes: Uint8Array): EncodingCandidate[] {
 		return result ? [result] : []
 	}
 	if (bytes.length % 2 === 0 && bytes.length > 0) {
+		const sniffed: EncodingCandidate[] = []
+		const pairs = bytes.length / 2
 		for (const encoding of ['utf-16le', 'utf-16be'] as const) {
 			const high = encoding === 'utf-16le' ? 1 : 0
 			let asciiPairs = 0
 			let punctuationPairs = 0
+			let newlinePairs = 0
 			for (let i = 0; i < bytes.length; i += 2) {
 				if (
 					bytes[i + high] === 0 &&
@@ -107,17 +110,27 @@ export function detectTxtEncoding(bytes: Uint8Array): EncodingCandidate[] {
 				)
 					asciiPairs++
 				const unit = bytes[i + high] * 256 + bytes[i + 1 - high]
+				if (unit === 10 || unit === 13) newlinePairs++
 				if ([0x3002, 0xff0c, 0xff01, 0xff1f, 0x300c, 0x300d].includes(unit))
 					punctuationPairs++
 			}
 			if (
-				(asciiPairs > 0 && asciiPairs / (bytes.length / 2) >= 0.02) ||
-				punctuationPairs / (bytes.length / 2) >= 0.05
+				(asciiPairs > 0 && asciiPairs / pairs >= 0.02) ||
+				punctuationPairs / pairs >= 0.05
 			) {
 				const result = candidate(bytes, encoding, false)
-				if (result) return [result]
+				if (result) {
+					result.score +=
+						(2 * asciiPairs + 4 * (newlinePairs + punctuationPairs)) / pairs
+					sniffed.push(result)
+				}
 			}
 		}
+		sniffed.sort((a, b) => b.score - a.score)
+		if (sniffed.length)
+			return sniffed.length === 1 || sniffed[0].score - sniffed[1].score >= 1.5
+				? sniffed.slice(0, 1)
+				: sniffed
 	}
 	const candidates = encodings
 		.flatMap((encoding) => {
