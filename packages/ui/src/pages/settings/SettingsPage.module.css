@@ -188,6 +188,8 @@
 }
 
 .postProcess {
+	align-items: start;
+	gap: var(--space-4);
 	border-top: 1px solid var(--divider);
 	padding-top: var(--space-4);
 }
@@ -197,6 +199,25 @@
 	gap: var(--space-1);
 	min-width: 0;
 	font-size: 13px;
+}
+
+.fullField .field {
+	gap: 6px;
+}
+
+.fullField .field > span {
+	color: var(--color-on-surface-variant);
+	font-family: var(--font-body);
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.2;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+.fieldHint {
+	color: var(--color-outline);
+	font-size: 12px;
 }
 
 .field input,

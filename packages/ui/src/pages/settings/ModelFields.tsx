@@ -46,16 +46,19 @@ export function Select<T extends string | number>({
 	value,
 	onChange,
 	disabled,
+	describedBy,
 }: {
 	label: string
 	options: ReadonlyArray<readonly [T, string, ...string[]]>
 	value: T
 	onChange(value: T): void
 	disabled?: boolean
+	describedBy?: string
 }) {
 	return (
 		<select
 			aria-label={label}
+			aria-describedby={describedBy}
 			value={value}
 			disabled={disabled}
 			onChange={(event) => {
@@ -341,16 +344,20 @@ export function useImageFields(
 					<span>原生长边上限</span>
 					<Select
 						label="原生长边上限"
+						describedBy="native-max-edge-hint"
 						value={draft.nativeMaxEdge}
 						options={[
-							[1536, '1536（Codex 渠道）'],
+							[1536, '1536 · Codex 渠道'],
 							[2048, '2048'],
-							[2560, '2560（OpenAI 官方 API）'],
-							[2816, '2816（Seedream 5.x）'],
+							[2560, '2560 · OpenAI 官方 API'],
+							[2816, '2816 · Seedream 5.x'],
 							[3840, '3840 · 4K（OpenAI 实验 / Seedream 4.5）'],
 						]}
 						onChange={(nativeMaxEdge) => change({ nativeMaxEdge })}
 					/>
+					<small id="native-max-edge-hint" className={styles.fieldHint}>
+						超出部分由本地放大
+					</small>
 				</div>
 				<Input
 					label="同时出图数"
@@ -372,7 +379,7 @@ export function useImageFields(
 							value={draft.postProcess}
 							options={[
 								['off', '关'],
-								['single', '放大降噪'],
+								['single', '放大降噪（默认）'],
 								['double', '双重放大降噪'],
 							]}
 							onChange={(postProcess) => change({ postProcess })}
@@ -385,12 +392,19 @@ export function useImageFields(
 							value={draft.upscaleTier}
 							disabled={draft.postProcess === 'off'}
 							options={[
-								['anime', '动漫'],
-								['fast', '快速（低性能机用，画质下降）'],
-								['detail', '保留细节（少改原画，保留纹理细节）'],
+								['anime', '动漫（默认）'],
+								['fast', '快速'],
+								['detail', '保留细节'],
 							]}
 							onChange={(upscaleTier) => change({ upscaleTier })}
 						/>
+						{draft.upscaleTier !== 'anime' && (
+							<small className={styles.fieldHint}>
+								{draft.upscaleTier === 'fast'
+									? '低性能机用，画质下降'
+									: '少改原画，保留纹理细节'}
+							</small>
+						)}
 					</div>
 				</div>
 			</>
