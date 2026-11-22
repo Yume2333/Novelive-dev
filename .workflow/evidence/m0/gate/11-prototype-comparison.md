@@ -38,3 +38,8 @@ recapturing the comparison. The fixes use the prototype source and DESIGN.md.
 The follow-up check verified the visible control order, pointer expansion via
 the chevron, the native-size hint, the language and theme options, and all
 four same-viewport screenshot pairs.
+
+DESIGN.md takes precedence over the prototype's inline hints: both the
+native-size explanation and the conditional upscale-tier explanation now
+appear only after opening their ⓘ prompts. The wording is unchanged.
+[App with the native-size prompt open](11-w5-app-image-info.png).

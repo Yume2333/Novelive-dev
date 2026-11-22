@@ -41,3 +41,12 @@ Checked 70 files in 24ms. No fixes applied.
 W3 Electron strict: reopened profile; three text protocols and three novelive:// thumbnails passed
 W3 Electron strict: recorded auth and synthetic moderation displayed in Settings
 W4 also reran successfully; see 11-browser-checks.txt and the refreshed screenshots.
+
+PR #14 follow-up — frozen install, pnpm check, and strict Xvfb Electron E2E
+Done in 30ms using pnpm v12.21.0
+Checked 70 files in 33ms. No fixes applied.
+ Test Files  7 passed (7)
+      Tests  129 passed (129)
+  13 passed (12.5s)
+Electron opened both image-field info prompts and dismissed them with Escape.
+The refreshed Chromium W5 pairs show the tokenized spacing and the ⓘ prompt.

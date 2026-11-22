@@ -3,7 +3,8 @@ import type {
 	MaskedConfig,
 	TextSlot,
 } from '@novelive/creator/contract'
-import { useRef, useState } from 'react'
+import { Info } from 'lucide-react'
+import { useId, useRef, useState } from 'react'
 import styles from './SettingsPage.module.css'
 
 type Models = MaskedConfig['models']
@@ -46,19 +47,16 @@ export function Select<T extends string | number>({
 	value,
 	onChange,
 	disabled,
-	describedBy,
 }: {
 	label: string
 	options: ReadonlyArray<readonly [T, string, ...string[]]>
 	value: T
 	onChange(value: T): void
 	disabled?: boolean
-	describedBy?: string
 }) {
 	return (
 		<select
 			aria-label={label}
-			aria-describedby={describedBy}
 			value={value}
 			disabled={disabled}
 			onChange={(event) => {
@@ -74,6 +72,25 @@ export function Select<T extends string | number>({
 				</option>
 			))}
 		</select>
+	)
+}
+
+function FieldInfo({ label, text }: { label: string; text: string }) {
+	const id = useId()
+	return (
+		<>
+			<button
+				aria-label={`${label}说明`}
+				className={styles.infoButton}
+				popoverTarget={id}
+				type="button"
+			>
+				<Info aria-hidden="true" size={14} />
+			</button>
+			<span className={styles.infoPrompt} id={id} popover="auto">
+				{text}
+			</span>
+		</>
 	)
 }
 
@@ -341,10 +358,12 @@ export function useImageFields(
 					/>
 				</div>
 				<div className={styles.field}>
-					<span>原生长边上限</span>
+					<span className={styles.fieldLabel}>
+						原生长边上限
+						<FieldInfo label="原生长边上限" text="超出部分由本地放大" />
+					</span>
 					<Select
 						label="原生长边上限"
-						describedBy="native-max-edge-hint"
 						value={draft.nativeMaxEdge}
 						options={[
 							[1536, '1536 · Codex 渠道'],
@@ -355,9 +374,6 @@ export function useImageFields(
 						]}
 						onChange={(nativeMaxEdge) => change({ nativeMaxEdge })}
 					/>
-					<small id="native-max-edge-hint" className={styles.fieldHint}>
-						超出部分由本地放大
-					</small>
 				</div>
 				<Input
 					label="同时出图数"
@@ -386,7 +402,19 @@ export function useImageFields(
 						/>
 					</div>
 					<div className={styles.field}>
-						<span>放大档位</span>
+						<span className={styles.fieldLabel}>
+							放大档位
+							{draft.upscaleTier !== 'anime' && (
+								<FieldInfo
+									label="放大档位"
+									text={
+										draft.upscaleTier === 'fast'
+											? '低性能机用，画质下降'
+											: '少改原画，保留纹理细节'
+									}
+								/>
+							)}
+						</span>
 						<Select
 							label="放大档位"
 							value={draft.upscaleTier}
@@ -398,13 +426,6 @@ export function useImageFields(
 							]}
 							onChange={(upscaleTier) => change({ upscaleTier })}
 						/>
-						{draft.upscaleTier !== 'anime' && (
-							<small className={styles.fieldHint}>
-								{draft.upscaleTier === 'fast'
-									? '低性能机用，画质下降'
-									: '少改原画，保留纹理细节'}
-							</small>
-						)}
 					</div>
 				</div>
 			</>
