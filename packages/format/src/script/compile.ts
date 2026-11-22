@@ -41,7 +41,12 @@ function lookup(entries: readonly Asset[]) {
 	const byId = new Map(entries.map((entry) => [entry.id, entry]))
 	const aliases = new Map<string, Asset | null>()
 	for (const entry of entries) {
-		for (const alias of entry.aliases) {
+		const parts = entry.id.split('/')
+		const costume =
+			entry.type === 'character' && parts.length === 3
+				? parts.slice(0, 2).join('/')
+				: undefined
+		for (const alias of costume ? [...entry.aliases, costume] : entry.aliases) {
 			const existing = aliases.get(alias)
 			aliases.set(
 				alias,

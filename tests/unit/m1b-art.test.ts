@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
+import { compileScript } from '@novelive/format/script'
 import sharp from 'sharp'
 import { expect, test } from 'vitest'
 import { checkImage } from '../../packages/creator/src/pipeline/art/check'
@@ -71,6 +72,21 @@ test('confirms three main visuals and costumes, stages the chapter and draws can
 		])
 		expect(results).toEqual(jobs.map(() => ({ status: 'drawn' })))
 		const { entries } = await art.registry()
+		const stagedCostume = manifest.script.replace(
+			'@show ada/coat/neutral center',
+			'@costume ada/coat',
+		)
+		const compiled = compileScript(stagedCostume, {
+			assets: entries,
+			speakers: ['ada'],
+			paragraphIds: ['p0001'],
+		})
+		expect(
+			compiled.ok &&
+				compiled.scenes[0].beats
+					.flatMap(({ actions }) => actions)
+					.find(({ name }) => name === 'costume')?.assets,
+		).toEqual([{ id: 'ada/coat/neutral' }])
 		expect(
 			entries.find((entry) => entry.id === 'ada/uniform/angry')?.aliases,
 		).toEqual(['ada/uniform/furious'])
