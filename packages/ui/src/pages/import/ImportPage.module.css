@@ -70,6 +70,12 @@ fieldset.card {
 	opacity: 1;
 }
 
+@media (prefers-reduced-motion: reduce) {
+	.actions {
+		transition: none;
+	}
+}
+
 .row + .row {
 	border-top: 1px solid var(--divider);
 }
