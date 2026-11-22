@@ -106,7 +106,7 @@ test('revisions rewrite chapters, volumes, settings and findings', async () => {
 	if (view.status !== 'ready') throw new Error('expected a project')
 	expect(view.references).toEqual(['source/references/01.png'])
 	expect(view.findings).toEqual([
-		{ paragraph: 6, note: '疑似标题，保留在正文待核对：Chapter One 余波' },
+		{ paragraph: 7, note: '疑似标题，保留在正文待核对：Chapter One 余波' },
 	])
 	expect(view.layout.confirmWithReferences).toBe(true)
 	let layout = renameChapter(view.layout, 1, '序章 门')
@@ -178,6 +178,31 @@ test('revisions rewrite chapters, volumes, settings and findings', async () => {
 		'v0002',
 		'v0003',
 	])
+})
+
+test('a finding follows its paragraph into a split chapter', async () => {
+	const dir = await workspace()
+	const source = join(dir, 'fuzzy.txt')
+	await writeFile(
+		source,
+		`${await readFile(fixture, 'utf8')}\nChapter One 余波\n`,
+	)
+	const view = await importTxtProject({
+		sourcePath: source,
+		folder: dir,
+		title: '风',
+		references: [],
+	})
+	if (view.status !== 'ready') throw new Error('expected a project')
+	await reviseTxtProject(
+		view.projectDir,
+		splitChapter(view.layout, 5, view.paragraphs),
+	)
+	const report = await json(view.projectDir, 'source/import-report.json')
+	expect(
+		report.check.chapterFindings.map((f: { chapterId: string }) => f.chapterId),
+	).toEqual(['ch0007'])
+	expect(await readdir(view.projectDir)).not.toContain('volumes.previous')
 })
 
 test('invalid layouts are rejected', () => {
