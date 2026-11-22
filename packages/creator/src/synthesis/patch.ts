@@ -500,10 +500,23 @@ export async function applyPatches(
 		const histories = new Map<string, History>()
 		const changed = new Set<string>()
 		const deferred = new Map<string, Patch[]>()
+		const rejectDeferred = (id: string, reason: string) => {
+			for (const item of deferred.get(id) ?? []) {
+				conflicts.push({
+					...item,
+					entry: { ...item.entry, status: 'candidate', conflict: reason },
+				} as Patch)
+			}
+			deferred.delete(id)
+		}
 		const applyItem = (item: Patch) => {
 			const id = item.entry.id
 			const current = entries.get(id)
 			if (item.op === 'delete') {
+				rejectDeferred(
+					id,
+					'Entry was deleted before its update could be applied',
+				)
 				if (current?.status === 'confirmed')
 					conflicts.push({
 						...item,
@@ -555,18 +568,8 @@ export async function applyPatches(
 		for (const item of patch) {
 			if (item.kind === kind && item.op !== 'none') applyItem(item)
 		}
-		for (const updates of deferred.values()) {
-			for (const item of updates) {
-				conflicts.push({
-					...item,
-					entry: {
-						...item.entry,
-						status: 'candidate',
-						conflict: 'Entry to update is not published',
-					},
-				} as Patch)
-			}
-		}
+		for (const id of deferred.keys())
+			rejectDeferred(id, 'Entry to update is not published')
 		for (const [id, history] of histories) {
 			const entry = entries.get(id)
 			if (!entry) continue

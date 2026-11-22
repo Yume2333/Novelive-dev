@@ -622,6 +622,45 @@ test('an update still waiting for an addition at the end goes to conflict review
 	expect(await readBible(project)).toEqual(bible)
 })
 
+test('a deletion sends deferred updates to review instead of applying them to a later re-add', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const entry = {
+		id: 'guide',
+		name: 'Guide',
+		aliases: [],
+		status: 'candidate' as const,
+		firstSeenChapter: 'c1',
+	}
+	const update = {
+		kind: 'character',
+		op: 'update',
+		entry: { ...entry, aliases: ['Old guide'] },
+	} satisfies BiblePatch[number]
+	const replacement = { ...entry, name: 'Replacement', firstSeenChapter: 'c2' }
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[
+			update,
+			{ kind: 'character', op: 'delete', entry },
+			{ kind: 'character', op: 'add', entry: replacement },
+		],
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toEqual([
+		{
+			...update,
+			entry: {
+				...update.entry,
+				conflict: 'Entry was deleted before its update could be applied',
+			},
+		},
+	])
+	expect((await readBible(project)).character).toContainEqual(replacement)
+})
+
 test('automatic fallback streams all preview packets without truncation', async () => {
 	await seed(root, true)
 	using project = await Project.open(root)
