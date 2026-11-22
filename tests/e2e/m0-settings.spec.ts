@@ -125,6 +125,15 @@ test('M0 settings saves five slots and runs recorded text and vision requests', 
 			await fast.getByRole('button', { name: '保存' }).click()
 			await expect(fast.getByRole('status')).toHaveText('已保存')
 			await expect(fast.getByLabel('上下文长度')).toHaveValue('8192')
+			const key = fast.getByLabel('API Key')
+			await key.focus()
+			await expect(key).toHaveValue('')
+			await key.blur()
+			await expect(key).toHaveValue('••••')
+			await key.pressSequentially('replacement-key')
+			await expect(key).toHaveValue('replacement-key')
+			await fast.getByRole('button', { name: '保存' }).click()
+			await expect(key).toHaveValue('••••')
 		} finally {
 			await app.close()
 		}

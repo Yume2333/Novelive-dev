@@ -86,6 +86,31 @@ function Input({
 	)
 }
 
+function ApiKeyInput({
+	value,
+	disabled,
+	onChange,
+}: {
+	value: string
+	disabled?: boolean
+	onChange(value: string): void
+}) {
+	const [focused, setFocused] = useState(false)
+	return (
+		<Input
+			label="API Key"
+			type="password"
+			autoComplete="new-password"
+			value={focused && value === '••••' ? '' : value}
+			disabled={disabled}
+			placeholder="sk-…"
+			onFocus={() => setFocused(true)}
+			onBlur={() => setFocused(false)}
+			onChange={(event) => onChange(event.target.value)}
+		/>
+	)
+}
+
 function integer(text: string, minimum: number) {
 	const number = Number(text)
 	if (!text.trim() || !Number.isSafeInteger(number) || number < minimum)
@@ -231,14 +256,10 @@ export function useTextFields(
 					placeholder="模型上下文窗口 tokens（至少 4096）"
 					onChange={(event) => change({ context: event.target.value })}
 				/>
-				<Input
-					label="API Key"
-					type="password"
-					autoComplete="new-password"
+				<ApiKeyInput
 					value={inherited ? fast.apiKeyMasked : draft.apiKey}
 					disabled={inherited}
-					placeholder="sk-…"
-					onChange={(event) => change({ apiKey: event.target.value })}
+					onChange={(apiKey) => change({ apiKey })}
 				/>
 			</>
 		),
@@ -292,13 +313,9 @@ export function useImageFields(
 					placeholder="模型名"
 					onChange={(event) => change({ model: event.target.value })}
 				/>
-				<Input
-					label="API Key"
-					type="password"
-					autoComplete="new-password"
+				<ApiKeyInput
 					value={draft.apiKey}
-					placeholder="sk-…"
-					onChange={(event) => change({ apiKey: event.target.value })}
+					onChange={(apiKey) => change({ apiKey })}
 				/>
 				<Input
 					label="同时出图数"
