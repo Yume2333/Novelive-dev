@@ -289,7 +289,15 @@ test('uses a supplied character design in both costume candidate rendering and a
 				prompt.includes('ada character design reference'),
 			)
 			expect(audits).toHaveLength(3)
-			for (const call of audits) expect(call[4]).toHaveLength(2)
+			for (const [, prompt, , , images] of audits) {
+				expect(images).toHaveLength(2)
+				expect(prompt).toContain(
+					'Image 2 is the ada character design reference.',
+				)
+				expect(prompt).not.toContain(
+					'Image 1 is the ada character design reference.',
+				)
+			}
 		})
 	} finally {
 		renderer.mockRestore()

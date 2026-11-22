@@ -399,10 +399,7 @@ export class ArtProduction {
 				[
 					'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
-					drawingPrompt(promptDrawing, content.content, ''),
-					...promptDrawing.references.map(
-						(ref, i) => `Attached image ${i + 2}: ${ref.label}`,
-					),
+					drawingPrompt(promptDrawing, content.content, '', 2),
 				].join('\n'),
 				auditSchema,
 				this.options,

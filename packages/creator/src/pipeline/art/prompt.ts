@@ -32,10 +32,11 @@ export function drawingPrompt(
 	drawing: Drawing,
 	content: string,
 	feedback: string,
+	firstReference = 1,
 ) {
 	const { kind, style, references, characters, keep } = drawing
 	const styleIndices = references.flatMap(({ role }, index) =>
-		role === 'style' ? [index + 1] : [],
+		role === 'style' ? [index + firstReference] : [],
 	)
 	const numbered =
 		styleIndices.length === 1
@@ -45,7 +46,9 @@ export function drawingPrompt(
 		? `${numbered} ${styleIndices.length === 1 ? 'is a style reference' : 'are style references'} only. Match how ${styleIndices.length === 1 ? 'it is' : 'they are'} drawn: line quality, coloring and shading method, brushwork, level of detail, lighting and overall color treatment, including whether ${styleIndices.length === 1 ? 'it is' : 'they are'} in color or monochrome. Do not copy the people in ${styleIndices.length === 1 ? 'it' : 'them'}: face, hairstyle, hair and eye color, outfit and accessories come only from the description below.`
 		: ''
 	const other = references.flatMap(({ role, label }, index) =>
-		role === 'style' ? [] : [`Image ${index + 1} is the ${label}.`],
+		role === 'style'
+			? []
+			: [`Image ${index + firstReference} is the ${label}.`],
 	)
 	const appearance = characters.flatMap(({ name, appearance }) =>
 		appearance
@@ -69,7 +72,7 @@ export function drawingPrompt(
 		kind === 'character'
 			? 'Center the character from the top of the head to above the knees, with a little headroom and the legs cut by the bottom edge above the knees. Use a transparent background without a floor or shadow. Match semitransparent edges to adjacent clothing or skin.'
 			: kind === 'expression' || kind === 'variant'
-				? `Keep everything else aligned to Image 1: ${keep.join('；')}.`
+				? `Keep everything else aligned to Image ${firstReference}: ${keep.join('；')}.`
 				: `Keep the subject in the central 4:3 safe area of the 16:9 canvas; extend only the surroundings to the left and right.${kind === 'location' ? ' Show an empty scene without people.' : ''}`
 	const suffix = styleIndices.length
 		? finish.replaceAll('Image 1', numbered)
