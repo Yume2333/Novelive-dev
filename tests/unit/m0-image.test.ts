@@ -17,6 +17,7 @@ import {
 const directory = 'tests/fixtures/image-models'
 const dirs: string[] = []
 afterEach(async () => {
+	vi.restoreAllMocks()
 	vi.unstubAllGlobals()
 	await Promise.all(
 		dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
@@ -33,7 +34,7 @@ const base: ImageConfig = {
 	postProcess: 'single',
 	upscaleTier: 'anime',
 }
-async function probe(scenario: string, seedream = false) {
+async function probe(scenario: string, seedream = false, signal?: AbortSignal) {
 	const cacheDir = await mkdtemp(join(tmpdir(), 'novelive-image-'))
 	dirs.push(cacheDir)
 	const network = vi.fn(() => {
@@ -49,7 +50,7 @@ async function probe(scenario: string, seedream = false) {
 					? 'ep-synthetic-endpoint'
 					: `${seedream || scenario === 'relay' ? 'seedream-5.5' : 'gpt-image'}-synthetic-${scenario}`,
 		},
-		{ cacheDir, replay: { mode: 'strict', directory } },
+		{ cacheDir, signal, replay: { mode: 'strict', directory } },
 	)
 	expect(network).not.toHaveBeenCalled()
 	return { results, cacheDir }
@@ -119,6 +120,28 @@ describe('native sizes', () => {
 it('uses OpenAI multipart edits for Seedream-named models on a relay', async () => {
 	const { results } = await probe('relay')
 	expect(Object.values(results).every((result) => result.ok)).toBe(true)
+})
+
+it('bounds URL downloads to 90 seconds and maps timeout to network', async () => {
+	const timeout = vi
+		.spyOn(AbortSignal, 'timeout')
+		.mockImplementation(() =>
+			AbortSignal.abort(new DOMException('Deadline', 'TimeoutError')),
+		)
+	const { results } = await probe('url')
+	for (const result of Object.values(results))
+		expect(result).toMatchObject({ ok: false, error: { code: 'network' } })
+	expect(timeout).toHaveBeenCalledWith(90000)
+})
+it('preserves caller cancellation during URL downloads', async () => {
+	const caller = new AbortController()
+	vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+		caller.abort()
+		return new AbortController().signal
+	})
+	const { results } = await probe('url', false, caller.signal)
+	for (const result of Object.values(results))
+		expect(result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
 })
 it('uses intersected size range for opaque Ark endpoint ids', async () => {
 	const { results } = await probe('endpoint', true)

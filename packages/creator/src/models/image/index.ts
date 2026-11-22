@@ -199,7 +199,11 @@ export async function testImage(
 			if (image?.b64_json) bytes = Buffer.from(image.b64_json, 'base64')
 			else if (image?.url) {
 				try {
-					const download = await fetch(image.url, { signal: options.signal })
+					const deadline = AbortSignal.timeout(90000)
+					const signal = options.signal
+						? AbortSignal.any([options.signal, deadline])
+						: deadline
+					const download = await fetch(image.url, { signal })
 					if (!download.ok) throw new Error('Image download failed')
 					bytes = Buffer.from(await download.arrayBuffer())
 				} catch (cause) {
