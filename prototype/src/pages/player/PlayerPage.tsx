@@ -4,7 +4,12 @@ import '@fontsource/noto-sans-sc/chinese-simplified-600.css'
 import '@fontsource/noto-sans-sc/chinese-simplified-700.css'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { EmptyState } from '../../components/Form'
+import { Button } from '../../components/Button'
+import { ProgressBar } from '../../components/Card'
+import { Chip, Slider } from '../../components/Extended'
+import { EmptyState, Tabs, Toggle } from '../../components/Form'
+import { IconButton } from '../../components/IconButton'
+import { ScrollArea } from '../../components/ScrollArea'
 import { useToast } from '../../components/Toast'
 import { findWork } from '../../mock/library'
 import { scriptForChapter, type Bg, type Expr, type Filter, type Particles, type PlayerLine, type Pos } from '../../mock/player'
@@ -679,15 +684,6 @@ export function PlayerPage() {
     </button>
   )
 
-  const glassPanel = (radius = 16): CSSProperties => ({
-    background: `linear-gradient(170deg, color-mix(in srgb, rgba(20,27,36,${boxOpacity}) 86%, ${accent}) 0%, rgba(10,14,19,${Math.min(boxOpacity + 0.12, 0.97)}) 100%), ${NOISE}`,
-    backdropFilter: 'blur(14px) saturate(1.3)',
-    WebkitBackdropFilter: 'blur(14px) saturate(1.3)',
-    border: `1px solid ${accent}38`,
-    borderRadius: radius,
-    boxShadow: `inset 0 1px 0 rgba(238,242,246,0.09), inset 0 0 0 1px rgba(8,11,15,0.35), 0 14px 44px rgba(0,0,0,0.55), 0 0 32px ${accent}22`,
-  })
-
   /* 句子内容 + 快捷菜单（三种文本框样式共用） */
   const textBody = (
     <>
@@ -734,56 +730,76 @@ export function PlayerPage() {
     </>
   )
 
+  const overlayPanelStyle: CSSProperties = {
+    background: 'var(--veil-95)',
+    borderRadius: 'var(--radius-2xl)',
+    boxShadow: 'var(--shadow-pop)',
+    color: 'var(--color-on-surface)',
+  }
+
   const screenTitle = (t: string, icon: PlayerIconName) => (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, marginBottom: 22 }}>
-      <PlayerIcon name={icon} size={22} style={{ color: accent, transform: 'translateY(2px)' }} />
-      <span style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 600, color: 'var(--nl-text)', letterSpacing: '0.24em' }}>{t}</span>
-      <span className="nl-orn-rule" />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-6)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <PlayerIcon name={icon} size={22} style={{ color: 'var(--color-on-surface-variant)' }} />
+        <h2 className="headline" style={{ fontSize: 24, color: 'var(--color-on-surface)' }}>{t}</h2>
+      </div>
+      <IconButton name="关闭" icon="close" onClick={() => setScreen('none')} />
     </div>
   )
 
-  const screenShell = (content: ReactNode) => (
+  const screenShell = (content: ReactNode, maxWidth = 960) => (
     <div
-      className="nl-screen-in"
+      className="nl-screen-in nl-player-overlay"
       onClick={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
-      style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(8,11,15,0.88)', backdropFilter: 'blur(16px) saturate(1.2)', display: 'flex', flexDirection: 'column', padding: '48px 8% 42px' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        backgroundColor: 'var(--veil-95)',
+        backgroundImage: 'var(--page-texture)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        color: 'var(--color-on-surface)',
+        display: 'flex',
+        justifyContent: 'center',
+        padding: 'var(--space-7) var(--space-6) var(--space-6)',
+      }}
     >
-      {content}
-      <button type="button" className="nl-qbtn nl-qbtn-end" data-tip="关闭" style={{ position: 'absolute', top: 48, right: '8%', minWidth: 40 }} onClick={() => setScreen('none')}>
-        <PlayerIcon name="close" size={18} />
-      </button>
+      <div style={{ width: '100%', maxWidth, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {content}
+      </div>
     </div>
   )
 
   const slotCard = (s: SaveSlot | null, i: number, saveMode: boolean, isQuick = false) => (
     <button
       key={i}
+      type="button"
+      className="glass-panel nl-card-interactive"
       onClick={() => (saveMode ? (isQuick ? saveTo('quick') : saveTo(savePage === 0 ? i - 1 : savePage * 6 - 1 + i)) : s ? loadFrom(s) : undefined)}
       style={{
-        border: `1px solid ${s ? `${accent}55` : 'rgba(233,237,242,0.14)'}`,
-        borderRadius: 14,
+        borderRadius: 'var(--radius-xl)',
         overflow: 'hidden',
-        background: 'rgba(233,237,242,0.04)',
         textAlign: 'left',
-        cursor: 'pointer',
-        transition: 'border-color 0.15s ease',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
+        opacity: !saveMode && !s ? 0.55 : 1,
+        cursor: !saveMode && !s ? 'default' : 'pointer',
       }}
     >
-      <div style={{ aspectRatio: '16 / 9', position: 'relative', background: s ? bgArt[s.bg].base : 'repeating-linear-gradient(45deg, rgba(233,237,242,0.04) 0 10px, rgba(233,237,242,0.08) 10px 20px)', flexShrink: 0 }}>
-        {s ? <div style={{ position: 'absolute', inset: 0 }}>{bgArt[s.bg].deco}</div> : <PlayerIcon name="save" size={24} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'rgba(233,237,242,0.18)' }} />}
+      <div style={{ aspectRatio: '16 / 9', position: 'relative', background: s ? bgArt[s.bg].base : 'var(--color-surface-container-low)', flexShrink: 0, borderBottom: '1px solid var(--divider)' }}>
+        {s ? <div style={{ position: 'absolute', inset: 0 }}>{bgArt[s.bg].deco}</div> : <PlayerIcon name="save" size={22} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'var(--color-outline)', opacity: 0.45 }} />}
         {isQuick ? (
-          <span style={{ position: 'absolute', top: 8, left: 8, display: 'inline-flex', alignItems: 'center', gap: 4, background: accent, color: '#0d1116', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', borderRadius: 5, padding: '3px 8px' }}>
+          <span style={{ position: 'absolute', top: 8, left: 8, display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 11, fontWeight: 600, borderRadius: 'var(--radius-sm)', padding: '2px 7px' }}>
             <PlayerIcon name="quicksave" size={12} />快速
           </span>
         ) : null}
       </div>
-      <div style={{ padding: '9px 12px 10px' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--nl-text)', fontFamily: SERIF }}>{s ? s.title : '空'}</div>
-        <div style={{ fontSize: 11, color: 'var(--nl-text-dim)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div style={{ padding: '10px 14px 12px' }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-on-surface)', fontFamily: 'var(--font-display)' }}>{s ? s.title : '空存档位'}</div>
+        <div style={{ fontSize: 12, color: 'var(--color-outline)', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {s ? `第 ${s.line + 1} 句 · ${lineText((work ? scriptForChapter(work.id, `c${s.chapterIdx}`)?.lines : undefined)?.[s.line] ?? { kind: 'narration', segs: [] })} · ${s.at}` : '—'}
         </div>
       </div>
@@ -791,8 +807,26 @@ export function PlayerPage() {
   )
 
   const sysMenuItem = (icon: PlayerIconName, label: string, fn: () => void) => (
-    <button key={label} className="nl-menu-item" onClick={(e) => { e.stopPropagation(); fn() }}>
-      <PlayerIcon name={icon} size={18} />
+    <button
+      key={label}
+      type="button"
+      className="nl-nav-item"
+      data-active="false"
+      onClick={(e) => { e.stopPropagation(); fn() }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-3)',
+        width: '100%',
+        padding: '10px var(--space-3)',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 14,
+        fontWeight: 500,
+        color: 'var(--color-on-surface-variant)',
+        textAlign: 'left',
+      }}
+    >
+      <PlayerIcon name={icon} size={17} />
       {label}
     </button>
   )
@@ -801,7 +835,7 @@ export function PlayerPage() {
     const bgs: Bg[] = ['harborNight', 'harborDawn', 'lighthouse', 'letterCg']
     const bg = bgs[i % bgs.length]!
     return (
-      <div style={{ width: 128, height: 72, borderRadius: 9, overflow: 'hidden', position: 'relative', flexShrink: 0, background: bgArt[bg].base, border: `1px solid ${accent}30`, opacity: status === 'published' ? 1 : 0.35 }}>
+      <div style={{ width: 112, height: 63, borderRadius: 'var(--radius-md)', overflow: 'hidden', position: 'relative', flexShrink: 0, background: bgArt[bg].base, border: '1px solid var(--divider)', opacity: status === 'published' ? 1 : 0.4 }}>
         <div style={{ position: 'absolute', inset: 0 }}>{bgArt[bg].deco}</div>
       </div>
     )
@@ -1053,42 +1087,36 @@ export function PlayerPage() {
         {!uiHidden && mode === 'waitEnd' && next ? (
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ position: 'absolute', inset: 0, zIndex: 45, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ position: 'absolute', inset: 0, zIndex: 45, background: 'var(--scrim)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)' }}
           >
-          <div
-            className="nl-rise"
-            style={{ width: 'min(88%, 500px)', ...glassPanel(18), padding: '30px 34px' }}
-          >
-            <div style={{ fontFamily: SERIF, fontSize: 12, letterSpacing: '0.32em', color: 'var(--nl-accent-strong)', marginBottom: 14 }}>本章结束</div>
-            <div style={{ fontFamily: SERIF, fontSize: 20, color: 'var(--nl-text)', marginBottom: 16, letterSpacing: '0.05em' }}>
-              下一章「{next.title}」{next.status === 'producing' ? '制作中' : '等待'}
-            </div>
-            {next.status === 'producing' ? (
-              <div style={{ fontFamily: SERIF, fontSize: 13.5, color: 'var(--nl-text-dim)', lineHeight: 1.9 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="nl-wait-ring" aria-hidden />
-                  {next.step}
+            <div
+              className="glass-panel nl-player-panel"
+              style={{ width: 'min(100%, 460px)', ...overlayPanelStyle, padding: 'var(--space-6)', animation: 'fade-up var(--dur-base) var(--ease-out)' }}
+            >
+              <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-2)' }}>本章结束</div>
+              <h3 className="headline" style={{ fontSize: 20, marginBottom: 'var(--space-4)' }}>
+                下一章「{next.title}」{next.status === 'producing' ? '制作中' : '等待'}
+              </h3>
+              {next.status === 'producing' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  <ProgressBar value={0.62} height={6} active />
+                  <div style={{ fontSize: 13, color: 'var(--color-on-surface-variant)' }}>
+                    {next.step} · 做完会自动载入开头
+                  </div>
                 </div>
-                <div style={{ marginTop: 6 }}>做完会自动载入开头</div>
-              </div>
-            ) : (
-              <div style={{ fontFamily: SERIF, fontSize: 13.5, color: 'var(--nl-text-dim)', lineHeight: 1.9, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="nl-wait-ring" aria-hidden />
-                <span>还在排队等待，做完后会自动载入开头。</span>
-              </div>
-            )}
-            {next.status === 'producing' ? (
-              <button
-                className="nl-btn nl-btn-quiet"
-                style={{ marginTop: 18 }}
-                onClick={simulateDone}
-                disabled={simBusy}
-              >
-                <PlayerIcon name="next" size={13} />
-                {simBusy ? '载入中……' : '模拟做完'}
-              </button>
-            ) : null}
-          </div>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', lineHeight: 1.6 }}>
+                  还在排队等待，做完后会自动载入开头。
+                </div>
+              )}
+              {next.status === 'producing' ? (
+                <div style={{ marginTop: 'var(--space-5)', display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button variant="secondary" size="sm" icon="play_arrow" loading={simBusy} onClick={simulateDone}>
+                    {simBusy ? '载入中…' : '模拟做完'}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -1096,16 +1124,19 @@ export function PlayerPage() {
         {!uiHidden && mode === 'nextReady' && next ? (
           <div
             className="nl-screen-in"
-            style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 45, background: 'rgba(5,8,12,0.62)' }}
+            style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 45, background: 'var(--scrim)', backdropFilter: 'blur(8px)', padding: 'var(--space-5)' }}
             onClick={(e) => {
               e.stopPropagation()
               setMode('finale')
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, animation: 'nl-rise 0.35s ease both' }}>
-              <div style={{ fontFamily: SERIF, fontSize: 28, color: 'var(--nl-text)', letterSpacing: '0.08em' }}>「{next.title}」</div>
-              <div style={{ fontFamily: SERIF, fontSize: 13, color: 'var(--nl-text-dim)', letterSpacing: '0.2em' }}>已载入开头</div>
-              <span className="nl-next-glyph" style={{ color: accent, marginTop: 12 }}><PlayerIcon name="next" size={16} /></span>
+            <div
+              className="glass-panel nl-player-panel"
+              style={{ width: 'min(100%, 400px)', ...overlayPanelStyle, padding: 'var(--space-6)', textAlign: 'center', animation: 'fade-up var(--dur-base) var(--ease-out)' }}
+            >
+              <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-2)' }}>已载入开头</div>
+              <h3 className="headline" style={{ fontSize: 22 }}>「{next.title}」</h3>
+              <p style={{ fontSize: 13, color: 'var(--color-on-surface-variant)', marginTop: 'var(--space-3)' }}>点击任意处继续</p>
             </div>
           </div>
         ) : null}
@@ -1114,44 +1145,45 @@ export function PlayerPage() {
         {!uiHidden && mode === 'finale' ? (
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ position: 'absolute', inset: 0, zIndex: 45, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ position: 'absolute', inset: 0, zIndex: 45, background: 'var(--scrim)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)' }}
           >
-          <div
-            className="nl-rise"
-            style={{ width: 'min(88%, 440px)', ...glassPanel(18), padding: '30px 32px', textAlign: 'center' }}
-          >
-            <PlayerIcon name="chapters" size={28} style={{ color: accent, margin: '0 auto' }} />
-            <div style={{ fontFamily: SERIF, fontSize: 19, color: 'var(--nl-text)', marginTop: 14, letterSpacing: '0.1em' }}>
-              {revisit ? '重看结束' : '已读到最新进度'}
-            </div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 24 }}>
-              <button
-                className="nl-btn"
-                onClick={() => navigate(`/work/${work.id}`)}
+            <div
+              className="glass-panel nl-player-panel"
+              style={{ width: 'min(100%, 420px)', ...overlayPanelStyle, padding: 'var(--space-6)', textAlign: 'center', animation: 'fade-up var(--dur-base) var(--ease-out)' }}
+            >
+              <div
+                className="glass-panel"
+                style={{ width: 48, height: 48, borderRadius: 'var(--radius-xl)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-4)', color: 'var(--color-on-surface-variant)' }}
               >
-                <PlayerIcon name="exit" size={15} />
-                返回作品页
-              </button>
-              <button
-                className="nl-btn nl-btn-quiet"
-                onClick={() => {
-                  setLineIdx(0)
-                  setShown(0)
-                  setMode('story')
-                  setStage(initialStage)
-                  prevVisualBgRef.current = initialStage.bg
-                  skipNextBgTransitionRef.current = true
-                  setPrevBg(null)
-                  setExitingCast({})
-                  prevCastRef.current = {}
-                  setRevealed(false)
-                }}
-              >
-                <PlayerIcon name="rollback" size={15} />
-                重新播放
-              </button>
+                <PlayerIcon name="chapters" size={22} />
+              </div>
+              <h3 className="headline" style={{ fontSize: 20 }}>
+                {revisit ? '重看结束' : '已读到最新进度'}
+              </h3>
+              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center', marginTop: 'var(--space-5)' }}>
+                <Button variant="primary" icon="arrow_back" onClick={() => navigate(`/work/${work.id}`)}>
+                  返回作品页
+                </Button>
+                <Button
+                  variant="secondary"
+                  icon="restart_alt"
+                  onClick={() => {
+                    setLineIdx(0)
+                    setShown(0)
+                    setMode('story')
+                    setStage(initialStage)
+                    prevVisualBgRef.current = initialStage.bg
+                    skipNextBgTransitionRef.current = true
+                    setPrevBg(null)
+                    setExitingCast({})
+                    prevCastRef.current = {}
+                    setRevealed(false)
+                  }}
+                >
+                  重新播放
+                </Button>
+              </div>
             </div>
-          </div>
           </div>
         ) : null}
       </div>
@@ -1160,25 +1192,31 @@ export function PlayerPage() {
       {screen === 'menu' ? (
         <div
           className="nl-screen-in"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setConfirmExit(false); setScreen('none') }}
           onWheel={(e) => e.stopPropagation()}
-          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(5,8,12,0.7)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'var(--scrim)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-5)' }}
         >
           {confirmExit ? (
-            <div className="nl-rise" style={{ width: 340, ...glassPanel(16), padding: '26px 28px 22px' }}>
-              <div style={{ fontFamily: SERIF, fontSize: 16, color: 'var(--nl-text)', letterSpacing: '0.08em' }}>返回作品页？</div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 24 }}>
-                <button className="nl-btn nl-btn-quiet" onClick={() => setConfirmExit(false)}>
-                  继续玩
-                </button>
-                <button className="nl-btn nl-btn-solid" onClick={() => navigate(`/work/${work.id}`)}>
-                  返回
-                </button>
+            <div
+              className="glass-panel nl-player-menu"
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: 340, ...overlayPanelStyle, padding: 'var(--space-5)', animation: 'fade-up var(--dur-base) var(--ease-out)' }}
+            >
+              <h4 className="headline" style={{ fontSize: 18 }}>返回作品页？</h4>
+              <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end', marginTop: 'var(--space-5)' }}>
+                <Button variant="ghost" onClick={() => setConfirmExit(false)}>继续玩</Button>
+                <Button variant="primary" onClick={() => navigate(`/work/${work.id}`)}>返回</Button>
               </div>
             </div>
           ) : (
-            <div style={{ width: 340, ...glassPanel(18), padding: '14px 10px', position: 'relative' }}>
-              <div style={{ padding: '6px 16px 12px', fontFamily: SERIF, fontSize: 12, letterSpacing: '0.3em', color: 'var(--nl-text-dim)' }}>{work.title}</div>
+            <div
+              className="glass-panel nl-player-menu"
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: 320, ...overlayPanelStyle, padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 2, animation: 'fade-up var(--dur-base) var(--ease-out)' }}
+            >
+              <div style={{ padding: 'var(--space-2) var(--space-3) var(--space-3)', fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600, color: 'var(--color-outline)', letterSpacing: '0.06em' }}>
+                {work.title}
+              </div>
               {sysMenuItem('play', '返回游戏', () => setScreen('none'))}
               {sysMenuItem('save', '存档', () => { setSavePage(0); setScreen('save') })}
               {sysMenuItem('load', '读档', () => { setSavePage(0); setScreen('load') })}
@@ -1188,7 +1226,7 @@ export function PlayerPage() {
               {work.kind === 'project'
                 ? sysMenuItem('edit', '在编辑器中打开这里', () => navigate(`/work/${work.id}/edit?chapter=${chapter.index}&line=${lineIdx + 1}`))
                 : null}
-              <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${accent}40, transparent)`, margin: '8px 14px' }} />
+              <div style={{ height: 1, background: 'var(--divider)', margin: 'var(--space-2) var(--space-3)' }} />
               {sysMenuItem('exit', '返回作品页', () => setConfirmExit(true))}
             </div>
           )}
@@ -1200,21 +1238,19 @@ export function PlayerPage() {
         ? screenShell(
             <>
               {screenTitle(screen === 'save' ? '存档' : '读档', screen === 'save' ? 'save' : 'load')}
-              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(2, 1fr)', gap: 18 }}>
-                {pageSlots.map((s, i) => slotCard(s, i, screen === 'save', savePage === 0 && i === 0))}
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center' }}>
+                <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-4)' }}>
+                  {pageSlots.map((s, i) => slotCard(s, i, screen === 'save', savePage === 0 && i === 0))}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', marginTop: 24 }}>
-                <button className="nl-qbtn" style={{ width: 'auto', padding: '4px 8px' }} onClick={() => setSavePage((p) => Math.max(0, p - 1))}>
-                  <PlayerIcon name="pageLeft" size={15} />
-                </button>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'center', alignItems: 'center', marginTop: 'var(--space-5)', flexShrink: 0 }}>
+                <IconButton name="上一页" icon="chevron_left" onClick={() => setSavePage((p) => Math.max(0, p - 1))} disabled={savePage === 0} />
                 {Array.from({ length: 6 }, (_, p) => (
-                  <button key={p} className={`nl-btn${p === savePage ? '' : ' nl-btn-quiet'}`} style={{ padding: '5px 13px', fontSize: 13, borderColor: p === savePage ? accent : undefined, color: p === savePage ? 'var(--nl-accent-strong)' : undefined }} onClick={() => setSavePage(p)}>
+                  <Button key={p} size="sm" variant={p === savePage ? 'primary' : 'secondary'} style={{ minWidth: 34, padding: '6px 10px' }} onClick={() => setSavePage(p)}>
                     {p + 1}
-                  </button>
+                  </Button>
                 ))}
-                <button className="nl-qbtn" style={{ width: 'auto', padding: '4px 8px' }} onClick={() => setSavePage((p) => Math.min(5, p + 1))}>
-                  <PlayerIcon name="pageRight" size={15} />
-                </button>
+                <IconButton name="下一页" icon="chevron_right" onClick={() => setSavePage((p) => Math.min(5, p + 1))} disabled={savePage === 5} />
               </div>
             </>,
           )
@@ -1225,7 +1261,7 @@ export function PlayerPage() {
         ? screenShell(
             <>
               {screenTitle('记录', 'log')}
-              <div className="nl-player-scroll" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <ScrollArea style={{ flex: 1 }} viewportStyle={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', paddingRight: 'var(--space-2)' }}>
                 {/* 跨章记录：每章只列出已读的句，点一句跳回那一章那一句 */}
                 {playable.map((c) => {
                   const sc = scriptForChapter(work.id, c.id)
@@ -1235,23 +1271,35 @@ export function PlayerPage() {
                     .filter(({ i }) => readSet.has(`${c.id}:${i}`) || (c.id === chapter.id && i <= lineIdx))
                   if (!readLines.length) return null
                   return (
-                    <div key={c.id}>
-                      <div style={{ fontFamily: SERIF, fontSize: 11, letterSpacing: '0.24em', color: 'var(--nl-text-dim)', padding: '16px 10px 8px', borderTop: c.id === playable[0]?.id ? 'none' : `1px solid ${accent}22` }}>
+                    <div key={c.id} className="glass-panel" style={{ borderRadius: 'var(--radius-xl)', overflow: 'hidden', marginBottom: 'var(--space-3)' }}>
+                      <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--divider)' }}>
                         第 {c.index} 章 · {c.title}
                       </div>
-                      {readLines.map(({ l, i }) => (
-                        <button key={i} className="nl-row" onClick={() => { setScreen('none'); if (c.id === chapter.id) goTo(i); else enterChapter(c.index, i) }}>
+                      {readLines.map(({ l, i }, idx) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className="hover-row"
+                          onClick={() => { setScreen('none'); if (c.id === chapter.id) goTo(i); else enterChapter(c.index, i) }}
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            padding: '12px var(--space-4)',
+                            textAlign: 'left',
+                            borderBottom: idx === readLines.length - 1 ? 'none' : '1px solid var(--divider)',
+                          }}
+                        >
                           {l.kind === 'caption' ? (
-                            <span style={{ fontFamily: SERIF, fontSize: 12, color: 'var(--nl-text-dim)', letterSpacing: '0.18em' }}>字幕 · {l.caption!.title}</span>
+                            <span style={{ fontSize: 12, color: 'var(--color-outline)' }}>字幕 · {l.caption!.title}</span>
                           ) : (
                             <div>
                               {(l.charId === 'xiu' && l.name === '神秘少女' && revealed ? '凛' : l.name) ? (
-                                <div style={{ fontFamily: SERIF, fontSize: 12, fontWeight: 700, color: 'var(--nl-accent-strong)', marginBottom: 3, letterSpacing: '0.1em' }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', marginBottom: 4 }}>
                                   {l.charId === 'xiu' && l.name === '神秘少女' && revealed ? '凛' : l.name}
                                   {l.kind === 'inner' ? '（心声）' : ''}
                                 </div>
                               ) : null}
-                              <div style={{ fontFamily: SERIF, fontSize: 14, color: 'var(--nl-text)', lineHeight: 1.8 }}>{lineText(l)}</div>
+                              <div style={{ fontSize: 14, color: 'var(--color-on-surface)', lineHeight: 1.7 }}>{lineText(l)}</div>
                             </div>
                           )}
                         </button>
@@ -1259,7 +1307,7 @@ export function PlayerPage() {
                     </div>
                   )
                 })}
-              </div>
+              </ScrollArea>
             </>,
           )
         : null}
@@ -1269,26 +1317,47 @@ export function PlayerPage() {
         ? screenShell(
             <>
               {screenTitle('章节', 'chapters')}
-              <div className="nl-player-scroll" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {work.chapters.map((c) => {
-                  const isPlayable = c.status === 'published'
-                  const isRead = c.index <= readThrough
-                  return (
-                    <button key={c.id} className="nl-row" disabled={!isPlayable} onClick={() => isPlayable && enterChapter(c.index)} style={{ opacity: isPlayable ? 1 : 0.4, alignItems: 'center' }}>
-                      {chapterThumb(c.status, c.index)}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontFamily: SERIF, fontSize: 15, color: 'var(--nl-text)', letterSpacing: '0.05em' }}>
-                          第 {c.index} 章 · {c.title}
+              <ScrollArea style={{ flex: 1 }} viewportStyle={{ paddingRight: 'var(--space-2)' }}>
+                <div className="glass-panel" style={{ borderRadius: 'var(--radius-2xl)', overflow: 'hidden' }}>
+                  {work.chapters.map((c, idx) => {
+                    const isPlayable = c.status === 'published'
+                    const isRead = c.index <= readThrough
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={isPlayable ? 'hover-row' : undefined}
+                        disabled={!isPlayable}
+                        onClick={() => isPlayable && enterChapter(c.index)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-4)',
+                          width: '100%',
+                          padding: '12px var(--space-4)',
+                          textAlign: 'left',
+                          opacity: isPlayable ? 1 : 0.45,
+                          cursor: isPlayable ? 'pointer' : 'not-allowed',
+                          borderBottom: idx === work.chapters.length - 1 ? 'none' : '1px solid var(--divider)',
+                        }}
+                      >
+                        {chapterThumb(c.status, c.index)}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 600, color: 'var(--color-on-surface)' }}>
+                            第 {c.index} 章 · {c.title}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 6 }}>
+                            <span style={{ fontSize: 12, color: 'var(--color-outline)' }}>
+                              {c.status === 'published' ? '已发布' : c.status === 'producing' ? '制作中' : '等待'}{c.issue ? ' · 需要处理' : ''}
+                            </span>
+                            {isRead && isPlayable ? <Chip>已读</Chip> : null}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                          <span style={{ fontSize: 11, color: 'var(--nl-text-dim)', letterSpacing: '0.14em' }}>{c.status === 'published' ? '已发布' : c.status === 'producing' ? '制作中' : '等待'}{c.issue ? ' · 需要处理' : ''}</span>
-                          {isRead && isPlayable ? <span style={{ fontSize: 11, color: 'var(--nl-accent-strong)', letterSpacing: '0.14em' }}>已读</span> : null}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
             </>,
           )
         : null}
@@ -1298,54 +1367,46 @@ export function PlayerPage() {
         ? screenShell(
             <>
               {screenTitle('设置', 'settings')}
-              <div style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 30 }}>
-                {([
-                  ['文字速度', 60 - charDelay, 5, 55, (v: number) => setCharDelay(60 - v)],
-                  ['自动播放速度', autoDelay, 400, 3000, setAutoDelay],
-                  ['字号', fontSize, 15, 30, setFontSize],
-                  ['对话框不透明度', Math.round(boxOpacity * 100), 40, 100, (v: number) => setBoxOpacity(v / 100)],
-                ] as [string, number, number, number, (v: number) => void][]).map(([label, val, min, max, fn]) => (
-                  <div key={label}>
-                    <div style={{ marginBottom: 12 }}>
-                      <span style={{ fontFamily: SERIF, fontSize: 14.5, color: 'var(--nl-text)', letterSpacing: '0.12em' }}>{label}</span>
+              <ScrollArea style={{ flex: 1 }}>
+                <div className="glass-panel" style={{ borderRadius: 'var(--radius-2xl)', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+                  {([
+                    ['文字速度', 60 - charDelay, 5, 55, (v: number) => setCharDelay(60 - v), ''],
+                    ['自动播放间隔', autoDelay, 400, 3000, setAutoDelay, 'ms'],
+                    ['字号', fontSize, 15, 30, setFontSize, 'px'],
+                    ['对话框不透明度', Math.round(boxOpacity * 100), 40, 100, (v: number) => setBoxOpacity(v / 100), '%'],
+                  ] as [string, number, number, number, (v: number) => void, string][]).map(([label, val, min, max, fn, suffix]) => (
+                    <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                      <span className="label-caps label-caps-zh" style={{ color: 'var(--color-on-surface-variant)' }}>{label}</span>
+                      <Slider value={val} min={min} max={max} onChange={fn} suffix={suffix} />
                     </div>
-                    <input className="nl-range" type="range" min={min} max={max} value={val} onChange={(e) => fn(Number(e.target.value))} />
-                  </div>
-                ))}
-                {([
-                  ['全屏', isFullscreen, toggleFullscreen] as const,
-                  // 开发调试项：只有 ?debug=1 才显示
-                  ...(debug ? [['显示 4:3 安全区', showSafeZone, () => setShowSafeZone((v) => !v)] as const] : []),
-                ]).map(([label, on, fn]) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontFamily: SERIF, fontSize: 14.5, color: 'var(--nl-text)', letterSpacing: '0.12em' }}>{label}</span>
-                    <button
-                      onClick={fn}
-                      style={{ width: 48, height: 25, borderRadius: 999, background: on ? accent : 'rgba(233,237,242,0.14)', position: 'relative', transition: 'background 0.2s ease', cursor: 'pointer', boxShadow: on ? `0 0 12px ${accent}55` : 'none' }}
-                    >
-                      <span style={{ position: 'absolute', top: 3.5, left: on ? 26 : 3.5, width: 18, height: 18, borderRadius: '50%', background: '#eef2f6', transition: 'left 0.2s ease' }} />
-                    </button>
-                  </div>
-                ))}
-                <div>
-                  <div style={{ marginBottom: 12 }}>
-                    <span style={{ fontFamily: SERIF, fontSize: 14.5, color: 'var(--nl-text)', letterSpacing: '0.12em' }}>对话框样式</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {([['b', '柔边通栏'], ['c', '浅色纸笺']] as const).map(([k, label]) => (
-                      <button
-                        key={k}
-                        onClick={() => setBoxStyle(k)}
-                        className={`nl-btn${boxStyle === k ? '' : ' nl-btn-quiet'}`}
-                        style={{ borderColor: boxStyle === k ? accent : undefined, color: boxStyle === k ? 'var(--nl-accent-strong)' : undefined }}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                  ))}
+                  <div style={{ height: 1, background: 'var(--divider)' }} />
+                  {([
+                    ['全屏', isFullscreen, toggleFullscreen] as const,
+                    // 开发调试项：只有 ?debug=1 才显示
+                    ...(debug ? [['显示 4:3 安全区', showSafeZone, () => setShowSafeZone((v) => !v)] as const] : []),
+                  ]).map(([label, on, fn]) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-on-surface)' }}>{label}</span>
+                      <Toggle on={on} onChange={fn} title={label} />
+                    </div>
+                  ))}
+                  <div style={{ height: 1, background: 'var(--divider)' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-on-surface)' }}>对话框样式</span>
+                    <Tabs
+                      active={boxStyle}
+                      onChange={(k) => setBoxStyle(k as 'b' | 'c')}
+                      tabs={[
+                        { key: 'b', label: '柔边通栏' },
+                        { key: 'c', label: '浅色纸笺' },
+                      ]}
+                    />
                   </div>
                 </div>
-              </div>
+              </ScrollArea>
             </>,
+            680,
           )
         : null}
     </div>

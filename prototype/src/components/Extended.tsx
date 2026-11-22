@@ -233,7 +233,7 @@ export function Slider({ value, onChange, min = 0, max = 100, step = 1, suffix }
         onChange={(e) => onChange(Number(e.target.value))}
         style={{ flex: 1, accentColor: 'var(--color-primary)', height: 4 }}
       />
-      <span className="label-caps" style={{ color: 'var(--color-primary)', minWidth: 40, textAlign: 'right' }}>
+      <span className="label-caps" style={{ color: 'var(--color-primary)', minWidth: 52, textAlign: 'right', textTransform: 'none' }}>
         {value}{suffix}
       </span>
     </div>
