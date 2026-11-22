@@ -50,6 +50,7 @@ export class ProductionTaskError extends Error {
 export type SchedulerOptions = {
 	imageConcurrency?: number
 	now?: () => number
+	onChange?: () => void
 }
 
 export type RunLogEntry = {
@@ -120,6 +121,7 @@ export class ChapterScheduler {
 	private readonly running = new Set<Promise<void>>()
 	private readonly imageConcurrency: number
 	private readonly now: () => number
+	private readonly onChange?: () => void
 	private disposed = false
 
 	constructor(
@@ -129,6 +131,7 @@ export class ChapterScheduler {
 	) {
 		this.imageConcurrency = options.imageConcurrency ?? defaultImageConcurrency
 		this.now = options.now ?? Date.now
+		this.onChange = options.onChange
 		this.recover()
 	}
 
@@ -399,6 +402,7 @@ export class ChapterScheduler {
 				this.launch(next.task, () => this.runChapter(next.task, next.link))
 		}
 		this.dispatchImages()
+		this.onChange?.()
 	}
 
 	private acquireSlot() {
@@ -596,6 +600,7 @@ export class ChapterScheduler {
 				task.task_id,
 			)
 			task.phase = name
+			this.onChange?.()
 			const result = await this.attempt(task, name, (desensitized, signal) => {
 				const context = {
 					workId: task.work_id,

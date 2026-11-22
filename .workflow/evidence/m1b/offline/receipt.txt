@@ -1,0 +1,49 @@
+M1b/09 — Strict Electron production gate
+Base e297472b1cc3e4460b159c6637863efbfb8d1798
+
+Checks (Node 24, pnpm 12, Electron 45; Electron under Xvfb):
+  NL_REPLAY=strict pnpm test:e2e --grep 'M1b make and play'
+    1 passed (21.3s)
+  NL_REPLAY=strict pnpm check
+    Test Files  21 passed (21)
+         Tests  323 passed (323)
+  NL_REPLAY=strict pnpm exec playwright test tests/e2e/m1b-wizard.spec.ts tests/e2e/m1b-creation-ui.spec.ts tests/e2e/m1b-player.spec.ts tests/e2e/m1b-production-contract.spec.ts
+    7 passed (3.9s)
+
+Real path:
+  Built Electron with real creator utility process; only the native file
+  chooser was answered by the test. The original TXT bytes persisted.
+  The first gate displayed three loadable main visual and three loadable
+  costume candidates. The creator selected both and started production.
+  The production screen stopped and resumed the real scheduler.
+  At confirmation point two, SQLite showed only chapter one published.
+  The player rendered a background, sprite, canvas and the adapted narration.
+  After manual continue, chapter two hit a cassette-controlled writer failure.
+  Retry passed the writing step; a corrupt image produced a real placeholder.
+  The production screen showed the failed run and both chapters published;
+  SQLite and the asset registry independently agreed.
+  Image edit transport used OpenAI's matching Response constructor, keeping its
+  local multipart capability probe out of strict provider replay.
+
+Full viewport visual evidence (1280 x 800; set NL_M1B_GATE_EVIDENCE to regenerate):
+  01-import.png
+  02-confirm-visual.png
+  03-confirm-first.png
+  04-play-chapter-one.png
+  05-chapter-two-published.png
+  Inspected against DESIGN.md and the corresponding prototype surfaces:
+  warm paper and translucent creation panels, three-column visual choices,
+  trial/continue separation, a sidebar-free playback stage, and production
+  progress plus chapter records. This is the minimal player and confirmation
+  UI, not a pixel-identical copy of the prototype. Scrollable creation views
+  use the app's overlay scrollbar; the test rejects visible native vertical
+  scrollbar styling. Fixture artwork is synthetic, not art-quality evidence.
+
+Replay and scope:
+  The fixture authoring path reused 18 exact responses from the committed
+  M1b art cassette; it added 16 synthetic response rows for gate-specific
+  requests. The task's offline rule excludes real provider calls. Paid
+  requests: 0. Paid tokens: 0. Paid images: 0. No usage ledger rows needed.
+  Existing M1b/08 quality regressions ran with pnpm check. W4 owner-book
+  acceptance, system suspend behavior on physical hardware, and independent
+  review were not verified by this task.

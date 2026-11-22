@@ -50,7 +50,7 @@ export function imageRenderer(config: ImageConfig, options: ModelOptions) {
 	const client = new OpenAI({
 		baseURL: config.baseUrl,
 		apiKey: config.apiKey,
-		fetch: replay.fetch,
+		fetch: Object.assign(replay.fetch, { Response }),
 		timeout: 90_000,
 		maxRetries: 0,
 	})
