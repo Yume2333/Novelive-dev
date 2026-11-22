@@ -19,3 +19,14 @@ generate: 6471 tokens, 1 image
 transparent: 6250 tokens, 1 image
 edit: 6474 tokens, 1 image
 Total: 3 calls, 19195 tokens, 3 images
+
+PR #11 ledger follow-up (no additional paid calls):
+$ NL_REPLAY=strict pnpm check
+Checked 56 files in 27ms. No fixes applied.
+ Test Files  6 passed (6)
+      Tests  101 passed (101)
+
+$ env -u NL_IMAGE_BASE_URL -u NL_IMAGE_API_KEY NL_USAGE_LEDGER=/dev/null/unused-usage.csv NL_REPLAY=strict NL_CASSETTE_DIR=tests/fixtures/image-models/smoke/ pnpm exec tsx tests/fixtures/image-models/smoke.ts
+strict generate: passed
+strict transparent: passed
+strict edit: passed

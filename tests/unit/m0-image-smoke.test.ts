@@ -26,6 +26,7 @@ async function setup() {
 	vi.stubEnv('NL_CASSETTE_DIR', join(dir, 'cassettes'))
 	vi.stubEnv('NL_IMAGE_BASE_URL', 'https://relay.invalid')
 	vi.stubEnv('NL_IMAGE_API_KEY', 'mock-key')
+	vi.stubEnv('NL_USAGE_LEDGER', undefined)
 	return dir
 }
 
@@ -50,5 +51,40 @@ it('records a paid timeout as an unresolved upper bound', async () => {
 	expect(upstream).toHaveBeenCalledTimes(1)
 	expect(await readFile(ledger, 'utf8')).toContain(
 		',gpt-image-2.6-sunburst,1,unknown,1,M0/12 generate connection smoke unresolved/timeout (requested image upper bound)\n',
+	)
+})
+
+it('initializes an overridden ledger and leaves it intact on the next record run', async () => {
+	const dir = await setup()
+	const ledger = join(dir, 'custom', 'usage.csv')
+	vi.stubEnv('NL_USAGE_LEDGER', ledger)
+	const header = 'date,model,calls,tokens,images,purpose\n'
+	vi.mocked(testImage).mockResolvedValue(
+		{} as Awaited<ReturnType<typeof testImage>>,
+	)
+	await import('../fixtures/image-models/smoke.js')
+	expect(await readFile(ledger, 'utf8')).toBe(header)
+	const existing = `${header}2026-01-01,example,1,20,1,existing entry\n`
+	await writeFile(ledger, existing)
+	vi.resetModules()
+	await import('../fixtures/image-models/smoke.js')
+	expect(await readFile(ledger, 'utf8')).toBe(existing)
+})
+
+it('does not open a ledger in strict replay', async () => {
+	const dir = await setup()
+	const blocked = join(dir, 'file')
+	await writeFile(blocked, '')
+	vi.stubEnv('NL_USAGE_LEDGER', join(blocked, 'usage.csv'))
+	vi.stubEnv('NL_REPLAY', 'strict')
+	vi.mocked(testImage).mockResolvedValue(
+		{} as Awaited<ReturnType<typeof testImage>>,
+	)
+	await import('../fixtures/image-models/smoke.js')
+	expect(testImage).toHaveBeenCalledWith(
+		expect.objectContaining({ baseUrl: 'https://relay.invalid/v1' }),
+		expect.objectContaining({
+			replay: expect.objectContaining({ mode: 'strict' }),
+		}),
 	)
 })

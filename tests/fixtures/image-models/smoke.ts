@@ -1,7 +1,14 @@
 import { constants } from 'node:fs'
-import { access, appendFile, mkdtemp, rm } from 'node:fs/promises'
+import {
+	access,
+	appendFile,
+	mkdir,
+	mkdtemp,
+	rm,
+	writeFile,
+} from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import {
 	type ImageCapability,
 	testImage,
@@ -21,8 +28,23 @@ const apiKey = record ? process.env.NL_IMAGE_API_KEY : 'offline-placeholder'
 if (!baseUrl || !apiKey)
 	throw new Error('Relay credentials are not provisioned')
 const config = imageSmokeConfig(baseUrl, apiKey)
-const ledger = join(homedir(), 'memory/poke_5b9601/files/novelive/usage.csv')
-if (record) await access(ledger, constants.W_OK)
+const ledger = record
+	? process.env.NL_USAGE_LEDGER ||
+		join(homedir(), 'memory/poke_5b9601/files/novelive/usage.csv')
+	: undefined
+if (ledger) {
+	await mkdir(dirname(ledger), { recursive: true })
+	try {
+		await writeFile(ledger, 'date,model,calls,tokens,images,purpose\n', {
+			flag: 'wx',
+			mode: 0o600,
+		})
+	} catch (error) {
+		if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST'))
+			throw error
+		await access(ledger, constants.W_OK)
+	}
+}
 
 const cacheDir = await mkdtemp(join(tmpdir(), 'novelive-image-smoke-'))
 const attempted = new Set<ImageCapability>()
@@ -39,7 +61,7 @@ try {
 				const request = new Request(input, init)
 				const url = new URL(request.url)
 				if (
-					!record ||
+					!ledger ||
 					request.method !== 'POST' ||
 					url.origin !== new URL(config.baseUrl).origin
 				)
