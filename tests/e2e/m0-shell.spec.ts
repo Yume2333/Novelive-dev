@@ -57,7 +57,7 @@ test('M0 desktop shell renders the empty library and connects to a real creator'
 			generation: result.state.generation,
 			ready: true,
 		})
-		expect(result.sqlite.ok).toBe(true)
+		expect(result.sqlite).toEqual({ ok: true, journalMode: 'wal', value: 1 })
 		expect(result.sharp.ok).toBe(true)
 		await page.screenshot({ path: test.info().outputPath('empty-library.png') })
 	} finally {

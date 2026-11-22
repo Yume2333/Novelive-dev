@@ -49,7 +49,10 @@ export const commands = {
 			snapshot: nullable(appSnapshot),
 		}),
 	},
-	'debug.sqliteSmoke': { input: empty, output: obj({ ok: bool() }) },
+	'debug.sqliteSmoke': {
+		input: empty,
+		output: obj({ ok: bool(), journalMode: lit('wal'), value: int() }),
+	},
 	'debug.sharpSmoke': { input: empty, output: obj({ ok: bool() }) },
 }
 

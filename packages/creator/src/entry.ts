@@ -1,3 +1,7 @@
+import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { type CreatorFrame, clientFrame, commandError } from './contract'
 import { createRegistry } from './registry'
 
@@ -14,8 +18,21 @@ registry.register('events.list', ({ scope }) => ({
 if (process.env.NL_E2E === '1') {
 	registry.register('debug.sqliteSmoke', async () => {
 		const { DatabaseSync } = await import('node:sqlite')
-		using db = new DatabaseSync(':memory:')
-		return { ok: db.prepare('SELECT 1 AS value').get()?.value === 1 }
+		const directory = await mkdtemp(join(tmpdir(), 'novelive-sqlite-'))
+		try {
+			using db = new DatabaseSync(join(directory, 'smoke.sqlite'))
+			const journalMode = db
+				.prepare('PRAGMA journal_mode = WAL')
+				.get()?.journal_mode
+			assert.equal(journalMode, 'wal')
+			db.exec('CREATE TABLE smoke (value INTEGER NOT NULL)')
+			db.prepare('INSERT INTO smoke (value) VALUES (?)').run(1)
+			const value = db.prepare('SELECT value FROM smoke').get()?.value
+			assert.equal(value, 1)
+			return { ok: true, journalMode, value } as const
+		} finally {
+			await rm(directory, { recursive: true, force: true })
+		}
 	})
 	registry.register('debug.sharpSmoke', async () => {
 		const { default: sharp } = await import('sharp')
