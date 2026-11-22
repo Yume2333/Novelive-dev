@@ -1,5 +1,6 @@
 import type { Message, Tool } from '@earendil-works/pi-ai'
 import { arr, compile, obj, oneOf, str } from '@earendil-works/pi-schema'
+import { ContextLimitError, fitUnits, promptFits } from './budget'
 import { textOf, userMessage, type writingModel } from './request'
 
 const categories = [
@@ -84,26 +85,70 @@ const tools: Tool[] = [
 	},
 ]
 
-export function splitText(text: string, limit: number) {
-	const parts: string[] = []
-	let part = ''
-	let size = 0
-	for (const char of text) {
-		const bytes = Buffer.byteLength(char)
-		if (size + bytes > limit && part) {
-			parts.push(part)
-			part = ''
-			size = 0
-		}
-		part += char
-		size += bytes
-	}
-	if (part) parts.push(part)
-	return parts
+function reviewTools(chapter: ReviewContext) {
+	if (!chapter.bible && !Object.keys(chapter.terms ?? {}).length) return tools
+	return tools.map((tool) =>
+		tool.name === 'read_bible'
+			? {
+					...tool,
+					description:
+						'Read Bible context. Select a Markdown section, an entry ID, or an inclusive glossary range (section=glossary, from/to are term keys).',
+					parameters: {
+						...strings('section', 'entry', 'from', 'to'),
+						required: [],
+					},
+				}
+			: tool,
+	)
 }
 
-const sizeOf = (value: unknown) => Buffer.byteLength(JSON.stringify(value))
-const toolsSize = sizeOf(tools)
+function bibleSection(bible: string, selector: string) {
+	const lines = bible.split('\n')
+	const headings = lines.map((line) => line.match(/^(#{1,6})\s+(.+?)\s*#*$/))
+	const start = headings.findIndex(
+		(heading) =>
+			heading?.[2].toLowerCase() === selector.toLowerCase() ||
+			heading?.[2].split(/\s+/).includes(selector),
+	)
+	const startHeading = headings[start]
+	if (!startHeading) return undefined
+	const end = headings.findIndex(
+		(heading, index) =>
+			index > start &&
+			heading !== null &&
+			heading[1].length <= startHeading[1].length,
+	)
+	return lines.slice(start, end < 0 ? undefined : end).join('\n')
+}
+
+function selectBible(chapter: ReviewContext, args: Record<string, unknown>) {
+	const section = typeof args.section === 'string' ? args.section : undefined
+	const entry = typeof args.entry === 'string' ? args.entry : undefined
+	if (section?.toLowerCase() === 'glossary') {
+		const entries = Object.entries(chapter.terms ?? {})
+		const from =
+			args.from === undefined
+				? 0
+				: entries.findIndex(([key]) => key === args.from)
+		const to =
+			args.to === undefined
+				? entries.length - 1
+				: entries.findIndex(([key]) => key === args.to)
+		if (entry !== undefined)
+			return Object.fromEntries(entries.filter(([key]) => key === entry))
+		if (from < 0 || (args.to !== undefined && to < from)) return undefined
+		return Object.fromEntries(entries.slice(from, to + 1))
+	}
+	if (args.from !== undefined || args.to !== undefined) return undefined
+	const bible = chapter.bible ?? ''
+	const selected = section ? bibleSection(bible, section) : bible
+	return entry && selected !== undefined
+		? (bibleSection(selected, entry) ??
+				selected
+					.split('\n')
+					.find((line) => line.split(/[\s|:]+/).includes(entry)))
+		: selected
+}
 
 function fidelityPrompt(
 	chapter: ReviewContext,
@@ -128,57 +173,73 @@ export async function reviewFidelity(
 	chapter: ReviewContext,
 	script: string,
 ) {
-	const available =
-		model.inputLimit -
-		toolsSize -
-		sizeOf(fidelityPrompt({ paragraphs: [] }, '', true)) -
-		320
-	if (available < 128) throw new Error('Insufficient fidelity review context')
-	const window = Math.floor(available / 3)
-	if (sizeOf(script) <= window && sizeOf(chapter.paragraphs) <= window)
-		return reviewWindow(model, chapter, script, false)
+	const activeTools = reviewTools(chapter)
+	const [heading, source, , ...lines] = script.trimEnd().split('\n')
+	const excerpt = (body: readonly string[]) =>
+		[heading, source, '', ...body].join('\n')
+	const fits = (
+		paragraphs: readonly SourceParagraph[],
+		draft: string,
+		partial: boolean,
+	) =>
+		promptFits(model, {
+			tools: activeTools,
+			messages: [
+				userMessage(fidelityPrompt({ ...chapter, paragraphs }, draft, partial)),
+				toolResult('source', 'read_source_range', JSON.stringify(paragraphs)),
+			],
+		})
+	if (fits(chapter.paragraphs, script, false))
+		return reviewWindow(model, chapter, script, false, activeTools)
 
-	const scripts = splitText(script, Math.max(16, Math.floor(window / 2)))
-	const windows: SourceParagraph[][] = []
-	let batch: SourceParagraph[] = []
-	for (const paragraph of chapter.paragraphs) {
-		for (const text of splitText(
-			paragraph.text,
-			Math.max(16, Math.floor(window / 4)),
-		)) {
-			const part = { ...paragraph, text }
-			if (
-				batch.length &&
-				(batch.some(({ id }) => id === part.id) ||
-					sizeOf([...batch, part]) > window)
-			) {
-				windows.push(batch)
-				batch = []
-			}
-			batch.push(part)
-		}
-	}
-	if (batch.length || !windows.length) windows.push(batch)
-	const count = Math.max(scripts.length, windows.length)
+	const widestLine = lines.reduce(
+		(longest, line) =>
+			Buffer.byteLength(JSON.stringify(line)) >
+			Buffer.byteLength(JSON.stringify(longest))
+				? line
+				: longest,
+		'',
+	)
 	const issues = new Map<string, FidelityIssue>()
-	for (let i = 0; i < count; i++) {
-		const scenePart = scripts[Math.floor((i * scripts.length) / count)] ?? ''
-		const paragraphs = windows[Math.floor((i * windows.length) / count)]
-		for (const issue of await reviewWindow(
-			model,
-			{ ...chapter, paragraphs },
-			scenePart,
-			true,
-		))
-			issues.set(JSON.stringify(issue), issue)
+	for (const paragraphs of fitUnits(
+		chapter.paragraphs,
+		(batch) => fits(batch, excerpt([widestLine]), true),
+		'Fidelity source paragraph',
+	)) {
+		// NVS cites paragraphs at scene level, not line level. Every excerpt
+		// retains that citation; do not guess a narrower alignment by position.
+		for (const body of fitUnits(
+			lines.length ? lines : [''],
+			(batch) => fits(paragraphs, excerpt(batch), true),
+			'Fidelity scene line',
+		)) {
+			for (const issue of await reviewWindow(
+				model,
+				{ ...chapter, paragraphs },
+				excerpt(body),
+				true,
+				activeTools,
+			))
+				issues.set(JSON.stringify(issue), issue)
+		}
 	}
 	return [...issues.values()]
 }
 
-function messageSize(message: Message) {
-	return message.role === 'assistant'
-		? sizeOf(message.content.filter(({ type }) => type !== 'thinking')) + 64
-		: sizeOf(message)
+function toolResult(
+	id: string,
+	name: string,
+	text: string,
+	isError = false,
+): Message {
+	return {
+		role: 'toolResult',
+		toolCallId: id,
+		toolName: name,
+		isError,
+		content: [{ type: 'text', text }],
+		timestamp: 0,
+	}
 }
 
 async function reviewWindow(
@@ -186,20 +247,16 @@ async function reviewWindow(
 	chapter: ReviewContext,
 	script: string,
 	partial: boolean,
+	activeTools: Tool[],
 ) {
 	const messages: Message[] = [
 		userMessage(fidelityPrompt(chapter, script, partial)),
 	]
-	const remaining = () =>
-		model.inputLimit -
-		toolsSize -
-		messages.reduce((bytes, message) => bytes + messageSize(message), 0)
 	for (let turn = 0; turn < 8; turn++) {
-		if (remaining() < 0)
-			throw new Error(
-				'Fidelity review exceeded its context budget without submitting',
-			)
-		const result = await model.request({ messages, tools })
+		const result = await model.request(
+			{ messages, tools: activeTools },
+			'Fidelity review',
+		)
 		messages.push(result)
 		let submitted: FidelityIssue[] | undefined
 		let rejected = false
@@ -235,7 +292,10 @@ async function reviewWindow(
 					value = chapter.preview ?? ''
 					break
 				case 'read_bible':
-					value = chapter.bible ?? ''
+					value = selectBible(chapter, args)
+					if (value === undefined)
+						error =
+							'Bible selector not found; use a section, entry, or glossary range.'
 					break
 				case 'submit_review': {
 					const checked = review.validate(args)
@@ -269,23 +329,27 @@ async function reviewWindow(
 				default:
 					error = 'Unknown review tool.'
 			}
-			const reply = error ?? JSON.stringify(value)
-			const fits = sizeOf(reply) + 240 <= remaining()
-			messages.push({
-				role: 'toolResult',
-				toolCallId: part.id,
-				toolName: part.name,
-				isError: error !== undefined || !fits,
-				content: [
-					{
-						type: 'text',
-						text: fits
-							? reply
-							: 'Tool result exceeds the remaining context. Request a smaller range or submit now.',
-					},
-				],
-				timestamp: 0,
-			})
+			const reply = toolResult(
+				part.id,
+				part.name,
+				error ?? JSON.stringify(value),
+				error !== undefined,
+			)
+			messages.push(
+				promptFits(model, {
+					messages: [...messages, reply],
+					tools: activeTools,
+				})
+					? reply
+					: toolResult(
+							part.id,
+							part.name,
+							part.name === 'read_bible'
+								? 'Bible result exceeds the remaining context. Use read_bible with a section, entry, or glossary range.'
+								: 'Tool result exceeds the remaining context. Request a smaller range or submit now.',
+							true,
+						),
+			)
 		}
 		if (submitted && !rejected) return submitted
 		if (result.stopReason !== 'toolUse')
@@ -310,15 +374,35 @@ export async function reviewStyle(
 	model: ReturnType<typeof writingModel>,
 	script: string,
 ) {
-	const response = textOf(
-		await model.request({
-			messages: [
-				userMessage(
-					`Review prose style only (voice, rhythm and wording). Do not evaluate fidelity or plot. Return JSON {"issues":["..."]}; use an empty array when no issues.\n${script}`,
-				),
-			],
-		}),
-	)
+	const prompt = (draft: string) => ({
+		messages: [
+			userMessage(
+				`Review prose style only (voice, rhythm and wording). Do not evaluate fidelity or plot. Return JSON {"issues":["..."]}; use an empty array when no issues.\n${draft}`,
+			),
+		],
+	})
+	if (promptFits(model, prompt(script)))
+		return styleIssues(
+			textOf(await model.request(prompt(script), 'Style review')),
+		)
+	const [heading, range, , ...lines] = script.trimEnd().split('\n')
+	const excerpt = (body: readonly string[]) =>
+		[heading, range, '', ...body].join('\n')
+	const issues = new Set<string>()
+	if (!lines.length) throw new ContextLimitError('Style review')
+	for (const body of fitUnits(
+		lines,
+		(batch) => promptFits(model, prompt(excerpt(batch))),
+		'Style review line',
+	))
+		for (const issue of styleIssues(
+			textOf(await model.request(prompt(excerpt(body)), 'Style review line')),
+		))
+			issues.add(issue)
+	return [...issues]
+}
+
+function styleIssues(response: string) {
 	let value: unknown
 	try {
 		value = JSON.parse(

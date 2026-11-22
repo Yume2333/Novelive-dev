@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { clientFrame, creatorFrame } from '../../packages/creator/src/contract'
+import {
+	clientFrame,
+	creatorCommandError,
+	creatorFrame,
+} from '../../packages/creator/src/contract'
+import { ContextLimitError } from '../../packages/creator/src/pipeline/writing/budget'
 
 describe('creator transport schemas', () => {
 	test('call and cancel carry the current generation and request identity', () => {
@@ -37,5 +42,20 @@ describe('creator transport schemas', () => {
 				envelope: { ...frame.envelope, scope: 'global' },
 			}),
 		).toBe(false)
+	})
+
+	test('preserves a context limit error through creator message serialization', () => {
+		const failure = new ContextLimitError('Scene repair')
+		const frame = structuredClone({
+			type: 'error',
+			generation: 1,
+			requestId: 1,
+			error: creatorCommandError(failure),
+		})
+		expect(creatorFrame.check(frame)).toBe(true)
+		expect(frame.error).toEqual({
+			code: 'context_limit',
+			message: failure.message,
+		})
 	})
 })

@@ -6,6 +6,7 @@ import {
 	type TextConnection,
 	TextModelError,
 } from '../../models/text'
+import { fitPrompt } from './budget'
 
 export type WritingTransport = {
 	signal?: AbortSignal
@@ -34,17 +35,29 @@ export function writingModel(
 		model.maxTokens,
 		Math.floor(model.contextWindow / 4),
 	)
-	return {
+	const limits = {
 		outputTokens,
 		inputLimit: model.contextWindow - outputTokens - 256,
-		async request(context: Context) {
+	}
+	return {
+		...limits,
+		async request(
+			context: Context,
+			phase = 'Writing prompt',
+			outputEstimate = 0,
+		) {
 			options.signal?.throwIfAborted()
-			const result = await stream(model, normalizeContext(context), {
-				apiKey: connection.apiKey,
-				signal: options.signal,
-				cacheRetention: 'none',
-				maxTokens: outputTokens,
-			}).result()
+			const normalized = normalizeContext(context)
+			const result = await stream(
+				model,
+				fitPrompt(limits, normalized, phase, outputEstimate),
+				{
+					apiKey: connection.apiKey,
+					signal: options.signal,
+					cacheRetention: 'none',
+					maxTokens: outputTokens,
+				},
+			).result()
 			options.signal?.throwIfAborted()
 			if (result.stopReason === 'error' || result.stopReason === 'aborted') {
 				const message = result.errorMessage ?? 'Writing model failed'

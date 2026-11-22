@@ -7,6 +7,7 @@ import {
 	type Scene,
 } from '@novelive/format/script'
 import type { TextConnection } from '../../models/text'
+import { ContextLimitError, fitUnits, promptFits } from './budget'
 import {
 	TruncatedWritingError,
 	textOf,
@@ -20,8 +21,9 @@ import {
 	reviewFidelity,
 	reviewStyle,
 	type SourceParagraph,
-	splitText,
 } from './review'
+
+export { ContextLimitError } from './budget'
 
 export type Continuity =
 	| { kind: 'none' }
@@ -67,16 +69,19 @@ function brief(chapter: WritingChapter, speakers: string[]) {
 	const settings = chapter.settings ?? defaultWorkSettings()
 	const link = chapter.continuity
 	const redLines = (chapter.redLines ?? []).join('\n')
+	const adaptationRule = `Adaptation: ${adaptation[settings.adaptation]}`
+	const requirements = `Requirements: ${settings.requirements}`
+	const rules = `Rules: ${[...settings.rules, ...(settings.chapterRules[chapter.chapterId] ?? [])].join('; ')}`
 	return {
 		instructions: [
 			...(redLines ? [`RED LINES (mandatory):\n${redLines}`] : []),
 			`Write a visual novel adaptation in ${chapter.language}.`,
 			grammar,
-			`Adaptation: ${adaptation[settings.adaptation]}`,
+			adaptationRule,
 			`Performance density: ${density[settings.stagingDensity]}`,
 			`Allowed speaker IDs: ${speakers.join(', ') || '(none; use narration)'}`,
-			`Requirements: ${settings.requirements}`,
-			`Rules: ${[...settings.rules, ...(settings.chapterRules[chapter.chapterId] ?? [])].join('; ')}`,
+			requirements,
+			rules,
 			`Writer style preset: ${chapter.preset ?? ''}`,
 			`Bible: ${chapter.bible ?? ''}`,
 			`Glossary: ${JSON.stringify(chapter.terms ?? {})}`,
@@ -88,6 +93,7 @@ function brief(chapter: WritingChapter, speakers: string[]) {
 						]
 					: []),
 		].join('\n'),
+		revision: [adaptationRule, requirements, rules].join('\n'),
 		end: redLines ? `\nRED LINES (mandatory):\n${redLines}` : '',
 	}
 }
@@ -123,11 +129,10 @@ function sourceBounds(chunk: string, paragraphs: readonly SourceParagraph[]) {
 		paragraphs.findIndex(({ id }) => id === (range?.[2] ?? range?.[1])),
 	]
 }
-function ask(model: Writer, prompt: string) {
-	if (Buffer.byteLength(prompt) > model.inputLimit)
-		throw new Error('Writer input exceeds its configured context window')
+const userPrompt = (prompt: string) => ({ messages: [userMessage(prompt)] })
+function ask(model: Writer, prompt: string, phase: string, outputEstimate = 0) {
 	return model
-		.request({ messages: [userMessage(prompt)] })
+		.request(userPrompt(prompt), phase, outputEstimate)
 		.then((result) => clean(textOf(result)))
 }
 
@@ -165,24 +170,93 @@ async function validate(
 		const startOfGap = coverage ? Math.min(previousEnd + 1, from) : from
 		const endOfGap =
 			coverage && index === chunks.length - 1 ? paragraphs.length - 1 : to
-		const repair = await ask(
+		const cited =
+			startOfGap >= 0 && endOfGap >= startOfGap
+				? paragraphs.slice(startOfGap, endOfGap + 1)
+				: []
+		const repair = await repairScene(
 			model,
-			[
-				instructions.instructions,
-				'Repair only the supplied scene. Return exactly one complete scene, keeping its narrative and valid IDs.',
-				`Diagnostics: ${JSON.stringify(errors)}`,
-				`Valid paragraph IDs: ${paragraphs.map(({ id }) => id).join(', ')}`,
-				...(startOfGap >= 0 && endOfGap >= startOfGap
-					? [source(paragraphs.slice(startOfGap, endOfGap + 1))]
-					: []),
-				chunks[index],
-				instructions.end,
-			].join('\n'),
+			chunks[index],
+			instructions,
+			errors,
+			start,
+			paragraphs,
+			cited,
 		)
 		if (rawScenes(repair).length === 1) {
 			chunks = chunks.map((chunk, i) => (i === index ? repair : chunk))
 		}
 	}
+}
+
+async function repairScene(
+	model: Writer,
+	draft: string,
+	instructions: ReturnType<typeof brief>,
+	errors: Diagnostic[],
+	start: number,
+	paragraphs: readonly SourceParagraph[],
+	cited: readonly SourceParagraph[],
+) {
+	const format = (
+		instruction: string,
+		text: string,
+		diagnostics: Diagnostic[],
+	) =>
+		[
+			instructions.instructions,
+			instruction,
+			`Diagnostics: ${JSON.stringify(diagnostics)}`,
+			`Valid paragraph IDs: ${paragraphs.map(({ id }) => id).join(', ')}`,
+			...(cited.length ? [source(cited)] : []),
+			text,
+			instructions.end,
+		].join('\n')
+	const whole = format(
+		'Repair only the supplied scene. Return exactly one complete scene, keeping its narrative and valid IDs.',
+		draft,
+		errors,
+	)
+	if (promptFits(model, userPrompt(whole), estimateNvs(draft)))
+		return ask(model, whole, 'Scene repair', estimateNvs(draft))
+
+	const lines = draft.split('\n')
+	const header = lines.findIndex((line) => /^\s*source\s/.test(line))
+	const bad = errors.filter(({ code }) => code.startsWith('E_'))
+	if (
+		header < 0 ||
+		!cited.length ||
+		!bad.length ||
+		bad.some(({ line }) => line - start <= header)
+	)
+		throw new ContextLimitError('Scene repair')
+	const body = lines
+		.slice(header + 1)
+		.map((text, i) => ({ text, line: start + header + 1 + i }))
+	const render = (units: readonly { text: string; line: number }[]) =>
+		format(
+			'Repair the supplied body lines, keeping valid IDs. Return only body lines (no scene or source header).',
+			units.map(({ text }) => text).join('\n'),
+			errors.filter(({ line }) => units.some((unit) => unit.line === line)),
+		)
+	const corrected = lines.slice(0, header + 1)
+	for (const unit of body) {
+		if (bad.some(({ line }) => line === unit.line))
+			corrected.push(
+				await ask(
+					model,
+					render([unit]),
+					'Scene repair',
+					estimateNvs(unit.text),
+				),
+			)
+		else corrected.push(unit.text)
+	}
+	return corrected.join('\n')
+}
+
+function estimateNvs(text: string) {
+	return 24 + Math.ceil(Buffer.byteLength(text) / 3)
 }
 
 export async function writeChapter(
@@ -204,7 +278,7 @@ export async function writeChapter(
 	const prompt = (batch: readonly SourceParagraph[]) =>
 		[
 			instructions.instructions,
-			`Previous segment ending (context only): ${staged.at(-1)?.slice(-400) ?? ''}`,
+			`Previous segment ending (context only): ${staged.at(-1)?.trimEnd().split('\n').at(-1) ?? ''}`,
 			'Source paragraphs:',
 			source(batch),
 			instructions.end,
@@ -223,10 +297,22 @@ export async function writeChapter(
 	async function writeBatch(batch: readonly SourceParagraph[]) {
 		let draft: string
 		try {
-			draft = await ask(model, prompt(batch))
+			draft = await ask(
+				model,
+				prompt(batch),
+				'Source paragraph adaptation',
+				outputEstimate(batch),
+			)
 		} catch (error) {
-			if (!(error instanceof TruncatedWritingError) || batch.length < 2)
+			if (
+				!(
+					error instanceof TruncatedWritingError ||
+					error instanceof ContextLimitError
+				)
+			)
 				throw error
+			if (batch.length < 2)
+				throw new ContextLimitError('Source paragraph adaptation')
 			const middle = Math.floor(batch.length / 2)
 			await writeBatch(batch.slice(0, middle))
 			await writeBatch(batch.slice(middle))
@@ -245,20 +331,13 @@ export async function writeChapter(
 		)
 		staged.push(...compiled.scenes.map(({ scene }) => formatScene(scene)))
 	}
-	for (let from = 0; from < paragraphs.length; ) {
-		let to = from + 1
-		while (to < paragraphs.length) {
-			const batch = paragraphs.slice(from, to + 1)
-			if (
-				Buffer.byteLength(prompt(batch)) > model.inputLimit ||
-				outputEstimate(batch) > model.outputTokens
-			)
-				break
-			to++
-		}
-		await writeBatch(paragraphs.slice(from, to))
-		from = to
-	}
+	for (const batch of fitUnits(
+		paragraphs,
+		(batch) =>
+			promptFits(model, userPrompt(prompt(batch)), outputEstimate(batch)),
+		'Source paragraph adaptation',
+	))
+		await writeBatch(batch)
 	return validate(
 		model,
 		staged.join('\n\n'),
@@ -332,6 +411,7 @@ export async function reviewChapter(
 			issues.length || styleIssues.length
 				? await reviseScene(
 						writer,
+						instructions.revision,
 						instructions.end,
 						script,
 						paragraphs,
@@ -365,6 +445,7 @@ export async function reviewChapter(
 
 async function reviseScene(
 	writer: Writer,
+	rules: string,
 	redLines: string,
 	script: string,
 	paragraphs: SourceParagraph[],
@@ -379,56 +460,80 @@ async function reviseScene(
 		text: string,
 		draft: string,
 	) =>
-		`${redLines}\n${instruction}\n${issues}\nSource:\n${text}\nDraft:\n${draft}${redLines}`
+		`${redLines}\n${instruction}\n${rules}\n${issues}\nSource:\n${text}\nDraft:\n${draft}${redLines}`
 	const whole = render(
 		'Revise this NVS scene once. Preserve the original source coverage and IDs for retained lines. Return only complete NVS scenes.',
 		findings,
 		original,
 		script,
 	)
-	if (Buffer.byteLength(whole) <= writer.inputLimit) return ask(writer, whole)
+	if (promptFits(writer, userPrompt(whole), estimateNvs(script)))
+		return ask(writer, whole, 'Scene revision', estimateNvs(script))
+
+	const paragraphPrompt = (batch: readonly SourceParagraph[]) => {
+		const cited = new Set(batch.map(({ id }) => id))
+		const issues = `Fidelity issues: ${JSON.stringify(fidelity.filter(({ paragraphId }) => cited.has(paragraphId)))}\nStyle issues: ${JSON.stringify(style)}`
+		return render(
+			'Revise only the portion of this NVS scene that adapts the supplied source paragraphs. The rest of the draft is context only. Return complete NVS scenes covering exactly the supplied paragraph IDs. Preserve IDs for retained lines.',
+			issues,
+			source(batch),
+			script,
+		)
+	}
+	const paragraphOutput = (batch: readonly SourceParagraph[]) =>
+		estimateNvs(source(batch))
+	const paragraphsFit = (batch: readonly SourceParagraph[]) =>
+		promptFits(
+			writer,
+			userPrompt(paragraphPrompt(batch)),
+			paragraphOutput(batch),
+		)
+	if (
+		paragraphs.length > 1 &&
+		paragraphs.every((paragraph) => paragraphsFit([paragraph]))
+	) {
+		const revised: string[] = []
+		for (const batch of fitUnits(
+			paragraphs,
+			paragraphsFit,
+			'Scene revision paragraph',
+		))
+			revised.push(
+				await ask(
+					writer,
+					paragraphPrompt(batch),
+					'Scene revision paragraph',
+					paragraphOutput(batch),
+				),
+			)
+		return revised.join('\n\n')
+	}
 
 	const instruction =
 		'Revise this fragment of an NVS scene once. Return only its body lines (no scene or source header). Preserve IDs for retained lines.'
-	const budget = Math.floor(
-		(writer.inputLimit - Buffer.byteLength(render(instruction, '', '', ''))) /
-			3,
-	)
-	if (budget < 16) throw new Error('Insufficient context for a scene revision')
 	const [heading, range, , ...lines] = script.trimEnd().split('\n')
-	const splitLines: string[] = []
-	for (const line of lines) {
-		const last = splitLines.at(-1) ?? ''
-		if (last && Buffer.byteLength(`${last}\n${line}`) <= budget)
-			splitLines[splitLines.length - 1] = `${last}\n${line}`
-		else splitLines.push(...splitText(line, budget))
-	}
-	const splitSource = splitText(original, budget)
-	const splitFindings = splitText(findings, budget)
-	const count = Math.max(
-		splitLines.length,
-		splitSource.length,
-		splitFindings.length,
-	)
-	const at = (chunks: string[], i: number) =>
-		chunks[Math.floor((i * chunks.length) / count)] ?? ''
+	const fragmentPrompt = (body: readonly string[]) =>
+		render(instruction, findings, original, body.join('\n'))
 	const revised: string[] = []
-	for (let i = 0; i < count; i++) {
-		const repeated =
-			i > 0 &&
-			Math.floor((i * splitLines.length) / count) ===
-				Math.floor(((i - 1) * splitLines.length) / count)
+	for (const body of fitUnits(
+		lines,
+		(body) =>
+			promptFits(
+				writer,
+				userPrompt(fragmentPrompt(body)),
+				estimateNvs(body.join('\n')),
+			),
+		'Scene revision line',
+	)) {
 		revised.push(
 			await ask(
 				writer,
-				render(
-					instruction,
-					at(splitFindings, i),
-					at(splitSource, i),
-					repeated ? '' : at(splitLines, i),
-				),
+				fragmentPrompt(body),
+				'Scene revision line',
+				estimateNvs(body.join('\n')),
 			),
 		)
 	}
+	if (!revised.length) throw new ContextLimitError('Scene revision line')
 	return [heading, range, '', ...revised].join('\n')
 }

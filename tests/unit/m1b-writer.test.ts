@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
+	ContextLimitError,
 	reviewChapter,
 	ScriptDiagnosticsError,
 	writeChapter,
@@ -66,7 +67,7 @@ function responses(...replies: Reply[]) {
 			{ headers: { 'content-type': 'text/event-stream' } },
 		)
 	}
-	return { requests, options: fixtureOptions(fetch) }
+	return { requests, options: fixtureOptions(fetch), fetch }
 }
 
 const scene =
@@ -260,13 +261,20 @@ describe('M1b writer', () => {
 		const draftText = [
 			'scene Bridge',
 			'source p0001',
-			...Array.from({ length: 4 }, (_, i) => `: Draft ${i} ${'a'.repeat(725)}`),
+			...Array.from(
+				{ length: 4 },
+				(_, i) => `: Draft ${i} ${'a'.repeat(1400)}`,
+			),
 		].join('\n')
 		const input = {
 			...chapter,
 			bible: 'Excluded Bible background',
 			settings: {
 				...defaultWorkSettings(),
+				adaptation: 'faithful' as const,
+				requirements: 'Keep the setting intact.',
+				rules: ['Outdoor scenes use narration.'],
+				chapterRules: { [chapter.chapterId]: ['Keep the time of day.'] },
 				fidelityReview: false,
 				styleReview: true,
 			},
@@ -289,6 +297,10 @@ describe('M1b writer', () => {
 		for (const request of requests.slice(2)) {
 			expect(request).toContain('Return only its body lines')
 			expect(request).not.toContain('Excluded Bible background')
+			expect(request).toContain('Preserve sentence order')
+			expect(request).toContain('Keep the setting intact.')
+			expect(request).toContain('Outdoor scenes use narration.')
+			expect(request).toContain('Keep the time of day.')
 			expect(Buffer.byteLength(request)).toBeLessThan(2816)
 		}
 	})
@@ -391,4 +403,209 @@ describe('M1b writer', () => {
 			vi.unstubAllEnvs()
 		}
 	})
+
+	test.each([
+		{
+			phase: 'Scene repair',
+			replies: [`scene Bridge\nsource p9999\n: ${'x'.repeat(3200)}`],
+			count: 1,
+		},
+		{
+			phase: 'Source paragraph adaptation',
+			replies: [
+				{ truncated: scene },
+				`scene Bridge\nsource p0001\n: ${'x'.repeat(2700)}`,
+			],
+			count: 2,
+		},
+	] as const)(
+		'surfaces context_limit for $phase before an oversized call',
+		async ({ phase, replies, count }) => {
+			const { options, requests } = responses(...replies)
+			const input =
+				phase === 'Scene repair'
+					? chapter
+					: {
+							...chapter,
+							paragraphs: [
+								...chapter.paragraphs,
+								{ id: 'p0002', text: 'A bell rang.' },
+							],
+						}
+			await expect(
+				writeChapter(input, {
+					...options,
+					writer: { ...options.writer, contextWindow: 4096 },
+				}),
+			).rejects.toMatchObject({ code: 'context_limit', phase })
+			expect(requests).toHaveLength(count)
+		},
+	)
+
+	test.each(['revision', 'fidelity'] as const)(
+		'does not split an indivisible %s line',
+		async (phase) => {
+			const draftText = `scene Bridge\nsource p0001\nchar001: ${'Dialogue '.repeat(450)}`
+			const input = {
+				...chapter,
+				settings: {
+					...defaultWorkSettings(),
+					fidelityReview: phase === 'fidelity',
+					styleReview: phase === 'revision',
+				},
+			}
+			const { options: original, requests } = responses(
+				draftText,
+				'{"issues":["Shorten this line."]}',
+			)
+			const options = {
+				...original,
+				script: { ...original.script, speakers: ['char001'] },
+			}
+			const draft = await writeChapter(input, options)
+			await expect(
+				reviewChapter(input, draft, {
+					...options,
+					[phase === 'fidelity' ? 'reviewer' : 'writer']: {
+						...options.writer,
+						contextWindow: 4096,
+					},
+				}),
+			).rejects.toBeInstanceOf(ContextLimitError)
+			expect(requests).toHaveLength(phase === 'fidelity' ? 1 : 2)
+		},
+	)
+
+	test('validates a quote in a full cited paragraph when the scene is excerpted', async () => {
+		const quote = 'A paper boat drifted towards the bridge. '.repeat(5).trim()
+		const input = { ...chapter, paragraphs: [{ id: 'p0001', text: quote }] }
+		const script = [
+			'scene Bridge',
+			'source p0001',
+			...Array.from({ length: 8 }, (_, i) => `: Line ${i} ${'x'.repeat(410)}`),
+		].join('\n')
+		const submit = { tool: 'submit_review', arguments: { issues: [] } }
+		const { options, requests } = responses(script)
+		const draft = await writeChapter(input, options)
+		const revision = responses(script)
+		const review = responses(
+			{ tool: 'read_source_range', arguments: { from: 'p0001', to: 'p0001' } },
+			{ tool: 'submit_review', arguments: { issues: [{ ...issue, quote }] } },
+			...Array.from({ length: 16 }, () => submit),
+		)
+		const result = await reviewChapter(input, draft, {
+			...review.options,
+			reviewer: { ...options.reviewer, contextWindow: 4096 },
+			fetch: async (request, init) => {
+				const body = await new Request(request, init).json()
+				return body.model === options.writer.model
+					? revision.fetch(request, init)
+					: review.fetch(request, init)
+			},
+		})
+		expect(requests).toHaveLength(1)
+		expect(review.requests[1]).toContain(quote)
+		expect(review.requests[1]).not.toContain('Quote not found')
+		expect(result.fidelity).toEqual([{ ...issue, quote }])
+	})
+
+	test('repairs only the invalid body line when the full scene does not fit', async () => {
+		const valid = `: ${'An unchanged beat. '.repeat(35)}`
+		const draft = [
+			'scene Bridge',
+			'source p0001',
+			valid,
+			'unknown: Fix this line.',
+			valid,
+			valid,
+			valid,
+		].join('\n')
+		const { options, requests } = responses(draft, ': Fixed.')
+		const result = await writeChapter(chapter, {
+			...options,
+			writer: { ...options.writer, contextWindow: 4096 },
+		})
+		expect(result.scenes[0].beats).toHaveLength(5)
+		expect(requests[1]).toContain('unknown: Fix this line.')
+		expect(requests[1]).not.toContain('An unchanged beat.')
+	})
+
+	test('splits a revision at cited paragraph boundaries before splitting body lines', async () => {
+		const second = 'scene Shore\nsource p0002\n: A bell rang.'
+		const firstSource = `A boat drifted. ${'water '.repeat(240)}`
+		const secondSource = `A bell rang. ${'bell '.repeat(280)}`
+		const input = {
+			...chapter,
+			paragraphs: [
+				{ id: 'p0001', text: firstSource },
+				{ id: 'p0002', text: secondSource },
+			],
+			settings: {
+				...defaultWorkSettings(),
+				fidelityReview: false,
+				styleReview: true,
+			},
+		}
+		const { options, requests } = responses(
+			scene.replace('p0001', 'p0001-p0002'),
+			'{"issues":["Sharpen the rhythm."]}',
+			scene,
+			second,
+		)
+		const draft = await writeChapter(input, options)
+		const result = await reviewChapter(input, draft, {
+			...options,
+			writer: { ...options.writer, contextWindow: 4096 },
+		})
+		expect(requests).toHaveLength(4)
+		expect(requests[2]).toContain(firstSource)
+		expect(requests[2]).not.toContain(secondSource)
+		expect(requests[3]).toContain(secondSource)
+		expect(result.scenes.map(({ scene }) => scene.source.from)).toEqual([
+			'p0001',
+			'p0002',
+		])
+	})
+
+	test.each([
+		{
+			args: { section: 'Characters', entry: 'ch001' },
+			matching: 'Boatkeeper',
+			unrelated: 'Night Watch',
+		},
+		{
+			args: { section: 'glossary', from: 'Boat', to: 'Bridge' },
+			matching: 'Stone crossing',
+			unrelated: 'Night Watch',
+		},
+	])(
+		'offers Bible selectors after an overflow and reads $args.section',
+		async ({ args, matching, unrelated }) => {
+			const { options, requests } = responses(
+				scene,
+				{ tool: 'read_bible', arguments: {} },
+				{ tool: 'read_bible', arguments: args },
+				{ tool: 'submit_review', arguments: { issues: [] } },
+			)
+			const draft = await writeChapter(chapter, options)
+			await reviewChapter(
+				{
+					...chapter,
+					bible: `# Background\n${'x'.repeat(14000)}\n# Characters\n## ch001\nBoatkeeper\n## ch002\nNight Watch`,
+					terms: {
+						Boat: 'Small vessel',
+						Bridge: 'Stone crossing',
+						Night: 'Night Watch',
+					},
+				},
+				draft,
+				options,
+			)
+			expect(requests[2]).toContain(
+				'Use read_bible with a section, entry, or glossary range.',
+			)
+			expect(requests[3]).toContain(matching)
+			expect(requests[3]).not.toContain(unrelated)
+		},
+	)
 })
