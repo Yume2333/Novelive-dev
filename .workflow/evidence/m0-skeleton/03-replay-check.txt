@@ -1,0 +1,10 @@
+
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev/.workflow/worktrees/m0-03
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  17:56:21
+   Duration  265ms (tests 58%, transform 30%, import 10%, worker 2%)
+
+$ tsc --noEmit
