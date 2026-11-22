@@ -25,8 +25,9 @@ export function writingModel(
 	const model = buildTextModel(connection)
 	const stream = createTextStream({
 		fetch: options.fetch,
-		requestRetries: 0,
-		streamRetries: 0,
+		...(process.env.NL_REPLAY === 'record'
+			? { requestRetries: 0, streamRetries: 0 }
+			: {}),
 	})
 	const outputTokens = Math.min(
 		4096,

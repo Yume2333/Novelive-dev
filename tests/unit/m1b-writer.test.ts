@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import {
 	reviewChapter,
 	ScriptDiagnosticsError,
@@ -342,5 +342,25 @@ describe('M1b writer', () => {
 		expect(requests[1]).toContain('p0002: A lantern went out.')
 		expect(requests[1]).toContain('p0004: Morning arrived.')
 		expect(requests[1]).not.toContain('p0001: At dusk')
+	})
+
+	test('retries an empty stream in strict mode but not in record mode', async () => {
+		try {
+			vi.stubEnv('NL_REPLAY', 'strict')
+			const strict = responses('', scene)
+			await expect(
+				writeChapter(chapter, strict.options),
+			).resolves.toMatchObject({ ok: true })
+			expect(strict.requests).toHaveLength(2)
+
+			vi.stubEnv('NL_REPLAY', 'record')
+			const record = responses('', scene)
+			await expect(writeChapter(chapter, record.options)).rejects.toThrow(
+				'empty response',
+			)
+			expect(record.requests).toHaveLength(1)
+		} finally {
+			vi.unstubAllEnvs()
+		}
 	})
 })
