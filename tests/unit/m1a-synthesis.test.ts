@@ -273,6 +273,20 @@ test('character deletion is rejected before writing if a surviving relation refe
 	const updated = await readBible(project)
 	expect(updated.character.map(({ id }) => id)).toEqual(['ada'])
 	expect(updated.relation).toEqual([])
+	await expect(
+		applyPatches(
+			project,
+			updated,
+			[
+				{ ...patch, op: 'add' },
+				patch,
+				{ kind: 'relation', op: 'add', entry: relation },
+			],
+			[],
+			new Set(chapters),
+		),
+	).rejects.toThrow('Cannot delete character guide: still referenced')
+	expect(await readBible(project)).toEqual(updated)
 })
 
 test('a proposal cannot smuggle fixed facts onto confirmed characters as temporal changes', async () => {

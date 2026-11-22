@@ -253,6 +253,7 @@ export async function applyPatches(
 	const conflicts: BiblePatch = []
 	const glossaryConflicts: GlossaryPatch = []
 	const pending: (() => Promise<void>)[] = []
+	const characterDeletions: (() => Promise<void>)[] = []
 	const removedCharacters = new Set<string>()
 	let survivingCharacters = bible.character
 	let survivingRelations = bible.relation
@@ -285,6 +286,7 @@ export async function applyPatches(
 				) {
 					entries.delete(current.id)
 					changed.add(current.id)
+					if (kind === 'character') removedCharacters.add(current.id)
 				}
 				continue
 			}
@@ -298,8 +300,13 @@ export async function applyPatches(
 		const survivors = [...entries.values()]
 		if (kind === 'character') {
 			survivingCharacters = survivors as Character[]
-			for (const { id } of original)
-				if (!entries.has(id)) removedCharacters.add(id)
+			for (const id of removedCharacters) {
+				if (entries.has(id)) removedCharacters.delete(id)
+				else {
+					changed.delete(id)
+					characterDeletions.push(() => persist(survivors, new Set([id])))
+				}
+			}
 		}
 		if (kind === 'relation') survivingRelations = survivors as Relation[]
 		if (changed.size) pending.push(() => persist(survivors, changed))
@@ -359,6 +366,7 @@ export async function applyPatches(
 		}
 	}
 	for (const persist of pending) await persist()
+	for (const persist of characterDeletions) await persist()
 	if (changed) await write(projectFiles.glossary(scope), [...terms.values()])
 	return { conflicts, glossaryConflicts }
 }
