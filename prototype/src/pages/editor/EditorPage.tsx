@@ -749,7 +749,7 @@ export function EditorPage() {
         <div style={twoCol ? { flex: 1, minWidth: 0, position: 'sticky', top: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' } : { width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', alignItems: 'center' }}>
           {/* 舞台预览 */}
           <div style={{ ...panelStyle, background: '#0a0e13', padding: 12, width: '100%', ...(twoCol ? {} : { maxWidth: stageCap }), boxSizing: 'border-box' }}>
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--radius-md)', overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', inset: 0, background: bgOverride[scene.id] ?? scene.background.gradient }} />
               <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 92%, rgba(143,180,212,0.16), transparent 62%)' }} />
               <div style={{ position: 'absolute', bottom: '22%', left: '5%', right: '5%', height: 1.5, background: 'rgba(143,180,212,0.2)' }} />

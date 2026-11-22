@@ -1,6 +1,0 @@
-4 KV calls queued
-ok KV-P-s1 23128ms
-ok KV-P-s2 30421ms
-ok KV-O-s2 55419ms
-ok KV-O-s1 57388ms
-KV done=4 failed=0

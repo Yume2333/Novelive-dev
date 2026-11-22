@@ -121,7 +121,7 @@
 - 文本模型填接口格式（OpenAI Chat Completions、OpenAI Responses、Anthropic Messages）、接口地址、模型名、上下文长度和 API Key，另有一个“兼容哪家”下拉（自动 / OpenAI / DeepSeek / 通义千问 / 智谱 / OpenRouter / 兼容 Anthropic）：自定义地址时把对应的推理参数格式和缓存标记格式写进 Agent 底座的模型 compat，否则“关掉推理”和显式缓存标记在这类服务上会静默失效。文本调用通过 Agent 底座发出，不限并发，制作的并发来自角色分工和出图队列。
 - API Key 简单加密后存在应用的配置文件里，方便备份和迁移。
 
-用量统计面板按作品、阶段、模型和时间（天 / 月）统计，每条记录含输入、输出和缓存读 / 写的 token 数，能拿到单价时显示参考金额。统计结果只作参考，不设预算，不做开工前估算，也不会自动停止。参考量级见 `.workflow/decisions.md` 与 `.workflow/evidence/`。
+用量统计面板按作品、阶段、模型和时间（天 / 月）统计，每条记录含输入、输出和缓存读 / 写的 token 数，能拿到单价时显示参考金额。统计结果只作参考，不设预算，不做开工前估算，也不会自动停止。参考量级见 `.workflow/decisions.md` 与 `.workflow/research/`。
 
 ## 7. 编辑器背后的修改
 

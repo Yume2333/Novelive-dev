@@ -427,7 +427,7 @@ export function AppShell() {
                 zIndex: 50,
                 background: 'var(--veil-95)',
                 borderRadius: 'var(--radius-2xl)',
-                boxShadow: 'var(--shadow-glass), 0 16px 48px var(--scrim)',
+                boxShadow: 'var(--shadow-pop)',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
