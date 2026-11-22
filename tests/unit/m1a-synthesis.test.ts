@@ -533,6 +533,95 @@ test('whole-volume dated updates apply after their new entry and keep their emis
 	})
 })
 
+test('a candidate can be deleted and then re-added in emission order', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const entry = {
+		id: 'guide',
+		name: 'Guide',
+		aliases: [],
+		status: 'candidate' as const,
+		firstSeenChapter: 'c1',
+	}
+	const replacement = { ...entry, name: 'Navigator', firstSeenChapter: 'c2' }
+	await project.write(projectFiles.character(scope, entry.id), {
+		formatVersion: 1,
+		entries: [entry],
+	})
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[
+			{ kind: 'character', op: 'delete', entry },
+			{ kind: 'character', op: 'add', entry: replacement },
+		],
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toEqual([])
+	expect((await readBible(project)).character).toContainEqual(replacement)
+})
+
+test('a later addition does not displace a same-chapter update to an existing character', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const entry = { ...confirmed, aliases: [] }
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[
+			{
+				kind: 'character',
+				op: 'update',
+				entry: { ...entry, identity: 'Captain' },
+				observedChapter: 'c2',
+			},
+			{
+				kind: 'character',
+				op: 'add',
+				entry: { ...entry, identity: 'Admiral' },
+				observedChapter: 'c2',
+			},
+		],
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toMatchObject([
+		{ op: 'add', entry: { identity: 'Admiral' } },
+	])
+	expect((await readBible(project)).character).toContainEqual({
+		...entry,
+		changes: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
+	})
+})
+
+test('an update still waiting for an addition at the end goes to conflict review', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const entry = {
+		id: 'guide',
+		name: 'Guide',
+		aliases: [],
+		status: 'candidate' as const,
+	}
+	const bible = await readBible(project)
+	const result = await applyPatches(
+		project,
+		bible,
+		[{ kind: 'character', op: 'update', entry }],
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toEqual([
+		{
+			kind: 'character',
+			op: 'update',
+			entry: { ...entry, conflict: 'Entry to update is not published' },
+		},
+	])
+	expect(await readBible(project)).toEqual(bible)
+})
+
 test('automatic fallback streams all preview packets without truncation', async () => {
 	await seed(root, true)
 	using project = await Project.open(root)

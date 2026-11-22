@@ -476,10 +476,6 @@ export async function applyPatches(
 	const chapterOrder = new Map(
 		Array.from(seriesChapters, (id, index) => [id, index]),
 	)
-	const additionsFirst = [
-		...patch.filter(({ op }) => op === 'add'),
-		...patch.filter(({ op }) => op !== 'add'),
-	]
 	const conflicts: BiblePatch = []
 	const glossaryConflicts: GlossaryPatch = []
 	const pending: (() => Promise<void>)[] = []
@@ -503,9 +499,10 @@ export async function applyPatches(
 		const entries = new Map(original.map((entry) => [entry.id, entry]))
 		const histories = new Map<string, History>()
 		const changed = new Set<string>()
-		for (const item of additionsFirst) {
-			if (item.kind !== kind || item.op === 'none') continue
-			const current = entries.get(item.entry.id)
+		const deferred = new Map<string, Patch[]>()
+		const applyItem = (item: Patch) => {
+			const id = item.entry.id
+			const current = entries.get(id)
 			if (item.op === 'delete') {
 				if (current?.status === 'confirmed')
 					conflicts.push({
@@ -521,21 +518,15 @@ export async function applyPatches(
 					changed.add(current.id)
 					if (kind === 'character') removedCharacters.add(current.id)
 				}
-				continue
+				return
 			}
 			if (item.op === 'update' && !current) {
-				conflicts.push({
-					...item,
-					entry: {
-						...item.entry,
-						status: 'candidate',
-						conflict: 'Entry to update is not published',
-					},
-				} as Patch)
-				continue
+				const updates = deferred.get(id) ?? []
+				updates.push(item)
+				deferred.set(id, updates)
+				return
 			}
-			const history =
-				histories.get(item.entry.id) ?? existingHistory(current, kind)
+			const history = histories.get(id) ?? existingHistory(current, kind)
 			const { entry, conflict } = merge<E>(
 				current,
 				item.entry as E,
@@ -552,6 +543,28 @@ export async function applyPatches(
 			if (entry && !isDeepStrictEqual(current, entry)) {
 				entries.set(entry.id, entry)
 				changed.add(entry.id)
+			}
+			if (item.op === 'add' && entry && !conflict) {
+				const updates = deferred.get(id)
+				if (updates) {
+					deferred.delete(id)
+					for (const update of updates) applyItem(update)
+				}
+			}
+		}
+		for (const item of patch) {
+			if (item.kind === kind && item.op !== 'none') applyItem(item)
+		}
+		for (const updates of deferred.values()) {
+			for (const item of updates) {
+				conflicts.push({
+					...item,
+					entry: {
+						...item.entry,
+						status: 'candidate',
+						conflict: 'Entry to update is not published',
+					},
+				} as Patch)
 			}
 		}
 		for (const [id, history] of histories) {
