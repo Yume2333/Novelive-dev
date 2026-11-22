@@ -20,7 +20,16 @@ import {
 } from '../config/schema'
 import { productionCommands } from './production'
 
-export type { ConfigUpdate, MaskedConfig, TextSlot } from '../config/schema'
+export {
+	type ConfigUpdate,
+	type MaskedConfig,
+	type ProductionRole,
+	type ProductionSettings,
+	roleModelDefaults,
+	type TextSlot,
+	type WriterPreset,
+	type WriterSettings,
+} from '../config/schema'
 export * from './production'
 
 const generation = int({ minimum: 1 })

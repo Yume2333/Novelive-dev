@@ -22,7 +22,10 @@ import {
 	type ConfigUpdate,
 	configUpdateSchema,
 	type MaskedConfig,
+	type ProductionRole,
+	type ProductionSettings,
 	privateConfigSchema,
+	roleModelDefaults,
 	type TextSlot,
 } from './schema'
 
@@ -44,6 +47,39 @@ const encryptionKey = Buffer.from(
 
 const configValidator = compile(privateConfigSchema)
 const updateValidator = compile(configUpdateSchema)
+
+const defaultProduction: ProductionSettings = {
+	roleModels: {},
+	writer: {
+		defaultPresetId: 'default',
+		presets: [
+			{
+				id: 'default',
+				name: '默认',
+				style: '叙述简洁，对白贴合角色口吻。',
+				constraints: '',
+				replacements: [],
+			},
+		],
+	},
+}
+
+function validWriter({ writer }: ProductionSettings) {
+	const ids = new Set(writer.presets.map(({ id }) => id))
+	return ids.size === writer.presets.length && ids.has(writer.defaultPresetId)
+}
+
+function textModel(config: Config, slot: TextSlot): Config['models']['fast'] {
+	const { models } = config
+	if (slot === 'fast') return models.fast
+	const { inheritFast, ...model } = models[slot]
+	if (!inheritFast) return model
+	return {
+		...models.fast,
+		model: model.model,
+		contextWindow: model.contextWindow,
+	}
+}
 
 function defaultConfig(): Config {
 	const fast: Config['models']['fast'] = {
@@ -132,6 +168,7 @@ function mask(config: Config): MaskedConfig {
 	} = config
 	return {
 		...app,
+		production: app.production ?? defaultProduction,
 		models: {
 			fast: maskModel(fast),
 			main: maskModel(main),
@@ -180,7 +217,11 @@ export function createConfigStore(userData: string) {
 		} catch {
 			return configError('配置文件不是有效的 JSON')
 		}
-		if (!configValidator.check(input)) return configError('配置字段无效')
+		if (
+			!configValidator.check(input) ||
+			(input.production && !validWriter(input.production))
+		)
+			return configError('配置字段无效')
 		try {
 			return mapKeys(input, decrypt)
 		} catch {
@@ -243,10 +284,20 @@ export function createConfigStore(userData: string) {
 				if (!updateValidator.check(patch)) {
 					throw { code: 'invalid_config', message: '配置更新字段无效' }
 				}
-				const { models, ...app } = patch
+				const { models, production, ...app } = patch
+				const currentProduction = current.production ?? defaultProduction
 				const next = {
 					...current,
 					...app,
+					...(production && {
+						production: {
+							roleModels: {
+								...currentProduction.roleModels,
+								...production.roleModels,
+							},
+							writer: production.writer ?? currentProduction.writer,
+						},
+					}),
 					models: {
 						fast: updateModel(current.models.fast, models?.fast),
 						main: updateModel(current.models.main, models?.main),
@@ -255,7 +306,10 @@ export function createConfigStore(userData: string) {
 						image: updateModel(current.models.image, models?.image),
 					},
 				}
-				if (!configValidator.check(next)) {
+				if (
+					!configValidator.check(next) ||
+					(next.production && !validWriter(next.production))
+				) {
 					throw { code: 'invalid_config', message: '配置更新字段无效' }
 				}
 				await write(next)
@@ -271,15 +325,25 @@ export function createConfigStore(userData: string) {
 			})
 		},
 		async resolveTextModel(slot: TextSlot): Promise<Config['models']['fast']> {
-			const { models } = requireConfig(await read())
-			if (slot === 'fast') return models.fast
-			const { inheritFast, ...model } = models[slot]
-			if (!inheritFast) return model
-			return {
-				...models.fast,
-				model: model.model,
-				contextWindow: model.contextWindow,
-			}
+			return textModel(requireConfig(await read()), slot)
+		},
+		async resolveRoleModel(
+			role: ProductionRole,
+		): Promise<Config['models']['fast']> {
+			const config = requireConfig(await read())
+			return textModel(
+				config,
+				config.production?.roleModels[role] ?? roleModelDefaults[role],
+			)
+		},
+		async resolveWriterPreset(presetId?: string) {
+			const { writer } =
+				requireConfig(await read()).production ?? defaultProduction
+			return (
+				writer.presets.find(({ id }) => id === presetId) ??
+				writer.presets.find(({ id }) => id === writer.defaultPresetId) ??
+				defaultProduction.writer.presets[0]
+			)
 		},
 		async resolveImageModel(): Promise<Config['models']['image']> {
 			return requireConfig(await read()).models.image

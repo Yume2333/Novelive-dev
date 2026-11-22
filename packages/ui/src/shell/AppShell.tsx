@@ -9,12 +9,15 @@ import {
 	Contrast,
 	LibraryBig,
 	Moon,
+	Play,
 	Settings,
 	Sun,
+	Workflow,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useMatch } from 'react-router-dom'
 import { ScrollArea } from '../components/ScrollArea'
+import { workRoute } from '../routes/production'
 import styles from './AppShell.module.css'
 
 const navigation = [
@@ -26,6 +29,11 @@ const themes = [
 	{ value: 'light', icon: Sun, name: '亮色' },
 	{ value: 'dark', icon: Moon, name: '暗色' },
 	{ value: 'system', icon: Contrast, name: '跟随系统' },
+] as const
+const workNavigation = [
+	{ route: 'work', icon: LibraryBig, name: '概览' },
+	{ route: 'play', icon: Play, name: '游玩' },
+	{ route: 'production', icon: Workflow, name: '制作' },
 ] as const
 export interface SettingsHost {
 	config: CommandOutput<'config.get'> | undefined
@@ -41,6 +49,7 @@ export function AppShell() {
 	>()
 	const [hostError, setHostError] = useState('')
 	const { pathname } = useLocation()
+	const workId = useMatch('/work/:id/*')?.params.id
 	const theme = config && 'theme' in config ? config.theme : 'system'
 	const updateConfig = useCallback(async (patch: ConfigUpdate) => {
 		const saved = await window.novelive.call('config.update', patch).promise
@@ -136,6 +145,21 @@ export function AppShell() {
 								</NavLink>
 							))}
 						</nav>
+						{workId && (
+							<nav aria-label="作品导航" className={styles.navigation}>
+								{workNavigation.map(({ route, icon: Icon, name }) => (
+									<NavLink
+										key={route}
+										end
+										className={styles.navLink}
+										to={workRoute(route, workId)}
+									>
+										<Icon aria-hidden="true" size={19} strokeWidth={1.8} />
+										{name}
+									</NavLink>
+								))}
+							</nav>
+						)}
 						<fieldset className={styles.themes} aria-label="主题">
 							{themes.map(({ value, icon: Icon, name }) => (
 								<button
