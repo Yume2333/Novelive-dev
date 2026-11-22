@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Icon } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Tooltip } from '../../components/Extended'
-import { CompactSelect, EmptyState, SectionLabel, TextInput } from '../../components/Form'
+import { CompactSelect, EmptyState, inputStyle, SectionLabel } from '../../components/Form'
 import { Page } from '../../components/Page'
 import { works } from '../../mock/library'
 import { listUsage, usageModels, usageRange, usageStages } from '../../mock/usage'
@@ -17,6 +17,7 @@ export function UsagePage() {
   const range = usageRange(byMonth)
   const [from, setFrom] = useState(range.min)
   const [to, setTo] = useState(range.max)
+  const [hoveredDay, setHoveredDay] = useState<string | null>(null)
 
   const data = useMemo(
     () => listUsage({ workId, stage, model, from, to, byMonth }, works),
@@ -64,9 +65,25 @@ export function UsagePage() {
         <CompactSelect value={stage} onChange={setStage} options={stageOptions} />
         <CompactSelect value={model} onChange={setModel} options={modelOptions} />
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <TextInput value={from} onChange={setFrom} placeholder={byMonth ? 'YYYY-MM' : 'YYYY-MM-DD'} />
+          <input
+            type={byMonth ? 'month' : 'date'}
+            className="nl-input"
+            value={from}
+            max={to || undefined}
+            onChange={(e) => setFrom(e.target.value)}
+            aria-label="开始日期"
+            style={{ ...inputStyle, width: 136, padding: '7px 10px', fontSize: 13 }}
+          />
           <span style={{ color: 'var(--color-outline)', fontSize: 12 }}>到</span>
-          <TextInput value={to} onChange={setTo} placeholder={byMonth ? 'YYYY-MM' : 'YYYY-MM-DD'} />
+          <input
+            type={byMonth ? 'month' : 'date'}
+            className="nl-input"
+            value={to}
+            min={from || undefined}
+            onChange={(e) => setTo(e.target.value)}
+            aria-label="结束日期"
+            style={{ ...inputStyle, width: 136, padding: '7px 10px', fontSize: 13 }}
+          />
         </span>
         <Tooltip text="文本按字数，图片按张数">
           <Icon name="help" size={17} style={{ color: 'var(--color-outline)' }} />
@@ -103,27 +120,83 @@ export function UsagePage() {
           </div>
 
           {/* 图与表上下排开，各自占满宽度 */}
-          <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-7)' }}>
+          <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-7)', overflow: 'visible' }}>
             <SectionLabel>{byMonth ? '各月调用量' : '各天调用量'}</SectionLabel>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: byMonth ? 16 : 10, height: 180, padding: '8px 2px 0' }}>
-              {data.days.map((d) => {
+              {data.days.map((d, idx) => {
                 const t = data.totals(() => true, d)
+                const isHovered = hoveredDay === d
                 return (
-                  <div key={d} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                    <span style={{ fontSize: 11, color: 'var(--color-outline)' }}>{t.calls}</span>
+                  <div
+                    key={d}
+                    tabIndex={0}
+                    aria-label={`${d} ${t.calls} 次`}
+                    onMouseEnter={() => setHoveredDay(d)}
+                    onMouseLeave={() => setHoveredDay((cur) => (cur === d ? null : cur))}
+                    onFocus={() => setHoveredDay(d)}
+                    onBlur={() => setHoveredDay((cur) => (cur === d ? null : cur))}
+                    style={{
+                      flex: 1,
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 6,
+                      minWidth: 0,
+                      position: 'relative',
+                      outline: 'none',
+                    }}
+                  >
+                    {isHovered ? (
+                      <div
+                        role="tooltip"
+                        style={{
+                          position: 'absolute',
+                          bottom: 'calc(100% + 6px)',
+                          ...(idx === 0
+                            ? { left: 0 }
+                            : idx === data.days.length - 1
+                              ? { right: 0 }
+                              : { left: '50%', transform: 'translateX(-50%)' }),
+                          background: 'var(--veil-95)',
+                          backdropFilter: 'blur(14px)',
+                          WebkitBackdropFilter: 'blur(14px)',
+                          border: '1px solid var(--glass-border)',
+                          boxShadow: 'var(--shadow-pop)',
+                          borderRadius: 'var(--radius-md)',
+                          padding: 'var(--space-2) var(--space-3)',
+                          color: 'var(--color-on-surface)',
+                          fontSize: 12,
+                          lineHeight: 1.5,
+                          whiteSpace: 'nowrap',
+                          pointerEvents: 'none',
+                          zIndex: 20,
+                          animation: 'fade-in var(--dur-fast) var(--ease-out)',
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, marginBottom: 2 }}>{d}</div>
+                        <div style={{ color: 'var(--color-on-surface-variant)' }}>
+                          {fmt.format(t.calls)} 次 · {fmt.format(Math.round(t.chars / 1000))} 千字
+                          {t.images ? ` · ${fmt.format(t.images)} 张图` : ''}
+                        </div>
+                        <div style={{ color: 'var(--color-outline)', fontSize: 11 }}>
+                          {t.cost !== null ? `参考 ¥ ${t.cost.toFixed(2)}` : '暂无单价'}
+                        </div>
+                      </div>
+                    ) : null}
+                    <span style={{ fontSize: 11, color: isHovered ? 'var(--color-on-surface)' : 'var(--color-outline)', transition: 'color var(--dur-fast) var(--ease-out)' }}>{t.calls}</span>
                     <div style={{ width: '100%', maxWidth: 64, flex: 1, minHeight: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                       <div
                         style={{
                           width: '100%',
                           height: `${Math.max(4, (t.calls / maxDay) * 100)}%`,
                           borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
-                          background: 'var(--color-primary)',
-                          opacity: 0.9,
+                          background: isHovered ? 'var(--color-primary)' : 'color-mix(in srgb, var(--color-primary) 78%, transparent)',
+                          transition: 'height var(--dur-slow) var(--ease-out), background var(--dur-fast) var(--ease-out)',
                         }}
-                        title={`${periodLabel(d)} · ${t.calls} 次`}
                       />
                     </div>
-                    <span style={{ fontSize: 10, color: 'var(--color-outline)', whiteSpace: 'nowrap' }}>{periodLabel(d)}</span>
+                    <span style={{ fontSize: 10, color: isHovered ? 'var(--color-on-surface)' : 'var(--color-outline)', whiteSpace: 'nowrap', transition: 'color var(--dur-fast) var(--ease-out)' }}>{periodLabel(d)}</span>
                   </div>
                 )
               })}
@@ -132,6 +205,7 @@ export function UsagePage() {
 
           <Card style={{ padding: 'var(--space-5)' }}>
             <SectionLabel>按作品 × 阶段</SectionLabel>
+            <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ color: 'var(--color-outline)', textAlign: 'left' }}>
@@ -146,7 +220,7 @@ export function UsagePage() {
                 {data.workIds.map((wid) => {
                   const rowTotal = data.totals((b) => b.workId === wid)
                   return (
-                    <tr key={wid} style={{ borderTop: '1px solid var(--divider)' }}>
+                    <tr key={wid} className="hover-row" style={{ borderTop: '1px solid var(--divider)' }}>
                       <td style={{ padding: '12px 10px', fontWeight: 600 }}>{data.titles.get(wid)}</td>
                       {data.stages.map((s) => {
                         const cell = data.totals((b) => b.workId === wid, undefined, s)
@@ -171,6 +245,7 @@ export function UsagePage() {
                 })}
               </tbody>
             </table>
+            </div>
           </Card>
         </>
       )}

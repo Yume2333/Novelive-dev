@@ -17,3 +17,44 @@
   .bible-chars { grid-template-columns: minmax(0, 1fr); }
   .bible-chars-side { position: static !important; }
 }
+
+/* 媒体预览卡：悬停露出操作，重绘时铺纸墨骨架波纹 */
+.bible-media-card {
+  position: relative;
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.bible-media-card:hover {
+  border-color: var(--accent-border-30) !important;
+  box-shadow: var(--shadow-glass);
+}
+.bible-media-actions {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.bible-media-card:hover .bible-media-actions,
+.bible-media-card:focus-within .bible-media-actions {
+  opacity: 1;
+}
+.bible-shimmer-overlay {
+  background: linear-gradient(
+    110deg,
+    var(--panel-75) 30%,
+    var(--white-80) 50%,
+    var(--panel-75) 70%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-wave 1.5s linear infinite, fade-in var(--dur-fast) var(--ease-out);
+}
+
+.bible-style-refs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+@container (max-width: 720px) {
+  .bible-style-refs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 480px) {
+  .bible-style-refs { grid-template-columns: minmax(0, 1fr); }
+}

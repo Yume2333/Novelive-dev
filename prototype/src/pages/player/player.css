@@ -46,12 +46,73 @@
   to { opacity: 1; }
 }
 .nl-screen-in { animation: nl-screen-in 0.28s ease both; }
-@keyframes nl-rise-in {
+@keyframes nl-rise {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.nl-rise { animation: nl-rise-in 0.4s ease both; }
+.nl-rise { animation: nl-rise 0.4s ease both; }
 
+@keyframes nl-bg-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.nl-bg-fade-in { animation: nl-bg-fade-in 0.65s ease both; }
+
+@keyframes nl-flash {
+  0% { opacity: 0; }
+  18% { opacity: 0.92; }
+  100% { opacity: 0; }
+}
+.nl-bg-flash { animation: nl-flash 0.45s ease-out both; }
+
+@keyframes nl-actor-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(6px); }
+}
+.nl-actor-enter { animation: nl-screen-in 0.55s ease both; }
+.nl-actor-exit { animation: nl-actor-exit 0.36s ease both; }
+
+@keyframes nl-expr-pop {
+  from { opacity: 0.45; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.nl-expr-pop { display: inline-flex; animation: nl-expr-pop 0.22s ease-out both; }
+
+@keyframes nl-box-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.nl-box-in { animation: nl-box-in 0.26s ease both; }
+
+@keyframes nl-wait-ring {
+  0% { transform: scale(0.85); opacity: 0.78; }
+  75%, 100% { transform: scale(1.95); opacity: 0; }
+}
+.nl-wait-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.nl-wait-ring::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nl-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--nl-accent) 65%, transparent);
+}
+.nl-wait-ring::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--nl-accent);
+  animation: nl-wait-ring 2.2s ease-out infinite;
+}
 /* ---------- 继续符（小三角，轻浮动 + 微光） ---------- */
 @keyframes nl-next-bob {
   0%, 100% { transform: translateY(0); opacity: 0.55; }
@@ -99,6 +160,21 @@
 .nl-qbtn:hover::after { opacity: 1; transform: translateX(-50%) translateY(0); }
 .nl-qbtn-on { opacity: 1; color: var(--nl-accent-strong); }
 .nl-qbtn-on:hover { color: var(--nl-accent-strong); }
+.nl-qbtn-end::after {
+  left: auto;
+  right: 0;
+  transform: translateY(3px);
+}
+.nl-qbtn-end:hover::after {
+  transform: translateY(0);
+}
+.nl-qbtn-disabled,
+.nl-qbtn-disabled:hover {
+  opacity: 0.38;
+  cursor: default;
+  background: transparent;
+  color: var(--nl-text-dim);
+}
 .nl-qsep {
   width: 1px;
   height: 14px;
@@ -207,4 +283,15 @@
   background: var(--nl-accent);
   border: 1px solid rgba(238,242,246,0.7);
   cursor: pointer;
+}
+
+/* ---------- 减弱动态 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

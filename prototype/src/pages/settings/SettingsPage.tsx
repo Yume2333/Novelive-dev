@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Icon, Spinner } from '../../components/Button'
 import { Card } from '../../components/Card'
-import { RadioGroup } from '../../components/Extended'
+import { ConfirmDialog, RadioGroup } from '../../components/Extended'
 import { CompactSelect, Field, SectionLabel, TextInput, textareaStyle } from '../../components/Form'
 import { Modal } from '../../components/Modal'
+import { Collapse } from '../../components/Motion'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import {
@@ -105,7 +106,15 @@ function ModelCard({
     <Card style={{ padding: 0 }}>
       <div
         onClick={() => setOpen(!open)}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault()
+            setOpen((v) => !v)
+          }
+        }}
         role="button"
+        tabIndex={0}
+        aria-expanded={open}
         style={{ display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', padding: 'var(--space-4) var(--space-5)', minHeight: 52, cursor: 'pointer' }}
       >
         <div
@@ -130,7 +139,7 @@ function ModelCard({
           onClick={(e) => e.stopPropagation()}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
         >
-          <Button size="sm" icon="cable" disabled={test === 'testing'} onClick={onTest}>
+          <Button size="sm" icon="cable" loading={test === 'testing'} onClick={onTest}>
             测试
           </Button>
           {m ? (
@@ -140,14 +149,16 @@ function ModelCard({
             </span>
           ) : null}
         </span>
-        <Icon name={open ? 'expand_less' : 'expand_more'} size={18} style={{ color: 'var(--color-outline)' }} />
+        <span className="nl-chevron" data-open={open} style={{ display: 'inline-flex', color: 'var(--color-outline)' }}>
+          <Icon name="expand_more" size={18} />
+        </span>
       </div>
-      {open ? (
+      <Collapse open={open}>
         <div style={{ padding: '0 var(--space-5) var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {result ?? null}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>{children}</div>
         </div>
-      ) : null}
+      </Collapse>
     </Card>
   )
 }
@@ -427,10 +438,25 @@ export function SettingsPage() {
   const [roleModel, setRoleModel] = useState<Record<string, ModelSlot>>(Object.fromEntries(agentRoles.map((r) => [r.id, r.slot])))
   const [presets, setPresets] = useState<WriterPreset[]>(defaultWriterPresets)
   const [editing, setEditing] = useState<WriterPreset | null>(null)
+  const [deletingPreset, setDeletingPreset] = useState<WriterPreset | null>(null)
+  const [licensesOpen, setLicensesOpen] = useState(false)
   const [imageFormat, setImageFormat] = useState<'lossy' | 'lossless'>('lossy')
   const [lang, setLang] = useState('zh-Hans')
   const [folder] = useState('~/文档/Novelive')
+  const timersRef = useRef<number[]>([])
 
+  const schedule = (fn: () => void, ms: number) => {
+    const id = window.setTimeout(() => {
+      timersRef.current = timersRef.current.filter((t) => t !== id)
+      fn()
+    }, ms)
+    timersRef.current.push(id)
+  }
+
+  useEffect(() => () => {
+    timersRef.current.forEach((id) => window.clearTimeout(id))
+    timersRef.current = []
+  }, [])
   const setText = (slot: Exclude<ModelSlot, 'image'>) => (c: TextModelConfig) => {
     setTexts((t) => ({ ...t, [slot]: c }))
     setTests((t) => ({ ...t, [slot]: 'idle' }))
@@ -450,14 +476,14 @@ export function SettingsPage() {
       setTests((t) => ({ ...t, image: 'testing' }))
       setCaps({ t2i: { state: 'idle' }, transparent: { state: 'idle' }, edit: { state: 'idle' } })
       if (!ok) {
-        setTimeout(() => setTests((t) => ({ ...t, image: 'fail' })), 700)
+        schedule(() => setTests((t) => ({ ...t, image: 'fail' })), 700)
         return
       }
       // 依次试文生图、透明底、图片编辑，三项分别出结果
       imageCapabilityTests.forEach((c, i) => {
-        setTimeout(() => {
+        schedule(() => {
           setCaps((prev) => (prev[c.id].state === 'idle' ? { ...prev, [c.id]: { state: 'testing' } } : prev))
-          setTimeout(() => {
+          schedule(() => {
             const outcome = imageCapabilityOutcome(image.model, c.id)
             setCaps((prev) => (prev[c.id].state === 'testing' ? { ...prev, [c.id]: outcome } : prev))
             if (i === imageCapabilityTests.length - 1) {
@@ -470,7 +496,7 @@ export function SettingsPage() {
     }
     setTests((t) => ({ ...t, [slot]: 'testing' }))
     const ok = textReady(slot)
-    setTimeout(() => setTests((t) => ({ ...t, [slot]: ok ? 'ok' : 'fail' })), 700)
+    schedule(() => setTests((t) => ({ ...t, [slot]: ok ? 'ok' : 'fail' })), 700)
   }
 
   const setImageField = (patch: Partial<typeof image>) => {
@@ -592,13 +618,17 @@ export function SettingsPage() {
 
         <section>
           <button
+            type="button"
+            aria-expanded={advanced}
             onClick={() => setAdvanced(!advanced)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-on-surface-variant)', marginBottom: 8 }}
           >
             <span className="label-caps label-caps-zh">高级</span>
-            <Icon name={advanced ? 'expand_less' : 'expand_more'} size={16} />
+            <span className="nl-chevron" data-open={advanced} style={{ display: 'inline-flex' }}>
+              <Icon name="expand_more" size={16} />
+            </span>
           </button>
-          {advanced ? (
+          <Collapse open={advanced}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <Card style={{ padding: '2px 0' }}>
                 {agentRoles.map((role, i) => (
@@ -646,7 +676,7 @@ export function SettingsPage() {
                           复制
                         </Button>
                         {!p.isDefault ? (
-                          <Button size="sm" variant="ghost" icon="delete" onClick={() => setPresets((list) => list.filter((x) => x.id !== p.id))}>
+                          <Button size="sm" variant="ghost" icon="delete" onClick={() => setDeletingPreset(p)}>
                             删除
                           </Button>
                         ) : null}
@@ -673,7 +703,7 @@ export function SettingsPage() {
                 />
               </Card>
             </div>
-          ) : null}
+          </Collapse>
         </section>
 
         <section>
@@ -685,12 +715,19 @@ export function SettingsPage() {
               control={
                 <CompactSelect
                   value={lang}
-                  onChange={(v) => { setLang(v); toast('界面语言已更新（演示）', 'language') }}
+                  onChange={(v) => {
+                    if (v !== 'zh-Hans') {
+                      toast('M5 翻译后启用', 'language')
+                      setLang('zh-Hans')
+                      return
+                    }
+                    setLang(v)
+                  }}
                   options={[
                     { value: 'zh-Hans', label: '简体中文' },
-                    { value: 'zh-Hant', label: '繁體中文' },
-                    { value: 'en', label: 'English' },
-                    { value: 'ja', label: '日本語' },
+                    { value: 'zh-Hant', label: '繁體中文（待翻译）' },
+                    { value: 'en', label: 'English（待翻译）' },
+                    { value: 'ja', label: '日本語（待翻译）' },
                   ]}
                 />
               }
@@ -744,17 +781,74 @@ export function SettingsPage() {
               <span style={{ fontSize: 12, color: 'var(--color-outline)' }}>v0.1.0 · AGPL-3.0</span>
             </div>
             <div style={{ display: 'flex', gap: 16, marginTop: 10 }}>
-              <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 12, color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <button
+                type="button"
+                onClick={() => setLicensesOpen(true)}
+                style={{ fontSize: 12, color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0 }}
+              >
                 第三方许可<Icon name="call_made" size={12} />
-              </a>
-              <a href="#" onClick={(e) => e.preventDefault()} style={{ fontSize: 12, color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              </button>
+              <button
+                type="button"
+                onClick={() => toast('源代码仓库：github.com/novelive/novelive（本地演示）', 'call_made')}
+                style={{ fontSize: 12, color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 4, padding: 0 }}
+              >
                 源代码<Icon name="call_made" size={12} />
-              </a>
+              </button>
             </div>
           </Card>
         </section>
       </div>
       {editing ? <PresetEditor preset={editing} onClose={() => setEditing(null)} onSave={savePreset} /> : null}
+      <ConfirmDialog
+        open={deletingPreset !== null}
+        danger
+        title="删除写手预设"
+        message={deletingPreset ? `确定删除写手预设「${deletingPreset.name}」吗？删除后无法恢复。` : ''}
+        confirmLabel="删除"
+        onCancel={() => setDeletingPreset(null)}
+        onConfirm={() => {
+          if (deletingPreset) {
+            setPresets((list) => list.filter((x) => x.id !== deletingPreset.id))
+            toast(`已删除「${deletingPreset.name}」`, 'delete')
+          }
+          setDeletingPreset(null)
+        }}
+      />
+      <Modal
+        open={licensesOpen}
+        title="第三方许可"
+        onClose={() => setLicensesOpen(false)}
+        width={520}
+        footer={<Button variant="primary" onClick={() => setLicensesOpen(false)}>关闭</Button>}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {[
+            ['React & React DOM', 'MIT License'],
+            ['React Router', 'MIT License'],
+            ['lucide-react', 'ISC License'],
+            ['CodeMirror 6', 'MIT License'],
+            ['Real-ESRGAN', 'BSD-3-Clause License'],
+            ['upscayl-bin', 'AGPL-3.0 License'],
+            ['Noto Sans SC / Noto Serif SC', 'SIL Open Font License 1.1'],
+          ].map(([name, license], idx) => (
+            <div
+              key={name}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: 'var(--space-2) 0',
+                borderTop: idx > 0 ? '1px solid var(--divider)' : 'none',
+                fontSize: 13,
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>{name}</span>
+              <span style={{ color: 'var(--color-outline)', fontSize: 12 }}>{license}</span>
+            </div>
+          ))}
+        </div>
+      </Modal>
     </Page>
   )
 }

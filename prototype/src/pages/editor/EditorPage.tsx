@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Button, Icon } from '../../components/Button'
-import { Banner, Checkbox, Chip, Drawer, RadioGroup, Tooltip } from '../../components/Extended'
-import { CompactSelect, EmptyState, Field, SectionLabel, TextInput, textareaStyle } from '../../components/Form'
+import { Banner, Checkbox, Chip, Drawer, RadioGroup, Skeleton, Tooltip } from '../../components/Extended'
+import { CompactSelect, EmptyState, Field, inputStyle, SectionLabel, TextInput, textareaStyle } from '../../components/Form'
 import { Dropdown, Modal } from '../../components/Modal'
+import { Collapse, FlowRail } from '../../components/Motion'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import {
@@ -39,8 +40,8 @@ interface HistoryEntry {
   id: string
   time: string
   desc: string
-  /** 这次修改动到的句子，prev 为修改前的草稿（undefined = 原本是剧本原文） */
-  changes: { lineId: string; prev?: DraftLine }[]
+  /** 这次修改动到的句子，prev 为修改前的草稿，next 为修改后的草稿 */
+  changes: { lineId: string; prev?: DraftLine; next?: DraftLine }[]
 }
 
 const panelStyle = {
@@ -168,6 +169,33 @@ function truncateRich(src: string, n: number): string {
   return out
 }
 
+/** 展开富文本的逐字延迟（受 {speed} 影响）与 {wait} 停顿点 */
+function buildPreviewSteps(src: string): { totalChars: number; charDelays: number[]; waitAt: Record<number, number> } {
+  const charDelays: number[] = []
+  const waitAt: Record<number, number> = {}
+  const walk = (text: string, speedFactor: number) => {
+    for (const seg of parseRich(text)) {
+      if (seg.kind === 'wait') {
+        const sec = Number.parseFloat(seg.seconds)
+        const ms = Number.isFinite(sec) && sec > 0 ? Math.round(sec * 1000) : 400
+        const pos = charDelays.length
+        waitAt[pos] = (waitAt[pos] ?? 0) + ms
+      } else if (seg.kind === 'speed') {
+        const f = Number.parseFloat(seg.factor)
+        const clamped = Number.isFinite(f) && f > 0 ? Math.min(5, Math.max(0.15, f)) : 1
+        walk(seg.text, clamped)
+      } else if (seg.kind === 'mark') {
+        walk(seg.text, speedFactor)
+      } else {
+        const delay = Math.round(26 / speedFactor)
+        for (let i = 0; i < seg.text.length; i++) charDelays.push(delay)
+      }
+    }
+  }
+  walk(src, 1)
+  return { totalChars: charDelays.length, charDelays, waitAt }
+}
+
 // ---- 舞台上的角色剪影 ----
 
 function CastSilhouette({ name, expr, position, speaking, tint, onClick }: {
@@ -194,9 +222,7 @@ function CastSilhouette({ name, expr, position, speaking, tint, onClick }: {
         width: '19%',
         height: '72%',
         padding: 0,
-        background: speaking
-          ? `linear-gradient(180deg, color-mix(in srgb, ${c} 55%, transparent), color-mix(in srgb, ${c} 12%, transparent))`
-          : `linear-gradient(180deg, color-mix(in srgb, ${c} 22%, transparent), color-mix(in srgb, ${c} 5%, transparent))`,
+        background: 'transparent',
         borderRadius: '48% 48% 0 0 / 26% 26% 0 0',
         border: `1px solid color-mix(in srgb, ${c} ${speaking ? 70 : 28}%, transparent)`,
         filter: speaking ? 'none' : 'brightness(0.72)',
@@ -204,6 +230,19 @@ function CastSilhouette({ name, expr, position, speaking, tint, onClick }: {
         cursor: 'pointer',
       }}
     >
+      <span
+        key={tint}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 'inherit',
+          background: speaking
+            ? `linear-gradient(180deg, color-mix(in srgb, ${c} 55%, transparent), color-mix(in srgb, ${c} 12%, transparent))`
+            : `linear-gradient(180deg, color-mix(in srgb, ${c} 22%, transparent), color-mix(in srgb, ${c} 5%, transparent))`,
+          animation: tint > 0 ? 'fade-in 300ms var(--ease-out)' : undefined,
+          pointerEvents: 'none',
+        }}
+      />
       <Icon name="person" size={30} style={{ position: 'absolute', top: '9%', left: '50%', transform: 'translateX(-50%)', color: 'color-mix(in srgb, var(--stage-text) 50%, transparent)' }} />
       <span
         className="label-caps label-caps-zh"
@@ -304,9 +343,11 @@ export function EditorPage() {
 
   const [drafts, setDrafts] = useState<Record<string, DraftLine>>({})
   const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [redoStack, setRedoStack] = useState<HistoryEntry[]>([])
   const [histOpen, setHistOpen] = useState(false)
 
   const [textDraft, setTextDraft] = useState('')
+  const [nameDraft, setNameDraft] = useState('')
   const textRef = useRef<HTMLTextAreaElement>(null)
   const [activeMark, setActiveMark] = useState<number | null>(null)
   const [markEdits, setMarkEdits] = useState<Record<number, string>>({})
@@ -316,12 +357,15 @@ export function EditorPage() {
   const [rewriteOpen, setRewriteOpen] = useState(false)
   const [rewriteInstr, setRewriteInstr] = useState('')
   const [rewriteGen, setRewriteGen] = useState(false)
+  const [rewriting, setRewriting] = useState(false)
+  const rewriteTimer = useRef<number | null>(null)
   const [rewritePick, setRewritePick] = useState<Record<string, boolean>>({})
 
   const [regenPick, setRegenPick] = useState<'bg' | 'portrait' | null>(null)
+  const [regenerating, setRegenerating] = useState<'bg' | 'portrait' | null>(null)
+  const regenTimer = useRef<number | null>(null)
   const [bgOverride, setBgOverride] = useState<Record<string, string>>({})
   const [portraitPick, setPortraitPick] = useState<Record<string, number>>({})
-
   const [ruleOpen, setRuleOpen] = useState(false)
   const [ruleScope, setRuleScope] = useState<'chapter' | 'work'>('chapter')
   const [ruleText, setRuleText] = useState('')
@@ -370,15 +414,18 @@ export function EditorPage() {
 
   // 撤销 / 应用重写后，编辑框同步已提交的文本（正在输入时不动）
   useEffect(() => {
-    if (line && document.activeElement !== textRef.current) setTextDraft(drafts[line.id]?.text ?? line.text)
+    if (!line) return
+    if (document.activeElement !== textRef.current) setTextDraft(drafts[line.id]?.text ?? line.text)
+    setNameDraft(drafts[line.id]?.displayAs ?? line.displayAs ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [line, drafts])
 
   // ---- 操作 ----
 
   const commit = (updates: Record<string, DraftLine>, desc: string) => {
-    const changes = Object.keys(updates).map((lid) => ({ lineId: lid, prev: drafts[lid] }))
+    const changes = Object.entries(updates).map(([lid, next]) => ({ lineId: lid, prev: drafts[lid], next }))
     setHistory((h) => [{ id: `h${Date.now()}-${h.length}`, time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }), desc, changes }, ...h])
+    setRedoStack([])
     setDrafts((prev) => {
       const next = { ...prev }
       for (const [lid, d] of Object.entries(updates)) next[lid] = d
@@ -398,11 +445,28 @@ export function EditorPage() {
       return next
     })
     setHistory((h) => h.filter((x) => x.id !== entryId))
+    setRedoStack((r) => [e, ...r])
+  }
+
+  const redoLatest = () => {
+    const e = redoStack[0]
+    if (!e) return
+    setDrafts((prev) => {
+      const next = { ...prev }
+      for (const c of e.changes) {
+        if (c.next === undefined) delete next[c.lineId]
+        else next[c.lineId] = c.next
+      }
+      return next
+    })
+    setRedoStack((r) => r.slice(1))
+    setHistory((h) => [e, ...h])
   }
 
   const selectLine = (l: SceneLine) => {
     setLineId(l.id)
     setTextDraft(drafts[l.id]?.text ?? l.text)
+    setNameDraft(drafts[l.id]?.displayAs ?? l.displayAs ?? '')
     setActiveMark(null)
     setMarkEdits({})
   }
@@ -422,6 +486,7 @@ export function EditorPage() {
       const l = list[0].lines[0]
       setLineId(l.id)
       setTextDraft(drafts[l.id]?.text ?? l.text)
+      setNameDraft(drafts[l.id]?.displayAs ?? l.displayAs ?? '')
       setActiveMark(null)
       setMarkEdits({})
     }
@@ -449,13 +514,13 @@ export function EditorPage() {
   // 打字机 → 停顿 → 下一句；暂停时停在原地，改文本立即反映（curText 是派生值）
   useEffect(() => {
     if (!playing || paused || !line) return
-    const plain = parseRich(curText)
-      .map((s) => ('text' in s ? s.text : ''))
-      .join('')
-    if (typedLen < plain.length) {
-      playTimer.current = window.setTimeout(() => setTypedLen((n) => n + 1), 26)
+    const { totalChars, charDelays, waitAt } = buildPreviewSteps(curText)
+    if (typedLen < totalChars) {
+      const delay = (charDelays[typedLen] ?? 26) + (waitAt[typedLen] ?? 0)
+      playTimer.current = window.setTimeout(() => setTypedLen((n) => n + 1), delay)
       return clearTimer
     }
+    const endWait = waitAt[totalChars] ?? 0
     playTimer.current = window.setTimeout(() => {
       const i = scene.lines.findIndex((l) => l.id === line.id)
       if (i >= scene.lines.length - 1) {
@@ -464,7 +529,7 @@ export function EditorPage() {
       }
       setTypedLen(0)
       selectLine(scene.lines[i + 1])
-    }, 900 + plain.length * 12)
+    }, 900 + totalChars * 12 + endWait)
     return clearTimer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, paused, line?.id, typedLen, curText])
@@ -486,10 +551,50 @@ export function EditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing])
 
+  // 全局快捷键：ArrowUp / ArrowDown 切句，Ctrl/⌘+Z 撤销，Ctrl/⌘+Shift+Z / Ctrl/⌘+Y 重做
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return
+
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redoLatest()
+        else if (history[0]) revertEntry(history[0].id)
+        return
+      }
+      if (mod && e.key.toLowerCase() === 'y' && !e.shiftKey) {
+        e.preventDefault()
+        redoLatest()
+        return
+      }
+
+      if (rewriteOpen || histOpen || ruleOpen || srcEdit !== null || regenPick !== null) return
+      if (!scene || !line) return
+
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const idx = scene.lines.findIndex((l) => l.id === line.id)
+        if (idx === -1) return
+        const nextIdx = e.key === 'ArrowUp' ? idx - 1 : idx + 1
+        if (nextIdx >= 0 && nextIdx < scene.lines.length) {
+          e.preventDefault()
+          selectLine(scene.lines[nextIdx])
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history, redoStack, scene, line, drafts, rewriteOpen, histOpen, ruleOpen, srcEdit, regenPick])
+
   // 卸载时停掉计时器并清掉 Agent 上下文
   useEffect(
     () => () => {
       clearTimer()
+      if (rewriteTimer.current !== null) window.clearTimeout(rewriteTimer.current)
+      if (regenTimer.current !== null) window.clearTimeout(regenTimer.current)
       shell.setChatContext(null)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -536,7 +641,9 @@ export function EditorPage() {
   }, [work, editable, searchParams])
 
   const commitText = (next: string) => {
-    if (!line || next === curText) return
+    if (!line) return
+    const committed = drafts[line.id]?.text ?? line.text
+    if (next === committed) return
     commit({ [line.id]: { ...drafts[line.id], text: next } }, `修改${lineKind.label}文本`)
   }
 
@@ -582,6 +689,7 @@ export function EditorPage() {
     if (!span || !line) return
     const tag = mark === 'wait' ? `{wait ${param ?? '0.4'}}` : `{${mark}${param ? ` ${param}` : ''}}${inner}{/${mark}}`
     const next = curText.slice(0, span.start) + tag + curText.slice(span.end)
+    if (next === curText) return
     setTextDraft(next)
     commit({ [line.id]: { ...drafts[line.id], text: next } }, desc)
   }
@@ -610,15 +718,34 @@ export function EditorPage() {
     toast(`已应用 ${picked.length} 句重写`, 'check')
   }
 
+  const startRewrite = () => {
+    if (rewriting) return
+    setRewriting(true)
+    if (rewriteTimer.current !== null) window.clearTimeout(rewriteTimer.current)
+    rewriteTimer.current = window.setTimeout(() => {
+      setRewriting(false)
+      setRewriteGen(true)
+      setRewritePick(Object.fromEntries(rewriteDiffs.map((d) => [d.line.id, true])))
+    }, 650)
+  }
+
   const regenOnce = (target: 'bg' | 'portrait') => {
-    if (!scene) return
-    if (target === 'bg') {
-      setBgOverride((o) => ({ ...o, [scene.id]: scene.background.variants[0] }))
-      toast(`已重新生成并替换背景「${scene.background.name}」`, 'image')
-    } else if (speaker) {
-      setPortraitPick((p) => ({ ...p, [speaker.id]: 1 }))
-      toast(`已重新生成「${speaker.name} · ${exprLabel}」立绘`, 'person')
-    }
+    if (!scene || regenerating) return
+    setRegenerating(target)
+    if (regenTimer.current !== null) window.clearTimeout(regenTimer.current)
+    regenTimer.current = window.setTimeout(() => {
+      if (target === 'bg') {
+        const cur = bgOverride[scene.id]
+        const curIdx = cur ? scene.background.variants.indexOf(cur) : -1
+        const next = scene.background.variants[(curIdx + 1) % scene.background.variants.length]
+        setBgOverride((o) => ({ ...o, [scene.id]: next }))
+        toast(`已重新生成并替换背景「${scene.background.name}」`, 'image')
+      } else if (speaker) {
+        setPortraitPick((p) => ({ ...p, [speaker.id]: ((p[speaker.id] ?? 0) + 1) % 3 }))
+        toast(`已重新生成「${speaker.name} · ${exprLabel}」立绘`, 'person')
+      }
+      setRegenerating(null)
+    }, 800)
   }
 
   const saveRule = () => {
@@ -691,8 +818,11 @@ export function EditorPage() {
           <Tooltip text={playing ? '停止预览' : '预览：从当前句开始在舞台上播放'}>
             <Button icon={playing ? 'stop' : 'play_arrow'} onClick={() => (playing ? stopPlay() : startPlay())} title="预览" />
           </Tooltip>
-          <Tooltip text={history.length ? `撤销：${history[0].desc}` : '没有可撤销的修改'}>
+          <Tooltip text={history.length ? `撤销（Ctrl/⌘+Z）：${history[0].desc}` : '没有可撤销的修改'}>
             <Button icon="undo" disabled={!history.length} onClick={() => history[0] && revertEntry(history[0].id)} title="撤销" />
+          </Tooltip>
+          <Tooltip text={redoStack.length ? `重做（Ctrl/⌘+Shift+Z）：${redoStack[0].desc}` : '没有可重做的修改'}>
+            <Button icon="redo" disabled={!redoStack.length} onClick={redoLatest} title="重做" />
           </Tooltip>
           <Dropdown
             trigger={<Button icon="more_horiz" title="更多" />}
@@ -701,7 +831,7 @@ export function EditorPage() {
               { label: '存为规则', icon: 'bookmark_add', onClick: () => { setRuleText(''); setRuleOpen(true) } },
             ]}
           />
-          <Button variant="primary" icon="auto_fix_high" onClick={() => { setRewriteGen(false); setRewriteOpen(true) }}>
+          <Button variant="primary" icon="auto_fix_high" onClick={() => { setRewriteGen(false); setRewriting(false); setRewriteOpen(true) }}>
             让 Agent 重写本场景
           </Button>
         </>
@@ -750,8 +880,16 @@ export function EditorPage() {
           {/* 舞台预览 */}
           <div style={{ ...panelStyle, background: 'var(--stage-frame, #0a0e13)', padding: 12, width: '100%', ...(twoCol ? {} : { maxWidth: stageCap }), boxSizing: 'border-box' }}>
             <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', inset: 0, background: bgOverride[scene.id] ?? scene.background.gradient }} />
-              <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 92%, rgba(143,180,212,0.16), transparent 62%)' }} />
+              <div style={{ position: 'absolute', inset: 0, background: scene.background.gradient }} />
+              <div
+                key={`${scene.id}-${bgOverride[scene.id] ?? 'base'}`}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: bgOverride[scene.id] ?? scene.background.gradient,
+                  animation: bgOverride[scene.id] ? 'fade-in 300ms var(--ease-out)' : undefined,
+                }}
+              />
               <div style={{ position: 'absolute', bottom: '22%', left: '5%', right: '5%', height: 1.5, background: 'rgba(143,180,212,0.2)' }} />
 
               {scene.cast.map((slot_) => {
@@ -852,6 +990,31 @@ export function EditorPage() {
                   </button>
                 </div>
               ) : null}
+              {regenerating ? (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 6,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 10,
+                    background: 'linear-gradient(110deg, color-mix(in srgb, var(--stage-frame) 72%, transparent) 30%, color-mix(in srgb, var(--stage-accent) 18%, var(--stage-frame)) 50%, color-mix(in srgb, var(--stage-frame) 72%, transparent) 70%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'skeleton-wave 1.5s linear infinite, fade-in var(--dur-fast) var(--ease-out)',
+                    backdropFilter: 'blur(3px)',
+                  }}
+                >
+                  <div style={{ width: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                    <span className="label-caps label-caps-zh" style={{ color: 'var(--stage-text)', fontSize: 11 }}>
+                      {regenerating === 'bg' ? '正在重绘背景…' : '正在重绘立绘…'}
+                    </span>
+                    <FlowRail active height={2} style={{ width: '100%' }} />
+                  </div>
+                </div>
+              ) : null}
 
               {/* 上 / 下一句 */}
               <div style={{ position: 'absolute', top: '44%', left: 8 }}>
@@ -885,7 +1048,7 @@ export function EditorPage() {
                 <Icon name="wallpaper" size={15} style={{ flexShrink: 0 }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>背景 · {scene.background.name}</span>
                 <Dropdown
-                  trigger={<Button size="sm" variant="ghost" icon="refresh" style={{ color: 'var(--stage-text)' }}>重新生成</Button>}
+                  trigger={<Button size="sm" variant="ghost" icon="refresh" loading={regenerating === 'bg'} style={{ color: 'var(--stage-text)' }}>重新生成</Button>}
                   items={[
                     { label: '出一张，直接替换', icon: 'image', onClick: () => regenOnce('bg') },
                     { label: '多出几张再挑', icon: 'photo_library', onClick: () => setRegenPick('bg') },
@@ -897,7 +1060,7 @@ export function EditorPage() {
                   <Icon name="person" size={15} style={{ flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>立绘 · {speaker.name} / {outfitLabel} / {exprLabel}</span>
                   <Dropdown
-                    trigger={<Button size="sm" variant="ghost" icon="refresh" style={{ color: 'var(--stage-text)' }}>重新生成</Button>}
+                    trigger={<Button size="sm" variant="ghost" icon="refresh" loading={regenerating === 'portrait'} style={{ color: 'var(--stage-text)' }}>重新生成</Button>}
                     items={[
                       { label: '出一张，直接替换', icon: 'image', onClick: () => regenOnce('portrait') },
                       { label: '多出几张再挑', icon: 'photo_library', onClick: () => setRegenPick('portrait') },
@@ -912,7 +1075,7 @@ export function EditorPage() {
         {/* ---- 右栏：句子列表（选中句就地展开编辑）；窄屏占满，宽屏固定宽、独立滚动 ---- */}
         <div style={twoCol ? { width: 452, flexShrink: 0, maxHeight: 'calc(100vh - 80px)', overflowY: 'auto', position: 'sticky', top: 'var(--space-5)' } : { width: '100%' }}>
           {twoCol && srcOpen && !threeCol ? (
-            <div style={{ ...panelStyle, padding: 'var(--space-4)' }}>
+            <div style={{ ...panelStyle, padding: 'var(--space-4)', animation: 'fade-in var(--dur-base) var(--ease-out)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
                 <SectionLabel>原文对照</SectionLabel>
                 <button onClick={() => setSrcOpen(false)} title="收起" style={{ display: 'flex', padding: 4, borderRadius: 'var(--radius-full)', color: 'var(--color-on-surface-variant)' }}>
@@ -1011,55 +1174,61 @@ export function EditorPage() {
                       </span>
                     </div>
                     {/* 选中句就地展开编辑 */}
-                    {active ? (
-                      <div style={{ padding: '0 var(--space-3) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-              <Chip active>{lineKind.label}</Chip>
-              {speaker ? <Chip>{curName || speaker.name}</Chip> : null}
-              {line.sourcePara ? <Chip>有原文对照</Chip> : null}
-            </div>
+                    <Collapse open={active}>
+                      <div style={{ padding: '0 var(--space-3) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', pointerEvents: active ? 'auto' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                          <Chip active>{lineKind.label}</Chip>
+                          {speaker ? <Chip>{curName || speaker.name}</Chip> : null}
+                          {line.sourcePara ? <Chip>有原文对照</Chip> : null}
+                        </div>
 
-            {isSpeakerLine && speaker ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Field label="表情">
-                  <CompactSelect value={curExpr} onChange={commitExpr} options={speaker.expressions.map((e) => ({ value: e.id, label: e.label }))} />
-                </Field>
-                <Field label="显示名">
-                  <input
-                    key={`${line.id}-${curName}`}
-                    defaultValue={curName}
-                    placeholder={speaker.name}
-                    onBlur={(e) => commitName(e.target.value)}
-                    style={{
-                      background: 'var(--white-60)',
-                      border: '1px solid var(--white-80)',
-                      borderRadius: 'var(--radius-md)',
-                      padding: '7px 10px',
-                      fontSize: 13,
-                      color: 'var(--color-on-surface)',
-                      outline: 'none',
-                      width: '100%',
-                    }}
-                  />
-                </Field>
-              </div>
-            ) : null}
+                        {isSpeakerLine && speaker ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            <Field label="表情">
+                              <CompactSelect value={curExpr} onChange={commitExpr} options={speaker.expressions.map((e) => ({ value: e.id, label: e.label }))} />
+                            </Field>
+                            <Field label="显示名">
+                              <input
+                                className="nl-input"
+                                type="text"
+                                tabIndex={active ? undefined : -1}
+                                value={active ? nameDraft : (drafts[l.id]?.displayAs ?? l.displayAs ?? '')}
+                                placeholder={speaker.name}
+                                onChange={(e) => setNameDraft(e.target.value)}
+                                onBlur={(e) => commitName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') commitName((e.target as HTMLInputElement).value)
+                                }}
+                                style={{
+                                  ...inputStyle,
+                                  padding: '7px 10px',
+                                  fontSize: 13,
+                                  boxShadow: 'none',
+                                }}
+                              />
+                            </Field>
+                          </div>
+                        ) : null}
 
-            <Field label="文本">
-              <textarea
-                ref={textRef}
-                rows={3}
-                value={textDraft}
-                onChange={(e) => setTextDraft(e.target.value)}
-                onBlur={() => commitText(textDraft)}
-                style={textareaStyle}
-              />
-            </Field>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'calc(-1 * var(--space-2))' }}>
-              <Button size="sm" variant="secondary" onClick={() => commitText(textDraft)} disabled={textDraft === curText}>
-                应用文本
-              </Button>
-            </div>
+                        <Field label="文本">
+                          <textarea
+                            ref={active ? textRef : undefined}
+                            className="nl-input"
+                            tabIndex={active ? undefined : -1}
+                            rows={3}
+                            value={active ? textDraft : t}
+                            onChange={(e) => setTextDraft(e.target.value)}
+                            onBlur={() => commitText(textDraft)}
+                            style={textareaStyle}
+                          />
+                        </Field>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'calc(-1 * var(--space-2))' }}>
+                          <span onMouseDown={(e) => e.preventDefault()}>
+                            <Button size="sm" variant="secondary" onClick={() => commitText(textDraft)} disabled={textDraft === curText}>
+                              应用文本
+                            </Button>
+                          </span>
+                        </div>
 
             {/* 标记工具条：带参数的收进「更多标记」 */}
             <div>
@@ -1099,29 +1268,31 @@ export function EditorPage() {
                 <SectionLabel>这句里的标记</SectionLabel>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {markSpans.map((sp, i) => {
-                    const active = activeMark === i
+                    const markActive = activeMark === i
                     return (
                       <div
                         key={`${sp.start}-${sp.mark}`}
                         style={{
                           padding: '7px 10px',
                           borderRadius: 'var(--radius-md)',
-                          background: active ? 'var(--accent-wash)' : 'var(--white-50)',
-                          border: active ? '1px solid var(--accent-border-30)' : '1px solid var(--white-60)',
+                          background: markActive ? 'var(--accent-wash)' : 'var(--white-50)',
+                          border: markActive ? '1px solid var(--accent-border-30)' : '1px solid var(--white-60)',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: 6,
+                          gap: markActive ? 6 : 0,
                         }}
                       >
-                        <button onClick={() => setActiveMark(active ? null : i)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 0, textAlign: 'left' }}>
-                          <Chip active={active}>{markLabel(sp.mark, marks)}</Chip>
+                        <button onClick={() => setActiveMark(markActive ? null : i)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 0, textAlign: 'left' }}>
+                          <Chip active={markActive}>{markLabel(sp.mark, marks)}</Chip>
                           <span style={{ flex: 1, fontSize: 12, color: 'var(--color-on-surface-variant)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {sp.mark === 'wait' ? `停 ${sp.param ?? '0.4'} 秒` : sp.mark === 'ruby' ? `${sp.inner} · ${sp.param}` : sp.mark === 'speed' ? `${sp.inner} · ×${sp.param}` : sp.inner}
                           </span>
-                          <Icon name={active ? 'expand_less' : 'expand_more'} size={15} style={{ color: 'var(--color-outline)' }} />
+                          <span className="nl-chevron" data-open={markActive ? 'true' : 'false'} style={{ display: 'inline-flex', color: 'var(--color-outline)' }}>
+                            <Icon name="expand_more" size={15} />
+                          </span>
                         </button>
-                        {active ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <Collapse open={markActive}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 6 }}>
                             {sp.mark === 'wait' || sp.mark === 'ruby' || sp.mark === 'speed' ? (
                               <Chip>{markLabel(sp.mark, marks)}</Chip>
                             ) : (
@@ -1137,18 +1308,17 @@ export function EditorPage() {
                             {sp.mark === 'wait' || sp.mark === 'ruby' || sp.mark === 'speed' ? (
                               <input
                                 key={`${sp.start}-p`}
+                                className="nl-input"
+                                type="text"
                                 defaultValue={sp.param ?? ''}
                                 placeholder={sp.mark === 'ruby' ? '读音' : sp.mark === 'speed' ? '倍率' : '秒数'}
                                 onBlur={(e) => rewriteSpan(i, sp.mark, e.target.value.trim() || sp.param, markEdits[i] ?? sp.inner, '改标记参数')}
                                 style={{
+                                  ...inputStyle,
                                   width: 72,
-                                  background: 'var(--white-60)',
-                                  border: '1px solid var(--white-80)',
-                                  borderRadius: 'var(--radius-md)',
                                   padding: '7px 10px',
                                   fontSize: 13,
-                                  color: 'var(--color-on-surface)',
-                                  outline: 'none',
+                                  boxShadow: 'none',
                                 }}
                               />
                             ) : null}
@@ -1164,17 +1334,15 @@ export function EditorPage() {
                               移除
                             </Button>
                           </div>
-                        ) : null}
+                        </Collapse>
                       </div>
                     )
                   })}
                 </div>
               </div>
             ) : null}
-
-
                       </div>
-                    ) : null}
+                    </Collapse>
                   </div>
                 )
               })}
@@ -1182,7 +1350,7 @@ export function EditorPage() {
           </div>
           )}
           {srcOpen && !twoCol ? (
-            <div style={{ ...panelStyle, padding: 'var(--space-4)', marginTop: 'var(--space-6)' }}>
+            <div style={{ ...panelStyle, padding: 'var(--space-4)', marginTop: 'var(--space-6)', animation: 'fade-in var(--dur-base) var(--ease-out)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
                 <SectionLabel>原文对照</SectionLabel>
                 <button onClick={() => setSrcOpen(false)} title="收起" style={{ display: 'flex', padding: 4, borderRadius: 'var(--radius-full)', color: 'var(--color-on-surface-variant)' }}>
@@ -1204,7 +1372,7 @@ export function EditorPage() {
         </div>
 
         {srcOpen && twoCol && threeCol ? (
-          <aside style={{ width: 320, flexShrink: 0, position: 'sticky', top: 'var(--space-5)', ...panelStyle, padding: 'var(--space-4)', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto' }}>
+          <aside style={{ width: 320, flexShrink: 0, position: 'sticky', top: 'var(--space-5)', ...panelStyle, padding: 'var(--space-4)', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto', animation: 'fade-in var(--dur-base) var(--ease-out)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
               <SectionLabel>原文对照</SectionLabel>
               <button onClick={() => setSrcOpen(false)} title="收起" style={{ display: 'flex', padding: 4, borderRadius: 'var(--radius-full)', color: 'var(--color-on-surface-variant)' }}>
@@ -1268,10 +1436,8 @@ export function EditorPage() {
               <Button
                 variant="primary"
                 icon="auto_fix_high"
-                onClick={() => {
-                  setRewriteGen(true)
-                  setRewritePick(Object.fromEntries(rewriteDiffs.map((d) => [d.line.id, true])))
-                }}
+                loading={rewriting}
+                onClick={startRewrite}
               >
                 生成重写预览
               </Button>
@@ -1281,13 +1447,41 @@ export function EditorPage() {
       >
         {!rewriteGen ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <TextInput value={rewriteInstr} onChange={setRewriteInstr} placeholder="例如：旁白再短一点，凛的语气更硬一些" />
+            <TextInput value={rewriteInstr} onChange={setRewriteInstr} placeholder="例如：旁白再短一点，凛的语气更硬一些" disabled={rewriting} />
+            {rewriting ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 4, animation: 'fade-in var(--dur-fast) var(--ease-out)' }}>
+                <FlowRail active height={2} />
+                <span className="ink-shimmer" style={{ fontSize: 12.5 }}>正在按指令重写本场景…</span>
+                <Skeleton width="88%" height={14} />
+                <Skeleton width="72%" height={14} />
+                <Skeleton width="94%" height={14} />
+              </div>
+            ) : null}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <p style={{ fontSize: 12, color: 'var(--color-outline)' }}>{rewriteInstr.trim() ? `要求：${rewriteInstr.trim()}` : '按默认方向重写'}</p>
-            {rewriteDiffs.map((d) => (
-              <div key={d.line.id} className="glass-panel" style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 'var(--radius-lg)', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <p style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>
+                {rewriteInstr.trim()
+                  ? `已按指令「${rewriteInstr.trim()}」调整以下 ${rewriteDiffs.length} 句`
+                  : `按默认方向重写以下 ${rewriteDiffs.length} 句`}
+              </p>
+              {rewriteInstr.trim() ? <Chip active>已应用自定义指令</Chip> : null}
+            </div>
+            {rewriteDiffs.map((d, idx) => (
+              <div
+                key={d.line.id}
+                className="glass-panel"
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-lg)',
+                  alignItems: 'flex-start',
+                  animation: 'fade-up var(--dur-base) var(--ease-out) both',
+                  animationDelay: `${idx * 55}ms`,
+                }}
+              >
                 <Checkbox checked={!!rewritePick[d.line.id]} onChange={() => setRewritePick((p) => ({ ...p, [d.line.id]: !p[d.line.id] }))} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="label-caps label-caps-zh" style={{ fontSize: 10, color: 'var(--color-outline)', marginBottom: 4 }}>
@@ -1360,7 +1554,7 @@ export function EditorPage() {
             />
           </Field>
           <Field label="规则内容">
-            <textarea rows={3} value={ruleText} onChange={(e) => setRuleText(e.target.value)} style={textareaStyle} placeholder="例：这一幕之后，凛不再主动提起灯塔" />
+            <textarea className="nl-input" rows={3} value={ruleText} onChange={(e) => setRuleText(e.target.value)} style={textareaStyle} placeholder="例：这一幕之后，凛不再主动提起灯塔" />
           </Field>
           <Banner kind="info">新规则只影响还没开始的任务；已经做完或在做的章节不受影响。</Banner>
           {rules.length ? (
@@ -1389,11 +1583,11 @@ export function EditorPage() {
               variant="primary"
               icon="auto_fix_high"
               onClick={() => {
+                if (srcInstr.trim()) setRewriteInstr(srcInstr.trim())
                 setSrcEdit(null)
-                toast('已按这段原文生成修改，并进重写预览确认', 'auto_fix_high')
-                setRewriteGen(true)
-                setRewritePick(Object.fromEntries(rewriteDiffs.map((d) => [d.line.id, true])))
+                setRewriteGen(false)
                 setRewriteOpen(true)
+                startRewrite()
               }}
             >
               生成修改

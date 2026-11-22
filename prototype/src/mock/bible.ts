@@ -123,13 +123,31 @@ export interface PreviewChapter {
   timeline?: string
   foreshadowing?: string
 }
+export interface BibleProp {
+  id: string
+  name: string
+  firstChapter: number
+  desc: string
+  reference: string
+  drawn: boolean
+  status: EntryStatus
+  layer: Layer
+}
+
+export interface StyleRef {
+  id: string
+  title: string
+  source: string
+  gradient: string
+}
 
 export interface BibleData {
   skeleton: string
-  style: { art: string; narration: string }
+  style: { art: string; narration: string; refs?: StyleRef[] }
   characters: BibleCharacter[]
   relations: Relation[]
   locations: BibleLocation[]
+  props: BibleProp[]
   timeline: TimelineEvent[]
   foreshadowing: Foreshadow[]
   glossary: GlossaryItem[]
@@ -146,6 +164,26 @@ const wugang: BibleData = {
   style: {
     art: '水彩厚涂，低饱和蓝灰色调；海雾用大面积留白，人物边缘柔和。主视觉参考：雾中邮筒与旧航海图。',
     narration: '克制、平静，偶尔带一点海风一样的凉意；重要的话放在短句里。',
+    refs: [
+      {
+        id: 'sr-main',
+        title: '雾中邮筒与海岸线',
+        source: '主视觉定稿',
+        gradient: 'linear-gradient(135deg, #273849 0%, #5c768e 52%, #c9d5df 100%)',
+      },
+      {
+        id: 'sr-mist',
+        title: '清晨海雾留白',
+        source: '补充画风参考',
+        gradient: 'linear-gradient(150deg, #dde4ea 0%, #8ea4b8 58%, #3c4f63 100%)',
+      },
+      {
+        id: 'sr-lantern',
+        title: '铜灯与木质栈桥',
+        source: '补充画风参考',
+        gradient: 'linear-gradient(135deg, #2b241d 0%, #7d5f3e 54%, #d6be96 100%)',
+      },
+    ],
   },
   characters: [
     {
@@ -398,6 +436,38 @@ const wugang: BibleData = {
       layer: '卷',
     },
   ],
+  props: [
+    {
+      id: 'prop-letter',
+      name: '未署名的信',
+      firstChapter: 1,
+      desc: '白色信封没有邮戳和署名，信纸却是灯塔看守人专用的淡蓝格日志纸。',
+      reference: '第 1 章确认后定稿，信纸边缘带海水潮痕。',
+      drawn: true,
+      status: '已确认',
+      layer: '作品',
+    },
+    {
+      id: 'prop-chart',
+      name: '旧航海图',
+      firstChapter: 4,
+      desc: '折痕发白的“白鸥号”航线图，雾港东北角的礁石圈被红铅笔反复圈出。',
+      reference: '第 4 章灯塔戏份首次出现，待绘制特写。',
+      drawn: false,
+      status: '已确认',
+      layer: '卷',
+    },
+    {
+      id: 'prop-lantern',
+      name: '铜制提灯',
+      firstChapter: 3,
+      desc: '阿澈随身带着的防风煤油提灯，灯罩有一道十年前留下的细裂纹。',
+      reference: '随阿澈人设一同定稿。',
+      drawn: true,
+      status: '已确认',
+      layer: '系列',
+    },
+  ],
   timeline: [
     { id: 'tl-10y', chapter: 1, storyTime: '十年前 冬', event: '“白鸥号”在雾中沉没，官方记录十九人获救。' },
     { id: 'tl-1', chapter: 1, storyTime: '现在 清晨', event: '凛在邮筒里收到没有署名的信。' },
@@ -511,6 +581,7 @@ const empty = (skeleton: string): BibleData => ({
   characters: [],
   relations: [],
   locations: [],
+  props: [],
   timeline: [],
   foreshadowing: [],
   glossary: [],
@@ -526,6 +597,20 @@ const byWork: Record<string, BibleData> = {
     style: {
       art: '清淡的水彩铅笔风，夏日高光偏暖，阴影带青。',
       narration: '安静、怀旧，带一点没说完的话。',
+      refs: [
+        {
+          id: 'sr-x-1',
+          title: '旧校舍斜阳',
+          source: '主视觉定稿',
+          gradient: 'linear-gradient(135deg, #4b3d5c 0%, #9b7f8c 55%, #e8d5c4 100%)',
+        },
+        {
+          id: 'sr-x-2',
+          title: '风吹起白窗帘',
+          source: '补充画风参考',
+          gradient: 'linear-gradient(155deg, #f0ebe3 0%, #a4b8c4 56%, #4c6473 100%)',
+        },
+      ],
     },
     glossary: [
       { source: 'おばけ', work: '妖怪', ruby: 'yāo guài', category: '文化表达', note: '直译，第一次出现加注音' },

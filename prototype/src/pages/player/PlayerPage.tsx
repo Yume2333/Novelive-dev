@@ -161,7 +161,7 @@ function PlaceholderArt({ kind }: { kind: 'character' | 'background' | 'cg' }) {
   )
 }
 
-function ActorSilhouette({ id, member, dimmed }: { id: 'lin' | 'xiu'; member: CastMember; dimmed: boolean }) {
+function ActorSilhouette({ id, member, dimmed, exiting }: { id: 'lin' | 'xiu'; member: CastMember; dimmed: boolean; exiting?: boolean }) {
   const color = actorColor[id]
   return (
     <div
@@ -172,34 +172,44 @@ function ActorSilhouette({ id, member, dimmed }: { id: 'lin' | 'xiu'; member: Ca
         transform: 'translateX(-50%)',
         width: 'min(21%, 300px)',
         height: '78%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
         opacity: dimmed ? 0.32 : 1,
         filter: dimmed ? 'brightness(0.72)' : 'none',
         transition: 'left 0.7s ease, opacity 0.5s ease, filter 0.5s ease',
-        animation: 'nl-screen-in 0.55s ease',
+        pointerEvents: exiting ? 'none' : undefined,
       }}
     >
       <div
+        className={exiting ? 'nl-actor-exit' : 'nl-actor-enter'}
         style={{
-          width: '70%',
+          width: '100%',
           height: '100%',
-          background: `linear-gradient(180deg, ${color}5c, ${color}12)`,
-          border: `1px solid ${color}70`,
-          borderRadius: '48% 48% 6% 6% / 24% 24% 4% 4%',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          paddingTop: '13%',
-          gap: 9,
+          justifyContent: 'flex-end',
         }}
       >
-        <div style={{ width: '44%', aspectRatio: '1', borderRadius: '50%', background: `${color}42`, border: `1px solid ${color}85`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {(() => { const F = exprIcon[member.expr]; return <F size={30} strokeWidth={1.4} style={{ color: '#eef2f6cc' }} /> })()}
+        <div
+          style={{
+            width: '70%',
+            height: '100%',
+            background: `linear-gradient(180deg, ${color}5c, ${color}12)`,
+            border: `1px solid ${color}70`,
+            borderRadius: '48% 48% 6% 6% / 24% 24% 4% 4%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            paddingTop: '13%',
+            gap: 9,
+          }}
+        >
+          <div style={{ width: '44%', aspectRatio: '1', borderRadius: '50%', background: `${color}42`, border: `1px solid ${color}85`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span key={member.expr} className="nl-expr-pop" style={{ alignItems: 'center', justifyContent: 'center' }}>
+              {(() => { const F = exprIcon[member.expr]; return <F size={30} strokeWidth={1.4} style={{ color: '#eef2f6cc' }} /> })()}
+            </span>
+          </div>
+          <span style={{ color: '#eef2f670', fontSize: 10.5, letterSpacing: '0.14em', fontFamily: SERIF }}>{actorName[id]}</span>
         </div>
-        <span style={{ color: '#eef2f670', fontSize: 10.5, letterSpacing: '0.14em', fontFamily: SERIF }}>{actorName[id]}</span>
       </div>
     </div>
   )
@@ -334,6 +344,10 @@ export function PlayerPage() {
     return arr
   })
   const [stage, setStage] = useState<StageState>(initialStage)
+  const [prevBg, setPrevBg] = useState<Bg | null>(null)
+  const [bgFadeKey, setBgFadeKey] = useState(0)
+  const [flashKey, setFlashKey] = useState(0)
+  const [exitingCast, setExitingCast] = useState<Partial<Record<'lin' | 'xiu', CastMember>>>({})
   const [shakeKey, setShakeKey] = useState(0)
   const [revealed, setRevealed] = useState(false)
   const [simBusy, setSimBusy] = useState(false)
@@ -342,6 +356,11 @@ export function PlayerPage() {
   const [entered, setEntered] = useState(false)
   const [showSafeZone, setShowSafeZone] = useState(false)
 
+  const prevVisualBgRef = useRef<Bg>(initialStage.bg)
+  const skipNextBgTransitionRef = useRef(false)
+  const bgFadeTimerRef = useRef<number | null>(null)
+  const prevCastRef = useRef<Partial<Record<'lin' | 'xiu', CastMember>>>({})
+  const exitTimersRef = useRef<Partial<Record<'lin' | 'xiu', number>>>({})
 
   const [readSet, setReadSet] = useState<Set<string>>(() => seedRead(work, readThrough))
 
@@ -364,6 +383,11 @@ export function PlayerPage() {
     setUiHidden(false)
     setRevisit(false)
     setStage(initialStage)
+    prevVisualBgRef.current = initialStage.bg
+    skipNextBgTransitionRef.current = true
+    setPrevBg(null)
+    setExitingCast({})
+    prevCastRef.current = {}
     setRevealed(false)
     setEntered(false)
     setReadSet(seedRead(work, readThrough))
@@ -385,12 +409,84 @@ export function PlayerPage() {
     return () => window.clearTimeout(t)
   }, [line, isCaption, shown, steps, screen, uiHidden])
 
+  const lineRef = useRef(line)
+  lineRef.current = line
+
   /* 行切换时应用演出 */
   useEffect(() => {
     setStage((s) => applyFx(s, line))
     if (line?.fx?.camera === 'shake') setShakeKey((k) => k + 1)
   }, [line])
 
+  /* 背景切换过渡（fade 交叉淡入 / flash 闪白） */
+  const visualBg: Bg = stage.cg ? 'letterCg' : stage.bg
+  useEffect(() => {
+    if (visualBg === prevVisualBgRef.current) return
+    const fromBg = prevVisualBgRef.current
+    prevVisualBgRef.current = visualBg
+    if (skipNextBgTransitionRef.current) {
+      skipNextBgTransitionRef.current = false
+      setPrevBg(null)
+      return
+    }
+    const transition = lineRef.current?.fx?.bgTransition ?? 'fade'
+    if (transition === 'flash') {
+      if (bgFadeTimerRef.current) {
+        window.clearTimeout(bgFadeTimerRef.current)
+        bgFadeTimerRef.current = null
+      }
+      setPrevBg(null)
+      setFlashKey((k) => k + 1)
+    } else {
+      setPrevBg(fromBg)
+      setBgFadeKey((k) => k + 1)
+      if (bgFadeTimerRef.current) window.clearTimeout(bgFadeTimerRef.current)
+      bgFadeTimerRef.current = window.setTimeout(() => {
+        setPrevBg(null)
+        bgFadeTimerRef.current = null
+      }, 680)
+    }
+  }, [visualBg])
+
+  /* 角色离场淡出 */
+  useEffect(() => {
+    const prev = prevCastRef.current
+    const curr = stage.cast
+    prevCastRef.current = curr
+    ;(['lin', 'xiu'] as const).forEach((cid) => {
+      const was = prev[cid]
+      const now = curr[cid]
+      if (was && !now) {
+        setExitingCast((e) => ({ ...e, [cid]: was }))
+        if (exitTimersRef.current[cid]) window.clearTimeout(exitTimersRef.current[cid])
+        exitTimersRef.current[cid] = window.setTimeout(() => {
+          setExitingCast((e) => {
+            if (!e[cid]) return e
+            const copy = { ...e }
+            delete copy[cid]
+            return copy
+          })
+          delete exitTimersRef.current[cid]
+        }, 360)
+      } else if (now) {
+        if (exitTimersRef.current[cid]) {
+          window.clearTimeout(exitTimersRef.current[cid])
+          delete exitTimersRef.current[cid]
+        }
+        setExitingCast((e) => {
+          if (!e[cid]) return e
+          const copy = { ...e }
+          delete copy[cid]
+          return copy
+        })
+      }
+    })
+  }, [stage.cast])
+
+  useEffect(() => () => {
+    if (bgFadeTimerRef.current) window.clearTimeout(bgFadeTimerRef.current)
+    Object.values(exitTimersRef.current).forEach((id) => id && window.clearTimeout(id))
+  }, [])
   /* 进场黑幕 */
   useEffect(() => {
     const t = window.setTimeout(() => setEntered(true), 1250)
@@ -451,6 +547,11 @@ export function PlayerPage() {
     setShown(0)
     setMode('story')
     setStage(initialStage)
+    prevVisualBgRef.current = initialStage.bg
+    skipNextBgTransitionRef.current = true
+    setPrevBg(null)
+    setExitingCast({})
+    prevCastRef.current = {}
     setRevealed(false)
     setScreen('none')
     setRevisit(target.index <= readThrough)
@@ -556,14 +657,22 @@ export function PlayerPage() {
   const talkingId = line && (line.kind === 'talk' || line.kind === 'inner') ? line.charId : undefined
   const pageSlots = savePage === 0 ? [quickSave, ...slots.slice(0, 5)] : slots.slice(savePage * 6 - 1, savePage * 6 + 5)
 
-  const qbtn = (icon: PlayerIconName, label: string, onClick: () => void, on = false) => (
+  const qbtn = (
+    icon: PlayerIconName,
+    label: string,
+    onClick: () => void,
+    on = false,
+    opts?: { disabled?: boolean; end?: boolean },
+  ) => (
     <button
       key={label}
-      className={`nl-qbtn${on ? ' nl-qbtn-on' : ''}`}
+      type="button"
+      className={`nl-qbtn${on ? ' nl-qbtn-on' : ''}${opts?.disabled ? ' nl-qbtn-disabled' : ''}${opts?.end ? ' nl-qbtn-end' : ''}`}
       data-tip={label}
+      aria-disabled={opts?.disabled || undefined}
       onClick={(e) => {
         e.stopPropagation()
-        onClick()
+        if (!opts?.disabled) onClick()
       }}
     >
       <PlayerIcon name={icon} size={18} />
@@ -605,7 +714,7 @@ export function PlayerPage() {
   const quickMenu = (
     <>
       {qbtn('quicksave', '快存', () => saveTo('quick'))}
-      {qbtn('quickload', '快读', () => quickSave && loadFrom(quickSave))}
+      {qbtn('quickload', quickSave ? '快读' : '暂无快速存档', () => quickSave && loadFrom(quickSave), false, { disabled: !quickSave })}
       {qbtn('save', '存档', () => { setSavePage(0); setScreen('save') })}
       {qbtn('load', '读档', () => { setSavePage(0); setScreen('load') })}
       <span className="nl-qsep" />
@@ -621,7 +730,7 @@ export function PlayerPage() {
       {qbtn('settings', '设置', () => setScreen('settings'))}
       <span className="nl-qsep" />
       {qbtn('hide', '隐藏', () => setUiHidden(true))}
-      {qbtn('menu', '菜单', () => { setConfirmExit(false); setScreen('menu') })}
+      {qbtn('menu', '菜单', () => { setConfirmExit(false); setScreen('menu') }, false, { end: true })}
     </>
   )
 
@@ -641,7 +750,7 @@ export function PlayerPage() {
       style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(8,11,15,0.88)', backdropFilter: 'blur(16px) saturate(1.2)', display: 'flex', flexDirection: 'column', padding: '48px 8% 42px' }}
     >
       {content}
-      <button className="nl-qbtn" style={{ position: 'absolute', top: 48, right: '8%', minWidth: 40 }} onClick={() => setScreen('none')}>
+      <button type="button" className="nl-qbtn nl-qbtn-end" data-tip="关闭" style={{ position: 'absolute', top: 48, right: '8%', minWidth: 40 }} onClick={() => setScreen('none')}>
         <PlayerIcon name="close" size={18} />
       </button>
     </div>
@@ -725,21 +834,54 @@ export function PlayerPage() {
         {/* 舞台：16:9 构图铺满视口（cover），无黑边 */}
         <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 'max(100vw, 177.78vh)', height: 'max(100vh, 56.25vw)', overflow: 'hidden' }}>
           <div key={shakeKey} className={camCls} style={{ position: 'absolute', inset: 0, transition: 'transform 0.5s ease', ...camStyle }}>
-              <div style={{ position: 'absolute', inset: 0, background: stage.cg ? bgArt.letterCg.base : bgArt[stage.bg].base, transition: 'background 0.7s ease', filter: filterCss }}>
-                {stage.cg ? bgArt.letterCg.deco : bgArt[stage.bg].deco}
+              <div style={{ position: 'absolute', inset: 0, filter: filterCss, transition: 'filter 0.55s ease' }}>
+                {prevBg ? (
+                  <div style={{ position: 'absolute', inset: 0, background: bgArt[prevBg].base }}>
+                    {bgArt[prevBg].deco}
+                  </div>
+                ) : null}
+                <div
+                  key={bgFadeKey}
+                  className={prevBg ? 'nl-bg-fade-in' : undefined}
+                  style={{ position: 'absolute', inset: 0, background: bgArt[visualBg].base, transition: 'background 0.7s ease, filter 0.55s ease' }}
+                >
+                  {bgArt[visualBg].deco}
+                </div>
               </div>
+              {flashKey > 0 ? (
+                <div
+                  key={`flash-${flashKey}`}
+                  className="nl-bg-flash"
+                  style={{ position: 'absolute', inset: 0, background: '#f8fafc', pointerEvents: 'none', zIndex: 25 }}
+                />
+              ) : null}
               {stage.bgPlaceholder && !stage.cg ? <PlaceholderArt kind="background" /> : null}
               {stage.cgPlaceholder && stage.cg ? <PlaceholderArt kind="cg" /> : null}
               {!stage.cg
-                ? (Object.keys(stage.cast) as ('lin' | 'xiu')[]).map((cid) =>
-                    stage.charPlaceholder ? (
-                      <div key={cid} style={{ position: 'absolute', bottom: 0, left: posX[stage.cast[cid]!.pos], transform: 'translateX(-50%)', width: 'min(21%,300px)', height: '78%' }}>
+                ? (['lin', 'xiu'] as const).map((cid) => {
+                    const activeMember = stage.cast[cid]
+                    const exitMember = !activeMember ? exitingCast[cid] : undefined
+                    const member = activeMember ?? exitMember
+                    if (!member) return null
+                    const isExiting = !activeMember && Boolean(exitMember)
+                    return stage.charPlaceholder ? (
+                      <div
+                        key={`${cid}-${isExiting ? 'exit' : 'enter'}`}
+                        className={isExiting ? 'nl-actor-exit' : undefined}
+                        style={{ position: 'absolute', bottom: 0, left: posX[member.pos], transform: 'translateX(-50%)', width: 'min(21%,300px)', height: '78%', pointerEvents: isExiting ? 'none' : undefined }}
+                      >
                         <PlaceholderArt kind="character" />
                       </div>
                     ) : (
-                      <ActorSilhouette key={cid} id={cid} member={stage.cast[cid]!} dimmed={talkingId !== undefined && talkingId !== cid} />
-                    ),
-                  )
+                      <ActorSilhouette
+                        key={cid}
+                        id={cid}
+                        member={member}
+                        dimmed={talkingId !== undefined && talkingId !== cid}
+                        exiting={isExiting}
+                      />
+                    )
+                  })
                 : null}
               <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
                 {stage.particles === 'fog' ? <FogLayer /> : null}
@@ -768,123 +910,144 @@ export function PlayerPage() {
         {!entered ? <div className="nl-enter-veil" style={{ position: 'absolute', inset: 0, background: '#05080c', zIndex: 80, pointerEvents: 'none' }} /> : null}
 
         {/* 自动 / 跳过指示 */}
-        {!uiHidden && (auto || skip) && screen === 'none' ? (
-          <div style={{ position: 'absolute', top: 20, right: 24, zIndex: 40, display: 'flex', alignItems: 'center', gap: 8, color: accent, fontSize: 11, letterSpacing: '0.2em', fontFamily: SERIF }}>
+        {(auto || skip) && screen === 'none' ? (
+          <div style={{ position: 'absolute', top: 20, right: 24, zIndex: 40, display: 'flex', alignItems: 'center', gap: 8, color: accent, fontSize: 11, letterSpacing: '0.2em', fontFamily: SERIF, opacity: uiHidden ? 0 : 1, pointerEvents: 'none', transition: 'opacity 0.24s ease' }}>
             <PlayerIcon name={skip ? 'skip' : 'auto'} size={15} />
             {skip ? '跳过中' : '自动'}
           </div>
         ) : null}
 
         {/* 重看徽标 */}
-        {!uiHidden && revisit && screen === 'none' ? (
-          <div style={{ position: 'absolute', top: 20, left: 24, zIndex: 40, color: 'rgba(238,242,246,0.65)', fontSize: 11, letterSpacing: '0.22em', fontFamily: SERIF, border: `1px solid ${accent}44`, borderRadius: 999, padding: '4px 13px', background: 'rgba(8,11,15,0.4)', backdropFilter: 'blur(6px)' }}>
+        {revisit && screen === 'none' ? (
+          <div style={{ position: 'absolute', top: 20, left: 24, zIndex: 40, color: 'rgba(238,242,246,0.65)', fontSize: 11, letterSpacing: '0.22em', fontFamily: SERIF, border: `1px solid ${accent}44`, borderRadius: 999, padding: '4px 13px', background: 'rgba(8,11,15,0.4)', backdropFilter: 'blur(6px)', opacity: uiHidden ? 0 : 1, pointerEvents: 'none', transition: 'opacity 0.24s ease' }}>
             重看
           </div>
         ) : null}
 
         {/* ======== 文本框（两种样式：b 柔边通栏 / c 浅色纸笺） ======== */}
-        {!uiHidden && mode === 'story' && !isCaption ? (
-          boxStyle === 'b' ? (
-            /* ---- B 柔边通栏：底部渐变带，无硬边 ---- */
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '34%', zIndex: 40 }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, transparent 0%, color-mix(in srgb, rgba(10,14,19,0.82) 82%, ${accent}) 68%, rgba(7,10,14,0.94) 100%)`, pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', top: '15%', left: '9%', right: '9%', height: 1, background: `linear-gradient(90deg, transparent, ${accent}66 30%, ${accent}66 70%, transparent)`, pointerEvents: 'none' }} />
-              <div onClick={advance} style={{ position: 'absolute', left: '8%', right: '8%', top: '25%', bottom: 14, cursor: 'pointer', fontFamily: SERIF }}>
-                {speaker ? (
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 9 }}>
-                    <span style={{ fontSize: fontSize + 6, fontWeight: 600, color: line.kind === 'inner' ? 'var(--nl-accent-strong)' : 'var(--nl-text)', letterSpacing: '0.18em', textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>
-                      {speaker}
-                    </span>
-                    {line.kind === 'inner' ? <span style={{ fontSize: 12, color: 'var(--nl-text-dim)', letterSpacing: '0.12em' }}>（心声）</span> : null}
-                    <div style={{ width: 48, height: 2, background: `linear-gradient(90deg, ${accent}, transparent)`, borderRadius: 1 }} />
-                  </div>
-                ) : null}
-                <div
-                  style={{
-                    fontWeight: 500,
-                    color: line.kind === 'inner' ? 'rgba(205,216,229,0.88)' : 'var(--nl-text)',
-                    fontSize,
-                    lineHeight: 1.92,
-                    letterSpacing: '0.02em',
-                    textShadow: '0 1px 4px rgba(0,0,0,0.65)',
-                  }}
-                >
-                  {textBody}
-                </div>
-              </div>
-              <div style={{ position: 'absolute', right: '5%', bottom: 14, display: 'flex', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
-                {quickMenu}
-              </div>
-            </div>
-          ) : boxStyle === 'c' ? (
-            /* ---- C 浅色纸笺：暖白透明纸面板 ---- */
-            <div className="nl-light" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: '3%', width: 'min(88%, 1060px)', zIndex: 40 }} onClick={(e) => e.stopPropagation()}>
+        {mode === 'story' && !isCaption ? (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 40,
+              opacity: uiHidden ? 0 : 1,
+              pointerEvents: 'none',
+              transition: 'opacity 0.24s ease',
+            }}
+          >
+            {boxStyle === 'b' ? (
+              /* ---- B 柔边通栏：底部渐变带，无硬边 ---- */
               <div
-                onClick={advance}
-                style={{
-                  position: 'relative',
-                  background: `linear-gradient(172deg, rgba(246,242,235,0.94) 0%, rgba(238,232,222,${Math.min(boxOpacity + 0.14, 0.98)}) 100%), ${NOISE}`,
-                  backdropFilter: 'blur(12px) saturate(1.1)',
-                  WebkitBackdropFilter: 'blur(12px) saturate(1.1)',
-                  borderRadius: 18,
-                  border: `1px solid color-mix(in srgb, ${accent} 32%, rgba(255,255,255,0.55))`,
-                  boxShadow: `inset 0 1px 0 rgba(255,255,255,0.8), 0 16px 40px rgba(0,0,0,0.42), 0 0 28px ${accent}18`,
-                  padding: '28px 44px 46px 48px',
-                  minHeight: 124,
-                  cursor: 'pointer',
-                }}
+                key="box-b"
+                className="nl-box-in"
+                style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '34%', pointerEvents: uiHidden ? 'none' : 'auto', transition: 'background 0.28s ease, opacity 0.24s ease' }}
+                onClick={(e) => e.stopPropagation()}
               >
-                {speaker ? (
+                <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, transparent 0%, color-mix(in srgb, rgba(10,14,19,0.82) 82%, ${accent}) 68%, rgba(7,10,14,0.94) 100%)`, pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', top: '15%', left: '9%', right: '9%', height: 1, background: `linear-gradient(90deg, transparent, ${accent}66 30%, ${accent}66 70%, transparent)`, pointerEvents: 'none' }} />
+                <div onClick={advance} style={{ position: 'absolute', left: '8%', right: '8%', top: '25%', bottom: 14, cursor: 'pointer', fontFamily: SERIF }}>
+                  {speaker ? (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 9 }}>
+                      <span style={{ fontSize: fontSize + 6, fontWeight: 600, color: line.kind === 'inner' ? 'var(--nl-accent-strong)' : 'var(--nl-text)', letterSpacing: '0.18em', textShadow: '0 1px 6px rgba(0,0,0,0.6)' }}>
+                        {speaker}
+                      </span>
+                      {line.kind === 'inner' ? <span style={{ fontSize: 12, color: 'var(--nl-text-dim)', letterSpacing: '0.12em' }}>（心声）</span> : null}
+                      <div style={{ width: 48, height: 2, background: `linear-gradient(90deg, ${accent}, transparent)`, borderRadius: 1 }} />
+                    </div>
+                  ) : null}
                   <div
                     style={{
-                      position: 'absolute',
-                      top: -19,
-                      left: 26,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 9,
-                      background: line.kind === 'inner' ? 'rgba(246,242,235,0.98)' : `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 68%, #453a2e))`,
-                      border: `1.5px solid ${line.kind === 'inner' ? accent : 'rgba(255,255,255,0.35)'}`,
-                      borderRadius: 10,
-                      padding: '7px 22px 6px',
-                      color: line.kind === 'inner' ? accent : '#fffdf8',
-                      fontWeight: 600,
-                      fontSize: 15,
-                      fontFamily: SERIF,
-                      letterSpacing: '0.18em',
-                      boxShadow: '0 5px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25)',
+                      fontWeight: 500,
+                      color: line.kind === 'inner' ? 'rgba(205,216,229,0.88)' : 'var(--nl-text)',
+                      fontSize,
+                      lineHeight: 1.92,
+                      letterSpacing: '0.02em',
+                      textShadow: '0 1px 4px rgba(0,0,0,0.65)',
                     }}
                   >
-                    {speaker}
-                    {line.kind === 'inner' ? <span style={{ fontSize: 11, opacity: 0.8 }}>（心声）</span> : null}
+                    {textBody}
                   </div>
-                ) : null}
-                <div
-                  style={{
-                    fontFamily: SERIF,
-                    fontWeight: 500,
-                    color: line.kind === 'inner' ? 'rgba(96,88,78,0.95)' : '#3a352e',
-                    fontSize,
-                    lineHeight: 1.9,
-                    letterSpacing: '0.02em',
-                    position: 'relative',
-                  }}
-                >
-                  {textBody}
                 </div>
-                <div style={{ position: 'absolute', right: 20, bottom: 11, display: 'flex', alignItems: 'center', color: '#6b655c' }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ position: 'absolute', right: '5%', bottom: 14, display: 'flex', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
                   {quickMenu}
                 </div>
               </div>
-            </div>
-          ) : null
-        ) : null}
-
-        {uiHidden ? (
-          <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 40, color: `${accent}55` }}>
-            <PlayerIcon name="next" size={10} />
+            ) : (
+              /* ---- C 浅色纸笺：暖白透明纸面板 ---- */
+              <div
+                key="box-c"
+                className="nl-light"
+                style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: '3%', width: 'min(88%, 1060px)', pointerEvents: uiHidden ? 'none' : 'auto', transition: 'opacity 0.24s ease' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div
+                  onClick={advance}
+                  className="nl-box-in"
+                  style={{
+                    position: 'relative',
+                    background: `linear-gradient(172deg, rgba(246,242,235,0.94) 0%, rgba(238,232,222,${Math.min(boxOpacity + 0.14, 0.98)}) 100%), ${NOISE}`,
+                    backdropFilter: 'blur(12px) saturate(1.1)',
+                    WebkitBackdropFilter: 'blur(12px) saturate(1.1)',
+                    borderRadius: 18,
+                    border: `1px solid color-mix(in srgb, ${accent} 32%, rgba(255,255,255,0.55))`,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.8), 0 16px 40px rgba(0,0,0,0.42), 0 0 28px ${accent}18`,
+                    padding: '28px 44px 46px 48px',
+                    minHeight: 124,
+                    cursor: 'pointer',
+                    transition: 'background 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease',
+                  }}
+                >
+                  {speaker ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: -19,
+                        left: 26,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 9,
+                        background: line.kind === 'inner' ? 'rgba(246,242,235,0.98)' : `linear-gradient(135deg, ${accent}, color-mix(in srgb, ${accent} 68%, #453a2e))`,
+                        border: `1.5px solid ${line.kind === 'inner' ? accent : 'rgba(255,255,255,0.35)'}`,
+                        borderRadius: 10,
+                        padding: '7px 22px 6px',
+                        color: line.kind === 'inner' ? accent : '#fffdf8',
+                        fontWeight: 600,
+                        fontSize: 15,
+                        fontFamily: SERIF,
+                        letterSpacing: '0.18em',
+                        boxShadow: '0 5px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.25)',
+                      }}
+                    >
+                      {speaker}
+                      {line.kind === 'inner' ? <span style={{ fontSize: 11, opacity: 0.8 }}>（心声）</span> : null}
+                    </div>
+                  ) : null}
+                  <div
+                    style={{
+                      fontFamily: SERIF,
+                      fontWeight: 500,
+                      color: line.kind === 'inner' ? 'rgba(96,88,78,0.95)' : '#3a352e',
+                      fontSize,
+                      lineHeight: 1.9,
+                      letterSpacing: '0.02em',
+                      position: 'relative',
+                    }}
+                  >
+                    {textBody}
+                  </div>
+                  <div style={{ position: 'absolute', right: 20, bottom: 11, display: 'flex', alignItems: 'center', color: '#6b655c' }} onClick={(e) => e.stopPropagation()}>
+                    {quickMenu}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
+
+        <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 40, color: `${accent}55`, opacity: uiHidden ? 1 : 0, pointerEvents: 'none', transition: 'opacity 0.24s ease' }}>
+          <PlayerIcon name="next" size={10} />
+        </div>
 
         {/* ======== 章末：下一章制作中 ======== */}
         {!uiHidden && mode === 'waitEnd' && next ? (
@@ -902,14 +1065,17 @@ export function PlayerPage() {
             </div>
             {next.status === 'producing' ? (
               <div style={{ fontFamily: SERIF, fontSize: 13.5, color: 'var(--nl-text-dim)', lineHeight: 1.9 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  <PlayerIcon name="auto" size={15} style={{ color: accent }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="nl-wait-ring" aria-hidden />
                   {next.step}
                 </div>
                 <div style={{ marginTop: 6 }}>做完会自动载入开头</div>
               </div>
             ) : (
-              <div style={{ fontFamily: SERIF, fontSize: 13.5, color: 'var(--nl-text-dim)', lineHeight: 1.9 }}>还在排队等待，做完后会自动载入开头。</div>
+              <div style={{ fontFamily: SERIF, fontSize: 13.5, color: 'var(--nl-text-dim)', lineHeight: 1.9, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="nl-wait-ring" aria-hidden />
+                <span>还在排队等待，做完后会自动载入开头。</span>
+              </div>
             )}
             {next.status === 'producing' ? (
               <button
@@ -929,15 +1095,18 @@ export function PlayerPage() {
         {/* 下一章就绪 */}
         {!uiHidden && mode === 'nextReady' && next ? (
           <div
-            style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, zIndex: 45, background: 'rgba(5,8,12,0.62)' }}
+            className="nl-screen-in"
+            style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 45, background: 'rgba(5,8,12,0.62)' }}
             onClick={(e) => {
               e.stopPropagation()
               setMode('finale')
             }}
           >
-            <div style={{ fontFamily: SERIF, fontSize: 28, color: 'var(--nl-text)', letterSpacing: '0.08em' }}>「{next.title}」</div>
-            <div style={{ fontFamily: SERIF, fontSize: 13, color: 'var(--nl-text-dim)', letterSpacing: '0.2em' }}>已载入开头</div>
-            <span className="nl-next-glyph" style={{ color: accent, marginTop: 12 }}><PlayerIcon name="next" size={16} /></span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, animation: 'nl-rise 0.35s ease both' }}>
+              <div style={{ fontFamily: SERIF, fontSize: 28, color: 'var(--nl-text)', letterSpacing: '0.08em' }}>「{next.title}」</div>
+              <div style={{ fontFamily: SERIF, fontSize: 13, color: 'var(--nl-text-dim)', letterSpacing: '0.2em' }}>已载入开头</div>
+              <span className="nl-next-glyph" style={{ color: accent, marginTop: 12 }}><PlayerIcon name="next" size={16} /></span>
+            </div>
           </div>
         ) : null}
 
@@ -970,6 +1139,11 @@ export function PlayerPage() {
                   setShown(0)
                   setMode('story')
                   setStage(initialStage)
+                  prevVisualBgRef.current = initialStage.bg
+                  skipNextBgTransitionRef.current = true
+                  setPrevBg(null)
+                  setExitingCast({})
+                  prevCastRef.current = {}
                   setRevealed(false)
                 }}
               >

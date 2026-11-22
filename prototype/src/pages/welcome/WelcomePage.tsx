@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Icon } from '../../components/Button'
-import { Tooltip } from '../../components/Extended'
+import { Banner, Tooltip } from '../../components/Extended'
 import { Field, Select, TextInput } from '../../components/Form'
 import { apiFormats, defaultBaseUrl, modelSlots, type ApiFormat } from '../../mock/settings'
 import type { CSSProperties, ReactNode } from 'react'
@@ -17,7 +17,7 @@ function StepCard({ children }: { children: ReactNode }) {
         maxWidth: 640,
         borderRadius: 'var(--radius-2xl)',
         padding: 'var(--space-7) var(--space-7) var(--space-6)',
-        animation: 'fade-up 0.25s ease',
+        animation: 'fade-up var(--dur-slow) var(--ease-out)',
       }}
     >
       {children}
@@ -101,6 +101,22 @@ function ModelStep() {
   const [key_, setKey] = useState('')
   const [names, setNames] = useState<Record<string, string>>({ fast: '', main: '', writing: '', visual: '' })
   const [img, setImg] = useState({ base: '', model: '', key: '' })
+  const [testState, setTestState] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
+  const timerRef = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+  }, [])
+
+  const runTest = () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    setTestState('testing')
+    const ok = base.trim().length > 0
+    timerRef.current = window.setTimeout(() => {
+      setTestState(ok ? 'ok' : 'fail')
+      timerRef.current = null
+    }, 600)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
@@ -108,17 +124,60 @@ function ModelStep() {
         <Field label="接口格式">
           <Select
             value={format}
-            onChange={(v) => { setFormat(v as ApiFormat); setBase(defaultBaseUrl(v as ApiFormat)) }}
+            onChange={(v) => { setFormat(v as ApiFormat); setBase(defaultBaseUrl(v as ApiFormat)); setTestState('idle') }}
             options={apiFormats.map((f) => ({ value: f.value, label: f.label }))}
           />
         </Field>
         <Field label="接口地址">
-          <TextInput value={base} onChange={setBase} placeholder="https://…" />
+          <TextInput value={base} onChange={(v) => { setBase(v); setTestState('idle') }} placeholder="https://…" />
         </Field>
       </div>
       <Field label="API Key">
-        <TextInput type="password" value={key_} onChange={setKey} placeholder="sk-…" />
+        <TextInput type="password" value={key_} onChange={(v) => { setKey(v); setTestState('idle') }} placeholder="sk-…" />
       </Field>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <Button size="sm" icon="cable" loading={testState === 'testing'} onClick={runTest}>
+          测试连接
+        </Button>
+        {testState === 'ok' ? (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '3px 10px',
+              borderRadius: 'var(--radius-full)',
+              background: 'var(--color-success-container)',
+              color: 'var(--color-success)',
+              fontSize: 12,
+              fontWeight: 600,
+              animation: 'fade-in var(--dur-fast) var(--ease-out)',
+            }}
+          >
+            <Icon name="check_circle" size={14} />
+            连接成功
+          </span>
+        ) : null}
+        {testState === 'fail' ? (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '3px 10px',
+              borderRadius: 'var(--radius-full)',
+              background: 'var(--color-error-container)',
+              color: 'var(--color-on-error-container)',
+              fontSize: 12,
+              fontWeight: 600,
+              animation: 'fade-in var(--dur-fast) var(--ease-out)',
+            }}
+          >
+            <Icon name="error" size={14} />
+            请填写接口地址
+          </span>
+        ) : null}
+      </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
         {modelSlots.filter((s) => s.id !== 'image').map((s) => (
           <Field key={s.id} label={s.label}>
@@ -170,7 +229,7 @@ export function WelcomePage() {
       </div>
 
       {step === 0 ? (
-        <StepCard>
+        <StepCard key={0}>
           <Dots total={3} current={0} />
           <h1 className="headline" style={{ fontSize: 24, marginBottom: 'var(--space-5)' }}>欢迎使用 Novelive</h1>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -226,7 +285,7 @@ export function WelcomePage() {
       ) : null}
 
       {step === 1 ? (
-        <StepCard>
+        <StepCard key={1}>
           <Dots total={3} current={1} />
           <h1 className="headline" style={{ fontSize: 24, marginBottom: 'var(--space-5)' }}>创作还是游玩</h1>
           <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
@@ -257,14 +316,21 @@ export function WelcomePage() {
       ) : null}
 
       {step === 2 ? (
-        <StepCard>
+        <StepCard key={2}>
           <Dots total={3} current={2} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 'var(--space-5)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 'var(--space-4)' }}>
             <h1 className="headline" style={{ fontSize: 24 }}>模型配置</h1>
             <Tooltip text="Key 只保存在本机配置文件中">
               <Icon name="info" size={15} style={{ color: 'var(--color-outline)' }} />
             </Tooltip>
           </div>
+          {path === 'play' ? (
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <Banner kind="info" icon="play_circle">
+                已选「游玩」路线：模型配置为可选项，可直接跳过前往书库导入 .novelive 作品包。
+              </Banner>
+            </div>
+          ) : null}
           <ModelStep />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-6)' }}>
             <Button variant="ghost" onClick={() => setStep(1)}>
