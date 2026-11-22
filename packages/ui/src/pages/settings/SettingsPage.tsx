@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { Collapse } from '../../components/Collapse'
 import type { SettingsHost } from '../../shell/AppShell'
 import {
 	type ModelDraft,
@@ -220,7 +221,7 @@ function ModelCard({
 					)}
 				</p>
 			)}
-			{open && (
+			<Collapse open={open}>
 				<div className={styles.editor}>
 					{images && <ImageResults results={images} />}
 					<fieldset className={styles.fields} disabled={busy}>
@@ -236,7 +237,7 @@ function ModelCard({
 						</button>
 					</div>
 				</div>
-			)}
+			</Collapse>
 		</section>
 	)
 }

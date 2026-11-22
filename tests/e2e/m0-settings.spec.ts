@@ -134,6 +134,14 @@ test('M0 settings saves five slots and runs recorded text and vision requests', 
 			await expect(key).toHaveValue('replacement-key')
 			await fast.getByRole('button', { name: '保存' }).click()
 			await expect(key).toHaveValue('••••')
+			const toggle = fast.getByRole('button', { name: '快速模型', exact: true })
+			await toggle.click()
+			await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+			await expect(fast.getByRole('textbox', { name: '模型名' })).toHaveCount(0)
+			await toggle.click()
+			await expect(fast.getByRole('textbox', { name: '模型名' })).toHaveValue(
+				'gpt-4o',
+			)
 		} finally {
 			await app.close()
 		}
