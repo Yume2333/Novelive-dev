@@ -22,6 +22,7 @@ import {
 	reviewStyle,
 	type SourceParagraph,
 } from './review'
+import { sceneBody, scopedScene, scopeScene } from './scope'
 
 export { ContextLimitError } from './budget'
 
@@ -295,14 +296,19 @@ export async function writeChapter(
 			0,
 		)
 	async function writeBatch(batch: readonly SourceParagraph[]) {
+		const currentPrompt = prompt(batch)
+		const estimate = outputEstimate(batch)
+		const phase = 'Source paragraph adaptation'
+		const split = async () => {
+			if (batch.length < 2) throw new ContextLimitError(phase)
+			const middle = Math.floor(batch.length / 2)
+			await writeBatch(batch.slice(0, middle))
+			await writeBatch(batch.slice(middle))
+		}
+		if (!promptFits(model, userPrompt(currentPrompt), estimate)) return split()
 		let draft: string
 		try {
-			draft = await ask(
-				model,
-				prompt(batch),
-				'Source paragraph adaptation',
-				outputEstimate(batch),
-			)
+			draft = await ask(model, currentPrompt, phase, estimate)
 		} catch (error) {
 			if (
 				!(
@@ -311,12 +317,7 @@ export async function writeChapter(
 				)
 			)
 				throw error
-			if (batch.length < 2)
-				throw new ContextLimitError('Source paragraph adaptation')
-			const middle = Math.floor(batch.length / 2)
-			await writeBatch(batch.slice(0, middle))
-			await writeBatch(batch.slice(middle))
-			return
+			return split()
 		}
 		const compiled = await validate(
 			model,
@@ -361,6 +362,12 @@ export async function reviewChapter(
 			revised: false,
 		}
 	const reviewer = writingModel(options.reviewer, options)
+	let writer: Writer | undefined
+	const getWriter = () => (writer ??= writingModel(options.writer, options))
+	const aligner = () => {
+		const candidate = getWriter()
+		return candidate.inputLimit > reviewer.inputLimit ? candidate : reviewer
+	}
 	const fidelity: FidelityIssue[] = []
 	if (settings.fidelityReview) {
 		for (const { scene } of draft.scenes) {
@@ -378,6 +385,7 @@ export async function reviewChapter(
 						paragraphs: chapter.paragraphs.slice(from, to + 1),
 					},
 					formatScene(scene),
+					aligner,
 				)),
 			)
 		}
@@ -390,7 +398,7 @@ export async function reviewChapter(
 	const style = [...styleByScene.values()].flat()
 	if (!fidelity.length && !style.length)
 		return { ...draft, fidelity, style, revised: false }
-	const writer = writingModel(options.writer, options)
+	const revisionWriter = getWriter()
 	const speakers = [...options.script.speakers]
 	const instructions = brief(chapter, speakers)
 	const parts: string[] = []
@@ -410,7 +418,8 @@ export async function reviewChapter(
 		const revised =
 			issues.length || styleIssues.length
 				? await reviseScene(
-						writer,
+						revisionWriter,
+						aligner,
 						instructions.revision,
 						instructions.end,
 						script,
@@ -428,7 +437,7 @@ export async function reviewChapter(
 		}
 	}
 	const output = await validate(
-		writer,
+		revisionWriter,
 		parts.join('\n\n'),
 		{
 			...options.script,
@@ -445,6 +454,7 @@ export async function reviewChapter(
 
 async function reviseScene(
 	writer: Writer,
+	aligner: () => Writer,
 	rules: string,
 	redLines: string,
 	script: string,
@@ -470,70 +480,84 @@ async function reviseScene(
 	if (promptFits(writer, userPrompt(whole), estimateNvs(script)))
 		return ask(writer, whole, 'Scene revision', estimateNvs(script))
 
-	const paragraphPrompt = (batch: readonly SourceParagraph[]) => {
-		const cited = new Set(batch.map(({ id }) => id))
-		const issues = `Fidelity issues: ${JSON.stringify(fidelity.filter(({ paragraphId }) => cited.has(paragraphId)))}\nStyle issues: ${JSON.stringify(style)}`
-		return render(
-			'Revise only the portion of this NVS scene that adapts the supplied source paragraphs. The rest of the draft is context only. Return complete NVS scenes covering exactly the supplied paragraph IDs. Preserve IDs for retained lines.',
-			issues,
-			source(batch),
-			script,
-		)
-	}
-	const paragraphOutput = (batch: readonly SourceParagraph[]) =>
-		estimateNvs(source(batch))
-	const paragraphsFit = (batch: readonly SourceParagraph[]) =>
-		promptFits(
-			writer,
-			userPrompt(paragraphPrompt(batch)),
-			paragraphOutput(batch),
-		)
+	const instruction =
+		'Revise this fragment of an NVS scene once. Return only its body lines (no scene or source header). Preserve IDs for retained lines.'
+	const { heading, lines } = sceneBody(script)
 	if (
-		paragraphs.length > 1 &&
-		paragraphs.every((paragraph) => paragraphsFit([paragraph]))
-	) {
+		paragraphs.length === 1 &&
+		lines.some(
+			(line) =>
+				!promptFits(
+					writer,
+					userPrompt(render(instruction, '', original, line)),
+					estimateNvs(line),
+				),
+		)
+	)
+		throw new ContextLimitError('Scene revision line')
+	const groups = await scopeScene(aligner, script, paragraphs, [
+		...fidelity.map((item) => ({
+			paragraphId: item.paragraphId,
+			text: JSON.stringify(item),
+		})),
+		...style.map((text) => ({ text })),
+	])
+	const subset = (indices: readonly number[]) => {
+		const accepted = new Set(indices)
+		return `Fidelity issues: ${JSON.stringify(fidelity.filter((_, i) => accepted.has(i)))}\nStyle issues: ${JSON.stringify(style.filter((_, i) => accepted.has(fidelity.length + i)))}`
+	}
+	const scenes: string[] = []
+	for (const group of groups) {
+		const current = scopedScene(heading, group.paragraphs, group.lines)
+		if (!group.targets.length) {
+			scenes.push(current)
+			continue
+		}
+		const cited = source(group.paragraphs)
+		const paragraphPrompt = render(
+			'Revise only the portion of this NVS scene that adapts the supplied source paragraphs. Return complete NVS scenes covering exactly the supplied paragraph IDs. Preserve IDs for retained lines.',
+			subset(group.targets.map(({ finding }) => finding)),
+			cited,
+			current,
+		)
+		if (
+			groups.length > 1 &&
+			promptFits(writer, userPrompt(paragraphPrompt), estimateNvs(current))
+		) {
+			scenes.push(
+				await ask(
+					writer,
+					paragraphPrompt,
+					'Scene revision paragraph',
+					estimateNvs(current),
+				),
+			)
+			continue
+		}
+		const units = (group.lines.length ? group.lines : ['']).map(
+			(text, line) => ({
+				text,
+				findings: group.targets
+					.filter((target) => target.line === line)
+					.map(({ finding }) => finding),
+			}),
+		)
 		const revised: string[] = []
-		for (const batch of fitUnits(
-			paragraphs,
-			paragraphsFit,
-			'Scene revision paragraph',
-		))
+		for (const unit of units) {
+			if (!unit.findings.length) {
+				revised.push(unit.text)
+				continue
+			}
 			revised.push(
 				await ask(
 					writer,
-					paragraphPrompt(batch),
-					'Scene revision paragraph',
-					paragraphOutput(batch),
+					render(instruction, subset(unit.findings), cited, unit.text),
+					'Scene revision line',
+					estimateNvs(unit.text),
 				),
 			)
-		return revised.join('\n\n')
+		}
+		scenes.push(scopedScene(heading, group.paragraphs, revised))
 	}
-
-	const instruction =
-		'Revise this fragment of an NVS scene once. Return only its body lines (no scene or source header). Preserve IDs for retained lines.'
-	const [heading, range, , ...lines] = script.trimEnd().split('\n')
-	const fragmentPrompt = (body: readonly string[]) =>
-		render(instruction, findings, original, body.join('\n'))
-	const revised: string[] = []
-	for (const body of fitUnits(
-		lines,
-		(body) =>
-			promptFits(
-				writer,
-				userPrompt(fragmentPrompt(body)),
-				estimateNvs(body.join('\n')),
-			),
-		'Scene revision line',
-	)) {
-		revised.push(
-			await ask(
-				writer,
-				fragmentPrompt(body),
-				'Scene revision line',
-				estimateNvs(body.join('\n')),
-			),
-		)
-	}
-	if (!revised.length) throw new ContextLimitError('Scene revision line')
-	return [heading, range, '', ...revised].join('\n')
+	return scenes.join('\n\n')
 }

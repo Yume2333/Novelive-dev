@@ -3,17 +3,17 @@ Base: e7cfb4807edabffe81fe901a7da3aa8bb2624f93
 
 $ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-writer.test.ts
 Test Files  1 passed (1)
-     Tests  21 passed (21)
+     Tests  25 passed (25)
 
 $ NL_REPLAY=strict pnpm check
 Test Files  20 passed (20)
-     Tests  311 passed (311)
+     Tests  315 passed (315)
 
 The task Check exercises writer and fidelity provider cassettes, rejects an invented citation, confirms one review-driven revision with retained IDs, verifies a style-only pass, checks priority continuity and settings, segments a long input, and verifies scene-local compiler repairs and retry exhaustion.
 
 $ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M1b TXT wizard|M1b minimal player|M1b creation surfaces'
 Running 6 tests using 3 workers
-  6 passed (3.3s)
+  6 passed (3.4s)
 These checks exercise real Electron TXT import and local first-chapter playback separately. The confirmation UI uses a projection fixture: it does not prove real scheduler dispatch. On the base and this branch, production.playerChapter is the only production handler registered in creator entry.ts. Task M1b/09 owns the creator/desktop wiring and the combined Electron gate:
 $ NL_REPLAY=strict pnpm exec playwright test --grep 'M1b make and play' --list
 Error: No tests found
@@ -35,12 +35,16 @@ PR #27 first review round (b13c657):
 - cceeb54: Keep style findings with their flagged scenes.
 The first round's strict checks passed 12 writer tests, 301 full-suite tests, and 6 Electron tests. Linux checks and Electron smoke were green.
 
-PR #27 shared-budget rework, verified by the checks above:
+PR #27 shared-budget rework (6ae0863):
 - All writing model requests preflight the rendered system message, messages, and tools, reserving provider output capacity. Writer batches and scene edits also estimate the size of the expected NVS output.
 - Split at complete scene, source paragraph, or NVS body-line boundaries. Oversized indivisible units return context_limit, which survives creator IPC as a typed failure.
 - Fidelity excerpts retain their parent scene's source references. Source windows and quote validation use whole cited paragraphs; Bible reads can select a section, entry ID, or glossary range.
 - Revision requests retain adaptation requirements and work/chapter rules, including in fragments.
-The existing cassette replayed unchanged. Neither review round made paid calls.
+PR #27 final review round, verified by the checks above:
+- Re-fit every recursive write retry with the preceding segment's current ending.
+- Reserve fidelity input for the source tool call and the larger of its full source reply and overflow reply.
+- On overflow, use a validated, ordered source-to-draft alignment when NVS's scene-level citations do not identify narrower excerpts. Review each excerpt only with its cited paragraphs, and route revision findings and draft lines to the affected chunks.
+The existing cassette replayed unchanged. No review round made paid calls.
 
 NL_REPLAY=record usage: 5 requests, 0 images. Four successful requests consumed 4,181 measured tokens (1,498 writer, 2,683 fidelity evaluator); the first writer request returned HTTP 404 because the provisioned base was missing the API path and returned no usage. Its 16,384-token reservation remains in the private ledger; conservative total 20,565 tokens. Four successful responses are in the cassette; the failed response is excluded. Relay host and credential checks on the cassette were clear.
 Independent review skipped: no fresh reviewer or isolated session launcher available; flow-close must cover it.

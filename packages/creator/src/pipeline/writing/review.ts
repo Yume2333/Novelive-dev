@@ -2,6 +2,14 @@ import type { Message, Tool } from '@earendil-works/pi-ai'
 import { arr, compile, obj, oneOf, str } from '@earendil-works/pi-schema'
 import { ContextLimitError, fitUnits, promptFits } from './budget'
 import { textOf, userMessage, type writingModel } from './request'
+import {
+	type SourceParagraph,
+	sceneBody,
+	scopedScene,
+	scopeScene,
+} from './scope'
+
+export type { SourceParagraph } from './scope'
 
 const categories = [
 	'omission',
@@ -20,6 +28,8 @@ const reviewIssue = obj({
 })
 const review = compile(obj({ issues: arr(reviewIssue) }))
 const style = compile(obj({ issues: arr(str({ minLength: 1 })) }))
+const overflow =
+	'Tool result exceeds the remaining context. Request a smaller range or submit now.'
 type Issue = (typeof categories)[number]
 export type FidelityIssue = {
 	category: Issue
@@ -27,7 +37,6 @@ export type FidelityIssue = {
 	quote: string
 	issue: string
 }
-export type SourceParagraph = { id: string; text: string }
 export type ReviewContext = {
 	paragraphs: readonly SourceParagraph[]
 	terms?: Readonly<Record<string, string>>
@@ -172,42 +181,67 @@ export async function reviewFidelity(
 	model: ReturnType<typeof writingModel>,
 	chapter: ReviewContext,
 	script: string,
+	aligner: () => ReturnType<typeof writingModel>,
 ) {
 	const activeTools = reviewTools(chapter)
-	const [heading, source, , ...lines] = script.trimEnd().split('\n')
-	const excerpt = (body: readonly string[]) =>
-		[heading, source, '', ...body].join('\n')
+	const { heading } = sceneBody(script)
 	const fits = (
 		paragraphs: readonly SourceParagraph[],
 		draft: string,
 		partial: boolean,
-	) =>
-		promptFits(model, {
-			tools: activeTools,
-			messages: [
-				userMessage(fidelityPrompt({ ...chapter, paragraphs }, draft, partial)),
-				toolResult('source', 'read_source_range', JSON.stringify(paragraphs)),
-			],
-		})
+	) => {
+		const id = 'call_'.padEnd(64, 'x')
+		const name = 'read_source_range'
+		const argumentsSize =
+			Buffer.byteLength(
+				JSON.stringify({
+					role: 'assistant',
+					content: [
+						{
+							type: 'toolCall',
+							id,
+							name,
+							arguments: { from: paragraphs[0]?.id, to: paragraphs.at(-1)?.id },
+						},
+					],
+				}),
+			) + 1
+		const limits = { ...model, inputLimit: model.inputLimit - argumentsSize }
+		return [JSON.stringify(paragraphs), overflow].every((reply) =>
+			promptFits(limits, {
+				tools: activeTools,
+				messages: [
+					userMessage(
+						fidelityPrompt({ ...chapter, paragraphs }, draft, partial),
+					),
+					toolResult(id, name, reply),
+				],
+			}),
+		)
+	}
 	if (fits(chapter.paragraphs, script, false))
 		return reviewWindow(model, chapter, script, false, activeTools)
 
-	const widestLine = lines.reduce(
-		(longest, line) =>
-			Buffer.byteLength(JSON.stringify(line)) >
-			Buffer.byteLength(JSON.stringify(longest))
-				? line
-				: longest,
-		'',
-	)
 	const issues = new Map<string, FidelityIssue>()
-	for (const paragraphs of fitUnits(
+	for (const { paragraphs, lines } of await scopeScene(
+		aligner,
+		script,
 		chapter.paragraphs,
-		(batch) => fits(batch, excerpt([widestLine]), true),
-		'Fidelity source paragraph',
 	)) {
-		// NVS cites paragraphs at scene level, not line level. Every excerpt
-		// retains that citation; do not guess a narrower alignment by position.
+		const excerpt = (body: readonly string[]) =>
+			scopedScene(heading, paragraphs, body)
+		const whole = excerpt(lines)
+		if (fits(paragraphs, whole, false)) {
+			for (const issue of await reviewWindow(
+				model,
+				{ ...chapter, paragraphs },
+				whole,
+				false,
+				activeTools,
+			))
+				issues.set(JSON.stringify(issue), issue)
+			continue
+		}
 		for (const body of fitUnits(
 			lines.length ? lines : [''],
 			(batch) => fits(paragraphs, excerpt(batch), true),
@@ -346,7 +380,7 @@ async function reviewWindow(
 							part.name,
 							part.name === 'read_bible'
 								? 'Bible result exceeds the remaining context. Use read_bible with a section, entry, or glossary range.'
-								: 'Tool result exceeds the remaining context. Request a smaller range or submit now.',
+								: overflow,
 							true,
 						),
 			)
