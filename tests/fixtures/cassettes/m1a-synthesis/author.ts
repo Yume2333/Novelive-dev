@@ -119,7 +119,23 @@ try {
 		})
 		if (scenario === 'invalid')
 			await assert.rejects(run, /Unknown character reference: missing/)
-		else await run
+		else {
+			await run
+			if (scenario === 'whole')
+				await synthesizeVolume(project, 'v1', chapters, {
+					strategy,
+					language: 'en',
+					connection,
+					rerun: true,
+					fetch: createReplayFetch({
+						mode: 'record',
+						directory: cassette,
+						fetch,
+						case: 'rerun',
+						tags: ['synthetic', 'not-a-provider-recording'],
+					}),
+				})
+		}
 	}
 } finally {
 	await rm(directory, { recursive: true, force: true })

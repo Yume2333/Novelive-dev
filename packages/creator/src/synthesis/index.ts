@@ -89,6 +89,7 @@ export interface SynthesisOptions {
 	strategy?: 'auto' | 'whole' | 'events'
 	maxEvents?: number
 	incremental?: boolean
+	rerun?: boolean
 	signal?: AbortSignal
 	fetch?: typeof globalThis.fetch
 }
@@ -212,7 +213,9 @@ export async function synthesizeVolume(
 		model: model.id,
 		context: model.contextWindow,
 	})
-	const saved = await existing(() => project.read(files.checkpoint))
+	const saved = options.rerun
+		? undefined
+		: await existing(() => project.read(files.checkpoint))
 	if (saved?.fingerprint === fingerprint && saved.applied)
 		return project.read(files.result)
 

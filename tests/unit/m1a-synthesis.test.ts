@@ -105,6 +105,24 @@ test('whole-volume replay persists a skeleton, candidates and conflicts without 
 	})
 })
 
+test('only an explicit rerun re-synthesizes a completed volume with the same inputs', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const fetch = vi.fn<typeof globalThis.fetch>(strict)
+	const whole = { ...options, strategy: 'whole' as const, fetch }
+	await synthesizeVolume(project, 'v1', chapters, whole)
+	expect(fetch).toHaveBeenCalledTimes(1)
+	await synthesizeVolume(project, 'v1', chapters, whole)
+	expect(fetch).toHaveBeenCalledTimes(1)
+	await synthesizeVolume(project, 'v1', chapters, { ...whole, rerun: true })
+	expect(fetch).toHaveBeenCalledTimes(2)
+	await synthesizeVolume(project, 'v1', chapters, whole)
+	expect(fetch).toHaveBeenCalledTimes(2)
+	expect(
+		await project.read(projectFiles.character(scope, 'ada')),
+	).toMatchObject({ entries: [confirmed] })
+})
+
 test('a hard stop persists exactly one event and resumes after reopening without replaying it', async () => {
 	await seed(root)
 	const fetch = vi.fn<typeof globalThis.fetch>(strict)
