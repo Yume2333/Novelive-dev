@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { previewBook } from '../../../../packages/creator/src/preview'
 import { Project } from '../../../../packages/creator/src/project'
 import { createReplayFetch } from '../../../../packages/creator/src/replay'
-import { chapters, connection } from './fixture'
+import { addedChapter, chapters, connection, editedChapter } from './fixture'
 
 // Local synthetic SSE only; never contacts a provider.
 const fetch: typeof globalThis.fetch = async (input, init) => {
@@ -86,21 +86,34 @@ try {
 			volumeIds: ['v1', 'v2'],
 		})
 		try {
+			const replayFetch = createReplayFetch({
+				mode: 'record',
+				directory: 'tests/fixtures/cassettes/m1a-preview',
+				fetch,
+				case: 'preview',
+				tags: ['synthetic', 'not-a-provider-recording'],
+			})
 			await previewBook(
 				project,
 				model === 'fixture-preview' ? chapters : [chapters[1]],
 				{
 					connection: { ...connection, model },
 					language: 'en',
-					fetch: createReplayFetch({
-						mode: 'record',
-						directory: 'tests/fixtures/cassettes/m1a-preview',
-						fetch,
-						case: 'preview',
-						tags: ['synthetic', 'not-a-provider-recording'],
-					}),
+					fetch: replayFetch,
 				},
 			)
+			if (model === 'fixture-preview') {
+				await previewBook(project, [chapters[0], editedChapter, chapters[2]], {
+					connection,
+					language: 'en',
+					fetch: replayFetch,
+				})
+				await previewBook(project, [...chapters, addedChapter], {
+					connection,
+					language: 'en',
+					fetch: replayFetch,
+				})
+			}
 		} catch (error) {
 			if (
 				!['fixture-preview-invalid', 'fixture-preview-length'].includes(model)

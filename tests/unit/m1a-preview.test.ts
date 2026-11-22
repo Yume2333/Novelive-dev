@@ -6,7 +6,12 @@ import { previewBook, splitChapter } from '../../packages/creator/src/preview'
 import { Project } from '../../packages/creator/src/project'
 import { createReplayFetch } from '../../packages/creator/src/replay'
 import { projectFiles } from '../../packages/format/src/model'
-import { chapters, connection } from '../fixtures/cassettes/m1a-preview/fixture'
+import {
+	addedChapter,
+	chapters,
+	connection,
+	editedChapter,
+} from '../fixtures/cassettes/m1a-preview/fixture'
 
 let directory: string
 let root: string
@@ -138,6 +143,71 @@ test('restart reuses completed chapter files and volume digests without model ca
 	} finally {
 		project.close()
 	}
+})
+
+test('edited chapter text invalidates its preview and volume digest but reuses other chapters', async () => {
+	using project = await Project.open(root)
+	await previewBook(project, chapters, {
+		connection,
+		language: 'en',
+		fetch: replay(),
+	})
+	const before = await project.readFile(projectFiles.preview('c1').path)
+	const oldDigest = await project.readFile(projectFiles.digest('v1').path)
+	const result = await previewBook(
+		project,
+		[chapters[0], editedChapter, chapters[2]],
+		{ connection, language: 'en', fetch: replay() },
+	)
+	expect(
+		result.previews.find((preview) => preview.chapterId === 'c2')?.characters,
+	).toContainEqual({ name: 'Cy' })
+	expect(await project.readFile(projectFiles.preview('c1').path)).toEqual(
+		before,
+	)
+	expect(await project.readFile(projectFiles.digest('v1').path)).not.toEqual(
+		oldDigest,
+	)
+	expect(result.digests[0].characters).toContainEqual({ name: 'Cy' })
+	const unused = vi.fn(replay())
+	await previewBook(project, [chapters[0], editedChapter, chapters[2]], {
+		connection,
+		language: 'en',
+		fetch: unused,
+	})
+	expect(unused).not.toHaveBeenCalled()
+})
+
+test('adding a chapter invalidates its volume digest without redoing finished chapters', async () => {
+	using project = await Project.open(root)
+	await previewBook(project, chapters, {
+		connection,
+		language: 'en',
+		fetch: replay(),
+	})
+	const oldDigest = await project.readFile(projectFiles.digest('v1').path)
+	const strict = replay()
+	const prompts: string[] = []
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		prompts.push((await request.clone().json()).messages[0].content)
+		return strict(request)
+	}
+	const result = await previewBook(project, [...chapters, addedChapter], {
+		connection,
+		language: 'en',
+		fetch,
+	})
+	expect(prompts.filter((prompt) => prompt.includes('\nText:\n'))).toHaveLength(
+		1,
+	)
+	expect(
+		prompts.some((prompt) => prompt.includes(addedChapter.paragraphs[0])),
+	).toBe(true)
+	expect(await project.readFile(projectFiles.digest('v1').path)).not.toEqual(
+		oldDigest,
+	)
+	expect(result.digests[0].characters).toContainEqual({ name: 'Cy' })
 })
 
 test('empty input makes no calls; cancellation and strict misses do not persist unfinished chapters', async () => {

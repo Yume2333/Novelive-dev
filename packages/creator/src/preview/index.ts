@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
-import { compile, obj, str } from '@earendil-works/pi-schema'
+import { compile, obj, opt, str } from '@earendil-works/pi-schema'
 import {
 	type ChapterPreview,
 	chapterPreviewFields,
@@ -24,13 +25,24 @@ export interface PreviewChapter {
 
 const fields = compile(obj(chapterPreviewFields))
 const digestFields = compile(obj({ summary: str() }))
+const storedPreviewSchema = obj({
+	...version,
+	chapterId: entityId,
+	...chapterPreviewFields,
+	inputFingerprint: opt(str()),
+})
 const storedDigestSchema = obj({
 	...version,
 	volumeId: entityId,
 	...chapterPreviewFields,
+	inputFingerprint: opt(str()),
 })
 type Details = Omit<ChapterPreview, 'chapterId' | 'formatVersion'>
 export type PreviewDigest = VolumeDigest & Omit<Details, 'summary'>
+
+function fingerprint(input: unknown): string {
+	return createHash('sha256').update(JSON.stringify(input)).digest('hex')
+}
 
 function merge(parts: Details[]): Details {
 	return {
@@ -166,9 +178,16 @@ export async function previewBook(
 			(chapter) => chapter.volumeId === volumeId,
 		)) {
 			options.signal?.throwIfAborted()
-			const file = projectFiles.preview(chapter.chapterId)
+			const file = {
+				path: projectFiles.preview(chapter.chapterId).path,
+				schema: storedPreviewSchema,
+			}
+			const inputFingerprint = fingerprint({
+				paragraphs: chapter.paragraphs,
+				language: options.language,
+			})
 			let preview = await existing(() => project.read(file))
-			if (!preview) {
+			if (!preview || preview.inputFingerprint !== inputFingerprint) {
 				const parts: Details[] = []
 				let previous = ''
 				for (const segment of splitChapter(chapter.paragraphs, budget)) {
@@ -184,6 +203,7 @@ export async function previewBook(
 					formatVersion,
 					chapterId: chapter.chapterId,
 					...merge(parts),
+					inputFingerprint,
 				}
 				await project.write(file, preview)
 			}
@@ -195,7 +215,8 @@ export async function previewBook(
 			schema: storedDigestSchema,
 		}
 		let digest = await existing(() => project.read(file))
-		if (!digest) {
+		const inputFingerprint = fingerprint({ volume, language: options.language })
+		if (!digest || digest.inputFingerprint !== inputFingerprint) {
 			const details = merge(volume)
 			const summaries: string[] = []
 			for (const segment of splitChapter(
@@ -219,6 +240,7 @@ export async function previewBook(
 				locations: details.locations,
 				timelineNotes: details.timelineNotes,
 				foreshadowingHints: details.foreshadowingHints,
+				inputFingerprint,
 			}
 			await project.write(file, digest)
 		}

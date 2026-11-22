@@ -35,3 +35,15 @@ export const chapters: PreviewChapter[] = [
 		],
 	},
 ]
+
+export const editedChapter: PreviewChapter = {
+	...chapters[1],
+	paragraphs: ['Cy met Ada on Ink Island on day four. The bell hid the key.'],
+}
+export const addedChapter: PreviewChapter = {
+	chapterId: 'c4',
+	volumeId: 'v1',
+	paragraphs: [
+		'Cy reached Paper Harbor on day four. The bell answered the tower.',
+	],
+}
