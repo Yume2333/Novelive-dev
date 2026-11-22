@@ -2,6 +2,7 @@ import type { Novelive } from '@novelive/creator/contract'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { ImportPage } from './pages/import/ImportPage'
 import { LibraryPage } from './pages/library/LibraryPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
 import { UsagePage } from './pages/usage/UsagePage'
@@ -26,6 +27,7 @@ if (root)
 				<Routes>
 					<Route element={<AppShell />}>
 						<Route index element={<LibraryPage />} />
+						<Route path="import" element={<ImportPage />} />
 						<Route path="usage" element={<UsagePage />} />
 						<Route path="settings" element={<SettingsPage />} />
 						<Route path="*" element={<Navigate to="/" replace />} />

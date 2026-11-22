@@ -156,6 +156,18 @@ app.whenReady().then(() => {
 		})
 		return result.filePaths[0] ?? null
 	})
+	ipcMain.handle('novelive:pick-files', async (_event, kind: unknown) => {
+		if (kind !== 'txt' && kind !== 'image') return []
+		const result = await dialog.showOpenDialog({
+			properties:
+				kind === 'image' ? ['openFile', 'multiSelections'] : ['openFile'],
+			filters:
+				kind === 'image'
+					? [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+					: [{ name: 'TXT', extensions: ['txt'] }],
+		})
+		return result.filePaths
+	})
 	ipcMain.handle('novelive:open-log-dir', async () => {
 		await mkdir(logDir(), { recursive: true })
 		const error = await shell.openPath(logDir())
