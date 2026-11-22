@@ -1,0 +1,50 @@
+$ pnpm typecheck && pnpm lint && pnpm test
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+tests/fixtures/text-models/build-synthetic.ts:63:3 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+  
+    61 │ function completions(content: string, finishReason = 'stop') {
+    62 │ 	return (
+  > 63 │ 		[
+       │ 		^
+  > 64 │ 			{
+        ...
+  > 82 │ 			)
+  > 83 │ 			.join('') + 'data: [DONE]\n\n'
+       │ 			^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    84 │ 	)
+    85 │ }
+  
+  i Template literals are easier to read than a chain of + operators and quotes, and they avoid mistakes with spaces and escaped quotes.
+  
+  i Unsafe fix: Use a template literal.
+  
+     61  61 │   function completions(content: string, finishReason = 'stop') {
+     62  62 │     return (
+     63     │ - → → [
+         63 │ + → → `${[
+     64  64 │         {
+     65  65 │           choices: [
+    ······· │ 
+     81  81 │             `data: ${JSON.stringify({ id: 'chat_fixture', ...chunk })}\n\n`,
+     82  82 │         )
+     83     │ - → → → .join('')·+·'data:·[DONE]\n\n'
+         83 │ + → → → .join('')}data:·[DONE]\n\n`
+     84  84 │     )
+     85  85 │   }
+  
+
+Checked 124 files in 41ms. No fixes applied.
+Found 1 info.
+$ vitest run
+
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev
+
+
+ Test Files  13 passed (13)
+      Tests  216 passed (216)
+   Start at  21:22:39
+   Duration  8.98s (tests 92%, import 5%, transform 2%)
+

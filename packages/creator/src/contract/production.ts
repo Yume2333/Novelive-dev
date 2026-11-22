@@ -13,7 +13,9 @@ import {
 } from '@earendil-works/pi-schema'
 import {
 	assetId,
+	assetRegistrySchema,
 	chapterProductionSchema,
+	chapterSchema,
 	chapterStepSchema,
 	entityId,
 	productionStatusSchema,
@@ -66,6 +68,17 @@ export const productionSnapshotSchema = obj({
 })
 
 export const productionCommands = {
+	'production.playerChapter': {
+		input: obj({ ...work, directory: str({ minLength: 1 }) }),
+		output: obj({
+			script: str(),
+			chapter: chapterSchema,
+			registry: assetRegistrySchema,
+			speakers: arr(entityId, { uniqueItems: true }),
+			speakerNames: map(str()),
+			customMarks: arr(str(), { uniqueItems: true }),
+		}),
+	},
 	'production.get': { input: obj(work), output: productionSnapshotSchema },
 	'production.resolveAsset': {
 		input: obj({ ...work, assetId }),

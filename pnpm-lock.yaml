@@ -278,6 +278,12 @@ importers:
       '@novelive/creator':
         specifier: workspace:*
         version: link:../creator
+      '@novelive/format':
+        specifier: workspace:*
+        version: link:../format
+      '@novelive/player':
+        specifier: workspace:*
+        version: link:../player
       lucide-react:
         specifier: 1.77.0
         version: 1.77.0(@types/react@19.3.0)(react@19.3.1)

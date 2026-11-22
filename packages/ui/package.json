@@ -3,6 +3,8 @@
 	"private": true,
 	"type": "module",
 	"dependencies": {
+		"@novelive/format": "workspace:*",
+		"@novelive/player": "workspace:*",
 		"@fontsource/hanken-grotesk": "5.3.0",
 		"@fontsource/manrope": "5.3.0",
 		"@fontsource/noto-sans-sc": "5.3.1",

@@ -1,0 +1,96 @@
+$ pnpm build && playwright test --grep 'M1b minimal player'
+$ pnpm --filter @novelive/desktop build
+$ electron-vite build
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 1289 modules transformed.
+rendering chunks...
+out/main/chunks/sanitize-unicode-BvtkLirb.js                      0.18 kB
+out/main/chunks/session-resources-Cy7gaMpB.js                     0.27 kB
+out/main/chunks/openai-prompt-cache-COP8flKD.js                   0.35 kB
+out/main/chunks/node-CuXhTfv0.js                                  0.39 kB
+out/main/chunks/hash-RwksDas4.js                                  0.50 kB
+out/main/chunks/headers-dI3nc1Mq.js                               0.67 kB
+out/main/chunks/github-copilot-headers-eBo5GwLf.js                0.85 kB
+out/main/chunks/abort-signals-DeiSNi7A.js                         0.97 kB
+out/main/chunks/openrouter-cost-2NkAUD0d.js                       1.15 kB
+out/main/chunks/typesafe-system-one-Kbpvoq5K.js                   1.29 kB
+out/main/chunks/cloudflare-workers-ai-system-one-DaDyLX6F.js      2.02 kB
+out/main/chunks/provider-retry-WJkqjyes.js                        3.20 kB
+out/main/chunks/classifier-shared-Bk5xSumK.js                     3.49 kB
+out/main/chunks/error-body-B6ksIuQ1.js                            3.68 kB
+out/main/chunks/openrouter-images-DS7KAFgd.js                     4.99 kB
+out/main/chunks/system-one-shared-CJtXZ3OS.js                     5.52 kB
+out/main/chunks/openai-decisions-DJ3VF3hL.js                      5.71 kB
+out/main/index.js                                                 5.82 kB
+out/main/chunks/multipart-parser-B0LCIKmg.js                     10.88 kB
+out/main/chunks/pi-messages-CAHBB1O8.js                          11.07 kB
+out/main/chunks/openai-responses-Bw-FwXi3.js                     14.12 kB
+out/main/chunks/google-generative-ai-nMRayiWc.js                 14.31 kB
+out/main/chunks/azure-openai-responses-BdKdy2X9.js               14.57 kB
+out/main/chunks/google-vertex-UvVqMnGF.js                        16.53 kB
+out/main/chunks/player-B215iRh-.js                               17.96 kB
+out/main/chunks/transform-messages-wPGqzXUC.js                   22.41 kB
+out/main/chunks/streaming-json-6gNt-JGQ.js                       25.65 kB
+out/main/chunks/mistral-conversations-xUY48MMk.js                26.10 kB
+out/main/chunks/openai-responses-shared-BYpTeMyK.js              28.17 kB
+out/main/chunks/index-Cit94trg.js                                36.19 kB
+out/main/chunks/openai-completions-BajPUTao.js                   49.82 kB
+out/main/chunks/openai-codex-responses-DNl6HB7Y.js               52.63 kB
+out/main/chunks/node-vDWu_fyy.js                                 89.71 kB
+out/main/creator.js                                             130.70 kB
+out/main/chunks/src-CoeAsqd5.js                                 241.28 kB
+out/main/chunks/anthropic-messages-D748Enq5.js                  570.57 kB
+out/main/chunks/client-B_wyAP3K.js                              954.72 kB
+out/main/chunks/index-BKm6Em_I.js                             1,227.42 kB
+out/main/chunks/google-shared-DJBRrjZZ.js                     1,527.42 kB
+out/main/chunks/image-B0i-3VoX.js                             2,001.93 kB
+✓ built in 4.45s
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 20 modules transformed.
+rendering chunks...
+out/preload/index.cjs  104.62 kB
+✓ built in 119ms
+vite v7.2.7 building client environment for production...
+transforming...
+✓ 2939 modules transformed.
+rendering chunks...
+../../apps/desktop/out/renderer/index.html                                                            0.40 kB
+../../apps/desktop/out/renderer/assets/manrope-vietnamese-700-normal-CUqMx5-1.woff2                   4.55 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-vietnamese-400-normal-BLrFBAHj.woff2            4.65 kB
+../../apps/desktop/out/renderer/assets/manrope-greek-700-normal-CHUG9PD8.woff2                        5.24 kB
+../../apps/desktop/out/renderer/assets/manrope-vietnamese-700-normal-pt65Fn2Z.woff                    6.36 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-vietnamese-400-normal-C-iWyKLC.woff             6.50 kB
+../../apps/desktop/out/renderer/assets/manrope-greek-700-normal-DyfsrCpP.woff                         6.74 kB
+../../apps/desktop/out/renderer/assets/manrope-cyrillic-700-normal-Dw_fZAg2.woff2                     7.85 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-ext-700-normal-DYOwVNan.woff2                    8.28 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-ext-400-normal-DR7lHpW4.woff2             9.05 kB
+../../apps/desktop/out/renderer/assets/manrope-cyrillic-700-normal-7JNVKxyl.woff                     10.00 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-ext-700-normal-eVCcYqtJ.woff                    11.35 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-ext-400-normal-DI-aIsWt.woff             12.55 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-400-normal-BG6hkEXj.woff2                13.46 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-700-normal-BZp_XxE4.woff2                       14.21 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-400-normal-CjyVwvJV.woff                 17.24 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-700-normal-DGRFkw-m.woff                        18.41 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-Ba7eOkfT.woff2  1,142.55 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-CN8EQoOj.woff   1,564.08 kB
+../../apps/desktop/out/renderer/assets/index-Bbbrkk4c.css                                            34.98 kB
+../../apps/desktop/out/renderer/assets/getTextureBatchBindGroup-tRNypuSI.js                           0.94 kB
+../../apps/desktop/out/renderer/assets/canvasUtils-n0VDiHlq.js                                       13.47 kB
+../../apps/desktop/out/renderer/assets/getTexelRangeRects-BLUEykl2.js                                19.18 kB
+../../apps/desktop/out/renderer/assets/webworkerAll-BjpEq6VV.js                                      34.97 kB
+../../apps/desktop/out/renderer/assets/CanvasPool-DtvCoH5J.js                                        64.92 kB
+../../apps/desktop/out/renderer/assets/browserAll-N_VdCUYm.js                                       102.79 kB
+../../apps/desktop/out/renderer/assets/WebGPURenderer-BCSO2yr2.js                                   123.79 kB
+../../apps/desktop/out/renderer/assets/WebGLRenderer-1qABidro.js                                    152.19 kB
+../../apps/desktop/out/renderer/assets/RenderTargetSystem-C7kppyjz.js                               167.68 kB
+../../apps/desktop/out/renderer/assets/CanvasRenderer-B7DooQnH.js                                   281.00 kB
+../../apps/desktop/out/renderer/assets/index-oJxSfzVo.js                                          1,194.97 kB
+✓ built in 3.16s
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/e2e/m1b-player.spec.ts:13:1 › M1b minimal player renders local compiled beats and advances all four text kinds (1.3s)
+
+  1 passed (1.9s)

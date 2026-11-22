@@ -6,6 +6,7 @@ import { ConfirmFirstPage } from './pages/confirm/ConfirmFirstPage'
 import { ConfirmVisualPage } from './pages/confirm/ConfirmVisualPage'
 import { ImportPage } from './pages/import/ImportPage'
 import { LibraryPage } from './pages/library/LibraryPage'
+import { PlayerPage } from './pages/player/PlayerPage'
 import { ProductionPage } from './pages/production/ProductionPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
 import { UsagePage } from './pages/usage/UsagePage'
@@ -31,6 +32,7 @@ if (root)
 		<StrictMode>
 			<HashRouter>
 				<Routes>
+					<Route path={productionRoutes.play} element={<PlayerPage />} />
 					<Route element={<AppShell />}>
 						<Route index element={<LibraryPage />} />
 						<Route path="import" element={<ImportPage />} />

@@ -1,6 +1,8 @@
 import type { AssetRegistry } from '@novelive/format/model'
 import { Application, Sprite, Texture } from 'pixi.js'
 
+export { mountMinimalPlayer } from './minimal'
+
 type AssetId = AssetRegistry['entries'][number]['id']
 
 export interface PlayerResources {
@@ -17,16 +19,11 @@ export async function mountFixedScene(
 	scene: FixedScene,
 	resources: PlayerResources,
 ): Promise<() => void> {
-	const loadImage = async (id: AssetId) => {
-		const image = new Image()
-		image.crossOrigin = 'anonymous'
-		image.src = await resources.resolveAsset(id)
-		await image.decode()
-		return image
-	}
 	const [background, portrait] = await Promise.all([
-		loadImage(scene.background),
-		scene.sprite === undefined ? undefined : loadImage(scene.sprite),
+		loadPlayerImage(scene.background, resources),
+		scene.sprite === undefined
+			? undefined
+			: loadPlayerImage(scene.sprite, resources),
 	])
 	const app = new Application()
 	await app.init({ width: 960, height: 540, preference: 'webgl' })
@@ -52,4 +49,12 @@ export async function mountFixedScene(
 			{ removeView: true },
 			{ children: true, texture: true, textureSource: true },
 		)
+}
+
+export async function loadPlayerImage(id: AssetId, resources: PlayerResources) {
+	const image = new Image()
+	image.crossOrigin = 'anonymous'
+	image.src = await resources.resolveAsset(id)
+	await image.decode()
+	return image
 }
