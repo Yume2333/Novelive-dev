@@ -1,5 +1,6 @@
 import {
 	arr,
+	bool,
 	obj,
 	oneOf,
 	opt,
@@ -25,6 +26,7 @@ export const characterSchema = obj(
 		...entry,
 		...named,
 		aliases: arr(str()),
+		major: opt(bool()),
 		addresses: opt(arr(obj({ speakerId: entityId, name: str() }, open))),
 		identity: opt(str()),
 		personality: opt(str()),

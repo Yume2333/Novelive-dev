@@ -84,27 +84,28 @@ export const importReportSchema = obj(
 	open,
 )
 const operation = oneOf(['add', 'update', 'delete', 'none'])
+const patchFields = { op: operation, observedChapter: opt(entityId) }
 export const biblePatchSchema = arr(
 	union([
 		obj(
-			{ kind: lit('character'), op: operation, entry: characterSchema },
+			{ kind: lit('character'), ...patchFields, entry: characterSchema },
 			open,
 		),
-		obj({ kind: lit('relation'), op: operation, entry: relationSchema }, open),
-		obj({ kind: lit('location'), op: operation, entry: locationSchema }, open),
+		obj({ kind: lit('relation'), ...patchFields, entry: relationSchema }, open),
+		obj({ kind: lit('location'), ...patchFields, entry: locationSchema }, open),
 		obj(
-			{ kind: lit('timeline'), op: operation, entry: timelineEntrySchema },
+			{ kind: lit('timeline'), ...patchFields, entry: timelineEntrySchema },
 			open,
 		),
 		obj(
 			{
 				kind: lit('foreshadowing'),
-				op: operation,
+				...patchFields,
 				entry: foreshadowingEntrySchema,
 			},
 			open,
 		),
-		obj({ kind: lit('style'), op: operation, entry: styleSchema }, open),
+		obj({ kind: lit('style'), ...patchFields, entry: styleSchema }, open),
 	]),
 )
 export const glossaryPatchSchema = arr(glossaryEntrySchema)
