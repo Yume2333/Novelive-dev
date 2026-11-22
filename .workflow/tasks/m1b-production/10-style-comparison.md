@@ -1,6 +1,7 @@
 # 10: 跑三组画风参考对照
 
 **Effort:** m1b-production
+**Executor:** spine (paid calls)
 **Blocked by:** 03, 08
 **Covers:** W3
 **Task type:** spike

@@ -3,6 +3,7 @@
 **Effort:** m1a-project
 **Blocked by:** 06
 **Covers:** W4
+**Executor:** spine (paid calls)
 **Task type:** spike
 **Files:** tests/acceptance/m1a-owner-book.test.ts, .workflow/evidence/m1a/owner/
 **Read first:** `.workflow/specs/m1a-project.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。

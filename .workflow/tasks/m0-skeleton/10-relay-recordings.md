@@ -3,6 +3,7 @@
 **Effort:** m0-skeleton
 **Blocked by:** 06, 09
 **Covers:** W3
+**Executor:** spine (paid calls)
 **Files:** tests/fixtures/cassettes/, .workflow/evidence/m0/live/
 **Read first:** `.workflow/specs/m0-skeleton.md`、`.workflow/research/handoff-defaults.md` M0、`docs/architecture.md`。
 **Check:** `NL_REPLAY=record pnpm dev` → 按 W3 逐个操作三文本协议和三图片能力；保存脱敏回放及截图。

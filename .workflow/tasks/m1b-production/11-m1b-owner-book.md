@@ -1,6 +1,7 @@
 # 11: 验收所有者选书的完整制作
 
 **Effort:** m1b-production
+**Executor:** spine (paid calls)
 **Blocked by:** 09, 10, m1a-project/07
 **Covers:** W4
 **Task type:** spike
