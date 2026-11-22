@@ -291,6 +291,8 @@ test('uses a supplied character design in both costume candidate rendering and a
 			expect(audits).toHaveLength(3)
 			for (const [, prompt, , , images] of audits) {
 				expect(images).toHaveLength(2)
+				expect(prompt).toMatch(/Original image brief .*: 造型候选 \d：蓝色制服/)
+				expect(prompt).toContain('窗光')
 				expect(prompt).toContain(
 					'Image 2 is the ada character design reference.',
 				)
