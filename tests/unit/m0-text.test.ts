@@ -111,6 +111,55 @@ describe('M0 text model adapter', () => {
 		expect(fetch).toHaveBeenCalledTimes(1)
 	})
 
+	it.each(['gpt-5', 'o3', 'o4-mini'])(
+		'omits unsupported Responses reasoning effort for %s',
+		async (model) => {
+			const message = {
+				id: 'msg_fixture',
+				type: 'message',
+				role: 'assistant',
+				status: 'completed',
+				content: [{ type: 'output_text', text: 'OK', annotations: [] }],
+			}
+			const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+				const body = await new Request(input, init).json()
+				if (body.reasoning?.effort === 'none') {
+					return Response.json(
+						{ error: { code: 'invalid_value', message: 'Unsupported effort' } },
+						{ status: 400 },
+					)
+				}
+				const events = [
+					{ type: 'response.output_item.done', item: message, output_index: 0 },
+					{
+						type: 'response.completed',
+						response: {
+							id: 'resp_fixture',
+							status: 'completed',
+							output: [message],
+						},
+					},
+				]
+				return new Response(
+					events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''),
+					{ headers: { 'content-type': 'text/event-stream' } },
+				)
+			})
+			await expect(
+				testTextConnection(
+					{
+						...configured,
+						format: 'openai-responses',
+						compat: 'openai',
+						model,
+					},
+					{ fetch },
+				),
+			).resolves.toHaveProperty('usage')
+			expect(fetch).toHaveBeenCalledOnce()
+		},
+	)
+
 	it.each([
 		['header-retry', 3],
 		['temporary', 2],

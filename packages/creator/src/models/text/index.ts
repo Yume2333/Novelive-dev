@@ -143,6 +143,7 @@ export function buildTextModel(
 		input: image ? ['text', 'image'] : (entry?.input ?? ['text']),
 		cost: entry?.cost ?? cost,
 		reasoning: entry?.reasoning ?? false,
+		thinkingLevelMap: entry?.thinkingLevelMap,
 		contextWindow,
 		maxTokens: Math.min(contextWindow, entry?.maxTokens ?? 4096),
 		compat: nativeCompat ?? qwenCompat,
