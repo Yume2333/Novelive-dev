@@ -665,6 +665,14 @@ test.each([
 		conflict: true,
 	},
 	{
+		name: 'a different observation at the confirmed first chapter conflicts without existing changes',
+		firstSeen: 'c1',
+		history: [],
+		proposals: [{ observed: 'c1', value: 'Captain', history: [] }],
+		expected: [],
+		conflict: true,
+	},
+	{
 		name: 'an earlier observation cannot move a confirmed base',
 		firstSeen: 'c2',
 		history: [],
@@ -803,6 +811,31 @@ test.each(['character', 'location'] as const)(
 		else expect(entry).toHaveProperty('description', '')
 	},
 )
+
+test('an undated whole-volume proposal retains its base through a later return', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const history = [
+		{ chapterId: 'c2', field: 'identity', value: 'Captain' },
+		{ chapterId: 'c3', field: 'identity', value: 'Cartographer' },
+	]
+	const entry = {
+		...confirmed,
+		status: 'candidate',
+		id: 'new',
+		aliases: [],
+		changes: history,
+	} as const
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[{ kind: 'character', op: 'add', entry }],
+		[],
+		new Set(['c1', 'c2', 'c3']),
+	)
+	expect(result.conflicts).toEqual([])
+	expect((await readBible(project)).character).toContainEqual(entry)
+})
 
 test.each(['relation', 'character'] as const)(
 	'a %s referencing a rejected character goes to review',

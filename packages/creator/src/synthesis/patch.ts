@@ -271,6 +271,11 @@ function existingHistory(
 	const points: Point[] = changesOf(current).filter(
 		({ field }) => field === temporalField(kind),
 	)
+	const base =
+		current?.status === 'confirmed' && current.firstSeenChapter
+			? temporalPoint(kind, current, current.firstSeenChapter)
+			: undefined
+	if (base) points.unshift(base)
 	return new Map(points.map((point) => [pointKey(point), point]))
 }
 
@@ -356,6 +361,11 @@ function merge<T extends Entry>(
 	)
 	const observation = temporalPoint(kind, candidate, observedChapter)
 	const base = current && temporalPoint(kind, current)
+	const startingPoint =
+		!current && !observedChapter && candidate.firstSeenChapter
+			? temporalPoint(kind, candidate, candidate.firstSeenChapter)
+			: undefined
+	if (startingPoint) points.unshift(startingPoint)
 	if (observation?.chapterId)
 		points.push({ ...observation, baseEcho: observation.value === base?.value })
 	const unscoped =
@@ -403,6 +413,7 @@ function merge<T extends Entry>(
 		}
 	if (
 		!current &&
+		!startingPoint &&
 		temporal &&
 		observation &&
 		points.some(({ value }) => value === observation.value)
