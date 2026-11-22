@@ -1,0 +1,18 @@
+W3 Check — NL_REPLAY=record pnpm dev
+Electron used a dedicated profile and an absolute private staging cassette directory; only audited records were copied to tests/fixtures/cassettes/.
+Development defaults were applied through the Settings config command; each Test action was exercised on the Settings page.
+
+Electron live Settings: deepseek-v4.1-flash messages passed
+Electron live Settings: devin-swe-2 responses passed
+Electron live Settings: gemini-3.8-flash chat-vision passed
+Electron live Settings: gpt-image-2.6-sunburst image passed
+All three image capabilities reported success; their displayed thumbnails loaded.
+Electron live Settings: intentionally invalid key returned auth
+Relay moderation check: HTTP 200; native moderation stop = false
+The W3 moderation entry is an explicitly tagged synthetic content_filter response.
+
+Audit: 8 W3 entries, 3 text smoke entries, 3 verified sidecars; no credentials, relay host, or unapproved URLs in decoded bodies or headers.
+The probes used fixed public test prompts and inputs. No private config, ledger, or raw capture was committed.
+M0/10 ledger: 8 calls, 22455 tokens, 3 images
+
+Live screenshot: 10-w3-settings.png (relay address and key fields masked).

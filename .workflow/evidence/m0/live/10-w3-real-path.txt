@@ -1,0 +1,26 @@
+Real path — exit Electron, restart pnpm dev with the same profile and
+NL_REPLAY=strict NL_CASSETTE_DIR="$PWD/tests/fixtures/cassettes"
+
+Electron reopened the same profile: all four configured W3 slots and API key masks persisted
+Before strict replay and screenshots, live addresses and keys were replaced with offline placeholders.
+Electron strict W3: deepseek-v4.1-flash messages passed
+Electron strict W3: devin-swe-2 responses passed
+Electron strict W3: gemini-3.8-flash chat-vision passed
+Electron strict W3: gpt-image-2.6-sunburst image passed
+Electron strict W3: auth failure replayed
+Electron strict W3: moderation failure replayed
+
+Screenshots: 10-w3-reopened.png (success and three loaded thumbnails);
+10-w3-errors.png (moderation rejection).
+
+Text smoke runner, strict, without relay environment:
+strict openai-completions gemini-3.8-flash: passed; 1162 tokens
+strict openai-responses devin-swe-2: passed; 502 tokens
+strict anthropic-messages deepseek-v4.1-flash: passed; 52 tokens
+
+pnpm check:
+ Test Files  7 passed (7)
+      Tests  129 passed (129)
+
+pnpm test:e2e:
+  13 passed (10.7s)

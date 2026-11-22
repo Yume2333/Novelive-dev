@@ -380,7 +380,12 @@ export async function testTextConnection(
 				{
 					role: 'user',
 					content: [
-						{ type: 'text', text: 'Reply with just OK.' },
+						{
+							type: 'text',
+							text: options.image
+								? 'Briefly describe the attached image in one short sentence.'
+								: 'Reply with just OK.',
+						},
 						...(options.image ? [options.image] : []),
 					],
 					timestamp: Date.now(),

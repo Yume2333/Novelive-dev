@@ -43,6 +43,10 @@ describe('M0 text model adapter', () => {
 					const request = new Request(input, init)
 					const payload = await request.clone().json()
 					expect(payload.messages[0].content).toContainEqual({
+						type: 'text',
+						text: 'Briefly describe the attached image in one short sentence.',
+					})
+					expect(payload.messages[0].content).toContainEqual({
 						type: 'image_url',
 						image_url: { url: `data:image/png;base64,${profile.image.data}` },
 					})
