@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Button, Icon } from '../../components/Button'
+import { Button, Icon, Spinner } from '../../components/Button'
 import { Banner, Checkbox, Chip, Drawer, RadioGroup, Skeleton, Tooltip } from '../../components/Extended'
 import { CompactSelect, EmptyState, Field, inputStyle, SectionLabel, TextInput, textareaStyle } from '../../components/Form'
 import { Dropdown, Modal } from '../../components/Modal'
-import { Collapse, FlowRail } from '../../components/Motion'
+import { Collapse } from '../../components/Motion'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import {
@@ -253,8 +253,9 @@ function CastSilhouette({ name, expr, position, speaking, tint, onClick }: {
           transform: 'translateX(-50%)',
           background: STAGE_DIM,
           color: c,
-          padding: '3px 10px',
-          borderRadius: 'var(--radius-full)',
+          padding: '3px 8px',
+          borderRadius: 'var(--radius-sm)',
+          letterSpacing: '0.02em',
           whiteSpace: 'nowrap',
           opacity: speaking ? 1 : 0,
           transition: 'opacity 0.25s ease',
@@ -301,7 +302,7 @@ function SourcePanel({ scene, line, onJump, onAsk }: {
               <button
                 onClick={() => onAsk(p.id)}
                 className="label-caps label-caps-zh"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-on-surface-variant)', padding: '3px 8px', borderRadius: 'var(--radius-full)', background: 'var(--white-60)' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, letterSpacing: '0.02em', color: 'var(--color-on-surface-variant)', padding: '3px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--white-60)' }}
               >
                 <Icon name="auto_fix_high" size={12} /> 让 Agent 按这段修改
               </button>
@@ -980,13 +981,13 @@ export function EditorPage() {
               {/* 播放中的浮动控制 */}
               {playing ? (
                 <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8, zIndex: 5 }}>
-                  <button onClick={() => setPaused((v) => !v)} title={paused ? '继续' : '暂停'} style={{ ...dimBtn, display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 'var(--radius-full)' }}>
+                  <button onClick={() => setPaused((v) => !v)} title={paused ? '继续' : '暂停'} style={{ ...dimBtn, display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 'var(--radius-md)' }}>
                     <Icon name={paused ? 'play_arrow' : 'pause'} size={15} />
-                    <span className="label-caps label-caps-zh" style={{ fontSize: 10 }}>{paused ? '继续' : '暂停'}</span>
+                    <span className="label-caps label-caps-zh" style={{ fontSize: 10, letterSpacing: '0.02em' }}>{paused ? '继续' : '暂停'}</span>
                   </button>
-                  <button onClick={stopPlay} title="停止（Esc）" style={{ ...dimBtn, display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 'var(--radius-full)' }}>
+                  <button onClick={stopPlay} title="停止（Esc）" style={{ ...dimBtn, display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 'var(--radius-md)' }}>
                     <Icon name="stop" size={15} />
-                    <span className="label-caps label-caps-zh" style={{ fontSize: 10 }}>停止</span>
+                    <span className="label-caps label-caps-zh" style={{ fontSize: 10, letterSpacing: '0.02em' }}>停止</span>
                   </button>
                 </div>
               ) : null}
@@ -1007,11 +1008,11 @@ export function EditorPage() {
                     backdropFilter: 'blur(3px)',
                   }}
                 >
-                  <div style={{ width: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                    <span className="label-caps label-caps-zh" style={{ color: 'var(--stage-text)', fontSize: 11 }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--stage-text)' }}>
+                    <Spinner size={14} />
+                    <span className="label-caps label-caps-zh" style={{ color: 'var(--stage-text)', fontSize: 11.5, letterSpacing: '0.02em' }}>
                       {regenerating === 'bg' ? '正在重绘背景…' : '正在重绘立绘…'}
                     </span>
-                    <FlowRail active height={2} style={{ width: '100%' }} />
                   </div>
                 </div>
               ) : null}
@@ -1450,8 +1451,10 @@ export function EditorPage() {
             <TextInput value={rewriteInstr} onChange={setRewriteInstr} placeholder="例如：旁白再短一点，凛的语气更硬一些" disabled={rewriting} />
             {rewriting ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 4, animation: 'fade-in var(--dur-fast) var(--ease-out)' }}>
-                <FlowRail active height={2} />
-                <span className="ink-shimmer" style={{ fontSize: 12.5 }}>正在按指令重写本场景…</span>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--color-primary)' }}>
+                  <Spinner size={14} />
+                  <span className="ink-shimmer" style={{ fontSize: 12.5 }}>正在按指令重写本场景…</span>
+                </div>
                 <Skeleton width="88%" height={14} />
                 <Skeleton width="72%" height={14} />
                 <Skeleton width="94%" height={14} />

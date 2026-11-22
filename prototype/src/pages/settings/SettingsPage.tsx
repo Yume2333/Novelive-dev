@@ -235,7 +235,7 @@ function ImageTestResult({
             style={{
               width: 24,
               height: 36,
-              borderRadius: 'var(--radius-full)',
+              borderRadius: 'var(--radius-sm)',
               background: 'var(--color-primary-container)',
               opacity: 0.85,
             }}

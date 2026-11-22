@@ -73,7 +73,7 @@ export function ConfirmFirstPage() {
         {scenes.map((s, i) => (
           <Card key={s.title} style={{ overflow: 'hidden' }}>
             <div style={{ height: 104, background: s.art, position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 10, bottom: 8, padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--scrim)', color: 'var(--stage-text)', fontSize: 11 }}>
+              <span style={{ position: 'absolute', left: 10, bottom: 8, padding: '3px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--scrim)', color: 'var(--stage-text)', fontSize: 11, letterSpacing: '0.02em' }}>
                 场景 {i + 1}
               </span>
             </div>

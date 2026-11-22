@@ -34,23 +34,27 @@ export function Chip({ children, active, onClick }: { children: ReactNode; activ
   const style: CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    padding: '3px 10px',
-    borderRadius: 'var(--radius-full)',
+    padding: '3px 8px',
+    borderRadius: 'var(--radius-sm)',
     background: active ? 'var(--color-primary)' : 'var(--color-tertiary-fixed)',
     color: active ? 'var(--color-on-primary)' : 'var(--color-on-secondary-container)',
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: 500,
+    letterSpacing: '0.02em',
+    lineHeight: 1.35,
+    whiteSpace: 'nowrap',
     cursor: onClick ? 'pointer' : 'default',
     transition: 'all var(--dur-fast) var(--ease-out)',
   }
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className="label-caps label-caps-zh" style={style}>
+      <button type="button" onClick={onClick} style={style}>
         {children}
       </button>
     )
   }
   return (
-    <span className="label-caps label-caps-zh" style={style}>
+    <span style={style}>
       {children}
     </span>
   )
@@ -286,7 +290,7 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
               alignItems: 'center',
               gap: 8,
               padding: '7px 14px',
-              borderRadius: 'var(--radius-full)',
+              borderRadius: 'var(--radius-md)',
               background: i === current ? 'var(--color-primary)' : i < current ? 'var(--accent-wash)' : 'var(--white-50)',
               color: i === current ? 'var(--color-on-primary)' : i < current ? 'var(--color-primary)' : 'var(--color-outline)',
               border: '1px solid var(--white-60)',

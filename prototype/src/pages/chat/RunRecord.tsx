@@ -1,7 +1,6 @@
-import { Icon } from '../../components/Button'
+import { Icon, Spinner } from '../../components/Button'
 import { Drawer } from '../../components/Extended'
 import { EmptyState } from '../../components/Form'
-import { StatusBeacon } from '../../components/Motion'
 import { runRecordMock } from '../../mock/chat'
 import type { ChapterStatus } from '../../mock/types'
 import { MessageParts } from './MessageView'
@@ -83,8 +82,8 @@ export function RunRecordDrawer({
                       完成
                     </span>
                   ) : status === 'running' ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-primary)' }}>
-                      <StatusBeacon tone="active" active size={6} />
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--color-primary)' }}>
+                      <Spinner size={12} />
                       <span className="ink-shimmer">进行中</span>
                     </span>
                   ) : (

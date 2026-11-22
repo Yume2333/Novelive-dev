@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Icon } from '../../components/Button'
+import { Button, Icon, Spinner } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Tooltip } from '../../components/Extended'
 import { EmptyState, Field, SectionLabel, textareaStyle } from '../../components/Form'
 import { Dropdown, Modal } from '../../components/Modal'
-import { FlowRail } from '../../components/Motion'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import { findVisualCandidates, type CandidateImage, type CharacterCandidate, type WorkVisualCandidates } from '../../mock/confirm'
@@ -42,11 +41,11 @@ function RegenOverlay() {
         padding: 'var(--space-4)',
       }}
     >
-      <span className="ink-shimmer" style={{ fontSize: 13, fontWeight: 600 }}>
-        正在生成新候选…
-      </span>
-      <div style={{ width: 160, maxWidth: '80%' }}>
-        <FlowRail active height={2} />
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--color-primary)' }}>
+        <Spinner size={15} />
+        <span className="ink-shimmer" style={{ fontSize: 13, fontWeight: 600 }}>
+          正在生成新候选…
+        </span>
       </div>
     </div>
   )
@@ -95,12 +94,13 @@ function Thumb({ img, selected, onSelect, onPreview, version = 1, h = 180 }: {
                 position: 'absolute',
                 left: 8,
                 bottom: 8,
-                padding: '2px var(--space-2)',
-                borderRadius: 'var(--radius-full)',
+                padding: '3px 8px',
+                borderRadius: 'var(--radius-sm)',
                 background: 'var(--veil-90)',
                 color: 'var(--color-on-surface-variant)',
                 fontSize: 10,
                 fontWeight: 600,
+                letterSpacing: '0.02em',
                 border: '1px solid var(--divider)',
               }}
             >

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Button, Icon } from '../../components/Button'
+import { Button, Icon, Spinner } from '../../components/Button'
 import { Chip } from '../../components/Extended'
 import { inputStyle } from '../../components/Form'
-import { Collapse, FlowRail, InkDots, StatusBeacon } from '../../components/Motion'
+import { Collapse } from '../../components/Motion'
 import {
   confirmKindMeta,
   type ChatNode,
@@ -65,8 +65,8 @@ function ToolCard({ t, defaultOpen }: { t: ToolPart; defaultOpen?: boolean }) {
         }}
       >
         {t.status === 'running' ? (
-          <span style={{ width: 15, height: 15, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <StatusBeacon tone="active" active size={7} />
+          <span style={{ width: 15, height: 15, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--color-primary)' }}>
+            <Spinner size={14} />
           </span>
         ) : (
           <Icon
@@ -141,7 +141,6 @@ function ToolCard({ t, defaultOpen }: { t: ToolPart; defaultOpen?: boolean }) {
           </div>
         ) : null}
       </Collapse>
-      {t.status === 'running' ? <FlowRail active height={2} style={{ borderRadius: 0 }} /> : null}
     </div>
   )
 }
@@ -154,7 +153,11 @@ function SubtaskCard({ s }: { s: SubtaskPart }) {
     <div className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
       <button onClick={() => setOpen((v) => !v)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', textAlign: 'left' }}>
         <Icon name="account_tree" size={15} style={{ flexShrink: 0, color: 'var(--color-primary)' }} />
-        {s.status === 'running' ? <StatusBeacon tone="active" active size={7} /> : null}
+        {s.status === 'running' ? (
+          <span style={{ display: 'inline-flex', color: 'var(--color-primary)', flexShrink: 0 }}>
+            <Spinner size={14} />
+          </span>
+        ) : null}
         <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, color: 'var(--color-on-surface)' }}>{s.title}</span>
         <Chip>子任务</Chip>
         <span
@@ -174,7 +177,6 @@ function SubtaskCard({ s }: { s: SubtaskPart }) {
           <MessageParts parts={s.parts} nested />
         </div>
       </Collapse>
-      {s.status === 'running' ? <FlowRail active height={2} style={{ borderRadius: 0 }} /> : null}
     </div>
   )
 }
@@ -375,7 +377,8 @@ export function MessageParts({ parts, ctx, nested, streaming }: {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    padding: '10px 14px',
+                    gap: 2,
+                    padding: '9px 13px',
                     borderRadius: 'var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm)',
                     background: 'var(--white-60)',
                     border: '1px solid var(--white-80)',
@@ -383,7 +386,8 @@ export function MessageParts({ parts, ctx, nested, streaming }: {
                     animation: 'fade-up var(--dur-base) var(--ease-out)',
                   }}
                 >
-                  <InkDots size={5} />
+                  <span className="ink-shimmer" style={{ fontSize: 12.5 }}>正在组织回复</span>
+                  <span className="typing-caret" />
                 </div>
               )
             }
@@ -488,14 +492,16 @@ export function MessageRow({ node, ctx, controls, streaming }: {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            padding: '10px 14px',
+            gap: 2,
+            padding: '9px 13px',
             borderRadius: 'var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm)',
             background: 'var(--white-60)',
             border: '1px solid var(--white-80)',
             width: 'fit-content',
           }}
         >
-          <InkDots size={5} />
+          <span className="ink-shimmer" style={{ fontSize: 12.5 }}>正在组织回复</span>
+          <span className="typing-caret" />
         </div>
       ) : null}
       {controls}

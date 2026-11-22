@@ -7,7 +7,6 @@ import { EmptyState, Select, TextInput, Toggle, inputStyle, textareaStyle } from
 import { defaultWriterPresets } from '../../mock/settings'
 import { GradientCover } from '../../components/GradientCover'
 import { Dropdown, Modal } from '../../components/Modal'
-import { FlowRail, StatusBeacon } from '../../components/Motion'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import { findSeries, findVolume, findWork, works } from '../../mock/library'
@@ -23,21 +22,20 @@ function PhaseCard({ work }: { work: Work }) {
   if (work.phase === 'preview' && work.previewProgress) {
     const p = work.previewProgress
     return (
-      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)', position: 'relative', overflow: 'hidden' }}>
-        <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <StatusBeacon tone={isActive ? 'active' : 'muted'} active={isActive} size={9} />
-          当前阶段 · {p.stage}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <Icon name="auto_stories" size={22} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-2)' }}>
+              当前阶段 · {p.stage}
+            </div>
             <h3 className="headline" style={{ fontSize: 20, marginBottom: 'var(--space-3)' }}>
               已读 {p.done} / {p.total} 章
             </h3>
-            <ProgressBar value={p.done / p.total} active={isActive} />
+            <ProgressBar value={p.done / p.total} height={6} active={isActive} />
           </div>
           {pos > 0 ? <Chip>排在第 {pos + 1} 位</Chip> : isActive ? <Chip active>正在处理</Chip> : <Chip>已停止</Chip>}
         </div>
-        <FlowRail active={isActive} height={2} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, borderRadius: 0 }} />
       </Card>
     )
   }
@@ -69,9 +67,9 @@ function PhaseCard({ work }: { work: Work }) {
     const attention = work.chapters.filter((c) => c.issue).length
     const doneCount = work.chapters.filter((c) => c.status === 'published').length
     return (
-      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)', position: 'relative', overflow: 'hidden' }}>
+      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <StatusBeacon tone={isActive ? 'active' : 'muted'} active={isActive} size={9} />
+          <Icon name="conveyor_belt" size={22} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 220 }}>
             <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-2)' }}>
               制作中{isActive ? ' · 正在制作' : pos === 0 ? ' · 已停止' : pos > 0 ? ` · 排在第 ${pos + 1} 位` : ' · 未在队列'}
@@ -81,7 +79,7 @@ function PhaseCard({ work }: { work: Work }) {
               {current?.step ? <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>（{current.step}）</span> : null}
             </h3>
             <div style={{ marginTop: 'var(--space-3)', maxWidth: 280 }}>
-              <ProgressBar value={doneCount / Math.max(1, work.chapters.length)} height={4} active={isActive} />
+              <ProgressBar value={doneCount / Math.max(1, work.chapters.length)} height={6} active={isActive} />
             </div>
             {attention ? (
               <p style={{ marginTop: 'var(--space-2)', fontSize: 12, color: 'var(--color-on-error-container)' }}>{attention} 章需要处理</p>
@@ -91,7 +89,6 @@ function PhaseCard({ work }: { work: Work }) {
             打开制作面板
           </Button>
         </div>
-        <FlowRail active={isActive} height={2} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, borderRadius: 0 }} />
       </Card>
     )
   }
@@ -359,7 +356,7 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
             color: 'var(--color-success)',
             background: 'var(--color-success-container)',
             padding: '2px var(--space-2)',
-            borderRadius: 'var(--radius-full)',
+            borderRadius: 'var(--radius-sm)',
             opacity: savedVisible ? 1 : 0,
             transform: savedVisible ? 'translateY(0)' : 'translateY(-2px)',
             transition: 'opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out)',

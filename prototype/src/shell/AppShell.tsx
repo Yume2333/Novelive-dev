@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-route
 import { Button, Icon } from '../components/Button'
 import { Drawer } from '../components/Extended'
 import { Dropdown } from '../components/Modal'
-import { StatusBeacon, usePresence } from '../components/Motion'
+import { usePresence } from '../components/Motion'
 import { findSeries, findVolume, findWork, works } from '../mock/library'
 import { globalStatusMeta, useProduction } from '../mock/production'
 import type { Work } from '../mock/types'
@@ -165,7 +165,7 @@ function WorkSection({ work, inside }: { work: Work; inside: boolean }) {
 
 /** 侧边栏底部：全局制作状态，点开看队列 */
 function GlobalStatus({ onOpen }: { onOpen: () => void }) {
-  const { status, running, queue, waitingConfirm } = useProduction()
+  const { status, queue, waitingConfirm } = useProduction()
   const meta = globalStatusMeta[status]
   const head = queue[0]
   const producingChapter = head?.chapters.find((c) => c.status === 'producing')
@@ -179,7 +179,7 @@ function GlobalStatus({ onOpen }: { onOpen: () => void }) {
         : status === 'stopped'
           ? `${queue.length} 部作品在排队`
           : '没有排队的作品'
-  const beaconTone = status === 'producing' ? 'active' : status === 'confirm' ? 'warning' : 'muted'
+  const iconColor = status === 'confirm' ? 'var(--color-on-error-container)' : status === 'producing' ? 'var(--color-primary)' : 'var(--color-outline)'
   return (
     <button
       type="button"
@@ -187,15 +187,13 @@ function GlobalStatus({ onOpen }: { onOpen: () => void }) {
       className="glass-panel"
       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px var(--space-3)', borderRadius: 'var(--radius-lg)', textAlign: 'left' }}
     >
-      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, flexShrink: 0 }}>
-        <StatusBeacon tone={beaconTone} active={running && status === 'producing'} size={8} />
-      </span>
+      <Icon name={meta.icon} size={18} style={{ color: iconColor, flexShrink: 0 }} />
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>{meta.label}</span>
         <span style={{ display: 'block', fontSize: 11, color: 'var(--color-outline)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{detail}</span>
       </span>
       {status !== 'confirm' && waitingConfirm.length ? (
-        <span title="等你确认" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 'var(--radius-full)', background: 'var(--color-error-container)', color: 'var(--color-on-error-container)', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span title="等你确认" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 'var(--radius-sm)', background: 'var(--color-error-container)', color: 'var(--color-on-error-container)', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {waitingConfirm.length}
         </span>
       ) : null}

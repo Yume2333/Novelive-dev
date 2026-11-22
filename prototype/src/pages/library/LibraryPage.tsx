@@ -15,7 +15,7 @@ import type { Work } from '../../mock/types'
 function statusLine(w: Work): { text: string; icon: string } {
   switch (w.phase) {
     case 'preview':
-      return { text: '全书预览中', icon: 'autorenew' }
+      return { text: '全书预览中', icon: 'auto_stories' }
     case 'confirm-visual':
       return { text: '等你确认角色设定', icon: 'palette' }
     case 'confirm-first':
@@ -23,7 +23,7 @@ function statusLine(w: Work): { text: string; icon: string } {
     case 'producing': {
       const published = w.chapters.filter((c) => c.status === 'published').length
       const attention = w.chapters.filter((c) => c.issue).length
-      return { text: `已发布 ${published}/${w.chapters.length} 章${attention ? ` · ${attention} 需处理` : ''}`, icon: 'autorenew' }
+      return { text: `已发布 ${published}/${w.chapters.length} 章${attention ? ` · ${attention} 需处理` : ''}`, icon: 'conveyor_belt' }
     }
     case 'done':
       return { text: `全部 ${w.chapters.length} 章已发布`, icon: 'check_circle' }
@@ -40,91 +40,77 @@ const lineColor: Partial<Record<Work['phase'], string>> = {
 
 // ---- 封面 + 信息的作品卡 ----
 
-function CoverBox({ work, badge }: { work: Work; badge?: ReactNode }) {
+function CoverBox({ work }: { work: Work }) {
   return (
-    <div style={{ position: 'relative', padding: 'var(--space-3)', paddingBottom: 0 }}>
-      <div
-        className="cover-tilt"
-        style={{
-          aspectRatio: '3 / 4',
-          borderRadius: 'var(--radius-md)',
-          overflow: 'hidden',
-          border: '1px solid var(--white-40)',
-          boxShadow: 'var(--shadow-glass)',
-        }}
-      >
-        <GradientCover work={work} />
-      </div>
-      {badge ? <div style={{ position: 'absolute', top: 20, right: 20 }}>{badge}</div> : null}
+    <div
+      className="cover-tilt"
+      style={{
+        width: 88,
+        aspectRatio: '3 / 4',
+        flexShrink: 0,
+        borderRadius: 'var(--radius-md)',
+        overflow: 'hidden',
+        border: '1px solid var(--white-40)',
+        boxShadow: 'var(--shadow-glass)',
+      }}
+    >
+      <GradientCover work={work} compact />
     </div>
   )
 }
 
-function CardBody({ work, menu }: { work: Work; menu?: ReactNode }) {
+function CardBody({ work, badge, menu }: { work: Work; badge?: ReactNode; menu?: ReactNode }) {
   const line = statusLine(work)
   const attention = work.chapters.some((c) => c.issue)
   const color = attention ? 'var(--color-on-error-container)' : lineColor[work.phase] ?? 'var(--color-on-surface-variant)'
   const published = work.chapters.filter((c) => c.status === 'published').length
   const producing = work.chapters.find((c) => c.status === 'producing')
   return (
-    <div style={{ padding: 'var(--space-3) var(--space-4) var(--space-4)', display: 'flex', flexDirection: 'column', flex: 1 }}>
+    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '2px 4px 2px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
         <div style={{ minWidth: 0 }}>
-          <h4 className="headline" style={{ fontSize: 16, marginBottom: 2 }}>{work.title}</h4>
+          <h4 className="headline" style={{ fontSize: 16, marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {work.title}
+          </h4>
           <p style={{ fontSize: 12, color: 'var(--color-on-surface-variant)' }}>{work.author}</p>
         </div>
-        {menu}
+        {badge || menu ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', flexShrink: 0 }}>
+            {badge}
+            {menu}
+          </div>
+        ) : null}
       </div>
-      <div style={{ marginTop: 'auto', paddingTop: 'var(--space-4)' }}>
-        <span
-          className="label-caps label-caps-zh"
-          style={{ display: 'flex', alignItems: 'center', gap: 6, color, fontSize: 11 }}
-        >
-          {work.phase === 'preview' || work.phase === 'producing' ? (
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: 'var(--radius-full)',
-                background: attention ? 'var(--color-on-error-container)' : 'var(--color-primary)',
-                flexShrink: 0,
-                animation: 'soft-pulse var(--dur-breath, 2200ms) var(--ease-in-out, ease-in-out) infinite alternate',
-              }}
-            />
-          ) : (
-            <Icon name={line.icon} size={14} />
-          )}
+      <div style={{ marginTop: 'auto', paddingTop: 'var(--space-3)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, color, fontSize: 12, fontWeight: 500 }}>
+          <Icon name={attention ? 'error' : line.icon} size={14} />
           {line.text}
         </span>
         {work.phase === 'producing' ? (
-          <div style={{ marginTop: 'var(--space-3)' }}>
-            <ProgressBar value={work.chapters.length ? published / work.chapters.length : 0} height={4} />
+          <div style={{ marginTop: 'var(--space-2)' }}>
+            <ProgressBar value={work.chapters.length ? published / work.chapters.length : 0} height={5} active />
             {producing?.step ? (
-              <div className="label-caps label-caps-zh" style={{ marginTop: 'var(--space-2)', fontSize: 10, color: 'var(--color-outline)' }}>
+              <div style={{ marginTop: 'var(--space-2)', fontSize: 11, color: 'var(--color-outline)' }}>
                 第 {producing.index} 章 · {producing.step}
               </div>
             ) : null}
           </div>
         ) : null}
         {work.phase === 'preview' && work.previewProgress ? (
-          <div style={{ marginTop: 'var(--space-3)' }}>
-            <ProgressBar value={work.previewProgress.done / work.previewProgress.total} height={4} />
-            <div className="label-caps label-caps-zh" style={{ marginTop: 'var(--space-2)', fontSize: 10, color: 'var(--color-outline)' }}>
+          <div style={{ marginTop: 'var(--space-2)' }}>
+            <ProgressBar value={work.previewProgress.done / work.previewProgress.total} height={5} active />
+            <div style={{ marginTop: 'var(--space-2)', fontSize: 11, color: 'var(--color-outline)' }}>
               {work.previewProgress.done}/{work.previewProgress.total} 章
             </div>
           </div>
         ) : null}
         {work.reading && work.phase !== 'producing' ? (
-          <div style={{ marginTop: 'var(--space-3)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }} className="label-caps label-caps-zh">
-              <span style={{ color: 'var(--color-on-surface-variant)', fontSize: 11 }}>
-                读到第 {work.reading.chapter} 章
-              </span>
-              <span style={{ color: 'var(--color-primary)', fontSize: 11 }}>
-                {Math.round(work.reading.progress * 100)}%
-              </span>
-            </div>
+          <div style={{ marginTop: 'var(--space-2)' }}>
             <ProgressBar value={work.reading.progress} height={5} />
+            <div style={{ marginTop: 'var(--space-2)', display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-outline)' }}>
+              <span>读到第 {work.reading.chapter} 章</span>
+              <span style={{ color: 'var(--color-primary)', fontWeight: 500 }}>{Math.round(work.reading.progress * 100)}%</span>
+            </div>
           </div>
         ) : null}
       </div>
@@ -141,8 +127,16 @@ const menuBtn = (
   </button>
 )
 
-const cardGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-5)' }
+const cardGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 'var(--space-4)' }
 
+const cardStyle = {
+  display: 'flex',
+  alignItems: 'stretch',
+  padding: 'var(--space-3)',
+  gap: 'var(--space-4)',
+  borderRadius: 'var(--radius-xl)',
+  cursor: 'pointer',
+} as const
 // ---- 导入作品包时的检查弹窗（同一作品的新版本 → 替换） ----
 
 interface ImportedPackage { title: string; author: string; version: number; sameId: string | null }
@@ -311,8 +305,9 @@ export function LibraryPage() {
                 </div>
                 <div style={cardGrid}>
                   {ws.map((w) => (
-                    <Card key={w.id} style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }} onClick={() => navigate(`/work/${w.id}`)}>
-                      <CoverBox
+                    <Card key={w.id} style={cardStyle} onClick={() => navigate(`/work/${w.id}`)}>
+                      <CoverBox work={w} />
+                      <CardBody
                         work={w}
                         badge={
                           w.phase === 'confirm-visual' ? <Chip active>确认点 1</Chip>
@@ -320,7 +315,6 @@ export function LibraryPage() {
                           : undefined
                         }
                       />
-                      <CardBody work={w} />
                     </Card>
                   ))}
                 </div>
@@ -331,26 +325,11 @@ export function LibraryPage() {
       ) : (
         <div style={cardGrid}>
           {imported.map((w) => (
-            <Card key={w.id} style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }} onClick={() => navigate(`/work/${w.id}`)}>
-              <CoverBox
-                work={w}
-                badge={
-                  <span
-                    className="label-caps"
-                    style={{
-                      padding: '4px 9px',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'var(--veil-90)',
-                      color: 'var(--color-primary)',
-                      fontSize: 10,
-                    }}
-                  >
-                    v{w.version}
-                  </span>
-                }
-              />
+            <Card key={w.id} style={cardStyle} onClick={() => navigate(`/work/${w.id}`)}>
+              <CoverBox work={w} />
               <CardBody
                 work={w}
+                badge={<Chip>v{w.version}</Chip>}
                 menu={
                   <Dropdown
                     trigger={menuBtn}

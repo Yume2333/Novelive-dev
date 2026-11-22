@@ -69,7 +69,7 @@ export function useProduction() {
 
 export const globalStatusMeta: Record<GlobalStatus, { label: string; icon: string }> = {
   idle: { label: '空闲', icon: 'bedtime' },
-  producing: { label: '制作中', icon: 'autorenew' },
+  producing: { label: '制作中', icon: 'conveyor_belt' },
   stopped: { label: '已停止', icon: 'stop_circle' },
   confirm: { label: '待确认', icon: 'pending_actions' },
 }

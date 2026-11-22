@@ -211,7 +211,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
     rerender()
   }
 
-  /** 演示回复：思考计时 → 工具卡（流光运行→完成）→ InkDots 停顿 → 正文逐字出现 → 确认卡 */
+  /** 演示回复：思考计时 → 工具卡（运行→完成）→ 组织回复 → 正文逐字出现 → 确认卡 */
   const runReply = (userNode: ChatNode) => {
     const steps = agentReplySteps(work.title, attached)
     const reply = appendNode(userNode.id, 'agent', [{ ...steps.thinking, active: true, seconds: 0.1 }])

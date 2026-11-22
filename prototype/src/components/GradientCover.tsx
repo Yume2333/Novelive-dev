@@ -26,7 +26,7 @@ const coverInk = {
 }
 
 // 纯 CSS 的书籍封面：渐变底 + 书脊 + 纸面高光 + motif 图标，避免位图素材
-export function GradientCover({ work, style }: { work: Work; style?: CSSProperties }) {
+export function GradientCover({ work, compact, style }: { work: Work; compact?: boolean; style?: CSSProperties }) {
   return (
     <div
       style={{
@@ -43,8 +43,8 @@ export function GradientCover({ work, style }: { work: Work; style?: CSSProperti
       }}
     >
       {/* 书脊：左侧压暗条 + 装订高光线 */}
-      <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 14, background: coverInk.spineShade }} />
-      <div style={{ position: 'absolute', top: 0, bottom: 0, left: 14, width: 1.5, background: coverInk.spineLine }} />
+      <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: compact ? 8 : 14, background: coverInk.spineShade }} />
+      <div style={{ position: 'absolute', top: 0, bottom: 0, left: compact ? 8 : 14, width: compact ? 1 : 1.5, background: coverInk.spineLine }} />
       {/* 纸面光泽 */}
       <div
         style={{
@@ -57,7 +57,7 @@ export function GradientCover({ work, style }: { work: Work; style?: CSSProperti
       <div
         style={{
           position: 'relative',
-          margin: '12% 14% 12% calc(14% + 8px)',
+          margin: compact ? '10% 10% 10% calc(10% + 5px)' : '12% 14% 12% calc(14% + 8px)',
           flex: 1,
           alignSelf: 'stretch',
           border: `1px solid ${coverInk.frame}`,
@@ -66,27 +66,31 @@ export function GradientCover({ work, style }: { work: Work; style?: CSSProperti
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 12,
-          padding: 12,
+          gap: compact ? 0 : 12,
+          padding: compact ? 6 : 12,
         }}
       >
-        <Icon name={motifIcon[work.coverMotif]} size={34} style={{ color: coverInk.motif }} />
-        <div
-          style={{
-            color: coverInk.title,
-            fontFamily: 'var(--font-display)',
-            fontSize: 16,
-            fontWeight: 600,
-            letterSpacing: '0.3em',
-            marginRight: '-0.3em',
-            textAlign: 'center',
-            lineHeight: 1.6,
-            textShadow: coverInk.titleShadow,
-          }}
-        >
-          {work.title}
-        </div>
-        <div style={{ color: coverInk.author, fontSize: 10, letterSpacing: '0.25em' }}>{work.author}</div>
+        <Icon name={motifIcon[work.coverMotif]} size={compact ? 24 : 34} style={{ color: coverInk.motif }} />
+        {!compact ? (
+          <>
+            <div
+              style={{
+                color: coverInk.title,
+                fontFamily: 'var(--font-display)',
+                fontSize: 16,
+                fontWeight: 600,
+                letterSpacing: '0.3em',
+                marginRight: '-0.3em',
+                textAlign: 'center',
+                lineHeight: 1.6,
+                textShadow: coverInk.titleShadow,
+              }}
+            >
+              {work.title}
+            </div>
+            <div style={{ color: coverInk.author, fontSize: 10, letterSpacing: '0.25em' }}>{work.author}</div>
+          </>
+        ) : null}
       </div>
     </div>
   )

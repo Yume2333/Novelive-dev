@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Button, Icon } from '../../components/Button'
+import { Button, Icon, Spinner } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Chip, Drawer, Slider, Tooltip } from '../../components/Extended'
 import { EmptyState, inputStyle, SectionLabel, textareaStyle } from '../../components/Form'
 import { Modal } from '../../components/Modal'
-import { Collapse, FlowRail } from '../../components/Motion'
+import { Collapse } from '../../components/Motion'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import {
@@ -306,8 +306,10 @@ function OutfitExpressions({
                           padding: 6,
                         }}
                       >
-                        <span style={{ fontSize: 9.5, color: 'var(--color-on-surface-variant)', fontWeight: 600 }}>正在生成…</span>
-                        <FlowRail active height={2} style={{ width: '100%' }} />
+                        <span style={{ color: 'var(--color-primary)', display: 'inline-flex' }}>
+                          <Spinner size={14} />
+                        </span>
+                        <span className="ink-shimmer" style={{ fontSize: 9.5, fontWeight: 600 }}>正在生成…</span>
                       </div>
                     )}
                   </div>
@@ -643,8 +645,10 @@ function LocationCard({
               padding: '0 24%',
             }}
           >
-            <span className="label-caps label-caps-zh" style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>正在生成…</span>
-            <FlowRail active height={2} style={{ width: '100%' }} />
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--color-primary)' }}>
+              <Spinner size={14} />
+              <span className="ink-shimmer" style={{ fontSize: 11.5, fontWeight: 600 }}>正在生成…</span>
+            </div>
           </div>
         ) : null}
       </div>
@@ -750,8 +754,10 @@ function PropCard({
               padding: '0 24%',
             }}
           >
-            <span className="label-caps label-caps-zh" style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>正在生成…</span>
-            <FlowRail active height={2} style={{ width: '100%' }} />
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--color-primary)' }}>
+              <Spinner size={14} />
+              <span className="ink-shimmer" style={{ fontSize: 11.5, fontWeight: 600 }}>正在生成…</span>
+            </div>
           </div>
         ) : null}
       </div>
@@ -1305,11 +1311,12 @@ export function BiblePage() {
                                     position: 'absolute',
                                     top: 8,
                                     left: 8,
-                                    padding: '2px 8px',
-                                    borderRadius: 'var(--radius-full)',
+                                    padding: '3px 8px',
+                                    borderRadius: 'var(--radius-sm)',
                                     background: 'var(--veil-90)',
                                     color: 'var(--color-on-surface)',
                                     fontSize: 10,
+                                    letterSpacing: '0.02em',
                                   }}
                                 >
                                   {sr.source}
@@ -1462,8 +1469,10 @@ export function BiblePage() {
                     padding: '0 26%',
                   }}
                 >
-                  <span className="label-caps label-caps-zh" style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>正在生成…</span>
-                  <FlowRail active height={2} style={{ width: '100%' }} />
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--color-primary)' }}>
+                    <Spinner size={14} />
+                    <span className="ink-shimmer" style={{ fontSize: 11.5, fontWeight: 600 }}>正在生成…</span>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1520,8 +1529,10 @@ export function BiblePage() {
                     padding: '0 26%',
                   }}
                 >
-                  <span className="label-caps label-caps-zh" style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>正在生成…</span>
-                  <FlowRail active height={2} style={{ width: '100%' }} />
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--color-primary)' }}>
+                    <Spinner size={14} />
+                    <span className="ink-shimmer" style={{ fontSize: 11.5, fontWeight: 600 }}>正在生成…</span>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1582,8 +1593,10 @@ export function BiblePage() {
                     padding: '0 26%',
                   }}
                 >
-                  <span className="label-caps label-caps-zh" style={{ fontSize: 11, color: 'var(--color-on-surface-variant)' }}>正在生成…</span>
-                  <FlowRail active height={2} style={{ width: '100%' }} />
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--color-primary)' }}>
+                    <Spinner size={14} />
+                    <span className="ink-shimmer" style={{ fontSize: 11.5, fontWeight: 600 }}>正在生成…</span>
+                  </div>
                 </div>
               ) : null}
             </div>

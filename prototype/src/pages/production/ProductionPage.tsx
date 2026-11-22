@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Icon } from '../../components/Button'
+import { Button, Icon, Spinner } from '../../components/Button'
 import { Card, ChapterStatusMark, ProgressBar } from '../../components/Card'
 import { Banner, Chip, ConfirmDialog, Drawer, Tooltip } from '../../components/Extended'
 import { EmptyState } from '../../components/Form'
 import { Dropdown } from '../../components/Modal'
-import { FlowRail, StatusBeacon } from '../../components/Motion'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import { findSeries, findVolume, findWork } from '../../mock/library'
@@ -242,6 +241,7 @@ export function ProductionPage() {
   const paintingChapter = work.chapters.find((c) => c.status === 'producing' && c.step?.startsWith('出图'))
   const current = writingChapter ?? paintingChapter
   const attention = work.chapters.filter((c) => c.issue)
+  const doneCount = work.chapters.filter((c) => c.status === 'published').length
   // 出图队列概况（假数据）：等待 9 张、正在画 5 张（上限来自设置的“同时出图数”）
   const imageQueue = { waiting: 9, painting: 5 }
 
@@ -325,27 +325,28 @@ export function ProductionPage() {
       ) : null}
 
       {/* 当前状态 */}
-      <Card style={{ padding: 'var(--space-5)', marginTop: attention.length && !crashed ? 'var(--space-5)' : 0, position: 'relative', overflow: 'hidden' }}>
+      <Card style={{ padding: 'var(--space-5)', marginTop: attention.length && !crashed ? 'var(--space-5)' : 0 }}>
         {work.phase === 'preview' && work.previewProgress ? (
-          <div>
-            <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-              <StatusBeacon tone={isHead && running ? 'active' : 'muted'} active={isHead && running} size={8} />
-              当前阶段 · {work.previewProgress.stage}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+            <Icon name="auto_stories" size={22} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-2)' }}>
+                当前阶段 · {work.previewProgress.stage}
+              </div>
+              <h3 className="headline" style={{ fontSize: 20, marginBottom: 'var(--space-3)' }}>
+                已读 {work.previewProgress.done} / {work.previewProgress.total} 章
+              </h3>
+              <ProgressBar value={work.previewProgress.done / work.previewProgress.total} height={6} active={isHead && running} />
             </div>
-            <h3 className="headline" style={{ fontSize: 20, marginBottom: 'var(--space-3)' }}>
-              已读 {work.previewProgress.done} / {work.previewProgress.total} 章
-            </h3>
-            <ProgressBar value={work.previewProgress.done / work.previewProgress.total} active={isHead && running} />
+            {pos > 0 ? <Chip>排在第 {pos + 1} 位</Chip> : isHead && running ? <Chip active>正在处理</Chip> : null}
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-flex', paddingTop: 'var(--space-1)', flexShrink: 0 }}>
-              <StatusBeacon
-                tone={work.phase === 'done' ? 'success' : current && isHead && running ? 'active' : 'muted'}
-                active={!!current && isHead && running}
-                size={10}
-              />
-            </span>
+            <Icon
+              name={work.phase === 'done' ? 'check_circle' : 'conveyor_belt'}
+              size={22}
+              style={{ color: work.phase === 'done' ? 'var(--color-success)' : 'var(--color-primary)', marginTop: 'var(--space-1)', flexShrink: 0 }}
+            />
             <div style={{ flex: 1, minWidth: 220 }}>
               <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-2)' }}>当前章节</div>
               {work.phase === 'done' ? (
@@ -365,31 +366,24 @@ export function ProductionPage() {
                     </h3>
                   ) : null}
                   {paintingChapter ? (
-                    <div style={{ fontSize: 12, color: 'var(--color-outline)', marginTop: 'var(--space-1)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                      <span>出图队列：等待 {imageQueue.waiting} 张 ·</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                        <StatusBeacon tone={isHead && running ? 'active' : 'muted'} active={isHead && running} size={6} />
-                        <span className={isHead && running ? 'ink-shimmer' : undefined}>
-                          正在画 {imageQueue.painting} 张
-                        </span>
-                      </span>
+                    <div style={{ fontSize: 12, color: 'var(--color-outline)', marginTop: 'var(--space-1)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                      <Icon name="image" size={13} />
+                      <span>出图队列：等待 {imageQueue.waiting} 张 · 正在画 {imageQueue.painting} 张</span>
                     </div>
                   ) : null}
                 </div>
               ) : (
                 <h3 className="headline" style={{ fontSize: 20 }}>等待下一个章节</h3>
               )}
+              {work.phase !== 'done' ? (
+                <div style={{ marginTop: 'var(--space-3)', maxWidth: 320 }}>
+                  <ProgressBar value={doneCount / Math.max(1, work.chapters.length)} height={6} active={isHead && running} />
+                </div>
+              ) : null}
             </div>
             {pos > 0 ? <Chip>排在第 {pos + 1} 位</Chip> : isHead && running ? <Chip active>正在制作</Chip> : null}
           </div>
         )}
-        {work.phase !== 'done' ? (
-          <FlowRail
-            active={isHead && running}
-            height={2}
-            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, borderRadius: 0 }}
-          />
-        ) : null}
       </Card>
 
       {/* 章节列表（按卷分组；原型每部作品只有一卷） */}
@@ -444,9 +438,9 @@ export function ProductionPage() {
                         <div style={{ fontWeight: 600, fontSize: 14 }}>{img.label}</div>
                         <div style={{ fontSize: 12, color: 'var(--color-outline)', marginTop: 'var(--space-1)' }}>{img.kind}</div>
                         {isRedrawing ? (
-                          <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-                            <span className="ink-shimmer" style={{ fontSize: 12, fontWeight: 600 }}>重绘中…</span>
-                            <FlowRail active height={2} />
+                          <div style={{ marginTop: 'var(--space-2)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 12, fontWeight: 500, color: 'var(--color-primary)' }}>
+                            <Spinner size={13} />
+                            <span>重绘中…</span>
                           </div>
                         ) : null}
                       </div>
