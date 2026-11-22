@@ -1,0 +1,30 @@
+M1a/06 offline gate
+Base: 32ac7a7ed5c26ff485085e002d3430cfe9ad2539
+
+W1 — Project schema and separate-process SQLite reopen
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/project-schema/reopen.ts create "$schemaProject"
+Created project, saved source and hierarchy, queued preview, closed SQLite.
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/project-schema/reopen.ts reopen "$schemaProject"
+Reopened project: series/work identity and original bytes preserved.
+Chapter p0001/p0002 and queued preview preserved; SQLite integrity_check: ok.
+
+W2 — TXT boundary and script compiler suites included in full check
+$ NL_REPLAY=strict pnpm check
+Test Files  19 passed (19)
+     Tests  288 passed (288)
+
+W3 — Synthetic multi-volume TXT via the real Project API
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m1a-project.test.ts
+Test Files  1 passed (1)
+     Tests  1 passed (1)
+
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m1a-offline/run.ts "$project" create
+create: 2 volumes, 3 chapters, original and report preserved, previews, digests, skeletons, glossary and conflict review verified; 7 replay requests.
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m1a-offline/run.ts "$project" reopen
+reopen: 2 volumes, 3 chapters, original and report preserved, previews, digests, skeletons, glossary and conflict review verified; 0 replay requests.
+
+The import-to-preview handoff lacked a loader for persisted chapters and a per-volume API returning preview and synthesis artifacts together. prepareVolume now takes the opened project, volume ID and role connections, loads the ordered source paragraphs from disk and runs preview/digest before synthesis. Later volumes default to incremental synthesis. Both desktop import commands use the pipeline module without starting model work during import.
+The confirmed character remained unchanged while the proposed rename went to conflict review; a new character and two glossary terms persisted as candidates. The second volume's synthetic cassette requires the first volume's new character in its Bible context.
+
+All model responses in this gate are checked-in synthetic SSE, authored in-process without access to an upstream provider. Paid usage: 0 calls, 0 tokens, 0 images.
+W4 (owner-book comparison) is outside this gate. Independent review skipped: no fresh reviewer or isolated session launch tool available; flow-close must cover it.

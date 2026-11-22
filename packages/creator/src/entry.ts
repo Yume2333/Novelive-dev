@@ -64,11 +64,11 @@ registry.register('model.testImage', async (_payload, signal) => {
 })
 
 registry.register('import.txt', async (payload) => {
-	const { importTxtProject } = await import('./import/wizard')
+	const { importTxtProject } = await import('./project-pipeline')
 	return importTxtProject(payload)
 })
 registry.register('import.revise', async ({ projectDir, layout }) => {
-	const { reviseTxtProject } = await import('./import/wizard')
+	const { reviseTxtProject } = await import('./project-pipeline')
 	return reviseTxtProject(projectDir, layout)
 })
 
