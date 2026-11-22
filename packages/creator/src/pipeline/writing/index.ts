@@ -4,6 +4,7 @@ import {
 	compileScript,
 	type Diagnostic,
 	formatScene,
+	type Scene,
 } from '@novelive/format/script'
 import type { TextConnection } from '../../models/text'
 import {
@@ -113,6 +114,8 @@ function clean(text: string) {
 }
 
 type Writer = ReturnType<typeof writingModel>
+const rawScenes = (script: string) =>
+	script.split(/\n(?=[^\S\n]*scene(?:\s|$))/)
 function ask(model: Writer, prompt: string) {
 	if (Buffer.byteLength(prompt) > model.inputLimit)
 		throw new Error('Writer input exceeds its configured context window')
@@ -128,7 +131,7 @@ async function validate(
 	paragraphs: readonly SourceParagraph[],
 	instructions: ReturnType<typeof brief>,
 ) {
-	let chunks = text.split(/\n(?=[^\S\n]*scene(?:\s|$))/)
+	let chunks = rawScenes(text)
 	const attempts = new Map<number, number>()
 	for (;;) {
 		const compiled = compileScript(chunks.join('\n'), options)
@@ -167,7 +170,7 @@ async function validate(
 				instructions.end,
 			].join('\n'),
 		)
-		if (repair.split(/\n(?=[^\S\n]*scene(?:\s|$))/).length === 1) {
+		if (rawScenes(repair).length === 1) {
 			chunks = chunks.map((chunk, i) => (i === index ? repair : chunk))
 		}
 	}
@@ -301,6 +304,8 @@ export async function reviewChapter(
 	const speakers = [...options.script.speakers]
 	const instructions = brief(chapter, speakers)
 	const parts: string[] = []
+	const previous: Scene[] = []
+	const sceneIds: string[] = []
 	for (const { scene } of draft.scenes) {
 		const from = chapter.paragraphs.findIndex(
 			({ id }) => id === scene.source.from,
@@ -310,19 +315,25 @@ export async function reviewChapter(
 		const issues = fidelity.filter(({ paragraphId }) =>
 			paragraphs.some(({ id }) => id === paragraphId),
 		)
-		if (!issues.length && !style.length) {
-			parts.push(formatScene(scene))
-			continue
+		const script = formatScene(scene)
+		const revised =
+			issues.length || style.length
+				? await reviseScene(
+						writer,
+						instructions.end,
+						script,
+						paragraphs,
+						issues,
+						style,
+					)
+				: script
+		if (scene.id) sceneIds[previous.length] = scene.id
+		for (const [index, part] of rawScenes(revised).entries()) {
+			parts.push(part)
+			previous.push(
+				index === 0 ? scene : { ...scene, id: undefined, title: '', lines: [] },
+			)
 		}
-		const revised = await reviseScene(
-			writer,
-			instructions.end,
-			formatScene(scene),
-			paragraphs,
-			issues,
-			style,
-		)
-		parts.push(revised)
 	}
 	const output = await validate(
 		writer,
@@ -331,10 +342,8 @@ export async function reviewChapter(
 			...options.script,
 			speakers,
 			paragraphIds: chapter.paragraphs.map(({ id }) => id),
-			previous: draft.scenes.map(({ scene }) => scene),
-			sceneIds: draft.scenes.flatMap(({ scene }) =>
-				scene.id ? [scene.id] : [],
-			),
+			previous,
+			sceneIds,
 		},
 		chapter.paragraphs,
 		instructions,

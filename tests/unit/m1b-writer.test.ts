@@ -292,4 +292,31 @@ describe('M1b writer', () => {
 			expect(Buffer.byteLength(request)).toBeLessThan(2816)
 		}
 	})
+
+	test('keeps the first split scene and later draft scene IDs', async () => {
+		const input = {
+			...chapter,
+			paragraphs: [
+				...chapter.paragraphs,
+				{ id: 'p0002', text: 'The water was calm.' },
+				{ id: 'p0003', text: 'A bell rang.' },
+			],
+		}
+		const first = scene.replace('p0001', 'p0001-p0002')
+		const next = 'scene Shore\nsource p0003\n: A bell rang.'
+		const split = 'scene Shore\nsource p0002\n: The water was calm.'
+		const { options } = responses(
+			`${first}\n${next}`,
+			{ tool: 'submit_review', arguments: { issues: [issue] } },
+			{ tool: 'submit_review', arguments: { issues: [] } },
+			`${scene.replace('scene Bridge', 'scene Dusk')}\n${split}`,
+		)
+		const draft = await writeChapter(input, options)
+		const result = await reviewChapter(input, draft, options)
+		expect(result.scenes).toHaveLength(3)
+		const ids = result.scenes.map(({ scene }) => scene.id)
+		expect(ids[0]).toBe(draft.scenes[0].scene.id)
+		expect(ids[2]).toBe(draft.scenes[1].scene.id)
+		expect(new Set(ids).size).toBe(3)
+	})
 })
