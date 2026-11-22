@@ -2,7 +2,7 @@ M1a/01 — W1 project folder and SQLite
 
 $ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1a-project-schema.test.ts
  Test Files  1 passed (1)
-      Tests  5 passed (5)
+      Tests  9 passed (9)
 
 The disk tests checked versioned hierarchy and source preservation, writes and
 reopen in all six SQLite categories (task, usage, session entry tree, proposal,
@@ -16,12 +16,12 @@ $ NL_REPLAY=strict pnpm exec vitest run --exclude tests/unit/m1a-project-schema.
  Test Files  7 passed (7)
       Tests  129 passed (129)
 
-After merging origin/main at 3ea7747 (merge eadcaea):
+After merging origin/main at 3ea7747 and applying PR #15's project fixes:
 $ NL_REPLAY=strict pnpm check
-Checked 85 files in 26ms. No fixes applied.
+Checked 85 files in 28ms. No fixes applied.
 Found 1 info.
  Test Files  8 passed (8)
-      Tests  134 passed (134)
+      Tests  138 passed (138)
 
 $ export NL_REPLAY=strict
 $ pnpm exec tsx tests/fixtures/project-schema/reopen.ts create "$project"
