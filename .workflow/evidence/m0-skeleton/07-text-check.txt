@@ -1,0 +1,28 @@
+$ NL_REPLAY=strict NL_CASSETTE_DIR=tests/fixtures/text-models/synthetic/ pnpm exec vitest run tests/unit/m0-text.test.ts
+RUN  v5.1.1
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Duration  470ms (tests 56%, import 24%, transform 20%, worker 1%)
+
+$ NL_REPLAY=strict pnpm check
+$ pnpm typecheck && pnpm lint && pnpm test
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 58 files in 22ms. No fixes applied.
+ Test Files  6 passed (6)
+      Tests  115 passed (115)
+
+PR #10 adapter review follow-up:
+$ NL_REPLAY=strict NL_CASSETTE_DIR=tests/fixtures/text-models/synthetic/ pnpm exec vitest run tests/unit/m0-text.test.ts
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+
+$ NL_REPLAY=strict pnpm check
+Checked 58 files in 19ms. No fixes applied.
+ Test Files  6 passed (6)
+      Tests  120 passed (120)
+
+$ NL_REPLAY=strict NL_CASSETTE_DIR=tests/fixtures/text-models/smoke/ pnpm exec tsx tests/fixtures/text-models/smoke.ts
+strict openai-completions gemini-3.8-flash: passed; 1140 tokens
+strict openai-responses devin-swe-2: passed; 502 tokens
+strict anthropic-messages deepseek-v4.1-flash: passed; 52 tokens

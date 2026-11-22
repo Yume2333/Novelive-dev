@@ -1,0 +1,11 @@
+$ NL_REPLAY=record NL_CASSETTE_DIR=<private-staging> pnpm exec tsx tests/fixtures/text-models/smoke.ts
+record openai-completions gemini-3.8-flash: passed; 1140 tokens
+record openai-responses devin-swe-2: passed; 502 tokens
+record anthropic-messages deepseek-v4.1-flash: passed; 52 tokens
+
+Cassette audit: 3 successful terminal SSE recordings; approved headers; no relay host or API key
+
+$ NL_REPLAY=strict NL_CASSETTE_DIR=tests/fixtures/text-models/smoke/ pnpm exec tsx tests/fixtures/text-models/smoke.ts
+strict openai-completions gemini-3.8-flash: passed; 1140 tokens
+strict openai-responses devin-swe-2: passed; 502 tokens
+strict anthropic-messages deepseek-v4.1-flash: passed; 52 tokens
