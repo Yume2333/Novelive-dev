@@ -316,7 +316,9 @@ export function createTextStream(
 				const empty =
 					(result.stopReason === 'stop' || result.stopReason === 'length') &&
 					!result.content.some(
-						(part) => part.type === 'text' && part.text.trim(),
+						(part) =>
+							(part.type === 'text' && part.text.trim()) ||
+							(result.stopReason === 'length' && part.type === 'toolCall'),
 					)
 				const watchdog = idle.signal.aborted
 				if (

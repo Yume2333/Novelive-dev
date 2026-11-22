@@ -331,4 +331,51 @@ describe('M0 text model adapter', () => {
 			provider.unregister()
 		}
 	})
+
+	it('lets pi Agent reject a tool call truncated at the token limit', async () => {
+		const provider = registerFauxProvider({
+			api: 'm0-text-truncated',
+			provider: 'm0-text-truncated',
+		})
+		const execute = vi.fn(async () => ({ content: [], details: undefined }))
+		try {
+			provider.setResponses([
+				fauxAssistantMessage(fauxToolCall('check', {}), {
+					stopReason: 'length',
+				}),
+				fauxAssistantMessage('OK'),
+			])
+			const agent = new Agent({
+				streamFn: createTextStream({ streamRetries: 0 }),
+				initialState: {
+					model: provider.getModel(),
+					tools: [
+						{
+							name: 'check',
+							label: 'Check',
+							description: 'Check the supplied arguments',
+							parameters: obj({}),
+							execute,
+						},
+					],
+				},
+			})
+			await agent.prompt('Call the check tool')
+			expect(execute).not.toHaveBeenCalled()
+			expect(provider.state.callCount).toBe(2)
+			expect(agent.state.messages).toContainEqual(
+				expect.objectContaining({
+					role: 'toolResult',
+					isError: true,
+					content: [
+						expect.objectContaining({
+							text: expect.stringContaining('may be truncated'),
+						}),
+					],
+				}),
+			)
+		} finally {
+			provider.unregister()
+		}
+	})
 })
