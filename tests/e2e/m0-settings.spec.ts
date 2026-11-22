@@ -142,6 +142,52 @@ test('M0 settings saves five slots and runs recorded text and vision requests', 
 	}
 })
 
+test('M0 settings preserves a manual context limit when inheritance keeps the catalog provider', async () => {
+	const profile = await mkdtemp(join(tmpdir(), 'novelive-settings-'))
+	try {
+		const { app, page } = await launch(profile, 'text-models/smoke')
+		try {
+			await page.evaluate(
+				() =>
+					window.novelive.call('config.update', {
+						models: {
+							main: {
+								model: 'gpt-4o',
+								contextWindow: 8192,
+								inheritFast: false,
+							},
+						},
+					}).promise,
+			)
+			await page.reload()
+			const main = card(page, '主模型')
+			await main.getByRole('button', { name: '主模型', exact: true }).click()
+			const context = main.getByLabel('上下文长度')
+			await expect(context).toHaveValue('8192')
+			await page.evaluate(() => {
+				window.novelive.call = new Proxy(window.novelive.call, {
+					apply(target, receiver, args) {
+						if (args[0] === 'model.suggestContextWindow')
+							document.body.dataset.suggestedContext = 'true'
+						return Reflect.apply(target, receiver, args)
+					},
+				})
+			})
+			await main.getByRole('checkbox', { name: '同快速模型' }).check()
+			await main.getByRole('button', { name: '保存' }).click()
+			await expect(main.getByRole('status')).toHaveText('已保存')
+			await expect(context).toHaveValue('8192')
+			expect(
+				await page.locator('body').getAttribute('data-suggested-context'),
+			).toBeNull()
+		} finally {
+			await app.close()
+		}
+	} finally {
+		await rm(profile, { recursive: true, force: true })
+	}
+})
+
 test('M0 settings shows recorded image capabilities and loads their protocol thumbnails', async () => {
 	const profile = await mkdtemp(join(tmpdir(), 'novelive-settings-'))
 	try {

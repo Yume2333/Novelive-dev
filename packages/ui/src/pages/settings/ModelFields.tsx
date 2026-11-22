@@ -221,8 +221,13 @@ export function useTextFields(
 							checked={Boolean(inherited)}
 							onChange={(event) => {
 								const inheritFast = event.target.checked
+								const nextConnection = inheritFast ? fast : draft
 								change({ inheritFast })
-								suggest({ ...draft, inheritFast }, inheritFast)
+								if (
+									nextConnection.format !== connection.format ||
+									nextConnection.compat !== connection.compat
+								)
+									suggest({ ...draft, inheritFast }, inheritFast)
 							}}
 						/>{' '}
 						同快速模型
