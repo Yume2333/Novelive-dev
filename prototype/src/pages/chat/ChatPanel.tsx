@@ -3,6 +3,7 @@ import { Button, Icon } from '../../components/Button'
 import { Chip, ConfirmDialog, Tooltip } from '../../components/Extended'
 import { inputStyle, textareaStyle } from '../../components/Form'
 import { Collapse } from '../../components/Motion'
+import { OverlayScrollbar, ScrollArea } from '../../components/ScrollArea'
 import { useToast } from '../../components/Toast'
 import {
   agentReplySteps,
@@ -414,11 +415,10 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
   const summaryBar = session.compressedSummary ? <SummaryDivider text={session.compressedSummary} /> : null
 
   const messageFlow = (
-    <div
-      ref={scrollRef}
-      style={{
-        flex: 1,
-        overflow: 'auto',
+    <ScrollArea
+      viewportRef={scrollRef}
+      style={{ flex: 1, minHeight: 0 }}
+      viewportStyle={{
         padding: 'var(--space-5) var(--space-4) var(--space-3)',
         display: 'flex',
         flexDirection: 'column',
@@ -493,7 +493,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
           新会话，说点什么开始。
         </div>
       ) : null}
-    </div>
+    </ScrollArea>
   )
 
   const expandBtn = (
@@ -552,6 +552,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
 
   const composerTextarea = (
     <div
+      className="nl-scroll-host"
       style={{
         position: 'relative',
         flex: 1,
@@ -563,7 +564,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
       <textarea
         ref={inputRef}
         rows={1}
-        className="nl-input"
+        className="nl-input nl-scroll-hidden"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
@@ -599,6 +600,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
           transition: inputExpanded ? 'none' : 'height var(--dur-fast) var(--ease-out)',
         }}
       />
+      <OverlayScrollbar targetRef={inputRef} insetTop={32} insetBottom={6} insetRight={4} />
       {expandBtn}
     </div>
   )
@@ -745,7 +747,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
 
         {/* 会话列表：可展开，能改名、删除、新建 */}
         <Collapse open={listOpen}>
-          <div style={{ padding: '0 var(--space-3) var(--space-3)', display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 240, overflow: 'auto' }}>
+          <ScrollArea style={{ maxHeight: 240 }} viewportStyle={{ padding: '0 var(--space-3) var(--space-3)', display: 'flex', flexDirection: 'column', gap: 2 }}>
             {wc.sessions.map((s) => (
               <div
                 key={s.id}
@@ -809,7 +811,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
               <Icon name="add" size={14} />
               新会话
             </button>
-          </div>
+          </ScrollArea>
         </Collapse>
       </div>
 

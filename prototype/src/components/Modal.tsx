@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Icon } from './Button'
 import { IconButton } from './IconButton'
 import { usePresence } from './Motion'
+import { ScrollArea } from './ScrollArea'
 
 export function Modal({
   open,
@@ -59,7 +60,9 @@ export function Modal({
           width,
           maxWidth: '100%',
           maxHeight: '85vh',
-          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
           borderRadius: 'var(--radius-2xl)',
           background: 'var(--veil-95)',
           animation: state === 'enter' ? 'fade-up var(--dur-base) var(--ease-out) forwards' : 'fade-down-out 160ms var(--ease-out) forwards',
@@ -72,12 +75,13 @@ export function Modal({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '20px 24px 12px',
+            flexShrink: 0,
           }}
         >
           <h4 className="headline" style={{ fontSize: 18 }}>{title}</h4>
           <IconButton name="关闭" icon="close" onClick={onClose} />
         </div>
-        <div style={{ padding: '8px 24px 20px' }}>{children}</div>
+        <ScrollArea style={{ flex: 1 }} viewportStyle={{ padding: '8px 24px 20px' }}>{children}</ScrollArea>
         {footer ? (
           <div
             style={{

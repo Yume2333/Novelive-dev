@@ -4,6 +4,7 @@ import { Button, Icon } from './Button'
 import { IconButton } from './IconButton'
 import { Modal } from './Modal'
 import { usePresence } from './Motion'
+import { ScrollArea } from './ScrollArea'
 
 /* 扩展控件库 — 完整产品开发用。全部遵守 DESIGN.md：tokens 变量、三种质感、克制动效 */
 
@@ -364,7 +365,7 @@ export function Drawer({ open, title, onClose, children, width = 380 }: {
           <h4 className="headline" style={{ fontSize: 17 }}>{title}</h4>
           <IconButton name="关闭" icon="close" onClick={onClose} />
         </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: '8px 20px 20px' }}>{children}</div>
+        <ScrollArea style={{ flex: 1 }} viewportStyle={{ padding: '8px 20px 20px' }}>{children}</ScrollArea>
       </div>
     </div>,
     document.body,

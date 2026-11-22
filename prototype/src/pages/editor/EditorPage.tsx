@@ -6,6 +6,7 @@ import { CompactSelect, EmptyState, Field, inputStyle, SectionLabel, TextInput, 
 import { Dropdown, Modal } from '../../components/Modal'
 import { Collapse } from '../../components/Motion'
 import { Page } from '../../components/Page'
+import { ScrollArea } from '../../components/ScrollArea'
 import { useToast } from '../../components/Toast'
 import {
   builtinMarks,
@@ -1074,7 +1075,7 @@ export function EditorPage() {
         </div>
 
         {/* ---- 右栏：句子列表（选中句就地展开编辑）；窄屏占满，宽屏固定宽、独立滚动 ---- */}
-        <div style={twoCol ? { width: 452, flexShrink: 0, maxHeight: 'calc(100vh - 80px)', overflowY: 'auto', position: 'sticky', top: 'var(--space-5)' } : { width: '100%' }}>
+        <ScrollArea style={twoCol ? { width: 452, flexShrink: 0, maxHeight: 'calc(100vh - 80px)', position: 'sticky', top: 'var(--space-5)' } : { width: '100%' }}>
           {twoCol && srcOpen && !threeCol ? (
             <div style={{ ...panelStyle, padding: 'var(--space-4)', animation: 'fade-in var(--dur-base) var(--ease-out)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
@@ -1370,10 +1371,11 @@ export function EditorPage() {
               />
             </div>
           ) : null}
-        </div>
+        </ScrollArea>
 
         {srcOpen && twoCol && threeCol ? (
-          <aside style={{ width: 320, flexShrink: 0, position: 'sticky', top: 'var(--space-5)', ...panelStyle, padding: 'var(--space-4)', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto', animation: 'fade-in var(--dur-base) var(--ease-out)' }}>
+          <aside style={{ width: 320, flexShrink: 0, position: 'sticky', top: 'var(--space-5)', ...panelStyle, maxHeight: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'fade-in var(--dur-base) var(--ease-out)' }}>
+            <ScrollArea style={{ flex: 1 }} viewportStyle={{ padding: 'var(--space-4)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
               <SectionLabel>原文对照</SectionLabel>
               <button onClick={() => setSrcOpen(false)} title="收起" style={{ display: 'flex', padding: 4, borderRadius: 'var(--radius-full)', color: 'var(--color-on-surface-variant)' }}>
@@ -1390,6 +1392,7 @@ export function EditorPage() {
               }}
               onAsk={(pid) => { setSrcEdit(pid); setSrcInstr('') }}
             />
+            </ScrollArea>
           </aside>
         ) : null}
       </div>

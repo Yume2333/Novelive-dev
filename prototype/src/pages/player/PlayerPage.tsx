@@ -1225,7 +1225,7 @@ export function PlayerPage() {
         ? screenShell(
             <>
               {screenTitle('记录', 'log')}
-              <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div className="nl-player-scroll" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {/* 跨章记录：每章只列出已读的句，点一句跳回那一章那一句 */}
                 {playable.map((c) => {
                   const sc = scriptForChapter(work.id, c.id)
@@ -1269,7 +1269,7 @@ export function PlayerPage() {
         ? screenShell(
             <>
               {screenTitle('章节', 'chapters')}
-              <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div className="nl-player-scroll" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {work.chapters.map((c) => {
                   const isPlayable = c.status === 'published'
                   const isRead = c.index <= readThrough

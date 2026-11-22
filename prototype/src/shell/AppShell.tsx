@@ -4,6 +4,7 @@ import { Button, Icon } from '../components/Button'
 import { Drawer } from '../components/Extended'
 import { Dropdown } from '../components/Modal'
 import { usePresence } from '../components/Motion'
+import { ScrollArea } from '../components/ScrollArea'
 import { findSeries, findVolume, findWork, works } from '../mock/library'
 import { globalStatusMeta, useProduction } from '../mock/production'
 import type { Work } from '../mock/types'
@@ -348,7 +349,7 @@ export function AppShell() {
 
   // 所有页面共用一个滚动容器，换页时回到顶部
   const { pathname } = useLocation()
-  const mainRef = useRef<HTMLElement>(null)
+  const mainRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 })
   }, [pathname])
@@ -396,9 +397,10 @@ export function AppShell() {
             borderRadius: 'var(--radius-2xl)',
             display: 'flex',
             flexDirection: 'column',
-            padding: '18px var(--space-3) 14px',
-            overflow: 'auto',
-          }}>
+            overflow: 'hidden',
+          }}
+        >
+          <ScrollArea style={{ flex: 1 }} viewportStyle={{ display: 'flex', flexDirection: 'column', minHeight: '100%', padding: '18px var(--space-3) 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 12px 14px' }}>
             <img className="brand-mark-light" src="/icon/novelive-mark.svg" alt="" width={24} height={24} />
             <img className="brand-mark-dark" src="/icon/novelive-mark-dark.svg" alt="" width={24} height={24} />
@@ -418,12 +420,15 @@ export function AppShell() {
             <GlobalStatus onOpen={() => setQueueOpen(true)} />
             <ThemeSwitch />
           </div>
+          </ScrollArea>
         </aside>
 
         {/* 主区域；Agent 面板盖在右侧，不挤压页面；全屏时盖住整个主区域 */}
         <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-          <main ref={mainRef} style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
-            <Outlet />
+          <main style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
+            <ScrollArea viewportRef={mainRef} style={{ flex: 1 }}>
+              <Outlet />
+            </ScrollArea>
           </main>
 
           {chatPresence.mounted && work ? (

@@ -55,6 +55,9 @@
   --accent-border-30: rgba(24, 25, 22, 0.3);
   --accent-border-35: rgba(24, 25, 22, 0.35);
   --scrim: rgba(26, 28, 27, 0.35);
+  --scrollbar-thumb: rgba(24, 25, 22, 0.18);
+  --scrollbar-thumb-hover: rgba(24, 25, 22, 0.34);
+  --scrollbar-thumb-active: rgba(24, 25, 22, 0.48);
 
   /* 阴影 */
   --shadow-glass: 0 4px 12px rgba(0, 0, 0, 0.03);
@@ -128,6 +131,9 @@
   --accent-border-30: rgba(227, 225, 220, 0.3);
   --accent-border-35: rgba(227, 225, 220, 0.35);
   --scrim: rgba(0, 0, 0, 0.55);
+  --scrollbar-thumb: rgba(227, 225, 220, 0.18);
+  --scrollbar-thumb-hover: rgba(227, 225, 220, 0.34);
+  --scrollbar-thumb-active: rgba(227, 225, 220, 0.48);
 
   --shadow-glass: 0 4px 14px rgba(0, 0, 0, 0.35);
   /* 小组件阴影：暗色下用更重的黑影，层次和亮色一致 */
