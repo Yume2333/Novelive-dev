@@ -7,5 +7,7 @@
 **Read first:** `.workflow/specs/m0-skeleton.md`、`.workflow/research/handoff-defaults.md` M0、`docs/architecture.md`。
 **Check:** `NL_REPLAY=strict pnpm test:e2e --grep 'M0 settings'` → 真实窗口保存设置、显示各模型测试结果、缩略图、取消和重启状态。
 
+**付费调用：** 只由协调者在交接中明确指定的串行主线会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
+
 - [ ] 按原型完成五槽、界面/工程/关于与警告横幅；配置损坏可备份重置。
 - [ ] 接入模型命令、宿主事件、错误映射和测试状态。
