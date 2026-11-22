@@ -1,0 +1,22 @@
+PR #18 review regressions, reproduced before each implementation change:
+
+FAIL compares both byte orders before selecting BOM-less utf-16be
+AssertionError: expected 'utf-16le' to be 'utf-16be' // Object.is equality
+Tests 1 failed | 1 passed | 23 skipped (25)
+
+FAIL reports skipped and reversed numbering for Chapter 1 / Ch. 1 / 第壹章 / 第壹拾章 / 第壹佰章 / 第壹仟章
+FAIL reports skipped and reversed volume numbering for 第壹卷 / Volume 1
+AssertionError: expected [] to have a length of 2 but got +0
+Tests 8 failed | 2 passed | 25 skipped (35)
+
+Final code, NL_REPLAY=strict pnpm exec vitest run tests/unit/m1a-txt.test.ts:
+Test Files  1 passed (1)
+Tests  38 passed (38)
+Start at  20:56:30
+Duration  243ms (transform 47%, tests 34%, import 17%, worker 2%)
+
+Final code, NL_REPLAY=strict pnpm test:
+Test Files  9 passed (9)
+Tests  176 passed (176)
+Start at  20:56:30
+Duration  8.32s (tests 94%, import 5%, transform 1%)

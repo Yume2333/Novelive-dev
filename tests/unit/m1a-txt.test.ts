@@ -202,6 +202,55 @@ test('volume titles do not require a space before their subtitle', () => {
 	).toEqual(['第一卷风起', '第二卷风止'])
 })
 
+test.each([
+	['Chapter 1', 'Chapter 3', 'Chapter 2'],
+	['Ch. 1', 'Ch. 3', 'Ch. 2'],
+	['第壹章', '第叁章', '第贰章'],
+	['第壹拾章', '第壹拾贰章', '第壹拾壹章'],
+	['第壹佰章', '第壹佰零贰章', '第壹佰零壹章'],
+	['第壹仟章', '第壹仟零贰章', '第壹仟零壹章'],
+	['第１章', '第３章', '第２章'],
+	['第二〇章', '第二二章', '第二一章'],
+])('reports skipped and reversed numbering for %s', (...titles) => {
+	const result = parseTxt(titles.map((title) => `${title}\n正文`).join('\n'))
+	expect(
+		result.findings.filter((finding) => finding.code === 'chapter-sequence'),
+	).toHaveLength(2)
+})
+
+test.each([
+	['第壹卷', '第叁卷', '第贰卷'],
+	['Volume 1', 'Volume 3', 'Volume 2'],
+])('reports skipped and reversed volume numbering for %s', (...titles) => {
+	const rules = [
+		...headingRules,
+		{
+			name: 'english-volume',
+			pattern: /^Volume \d+$/,
+			kind: 'volume' as const,
+			example: 'Volume 1',
+			enable: true,
+		},
+	]
+	const result = parseTxt(
+		titles.map((title) => `${title}\n第一章\n正文`).join('\n'),
+		{ rules },
+	)
+	expect(
+		result.findings.filter((finding) => finding.code === 'volume-sequence'),
+	).toHaveLength(2)
+})
+
+test.each([
+	['Chapter 1', 'Chapter 2', 'Chapter 3'],
+	['第壹拾玖章', '第二〇章', '第贰拾壹章'],
+	['第玖拾玖章', '第壹佰章', '第壹佰零壹章'],
+])('does not flag consecutive numbering for %s', (...titles) => {
+	expect(
+		parseTxt(titles.map((title) => `${title}\n正文`).join('\n')).findings,
+	).toEqual([])
+})
+
 test('BOM-less UTF-16 can be sniffed from Chinese punctuation without ASCII', () => {
 	const text = '她推开了门。风吹过山林，她说我们回家。'
 	const le = Buffer.from(text, 'utf16le')

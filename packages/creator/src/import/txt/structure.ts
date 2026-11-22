@@ -91,18 +91,51 @@ const annotation =
 	/^(?:[【[]?(?:注释|注釋|脚注|腳註|附注|附註|版权|版權|著作权|著作權|译者注|譯者註|作者注|注\s*[:：]|註\s*[:：])|[①②③④⑤⑥⑦⑧⑨⑩]|\[\d+\]\s)/
 
 function ordinal(title: string) {
-	const token = title.match(
-		/^(?:第\s*)?([0-9０-９零〇一二三四五六七八九十百千万两兩]+)(?:\s*[章回节節折卷部本]|[.、:：\s]|$)/,
-	)?.[1]
+	const token =
+		title.match(/^(?:chapter|ch\.|volume)\s+(\d+)\b/i)?.[1] ??
+		title.match(
+			new RegExp(
+				`^(?:第\\s*)?(${number})(?:\\s*[章回节節折卷部本]|[.、:：\\s]|$)`,
+			),
+		)?.[1]
 	if (!token) return
-	const normalized = token.replace(/[０-９]/g, (digit) =>
-		String(digit.charCodeAt(0) - 0xff10),
-	)
+	const normalized = token
+		.replace(/[０-９]/g, (digit) => String(digit.charCodeAt(0) - 0xff10))
+		.replace(
+			/[零〇兩两壹贰叁肆伍陆柒捌玖拾佰仟]/g,
+			(char) =>
+				(
+					({
+						零: '〇',
+						〇: '〇',
+						兩: '二',
+						两: '二',
+						壹: '一',
+						贰: '二',
+						叁: '三',
+						肆: '四',
+						伍: '五',
+						陆: '六',
+						柒: '七',
+						捌: '八',
+						玖: '九',
+						拾: '十',
+						佰: '百',
+						仟: '千',
+					}) as Record<string, string>
+				)[char],
+		)
 	if (/^\d+$/.test(normalized)) return Number(normalized)
+	if (/^[〇一二三四五六七八九]+$/.test(normalized))
+		return Number(
+			[...normalized]
+				.map((char) => '〇一二三四五六七八九'.indexOf(char))
+				.join(''),
+		)
 	let total = 0
 	let section = 0
 	let digit = 0
-	for (const char of token) {
+	for (const char of normalized) {
 		const unit = (
 			{ 十: 10, 百: 100, 千: 1000, 万: 10000 } as Record<string, number>
 		)[char]
