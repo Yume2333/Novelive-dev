@@ -53,6 +53,8 @@ export function connectDevBridge({
 			for (const call of pending.values()) call.reject(disconnected)
 			pending.clear()
 			emit('creator.down', { generation: previous.generation })
+		} else if (previous.creator === 'starting' && next.creator === 'failed') {
+			emit('creator.down', { generation: next.generation })
 		}
 		if (
 			next.creator === 'ready' &&
