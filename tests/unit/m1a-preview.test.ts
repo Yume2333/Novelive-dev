@@ -1,0 +1,192 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { previewBook, splitChapter } from '../../packages/creator/src/preview'
+import { Project } from '../../packages/creator/src/project'
+import { createReplayFetch } from '../../packages/creator/src/replay'
+import { projectFiles } from '../../packages/format/src/model'
+import { chapters, connection } from '../fixtures/cassettes/m1a-preview/fixture'
+
+let directory: string
+let root: string
+const cassetteDirectory = 'tests/fixtures/cassettes/m1a-preview'
+const network = vi.fn<typeof globalThis.fetch>(async () => {
+	throw new Error('Network forbidden')
+})
+const replay = () =>
+	createReplayFetch({
+		mode: 'strict',
+		directory: cassetteDirectory,
+		fetch: network,
+	})
+beforeEach(async () => {
+	directory = await mkdtemp(join(tmpdir(), 'novelive-preview-'))
+	root = join(directory, 'project')
+	using _project = await Project.create(root, {
+		formatVersion: 1,
+		seriesId: 'synthetic',
+		title: 'Paper sea',
+		volumeIds: ['v1', 'v2'],
+	})
+	network.mockClear()
+})
+afterEach(async () => {
+	await rm(directory, { recursive: true, force: true })
+})
+
+test('splits on paragraph boundaries, reads every character even in an oversized paragraph', () => {
+	for (const paragraphs of [
+		[],
+		[''],
+		['one', 'two'],
+		['x'.repeat(2001), 'end'],
+		['a😀星'.repeat(600)],
+		chapters[0].paragraphs,
+	]) {
+		const segments = splitChapter(paragraphs, 512)
+		expect(segments.every((segment) => segment.length <= 512)).toBe(true)
+		expect(segments.every((segment) => segment.isWellFormed())).toBe(true)
+		expect(segments.join('').replaceAll('\n', '')).toBe(paragraphs.join(''))
+	}
+	expect(splitChapter(['abc', 'def'], 5)).toEqual(['abc', 'def'])
+	expect(() => splitChapter(['x'], 0)).toThrow('Invalid preview budget')
+})
+
+test('strict replay covers all chapters, segments and per-volume facts on disk', async () => {
+	using project = await Project.open(root)
+	const requests: string[] = []
+	const strict = replay()
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const request = new Request(input, init)
+		requests.push(JSON.stringify(await request.clone().json()))
+		return strict(request)
+	})
+	const result = await previewBook(project, chapters, {
+		connection,
+		language: 'en',
+		fetch,
+	})
+	expect(result.previews).toHaveLength(3)
+	expect(result.digests).toHaveLength(2)
+	const inputs = requests.map(
+		(request) => JSON.parse(request).messages[0].content as string,
+	)
+	const previewInputs = inputs.filter((input) => input.includes('\nText:\n'))
+	expect(previewInputs.length).toBeGreaterThan(chapters.length)
+	const covered = previewInputs
+		.map((input) => input.split('\nText:\n')[1])
+		.join('')
+	expect(covered.replaceAll('\n', '')).toBe(
+		chapters.flatMap((chapter) => chapter.paragraphs).join(''),
+	)
+	for (const preview of result.previews)
+		expect(await project.read(projectFiles.preview(preview.chapterId))).toEqual(
+			preview,
+		)
+	const digest = JSON.parse(
+		await readFile(join(root, projectFiles.digest('v1').path), 'utf8'),
+	)
+	expect(
+		digest.characters.map((entry: { name: string }) => entry.name),
+	).toEqual(expect.arrayContaining(['Ada', 'Bo']))
+	expect(digest.locations.map((entry: { name: string }) => entry.name)).toEqual(
+		expect.arrayContaining(['Paper Harbor', 'Ink Island']),
+	)
+	expect(digest.timelineNotes.join(' ')).toContain('day three')
+	expect(digest.foreshadowingHints.join(' ')).toContain('key')
+	expect(JSON.stringify(result.digests[1])).not.toContain('Paper Harbor')
+	expect(network).not.toHaveBeenCalled()
+})
+
+test('restart reuses completed chapter files and volume digests without model calls', async () => {
+	let project = await Project.open(root)
+	const strict = replay()
+	let calls = 0
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		if (++calls >= 3) throw new Error('interrupted')
+		return strict(input, init)
+	}
+	await expect(
+		previewBook(project, chapters, { connection, language: 'en', fetch }),
+	).rejects.toThrow()
+	const first = await project.readFile(projectFiles.preview('c1').path)
+	project.close()
+	project = await Project.open(root)
+	try {
+		const resumed = vi.fn(replay())
+		await previewBook(project, chapters, {
+			connection,
+			language: 'en',
+			fetch: resumed,
+		})
+		expect(await project.readFile(projectFiles.preview('c1').path)).toEqual(
+			first,
+		)
+		expect(resumed).toHaveBeenCalled()
+		for (const [input, init] of resumed.mock.calls) {
+			const payload = await new Request(input, init).json()
+			expect(JSON.stringify(payload)).not.toContain('Ada entered Paper Harbor')
+		}
+		const unused = vi.fn(replay())
+		await previewBook(project, chapters, {
+			connection,
+			language: 'en',
+			fetch: unused,
+		})
+		expect(unused).not.toHaveBeenCalled()
+	} finally {
+		project.close()
+	}
+})
+
+test('empty input makes no calls; cancellation and strict misses do not persist unfinished chapters', async () => {
+	using project = await Project.open(root)
+	const fetch = vi.fn(replay())
+	expect(
+		await previewBook(project, [], { connection, language: 'en', fetch }),
+	).toEqual({ previews: [], digests: [] })
+	expect(fetch).not.toHaveBeenCalled()
+	await expect(
+		previewBook(project, chapters, {
+			connection,
+			language: 'en',
+			signal: AbortSignal.abort(),
+			fetch,
+		}),
+	).rejects.toMatchObject({ name: 'AbortError' })
+	await expect(
+		previewBook(
+			project,
+			[{ chapterId: 'missing', volumeId: 'v1', paragraphs: ['unrecorded'] }],
+			{ connection, language: 'en', fetch },
+		),
+	).rejects.toThrow()
+	await expect(
+		project.read(projectFiles.preview('missing')),
+	).rejects.toMatchObject({ code: 'ENOENT' })
+	expect(network).not.toHaveBeenCalled()
+})
+
+test.each(['repair', 'invalid', 'length'])(
+	'validates and repairs model JSON once: %s',
+	async (mode) => {
+		using project = await Project.open(root)
+		const fetch = vi.fn(replay())
+		const run = previewBook(project, [chapters[1]], {
+			connection: { ...connection, model: `fixture-preview-${mode}` },
+			language: 'en',
+			fetch,
+		})
+		if (mode === 'repair') {
+			expect((await run).previews[0].characters).toEqual([{ name: 'Ada' }])
+		} else {
+			await expect(run).rejects.toThrow()
+			await expect(
+				project.read(projectFiles.preview('c2')),
+			).rejects.toMatchObject({ code: 'ENOENT' })
+			expect(fetch).toHaveBeenCalledTimes(mode === 'invalid' ? 2 : 1)
+		}
+		expect(network).not.toHaveBeenCalled()
+	},
+)
