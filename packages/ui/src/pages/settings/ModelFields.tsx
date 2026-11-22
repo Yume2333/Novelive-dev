@@ -318,22 +318,12 @@ export function useImageFields(
 					placeholder="模型名"
 					onChange={(event) => change({ model: event.target.value })}
 				/>
-				<ApiKeyInput
-					value={draft.apiKey}
-					onChange={(apiKey) => change({ apiKey })}
-				/>
-				<Input
-					label="同时出图数"
-					inputMode="numeric"
-					value={draft.concurrency}
-					onChange={(event) => change({ concurrency: event.target.value })}
-				/>
-				<Input
-					label="生图失败重试次数"
-					inputMode="numeric"
-					value={draft.retries}
-					onChange={(event) => change({ retries: event.target.value })}
-				/>
+				<div className={styles.fullField}>
+					<ApiKeyInput
+						value={draft.apiKey}
+						onChange={(apiKey) => change({ apiKey })}
+					/>
+				</div>
 				<div className={styles.field}>
 					<span>生图质量</span>
 					<Select
@@ -362,32 +352,46 @@ export function useImageFields(
 						onChange={(nativeMaxEdge) => change({ nativeMaxEdge })}
 					/>
 				</div>
-				<div className={styles.field}>
-					<span>后处理</span>
-					<Select
-						label="后处理"
-						value={draft.postProcess}
-						options={[
-							['off', '关'],
-							['single', '放大降噪'],
-							['double', '双重放大降噪'],
-						]}
-						onChange={(postProcess) => change({ postProcess })}
-					/>
-				</div>
-				<div className={styles.field}>
-					<span>放大档位</span>
-					<Select
-						label="放大档位"
-						value={draft.upscaleTier}
-						disabled={draft.postProcess === 'off'}
-						options={[
-							['anime', '动漫'],
-							['fast', '快速（低性能机用，画质下降）'],
-							['detail', '保留细节（少改原画，保留纹理细节）'],
-						]}
-						onChange={(upscaleTier) => change({ upscaleTier })}
-					/>
+				<Input
+					label="同时出图数"
+					inputMode="numeric"
+					value={draft.concurrency}
+					onChange={(event) => change({ concurrency: event.target.value })}
+				/>
+				<Input
+					label="生图失败重试次数"
+					inputMode="numeric"
+					value={draft.retries}
+					onChange={(event) => change({ retries: event.target.value })}
+				/>
+				<div className={styles.postProcess}>
+					<div className={styles.field}>
+						<span>后处理</span>
+						<Select
+							label="后处理"
+							value={draft.postProcess}
+							options={[
+								['off', '关'],
+								['single', '放大降噪'],
+								['double', '双重放大降噪'],
+							]}
+							onChange={(postProcess) => change({ postProcess })}
+						/>
+					</div>
+					<div className={styles.field}>
+						<span>放大档位</span>
+						<Select
+							label="放大档位"
+							value={draft.upscaleTier}
+							disabled={draft.postProcess === 'off'}
+							options={[
+								['anime', '动漫'],
+								['fast', '快速（低性能机用，画质下降）'],
+								['detail', '保留细节（少改原画，保留纹理细节）'],
+							]}
+							onChange={(upscaleTier) => change({ upscaleTier })}
+						/>
+					</div>
 				</div>
 			</>
 		),
