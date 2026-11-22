@@ -1,7 +1,7 @@
 # 09: 接线设置页和崩溃横幅
 
 **Effort:** m0-skeleton
-**Blocked by:** 04, 05, 07, 08
+**Blocked by:** 04, 05, 07, 08, 12
 **Covers:** W2, W5
 **Files:** packages/ui/src/pages/settings/, packages/ui/src/shell/, packages/creator/src/entry.ts, tests/e2e/m0-settings.spec.ts
 **Read first:** `.workflow/specs/m0-skeleton.md`、`.workflow/research/handoff-defaults.md` M0、`docs/architecture.md`。
