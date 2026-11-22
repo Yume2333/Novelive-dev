@@ -1,0 +1,63 @@
+$ pnpm typecheck && pnpm lint && pnpm test
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 36 files in 12ms. No fixes applied.
+$ vitest run
+
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev/.workflow/worktrees/m0-04
+
+
+ Test Files  2 passed (2)
+      Tests  9 passed (9)
+   Start at  17:58:33
+   Duration  201ms (transform 54%, import 23%, tests 20%, worker 3%)
+
+$ pnpm build && playwright test --grep 'M0 library and usage'
+$ pnpm --filter @novelive/desktop build
+$ electron-vite build
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 14 modules transformed.
+rendering chunks...
+out/main/index.js     3.06 kB
+out/main/creator.js  93.99 kB
+✓ built in 222ms
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 12 modules transformed.
+rendering chunks...
+out/preload/index.cjs  91.43 kB
+✓ built in 115ms
+vite v7.2.7 building client environment for production...
+transforming...
+✓ 2155 modules transformed.
+rendering chunks...
+../../apps/desktop/out/renderer/index.html                                                            0.40 kB
+../../apps/desktop/out/renderer/assets/manrope-vietnamese-700-normal-CUqMx5-1.woff2                   4.55 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-vietnamese-400-normal-BLrFBAHj.woff2            4.65 kB
+../../apps/desktop/out/renderer/assets/manrope-greek-700-normal-CHUG9PD8.woff2                        5.24 kB
+../../apps/desktop/out/renderer/assets/manrope-vietnamese-700-normal-pt65Fn2Z.woff                    6.36 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-vietnamese-400-normal-C-iWyKLC.woff             6.50 kB
+../../apps/desktop/out/renderer/assets/manrope-greek-700-normal-DyfsrCpP.woff                         6.74 kB
+../../apps/desktop/out/renderer/assets/manrope-cyrillic-700-normal-Dw_fZAg2.woff2                     7.85 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-ext-700-normal-DYOwVNan.woff2                    8.28 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-ext-400-normal-DR7lHpW4.woff2             9.05 kB
+../../apps/desktop/out/renderer/assets/manrope-cyrillic-700-normal-7JNVKxyl.woff                     10.00 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-ext-700-normal-eVCcYqtJ.woff                    11.35 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-ext-400-normal-DI-aIsWt.woff             12.55 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-400-normal-BG6hkEXj.woff2                13.46 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-700-normal-BZp_XxE4.woff2                       14.21 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-400-normal-CjyVwvJV.woff                 17.24 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-700-normal-DGRFkw-m.woff                        18.41 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-Ba7eOkfT.woff2  1,142.55 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-CN8EQoOj.woff   1,564.08 kB
+../../apps/desktop/out/renderer/assets/index-CDDjtZlV.css                                            24.35 kB
+../../apps/desktop/out/renderer/assets/index-CK_qLqS8.js                                            714.66 kB
+✓ built in 1.29s
+
+Running 1 test using 1 worker
+
+Downloading Electron binary...
+  ✓  1 tests/e2e/m0-ui-shell.spec.ts:11:1 › M0 library and usage navigate between real empty pages and switch theme without native scrollbars (3.2s)
+
+  1 passed (3.6s)
