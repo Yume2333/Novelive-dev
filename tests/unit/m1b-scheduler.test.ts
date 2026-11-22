@@ -217,6 +217,7 @@ test('a failed chapter pauses the work until it is retried and resumes from the 
 		new ProductionTaskError('transient', 'reset'),
 		new ProductionTaskError('transient', 'reset'),
 	)
+	worker.script('review:ch2', new ProductionTaskError('transient', 'reset'))
 	worker.script(
 		'review:ch3',
 		new ProductionTaskError('final', '审稿结果无法解析'),
@@ -269,7 +270,7 @@ test('image failures fall back to placeholders but unsupported capabilities paus
 			cg('cg-a'),
 			cg('cg-b'),
 		],
-		ch2: [cg('cg-c')],
+		ch2: [cg('cg-c'), { assetId: 'hero/default', kind: 'character' }],
 	})
 	const target = open(worker)
 	target.start(workId, ['ch1', 'ch2'])
@@ -323,7 +324,17 @@ test('image failures fall back to placeholders but unsupported capabilities paus
 		phase: 'done',
 		chapters: [{}, { status: 'published' }],
 	})
-	expect(snapshot().chapters[1]?.issue).toBeUndefined()
+	expect(snapshot().chapters[1]?.issue).toBe('1 张图用了占位图')
+	expect(worker.count('draw:hero/default')).toBe(1)
+})
+
+test('a single-chapter work still stops at the first-chapter confirmation', async () => {
+	const target = open(new ScriptedWorker())
+	target.start(workId, ['ch1'])
+	target.confirmVisual(workId)
+	await target.idle()
+	expect(snapshot().phase).toBe('confirm-first')
+	expect(target.continue(workId).phase).toBe('done')
 })
 
 test('crash recovery keeps confirmed work, skips saved images and leaves a replayable run log', async () => {

@@ -1,13 +1,12 @@
 $ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-scheduler.test.ts
  RUN  v5.1.1 .
- ✓ tests/unit/m1b-scheduler.test.ts > two confirmation points gate chapter production 46ms
- ✓ tests/unit/m1b-scheduler.test.ts > writes the next chapter while images draw, dedupes assets, draws bases first within the concurrency limit 72ms
- ✓ tests/unit/m1b-scheduler.test.ts > prioritized chapters jump the chapter pipeline and link through the preview summary 23ms
- ✓ tests/unit/m1b-scheduler.test.ts > stop cancels queued work, aborts running calls, and continue reruns only what was cut off 102ms
- ✓ tests/unit/m1b-scheduler.test.ts > a failed chapter pauses the work until it is retried and resumes from the failed step 81ms
- ✓ tests/unit/m1b-scheduler.test.ts > image failures fall back to placeholders but unsupported capabilities pause the work 35ms
- ✓ tests/unit/m1b-scheduler.test.ts > crash recovery keeps confirmed work, skips saved images and leaves a replayable run log 80ms
+ ✓ tests/unit/m1b-scheduler.test.ts > two confirmation points gate chapter production 43ms
+ ✓ tests/unit/m1b-scheduler.test.ts > writes the next chapter while images draw, dedupes assets, draws bases first within the concurrency limit 73ms
+ ✓ tests/unit/m1b-scheduler.test.ts > prioritized chapters jump the chapter pipeline and link through the preview summary 21ms
+ ✓ tests/unit/m1b-scheduler.test.ts > stop cancels queued work, aborts running calls, and continue reruns only what was cut off 88ms
+ ✓ tests/unit/m1b-scheduler.test.ts > a failed chapter pauses the work until it is retried and resumes from the failed step 86ms
+ ✓ tests/unit/m1b-scheduler.test.ts > image failures fall back to placeholders but unsupported capabilities pause the work 63ms
+ ✓ tests/unit/m1b-scheduler.test.ts > a single-chapter work still stops at the first-chapter confirmation 16ms
+ ✓ tests/unit/m1b-scheduler.test.ts > crash recovery keeps confirmed work, skips saved images and leaves a replayable run log 75ms
  Test Files  1 passed (1)
-      Tests  7 passed (7)
-   Start at  21:26:25
-   Duration  584ms (tests 87%, transform 7%, import 5%, worker 1%)
+      Tests  8 passed (8)

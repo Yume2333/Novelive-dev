@@ -161,7 +161,7 @@ export class ChapterScheduler {
 
 	confirmVisual(workId: string): ProductionSnapshot {
 		if (this.pauseReason(workId) === 'confirm_visual') {
-			this.requeueWork(workId)
+			this.resumeWork(workId)
 			this.pump()
 		}
 		return this.snapshot(workId)
@@ -170,7 +170,7 @@ export class ChapterScheduler {
 	continue(workId: string): ProductionSnapshot {
 		const work = this.work(workId)
 		if (work.status === 'awaiting_confirm' && work.reason === 'confirm_first') {
-			this.requeueWork(workId)
+			this.resumeWork(workId)
 		} else if (work.status === 'paused' && work.reason !== 'chapter_failed') {
 			this.transaction(() => {
 				for (const task of this.all<{ task_id: string; ref_id: string }>(
@@ -264,7 +264,7 @@ export class ChapterScheduler {
 					chapterId,
 				)
 				if (this.pauseReason(workId) === 'chapter_failed') {
-					this.requeueWork(workId)
+					this.resumeWork(workId)
 				}
 			})
 			this.pump()
@@ -614,32 +614,40 @@ export class ChapterScheduler {
 				return
 			}
 			this.transaction(() => {
-				if (name === 'stage') {
-					for (const item of result.value) {
-						const imageTask = this.ensureImageTask(
-							task.work_id,
-							item,
-							task.ref_id,
-						)
-						this.addDep(task.task_id, imageTask, false)
-					}
-				}
+				task.attempts = 0
 				this.exec(
-					'UPDATE task SET phase = ? WHERE task_id = ?',
+					'UPDATE task SET phase = ?, attempts = 0 WHERE task_id = ?',
 					nextPhase[name],
 					task.task_id,
 				)
+				if (name !== 'stage') return
+				for (const item of result.value) {
+					const imageTask = this.ensureImageTask(
+						task.work_id,
+						item,
+						task.ref_id,
+					)
+					this.addDep(task.task_id, imageTask, false)
+					const settled = this.get<{ status: string; asset: string }>(
+						`SELECT t.status, a.status AS asset FROM task t
+						JOIN asset a ON a.work_id = t.work_id AND a.asset_key = t.ref_id WHERE t.task_id = ?`,
+						imageTask,
+					)
+					if (settled?.asset === 'placeholder') {
+						this.flagFromImage(task.task_id, task.work_id, 'placeholder')
+					} else if (settled?.status === 'needs_attention') {
+						this.flagFromImage(task.task_id, task.work_id, 'unsupported')
+					}
+				}
+				this.exec(
+					"UPDATE task SET status = 'queued', run_id = NULL WHERE task_id = ?",
+					task.task_id,
+				)
+				this.endRun(task, 'done')
+				this.inflight.delete(task.task_id)
+				this.maybePublish(task.task_id)
 			})
 		}
-		this.transaction(() => {
-			this.exec(
-				"UPDATE task SET status = 'queued', run_id = NULL WHERE task_id = ?",
-				task.task_id,
-			)
-			this.endRun(task, 'done')
-			this.inflight.delete(task.task_id)
-			this.maybePublish(task.task_id)
-		})
 	}
 
 	private async runImage(task: TaskRow) {
@@ -735,23 +743,30 @@ export class ChapterScheduler {
 			task.task_id,
 		)
 		for (const { task_id } of dependents) {
-			if (outcome !== 'drawn') {
-				this.exec(
-					`UPDATE chapter SET flagged = 1, placeholder = CASE WHEN ? = 'placeholder' THEN 1 ELSE placeholder END
-					WHERE work_id = ? AND chapter_id = (SELECT ref_id FROM task WHERE task_id = ?)`,
-					outcome,
-					task.work_id,
-					task_id,
-				)
-			}
+			this.flagFromImage(task_id, task.work_id, outcome)
 			this.maybePublish(task_id)
 		}
 		if (
 			outcome === 'unsupported' &&
-			this.pauseReason(task.work_id) !== 'chapter_failed'
+			['active', 'queued'].includes(this.work(task.work_id).status)
 		) {
 			this.setWork(task.work_id, 'paused', 'image_unsupported')
 		}
+	}
+
+	private flagFromImage(
+		chapterTaskId: string,
+		workId: string,
+		outcome: ImageJobResult['status'],
+	) {
+		if (outcome === 'drawn') return
+		this.exec(
+			`UPDATE chapter SET flagged = 1, placeholder = CASE WHEN ? = 'placeholder' THEN 1 ELSE placeholder END
+			WHERE work_id = ? AND chapter_id = (SELECT ref_id FROM task WHERE task_id = ?)`,
+			outcome,
+			workId,
+			chapterTaskId,
+		)
 	}
 
 	private failChapter(task: TaskRow, error: Error) {
@@ -798,26 +813,25 @@ export class ChapterScheduler {
 			task.ref_id,
 		)
 		const work = this.work(task.work_id)
-		if (
+		const first =
+			this.get<{ ord: number }>(
+				'SELECT MIN(ord) AS ord FROM chapter WHERE work_id = ?',
+				task.work_id,
+			)?.ord ===
+			this.get<{ ord: number }>(
+				'SELECT ord FROM chapter WHERE work_id = ? AND chapter_id = ?',
+				task.work_id,
+				task.ref_id,
+			)?.ord
+		if (first && work.status === 'active') {
+			this.setWork(task.work_id, 'awaiting_confirm', 'confirm_first')
+		} else if (
 			!this.get(
 				"SELECT 1 FROM task WHERE work_id = ? AND kind = 'chapter' AND status <> 'done'",
 				task.work_id,
 			)
 		) {
 			this.setWork(task.work_id, 'done', null)
-		} else if (
-			work.status === 'active' &&
-			this.get<{ ord: number }>(
-				'SELECT MIN(ord) AS ord FROM chapter WHERE work_id = ?',
-				task.work_id,
-			)?.ord ===
-				this.get<{ ord: number }>(
-					'SELECT ord FROM chapter WHERE work_id = ? AND chapter_id = ?',
-					task.work_id,
-					task.ref_id,
-				)?.ord
-		) {
-			this.setWork(task.work_id, 'awaiting_confirm', 'confirm_first')
 		}
 	}
 
@@ -946,6 +960,26 @@ export class ChapterScheduler {
 			dependsOn,
 			soft ? 1 : 0,
 		)
+	}
+
+	private resumeWork(workId: string) {
+		if (
+			!this.get(
+				"SELECT 1 FROM task WHERE work_id = ? AND kind = 'chapter' AND status <> 'done'",
+				workId,
+			)
+		) {
+			this.setWork(workId, 'done', null)
+		} else if (
+			this.get(
+				"SELECT 1 FROM task WHERE work_id = ? AND kind = 'image' AND status = 'needs_attention'",
+				workId,
+			)
+		) {
+			this.setWork(workId, 'paused', 'image_unsupported')
+		} else {
+			this.requeueWork(workId)
+		}
 	}
 
 	private requeueWork(workId: string) {
