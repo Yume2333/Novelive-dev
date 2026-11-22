@@ -1,0 +1,7 @@
+RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev/.workflow/worktrees/m1a-04
+
+
+ Test Files  3 passed (3)
+      Tests  41 passed (41)
+   Start at  20:51:10
+   Duration  434ms (tests 57%, transform 25%, import 17%, worker 1%)

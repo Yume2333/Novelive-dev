@@ -1,0 +1,2 @@
+Created disk project: 3 chapter previews, 2 volume digests (strict replay).
+Reopened disk project in a new process: 0 model calls; all previews and digests reused.
