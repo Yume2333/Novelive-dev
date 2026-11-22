@@ -476,6 +476,10 @@ export async function applyPatches(
 	const chapterOrder = new Map(
 		Array.from(seriesChapters, (id, index) => [id, index]),
 	)
+	const additionsFirst = [
+		...patch.filter(({ op }) => op === 'add'),
+		...patch.filter(({ op }) => op !== 'add'),
+	]
 	const conflicts: BiblePatch = []
 	const glossaryConflicts: GlossaryPatch = []
 	const pending: (() => Promise<void>)[] = []
@@ -499,7 +503,7 @@ export async function applyPatches(
 		const entries = new Map(original.map((entry) => [entry.id, entry]))
 		const histories = new Map<string, History>()
 		const changed = new Set<string>()
-		for (const item of patch) {
+		for (const item of additionsFirst) {
 			if (item.kind !== kind || item.op === 'none') continue
 			const current = entries.get(item.entry.id)
 			if (item.op === 'delete') {

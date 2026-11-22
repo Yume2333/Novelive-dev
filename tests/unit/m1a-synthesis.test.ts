@@ -494,6 +494,45 @@ test('an undated update follows the dated addition it depends on', async () => {
 	})
 })
 
+test('whole-volume dated updates apply after their new entry and keep their emission order', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const entry = {
+		id: 'guide',
+		name: 'Guide',
+		aliases: [],
+		status: 'candidate' as const,
+		firstSeenChapter: 'c1',
+		identity: 'Guide',
+	}
+	const changes = [{ chapterId: 'c2', field: 'identity', value: 'Navigator' }]
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[
+			{
+				kind: 'character',
+				op: 'update',
+				entry: { ...entry, changes, aliases: ['Zulu'] },
+			},
+			{
+				kind: 'character',
+				op: 'update',
+				entry: { ...entry, changes, aliases: ['Alpha'] },
+			},
+			{ kind: 'character', op: 'add', entry },
+		],
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toEqual([])
+	expect((await readBible(project)).character).toContainEqual({
+		...entry,
+		aliases: ['Alpha'],
+		changes,
+	})
+})
+
 test('automatic fallback streams all preview packets without truncation', async () => {
 	await seed(root, true)
 	using project = await Project.open(root)
