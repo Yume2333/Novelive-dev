@@ -255,4 +255,41 @@ describe('M1b writer', () => {
 		expect(requests[3]).not.toContain('scene Bridge')
 		expect(requests[4]).toContain('A bell rang at noon.')
 	})
+
+	test('chunks an oversized flagged scene without attaching unrelated writer context', async () => {
+		const draftText = [
+			'scene Bridge',
+			'source p0001',
+			...Array.from({ length: 4 }, (_, i) => `: Draft ${i} ${'a'.repeat(725)}`),
+		].join('\n')
+		const input = {
+			...chapter,
+			bible: 'Excluded Bible background',
+			settings: {
+				...defaultWorkSettings(),
+				fidelityReview: false,
+				styleReview: true,
+			},
+		}
+		const { options, requests } = responses(
+			draftText,
+			'{"issues":["Shorten the prose."]}',
+			': One.',
+			': Two.',
+			': Three.',
+			': Four.',
+		)
+		const draft = await writeChapter(input, options)
+		const result = await reviewChapter(input, draft, {
+			...options,
+			writer: { ...options.writer, contextWindow: 4096 },
+		})
+		expect(result.scenes[0].beats).toHaveLength(4)
+		expect(requests.slice(2)).toHaveLength(4)
+		for (const request of requests.slice(2)) {
+			expect(request).toContain('Return only its body lines')
+			expect(request).not.toContain('Excluded Bible background')
+			expect(Buffer.byteLength(request)).toBeLessThan(2816)
+		}
+	})
 })

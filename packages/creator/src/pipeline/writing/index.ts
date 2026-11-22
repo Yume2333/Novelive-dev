@@ -19,6 +19,7 @@ import {
 	reviewFidelity,
 	reviewStyle,
 	type SourceParagraph,
+	splitText,
 } from './review'
 
 export type Continuity =
@@ -313,17 +314,13 @@ export async function reviewChapter(
 			parts.push(formatScene(scene))
 			continue
 		}
-		const revised = await ask(
+		const revised = await reviseScene(
 			writer,
-			[
-				instructions.instructions,
-				'Revise this scene once. Preserve its heading, source range, and IDs for retained lines. Return exactly one scene.',
-				`Fidelity issues: ${JSON.stringify(issues)}`,
-				`Style issues (only apply those relevant to this scene): ${JSON.stringify(style)}`,
-				source(paragraphs),
-				formatScene(scene),
-				instructions.end,
-			].join('\n'),
+			instructions.end,
+			formatScene(scene),
+			paragraphs,
+			issues,
+			style,
 		)
 		parts.push(revised)
 	}
@@ -343,4 +340,74 @@ export async function reviewChapter(
 		instructions,
 	)
 	return { ...output, fidelity, style, revised: true }
+}
+
+async function reviseScene(
+	writer: Writer,
+	redLines: string,
+	script: string,
+	paragraphs: SourceParagraph[],
+	fidelity: FidelityIssue[],
+	style: string[],
+) {
+	const findings = `Fidelity issues: ${JSON.stringify(fidelity)}\nStyle issues: ${JSON.stringify(style)}`
+	const original = source(paragraphs)
+	const render = (
+		instruction: string,
+		issues: string,
+		text: string,
+		draft: string,
+	) =>
+		`${redLines}\n${instruction}\n${issues}\nSource:\n${text}\nDraft:\n${draft}${redLines}`
+	const whole = render(
+		'Revise this NVS scene once. Preserve the original source coverage and IDs for retained lines. Return only complete NVS scenes.',
+		findings,
+		original,
+		script,
+	)
+	if (Buffer.byteLength(whole) <= writer.inputLimit) return ask(writer, whole)
+
+	const instruction =
+		'Revise this fragment of an NVS scene once. Return only its body lines (no scene or source header). Preserve IDs for retained lines.'
+	const budget = Math.floor(
+		(writer.inputLimit - Buffer.byteLength(render(instruction, '', '', ''))) /
+			3,
+	)
+	if (budget < 16) throw new Error('Insufficient context for a scene revision')
+	const [heading, range, , ...lines] = script.trimEnd().split('\n')
+	const splitLines: string[] = []
+	for (const line of lines) {
+		const last = splitLines.at(-1) ?? ''
+		if (last && Buffer.byteLength(`${last}\n${line}`) <= budget)
+			splitLines[splitLines.length - 1] = `${last}\n${line}`
+		else splitLines.push(...splitText(line, budget))
+	}
+	const splitSource = splitText(original, budget)
+	const splitFindings = splitText(findings, budget)
+	const count = Math.max(
+		splitLines.length,
+		splitSource.length,
+		splitFindings.length,
+	)
+	const at = (chunks: string[], i: number) =>
+		chunks[Math.floor((i * chunks.length) / count)] ?? ''
+	const revised: string[] = []
+	for (let i = 0; i < count; i++) {
+		const repeated =
+			i > 0 &&
+			Math.floor((i * splitLines.length) / count) ===
+				Math.floor(((i - 1) * splitLines.length) / count)
+		revised.push(
+			await ask(
+				writer,
+				render(
+					instruction,
+					at(splitFindings, i),
+					at(splitSource, i),
+					repeated ? '' : at(splitLines, i),
+				),
+			),
+		)
+	}
+	return [heading, range, '', ...revised].join('\n')
 }

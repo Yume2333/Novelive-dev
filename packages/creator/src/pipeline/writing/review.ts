@@ -84,7 +84,7 @@ const tools: Tool[] = [
 	},
 ]
 
-function splitText(text: string, limit: number) {
+export function splitText(text: string, limit: number) {
 	const parts: string[] = []
 	let part = ''
 	let size = 0
