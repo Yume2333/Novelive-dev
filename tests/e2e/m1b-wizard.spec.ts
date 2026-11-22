@@ -32,6 +32,7 @@ async function launch(profile: string) {
 		env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
 	})
 	const page = await app.firstWindow()
+	await expect(page).toHaveURL(/^file:.*\/out\/renderer\/index\.html$/)
 	await expect(page.getByText('创作端已就绪')).toBeAttached()
 	return { app, page }
 }
@@ -108,6 +109,17 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 		await page.getByRole('button', { name: '导入', exact: true }).click()
 
 		await expect(page.getByRole('heading', { name: '核对导入' })).toBeVisible()
+		const root = join(projects, '风')
+		expect(await readFile(join(root, 'source/original.txt'))).toEqual(
+			await readFile(source),
+		)
+		const imported = await chapters(root)
+		expect(imported.series.volumeIds).toEqual(['v0001', 'v0002', 'v0003'])
+		expect(imported.result).toContainEqual([
+			'第一卷 风起',
+			'序章',
+			'她推开了门。\n',
+		])
 		const findings = page.getByRole('region', { name: '整理建议' })
 		await expect(findings).toContainText('第一章 再会')
 		await expect(findings).toContainText(
@@ -141,7 +153,6 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 		await page.getByRole('button', { name: '确认' }).click()
 		await expect(page.getByRole('heading', { name: '核对导入' })).toBeHidden()
 
-		const root = join(projects, '风')
 		const { series, result } = await chapters(root)
 		expect(series.volumeIds).toEqual(['v0001', 'v0002', 'v0003'])
 		expect(result).toEqual([

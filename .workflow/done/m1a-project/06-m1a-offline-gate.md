@@ -14,7 +14,8 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/integration/m1a-project.test.ts` — 1 项通过；完整 `pnpm check` 288 项通过，含 TXT 边界和剧本编译测试。
+- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/integration/m1a-project.test.ts` — 2 项通过（含中间空卷）；完整 `pnpm check` 289 项通过，含 TXT 边界和剧本编译测试。
 - Real path: 独立 CLI 进程导入合成两卷三章，首跑回放 7 次，重开 0 次；确认设定未被候选冲突覆盖。工程 schema 的独立重开保留排队任务及 SQLite 完整性。[凭据](../../evidence/m1a/offline/receipt.txt)
+- Electron: 严格回放下导入与核对向导 2 项通过；由构建后的 `file://` 页面经创作端 IPC 写盘，检查原文、章节及调整后的卷布局。
 - M1b 从 `packages/creator/src/project-pipeline` 调用 `prepareVolume(project, volumeId, options)`，从磁盘读取序列、工作及正文，返回 `previews`、`digests` 和 `synthesis`。导入本身不触发模型。无付费调用；不覆盖 W4 真书验收。
 - Review: skipped — 无可启动的独立审查代理或隔离会话，按降级规则由 flow-close 补审。
