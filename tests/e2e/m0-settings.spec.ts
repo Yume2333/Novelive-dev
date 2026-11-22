@@ -96,7 +96,13 @@ test('M0 settings saves five slots and runs recorded text and vision requests', 
 				await expect(region.getByRole('status')).toHaveText('连接成功')
 			}
 
-			await page
+			const appearance = page.getByRole('region', { name: '界面', exact: true })
+			await expect(
+				appearance
+					.getByRole('combobox', { name: '界面语言' })
+					.locator('option'),
+			).toHaveText(['简体中文'])
+			await appearance
 				.getByRole('combobox', { name: '主题', exact: true })
 				.selectOption('dark')
 			await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')

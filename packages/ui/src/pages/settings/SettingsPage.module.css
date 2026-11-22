@@ -275,6 +275,44 @@
 	border-top: 1px solid var(--divider);
 }
 
+.appearance {
+	padding-block: 2px;
+}
+
+.appearance .row {
+	gap: 14px;
+	padding: 14px 18px;
+}
+
+.appearance .row + .row {
+	position: relative;
+	border-top-color: transparent;
+}
+
+.appearance .row + .row::before {
+	position: absolute;
+	inset: -1px 18px auto;
+	height: 1px;
+	background: var(--divider);
+	content: "";
+}
+
+.appearance .row .icon {
+	color: var(--color-on-surface-variant);
+}
+
+.appearance .row select {
+	padding: 7px 10px;
+	border-color: var(--white-80);
+	background: var(--white-60);
+	font-size: 13px;
+}
+
+.appearance .row strong {
+	font-size: 13.5px;
+	font-weight: 600;
+}
+
 .row strong,
 .about .row span:nth-child(2) {
 	flex: 1;

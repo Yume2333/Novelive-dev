@@ -11,13 +11,13 @@ import {
 	Cable,
 	Check,
 	ChevronDown,
+	Contrast,
 	Eye,
 	FilePenLine,
 	FolderOpen,
 	Globe,
 	Image,
 	type LucideIcon,
-	Palette,
 	Zap,
 } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
@@ -385,7 +385,7 @@ export function SettingsPage() {
 					</section>
 					<section aria-labelledby="appearance-settings">
 						<h2 id="appearance-settings">界面</h2>
-						<div className={styles.card}>
+						<div className={`${styles.card} ${styles.appearance}`}>
 							<SettingRow title="界面语言" icon={Globe}>
 								<Select
 									label="界面语言"
@@ -396,7 +396,7 @@ export function SettingsPage() {
 									}
 								/>
 							</SettingRow>
-							<SettingRow title="主题" icon={Palette}>
+							<SettingRow title="主题" icon={Contrast}>
 								<Select
 									label="主题"
 									options={themes}

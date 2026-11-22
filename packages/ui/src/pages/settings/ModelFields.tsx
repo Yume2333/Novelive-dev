@@ -16,8 +16,8 @@ export type ModelDraft = {
 }
 
 export const themes = [
-	['light', '亮色'],
-	['dark', '暗色'],
+	['light', '亮'],
+	['dark', '暗'],
 	['system', '跟随系统'],
 ] as const
 
