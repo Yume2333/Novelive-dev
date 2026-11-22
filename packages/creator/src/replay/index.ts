@@ -59,6 +59,16 @@ function missing(error: unknown) {
 	return error instanceof Error && 'code' in error && error.code === 'ENOENT'
 }
 
+function encodedOrigin(origin: string) {
+	const pattern = Array.from(origin, (character) => {
+		const hex = character.charCodeAt(0).toString(16).padStart(2, '0')
+		const literal = character.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&')
+		const slash = character === '/' ? '|\\\\/' : ''
+		return `(?:${literal}${slash}|\\\\u00${hex}|%${hex})`
+	}).join('')
+	return new RegExp(pattern, 'gi')
+}
+
 async function requestIdentity(request: Request) {
 	const url = new URL(request.url)
 	const secrets = [
@@ -75,13 +85,15 @@ async function requestIdentity(request: Request) {
 		url.searchParams.append(name, secret ? '[redacted]' : value)
 	}
 	url.searchParams.sort()
+	const relayOrigin =
+		url.origin === 'null' ? undefined : encodedOrigin(url.origin)
 	function scrub(text: string) {
 		for (const secret of secrets) {
 			if (secret) text = text.replaceAll(secret, '[redacted]')
 		}
-		return url.origin === 'null'
-			? text
-			: text.replaceAll(url.origin, 'https://relay.invalid')
+		return relayOrigin
+			? text.replace(relayOrigin, 'https://relay.invalid')
+			: text
 	}
 	const path = scrub(url.pathname + url.search)
 	const method = request.method

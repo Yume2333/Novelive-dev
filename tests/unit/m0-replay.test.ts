@@ -79,6 +79,27 @@ test('records only allowlisted headers and redacts relay and credential values, 
 	expect(fetch).toHaveBeenCalledTimes(1)
 })
 
+test('redacts escaped and percent-encoded relay origins in recorded JSON', async () => {
+	const body =
+		'{"escaped":"https:\\/\\/relay.example.test","unicode":"https\\u003a\\u002F/relay\\u002eexample.test","encoded":"https%3A%2F%2Frelay%2eexample.test"}'
+	const fetch = vi.fn(
+		async () =>
+			new Response(body, {
+				headers: { 'content-type': 'application/json' },
+			}),
+	)
+	const record = createReplayFetch({ mode: 'record', directory, fetch })
+	expect(await (await record(origin)).text()).toBe(body)
+	const row = JSON.parse(await readFile(join(directory, rowFile), 'utf8'))
+	const sanitized = Buffer.from(row.body.b64, 'base64').toString()
+	expect(sanitized).not.toMatch(/relay(?:\.|%2e|\\u002e)example/i)
+	expect(JSON.parse(sanitized)).toEqual({
+		escaped: 'https://relay.invalid',
+		unicode: 'https://relay.invalid',
+		encoded: 'https://relay.invalid',
+	})
+})
+
 test('matches image-edit multipart requests across boundaries and externally stores raw large bodies', async () => {
 	const body = Buffer.alloc(256 * 1024 + 1, 0xab)
 	const fetch = vi.fn(
