@@ -247,3 +247,19 @@ test('keeps long lines as warnings but rejects mismatched tags, bad numeric rang
 		'E_TAG',
 	])
 })
+
+test('accepts digit-leading IDs from the metadata registry and speaker list', () => {
+	const input = single(
+		'@bg room/2f\n@cg cg-01\n@show 7traveler/2coat/3plain left\n7traveler: 到了。\n@hide 7traveler',
+	)
+	const result = compileScript(input, {
+		...scalarContext,
+		speakers: ['7traveler'],
+		assets: [
+			{ ...context.assets[0], id: 'room/2f' },
+			{ ...context.assets[2], id: 'cg-01' },
+			{ ...context.assets[3], id: '7traveler/2coat/3plain' },
+		],
+	})
+	expect(result).toMatchObject({ ok: true, diagnostics: [] })
+})

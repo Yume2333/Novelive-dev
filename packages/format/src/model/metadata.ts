@@ -14,7 +14,10 @@ import {
 export const formatVersion = 1
 export const version = { formatVersion: lit(formatVersion) }
 export const open = { open: true } as const
-export const idPattern = '^[a-z0-9][a-z0-9_-]*$'
+export const idToken = '[a-z0-9][a-z0-9_-]*'
+export const idPattern = `^${idToken}$`
+export const assetPathId = `${idToken}(?:/${idToken}){1,2}`
+export const cgId = `cg-${idToken}`
 export const entityId = str({ pattern: idPattern })
 export const paragraphIdPattern =
 	'^p(?:000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3,4})$'
@@ -94,8 +97,7 @@ export const assetRegistrySchema = obj(
 			obj(
 				{
 					id: str({
-						pattern:
-							'^(?:cg-[a-z0-9][a-z0-9_-]*|[a-z0-9][a-z0-9_-]*(?:/[a-z0-9][a-z0-9_-]*){1,2})$',
+						pattern: `^(?:${cgId}|${assetPathId})$`,
 					}),
 					type: oneOf(['character', 'location', 'cg', 'expression', 'variant']),
 					path: str({ minLength: 1 }),

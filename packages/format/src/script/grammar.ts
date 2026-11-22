@@ -1,3 +1,5 @@
+import { assetPathId, cgId, idPattern } from '../model/metadata'
+
 export const slots = ['left', 'center', 'right'] as const
 const easings = [
 	'linear',
@@ -20,7 +22,7 @@ const transitions = [
 	'none',
 ] as const
 export const namePattern = /^[a-z][a-z0-9_-]*$/
-const assetPattern = /^[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*){1,2}$/
+const assetPattern = new RegExp(`^${assetPathId}$`)
 export const builtInMarks = [
 	'em',
 	'b',
@@ -69,14 +71,14 @@ const easing = (value: string) => option('easing', choice(easings), value)
 const transition = (value: string) =>
 	option('transition', choice(transitions), value)
 const slot = choice(slots)
-const id = matching(namePattern)
+const id = matching(new RegExp(idPattern))
 const asset = matching(assetPattern)
 const typedAsset =
 	(parts: number): Read =>
 	(token) =>
 		asset(token) && token.split('/').length === parts ? token : undefined
 const sceneTarget = choice(['stage', ...slots])
-const cg = matching(/^(?:cg-[a-z][a-z0-9_-]*|none)$/)
+const cg = matching(new RegExp(`^(?:${cgId}|none)$`))
 
 export const actions = {
 	bg: {

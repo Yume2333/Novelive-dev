@@ -1,4 +1,4 @@
-import { paragraphIdPattern } from '../model/metadata'
+import { idToken, paragraphIdPattern } from '../model/metadata'
 import {
 	type ActionName,
 	actionNames,
@@ -20,6 +20,9 @@ type Report = (
 type Token = Point & { text: string }
 type Body = { scene: Scene | undefined; ids: Set<string> }
 const paragraph = new RegExp(paragraphIdPattern)
+const textPrefix = new RegExp(
+	`^(?:(${idToken})(?:\\s+(\\(inner\\)))?(?:\\s+as\\s+([^:]+?))?)?:\\s*`,
+)
 const lineId = /^[0-9a-f]{4}$/
 const actionSet = new Set<string>(actionNames)
 const seconds = numeric(0)
@@ -280,10 +283,7 @@ function parseLine(
 		}
 		fields = { kind: 'caption' }
 	} else {
-		const prefix =
-			/^(?:([a-z][a-z0-9_-]*)(?:\s+(\(inner\)))?(?:\s+as\s+([^:]+?))?)?:\s*/.exec(
-				line,
-			)
+		const prefix = textPrefix.exec(line)
 		if (!prefix) {
 			report(
 				'E_LINE',
