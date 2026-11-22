@@ -126,6 +126,7 @@ const api: Novelive = {
 	resourceUrl: (path) =>
 		`novelive://cache/${path.split('/').map(encodeURIComponent).join('/')}`,
 	pickFolder: () => ipcRenderer.invoke('novelive:pick-folder'),
+	pickFiles: (kind) => ipcRenderer.invoke('novelive:pick-files', kind),
 	host: {
 		appState: (): Promise<HostState> => ipcRenderer.invoke('novelive:state'),
 		openLogDir: () => ipcRenderer.invoke('novelive:open-log-dir'),

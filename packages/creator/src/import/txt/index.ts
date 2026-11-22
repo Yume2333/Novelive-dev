@@ -4,10 +4,16 @@ import {
 	formatVersion,
 	type ImportReport,
 	projectFiles,
+	type WorkSettings,
 } from '@novelive/format/model'
 import type { Project } from '../../project'
 import { decodeTxt, type TxtEncoding } from './encoding'
-import { type HeadingRule, parseTxt, type TxtStructure } from './structure'
+import {
+	type HeadingRule,
+	parseTxt,
+	type TxtStructure,
+	type TxtVolume,
+} from './structure'
 
 export {
 	decodeTxt,
@@ -22,6 +28,7 @@ export {
 	MAX_CHAPTER_CHARS,
 	parseTxt,
 	type TxtStructure,
+	type TxtVolume,
 } from './structure'
 
 export interface TxtImportOptions {
@@ -79,8 +86,30 @@ export async function importTxt(
 		structure,
 	}
 	await project.writeFile(projectFiles.original('txt'), bytes)
-	for (const volume of structure.volumes) {
-		const workId = randomUUID()
+	await writeTxtLayout(project, structure.volumes, {
+		title: options.title,
+		language,
+	})
+	await project.write(projectFiles.importReport, report)
+	await project.write(projectFiles.series, {
+		...series,
+		volumeIds: structure.volumes.map((volume) => volume.volumeId),
+	})
+	return report
+}
+
+export async function writeTxtLayout(
+	project: Project,
+	volumes: TxtVolume[],
+	options: {
+		title: string
+		language: string
+		workIds?: string[]
+		settings?: WorkSettings
+	},
+) {
+	for (const [index, volume] of volumes.entries()) {
+		const workId = options.workIds?.[index] ?? randomUUID()
 		await project.write(projectFiles.volume(volume.volumeId), {
 			formatVersion,
 			volumeId: volume.volumeId,
@@ -95,8 +124,8 @@ export async function importTxt(
 			version: 0,
 			minReaderVersion: 1,
 			appVersion: '0.1.0',
-			language,
-			settings: defaultWorkSettings(),
+			language: options.language,
+			settings: options.settings ?? defaultWorkSettings(),
 		})
 		for (const chapter of volume.chapters) {
 			await project.write(
@@ -125,10 +154,4 @@ export async function importTxt(
 			)
 		}
 	}
-	await project.write(projectFiles.importReport, report)
-	await project.write(projectFiles.series, {
-		...series,
-		volumeIds: structure.volumes.map((volume) => volume.volumeId),
-	})
-	return report
 }

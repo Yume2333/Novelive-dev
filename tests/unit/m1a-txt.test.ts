@@ -70,7 +70,7 @@ test('main and auxiliary rules form a union; volumes, preface and cleanup are pr
 	const result = parseTxt(await readFile(fixture, 'utf8'))
 	expect(result.mainRule).toBe('numbered')
 	expect(result.volumes.map((volume) => volume.title)).toEqual([
-		'第一卷',
+		'前言',
 		'第一卷 风起',
 		'第二卷 风止',
 	])

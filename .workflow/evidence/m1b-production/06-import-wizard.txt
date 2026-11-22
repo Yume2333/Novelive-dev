@@ -1,0 +1,41 @@
+M1b/06 — 2026-11-23
+Base: f1a0090eba860b4f86937b57b09c7ab9f246b4ac
+
+Check
+$ NL_REPLAY=strict pnpm test:e2e --grep 'M1b TXT wizard'
+✓ tests/e2e/m1b-wizard.spec.ts › M1b TXT wizard reviews findings, revises chapter divisions and keeps a reference image (942ms)
+✓ tests/e2e/m1b-wizard.spec.ts › M1b TXT wizard asks for an ambiguous encoding and can skip review (685ms)
+2 passed (2.4s)
+
+$ pnpm check
+Test Files  13 passed (13)
+     Tests  216 passed (216)
+
+$ NL_REPLAY=strict pnpm test:e2e
+16 passed (11.2s)
+
+Real path
+The built Electron app opened 书库 → 导入原文. Native open dialogs were
+answered in the main process (dialog.showOpenDialog) with a synthetic TXT,
+a PNG reference image and a project folder, so the renderer, preload IPC,
+creator utility process and project files on disk were all real.
+
+Run 1: the synthetic multivolume TXT plus one fuzzy heading imported through
+M1a importTxt; the review page read source/import-report.json and showed the
+finding under 整理建议. Renaming a chapter, splitting, merging, merging a
+volume, starting a new volume and turning off 已有参考图时也停在角色设定 were
+confirmed; the project on disk then held 3 volumes / 6 chapters with the
+expected titles and text, notes kept, findings remapped to the new chapter
+IDs, the reference copied to source/references/01.png and
+confirmWithReferences=false in every work.json.
+
+Run 2: bytes a4a4 were ambiguous; the wizard listed encoding candidates and
+created no folder until Big5 was chosen, then 跳过核对 left the M1a layout
+untouched (no layout entry in the report).
+
+Review follow-up: when explicit volume headings follow text that precedes
+them, the implicit leading volume is now titled 前言 instead of a second
+第一卷; a TXT without volume headings still gets one 第一卷.
+
+No paid model calls. The organizer model pass for volume suggestions on a
+real unvolumed book is left for the main session's recording.

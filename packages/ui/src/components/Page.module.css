@@ -4,6 +4,36 @@
 	padding: var(--space-7);
 }
 
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+}
+
+.primary {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: var(--space-2) var(--space-4);
+	border-radius: var(--radius-md);
+	background: var(--color-primary);
+	box-shadow: var(--shadow-raised);
+	color: var(--color-on-primary);
+	font-size: 13px;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.primary:hover {
+	filter: brightness(1.08);
+}
+
+.primary:focus-visible {
+	outline: none;
+	box-shadow: var(--shadow-focus);
+}
+
 .page h1 {
 	margin: 0;
 	font-family: var(--font-display);

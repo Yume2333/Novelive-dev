@@ -1,17 +1,23 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import styles from './Page.module.css'
 
 export function Page({
 	title,
+	action,
 	children,
 }: {
 	title: string
+	action?: ReactNode
 	children?: ReactNode
 }) {
 	return (
 		<section className={styles.page}>
-			<h1>{title}</h1>
+			<header className={styles.header}>
+				<h1>{title}</h1>
+				{action}
+			</header>
 			{children}
 		</section>
 	)
@@ -38,5 +44,22 @@ export function EmptyState({
 			{title && <h2>{title}</h2>}
 			<p>{text}</p>
 		</div>
+	)
+}
+
+export function PageAction({
+	icon: Icon,
+	to,
+	children,
+}: {
+	icon: LucideIcon
+	to: string
+	children: ReactNode
+}) {
+	return (
+		<Link className={styles.primary} to={to}>
+			<Icon aria-hidden="true" size={16} />
+			{children}
+		</Link>
 	)
 }
