@@ -1,0 +1,2 @@
+Imported synthetic TXT: 3 volumes, 6 chapters; original, body, notes, chapter metadata and report saved.
+Reopened synthetic TXT project in a new process: 6 chapter bodies and paragraph tables verified; notes/report readable; original bytes unchanged; SQLite integrity_check: ok.
