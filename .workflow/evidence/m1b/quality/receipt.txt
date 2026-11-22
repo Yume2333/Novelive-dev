@@ -1,0 +1,33 @@
+M1b/08 — reproducible quality regression
+Base: 3e7806efd006636df74945248606fa23cc7fb3df
+
+NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-quality.test.ts
+Test Files  1 passed (1)
+     Tests  2 passed (2)
+
+NL_REPLAY=strict pnpm check
+Test Files  21 passed (21)
+     Tests  322 passed (322)
+
+NL_REPLAY=strict pnpm exec tsx tools/quality/run.ts
+Summary: 1 passed, 1 failed, 0 undecided, passRate 0.5
+The failure is the intentionally flawed control, not a CLI failure.
+
+Both NVS scripts compile. The matched pair holds the synthetic source and
+Bible fixed while moving the same envelope, characters, dialogue and actions
+between adjacent paragraph citations. The independent judge accepted the
+aligned control and flagged the swapped citations, a costume and character
+knowledge contradiction, an omitted/revealed clue, and unstageable action.
+The mechanical check found one configured overlong text line in the flawed
+control. That threshold is fixture-specific, not a product script limit.
+
+The judge receives the source, draft, Bible and checklist but not the expected
+labels. Results include dimension scores, reasons, checklist failures and
+mechanical counts. Invalid or unavailable submissions are reported separately
+and excluded from the pass-rate denominator.
+
+Paid recording: 2 requests to deepseek-v4.1-flash, 3,842 measured tokens,
+0 images; every request logged in the private usage ledger. The committed
+cassette contains only recordings of the hand-authored synthetic cases.
+Strict verification made no paid calls. This is the regression portion of
+W3, not the style comparison or the authorized real-book acceptance.
