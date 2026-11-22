@@ -36,10 +36,13 @@ The owner pre-authorized autonomous delivery; no separate sign-off was sought.
 ## Waived checks & skipped reviews
 
 - No spec check was waived. The owner pre-authorized autonomous delivery.
-- Historical independent task reviews were skipped for M0/01–07, 09, 10 and
-  12 as recorded in their archived Progress. The independent lead review here
-  covers W5; no separate retrospective workflow or security reviewer was
-  available for the earlier task diffs. The integration was checked at the gate.
+- All earlier M0 task PRs passed independent Devin Review: M0/01 [PR #2](https://github.com/Yume2333/Novelive-dev/pull/2),
+  M0/02 [PR #3](https://github.com/Yume2333/Novelive-dev/pull/3), M0/03 [PR #4](https://github.com/Yume2333/Novelive-dev/pull/4), M0/04 [PR #5](https://github.com/Yume2333/Novelive-dev/pull/5), M0/05 [PR #6](https://github.com/Yume2333/Novelive-dev/pull/6),
+  M0/06 [PR #7](https://github.com/Yume2333/Novelive-dev/pull/7), M0/07 [PR #10](https://github.com/Yume2333/Novelive-dev/pull/10), M0/08 [PR #9](https://github.com/Yume2333/Novelive-dev/pull/9), M0/09 [PR #12](https://github.com/Yume2333/Novelive-dev/pull/12),
+  M0/10 [PR #13](https://github.com/Yume2333/Novelive-dev/pull/13), and M0/12 [PR #11](https://github.com/Yume2333/Novelive-dev/pull/11). The paid-call workflow amendment
+  also passed in [PR #8](https://github.com/Yume2333/Novelive-dev/pull/8). The archived Progress entries cite the reviews.
+- M0/11 received independent W5 review from the lead. Its integration was
+  checked at the gate.
 
 ## Remaining debt & follow-ups
 
