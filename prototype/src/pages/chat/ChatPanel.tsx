@@ -497,7 +497,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
       <div style={{ borderBottom: '1px solid var(--divider)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4) var(--space-4) var(--space-3)' }}>
           <span
-            className="neu-button"
+            className="glass-panel"
             style={{ width: 34, height: 34, borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)', flexShrink: 0 }}
           >
             <Icon name="auto_awesome" size={17} />

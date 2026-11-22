@@ -166,7 +166,7 @@ function ImportPackageModal({ open, onClose }: { open: boolean; onClose: () => v
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-          <span className="neu-button" style={{ width: 44, height: 44, borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span className="glass-panel" style={{ width: 44, height: 44, borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icon name="deployed_code" size={21} />
           </span>
           <div>

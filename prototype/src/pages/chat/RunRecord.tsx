@@ -20,7 +20,7 @@ export function RunRecordDrawer({ chapterTitle, open, onClose }: {
           <section key={step.title} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span
-                className="neu-button"
+                className="glass-panel"
                 style={{
                   width: 22,
                   height: 22,

@@ -41,7 +41,7 @@ function SettingRow({ icon, title, control }: { icon: string; title: string; con
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px' }}>
       <div
-        className="neu-button"
+        className="glass-panel"
         style={{
           width: 36,
           height: 36,
@@ -109,7 +109,7 @@ function ModelCard({
         style={{ display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', padding: 'var(--space-4) var(--space-5)', minHeight: 52, cursor: 'pointer' }}
       >
         <div
-          className="neu-button"
+          className="glass-panel"
           style={{
             width: 36, height: 36, borderRadius: 'var(--radius-md)', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-primary)',

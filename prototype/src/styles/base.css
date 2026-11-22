@@ -34,14 +34,6 @@ button.glass-panel { transition: background 0.15s ease, box-shadow 0.15s ease; }
 button.glass-panel:hover:not(:disabled) { background: var(--white-90); }
 button.glass-panel:active:not(:disabled) { box-shadow: var(--shadow-inset); }
 
-.neu-button {
-  background: var(--neu-bg);
-  box-shadow: var(--shadow-neu);
-  transition: all 0.2s ease;
-  border: 1px solid var(--neu-border);
-}
-.neu-button:active { box-shadow: var(--shadow-neu-inset); }
-
 .soft-glow { animation: soft-pulse 4s infinite alternate; }
 @keyframes soft-pulse {
   0% { opacity: 0.7; box-shadow: 0 0 3px var(--glow); }

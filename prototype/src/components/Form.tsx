@@ -272,7 +272,7 @@ export function EmptyState({
       }}
     >
       <div
-        className="neu-button"
+        className="glass-panel"
         style={{
           width: 64,
           height: 64,

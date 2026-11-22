@@ -75,7 +75,7 @@ function PathCard({ icon, title, desc, active, onClick }: {
       }}
     >
       <span
-        className="neu-button"
+        className="glass-panel"
         style={{
           width: 38,
           height: 38,

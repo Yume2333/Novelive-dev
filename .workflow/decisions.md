@@ -877,3 +877,11 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** 所有者看完 17 个模型 × 3 遍的真图对比：动漫风格和线条清晰度上 `digital-art-4x` 最好，它和 animevideov3 的双重放大在风格化和线条上明显更好；YandereNeo 改动原画最少，保留复杂纹理更好，适合写实或细节多的画面。证据在 `.workflow/evidence/spikes-r4/upscale/`。
 - **Decided by:** user
 - **Supersedes:** 2026-11-21 - 放大默认用 Real-ESRGAN 动漫模型
+
+## 2026-11-22 - 界面去掉浮雕，统一用玻璃面板
+
+- **Decided:** 界面不再用浮雕（左上白光加右下阴影）。次要按钮、图标底座、侧边栏的 Novelive Agent 和全局制作状态都用玻璃面板；可点的玻璃面板悬停时底色变亮，和导航选中项一致。删除 `.neu-button` 和 `--shadow-neu`、`--shadow-neu-inset`、`--neu-bg`、`--neu-border` 四个 Token。
+- **Instead of:** 保留减轻后的浮雕，只用在图标底座上。
+- **Because:** 所有者看过原型，觉得浮雕控件周围的高光和阴影用力过猛；侧边栏导航选中项那种淡底色的效果更合适。
+- **Decided by:** user
+- **Supersedes:** 2026-11-20 - 界面风格保留，导航改侧边栏（只替换其中“轻浮雕”一项，侧边栏导航不变）
