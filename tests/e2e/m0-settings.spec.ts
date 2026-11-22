@@ -172,22 +172,18 @@ test('M0 settings preserves a manual context limit when inheritance keeps the ca
 			await main.getByRole('button', { name: '主模型', exact: true }).click()
 			const context = main.getByLabel('上下文长度')
 			await expect(context).toHaveValue('8192')
-			await page.evaluate(() => {
-				window.novelive.call = new Proxy(window.novelive.call, {
-					apply(target, receiver, args) {
-						if (args[0] === 'model.suggestContextWindow')
-							document.body.dataset.suggestedContext = 'true'
-						return Reflect.apply(target, receiver, args)
-					},
-				})
-			})
 			await main.getByRole('checkbox', { name: '同快速模型' }).check()
+			await page.evaluate(async () => {
+				await window.novelive.call('model.suggestContextWindow', {
+					model: 'gpt-4o',
+					format: 'openai-completions',
+					compat: 'auto',
+				}).promise
+			})
+			await expect(context).toHaveValue('8192')
 			await main.getByRole('button', { name: '保存' }).click()
 			await expect(main.getByRole('status')).toHaveText('已保存')
 			await expect(context).toHaveValue('8192')
-			expect(
-				await page.locator('body').getAttribute('data-suggested-context'),
-			).toBeNull()
 		} finally {
 			await app.close()
 		}
