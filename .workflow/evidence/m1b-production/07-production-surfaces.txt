@@ -1,0 +1,20 @@
+M1b/07 — 2026-11-22
+Base: f1a0090eba860b4f86937b57b09c7ab9f246b4ac
+Code: 3f66d5c0e003be58b6168711ef1cd81d2c731660
+
+Check and real entry point (Linux Electron under Xvfb)
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M1b creation surfaces'
+✓ M1b creation surfaces show the two gates, blocked chapters and live records
+✓ M1b creation surfaces persist role models and writer presets through the creator
+2 passed (3.1s)
+
+The first test used the built desktop renderer with a synthetic creator
+projection for production; the second used the real creator and persisted
+settings in an isolated profile. The first-chapter link is exercised; the
+full generation-to-play route belongs to integrated M1b acceptance.
+
+$ NL_REPLAY=strict pnpm check
+Test Files  13 passed (13)
+     Tests  213 passed (213)
+
+Paid usage: 0 calls, 0 tokens, 0 images.
