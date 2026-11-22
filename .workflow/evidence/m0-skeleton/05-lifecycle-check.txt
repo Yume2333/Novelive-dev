@@ -1,0 +1,35 @@
+$ tsc --noEmit
+$ pnpm build && playwright test --grep 'M0 creator lifecycle and protocol'
+$ pnpm --filter @novelive/desktop build
+$ electron-vite build
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 15 modules transformed.
+rendering chunks...
+out/main/index.js     5.44 kB
+out/main/creator.js  93.99 kB
+✓ built in 306ms
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 12 modules transformed.
+rendering chunks...
+out/preload/index.cjs  91.53 kB
+✓ built in 92ms
+vite v7.2.7 building client environment for production...
+transforming...
+✓ 29 modules transformed.
+rendering chunks...
+../../apps/desktop/out/renderer/index.html                                                            0.40 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-Ba7eOkfT.woff2  1,142.55 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-CN8EQoOj.woff   1,564.08 kB
+../../apps/desktop/out/renderer/assets/index-BLXoykmq.css                                             0.78 kB
+../../apps/desktop/out/renderer/assets/index-CvWx2pir.js                                            641.80 kB
+✓ built in 535ms
+
+Running 2 tests using 1 worker
+
+Downloading Electron binary...
+  ✓  1 tests/e2e/m0-lifecycle.spec.ts:11:1 › M0 creator lifecycle and protocol recovers an interrupted generation and confines cache images (2.7s)
+  ✓  2 tests/e2e/m0-lifecycle.spec.ts:107:1 › M0 creator lifecycle and protocol stops after three failed handshakes until manually restarted (794ms)
+
+  2 passed (3.9s)

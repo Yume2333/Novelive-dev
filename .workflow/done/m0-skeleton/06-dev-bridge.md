@@ -16,3 +16,4 @@
 - Check after: 指定 Vitest 测试及类型检查通过。[检查日志](../../evidence/m0-skeleton/06-dev-bridge-check.txt)
 - Real path: `NL_REPLAY=strict pnpm dev:web` 在 Chromium 实测宿主日志、重启、WebSocket 命令和 HTTP 图片。[实际运行输出](../../evidence/m0-skeleton/06-dev-bridge-real-path.txt)
 - Review: skipped — 当前会话未进行独立工作流与安全审查。
+- PR #7 合并复验: 保留 Electron UI 和开发桥两套依赖；冻结安装、开发桥 Check 和完整检查通过。首次并行 E2E 争用 Electron 下载，安装完成后重跑通过。[检查日志](../../evidence/m0-skeleton/06-dev-bridge-merge-check.txt) · [Chromium 真实路径](../../evidence/m0-skeleton/06-dev-bridge-merge-real-path.txt)

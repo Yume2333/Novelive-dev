@@ -1,0 +1,59 @@
+.host {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.viewport {
+	flex: 1;
+	min-height: 0;
+	overflow: hidden auto;
+	scrollbar-width: none;
+}
+
+.viewport::-webkit-scrollbar {
+	display: none;
+}
+
+.track {
+	position: absolute;
+	width: var(--space-2);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity var(--dur-base) var(--ease-out);
+	user-select: none;
+}
+
+.host:hover > .track,
+.track[data-active="true"],
+.track:hover {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.thumb {
+	position: absolute;
+	top: 0;
+	right: 1px;
+	width: var(--space-1);
+	border-radius: var(--radius-full);
+	background: var(--scrollbar-thumb);
+	cursor: pointer;
+	touch-action: none;
+}
+
+.track:hover .thumb {
+	background: var(--scrollbar-thumb-hover);
+}
+
+.track[data-dragging="true"] .thumb {
+	background: var(--scrollbar-thumb-active);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.track {
+		transition: none;
+	}
+}
