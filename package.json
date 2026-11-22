@@ -9,6 +9,7 @@
 	},
 	"scripts": {
 		"dev": "pnpm --filter @novelive/desktop dev",
+		"dev:web": "pnpm --filter @novelive/dev-bridge dev",
 		"build": "pnpm --filter @novelive/desktop build",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check && stylelint 'packages/ui/src/**/*.css'",
