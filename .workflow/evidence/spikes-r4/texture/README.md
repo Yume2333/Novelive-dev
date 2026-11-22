@@ -87,3 +87,29 @@ node src/postproc.mjs        # -> -D1.png，删 work/ 中间文件
 
 对照页：`.venv/bin/python src/contact_round3.py` → `contact/round3-T{n}.png`，一行三格
 （参考图 | sunburst | sunburst-4k），统一缩到同一高度（Lanczos），透明立绘铺浅灰底，标注原生尺寸。
+
+## Round 4（参考图色调外溢 A/B，sunburst）
+
+Round 3 出图整体偏紫（白桌布发紫）。两臂都换成 `docs/visuals.md` 2.5 的拼装：画风参考声明句（单数）
++ 内容段 + 构图 + 每角色一句颜色锁定句 + FXB；内容段里 `as in Image 1` 的服装引用改成直写，A/B 相同。
+
+- A：2.5 声明句原文（含 `overall color treatment`）
+- B：声明句去掉 `overall color treatment`，颜色锁定句后加调色板句：
+  `The palette comes from the description: time of day, weather, light sources and the stated colors of objects decide the colors; white objects stay white. Keep the style reference's way of coloring, not its color cast.`
+
+T1/T2/T3 × A/B × r1/r2 = 12 次，全部成功。`node src/run_round4.mjs --print T3 B` 打出全文。
+对照页 `.venv/bin/python src/contact_round4.py` → `contact/round4-T{n}.png`
+（参考图 | round3 旧声明 | A r1 | A r2 | B r1 | B r2），色偏指标写在 `contact/round4-metrics.tsv`。
+
+色偏指标 B−G = 不透明像素平均蓝减平均绿（T3 另量桌布带）：
+
+| 场景 | round3 | A r1 / r2 | B r1 / r2 |
+|------|--------|-----------|-----------|
+| T1 | +54 | +39 / +36 | +42 / +40 |
+| T2 | +56 | +56 / +44 | +53 / +50 |
+| T3 全图 | +38 | +38 / +31 | +42 / +39 |
+| T3 桌布 | +34 | +39 / +28 | +32 / +39 |
+
+结论：B 和 A 没有可分辨的差别，同臂两次之间的差距比 A/B 之间还大；目测 B 的桌布、雨天天空仍是淡紫。
+2.5 声明句（A）相对旧声明在 T1 上色偏小一些，T2/T3 看不出。调色板句不采用。
+三个场景的角色都穿紫/薰衣草色，色偏来自参考图还是来自内容本身，这一轮分不开。
