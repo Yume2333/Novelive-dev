@@ -415,30 +415,32 @@ function Review({
 										}
 									/>
 									<span className={styles.count}>{length} 段</span>
-									<button
-										type="button"
-										disabled={length < 2}
-										onClick={() => onChange(splitChapter(layout, i, total))}
-									>
-										<Scissors aria-hidden="true" size={14} />
-										拆分
-									</button>
-									<button
-										type="button"
-										disabled={i === 0 || isVolumeStart(layout, i)}
-										onClick={() => onChange(mergeChapter(layout, i))}
-									>
-										<Merge aria-hidden="true" size={14} />
-										并入上一章
-									</button>
-									<button
-										type="button"
-										disabled={i === 0 || isVolumeStart(layout, i)}
-										onClick={() => onChange(startVolume(layout, i))}
-									>
-										<SplitSquareVertical aria-hidden="true" size={14} />
-										从此分卷
-									</button>
+									<span className={styles.actions}>
+										<button
+											type="button"
+											disabled={length < 2}
+											onClick={() => onChange(splitChapter(layout, i, total))}
+										>
+											<Scissors aria-hidden="true" size={14} />
+											拆分
+										</button>
+										<button
+											type="button"
+											disabled={i === 0 || isVolumeStart(layout, i)}
+											onClick={() => onChange(mergeChapter(layout, i))}
+										>
+											<Merge aria-hidden="true" size={14} />
+											并入上一章
+										</button>
+										<button
+											type="button"
+											disabled={i === 0 || isVolumeStart(layout, i)}
+											onClick={() => onChange(startVolume(layout, i))}
+										>
+											<SplitSquareVertical aria-hidden="true" size={14} />
+											从此分卷
+										</button>
+									</span>
 								</fieldset>
 							)
 						})}
