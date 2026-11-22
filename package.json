@@ -21,6 +21,7 @@
 		"@biomejs/biome": "2.6.8",
 		"@playwright/test": "1.65.1",
 		"@types/node": "24.19.2",
+		"openai": "7.62.0",
 		"stylelint": "18.1.0",
 		"typescript": "5.9.3",
 		"vitest": "5.1.1"

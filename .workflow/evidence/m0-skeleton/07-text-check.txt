@@ -2,12 +2,12 @@ $ NL_REPLAY=strict NL_CASSETTE_DIR=tests/fixtures/text-models/synthetic/ pnpm ex
 RUN  v5.1.1
  Test Files  1 passed (1)
       Tests  17 passed (17)
-   Duration  456ms (tests 63%, import 23%, transform 14%, worker 1%)
+   Duration  470ms (tests 56%, import 24%, transform 20%, worker 1%)
 
 $ NL_REPLAY=strict pnpm check
 $ pnpm typecheck && pnpm lint && pnpm test
 $ tsc --noEmit
 $ biome check && stylelint 'packages/ui/src/**/*.css'
-Checked 53 files in 17ms. No fixes applied.
- Test Files  5 passed (5)
-      Tests  38 passed (38)
+Checked 58 files in 22ms. No fixes applied.
+ Test Files  6 passed (6)
+      Tests  115 passed (115)
