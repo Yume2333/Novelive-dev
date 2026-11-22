@@ -14,6 +14,6 @@
 ## Progress
 
 - Check before: 基线 627385e 尚无配置模块或该测试文件。
-- Check after: `pnpm exec vitest run tests/unit/m0-config.test.ts` 在真实临时目录完成，`Test Files  1 passed (1)`、`Tests  7 passed (7)`。
-- Real path: Electron 45.4.1 的 utility process 使用隔离的 `userData`，跨进程验证加密保存、掩码重读、快速槽连接继承，并确认损坏文件禁止更新且重置保留逐字节相同的备份。未修改生产入口；设置页命令接线留给 09。
+- Check after: `pnpm exec vitest run tests/unit/m0-config.test.ts` 在真实临时目录完成，`Test Files  1 passed (1)`、`Tests  7 passed (7)`。[检查日志](../../evidence/m0-skeleton/02-config-check.txt)
+- Real path: Electron 45.4.1 的 utility process 使用隔离的 `userData`，跨进程验证加密保存、掩码重读、快速槽连接继承，并确认损坏文件禁止更新且重置保留逐字节相同的备份。未修改生产入口；设置页命令接线留给 09。[实际运行输出](../../evidence/m0-skeleton/02-config-real-path.txt)
 - Review: skipped — 当前会话无法启动独立工作流与安全审查员，留待 PR 审查。
