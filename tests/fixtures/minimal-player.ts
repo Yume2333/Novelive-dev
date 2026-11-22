@@ -18,8 +18,11 @@ traveler: 你好，世界。
 listener (inner): 我在想什么？
 : 风从窗边吹过。
 @caption 黄昏时分 wait
+@show right/coat/calm left
+@hide right
 @hide traveler
 : 屋子静了。
+@hide left
 `
 
 export async function seedPlayerProject(
@@ -79,6 +82,13 @@ export async function seedPlayerProject(
 	await project.write(projectFiles.assetRegistry({ level: 'series' }), {
 		formatVersion: 1,
 		entries: [
+			{
+				id: 'right/coat/calm',
+				type: 'expression',
+				path: 'assets/traveler.png',
+				aliases: [],
+				status: 'drawn',
+			},
 			{
 				id: 'future/day',
 				type: 'location',

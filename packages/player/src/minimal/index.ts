@@ -65,8 +65,10 @@ export async function mountMinimalPlayer(
 		for (const action of current.actions) {
 			if (action.name === 'hide') {
 				const target = String(action.args.target)
+				const isSlot =
+					target === 'left' || target === 'center' || target === 'right'
 				for (const [slot, item] of cast) {
-					if (slot === target || item.id.split('/')[0] === target) {
+					if (isSlot ? slot === target : item.id.split('/')[0] === target) {
 						item.sprite.destroy()
 						cast.delete(slot)
 					}
