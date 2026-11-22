@@ -59,7 +59,7 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 			returning
 				? [`c${events + 1}`]
 				: aliasUpdates
-					? ['c2']
+					? [events === 0 ? 'c1' : 'c2']
 					: repeated && events > 0
 						? ['c2']
 						: chapterIds,
@@ -72,22 +72,25 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 			firstLongEvent && events === 0
 				? oversized
 				: `Event ${packet[1]}:${events}`,
-		is_last:
-			returning || aliasUpdates
+		is_last: aliasUpdates
+			? events === 3
+			: returning
 				? events === 2
 				: !(firstLongEvent || repeated) || events > 0,
 		biblePatch: aliasUpdates
-			? [
-					{
-						kind: 'character',
-						op: 'update',
-						entry: {
-							...confirmed,
-							identity: undefined,
-							aliases: [events === 1 ? 'Zulu' : 'Alpha'],
+			? events === 0
+				? []
+				: [
+						{
+							kind: 'character',
+							op: 'update',
+							entry: {
+								...confirmed,
+								identity: undefined,
+								aliases: [events === 2 ? 'Zulu' : 'Alpha'],
+							},
 						},
-					},
-				]
+					]
 			: repeated || returning
 				? [
 						{
@@ -1065,17 +1068,18 @@ test('seeded timeline merges preserve confirmed facts, chapter values and publis
 		entry: { ...validRelation, to: 'missing' },
 	} satisfies BiblePatch[number]
 	for (let trial = 0; trial < 20; trial++) {
-		const observations = ids
-			.slice(2)
-			.flatMap((id) =>
-				next(3) === 0 ? [] : [observe(id, values[next(values.length)])],
-			)
-		if (trial % 2 === 0) {
-			observations.push(observe('c3', 'Captain'), observe('c3', 'Admiral'))
-		}
-		if (trial % 3 === 0) {
-			observations.push(observe('c4', 'Café'), observe('c4', 'Cafe\u0301'))
-		}
+		const competing: ReturnType<typeof observe>[] = []
+		const observations = ids.slice(2).flatMap((id) => {
+			if (id === 'c3' && trial % 2 === 0) {
+				competing.push(observe(id, 'Admiral'))
+				return [observe(id, 'Captain')]
+			}
+			if (id === 'c4' && trial % 3 === 0) {
+				competing.push(observe(id, 'Cafe\u0301'))
+				return [observe(id, 'Café')]
+			}
+			return next(3) === 0 ? [] : [observe(id, values[next(values.length)])]
+		})
 		const earlier = observe('c0', 'Impostor')
 		const atStart = observe('c1', 'Impostor')
 		const moved = {
@@ -1088,6 +1092,7 @@ test('seeded timeline merges preserve confirmed facts, chapter values and publis
 		} satisfies BiblePatch[number]
 		const proposals: BiblePatch = [
 			...observations,
+			...competing,
 			earlier,
 			atStart,
 			moved,
@@ -1095,13 +1100,15 @@ test('seeded timeline merges preserve confirmed facts, chapter values and publis
 			valid,
 			dangling,
 		]
-		const shuffled = [...proposals]
-		for (let index = shuffled.length - 1; index > 0; index--) {
+		const groups = [...ids, undefined].map((chapter) =>
+			proposals.filter(({ observedChapter }) => observedChapter === chapter),
+		)
+		for (let index = groups.length - 1; index > 0; index--) {
 			const other = next(index + 1)
-			;[shuffled[index], shuffled[other]] = [shuffled[other], shuffled[index]]
+			;[groups[index], groups[other]] = [groups[other], groups[index]]
 		}
 		const outcomes = []
-		for (const [permutation, patch] of [proposals, shuffled].entries()) {
+		for (const [permutation, patch] of [proposals, groups.flat()].entries()) {
 			const path = join(directory, `timeline-${trial}-${permutation}`)
 			await seed(path)
 			using project = await Project.open(path)
@@ -1114,7 +1121,14 @@ test('seeded timeline merges preserve confirmed facts, chapter values and publis
 			)
 			const [published] = (await project.read(file)).entries
 			expect(published).toMatchObject(base)
-			for (const rejected of [earlier, atStart, moved, fixed, dangling]) {
+			for (const rejected of [
+				earlier,
+				atStart,
+				moved,
+				fixed,
+				dangling,
+				...competing,
+			]) {
 				const { entry, ...proposal } = rejected
 				expect(conflicts).toContainEqual(
 					expect.objectContaining({
@@ -1127,21 +1141,19 @@ test('seeded timeline merges preserve confirmed facts, chapter values and publis
 					}),
 				)
 			}
-			const valid = observations.filter(
-				({ observedChapter, entry }) =>
-					!conflicts.some(
-						(conflict) =>
-							conflict.kind === 'character' &&
-							conflict.observedChapter === observedChapter &&
-							conflict.entry.identity === entry.identity,
-					),
-			)
+			for (const { entry, ...proposal } of observations)
+				expect(conflicts).not.toContainEqual(
+					expect.objectContaining({
+						...proposal,
+						entry: expect.objectContaining({ ...entry, status: 'candidate' }),
+					}),
+				)
 			for (const [index, id] of ids.entries()) {
 				const before = ids.slice(0, index + 1)
 				const expected =
 					before
 						.flatMap((chapter) =>
-							valid.filter(
+							observations.filter(
 								({ observedChapter }) => observedChapter === chapter,
 							),
 						)

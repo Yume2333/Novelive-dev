@@ -3,11 +3,11 @@ Base: f1a0090eba860b4f86937b57b09c7ab9f246b4ac
 
 Check: NL_REPLAY=strict pnpm exec vitest run tests/unit/m1a-synthesis.test.ts
 Test Files  1 passed (1)
-     Tests  38 passed (38)
+     Tests  41 passed (41)
 
 Regression: NL_REPLAY=strict pnpm check
 Test Files  13 passed (13)
-     Tests  250 passed (250)
+     Tests  253 passed (253)
 
 Real path: NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m1a-synthesis/run.ts <project-path> <step>
 Ran whole on a fresh project, then checkpoint, resume and reopen on a second project in separate processes:
@@ -18,4 +18,4 @@ reopen: 0 replay requests; 2-chapter skeleton, candidates and conflicts persiste
 
 Replay: 15 synthetic SSE entries authored with an in-process upstream, not provider recordings. The large-volume and minimum-context tests use an in-process synthetic upstream. Strict runs reject network access. Paid usage: 0 calls, 0 tokens, 0 images; no ledger entries.
 W3 full multi-volume integration belongs to M1a/06. W4 real-book comparison (normalized BiblePatch F1 ≥ 0.90 and no loss of confirmed settings) remains unaccepted pending an owner-approved book and M1a/07. Synthetic replay does not measure extraction quality.
-Review: PR #20 Devin Review findings through 82624c3 addressed. A seeded test exercises 20 generated timelines with two proposal orders each, checking confirmed facts, chapter values, and published references. Final independent review not yet recorded.
+Review: PR #20 Devin Review findings through 1b3d791 addressed. A seeded test exercises 20 generated timelines in two chapter permutations with the same within-chapter event order. It checks confirmed facts, chapter values, and published references, and asserts that no observation generated as valid is rejected. Final independent review not yet recorded.
