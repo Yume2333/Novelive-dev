@@ -54,7 +54,7 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 					? changes.slice(2)
 					: []
 			: changes.map((item) =>
-					item.entry.identity === 'Captain'
+					'identity' in item.entry && item.entry.identity === 'Captain'
 						? {
 								...item,
 								entry: {
