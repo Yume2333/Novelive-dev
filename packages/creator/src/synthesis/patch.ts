@@ -174,7 +174,7 @@ function merge<T extends Entry>(
 	const temporal =
 		kind === 'character'
 			? 'identity'
-			: kind === 'relation'
+			: kind === 'relation' || kind === 'location'
 				? 'description'
 				: undefined
 	const incoming = candidate as Entry & Record<string, unknown>

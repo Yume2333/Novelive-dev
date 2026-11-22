@@ -403,6 +403,46 @@ test('a proposal cannot smuggle fixed facts onto confirmed characters as tempora
 	])
 })
 
+test('chapter-scoped location descriptions are temporal, but renaming is a conflict', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const tower = {
+		id: 'tower',
+		name: 'Paper Tower',
+		description: 'Intact',
+		status: 'confirmed',
+		firstSeenChapter: 'c1',
+	} as const
+	const file = projectFiles.location(scope, 'tower')
+	await project.write(file, { formatVersion: 1, entries: [tower] })
+	const temporal = { chapterId: 'c2', field: 'description', value: 'Ruined' }
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[
+			{
+				kind: 'location',
+				op: 'update',
+				entry: { ...tower, changes: [temporal] },
+			},
+			{
+				kind: 'location',
+				op: 'update',
+				entry: {
+					...tower,
+					changes: [{ ...temporal, field: 'name', value: 'Other Tower' }],
+				},
+			},
+		],
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toHaveLength(1)
+	expect(await project.read(file)).toMatchObject({
+		entries: [{ ...tower, changes: [temporal] }],
+	})
+})
+
 test('unresolved references trigger one repair and are never published', async () => {
 	await seed(root)
 	using project = await Project.open(root)
