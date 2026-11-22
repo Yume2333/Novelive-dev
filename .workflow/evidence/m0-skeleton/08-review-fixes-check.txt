@@ -1,0 +1,8 @@
+
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev/.workflow/worktrees/08-image-models
+
+
+ Test Files  1 passed (1)
+      Tests  77 passed (77)
+   Start at  18:25:29
+   Duration  8.42s (tests 98%, import 1%, transform 1%)

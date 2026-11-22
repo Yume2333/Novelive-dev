@@ -1,6 +1,13 @@
 import type { Novelive } from '@novelive/creator/contract'
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Page } from './components/Page'
+import { LibraryPage } from './pages/library/LibraryPage'
+import { UsagePage } from './pages/usage/UsagePage'
+import { AppShell } from './shell/AppShell'
+import '@fontsource/hanken-grotesk/400.css'
+import '@fontsource/manrope/700.css'
 import '@fontsource/noto-sans-sc/chinese-simplified-400.css'
 import './styles/tokens.css'
 import './styles/shell.css'
@@ -11,43 +18,19 @@ declare global {
 	}
 }
 
-function Library() {
-	const [ready, setReady] = useState(false)
-
-	useEffect(() => {
-		let active = true
-		let sawEvent = false
-		const onReady = window.novelive.on('creator.ready', () => {
-			sawEvent = true
-			setReady(true)
-		})
-		const onDown = window.novelive.on('creator.down', () => {
-			sawEvent = true
-			setReady(false)
-		})
-		void window.novelive.host.appState().then((state) => {
-			if (active && !sawEvent) setReady(state.creator === 'ready')
-		})
-		return () => {
-			active = false
-			onReady()
-			onDown()
-		}
-	}, [])
-
-	return (
-		<main>
-			<h1>书库</h1>
-			<p>还没有作品</p>
-			<p role="status">{ready ? '创作端已就绪' : '创作端未就绪'}</p>
-		</main>
-	)
-}
-
 const root = document.getElementById('root')
 if (root)
 	createRoot(root).render(
 		<StrictMode>
-			<Library />
+			<HashRouter>
+				<Routes>
+					<Route element={<AppShell />}>
+						<Route index element={<LibraryPage />} />
+						<Route path="usage" element={<UsagePage />} />
+						<Route path="settings" element={<Page title="设置" />} />
+						<Route path="*" element={<Navigate to="/" replace />} />
+					</Route>
+				</Routes>
+			</HashRouter>
 		</StrictMode>,
 	)

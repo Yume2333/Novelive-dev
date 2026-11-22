@@ -1,0 +1,13 @@
+$ pnpm typecheck && pnpm lint && pnpm test
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 45 files in 30ms. No fixes applied.
+$ vitest run
+
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev/.workflow/worktrees/08-image-models
+
+
+ Test Files  4 passed (4)
+      Tests  96 passed (96)
+   Start at  18:25:40
+   Duration  8.59s (tests 97%, import 2%)

@@ -1,0 +1,96 @@
+.shell {
+	display: flex;
+	height: 100%;
+	overflow: hidden;
+}
+
+.sidebar {
+	flex: 0 0 248px;
+	display: flex;
+	flex-direction: column;
+	margin: var(--space-3) 0 var(--space-3) var(--space-3);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-2xl);
+	background: var(--panel-70);
+	box-shadow: var(--shadow-glass);
+	backdrop-filter: blur(16px);
+}
+
+.sideScroll,
+.mainScroll {
+	flex: 1;
+}
+
+.sideContent {
+	display: flex;
+	flex-direction: column;
+	min-height: 100%;
+	padding: var(--space-4) var(--space-3);
+}
+
+.brand {
+	padding: var(--space-2) var(--space-3) var(--space-4);
+	font: 700 16px var(--font-display);
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+.navigation {
+	display: grid;
+	gap: var(--space-1);
+}
+
+.navLink {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	padding: var(--space-2) var(--space-3);
+	border-radius: var(--radius-lg);
+	color: var(--color-on-surface-variant);
+	text-decoration: none;
+}
+
+.navLink:hover,
+.themes button:hover {
+	background: var(--color-surface-container-low);
+}
+
+.navLink[aria-current="page"],
+.themes button[aria-pressed="true"] {
+	background: var(--color-surface-container-high);
+	color: var(--color-primary);
+}
+
+.themes {
+	display: flex;
+	gap: var(--space-1);
+	padding: var(--space-4) 0 0;
+	margin: auto 0 0;
+	border: 0;
+}
+
+.themes button {
+	display: grid;
+	flex: 1;
+	place-items: center;
+	padding: var(--space-2);
+	border: 0;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	cursor: pointer;
+}
+
+.main {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+}
+
+.announcer {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+}

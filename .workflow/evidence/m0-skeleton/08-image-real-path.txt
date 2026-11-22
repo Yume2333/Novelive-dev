@@ -1,0 +1,6 @@
+gpt-image generate: PASS (SDK strict replay → sharp → app cache → novelive://cache image and thumbnail HTTP 200)
+gpt-image transparent: PASS (SDK strict replay → sharp → app cache → novelive://cache image and thumbnail HTTP 200)
+gpt-image edit: PASS (SDK strict replay → sharp → app cache → novelive://cache image and thumbnail HTTP 200)
+seedream-5.5 generate: PASS (SDK strict replay → sharp → app cache → novelive://cache image and thumbnail HTTP 200)
+seedream-5.5 transparent: PASS (SDK strict replay → sharp → app cache → novelive://cache image and thumbnail HTTP 200)
+seedream-5.5 edit: PASS (SDK strict replay → sharp → app cache → novelive://cache image and thumbnail HTTP 200)

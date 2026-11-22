@@ -11,6 +11,6 @@
 
 - [ ] 补 GitHub Actions Linux 校验及 Xvfb sharp 真解码；记录 PR CI 结果。
 - [ ] W4 浏览器成功回放：以 `NL_REPLAY=strict pnpm dev:web` 分别启动文本和图片用例，`NL_CASSETTE_DIR` 指向从仓库根解析的 `tests/fixtures/text-models/smoke/` 和 `tests/fixtures/image-models/smoke/`，复用 W2 的 smoke 配置与 cassette。在浏览器设置页点击测试，确认三种文本协议和图片三项能力成功，并确认缩略图经 dev-bridge 资源地址加载。
-- [ ] W4 浏览器失败回放：另起严格回放进程，`NL_CASSETTE_DIR` 分别指向从仓库根解析的 `tests/fixtures/text-models/synthetic/` 和 `tests/fixtures/image-models/synthetic/`；在设置页验证文本慢流取消、断线重试耗尽后显示 `network`，以及图片故障显示对应能力的错误而不是成功。
-- [ ] W4 浏览器宿主：结束故障回放进程，重新以 `NL_REPLAY=strict pnpm dev:web` 启动开发桥，将 `NL_CASSETTE_DIR` 切回待重测的文本或图片 `smoke/` 绝对路径，不沿用 `synthetic/`。调用 `host.openLogDir()`，确认终端打印日志目录；在此 smoke 会话调用 `host.restartCreator()`，等创作端重新就绪，再用同一 smoke 配置点击设置页的对应测试并确认成功。
+- [ ] W4 浏览器失败回放：另起严格回放进程，`NL_CASSETTE_DIR` 分别指向从仓库根解析的 `tests/fixtures/text-models/synthetic/` 和 `tests/fixtures/image-models/`；在设置页验证文本慢流取消、断线重试耗尽后显示 `network`，以及图片故障显示对应能力的错误而不是成功。
+- [ ] W4 浏览器宿主：结束故障回放进程，重新以 `NL_REPLAY=strict pnpm dev:web` 启动开发桥，将 `NL_CASSETTE_DIR` 切回待重测的文本或图片 `smoke/` 绝对路径，不沿用故障目录。调用 `host.openLogDir()`，确认终端打印日志目录；在此 smoke 会话调用 `host.restartCreator()`，等创作端重新就绪，再用同一 smoke 配置点击设置页的对应测试并确认成功。
 - [ ] 同视口对比两页并按 W5 记录刻意差异；临时写颜色字面量验证 W6 后还原。

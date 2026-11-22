@@ -1,0 +1,1 @@
+Native fetch → on-disk JSONL → strict replay passed; strict miss made no upstream call

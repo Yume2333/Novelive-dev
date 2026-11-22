@@ -3,7 +3,17 @@
 	"private": true,
 	"type": "module",
 	"exports": "./src/frames.ts",
+	"scripts": {
+		"dev": "tsx src/dev.ts"
+	},
 	"dependencies": {
 		"@novelive/creator": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/ws": "8.18.1",
+		"@vitejs/plugin-react": "5.1.2",
+		"tsx": "4.21.0",
+		"vite": "7.2.7",
+		"ws": "8.18.3"
 	}
 }
