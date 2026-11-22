@@ -397,7 +397,6 @@ ${packets[packet]}`,
 
 	const parts = state.whole ? [state.whole] : state.events
 	const skeleton = combine(volumeId, chapterIds, parts)
-	const observations = new Map<BiblePatch[number], string>()
 	const proposals = new Map<
 		string,
 		{ item: BiblePatch[number]; content: string; chapter?: string }
@@ -421,7 +420,7 @@ ${packets[packet]}`,
 				: new Set(packetIds).size === 1
 					? packetIds[0]
 					: undefined
-		for (const item of part.biblePatch) {
+		for (const { observedChapter: _claimed, ...item } of part.biblePatch) {
 			const { content, observation } = proposalKeys(item, observed)
 			const key = JSON.stringify([content, observation])
 			if (observation) located.add(content)
@@ -437,9 +436,7 @@ ${packets[packet]}`,
 	const biblePatch = [...proposals.values()].flatMap(
 		({ item, content, chapter }) => {
 			if (!chapter) return located.has(content) ? [] : [item]
-			const observed = { ...item }
-			observations.set(observed, chapter)
-			return [observed]
+			return [{ ...item, observedChapter: chapter }]
 		},
 	)
 	const glossaryPatch = unique(parts.flatMap((part) => part.glossaryPatch))
@@ -468,7 +465,6 @@ ${packets[packet]}`,
 					biblePatch,
 					glossaryPatch,
 					chapterSet,
-					observations,
 					provenance,
 				)
 			: {

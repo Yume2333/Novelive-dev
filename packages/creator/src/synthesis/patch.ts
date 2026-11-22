@@ -223,7 +223,10 @@ function unique<T>(values: T[]) {
 	return result
 }
 
-type Point = Omit<Change, 'chapterId'> & { chapterId?: string }
+type Point = Omit<Change, 'chapterId'> & {
+	chapterId?: string
+	baseEcho?: boolean
+}
 type History = Map<string, Point>
 
 function temporalField(kind: keyof Bible) {
@@ -243,7 +246,8 @@ function temporalPoint(
 ): Point | undefined {
 	const field = temporalField(kind)
 	const value = field && (entry as Entry & Record<string, unknown>)[field]
-	if (field && typeof value === 'string') return { field, value, chapterId }
+	if (field && typeof value === 'string' && value)
+		return { field, value, chapterId }
 }
 
 const pointKey = ({ field, value, chapterId }: Point) =>
@@ -267,28 +271,27 @@ function existingHistory(
 	const points: Point[] = changesOf(current).filter(
 		({ field }) => field === temporalField(kind),
 	)
-	const base = current && temporalPoint(kind, current, current.firstSeenChapter)
-	if (base) points.unshift(base)
 	return new Map(points.map((point) => [pointKey(point), point]))
 }
 
 function addPoints(history: History, points: Point[]) {
-	const additions = new Map<string, Point>()
+	const next = new Map(history)
 	for (const point of points) {
 		const key = pointKey(point)
-		if (history.has(key) || additions.has(key)) continue
-		if (
-			[...history.values(), ...additions.values()].some(
-				(prior) =>
-					prior.field === point.field &&
-					prior.chapterId === point.chapterId &&
-					prior.value !== point.value,
-			)
+		const existing = [...next].filter(
+			([, prior]) =>
+				prior.field === point.field && prior.chapterId === point.chapterId,
 		)
-			return false
-		additions.set(key, point)
+		if (point.baseEcho && existing.some(([, prior]) => !prior.baseEcho))
+			continue
+		for (const [priorKey, prior] of existing) {
+			if (prior.baseEcho && !point.baseEcho) next.delete(priorKey)
+			else if (prior.value !== point.value) return false
+		}
+		next.set(key, point)
 	}
-	for (const [key, point] of additions) history.set(key, point)
+	history.clear()
+	for (const [key, point] of next) history.set(key, point)
 	return true
 }
 
@@ -302,26 +305,17 @@ function normalizeHistory<T extends Entry>(
 	const points = [...history.values()].sort(
 		(a, b) => rank(a.chapterId) - rank(b.chapterId),
 	)
-	const base = points[0]
-	if (!base) return entry
-	const transitions = points
-		.slice(1)
-		.filter(
-			(point, index) =>
-				point.chapterId !== undefined && point.value !== points[index].value,
-		)
-	const changes = [
-		...changesOf(entry).filter(({ field }) => field !== base.field),
-		...transitions,
-	]
-	const firstSeenChapter =
-		base.chapterId && rank(base.chapterId) < rank(entry.firstSeenChapter)
-			? base.chapterId
-			: entry.firstSeenChapter
+	const field = points[0]?.field
+	if (!field) return entry
+	let previous = (entry as Entry & Record<string, unknown>)[field] || undefined
+	const changes = changesOf(entry).filter((change) => change.field !== field)
+	for (const { chapterId, value } of points) {
+		if (!chapterId || value === previous) continue
+		changes.push({ chapterId, field, value })
+		previous = value
+	}
 	return {
 		...entry,
-		[base.field]: base.value,
-		...(firstSeenChapter ? { firstSeenChapter } : {}),
 		...(changes.length || 'changes' in entry ? { changes } : {}),
 	}
 }
@@ -332,6 +326,7 @@ function merge<T extends Entry>(
 	kind: keyof Bible,
 	observedChapter?: string,
 	history?: History,
+	order?: ReadonlyMap<string, number>,
 ) {
 	const { conflict: _conflict, ...fields } = raw
 	const candidate = { ...fields, status: 'candidate' } as T
@@ -359,33 +354,62 @@ function merge<T extends Entry>(
 	const points: Point[] = proposedChanges.filter(
 		({ field }) => field === temporal,
 	)
-	const observation = temporalPoint(
-		kind,
-		candidate,
-		observedChapter ?? (!current ? candidate.firstSeenChapter : undefined),
-	)
-	if (observation && (observation.chapterId || !current))
-		points.push(observation)
-	const temporalConflict =
-		!fixedConflict && history && !addPoints(history, points)
-	if (current && (fixedConflict || temporalConflict))
+	const observation = temporalPoint(kind, candidate, observedChapter)
+	const base = current && temporalPoint(kind, current)
+	if (observation?.chapterId)
+		points.push({ ...observation, baseEcho: observation.value === base?.value })
+	const unscoped =
+		current?.status === 'confirmed' &&
+		observation &&
+		!observation.chapterId &&
+		observation.value !== base?.value &&
+		!points.some(({ value }) => value === observation.value)
+	const firstSeen = current?.firstSeenChapter
+		? order?.get(current.firstSeenChapter)
+		: undefined
+	const proposedFirstSeen = candidate.firstSeenChapter
+		? order?.get(candidate.firstSeenChapter)
+		: undefined
+	const predates =
+		current?.status === 'confirmed' &&
+		firstSeen !== undefined &&
+		((proposedFirstSeen !== undefined && proposedFirstSeen < firstSeen) ||
+			points.some((point) => {
+				const chapter = point.chapterId
+					? order?.get(point.chapterId)
+					: undefined
+				return (
+					chapter !== undefined &&
+					chapter < firstSeen &&
+					!history?.has(pointKey(point))
+				)
+			}))
+	const conflict = fixedConflict
+		? difference
+		: unscoped
+			? 'Proposed temporal value has no observed chapter'
+			: predates
+				? 'Proposed temporal value predates the confirmed entry'
+				: history && !addPoints(history, points)
+					? 'Different temporal values claimed for the same chapter'
+					: undefined
+	if (conflict)
 		return {
 			entry: current,
 			conflict: {
 				...candidate,
-				conflict: fixedConflict
-					? difference
-					: 'Different temporal values claimed for the same chapter',
+				conflict,
 			} as T,
 		}
-	if (temporalConflict)
-		return {
-			entry: undefined,
-			conflict: {
-				...candidate,
-				conflict: 'Different temporal values claimed for the same chapter',
-			} as T,
-		}
+	if (
+		!current &&
+		temporal &&
+		observation &&
+		points.some(({ value }) => value === observation.value)
+	) {
+		if (temporal === 'identity') delete after[temporal]
+		else Object.assign(after, { [temporal]: '' })
+	}
 	if (current?.status !== 'confirmed') Object.assign(after, incoming)
 	for (const field of ['firstSeenChapter', 'revealedChapter'] as const)
 		if (current?.[field] !== undefined) after[field] = current[field]
@@ -413,7 +437,6 @@ export async function applyPatches(
 	patch: BiblePatch,
 	glossary: GlossaryPatch,
 	chapters: ReadonlySet<string>,
-	observations: ReadonlyMap<Patch, string> = new Map(),
 	seriesChapters = chapters,
 ): Promise<{ conflicts: BiblePatch; glossaryConflicts: GlossaryPatch }> {
 	const chapterOrder = new Map(
@@ -424,6 +447,7 @@ export async function applyPatches(
 	const pending: (() => Promise<void>)[] = []
 	const characterDeletions: (() => Promise<void>)[] = []
 	const removedCharacters = new Set<string>()
+	const accepted = new Set<Patch>()
 	let survivingCharacters = bible.character
 	let survivingRelations = bible.relation
 	const write = async <T>(
@@ -461,17 +485,32 @@ export async function applyPatches(
 				}
 				continue
 			}
+			if (item.op === 'update' && !current) {
+				conflicts.push({
+					...item,
+					entry: {
+						...item.entry,
+						status: 'candidate',
+						conflict: 'Entry to update is not published',
+					},
+				} as Patch)
+				continue
+			}
 			const history =
 				histories.get(item.entry.id) ?? existingHistory(current, kind)
 			const { entry, conflict } = merge<E>(
 				current,
 				item.entry as E,
 				kind,
-				observations.get(item),
+				item.observedChapter,
 				history,
+				chapterOrder,
 			)
 			if (conflict) conflicts.push({ ...item, entry: conflict } as Patch)
-			else if (entry && history.size) histories.set(entry.id, history)
+			else if (entry) {
+				accepted.add(item)
+				if (history.size) histories.set(entry.id, history)
+			}
 			if (entry && !isDeepStrictEqual(current, entry)) {
 				entries.set(entry.id, entry)
 				changed.add(entry.id)
@@ -532,39 +571,60 @@ export async function applyPatches(
 		write(projectFiles.style(scope), entries),
 	)
 
-	const blocked = new Set(
-		[
-			...survivingRelations.flatMap(({ from, to }) => [from, to]),
-			...survivingCharacters.flatMap(
-				({ addresses }) => addresses?.map(({ speakerId }) => speakerId) ?? [],
-			),
-		].filter((id) => removedCharacters.has(id)),
-	)
-	if (blocked.size) {
+	const publishedIds = new Set(survivingCharacters.map(({ id }) => id))
+	const references = (entry: Character | Relation) =>
+		'from' in entry
+			? [entry.from, entry.to]
+			: (entry.addresses?.map(({ speakerId }) => speakerId) ?? [])
+	const blocked = new Set<string>()
+	const invalid = new Map<Patch, string>()
+	for (const [kind, survivors, original] of [
+		['relation', survivingRelations, bible.relation],
+		['character', survivingCharacters, bible.character],
+	] as const) {
+		for (const entry of survivors) {
+			const originalEntry = original.find(({ id }) => id === entry.id)
+			const originalRefs = originalEntry
+				? new Set(references(originalEntry))
+				: new Set<string>()
+			for (const id of references(entry)) {
+				if (publishedIds.has(id)) continue
+				if (originalRefs.has(id) && removedCharacters.has(id)) blocked.add(id)
+				else
+					for (const proposal of accepted)
+						if (proposal.kind === kind && proposal.entry.id === entry.id)
+							invalid.set(proposal, id)
+			}
+		}
+	}
+	if (blocked.size || invalid.size) {
 		const allowed: BiblePatch = []
 		const rejected: BiblePatch = []
-		for (const item of patch)
-			if (
+		for (const item of patch) {
+			const missing = invalid.get(item)
+			const referenced =
 				item.kind === 'character' &&
 				item.op === 'delete' &&
 				blocked.has(item.entry.id)
-			)
+			if (referenced || missing)
 				rejected.push({
 					...item,
 					entry: {
 						...item.entry,
 						status: 'candidate',
-						conflict: `Cannot delete character ${item.entry.id}: still referenced in the Bible`,
+						conflict: referenced
+							? `Cannot delete character ${item.entry.id}: still referenced in the Bible`
+							: `Referenced character is not published: ${missing}`,
 					},
-				})
+				} as Patch)
 			else allowed.push(item)
+		}
 		const result = await applyPatches(
 			project,
 			bible,
 			allowed,
 			glossary,
 			chapters,
-			observations,
 			seriesChapters,
 		)
 		return { ...result, conflicts: [...rejected, ...result.conflicts] }

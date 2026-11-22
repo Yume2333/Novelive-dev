@@ -312,11 +312,13 @@ test.each([
 	{
 		model: 'fixture-repeated-proposal',
 		count: 1,
+		chapters: ['c2'],
 		expected: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
 	},
 	{
 		model: 'fixture-returning-proposal',
 		count: 3,
+		chapters: ['c1', 'c2', 'c3'],
 		expected: [
 			{ chapterId: 'c2', field: 'identity', value: 'Captain' },
 			{ chapterId: 'c3', field: 'identity', value: 'Cartographer' },
@@ -324,7 +326,7 @@ test.each([
 	},
 ])(
 	'proposal deduplication retains required chapter evidence: $model',
-	async ({ model, count, expected }) => {
+	async ({ model, count, expected, chapters: observed }) => {
 		await seed(root)
 		using project = await Project.open(root)
 		const ids =
@@ -341,6 +343,11 @@ test.each([
 			fetch: packetFetch,
 		})
 		expect(result.biblePatch).toHaveLength(count)
+		expect(
+			(await project.read(files.result)).biblePatch.map(
+				({ observedChapter }) => observedChapter,
+			),
+		).toEqual(observed)
 		expect(result.conflicts).toEqual([])
 		expect(
 			await project.read(projectFiles.character(scope, 'ada')),
@@ -519,10 +526,9 @@ test('character deletion becomes a conflict if a surviving relation references i
 		new Set(chapters),
 	)
 	expect(added.conflicts).toHaveLength(1)
-	expect((await readBible(project)).relation).toEqual([relation])
+	expect((await readBible(project)).relation).toEqual([])
 	expect((await readBible(project)).character.map(({ id }) => id)).toEqual([
 		'ada',
-		'guide',
 	])
 })
 
@@ -576,6 +582,7 @@ test.each(['explicit', 'observed'])(
 		const update = {
 			kind: 'location',
 			op: 'update',
+			observedChapter: source === 'observed' ? 'c2' : undefined,
 			entry:
 				source === 'explicit'
 					? { ...tower, changes: [temporal] }
@@ -597,7 +604,6 @@ test.each(['explicit', 'observed'])(
 			],
 			[],
 			new Set(chapters),
-			source === 'observed' ? new Map([[update, 'c2']]) : undefined,
 		)
 		expect(result.conflicts).toHaveLength(1)
 		expect(await project.read(file)).toMatchObject({
@@ -658,12 +664,48 @@ test.each([
 		expected: [['c1', 'Captain']],
 		conflict: true,
 	},
+	{
+		name: 'an earlier observation cannot move a confirmed base',
+		firstSeen: 'c2',
+		history: [],
+		proposals: [{ observed: 'c1', value: 'Captain', history: [] }],
+		expected: [],
+		conflict: true,
+	},
+	{
+		name: 'an undated different value conflicts',
+		history: [],
+		proposals: [{ observed: undefined, value: 'Captain', history: [] }],
+		expected: [],
+		conflict: true,
+	},
+	{
+		name: 'an explicit change wins over a base echo in the same proposal',
+		history: [],
+		proposals: [
+			{ observed: 'c2', value: 'Cartographer', history: [['c2', 'Captain']] },
+		],
+		expected: [['c2', 'Captain']],
+	},
+	{
+		name: 'an explicit change wins over a previously collected base echo',
+		history: [],
+		proposals: [
+			{ observed: 'c2', value: 'Cartographer', history: [] },
+			{ history: [['c2', 'Captain']] },
+		],
+		expected: [['c2', 'Captain']],
+	},
 ])(
 	'temporal normalization: $name',
-	async ({ history, proposals, expected, conflict }) => {
+	async ({ history, proposals, expected, conflict, firstSeen }) => {
 		await seed(root)
 		using project = await Project.open(root)
-		const entry = { ...confirmed, aliases: [], firstSeenChapter: 'earlier' }
+		const entry = {
+			...confirmed,
+			aliases: [],
+			firstSeenChapter: firstSeen ?? 'earlier',
+		}
 		const points = (rows: string[][]) =>
 			rows.map(([chapterId, value]) => ({
 				chapterId,
@@ -675,18 +717,17 @@ test.each([
 			formatVersion: 1,
 			entries: [{ ...entry, changes: points(history) }],
 		})
-		const observations = new Map<BiblePatch[number], string>()
 		const patch = proposals.map((proposal) => {
 			const item = {
 				kind: 'character',
 				op: 'update',
+				observedChapter: proposal.observed,
 				entry: {
 					...entry,
 					identity: proposal.value,
 					changes: points(proposal.history),
 				},
 			} satisfies BiblePatch[number]
-			if (proposal.observed) observations.set(item, proposal.observed)
 			return item
 		})
 		const result = await applyPatches(
@@ -695,7 +736,6 @@ test.each([
 			patch,
 			[],
 			new Set(chapters),
-			observations,
 			new Set(['earlier', ...chapters, 'c3']),
 		)
 		expect(result.conflicts).toHaveLength(conflict ? 1 : 0)
@@ -707,6 +747,126 @@ test.each([
 				},
 			],
 		})
+	},
+)
+
+test.each(['character', 'location'] as const)(
+	'a dated %s value is never promoted to the base',
+	async (kind) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const item: BiblePatch[number] =
+			kind === 'character'
+				? {
+						kind,
+						op: 'add',
+						observedChapter: 'c2',
+						entry: {
+							...confirmed,
+							aliases: [],
+							status: 'candidate',
+							id: 'new',
+							identity: 'Captain',
+						},
+					}
+				: {
+						kind,
+						op: 'add',
+						entry: {
+							id: 'new',
+							status: 'candidate',
+							name: 'New',
+							description: 'Ruined',
+							changes: [
+								{ chapterId: 'c2', field: 'description', value: 'Ruined' },
+							],
+						},
+					}
+		const result = await applyPatches(
+			project,
+			await readBible(project),
+			[item],
+			[],
+			new Set(chapters),
+		)
+		expect(result.conflicts).toEqual([])
+		const entries = (await readBible(project))[kind]
+		const entry = entries.find(({ id }) => id === 'new')
+		expect(entry).toMatchObject({
+			changes: [
+				kind === 'character'
+					? { chapterId: 'c2', field: 'identity', value: 'Captain' }
+					: { chapterId: 'c2', field: 'description', value: 'Ruined' },
+			],
+		})
+		if (kind === 'character') expect(entry).not.toHaveProperty('identity')
+		else expect(entry).toHaveProperty('description', '')
+	},
+)
+
+test.each(['relation', 'character'] as const)(
+	'a %s referencing a rejected character goes to review',
+	async (kind) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const missing = {
+			kind: 'character',
+			op: 'add',
+			observedChapter: 'c1',
+			entry: {
+				...confirmed,
+				aliases: [],
+				id: 'missing',
+				identity: 'Captain',
+				changes: [{ chapterId: 'c1', field: 'identity', value: 'Admiral' }],
+			},
+		} satisfies BiblePatch[number]
+		const dependent =
+			kind === 'relation'
+				? ({
+						kind,
+						op: 'add',
+						entry: {
+							id: 'dependent',
+							status: 'candidate',
+							from: 'ada',
+							to: 'missing',
+							description: 'Guide',
+						},
+					} satisfies BiblePatch[number])
+				: ({
+						kind,
+						op: 'add',
+						entry: {
+							...confirmed,
+							aliases: [],
+							id: 'dependent',
+							addresses: [{ speakerId: 'missing', name: 'Friend' }],
+						},
+					} satisfies BiblePatch[number])
+		const result = await applyPatches(
+			project,
+			await readBible(project),
+			[missing, dependent],
+			[],
+			new Set(chapters),
+		)
+		expect(result.conflicts).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					entry: expect.objectContaining({ id: 'missing' }),
+				}),
+				expect.objectContaining({
+					entry: expect.objectContaining({
+						id: 'dependent',
+						conflict: 'Referenced character is not published: missing',
+					}),
+				}),
+			]),
+		)
+		const bible = await readBible(project)
+		expect(bible.character.map(({ id }) => id)).toEqual(['ada'])
+		expect(bible.relation).toEqual([])
 	},
 )
 

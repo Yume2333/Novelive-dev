@@ -14,9 +14,9 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m1a-synthesis.test.ts` — 26 passed; full strict `pnpm check` — 238 passed.
+- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m1a-synthesis.test.ts` — 34 passed; full strict `pnpm check` — 246 passed.
 - Real path: whole-volume replay saved the skeleton and candidate/conflict records. In separate processes, event synthesis stopped after one event, resumed with one replay request and reopened with zero. Confirmed content remained in use.
 - Receipt: [05-volume-synthesis.txt](../../evidence/m1a/05-volume-synthesis.txt).
 - W4 real-book comparison remains unaccepted pending M1a/07 and book approval. Paid usage: 0 calls, 0 tokens, 0 images.
 - Review: skipped — no fresh local reviewer tool available at archive.
-- [PR #20 Devin Review](https://app.devin.ai/review/yume2333/novelive-dev/pull/20): addressed findings through `723e142`, including chapter-keyed temporal normalization; final independent review not yet recorded.
+- [PR #20 Devin Review](https://app.devin.ai/review/yume2333/novelive-dev/pull/20): addressed findings through `f4fe261`, including temporal base preservation, final reference validation, and persistence of observed chapters; final independent review not yet recorded.
