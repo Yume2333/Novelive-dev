@@ -45,7 +45,7 @@ Evidence: `.workflow/evidence/`（界面验收截图和日志进仓库；生图�
 
 ## Code conventions
 
-- 界面必须遵守 `DESIGN.md`；颜色、间距、圆角只用 Tokens；**全项目禁止系统默认滚动条**，滚动容器统一复用控件库 `<ScrollArea>`（多行输入框用 `.nl-scroll-hidden` + `<OverlayScrollbar>`）。
+- 界面必须遵守 `DESIGN.md`：颜色、间距、圆角、阴影与动效只用 Tokens；**全项目禁止系统默认滚动条**（统一 `<ScrollArea>` / `<OverlayScrollbar>`）；禁止细长 `radius-full` 文字胶囊、圆点状态指示、卡片底线滑条与输入框实线聚焦描边；播放器默认菜单与覆盖层沿用主界面 Tokens（作品配色由自定义 CSS 覆盖）。
 - 播放器包不依赖创作端；界面只通过 `@novelive/creator/contract` 引用创作端的命令和事件类型。
 - 「不做防御性设计」只管产品代码，不放宽上面的开发期规则。
 
