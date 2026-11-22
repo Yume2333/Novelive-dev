@@ -1,10 +1,22 @@
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { expect, test } from 'vitest'
 import { WebSocket } from 'ws'
 import { connectDevBridge } from '../../tools/dev-bridge/src/client'
 import { startDevBridge } from '../../tools/dev-bridge/src/server'
+import { viteFileUrl } from '../../tools/dev-bridge/src/vite-url'
+
+test('Vite bootstrap URLs preserve Windows drive paths and encode spaces', () => {
+	const path = win32.join('C:\\', 'Novelive dev', 'browser.ts')
+	expect(viteFileUrl(pathToFileURL(path, { windows: true }))).toBe(
+		'/@fs/C:/Novelive%20dev/browser.ts',
+	)
+	expect(viteFileUrl(new URL('file:///home/novelive/browser.ts'))).toBe(
+		'/@fs/home/novelive/browser.ts',
+	)
+})
 
 test('local browser bridge forwards creator commands and host operations and confines cache resources', async () => {
 	const dataDir = await mkdtemp(join(tmpdir(), 'novelive-bridge-'))

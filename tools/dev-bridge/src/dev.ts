@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { createServer } from 'vite'
 import { startDevBridge } from './server'
+import { viteFileUrl } from './vite-url'
 
 const root = resolve(import.meta.dirname, '../../..')
 const bridge = await startDevBridge()
@@ -26,7 +27,7 @@ try {
 							tag: 'script',
 							attrs: {
 								type: 'module',
-								src: `/@fs${resolve(import.meta.dirname, 'browser.ts')}`,
+								src: viteFileUrl(new URL('./browser.ts', import.meta.url)),
 							},
 							injectTo: 'head-prepend',
 						},
