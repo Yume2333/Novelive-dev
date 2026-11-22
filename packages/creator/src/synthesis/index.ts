@@ -129,6 +129,27 @@ function previewPackets(
 	}
 	return packets
 }
+
+async function seriesChapterIds(
+	project: Project,
+	chapterIds: readonly string[],
+) {
+	const series = await project.read(projectFiles.series)
+	const volumes = await Promise.all(
+		series.volumeIds.map((id) =>
+			existing(() => project.read(projectFiles.volume(id))),
+		),
+	)
+	const works = await Promise.all(
+		volumes.flatMap(
+			(volume) =>
+				volume?.workIds.map((id) =>
+					project.read(projectFiles.work(volume.volumeId, id)),
+				) ?? [],
+		),
+	)
+	return new Set([...chapterIds, ...works.flatMap((work) => work.chapterIds)])
+}
 const unique = <T>(items: T[]) => [
 	...new Map(items.map((item) => [JSON.stringify(item), item])).values(),
 ]
@@ -237,6 +258,7 @@ ${packetText.join('\n')}`
 		throw new Error('Existing Bible is too large for synthesis context')
 
 	const chapterSet = new Set(chapterIds)
+	const provenance = await seriesChapterIds(project, chapterIds)
 	async function request<T extends Output>(
 		prompt: string,
 		validator: {
@@ -296,7 +318,7 @@ ${packetText.join('\n')}`
 			bible,
 			[...prior.flatMap((part) => part.biblePatch), ...output.biblePatch],
 			output.glossaryPatch,
-			chapterSet,
+			provenance,
 			incremental,
 		)
 	}

@@ -13,6 +13,7 @@ import {
 	chapters,
 	confirmed,
 	connection,
+	planted,
 	previews,
 	scope,
 	seed,
@@ -187,6 +188,20 @@ test('automatic fallback streams all preview packets without truncation', async 
 	expect(result.chapters[1]).toEqual({
 		chapterId: 'c2',
 		progress: 'Ada opens the tower.',
+	})
+})
+
+test('incremental synthesis can resolve foreshadowing planted in an earlier volume', async () => {
+	await seed(root, false, true)
+	using project = await Project.open(root)
+	await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		connection: { ...connection, model: 'fixture-synthesis-cross-volume' },
+		incremental: true,
+		strategy: 'whole',
+	})
+	expect(await project.read(projectFiles.foreshadowing(scope))).toMatchObject({
+		entries: [{ ...planted, resolvedChapter: 'c2' }],
 	})
 })
 

@@ -10,6 +10,7 @@ import {
 	chapters,
 	connection,
 	glossaryChanges,
+	planted,
 	progress,
 	seed,
 } from './fixture'
@@ -69,6 +70,15 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 			},
 		] as unknown as typeof changes
 	}
+	if (body.model === 'fixture-synthesis-cross-volume') {
+		result.biblePatch = [
+			{
+				kind: 'foreshadowing',
+				op: 'update',
+				entry: { ...planted, resolvedChapter: 'c2' },
+			},
+		] as unknown as typeof changes
+	}
 	return new Response(
 		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
 		{
@@ -86,16 +96,18 @@ try {
 		['events', 'events', false],
 		['auto', 'auto', true],
 		['invalid', 'whole', false],
+		['cross-volume', 'whole', false],
 	] as const) {
 		const root = join(directory, scenario)
-		await seed(root, extended)
+		await seed(root, extended, scenario === 'cross-volume')
 		using project = await Project.open(root)
 		const run = synthesizeVolume(project, 'v1', chapters, {
+			incremental: scenario === 'cross-volume',
 			strategy,
 			language: 'en',
 			connection:
-				scenario === 'invalid'
-					? { ...connection, model: 'fixture-synthesis-invalid' }
+				scenario === 'invalid' || scenario === 'cross-volume'
+					? { ...connection, model: `fixture-synthesis-${scenario}` }
 					: connection,
 			fetch: createReplayFetch({
 				mode: 'record',

@@ -2,6 +2,7 @@ import type { TextConnection } from '../../../../packages/creator/src/models/tex
 import { Project } from '../../../../packages/creator/src/project'
 import {
 	type ChapterPreview,
+	defaultWorkSettings,
 	formatVersion,
 	projectFiles,
 } from '../../../../packages/format/src/model'
@@ -45,13 +46,48 @@ export const previews: ChapterPreview[] = chapters.map((chapterId, index) => ({
 	foreshadowingHints: [],
 }))
 
-export async function seed(root: string, extended = false) {
+export const planted = {
+	id: 'old-key',
+	description: 'The key foreshadows opening the tower.',
+	status: 'candidate',
+	plantedChapter: 'earlier',
+} as const
+
+export async function seed(
+	root: string,
+	extended = false,
+	crossVolume = false,
+) {
 	using project = await Project.create(root, {
 		formatVersion,
 		seriesId: 'paper',
 		title: 'Paper Sea',
-		volumeIds: ['v1'],
+		volumeIds: crossVolume ? ['v0', 'v1'] : ['v1'],
 	})
+	if (crossVolume) {
+		const workId = '00000000-0000-0000-0000-000000000001'
+		await project.write(projectFiles.volume('v0'), {
+			formatVersion,
+			volumeId: 'v0',
+			title: 'First volume',
+			workIds: [workId],
+		})
+		await project.write(projectFiles.work('v0', workId), {
+			formatVersion,
+			workId,
+			title: 'First volume',
+			chapterIds: ['earlier'],
+			version: 0,
+			minReaderVersion: 1,
+			appVersion: '0.1.0',
+			language: 'en',
+			settings: defaultWorkSettings(),
+		})
+		await project.write(projectFiles.foreshadowing(scope), {
+			formatVersion,
+			entries: [planted],
+		})
+	}
 	await project.write(projectFiles.character(scope, 'ada'), {
 		formatVersion,
 		entries: [{ ...confirmed, aliases: [] }],
