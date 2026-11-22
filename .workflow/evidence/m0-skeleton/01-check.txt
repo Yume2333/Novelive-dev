@@ -1,0 +1,51 @@
+Scope: all 5 workspace projects
+✓ Lockfile passes supply-chain policies (verified 3m ago)
+Lockfile is up to date, resolution step is skipped
+Done in 21ms using pnpm v12.21.0
+$ pnpm typecheck && pnpm lint && pnpm test
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 24 files in 7ms. No fixes applied.
+$ vitest run
+
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  17:36:55
+   Duration  138ms (transform 60%, import 29%, worker 6%, tests 5%)
+
+$ pnpm build && playwright test --grep 'M0 desktop shell'
+$ pnpm --filter @novelive/desktop build
+$ electron-vite build
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 14 modules transformed.
+rendering chunks...
+out/main/index.js     3.06 kB
+out/main/creator.js  93.24 kB
+✓ built in 294ms
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 12 modules transformed.
+rendering chunks...
+out/preload/index.cjs  91.39 kB
+✓ built in 118ms
+vite v7.2.7 building client environment for production...
+transforming...
+✓ 29 modules transformed.
+rendering chunks...
+../../apps/desktop/out/renderer/index.html                                                            0.40 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-Ba7eOkfT.woff2  1,142.55 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-CN8EQoOj.woff   1,564.08 kB
+../../apps/desktop/out/renderer/assets/index-BLXoykmq.css                                             0.78 kB
+../../apps/desktop/out/renderer/assets/index-CvWx2pir.js                                            641.80 kB
+✓ built in 1.03s
+
+Running 2 tests using 1 worker
+
+  ✓  1 tests/e2e/m0-shell.spec.ts:36:1 › M0 desktop shell renders the empty library and connects to a real creator (465ms)
+  ✓  2 tests/e2e/m0-shell.spec.ts:68:1 › M0 desktop shell does not register debug commands without NL_E2E (327ms)
+
+  2 passed (1.4s)

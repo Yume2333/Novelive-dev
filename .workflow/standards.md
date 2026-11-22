@@ -10,15 +10,17 @@ Novelive：Electron 桌面应用（Windows/macOS/Linux）。创作者导入小�
 
 环境前提：Node 24（24.22.3）、pnpm 12（12.21.0）、Electron 45.4.1（完整锁定表见 `docs/architecture.md`「版本锁定」）。
 
-M0 搭好 pnpm workspaces 骨架后填写安装、运行、测试、类型检查命令。在那之前只有原型：
+Linux 需安装 `patchelf`（支持 `--rename-dynamic-symbols`）和 `binutils`。无图形会话时用 `xvfb-run -a` 运行 Electron。
 
 ```sh
-cd prototype && npm install
-cd prototype && npm run dev
-cd prototype && npx tsc --noEmit
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm typecheck
+pnpm check
+pnpm test:e2e --grep 'M0 desktop shell'
 ```
 
-Real path: M0 之后启动 Electron 应用，把流程实际走一遍；在那之前用浏览器打开原型页面。
+Real path: 启动 Electron 应用，把流程实际走一遍。
 Evidence: `.workflow/evidence/`（界面验收截图和日志进仓库；生图对比试验图片按目录 `.gitignore` 排除；录制文件放 `tests/fixtures/`。仓库是公开的，Key、中转地址和测试用书原文不进仓库）
 
 ## Layout

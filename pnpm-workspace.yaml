@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/dev-bridge
+nodeLinker: hoisted
+shamefullyHoist: true
+engineStrict: true
+allowBuilds:
+  electron: true
+  esbuild: true
+  sharp: true
+overrides:
+  vite: 7.2.7

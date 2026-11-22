@@ -1,0 +1,19 @@
+{
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"files": {
+		"includes": [
+			"*.json",
+			"*.ts",
+			"apps/**",
+			"packages/**",
+			"tools/**",
+			"tests/**",
+			"!!**/node_modules",
+			"!!**/out",
+			"!!**/dist"
+		]
+	},
+	"javascript": {
+		"formatter": { "quoteStyle": "single", "semicolons": "asNeeded" }
+	}
+}

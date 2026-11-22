@@ -1,0 +1,27 @@
+{
+	"name": "novelive",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@12.21.0",
+	"engines": {
+		"node": "24.22.3",
+		"pnpm": "12.21.0"
+	},
+	"scripts": {
+		"dev": "pnpm --filter @novelive/desktop dev",
+		"build": "pnpm --filter @novelive/desktop build",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check && stylelint 'packages/ui/src/**/*.css'",
+		"test": "vitest run",
+		"check": "pnpm typecheck && pnpm lint && pnpm test",
+		"test:e2e": "pnpm build && playwright test"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.8",
+		"@playwright/test": "1.65.1",
+		"@types/node": "24.19.2",
+		"stylelint": "18.1.0",
+		"typescript": "5.9.3",
+		"vitest": "5.1.1"
+	}
+}

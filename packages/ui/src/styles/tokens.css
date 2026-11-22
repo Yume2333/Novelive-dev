@@ -1,0 +1,7 @@
+:root {
+	--color-background: #faf9f7;
+	--color-on-surface: #1a1c1b;
+	--color-on-surface-variant: #474741;
+	--shell-spacing: 48px;
+	--font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
