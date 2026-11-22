@@ -14,9 +14,13 @@ import {
 export const formatVersion = 1
 export const version = { formatVersion: lit(formatVersion) }
 export const open = { open: true } as const
-export const idPattern = '^[a-z0-9][a-z0-9_-]*$'
+export const idToken = '[a-z0-9][a-z0-9_-]*'
+export const idPattern = `^${idToken}$`
+export const assetPathId = `${idToken}(?:/${idToken}){1,2}`
+export const cgId = `cg-${idToken}`
 export const entityId = str({ pattern: idPattern })
-export const paragraphId = str({ pattern: '^p(?!0+$)[0-9]{4,}$' })
+export const paragraphIdPattern = '^p(?!0+$)[0-9]{4,}$'
+export const paragraphId = str({ pattern: paragraphIdPattern })
 export const sceneId = str({ pattern: '^[0-9a-f]{8}$' })
 export const lineId = str({ pattern: '^[0-9a-f]{4}$' })
 export const workId = str({
@@ -92,8 +96,7 @@ export const assetRegistrySchema = obj(
 			obj(
 				{
 					id: str({
-						pattern:
-							'^(?:cg-[a-z0-9][a-z0-9_-]*|[a-z0-9][a-z0-9_-]*(?:/[a-z0-9][a-z0-9_-]*){1,2})$',
+						pattern: `^(?:${cgId}|${assetPathId})$`,
 					}),
 					type: oneOf(['character', 'location', 'cg', 'expression', 'variant']),
 					path: str({ minLength: 1 }),
