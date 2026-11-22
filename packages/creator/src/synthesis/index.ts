@@ -413,7 +413,12 @@ ${packets[packet]}`,
 					: undefined
 		for (const item of part.biblePatch) {
 			const key = JSON.stringify(item)
-			if (proposals.has(key)) continue
+			const prior = proposals.get(key)
+			if (prior) {
+				if (observed && !observations.has(prior))
+					observations.set(prior, observed)
+				continue
+			}
 			proposals.set(key, item)
 			if (observed) observations.set(item, observed)
 		}

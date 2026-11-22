@@ -42,6 +42,7 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 	const firstLongEvent =
 		body.model === 'fixture-long-event' && packet[1] === '1'
 	const events = Number(/^Events already extracted: (\d+)$/m.exec(prompt)?.[1])
+	const repeated = body.model === 'fixture-repeated-proposal'
 	const oversized = '🦊'.repeat(160)
 	if (firstLongEvent && events === 1) {
 		const encoded = /^Recent event summaries: (.+)$/m.exec(prompt)?.[1] ?? ''
@@ -52,13 +53,27 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 	}
 	const result = {
 		overview: 'A long journey.',
-		chapters: Array.from(chapterIds, (chapterId) => ({
-			chapterId,
-			progress: 'The journey continues.',
-		})),
-		event: firstLongEvent && events === 0 ? oversized : `Event ${packet[1]}`,
-		is_last: !firstLongEvent || events > 0,
-		biblePatch: [],
+		chapters: Array.from(
+			repeated && events > 0 ? ['c2'] : chapterIds,
+			(chapterId) => ({
+				chapterId,
+				progress: 'The journey continues.',
+			}),
+		),
+		event:
+			firstLongEvent && events === 0
+				? oversized
+				: `Event ${packet[1]}:${events}`,
+		is_last: !(firstLongEvent || repeated) || events > 0,
+		biblePatch: repeated
+			? [
+					{
+						kind: 'character',
+						op: 'update',
+						entry: { ...confirmed, identity: 'Captain' },
+					},
+				]
+			: [],
 		glossaryPatch: [],
 	}
 	return new Response(
@@ -279,6 +294,29 @@ test('a minimum-context continuation retains a truncated newest event in the sam
 	})
 	expect(packetFetch.mock.calls.length).toBeGreaterThan(1)
 	expect(result.chapters.map(({ chapterId }) => chapterId)).toEqual(chapters)
+})
+
+test('duplicate proposals retain a chapter named only in the later copy', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		connection: { ...connection, model: 'fixture-repeated-proposal' },
+		strategy: 'events',
+		fetch: packetFetch,
+	})
+	expect(result.biblePatch).toHaveLength(1)
+	expect(result.conflicts).toEqual([])
+	expect(
+		await project.read(projectFiles.character(scope, 'ada')),
+	).toMatchObject({
+		entries: [
+			{
+				...confirmed,
+				changes: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
+			},
+		],
+	})
 })
 
 test('automatic fallback streams all preview packets without truncation', async () => {
