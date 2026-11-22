@@ -6,6 +6,7 @@ import sharp from 'sharp'
 import type { MaskedConfig } from '../../config'
 import type { CommandError } from '../../contract'
 import { createReplayFetch, type ReplayOptions } from '../../replay'
+import { imageDownloadUpstream } from './download'
 import { imageProvider, imageSize } from './size'
 
 export { imageProvider, imageSize } from './size'
@@ -128,6 +129,10 @@ export async function testImage(
 		return results
 	}
 	const fetch = createReplayFetch(options.replay)
+	const download = createReplayFetch({
+		...options.replay,
+		fetch: imageDownloadUpstream(config.baseUrl, options.replay?.fetch),
+	})
 	for (const capability of ['generate', 'transparent', 'edit'] as const) {
 		try {
 			options.signal?.throwIfAborted()
@@ -215,9 +220,16 @@ export async function testImage(
 					const signal = options.signal
 						? AbortSignal.any([options.signal, deadline])
 						: deadline
-					const download = await fetch(image.url, { signal })
-					if (!download.ok) throw new Error('Image download failed')
-					bytes = Buffer.from(await download.arrayBuffer())
+					const url = new URL(image.url)
+					if (
+						!['http:', 'https:'].includes(url.protocol) ||
+						url.username ||
+						url.password
+					)
+						throw new Error('Invalid image download URL')
+					const response = await download(url, { signal })
+					if (!response.ok) throw new Error('Image download failed')
+					bytes = Buffer.from(await response.arrayBuffer())
 				} catch (cause) {
 					throw new OpenAI.APIConnectionError({
 						message: 'Image download failed',

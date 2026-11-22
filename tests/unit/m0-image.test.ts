@@ -13,6 +13,39 @@ import {
 	imageSize,
 	testImage,
 } from '../../packages/creator/src/models/image'
+import { imageDownloadUpstream } from '../../packages/creator/src/models/image/download'
+
+it('rejects non-web image destinations and checks redirects outside the configured origin', async () => {
+	const upstream = vi.fn(
+		async () =>
+			new Response(null, {
+				status: 302,
+				headers: { location: 'http://[::ffff:127.0.0.1]/' },
+			}),
+	)
+	const download = imageDownloadUpstream('http://127.0.0.1:8123/v1', upstream)
+	await expect(download('file:///image.png')).rejects.toThrow(
+		'Invalid image download URL',
+	)
+	await expect(download('http://127.0.0.1:8123/image.png')).rejects.toThrow(
+		'requires a public address',
+	)
+	expect(upstream).toHaveBeenCalledTimes(1)
+	expect(upstream).toHaveBeenCalledWith(
+		new URL('http://127.0.0.1:8123/image.png'),
+		expect.objectContaining({
+			redirect: 'manual',
+			dispatcher: undefined,
+		}),
+	)
+})
+
+it('refuses image hostnames whose DNS answers are private', async () => {
+	const download = imageDownloadUpstream(base.baseUrl)
+	await expect(download('http://localhost/image.png')).rejects.toMatchObject({
+		cause: { message: 'Image download requires a public address' },
+	})
+})
 
 const directory = 'tests/fixtures/image-models'
 const dirs: string[] = []
