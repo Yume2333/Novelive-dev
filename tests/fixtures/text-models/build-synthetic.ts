@@ -86,7 +86,7 @@ function completions(content: string, finishReason = 'stop') {
 
 const [chat, responses, messages] = smokeProfiles
 const success = [
-	{ profile: chat, body: completions('OK') },
+	{ profile: chat, body: completions('A single pixel.') },
 	{ profile: responses, body: successfulResponses },
 	{ profile: messages, body: successfulMessages },
 ]
