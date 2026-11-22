@@ -1,0 +1,20 @@
+$ NL_REPLAY=strict pnpm test:e2e --grep 'M0 settings'  # run under xvfb-run
+Running 6 tests using 1 worker
+
+  ✓  1 tests/e2e/m0-settings.spec.ts:75:1 › M0 settings saves five slots and runs recorded text and vision requests (1.6s)
+  ✓  2 tests/e2e/m0-settings.spec.ts:136:1 › M0 settings shows recorded image capabilities and loads their protocol thumbnails (1.7s)
+  ✓  3 tests/e2e/m0-settings.spec.ts:174:1 › M0 settings cancels a slow test, reports creator interruption and retests after restart (4.1s)
+  ✓  4 tests/e2e/m0-settings.spec.ts:248:1 › M0 settings reports exhausted disconnection in the UI (607ms)
+  ✓  5 tests/e2e/m0-settings.spec.ts:273:1 › M0 settings keeps other image results when the edit endpoint is unsupported (750ms)
+  ✓  6 tests/e2e/m0-settings.spec.ts:310:1 › M0 settings backs up a damaged config before resetting it (394ms)
+
+  6 passed (9.7s)
+
+$ NL_REPLAY=strict pnpm check
+Checked 66 files in 30ms. No fixes applied.
+Found 1 info.
+ Test Files  7 passed (7)
+      Tests  123 passed (123)
+
+$ NL_REPLAY=strict pnpm exec playwright test --grep-invert 'M0 settings'  # run under xvfb-run
+  6 passed (2.4s)

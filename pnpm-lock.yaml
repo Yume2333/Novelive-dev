@@ -242,6 +242,9 @@ importers:
       sharp:
         specifier: 0.35.5
         version: 0.35.5(@types/node@24.19.2)
+      undici:
+        specifier: 7.30.2
+        version: 7.30.2
 
   packages/ui:
     dependencies:
@@ -3788,8 +3791,7 @@ snapshots:
 
   undici-types@7.24.6: {}
 
-  undici@7.30.2:
-    optional: true
+  undici@7.30.2: {}
 
   update-browserslist-db@1.4.0(browserslist@4.29.6):
     dependencies:

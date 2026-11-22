@@ -1,4 +1,6 @@
+import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import OpenAI from 'openai'
@@ -13,6 +15,107 @@ import {
 	imageSize,
 	testImage,
 } from '../../packages/creator/src/models/image'
+import { imageDownloadUpstream } from '../../packages/creator/src/models/image/download'
+import { createReplayFetch } from '../../packages/creator/src/replay'
+
+it('rejects non-web image destinations and checks redirects outside the configured origin', async () => {
+	const upstream = vi.fn(
+		async () =>
+			new Response(null, {
+				status: 302,
+				headers: { location: 'http://[::ffff:127.0.0.1]/' },
+			}),
+	)
+	const download = imageDownloadUpstream('http://127.0.0.1:8123/v1', upstream)
+	await expect(download('file:///image.png')).rejects.toThrow(
+		'Invalid image download URL',
+	)
+	await expect(download('http://127.0.0.1:8123/image.png')).rejects.toThrow(
+		'requires a public address',
+	)
+	expect(upstream).toHaveBeenCalledTimes(1)
+	expect(upstream).toHaveBeenCalledWith(
+		new URL('http://127.0.0.1:8123/image.png'),
+		expect.objectContaining({
+			redirect: 'manual',
+			dispatcher: undefined,
+		}),
+	)
+})
+
+it('refuses image hostnames whose DNS answers are private', async () => {
+	const download = imageDownloadUpstream(base.baseUrl)
+	await expect(download('http://localhost/image.png')).rejects.toMatchObject({
+		cause: { message: 'Image download requires a public address' },
+	})
+})
+
+it('forwards cancellation from the replay layer’s Request to image downloads', async () => {
+	const caller = new AbortController()
+	const request = new Request('https://relay.invalid/image.png', {
+		signal: caller.signal,
+	})
+	const upstream: typeof fetch = async (_input, options) => {
+		expect(options?.signal).toBe(request.signal)
+		caller.abort()
+		options?.signal?.throwIfAborted()
+		return new Response()
+	}
+	await expect(
+		imageDownloadUpstream(base.baseUrl, upstream)(request),
+	).rejects.toMatchObject({
+		name: 'AbortError',
+	})
+})
+
+it('downloads and records image bytes through a same-origin HTTP redirect', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-image-'))
+	dirs.push(directory)
+	const png = await sharp({
+		create: { width: 1, height: 1, channels: 3, background: 'blue' },
+	})
+		.png()
+		.toBuffer()
+	const paths: (string | undefined)[] = []
+	const server = createServer((request, response) => {
+		paths.push(request.url)
+		if (request.url === '/start') {
+			response.writeHead(302, { location: '/image.png' }).end()
+		} else if (request.url === '/image.png') {
+			response.writeHead(200, { 'content-type': 'image/png' }).end(png)
+		} else response.writeHead(404).end()
+	})
+	server.listen(0, '127.0.0.1')
+	try {
+		await once(server, 'listening')
+		const address = server.address()
+		if (!address || typeof address === 'string')
+			throw new Error('Expected TCP address')
+		const origin = `http://127.0.0.1:${address.port}`
+		const record = createReplayFetch({
+			directory,
+			mode: 'record',
+			fetch: imageDownloadUpstream(`${origin}/v1`),
+		})
+		const recorded = await record(`${origin}/start`)
+		expect(recorded.ok).toBe(true)
+		expect(Buffer.from(await recorded.arrayBuffer())).toEqual(png)
+		const upstream = vi.fn<typeof fetch>()
+		const replay = createReplayFetch({
+			directory,
+			mode: 'strict',
+			fetch: upstream,
+		})
+		const replayed = await replay(`${origin}/start`)
+		expect(Buffer.from(await replayed.arrayBuffer())).toEqual(png)
+		expect(upstream).not.toHaveBeenCalled()
+		expect(paths).toEqual(['/start', '/image.png'])
+	} finally {
+		await new Promise<void>((resolve, reject) =>
+			server.close((error) => (error ? reject(error) : resolve())),
+		)
+	}
+})
 
 const directory = 'tests/fixtures/image-models'
 const dirs: string[] = []
@@ -34,6 +137,24 @@ const base: ImageConfig = {
 	postProcess: 'single',
 	upscaleTier: 'anime',
 }
+
+it('reports malformed configured URLs for all image capabilities', async () => {
+	const cacheDir = await mkdtemp(join(tmpdir(), 'novelive-image-'))
+	dirs.push(cacheDir)
+	const fetch = vi.fn()
+	const results = await testImage(
+		{ ...base, baseUrl: 'not a URL', model: 'test-image' },
+		{ cacheDir, replay: { fetch } },
+	)
+	const invalid = { ok: false, error: { code: 'invalid_config' } }
+	expect(results).toMatchObject({
+		generate: invalid,
+		transparent: invalid,
+		edit: invalid,
+	})
+	expect(fetch).not.toHaveBeenCalled()
+})
+
 async function probe(scenario: string, seedream = false, signal?: AbortSignal) {
 	const cacheDir = await mkdtemp(join(tmpdir(), 'novelive-image-'))
 	dirs.push(cacheDir)

@@ -2,8 +2,8 @@ import type { Novelive } from '@novelive/creator/contract'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { Page } from './components/Page'
 import { LibraryPage } from './pages/library/LibraryPage'
+import { SettingsPage } from './pages/settings/SettingsPage'
 import { UsagePage } from './pages/usage/UsagePage'
 import { AppShell } from './shell/AppShell'
 import '@fontsource/hanken-grotesk/400.css'
@@ -27,7 +27,7 @@ if (root)
 					<Route element={<AppShell />}>
 						<Route index element={<LibraryPage />} />
 						<Route path="usage" element={<UsagePage />} />
-						<Route path="settings" element={<Page title="设置" />} />
+						<Route path="settings" element={<SettingsPage />} />
 						<Route path="*" element={<Navigate to="/" replace />} />
 					</Route>
 				</Routes>

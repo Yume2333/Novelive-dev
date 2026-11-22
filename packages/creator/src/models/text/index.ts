@@ -40,6 +40,11 @@ const minimumContext = 4096
 const watchdogMs = 90_000
 const cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
 const noUsage: Usage = { ...cost, totalTokens: 0, cost: { ...cost, total: 0 } }
+export const textConnectionImage: ImageContent = {
+	type: 'image',
+	mimeType: 'image/png',
+	data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+}
 
 function vendor(config: Pick<Settings, 'format' | 'compat'>) {
 	return config.compat === 'auto'

@@ -57,6 +57,7 @@ function startCreator(window: BrowserWindow) {
 			env: {
 				...process.env,
 				NL_CREATOR_GENERATION: String(current),
+				NL_CREATOR_DATA_DIR: app.getPath('userData'),
 				NL_E2E: !app.isPackaged && process.env.NL_E2E === '1' ? '1' : '0',
 			},
 			serviceName: 'Novelive Creator',

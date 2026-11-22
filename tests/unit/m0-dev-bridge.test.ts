@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, win32 } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { expect, test } from 'vitest'
-import { WebSocket } from 'ws'
+import { WebSocket, WebSocketServer } from 'ws'
 import { connectDevBridge } from '../../tools/dev-bridge/src/client'
 import { startDevBridge } from '../../tools/dev-bridge/src/server'
 import { viteFileUrl } from '../../tools/dev-bridge/src/vite-url'
@@ -16,6 +16,49 @@ test('Vite bootstrap URLs preserve Windows drive paths and encode spaces', () =>
 	expect(viteFileUrl(new URL('file:///home/novelive/browser.ts'))).toBe(
 		'/@fs/home/novelive/browser.ts',
 	)
+})
+
+test('browser clients see a creator startup failure before any ready event', async () => {
+	const server = new WebSocketServer({ host: '127.0.0.1', port: 0 })
+	await new Promise<void>((resolve, reject) => {
+		server.once('listening', resolve).once('error', reject)
+	})
+	const address = server.address()
+	if (typeof address === 'string' || !address)
+		throw new Error('Expected TCP address')
+	const client = connectDevBridge({ wsUrl: `ws://127.0.0.1:${address.port}` })
+	try {
+		const connection = await new Promise<WebSocket>((resolve) =>
+			server.once('connection', resolve),
+		)
+		const state = (creator: 'starting' | 'failed') =>
+			connection.send(
+				JSON.stringify({
+					type: 'state',
+					state: {
+						creator,
+						generation: 1,
+						breakerOpen: false,
+						logDir: '/logs',
+					},
+				}),
+			)
+		state('starting')
+		await expect(client.api.host.appState()).resolves.toMatchObject({
+			creator: 'starting',
+		})
+		const down = new Promise((resolve) =>
+			client.api.on('creator.down', resolve),
+		)
+		state('failed')
+		await expect(down).resolves.toEqual({ generation: 1 })
+		await expect(client.api.host.appState()).resolves.toMatchObject({
+			creator: 'failed',
+		})
+	} finally {
+		client.close()
+		await new Promise<void>((resolve) => server.close(() => resolve()))
+	}
 })
 
 test('local browser bridge forwards creator commands and host operations and confines cache resources', async () => {
