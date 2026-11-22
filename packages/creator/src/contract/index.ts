@@ -54,6 +54,7 @@ const error = obj({
 		'network',
 		'moderation',
 		'invalid_config',
+		'context_limit',
 		'cancelled',
 		'creator_down',
 		'internal',
@@ -135,6 +136,15 @@ const creatorSchema = union([
 export const clientFrame = compile(clientSchema)
 export const creatorFrame = compile(creatorSchema)
 export const commandError = compile(error)
+export function creatorCommandError(error: unknown): CommandError {
+	const failure =
+		error instanceof Error && 'code' in error
+			? { code: error.code, message: error.message }
+			: error
+	return commandError.check(failure)
+		? failure
+		: { code: 'internal', message: '创作端命令失败' }
+}
 export type ClientFrame = Static<typeof clientSchema>
 export type CreatorFrame = Static<typeof creatorSchema>
 

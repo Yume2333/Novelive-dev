@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createConfigStore } from './config'
-import { type CreatorFrame, clientFrame, commandError } from './contract'
+import { type CreatorFrame, clientFrame, creatorCommandError } from './contract'
 import { createRegistry } from './registry'
 import { createReplayFetch, type ReplayOptions } from './replay'
 
@@ -143,9 +143,7 @@ parent.once('message', ({ ports }) => {
 				type: 'error',
 				generation,
 				requestId,
-				error: commandError.check(error)
-					? error
-					: { code: 'internal', message: '创作端命令失败' },
+				error: creatorCommandError(error),
 			}
 		}
 		if (!controller.signal.aborted) {
