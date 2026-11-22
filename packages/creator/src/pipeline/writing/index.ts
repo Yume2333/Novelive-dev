@@ -498,6 +498,7 @@ async function reviseScene(
 	const groups = await scopeScene(aligner, script, paragraphs, [
 		...fidelity.map((item) => ({
 			paragraphId: item.paragraphId,
+			quote: item.quote,
 			text: JSON.stringify(item),
 		})),
 		...style.map((text) => ({ text })),

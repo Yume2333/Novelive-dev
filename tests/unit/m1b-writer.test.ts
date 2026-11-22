@@ -7,7 +7,9 @@ import {
 	writeChapter,
 } from '../../packages/creator/src/pipeline/writing'
 import { promptFits } from '../../packages/creator/src/pipeline/writing/budget'
+import { writingModel } from '../../packages/creator/src/pipeline/writing/request'
 import { reviewFidelity } from '../../packages/creator/src/pipeline/writing/review'
+import { scopeScene } from '../../packages/creator/src/pipeline/writing/scope'
 import { createReplayFetch } from '../../packages/creator/src/replay'
 import { defaultWorkSettings } from '../../packages/format/src/model'
 import {
@@ -656,6 +658,124 @@ describe('M1b writer', () => {
 		expect(requests[5]).toContain('Bell source.')
 		expect(requests[5]).not.toContain('Tool result exceeds')
 	})
+
+	test('finds bounded paragraph groups when the whole alignment request does not fit', async () => {
+		const paragraphs = ['Water', 'Bell', 'Shore'].map((word, i) => ({
+			id: `p000${i + 1}`,
+			text: `${word} source. ${word.repeat(145)}`,
+		}))
+		const lines = ['Water', 'Bell', 'Shore'].map(
+			(word) => `: ${word} line. ${word.repeat(145)}`,
+		)
+		const script = ['scene Bridge', 'source p0001-p0003', '', ...lines].join(
+			'\n',
+		)
+		const { options, requests } = responses(
+			'{"lineCount":1,"complete":true}',
+			'{"lineCount":1,"complete":true}',
+		)
+		const model = writingModel(
+			{ ...options.writer, contextWindow: 4096 },
+			options,
+		)
+		const groups = await scopeScene(() => model, script, paragraphs)
+		expect(
+			groups.map(({ paragraphs, lines }) => [
+				paragraphs.map(({ id }) => id),
+				lines,
+			]),
+		).toEqual(lines.map((line, i) => [[paragraphs[i].id], [line]]))
+		expect(requests).toHaveLength(2)
+		expect(requests[0]).toContain('Water source.')
+		expect(requests[0]).not.toContain('Bell source.')
+		expect(requests[1]).toContain('Bell source.')
+		expect(requests[1]).not.toContain('Water line.')
+	})
+
+	test('keeps the typed limit when one paragraph with its draft lines is oversized', async () => {
+		const paragraphs = [
+			{ id: 'p0001', text: 'water '.repeat(800) },
+			{ id: 'p0002', text: 'A bell rang.' },
+		]
+		const { options, requests } = responses()
+		const model = writingModel(
+			{ ...options.writer, contextWindow: 4096 },
+			options,
+		)
+		await expect(
+			scopeScene(
+				() => model,
+				'scene Bridge\nsource p0001-p0002\n\n: A boat drifted.',
+				paragraphs,
+			),
+		).rejects.toMatchObject({
+			code: 'context_limit',
+			phase: 'Scene source alignment',
+		})
+		expect(requests).toHaveLength(0)
+	})
+
+	test('revises all oversized draft lines covered by one cited finding', async () => {
+		const original = [
+			'scene Bridge',
+			'source p0001',
+			...Array.from(
+				{ length: 3 },
+				(_, i) => `: Draft ${i} ${'water '.repeat(230)}`,
+			),
+		].join('\n')
+		const { options, requests } = responses(
+			original,
+			{ tool: 'submit_review', arguments: { issues: [issue] } },
+			'[{"paragraphCount":1,"lineCount":3,"targets":[{"finding":0,"line":0}]}]',
+			': First fixed.',
+			': Second fixed.',
+			': Third fixed.',
+		)
+		const draft = await writeChapter(chapter, options)
+		const result = await reviewChapter(chapter, draft, {
+			...options,
+			writer: { ...options.writer, contextWindow: 4096 },
+		})
+		expect(result.revised).toBe(true)
+		expect(result.scenes[0].beats).toHaveLength(3)
+		expect(requests.slice(3)).toHaveLength(3)
+		for (const [i, request] of requests.slice(3).entries()) {
+			expect(request).toContain(issue.issue)
+			expect(request).toContain(`Draft ${i}`)
+			expect(request).not.toContain(`Draft ${(i + 1) % 3}`)
+		}
+	})
+
+	test.each([{ reported: [0] }, { reported: [0, 1] }])(
+		'maps every line a quote crosses (reported lines: $reported)',
+		async ({ reported }) => {
+			const quote = 'The bell rang at dusk'
+			const paragraphs = [
+				{ id: 'p0001', text: quote },
+				{ id: 'p0002', text: 'A boat drifted.' },
+			]
+			const { options } = responses(
+				JSON.stringify([
+					{
+						paragraphCount: 2,
+						lineCount: 3,
+						targets: reported.map((line) => ({ finding: 0, line })),
+					},
+				]),
+			)
+			const model = writingModel(options.writer, options)
+			const script =
+				'scene Bridge\nsource p0001-p0002\n\n: The bell #0001\n: rang at dusk #0002\n: A boat drifted. #0003'
+			const [group] = await scopeScene(() => model, script, paragraphs, [
+				{ paragraphId: 'p0001', quote, text: 'Keep the sound.' },
+			])
+			expect(group.targets).toEqual([
+				{ finding: 0, line: 0 },
+				{ finding: 0, line: 1 },
+			])
+		},
+	)
 
 	test.each(['short source', 'A source paragraph '.repeat(20)])(
 		'preflights both the source tool call and its reply before the first fidelity request (%s)',

@@ -14,7 +14,7 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-writer.test.ts` — 25 项通过；完整 `pnpm check` 315 项通过。[凭据及 PR #27 审查修复](../../evidence/m1b-production/02-writer-review.txt)
+- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-writer.test.ts` — 30 项通过；完整 `pnpm check` 320 项通过。[凭据及 PR #27 审查修复](../../evidence/m1b-production/02-writer-review.txt)
 - Real path: Electron 导入、播放器和确认界面 6 项通过；确认界面使用投影夹具。真实导入到两次确认的串接缺创作端调度命令，由 M1b/09 验证；本任务未宣称 W2/W3 整体验收。
 - 合成短文录制已提交；4 次成功计量 4,181 tokens，1 次无计量 404 保留上界 16,384 tokens，合计按 20,565 tokens 记账，0 图片。
 - Review: skipped — 无可启动的独立审查代理或隔离会话，按降级规则由 flow-close 补审。

@@ -3,11 +3,11 @@ Base: e7cfb4807edabffe81fe901a7da3aa8bb2624f93
 
 $ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-writer.test.ts
 Test Files  1 passed (1)
-     Tests  25 passed (25)
+     Tests  30 passed (30)
 
 $ NL_REPLAY=strict pnpm check
 Test Files  20 passed (20)
-     Tests  315 passed (315)
+     Tests  320 passed (320)
 
 The task Check exercises writer and fidelity provider cassettes, rejects an invented citation, confirms one review-driven revision with retained IDs, verifies a style-only pass, checks priority continuity and settings, segments a long input, and verifies scene-local compiler repairs and retry exhaustion.
 
@@ -40,10 +40,14 @@ PR #27 shared-budget rework (6ae0863):
 - Split at complete scene, source paragraph, or NVS body-line boundaries. Oversized indivisible units return context_limit, which survives creator IPC as a typed failure.
 - Fidelity excerpts retain their parent scene's source references. Source windows and quote validation use whole cited paragraphs; Bible reads can select a section, entry ID, or glossary range.
 - Revision requests retain adaptation requirements and work/chapter rules, including in fragments.
-PR #27 final review round, verified by the checks above:
+PR #27 four-item round (093dc17):
 - Re-fit every recursive write retry with the preceding segment's current ending.
 - Reserve fidelity input for the source tool call and the larger of its full source reply and overflow reply.
 - On overflow, use a validated, ordered source-to-draft alignment when NVS's scene-level citations do not identify narrower excerpts. Review each excerpt only with its cited paragraphs, and route revision findings and draft lines to the affected chunks.
+
+PR #27 alignment follow-up, verified by the checks above:
+- Oversized alignment requests fall back to ordered paragraph windows. Budgeted boundary probes use draft lookahead to determine each window's lines, and actual paragraph scopes are checked before review or revision.
+- Findings can target multiple lines. Cite-only single-paragraph groups and exact quotes spanning several draft lines contribute every overlapping target; the revision loop visits each affected line.
 The existing cassette replayed unchanged. No review round made paid calls.
 
 NL_REPLAY=record usage: 5 requests, 0 images. Four successful requests consumed 4,181 measured tokens (1,498 writer, 2,683 fidelity evaluator); the first writer request returned HTTP 404 because the provisioned base was missing the API path and returned no usage. Its 16,384-token reservation remains in the private ledger; conservative total 20,565 tokens. Four successful responses are in the cassette; the failed response is excluded. Relay host and credential checks on the cassette were clear.
