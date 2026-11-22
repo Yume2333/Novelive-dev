@@ -424,6 +424,7 @@ ${packets[packet]}`,
 			const { content, observation } = proposalKeys(item, observed)
 			const key = JSON.stringify([content, observation])
 			if (observation) located.add(content)
+			if (item.op === 'add' || item.op === 'update') proposals.delete(key)
 			if (!proposals.has(key))
 				proposals.set(key, {
 					item,

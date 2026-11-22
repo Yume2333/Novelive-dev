@@ -44,6 +44,7 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 	const events = Number(/^Events already extracted: (\d+)$/m.exec(prompt)?.[1])
 	const repeated = body.model === 'fixture-repeated-proposal'
 	const returning = body.model === 'fixture-returning-proposal'
+	const aliasUpdates = body.model === 'fixture-alias-updates'
 	const oversized = '🦊'.repeat(160)
 	if (firstLongEvent && events === 1) {
 		const encoded = /^Recent event summaries: (.+)$/m.exec(prompt)?.[1] ?? ''
@@ -57,9 +58,11 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 		chapters: Array.from(
 			returning
 				? [`c${events + 1}`]
-				: repeated && events > 0
+				: aliasUpdates
 					? ['c2']
-					: chapterIds,
+					: repeated && events > 0
+						? ['c2']
+						: chapterIds,
 			(chapterId) => ({
 				chapterId,
 				progress: 'The journey continues.',
@@ -69,11 +72,23 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 			firstLongEvent && events === 0
 				? oversized
 				: `Event ${packet[1]}:${events}`,
-		is_last: returning
-			? events === 2
-			: !(firstLongEvent || repeated) || events > 0,
-		biblePatch:
-			repeated || returning
+		is_last:
+			returning || aliasUpdates
+				? events === 2
+				: !(firstLongEvent || repeated) || events > 0,
+		biblePatch: aliasUpdates
+			? [
+					{
+						kind: 'character',
+						op: 'update',
+						entry: {
+							...confirmed,
+							identity: undefined,
+							aliases: [events === 1 ? 'Zulu' : 'Alpha'],
+						},
+					},
+				]
+			: repeated || returning
 				? [
 						{
 							kind: 'character',
@@ -361,6 +376,33 @@ test.each([
 		})
 	},
 )
+
+test('same-chapter candidate alias updates apply in event order even when the final proposal repeats', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const file = projectFiles.character(scope, 'ada')
+	await project.write(file, {
+		formatVersion: 1,
+		entries: [{ ...confirmed, status: 'candidate', aliases: [] }],
+	})
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		connection: { ...connection, model: 'fixture-alias-updates' },
+		strategy: 'events',
+		fetch: packetFetch,
+	})
+	expect(result.conflicts).toEqual([])
+	expect(
+		result.biblePatch.map(({ entry, observedChapter }) => [
+			entry,
+			observedChapter,
+		]),
+	).toMatchObject([
+		[{ aliases: ['Zulu'] }, 'c2'],
+		[{ aliases: ['Alpha'] }, 'c2'],
+	])
+	expect((await project.read(file)).entries[0].aliases).toEqual(['Alpha'])
+})
 
 test('automatic fallback streams all preview packets without truncation', async () => {
 	await seed(root, true)

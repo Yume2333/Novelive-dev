@@ -254,13 +254,20 @@ const pointKey = ({ field, value, chapterId }: Point) =>
 	JSON.stringify([field, value, chapterId])
 
 export function proposalKeys(item: Patch, observedChapter?: string) {
-	const point =
-		item.op === 'add' || item.op === 'update'
-			? temporalPoint(item.kind, item.entry, observedChapter)
-			: undefined
+	const located =
+		observedChapter &&
+		temporalField(item.kind) &&
+		(item.op === 'add' || item.op === 'update')
+	const point = located
+		? temporalPoint(item.kind, item.entry, observedChapter)
+		: undefined
 	return {
 		content: JSON.stringify(item),
-		observation: point?.chapterId ? pointKey(point) : undefined,
+		observation: point
+			? pointKey(point)
+			: located
+				? observedChapter
+				: undefined,
 	}
 }
 
@@ -293,14 +300,7 @@ function orderedProposals(items: Patch[], order: ReadonlyMap<string, number>) {
 		const chapter = observedChapter ?? entry.firstSeenChapter
 		return chapter === undefined ? -1 : (order.get(chapter) ?? -1)
 	}
-	const compare = (a: Patch, b: Patch) => {
-		const chronological =
-			Number(b.op === 'add') - Number(a.op === 'add') || rank(a) - rank(b)
-		if (chronological) return chronological
-		const left = JSON.stringify(a)
-		const right = JSON.stringify(b)
-		return left < right ? -1 : Number(left > right)
-	}
+	const compare = (a: Patch, b: Patch) => rank(a) - rank(b)
 	return [...groups.keys()].sort().flatMap((id) => {
 		const ordered: Patch[] = []
 		let pending: Patch[] = []
