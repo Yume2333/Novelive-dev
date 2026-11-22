@@ -2,8 +2,10 @@ import type { Novelive } from '../../../packages/creator/src/contract'
 import { mountFixedScene } from '../../../packages/player/src'
 
 const { novelive } = window as Window & { novelive: Novelive }
-const stage = document.querySelector('main')
-if (!stage) throw new Error('Missing fixed scene mount point')
+const stage = document.createElement('div')
+stage.id = 'fixed-scene'
+stage.style.cssText = 'position: fixed; top: 0; left: 0'
+document.body.append(stage)
 void mountFixedScene(
 	stage,
 	{ background: 'room/dusk', sprite: 'traveler/coat/calm' },

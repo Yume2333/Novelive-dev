@@ -22,6 +22,14 @@ preload's resourceUrl and Electron's cache protocol, rendered them with PixiJS
 The complete Electron suite also exercised cache confinement and Settings
 thumbnails. This is not the W1/W2 production-flow acceptance gate.
 
+PR #19 follow-up: the pixel check now asserts that Electron loaded
+out/renderer/index.html from file:// before mounting the bundled fixture.
+Both pixels matched through the same cache protocol without changing its CORS
+configuration. This exercises loadFile in a build, not an installed package.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M1b fixed scene'
+✓ tests/e2e/m1b-production-contract.spec.ts:14:1 › M1b fixed scene renders two host resources from the built Electron renderer (2.8s)
+1 passed (3.4s)
+
 Contract decisions
 - Work confirmation phase and chapter publication are separate; an issue
   marker does not change the status or playability of a published chapter.
