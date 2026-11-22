@@ -203,6 +203,32 @@ function replayBody(
 	})
 }
 
+function corruptImage(bytes: Uint8Array): Uint8Array {
+	const invalid = Buffer.from('invalid image data')
+	let envelope: unknown
+	try {
+		envelope = JSON.parse(Buffer.from(bytes).toString('utf8'))
+	} catch {
+		return invalid
+	}
+	if (
+		!envelope ||
+		typeof envelope !== 'object' ||
+		!('data' in envelope) ||
+		!Array.isArray(envelope.data)
+	)
+		return bytes
+	const corrupt = invalid.toString('base64')
+	let changed = false
+	for (const image of envelope.data) {
+		if (image && typeof image.b64_json === 'string') {
+			image.b64_json = corrupt
+			changed = true
+		}
+	}
+	return changed ? Buffer.from(JSON.stringify(envelope)) : bytes
+}
+
 export function createReplayFetch(
 	options: ReplayOptions = {},
 ): typeof globalThis.fetch {
@@ -368,7 +394,7 @@ export function createReplayFetch(
 		} else {
 			bytes = Buffer.from(row.body.b64 ?? '', 'base64')
 		}
-		if (options.fault === 'bad-image') bytes = Buffer.from('invalid image data')
+		if (options.fault === 'bad-image') bytes = corruptImage(bytes)
 		const stream =
 			request.method === 'HEAD' || [204, 205, 304].includes(row.status)
 				? null

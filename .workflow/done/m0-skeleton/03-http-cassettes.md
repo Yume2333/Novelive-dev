@@ -17,3 +17,4 @@
 - Check after: `pnpm exec vitest run tests/unit/m0-replay.test.ts`：4 个测试通过，类型检查通过。[检查日志](../../evidence/m0-skeleton/03-replay-check.txt)
 - Real path: 用原生 fetch 读取合成数据并落盘，然后从磁盘严格回放；缺档不调用上游。[实际运行输出](../../evidence/m0-skeleton/03-replay-real-path.txt)
 - Review: skipped — 当前会话无法启动独立工作流与安全审查员，留待 PR 审查。
+- PR #4 审查修复: 中转地址在 JSON 转义和 URL 编码时同样脱敏；仅在完整终止事件后保留取消读取的 SSE；坏图故障保留 JSON 外层、只改图片载荷。[复查日志](../../evidence/m0-skeleton/03-replay-review-check.txt) · [本地 HTTP 复验](../../evidence/m0-skeleton/03-replay-review-real-path.txt)

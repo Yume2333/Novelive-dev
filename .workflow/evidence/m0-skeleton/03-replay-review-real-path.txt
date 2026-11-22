@@ -1,0 +1,1 @@
+Native HTTP fetch → disk → offline strict replay: terminal SSE survives cancel, escaped origin is redacted, and valid JSON contains corrupt image bytes

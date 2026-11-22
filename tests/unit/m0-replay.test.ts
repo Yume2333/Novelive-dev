@@ -244,3 +244,36 @@ test('stream faults and abort during a delayed pull do not change the recording'
 	expect(await readFile(join(directory, rowFile), 'utf8')).toBe(disk)
 	expect(fetch).toHaveBeenCalledTimes(1)
 })
+
+test('bad-image keeps JSON metadata and corrupts only the encoded image payload', async () => {
+	const envelope = {
+		created: 1,
+		data: [{ b64_json: 'iVBORw0KGgo=', revised_prompt: 'fixture' }],
+	}
+	const fetch = vi.fn(async () => Response.json(envelope))
+	const record = createReplayFetch({ mode: 'record', directory, fetch })
+	const url = `${origin}/v1/images/generations`
+	expect(await (await record(url)).json()).toEqual(envelope)
+	const strict = createReplayFetch({
+		mode: 'strict',
+		directory,
+		fetch,
+		fault: 'bad-image',
+	})
+	const response = await strict(url)
+	expect(response.headers.get('content-type')).toBe('application/json')
+	const replay = await response.json()
+	expect(replay).toEqual({
+		created: 1,
+		data: [{ b64_json: expect.any(String), revised_prompt: 'fixture' }],
+	})
+	expect(Buffer.from(replay.data[0].b64_json, 'base64').toString()).toBe(
+		'invalid image data',
+	)
+	expect(
+		await (
+			await createReplayFetch({ mode: 'strict', directory, fetch })(url)
+		).json(),
+	).toEqual(envelope)
+	expect(fetch).toHaveBeenCalledTimes(1)
+})
