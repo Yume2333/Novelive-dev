@@ -53,7 +53,7 @@ export const workSettingsSchema = obj(
 		fidelityReview: bool(),
 		styleReview: bool(),
 		confirmWithReferences: bool(),
-		customMarks: map(str()),
+		customMarks: map(obj({ css: str(), perChar: bool() }, open)),
 		outputResolution: oneOf(['2K', '4K']),
 		accent: opt(str()),
 	},

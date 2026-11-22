@@ -166,6 +166,24 @@ test('allows open JSON fields but rejects incompatible versions and protects exi
 	})
 })
 
+test('round-trips CSS and the per-character switch for each custom mark', async () => {
+	await seed(root)
+	const file = projectFiles.work(ref.volumeId, ref.workId)
+	const customMarks = {
+		wave: { css: 'animation: wave 1s infinite', perChar: true },
+		accent: { css: 'font-weight: bold', perChar: false },
+	}
+	{
+		using project = await Project.open(root)
+		await project.write(file, {
+			...work,
+			settings: { ...work.settings, customMarks },
+		})
+	}
+	using project = await Project.open(root)
+	expect((await project.read(file)).settings.customMarks).toEqual(customMarks)
+})
+
 test('does not create missing databases while reopening and rejects unknown database versions', async () => {
 	await seed(root)
 	await rm(join(root, projectFiles.database))
