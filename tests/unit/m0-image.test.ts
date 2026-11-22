@@ -1,4 +1,6 @@
+import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import OpenAI from 'openai'
@@ -14,6 +16,7 @@ import {
 	testImage,
 } from '../../packages/creator/src/models/image'
 import { imageDownloadUpstream } from '../../packages/creator/src/models/image/download'
+import { createReplayFetch } from '../../packages/creator/src/replay'
 
 it('rejects non-web image destinations and checks redirects outside the configured origin', async () => {
 	const upstream = vi.fn(
@@ -63,6 +66,55 @@ it('forwards cancellation from the replay layer’s Request to image downloads',
 	).rejects.toMatchObject({
 		name: 'AbortError',
 	})
+})
+
+it('downloads and records image bytes through a same-origin HTTP redirect', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-image-'))
+	dirs.push(directory)
+	const png = await sharp({
+		create: { width: 1, height: 1, channels: 3, background: 'blue' },
+	})
+		.png()
+		.toBuffer()
+	const paths: (string | undefined)[] = []
+	const server = createServer((request, response) => {
+		paths.push(request.url)
+		if (request.url === '/start') {
+			response.writeHead(302, { location: '/image.png' }).end()
+		} else if (request.url === '/image.png') {
+			response.writeHead(200, { 'content-type': 'image/png' }).end(png)
+		} else response.writeHead(404).end()
+	})
+	server.listen(0, '127.0.0.1')
+	try {
+		await once(server, 'listening')
+		const address = server.address()
+		if (!address || typeof address === 'string')
+			throw new Error('Expected TCP address')
+		const origin = `http://127.0.0.1:${address.port}`
+		const record = createReplayFetch({
+			directory,
+			mode: 'record',
+			fetch: imageDownloadUpstream(`${origin}/v1`),
+		})
+		const recorded = await record(`${origin}/start`)
+		expect(recorded.ok).toBe(true)
+		expect(Buffer.from(await recorded.arrayBuffer())).toEqual(png)
+		const upstream = vi.fn<typeof fetch>()
+		const replay = createReplayFetch({
+			directory,
+			mode: 'strict',
+			fetch: upstream,
+		})
+		const replayed = await replay(`${origin}/start`)
+		expect(Buffer.from(await replayed.arrayBuffer())).toEqual(png)
+		expect(upstream).not.toHaveBeenCalled()
+		expect(paths).toEqual(['/start', '/image.png'])
+	} finally {
+		await new Promise<void>((resolve, reject) =>
+			server.close((error) => (error ? reject(error) : resolve())),
+		)
+	}
 })
 
 const directory = 'tests/fixtures/image-models'
