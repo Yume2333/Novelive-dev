@@ -367,20 +367,40 @@ ${packets[packet]}`,
 		) !== hash(previews)
 	)
 		throw new Error('Chapter previews changed during synthesis')
-	const latest = await readBible(project)
+	let latest = await readBible(project)
 	if (!state.ready) {
-		if (hash(latest) !== basis)
+		if (hash(latest) !== state.basis)
 			throw new Error('Bible changed during synthesis')
 		state.ready = true
 		await project.write(files.checkpoint, state)
+		latest = await readBible(project)
 	}
-	const { conflicts, glossaryConflicts } = await applyPatches(
-		project,
-		latest,
-		biblePatch,
-		glossaryPatch,
-		chapterSet,
-	)
+	const { conflicts, glossaryConflicts } =
+		hash(latest) === state.basis
+			? await applyPatches(
+					project,
+					latest,
+					biblePatch,
+					glossaryPatch,
+					chapterSet,
+				)
+			: {
+					conflicts: biblePatch
+						.filter(({ op }) => op !== 'none')
+						.map((item) => ({
+							...item,
+							entry: {
+								...item.entry,
+								status: 'candidate',
+								conflict: 'Bible changed before synthesis publication',
+							},
+						})) as typeof biblePatch,
+					glossaryConflicts: glossaryPatch.map((entry) => ({
+						...entry,
+						status: 'candidate' as const,
+						conflict: 'Bible changed before synthesis publication',
+					})),
+				}
 	const result: VolumeSynthesis = {
 		...skeleton,
 		biblePatch,

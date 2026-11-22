@@ -307,6 +307,65 @@ test('unresolved references trigger one repair and are never published', async (
 	})
 })
 
+test('a ready checkpoint with a stale Bible saves conflicts without replacing later candidate edits', async () => {
+	await seed(root)
+	const tower = projectFiles.location(scope, 'tower')
+	{
+		using project = await Project.open(root)
+		const write = project.write.bind(project)
+		const interrupted = vi
+			.spyOn(project, 'write')
+			.mockImplementation(async (file, value) => {
+				if (file.path === tower.path) throw new Error('Publication interrupted')
+				return write(file, value)
+			})
+		await expect(
+			synthesizeVolume(project, 'v1', chapters, {
+				...options,
+				strategy: 'whole',
+			}),
+		).rejects.toThrow('Publication interrupted')
+		interrupted.mockRestore()
+		expect(await project.read(files.checkpoint)).toMatchObject({
+			ready: true,
+			applied: false,
+		})
+		await project.write(tower, {
+			formatVersion: 1,
+			entries: [
+				{
+					id: 'tower',
+					name: 'Edited tower',
+					description: 'Creator edit',
+					status: 'candidate',
+				},
+			],
+		})
+	}
+	{
+		using project = await Project.open(root)
+		const fetch = vi.fn<typeof globalThis.fetch>(strict)
+		const result = await synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			strategy: 'whole',
+			fetch,
+		})
+		expect(fetch).not.toHaveBeenCalled()
+		expect(await project.read(tower)).toMatchObject({
+			entries: [{ name: 'Edited tower', description: 'Creator edit' }],
+		})
+		expect(result.conflicts).toContainEqual(
+			expect.objectContaining({
+				entry: expect.objectContaining({
+					id: 'tower',
+					conflict: 'Bible changed before synthesis publication',
+				}),
+			}),
+		)
+		expect(result.glossaryConflicts).toHaveLength(2)
+	}
+})
+
 test('changing a source preview during the run prevents publication', async () => {
 	await seed(root)
 	using project = await Project.open(root)
