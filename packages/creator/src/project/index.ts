@@ -101,15 +101,20 @@ export class Project {
 		const root = resolve(directory)
 		decode(projectFiles.series, series)
 		await mkdir(root)
-		const project = new Project(
-			root,
-			openProjectDatabase(join(root, projectFiles.database), true),
-		)
 		try {
-			await project.write(projectFiles.series, series)
-			return project
+			const project = new Project(
+				root,
+				openProjectDatabase(join(root, projectFiles.database), true),
+			)
+			try {
+				await project.write(projectFiles.series, series)
+				return project
+			} catch (error) {
+				project.close()
+				throw error
+			}
 		} catch (error) {
-			project.close()
+			await rm(root, { recursive: true, force: true })
 			throw error
 		}
 	}

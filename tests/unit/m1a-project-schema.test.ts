@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { Project } from '../../packages/creator/src/project'
 import { formatVersion, projectFiles } from '../../packages/format/src/model'
 import {
@@ -198,6 +198,39 @@ test('does not create missing databases while reopening and rejects unknown data
 	await expect(Project.open(root)).rejects.toMatchObject({
 		code: 'unsupported_database',
 	})
+})
+
+test.each(['SQLite initialization', 'first save'])(
+	'removes the new directory if %s fails and allows retry',
+	async (step) => {
+		const failure = new Error(step)
+		const mock =
+			step === 'SQLite initialization'
+				? vi
+						.spyOn(DatabaseSync.prototype, 'exec')
+						.mockImplementationOnce(() => {
+							throw failure
+						})
+				: vi.spyOn(Project.prototype, 'write').mockRejectedValueOnce(failure)
+		try {
+			await expect(Project.create(root, series)).rejects.toBe(failure)
+			await expect(stat(root)).rejects.toMatchObject({ code: 'ENOENT' })
+		} finally {
+			mock.mockRestore()
+		}
+		using project = await Project.create(root, series)
+		expect(await project.read(projectFiles.series)).toEqual(series)
+	},
+)
+
+test('never removes an existing directory or its contents when create fails', async () => {
+	await mkdir(root)
+	const existing = join(root, 'existing.txt')
+	await writeFile(existing, 'keep')
+	await expect(Project.create(root, series)).rejects.toMatchObject({
+		code: 'EEXIST',
+	})
+	expect(await readFile(existing, 'utf8')).toBe('keep')
 })
 
 test('uses distinct digest and skeleton paths and rejects nonlocal project paths', async () => {
