@@ -393,8 +393,21 @@ function merge<T extends Entry>(
 	)
 	const observation = temporalPoint(kind, candidate, observedChapter)
 	const base = current && temporalPoint(kind, current)
+	const rank = (chapter?: string) =>
+		chapter === undefined ? -1 : (order?.get(chapter) ?? -1)
+	const firstDated = points.reduce<Point | undefined>(
+		(first, point) =>
+			!first || rank(point.chapterId) < rank(first.chapterId) ? point : first,
+		undefined,
+	)
 	const startingPoint =
-		!current && !observedChapter && candidate.firstSeenChapter
+		!current &&
+		!observedChapter &&
+		candidate.firstSeenChapter &&
+		!(
+			firstDated?.value === observation?.value &&
+			rank(firstDated?.chapterId) > rank(candidate.firstSeenChapter)
+		)
 			? temporalPoint(kind, candidate, candidate.firstSeenChapter)
 			: undefined
 	if (startingPoint) points.unshift(startingPoint)

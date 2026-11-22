@@ -837,6 +837,42 @@ test('an undated whole-volume proposal retains its base through a later return',
 	expect((await readBible(project)).character).toContainEqual(entry)
 })
 
+test('an undated addition that repeats the first dated identity does not backdate it', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const changes = [
+		{ chapterId: 'c3', field: 'identity', value: 'Admiral' },
+		{ chapterId: 'c2', field: 'identity', value: 'Captain' },
+	]
+	const item = {
+		kind: 'character',
+		op: 'add',
+		entry: {
+			...confirmed,
+			id: 'new',
+			aliases: [],
+			identity: 'Captain',
+			changes,
+		},
+	} satisfies BiblePatch[number]
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[item],
+		[],
+		new Set(['c1', 'c2', 'c3']),
+	)
+	expect(result.conflicts).toEqual([])
+	const published = (await readBible(project)).character.find(
+		({ id }) => id === 'new',
+	)
+	expect(published).toMatchObject({
+		firstSeenChapter: 'c1',
+		changes: [...changes].reverse(),
+	})
+	expect(published).not.toHaveProperty('identity')
+})
+
 test.each(['relation', 'character'] as const)(
 	'a %s referencing a rejected character goes to review',
 	async (kind) => {
