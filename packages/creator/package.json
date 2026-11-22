@@ -6,7 +6,8 @@
 		"./contract": "./src/contract/index.ts"
 	},
 	"dependencies": {
-		"@earendil-works/pi-schema": "1.6.0"
+		"@earendil-works/pi-schema": "1.6.0",
+		"openai": "7.62.0"
 	},
 	"peerDependencies": {
 		"sharp": "0.35.5"
