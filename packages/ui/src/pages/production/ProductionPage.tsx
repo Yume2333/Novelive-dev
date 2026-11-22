@@ -9,6 +9,7 @@ import { chapterTitle, useWorkProduction } from '../work/WorkProduction'
 import { ChapterRecords } from './ChapterRecords'
 import { ChapterState } from './ChapterState'
 import styles from './Production.module.css'
+import { ProductionNotice } from './ProductionNotice'
 
 const workStatus = {
 	idle: '空闲',
@@ -91,7 +92,7 @@ export function ProductionPage() {
 	const published = chapters.filter(
 		(chapter) => chapter.status === 'published',
 	).length
-	const flagged = chapters.filter((chapter) => chapter.issue).length
+	const flagged = chapters.filter((chapter) => chapter.issue)
 	const gate =
 		phase === 'confirm-visual'
 			? 'confirmVisual'
@@ -149,11 +150,16 @@ export function ProductionPage() {
 						/>
 					)}
 				</section>
-				{flagged > 0 && (
-					<div className={styles.notice}>
-						<p>{flagged} 章需要处理</p>
+				{flagged.length > 0 && (
+					<ProductionNotice
+						key={JSON.stringify([
+							blockedChapterId,
+							...flagged.map(({ chapterId, issue }) => [chapterId, issue]),
+						])}
+					>
+						<p>{flagged.length} 章需要处理</p>
 						{blockedChapterId && <p>制作已暂停，请在失败的章节中重试。</p>}
-					</div>
+					</ProductionNotice>
 				)}
 				<section className={styles.card} aria-labelledby="production-chapters">
 					<h2 id="production-chapters">章节制作</h2>

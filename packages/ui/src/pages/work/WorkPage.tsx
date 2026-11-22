@@ -3,6 +3,7 @@ import { Page } from '../../components/Page'
 import { workRoute } from '../../routes/production'
 import { ChapterState } from '../production/ChapterState'
 import styles from '../production/Production.module.css'
+import { ProductionNotice } from '../production/ProductionNotice'
 import { chapterTitle, useWorkProduction } from './WorkProduction'
 
 export function WorkPage() {
@@ -26,16 +27,16 @@ export function WorkPage() {
 					</Link>
 				</div>
 				{phase === 'confirm-visual' && (
-					<div className={styles.notice}>
+					<ProductionNotice>
 						<p>第一卷角色和主视觉已就绪，等待确认。</p>
 						<Link to={workRoute('confirmVisual', workId)}>选择主视觉</Link>
-					</div>
+					</ProductionNotice>
 				)}
 				{phase === 'confirm-first' && (
-					<div className={styles.notice}>
+					<ProductionNotice>
 						<p>第一章已发布，可以先试玩，再继续制作。</p>
 						<Link to={workRoute('confirmFirst', workId)}>确认第一章</Link>
-					</div>
+					</ProductionNotice>
 				)}
 				<section className={styles.card} aria-labelledby="work-chapters">
 					<h2 id="work-chapters">章节</h2>
