@@ -24,13 +24,17 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 		/^Events already extracted: (\d+)$/m.exec(prompt)?.[1] ?? 0,
 	)
 	const lastPacket = packet?.[1] === packet?.[2]
+	const fragmentChapter = /^Chapter (\w+):$/m.exec(prompt)?.[1]
 	const result = {
 		overview: 'A key opens Paper Tower.',
 		chapters: packet
 			? eventIndex === 0
 				? [progress[0]]
 				: lastPacket
-					? [progress[1]]
+					? [
+							progress.find(({ chapterId }) => chapterId === fragmentChapter) ??
+								progress[1],
+						]
 					: []
 			: progress,
 		biblePatch: packet

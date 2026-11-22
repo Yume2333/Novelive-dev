@@ -110,6 +110,25 @@ function recentEvents(events: Event[]) {
 	}
 	return JSON.stringify(summaries)
 }
+function previewPackets(
+	previews: readonly string[],
+	chapterIds: readonly string[],
+	budget: number,
+) {
+	const packets: string[] = []
+	for (const [i, preview] of previews.entries()) {
+		const label = `Chapter ${chapterIds[i]}:\n`
+		if (budget - label.length < 2) return []
+		for (const fragment of splitChapter([preview], budget - label.length)) {
+			const part = label + fragment
+			const last = packets.at(-1)
+			if (last && last.length + part.length + 1 <= budget)
+				packets[packets.length - 1] = `${last}\n${part}`
+			else packets.push(part)
+		}
+	}
+	return packets
+}
 const unique = <T>(items: T[]) => [
 	...new Map(items.map((item) => [JSON.stringify(item), item])).values(),
 ]
@@ -163,6 +182,7 @@ export async function synthesizeVolume(
 	if (previews.some((preview, i) => preview.chapterId !== chapterIds[i]))
 		throw new Error('Stored preview chapter ID does not match its file')
 	const fingerprint = hash({
+		packetFormat: 1,
 		previews,
 		language: options.language,
 		requirements: options.requirements,
@@ -197,7 +217,9 @@ ${packetText.join('\n')}`
 		(budget - bytes(instructions) - historyBudget - 1024) / 8,
 	)
 	const packets =
-		useEvents && packetBudget > 0 ? splitChapter(packetText, packetBudget) : []
+		useEvents && packetBudget > 0
+			? previewPackets(packetText, chapterIds, packetBudget)
+			: []
 	const state: Checkpoint =
 		saved?.fingerprint === fingerprint && (saved.ready || saved.basis === basis)
 			? saved

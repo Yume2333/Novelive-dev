@@ -165,14 +165,29 @@ test('automatic fallback streams all preview packets without truncation', async 
 		segments.push(body.messages[0].content.split('Chapter previews:\n')[1])
 		return strict(request)
 	}
-	await synthesizeVolume(project, 'v1', chapters, { ...options, fetch })
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		fetch,
+	})
 	expect(segments.length).toBeGreaterThan(2)
 	const stored = await Promise.all(
 		chapters.map((id) => project.read(projectFiles.preview(id))),
 	)
-	expect(segments.join('').replaceAll('\n', '')).toBe(
-		stored.map((preview) => JSON.stringify(preview)).join(''),
-	)
+	const fragments = segments.flatMap((packet) => [
+		...packet.matchAll(/^Chapter (\w+):\n([^\n]+)/gm),
+	])
+	for (const preview of stored) {
+		const parts = fragments.filter(([, id]) => id === preview.chapterId)
+		expect(parts.length).toBeGreaterThan(1)
+		expect(parts.map(([, , text]) => text).join('')).toBe(
+			JSON.stringify(preview),
+		)
+	}
+	expect(segments.at(-1)).toMatch(/^Chapter c2:\n(?!\{)/)
+	expect(result.chapters[1]).toEqual({
+		chapterId: 'c2',
+		progress: 'Ada opens the tower.',
+	})
 })
 
 test('unresolved references trigger one repair and are never published', async () => {
