@@ -1,0 +1,23 @@
+{
+	"ignoreFiles": ["**/tokens.css"],
+	"rules": {
+		"color-no-hex": true,
+		"function-disallowed-list": [
+			"rgb",
+			"rgba",
+			"hsl",
+			"hsla",
+			"hwb",
+			"lab",
+			"lch",
+			"oklab",
+			"oklch",
+			"color"
+		],
+		"declaration-property-value-disallowed-list": {
+			"/^(?:color|background-color|border(?:-[a-z]+)*-color|outline-color|fill|stroke)$/": [
+				"/^(?!(?:var|color-mix|light-dark)\\(|(?:transparent|currentcolor|inherit|initial|unset|revert|revert-layer|none)$)[a-z]+$/i"
+			]
+		}
+	}
+}

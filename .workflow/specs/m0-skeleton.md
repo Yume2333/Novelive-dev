@@ -20,7 +20,7 @@ M1 要在应用里用一本真书走完整条链路。在那之前，桌面外�
 - **后台进程崩溃时**：窗口照常可用，顶部出现提示横幅；宿主自动重新拉起创作端，界面重新连上后横幅消失，设置页可以继续测试。如果创作端还没启动好就退出，或连续失败触发断路器，横幅显示错误信息、「日志」按钮和「重新启动」按钮，不再自动重试。
 - **浏览器开发模式**：`pnpm dev:web` 在普通浏览器里打开同一套界面，连接同一份创作端代码，设置测试同样可用。
 - **质量工具**：`pnpm check` 一条命令跑完各包类型检查、Biome、Stylelint 和 Vitest 单元测试；`pnpm test:e2e` 先执行 `pnpm build`，再用 Playwright 启动 Electron 跑冒烟用例。推到 `Yume2333/Novelive-dev` 后 GitHub Actions 跑 `pnpm check` 与 Linux sharp 冒烟。
-- **pnpm 配置**：根目录 `.npmrc` 配置 `node-linker=hoisted` 和 `shamefully-hoist=true`；pnpm 12 的 `onlyBuiltDependencies`（列出 `electron`、`esbuild`、`sharp`）和 `overrides` 写在 `pnpm-workspace.yaml` 里（`package.json` 的 `pnpm` 字段被忽略）。
+- **pnpm 配置**：根目录 `.npmrc` 记录 `node-linker=hoisted` 和 `shamefully-hoist=true`；锁定的 pnpm 12.21.0 从 `pnpm-workspace.yaml` 读取对应设置。构建脚本用 `allowBuilds` 明确批准 `electron`、`esbuild`、`sharp`；`overrides` 同样放在工作区配置。
 - **日志**：创作端和主进程各自写 `userData/logs/<process>-<YYYY-MM-DD>.log`（纯文本行，当日单文件不 rotate）；创作端崩溃时横幅提供「日志」按钮打开 `userData/logs/`。
 - **CI**：交付物包含 `.github/workflows/ci.yml`：ubuntu、Node 24、pnpm 12，apt 安装 `patchelf`、`binutils`、Electron 运行库和 `xvfb`，跑 `pnpm install --frozen-lockfile && pnpm check`，再在 `xvfb-run` 下启动真实 Electron 解码一张图完成 sharp 冒烟（`postinstall` 已运行幂等的 `tools/patch-sharp.mjs`）。完整 `pnpm test:e2e` 仅在本地运行。
 

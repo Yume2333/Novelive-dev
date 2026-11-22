@@ -1,0 +1,99 @@
+import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { type CreatorFrame, clientFrame, commandError } from './contract'
+import { createRegistry } from './registry'
+
+const parent = process.parentPort
+const generation = Number(process.env.NL_CREATOR_GENERATION)
+const registry = createRegistry()
+
+registry.register('events.list', ({ scope }) => ({
+	events: [],
+	gap: false,
+	snapshot: scope === 'app' ? { ready: true, generation } : null,
+}))
+
+if (process.env.NL_E2E === '1') {
+	registry.register('debug.sqliteSmoke', async () => {
+		const { DatabaseSync } = await import('node:sqlite')
+		const directory = await mkdtemp(join(tmpdir(), 'novelive-sqlite-'))
+		try {
+			using db = new DatabaseSync(join(directory, 'smoke.sqlite'))
+			const journalMode = db
+				.prepare('PRAGMA journal_mode = WAL')
+				.get()?.journal_mode
+			assert.equal(journalMode, 'wal')
+			db.exec('CREATE TABLE smoke (value INTEGER NOT NULL)')
+			db.prepare('INSERT INTO smoke (value) VALUES (?)').run(1)
+			const value = db.prepare('SELECT value FROM smoke').get()?.value
+			assert.equal(value, 1)
+			return { ok: true, journalMode, value } as const
+		} finally {
+			await rm(directory, { recursive: true, force: true })
+		}
+	})
+	registry.register('debug.sharpSmoke', async () => {
+		const { default: sharp } = await import('sharp')
+		const png = await sharp({
+			create: { width: 2, height: 2, channels: 3, background: '#ffffff' },
+		})
+			.png()
+			.toBuffer()
+		const decoded = await sharp(png).raw().toBuffer()
+		return {
+			ok: decoded.length === 12 && decoded.every((byte) => byte === 255),
+		}
+	})
+}
+
+parent.once('message', ({ ports }) => {
+	const [port] = ports
+	const pending = new Map<number, AbortController>()
+
+	port.on('message', async ({ data }) => {
+		if (!clientFrame.check(data)) {
+			console.error('Invalid creator command frame')
+			return
+		}
+		if (data.generation !== generation) return
+		const { requestId } = data
+		if (data.type === 'cancel') {
+			pending.get(requestId)?.abort()
+			pending.delete(requestId)
+			return
+		}
+		if (pending.has(requestId)) return
+		const controller = new AbortController()
+		pending.set(requestId, controller)
+		let response: CreatorFrame
+		try {
+			const result = await registry.run(
+				data.command,
+				data.payload,
+				controller.signal,
+			)
+			response = { type: 'result', generation, requestId, result }
+		} catch (error) {
+			response = {
+				type: 'error',
+				generation,
+				requestId,
+				error: commandError.check(error)
+					? error
+					: { code: 'internal', message: '创作端命令失败' },
+			}
+		}
+		if (!controller.signal.aborted) {
+			pending.delete(requestId)
+			port.postMessage(response)
+		}
+	})
+	port.once('close', () => {
+		for (const controller of pending.values()) controller.abort()
+		pending.clear()
+	})
+	port.start()
+	parent.postMessage({ type: 'ready', generation })
+})

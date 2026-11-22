@@ -1,0 +1,9 @@
+{
+	"name": "@novelive/dev-bridge",
+	"private": true,
+	"type": "module",
+	"exports": "./src/frames.ts",
+	"dependencies": {
+		"@novelive/creator": "workspace:*"
+	}
+}

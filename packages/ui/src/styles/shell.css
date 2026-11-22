@@ -1,0 +1,18 @@
+html {
+	scrollbar-width: none;
+}
+
+body {
+	margin: 0;
+	background: var(--color-background);
+	color: var(--color-on-surface);
+	font-family: var(--font-body);
+}
+
+main {
+	padding: var(--shell-spacing);
+}
+
+p {
+	color: var(--color-on-surface-variant);
+}

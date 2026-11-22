@@ -1,0 +1,14 @@
+{
+	"name": "@novelive/creator",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./contract": "./src/contract/index.ts"
+	},
+	"dependencies": {
+		"@earendil-works/pi-schema": "1.6.0"
+	},
+	"peerDependencies": {
+		"sharp": "0.35.5"
+	}
+}
