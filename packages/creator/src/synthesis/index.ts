@@ -171,8 +171,8 @@ async function seriesChapterIds(
 	if (current && chapterIds.some((id) => !currentIds.has(id)))
 		throw new Error('Synthesis chapter IDs must belong to this volume')
 	return new Set([
-		...chapterIds,
 		...indexed.flatMap((volume) => volume.chapters),
+		...chapterIds,
 	])
 }
 const unique = <T>(items: T[]) => [
@@ -447,6 +447,7 @@ ${packets[packet]}`,
 					glossaryPatch,
 					chapterSet,
 					observations,
+					provenance,
 				)
 			: {
 					conflicts: biblePatch

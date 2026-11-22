@@ -228,6 +228,7 @@ function merge<T extends Entry>(
 	raw: T,
 	kind: keyof Bible,
 	observedChapter?: string,
+	chapterOrder?: ReadonlyMap<string, number>,
 ) {
 	const { conflict: _conflict, ...fields } = raw
 	const candidate = { ...fields, status: 'candidate' } as T
@@ -247,14 +248,34 @@ function merge<T extends Entry>(
 	let unscopedChange = false
 	if (temporal) {
 		const value = incoming[temporal]
+		let prior = before[temporal]
+		if (observedChapter && chapterOrder && Array.isArray(before.changes)) {
+			const cutoff = chapterOrder.get(observedChapter) ?? -1
+			let latest = -Infinity
+			for (const change of before.changes as Change[]) {
+				const position = chapterOrder.get(change.chapterId) ?? -1
+				if (
+					change.field === temporal &&
+					position <= cutoff &&
+					position >= latest
+				) {
+					prior = change.value
+					latest = position
+				}
+			}
+		}
 		if (
 			typeof value === 'string' &&
 			before[temporal] !== undefined &&
-			value !== before[temporal]
+			(value !== before[temporal] || value !== prior)
 		) {
 			if (
+				value !== prior &&
 				!changes.some(
-					(change) => change.field === temporal && change.value === value,
+					(change) =>
+						change.field === temporal &&
+						change.value === value &&
+						(!observedChapter || change.chapterId === observedChapter),
 				)
 			) {
 				if (observedChapter)
@@ -318,7 +339,11 @@ export async function applyPatches(
 	glossary: GlossaryPatch,
 	chapters: ReadonlySet<string>,
 	observations: ReadonlyMap<Patch, string> = new Map(),
+	seriesChapters = chapters,
 ): Promise<{ conflicts: BiblePatch; glossaryConflicts: GlossaryPatch }> {
+	const chapterOrder = new Map(
+		Array.from(seriesChapters, (id, index) => [id, index]),
+	)
 	const conflicts: BiblePatch = []
 	const glossaryConflicts: GlossaryPatch = []
 	const pending: (() => Promise<void>)[] = []
@@ -364,6 +389,7 @@ export async function applyPatches(
 				item.entry as E,
 				kind,
 				observations.get(item),
+				chapterOrder,
 			)
 			if (conflict) conflicts.push({ ...item, entry: conflict } as Patch)
 			if (!isDeepStrictEqual(current, entry)) {
@@ -450,6 +476,7 @@ export async function applyPatches(
 			glossary,
 			chapters,
 			observations,
+			seriesChapters,
 		)
 		return { ...result, conflicts: [...rejected, ...result.conflicts] }
 	}

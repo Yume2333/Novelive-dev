@@ -524,6 +524,45 @@ test('chapter-scoped location descriptions are temporal, but renaming is a confl
 	})
 })
 
+test('returning to an old value records a new transition even with copied history', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const cartographer = {
+		chapterId: 'earlier',
+		field: 'identity',
+		value: 'Cartographer',
+	}
+	const captain = { chapterId: 'c1', field: 'identity', value: 'Captain' }
+	const file = projectFiles.character(scope, 'ada')
+	await project.write(file, {
+		formatVersion: 1,
+		entries: [{ ...confirmed, aliases: [], changes: [cartographer, captain] }],
+	})
+	const proposal = {
+		kind: 'character',
+		op: 'update',
+		entry: { ...confirmed, aliases: [], changes: [cartographer] },
+	} satisfies BiblePatch[number]
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[proposal],
+		[],
+		new Set(chapters),
+		new Map([[proposal, 'c2']]),
+		new Set(['earlier', ...chapters]),
+	)
+	expect(result.conflicts).toEqual([])
+	expect(await project.read(file)).toMatchObject({
+		entries: [
+			{
+				...confirmed,
+				changes: [cartographer, captain, { ...cartographer, chapterId: 'c2' }],
+			},
+		],
+	})
+})
+
 test('unresolved references trigger one repair and are never published', async () => {
 	await seed(root)
 	using project = await Project.open(root)
