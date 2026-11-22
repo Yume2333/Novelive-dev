@@ -227,7 +227,7 @@ export function LibraryPage() {
         actions={
           <>
             <Button variant="primary" icon="add" onClick={() => navigate('/import')}>新建工程</Button>
-            <Button variant="neu" icon="upload_file" onClick={() => setImportOpen(true)}>导入作品包</Button>
+            <Button icon="upload_file" onClick={() => setImportOpen(true)}>导入作品包</Button>
           </>
         }
       />
@@ -248,12 +248,12 @@ export function LibraryPage() {
       title="书库"
       actions={
         <>
-          <Button variant="neu" icon="upload_file" onClick={() => setImportOpen(true)}>
+          <Button icon="upload_file" onClick={() => setImportOpen(true)}>
             导入作品包
           </Button>
           <Dropdown
             trigger={
-              <Button variant="neu" icon="more_horiz" title="更多">
+              <Button icon="more_horiz" title="更多">
                 更多
               </Button>
             }

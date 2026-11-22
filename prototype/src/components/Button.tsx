@@ -11,10 +11,10 @@ export function Icon({ name, size = 18, style }: { name: string; size?: number; 
   )
 }
 
-type ButtonVariant = 'primary' | 'neu' | 'ghost' | 'danger'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
 export function Button({
-  variant = 'neu',
+  variant = 'secondary',
   size,
   icon,
   children,
@@ -54,7 +54,7 @@ export function Button({
       border: '1px solid var(--color-primary-container)',
       boxShadow: 'var(--shadow-raised)',
     },
-    neu: { color: 'var(--color-primary)' },
+    secondary: { color: 'var(--color-primary)' },
     ghost: {
       color: 'var(--color-on-surface-variant)',
       border: '1px solid transparent',
@@ -67,7 +67,7 @@ export function Button({
   }
   return (
     <button
-      className={variant === 'neu' ? 'neu-button' : undefined}
+      className={variant === 'secondary' ? 'glass-panel' : undefined}
       style={{ ...base, ...variants[variant], ...style }}
       onClick={onClick}
       disabled={disabled}

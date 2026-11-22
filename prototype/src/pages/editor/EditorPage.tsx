@@ -686,16 +686,16 @@ export function EditorPage() {
       actions={
         <>
           <Tooltip text="打开 / 收起原文对照">
-            <Button variant="neu" icon="menu_book" onClick={() => setSrcOpen((v) => !v)} title="原文对照" />
+            <Button icon="menu_book" onClick={() => setSrcOpen((v) => !v)} title="原文对照" />
           </Tooltip>
           <Tooltip text={playing ? '停止预览' : '预览：从当前句开始在舞台上播放'}>
-            <Button variant="neu" icon={playing ? 'stop' : 'play_arrow'} onClick={() => (playing ? stopPlay() : startPlay())} title="预览" />
+            <Button icon={playing ? 'stop' : 'play_arrow'} onClick={() => (playing ? stopPlay() : startPlay())} title="预览" />
           </Tooltip>
           <Tooltip text={history.length ? `撤销：${history[0].desc}` : '没有可撤销的修改'}>
-            <Button variant="neu" icon="undo" disabled={!history.length} onClick={() => history[0] && revertEntry(history[0].id)} title="撤销" />
+            <Button icon="undo" disabled={!history.length} onClick={() => history[0] && revertEntry(history[0].id)} title="撤销" />
           </Tooltip>
           <Dropdown
-            trigger={<Button variant="neu" icon="more_horiz" title="更多" />}
+            trigger={<Button icon="more_horiz" title="更多" />}
             items={[
               { label: `修改历史${history.length ? `（${history.length}）` : ''}`, icon: 'history', onClick: () => setHistOpen(true) },
               { label: '存为规则', icon: 'bookmark_add', onClick: () => { setRuleText(''); setRuleOpen(true) } },
@@ -1083,7 +1083,7 @@ export function EditorPage() {
                   </Tooltip>
                 ))}
                 <Dropdown
-                  trigger={<Button size="sm" variant="neu" icon="more_horiz">更多标记</Button>}
+                  trigger={<Button size="sm" icon="more_horiz">更多标记</Button>}
                   items={[
                     { label: '注音', icon: 'record_voice_over', onClick: () => wrapSelection('{ruby 读音}', '{/ruby}', '加注音') },
                     { label: '变速 ×0.6', icon: 'speed', onClick: () => wrapSelection('{speed 0.6}', '{/speed}', '加变速') },
@@ -1154,7 +1154,6 @@ export function EditorPage() {
                             ) : null}
                             <Button
                               size="sm"
-                              variant="neu"
                               icon="check"
                               onClick={() => rewriteSpan(i, sp.mark, sp.param, markEdits[i] ?? sp.inner, '改标记文字')}
                               disabled={sp.mark === 'wait' || (markEdits[i] ?? sp.inner) === sp.inner}

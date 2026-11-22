@@ -84,7 +84,7 @@ function PhaseCard({ work }: { work: Work }) {
               <p style={{ marginTop: 6, fontSize: 12, color: 'var(--color-on-error-container)' }}>{attention} 章需要处理</p>
             ) : null}
           </div>
-          <Button variant="neu" icon="conveyor_belt" onClick={() => navigate(`/work/${work.id}/production`)}>
+          <Button icon="conveyor_belt" onClick={() => navigate(`/work/${work.id}/production`)}>
             打开制作面板
           </Button>
         </div>
@@ -296,7 +296,7 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
             <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
               <Chip>{`改编强度 · ${work.presets.strength}`}</Chip>
               <Chip>{`演出密度 · ${work.presets.density}`}</Chip>
-              <Button variant="neu" size="sm" icon="tune" onClick={() => toast('已记录：下次制作前会再问一遍预设（演示）', 'tune')}>
+              <Button size="sm" icon="tune" onClick={() => toast('已记录：下次制作前会再问一遍预设（演示）', 'tune')}>
                 调整
               </Button>
             </div>
@@ -310,7 +310,7 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               <Select value={writerPreset} onChange={setWriterPreset} options={presetOptions} />
               {writerPreset === 'custom' ? (
-                <Button variant="neu" size="sm" icon="edit" onClick={() => toast('这里会打开预设编辑（演示）', 'edit')}>
+                <Button size="sm" icon="edit" onClick={() => toast('这里会打开预设编辑（演示）', 'edit')}>
                   编辑
                 </Button>
               ) : null}
@@ -371,7 +371,7 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>自定义标记</span>
-              <Button size="sm" variant="neu" icon="add" onClick={addMark}>
+              <Button size="sm" icon="add" onClick={addMark}>
                 新建
               </Button>
             </div>
@@ -420,7 +420,7 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
           ))}
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
             <TextInput value={newRule} placeholder="加一条规则" onChange={setNewRule} />
-            <Button size="sm" variant="neu" icon="add" onClick={addRule}>
+            <Button size="sm" icon="add" onClick={addRule}>
               添加
             </Button>
           </div>
@@ -528,7 +528,7 @@ export function WorkPage() {
         <>
           <Dropdown
             trigger={
-              <Button variant="neu" icon="more_horiz" title="更多">
+              <Button icon="more_horiz" title="更多">
                 更多
               </Button>
             }

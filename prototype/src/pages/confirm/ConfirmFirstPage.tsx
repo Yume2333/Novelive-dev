@@ -38,7 +38,7 @@ export function ConfirmFirstPage() {
       }
       actions={
         <>
-          <Button variant="neu" icon="play_circle" onClick={() => navigate(`/work/${work.id}/play`)}>试玩第一章</Button>
+          <Button icon="play_circle" onClick={() => navigate(`/work/${work.id}/play`)}>试玩第一章</Button>
           <Button variant="ghost" icon="edit_note" onClick={() => navigate(`/work/${work.id}/edit`)}>进编辑器修改</Button>
           <Button
             variant="primary"

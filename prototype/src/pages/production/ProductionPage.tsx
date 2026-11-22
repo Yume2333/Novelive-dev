@@ -375,7 +375,7 @@ export function ProductionPage() {
                     </p>
                   ) : null}
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
-                    <Button variant="neu" size="sm" icon="refresh" onClick={() => toast(`已把「${img.label}」加入重画`, 'refresh')}>重画</Button>
+                    <Button size="sm" icon="refresh" onClick={() => toast(`已把「${img.label}」加入重画`, 'refresh')}>重画</Button>
                     <Button variant="ghost" size="sm" icon="keep" onClick={() => toast(`「${img.label}」保留旧图`)}>保留</Button>
                   </div>
                 </div>

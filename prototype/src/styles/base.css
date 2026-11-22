@@ -30,6 +30,9 @@ input, select, textarea { font-family: inherit; }
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-glass);
 }
+button.glass-panel { transition: background 0.15s ease, box-shadow 0.15s ease; }
+button.glass-panel:hover:not(:disabled) { background: var(--white-90); }
+button.glass-panel:active:not(:disabled) { box-shadow: var(--shadow-inset); }
 
 .neu-button {
   background: var(--neu-bg);

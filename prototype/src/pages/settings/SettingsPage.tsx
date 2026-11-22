@@ -396,7 +396,7 @@ function PresetEditor({ preset, onClose, onSave }: { preset: WriterPreset; onClo
                 </button>
               </div>
             ))}
-            <Button size="sm" variant="neu" icon="add" style={{ alignSelf: 'flex-start' }} onClick={() => set({ replacements: [...draft.replacements, { find: '', replace: '' }] })}>
+            <Button size="sm" icon="add" style={{ alignSelf: 'flex-start' }} onClick={() => set({ replacements: [...draft.replacements, { find: '', replace: '' }] })}>
               加一条
             </Button>
           </div>
