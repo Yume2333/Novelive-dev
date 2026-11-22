@@ -1,9 +1,12 @@
 import {
 	arr,
+	compile,
 	int,
 	lit,
+	map,
 	nullable,
 	obj,
+	oneOf,
 	opt,
 	type Static,
 	str,
@@ -11,6 +14,7 @@ import {
 import {
 	assetId,
 	chapterProductionSchema,
+	chapterStepSchema,
 	entityId,
 	productionStatusSchema,
 	workId,
@@ -37,6 +41,9 @@ const visualChoices = {
 
 export const productionSnapshotSchema = obj({
 	...work,
+	title: opt(str()),
+	summary: opt(str()),
+	chapterTitles: opt(map(str())),
 	phase: workPhaseSchema,
 	status: productionStatusSchema,
 	chapters: arr(chapterProductionSchema),
@@ -48,6 +55,8 @@ export const productionSnapshotSchema = obj({
 				obj({
 					characterId: entityId,
 					costumeId: entityId,
+					characterName: opt(str()),
+					costumeName: opt(str()),
 					candidates: arr(candidateSchema, { minItems: 1 }),
 				}),
 			),
@@ -90,6 +99,20 @@ export const productionSnapshotEventSchema = obj({
 	type: lit('production.snapshot'),
 	payload: productionSnapshotSchema,
 })
+
+export const productionSnapshotEvent = compile(productionSnapshotEventSchema)
+export const productionChapterRecordEvent = compile(
+	obj({
+		type: lit('production.chapterRecord'),
+		payload: obj({
+			...chapter,
+			step: chapterStepSchema,
+			status: oneOf(['running', 'done', 'failed']),
+			message: str(),
+			detail: opt(str()),
+		}),
+	}),
+)
 
 export type ProductionSnapshot = Static<typeof productionSnapshotSchema>
 export type ProductionSnapshotEvent = Static<

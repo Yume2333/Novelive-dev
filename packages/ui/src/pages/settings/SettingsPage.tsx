@@ -31,6 +31,7 @@ import {
 	useImageFields,
 	useTextFields,
 } from './ModelFields'
+import { ProductionSettings } from './production/ProductionSettings'
 import styles from './SettingsPage.module.css'
 
 const textSlots = [
@@ -382,6 +383,10 @@ export function SettingsPage() {
 							))}
 							<ImageCard model={config.models.image} update={updateConfig} />
 						</div>
+						<ProductionSettings
+							config={config.production}
+							update={updateConfig}
+						/>
 					</section>
 					<section aria-labelledby="appearance-settings">
 						<h2 id="appearance-settings">界面</h2>
