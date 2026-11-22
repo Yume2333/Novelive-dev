@@ -27,6 +27,9 @@ const original = Buffer.from(
 		'',
 	].join('\r\n'),
 )
+const withEmptyVolume = Buffer.from(
+	original.toString().replace('第二卷 风止', '第二卷 空卷\r\n第三卷 风止'),
+)
 const series = {
 	formatVersion: 1,
 	seriesId: 'paper-sea',
@@ -49,9 +52,9 @@ const connection = {
 	contextWindow: 16384,
 } as const
 
-export async function importFixture(root: string) {
+export async function importFixture(root: string, emptyVolume = false) {
 	using project = await Project.create(root, { ...series, volumeIds: [] })
-	await importTxt(project, original, {
+	await importTxt(project, emptyVolume ? withEmptyVolume : original, {
 		title: series.title,
 		language: 'en',
 		encoding: 'utf-8',
@@ -62,7 +65,11 @@ export async function importFixture(root: string) {
 	})
 }
 
-export async function runGate(root: string, replay: typeof globalThis.fetch) {
+export async function runGate(
+	root: string,
+	replay: typeof globalThis.fetch,
+	emptyVolume = false,
+) {
 	using project = await Project.open(root)
 	let requests = 0
 	const fetch: typeof globalThis.fetch = (...args) => {
@@ -72,10 +79,13 @@ export async function runGate(root: string, replay: typeof globalThis.fetch) {
 	const { volumeIds, ...identity } = await project.read(projectFiles.series)
 	const { volumeIds: _, ...expected } = series
 	assert.deepEqual(identity, expected)
-	assert.deepEqual(volumeIds, ['v0001', 'v0002'])
+	assert.deepEqual(
+		volumeIds,
+		emptyVolume ? ['v0001', 'v0002', 'v0003'] : ['v0001', 'v0002'],
+	)
 	assert.deepEqual(
 		await project.readFile(projectFiles.original('txt')),
-		original,
+		emptyVolume ? withEmptyVolume : original,
 	)
 	const report = await project.read(projectFiles.importReport)
 	assert.ok(report.check)
@@ -93,7 +103,11 @@ export async function runGate(root: string, replay: typeof globalThis.fetch) {
 	)
 	const notes = await project.readFile(projectFiles.chapterNotes('ch0001'))
 	assert.equal(notes.toString(), '附注：不进入预览\n')
-	const chapterIds = [['ch0001', 'ch0002'], ['ch0003']]
+	const chapterIds = [
+		['ch0001', 'ch0002'],
+		...(emptyVolume ? [[]] : []),
+		['ch0003'],
+	]
 	let chapterIndex = 0
 	for (const [i, volumeId] of volumeIds.entries()) {
 		const volume = await project.read(projectFiles.volume(volumeId))
@@ -112,12 +126,34 @@ export async function runGate(root: string, replay: typeof globalThis.fetch) {
 				`${paragraphs[chapterIndex++].join('\n\n')}\n`,
 			)
 		}
+		const before = requests
 		const result = await prepareVolume(project, volumeId, {
 			language: work.language,
 			previewConnection: { ...connection, model: 'offline-preview' },
 			synthesisConnection: { ...connection, model: 'offline-synthesis' },
 			fetch,
 		})
+		if (!work.chapterIds.length) {
+			assert.equal(requests, before)
+			assert.deepEqual(result, {
+				previews: [],
+				digests: [],
+				synthesis: {
+					formatVersion: 1,
+					volumeId,
+					overview: '',
+					chapters: [],
+					biblePatch: [],
+					glossaryPatch: [],
+					conflicts: [],
+					glossaryConflicts: [],
+				},
+			})
+			await assert.rejects(project.read(projectFiles.skeleton(volumeId)), {
+				code: 'ENOENT',
+			})
+			continue
+		}
 		assert.deepEqual(
 			result.previews.map((preview) => preview.chapterId),
 			chapterIds[i],

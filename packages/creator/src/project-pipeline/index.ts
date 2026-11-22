@@ -1,8 +1,20 @@
-import { projectFiles } from '@novelive/format/model'
+import {
+	type ChapterPreview,
+	formatVersion,
+	projectFiles,
+} from '@novelive/format/model'
 import type { TextConnection } from '../models/text'
-import { type PreviewChapter, previewBook } from '../preview'
+import {
+	type PreviewChapter,
+	type PreviewDigest,
+	previewBook,
+} from '../preview'
 import type { Project } from '../project'
-import { type SynthesisOptions, synthesizeVolume } from '../synthesis'
+import {
+	type SynthesisOptions,
+	synthesizeVolume,
+	type VolumeSynthesis,
+} from '../synthesis'
 
 export { importTxt, type TxtImportOptions } from '../import/txt'
 export { importTxtProject, reviseTxtProject } from '../import/wizard'
@@ -17,7 +29,11 @@ export async function prepareVolume(
 	project: Project,
 	volumeId: string,
 	{ previewConnection, synthesisConnection, ...options }: PrepareVolumeOptions,
-) {
+): Promise<{
+	previews: ChapterPreview[]
+	digests: PreviewDigest[]
+	synthesis: VolumeSynthesis
+}> {
 	const series = await project.read(projectFiles.series)
 	const volumeIndex = series.volumeIds.indexOf(volumeId)
 	if (volumeIndex === -1) throw new Error(`Unknown project volume: ${volumeId}`)
@@ -28,6 +44,21 @@ export async function prepareVolume(
 		),
 	)
 	const chapterIds = works.flatMap((work) => work.chapterIds)
+	if (!chapterIds.length)
+		return {
+			previews: [],
+			digests: [],
+			synthesis: {
+				formatVersion,
+				volumeId,
+				overview: '',
+				chapters: [],
+				biblePatch: [],
+				glossaryPatch: [],
+				conflicts: [],
+				glossaryConflicts: [],
+			},
+		}
 	const chapters: PreviewChapter[] = []
 	for (const chapterId of chapterIds) {
 		options.signal?.throwIfAborted()
