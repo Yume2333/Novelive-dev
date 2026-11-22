@@ -1,11 +1,8 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
-import type { TextConnection } from '../../../packages/creator/src/models/text/index.js'
-
-const pixel: ImageContent = {
-	type: 'image',
-	mimeType: 'image/png',
-	data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
-}
+import {
+	type TextConnection,
+	textConnectionImage,
+} from '../../../packages/creator/src/models/text/index.js'
 
 export const smokeProfiles = [
 	{
@@ -13,7 +10,7 @@ export const smokeProfiles = [
 		model: 'gemini-3.8-flash',
 		basePath: '/v1',
 		contextWindow: 1_000_000,
-		image: pixel,
+		image: textConnectionImage,
 	},
 	{
 		format: 'openai-responses',

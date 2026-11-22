@@ -12,6 +12,14 @@ import {
 	str,
 	union,
 } from '@earendil-works/pi-schema'
+import {
+	configErrorSchema,
+	configUpdateSchema,
+	maskedConfigSchema,
+	textCatalogSchema,
+} from '../config/schema'
+
+export type { ConfigUpdate, MaskedConfig, TextSlot } from '../config/schema'
 
 const generation = int({ minimum: 1 })
 const scope = oneOf(['app', 'work'])
@@ -39,8 +47,34 @@ const error = obj({
 	]),
 	message: str(),
 })
+const imageCapability = union([
+	obj({ ok: lit(true), path: str(), thumbnail: str() }),
+	obj({ ok: lit(false), error }),
+])
 
 export const commands = {
+	'config.get': {
+		input: empty,
+		output: union([maskedConfigSchema, configErrorSchema]),
+	},
+	'config.update': { input: configUpdateSchema, output: maskedConfigSchema },
+	'config.reset': { input: empty, output: maskedConfigSchema },
+	'model.suggestContextWindow': {
+		input: textCatalogSchema,
+		output: nullable(int({ minimum: 4096 })),
+	},
+	'model.testText': {
+		input: obj({ slot: oneOf(['fast', 'main', 'writing', 'visual']) }),
+		output: obj({ ok: lit(true) }),
+	},
+	'model.testImage': {
+		input: empty,
+		output: obj({
+			generate: imageCapability,
+			transparent: imageCapability,
+			edit: imageCapability,
+		}),
+	},
 	'events.list': {
 		input: obj({ scope, scopeId: str(), afterSeq: int({ minimum: 0 }) }),
 		output: obj({

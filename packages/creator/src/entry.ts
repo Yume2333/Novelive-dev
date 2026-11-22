@@ -2,12 +2,62 @@ import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createConfigStore } from './config'
 import { type CreatorFrame, clientFrame, commandError } from './contract'
 import { createRegistry } from './registry'
+import { createReplayFetch, type ReplayOptions } from './replay'
 
 const parent = process.parentPort
 const generation = Number(process.env.NL_CREATOR_GENERATION)
 const registry = createRegistry()
+const dataDir = process.env.NL_CREATOR_DATA_DIR
+assert(dataDir, 'Creator data directory is required')
+const config = createConfigStore(dataDir)
+const cacheDir = join(dataDir, 'cache')
+
+function strictReplayOptions(): ReplayOptions | undefined {
+	if (process.env.NL_REPLAY !== 'strict') return undefined
+	const delay = Number(process.env.NL_REPLAY_DELAY_MS)
+	const fault = process.env.NL_REPLAY_FAULT
+	return {
+		delayMs: Number.isSafeInteger(delay) && delay > 0 ? delay : undefined,
+		fault: fault === 'disconnect' || fault === 'bad-image' ? fault : undefined,
+	}
+}
+
+registry.register('config.get', () => config.get())
+registry.register('config.update', (patch) => config.update(patch))
+registry.register('config.reset', () => config.reset())
+registry.register('model.suggestContextWindow', async (model) => {
+	const { suggestContextWindow } = await import('./models/text')
+	return suggestContextWindow(model)
+})
+registry.register('model.testText', async ({ slot }, signal) => {
+	const { testTextConnection, textConnectionImage, TextModelError } =
+		await import('./models/text')
+	const model = await config.resolveTextModel(slot)
+	const replay = strictReplayOptions()
+	try {
+		await testTextConnection(model, {
+			signal,
+			image: slot === 'visual' ? textConnectionImage : undefined,
+			fetch: createReplayFetch(replay),
+		})
+		return { ok: true } as const
+	} catch (error) {
+		if (error instanceof TextModelError)
+			throw { code: error.code, message: error.message }
+		throw error
+	}
+})
+registry.register('model.testImage', async (_payload, signal) => {
+	const { testImage } = await import('./models/image')
+	return testImage(await config.resolveImageModel(), {
+		cacheDir,
+		signal,
+		replay: strictReplayOptions(),
+	})
+})
 
 registry.register('events.list', ({ scope }) => ({
 	events: [],

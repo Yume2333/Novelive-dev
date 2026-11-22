@@ -14,123 +14,35 @@ import {
 	writeFile,
 } from 'node:fs/promises'
 import { join } from 'node:path'
+import { compile } from '@earendil-works/pi-schema'
 import {
-	bool,
-	compile,
-	int,
-	lit,
-	nullable,
-	type Optional,
-	obj,
-	oneOf,
-	opt,
-	type Schema,
-	type Static,
-	str,
-} from '@earendil-works/pi-schema'
+	apiKeyMasked,
+	type Config,
+	type ConfigError,
+	type ConfigUpdate,
+	configUpdateSchema,
+	type MaskedConfig,
+	privateConfigSchema,
+	type TextSlot,
+} from './schema'
 
-export const apiKeyMasked = '••••'
+export {
+	apiKeyMasked,
+	type ConfigError,
+	type ConfigUpdate,
+	configErrorSchema,
+	configUpdateSchema,
+	type MaskedConfig,
+	maskedConfigSchema,
+	type TextSlot,
+} from './schema'
+
 const encryptionKey = Buffer.from(
 	'df846708a87a482a44b97ed9fd8391e212d2995862fa4447fdbd9b9001ab99058',
 	'hex',
 )
 
-const connection = {
-	baseUrl: str(),
-	model: str(),
-}
-const textFields = {
-	...connection,
-	format: oneOf([
-		'openai-completions',
-		'openai-responses',
-		'anthropic-messages',
-	]),
-	compat: oneOf([
-		'auto',
-		'openai',
-		'deepseek',
-		'qwen',
-		'zhipu',
-		'openrouter',
-		'anthropic-compat',
-	]),
-	contextWindow: nullable(
-		int({ minimum: 4096, maximum: Number.MAX_SAFE_INTEGER }),
-	),
-}
-const imageFields = {
-	...connection,
-	concurrency: int({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
-	retries: int({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
-	quality: oneOf(['high', 'medium', 'low']),
-	nativeMaxEdge: oneOf([1536, 2048, 2560, 2816, 3840]),
-	postProcess: oneOf(['off', 'single', 'double']),
-	upscaleTier: oneOf(['anime', 'fast', 'detail']),
-}
-const appFields = {
-	theme: oneOf(['light', 'dark', 'system']),
-	language: lit('zh-CN'),
-	projectDir: str(),
-}
-
-function modelFields<K extends Record<string, Schema>>(key: K) {
-	const fast = { ...textFields, ...key }
-	const inherited = { ...fast, inheritFast: bool() }
-	return { fast, inherited, image: { ...imageFields, ...key } }
-}
-
-function configSchema<K extends Record<string, Schema>>(key: K) {
-	const { fast, inherited, image } = modelFields(key)
-	return obj({
-		...appFields,
-		models: obj({
-			fast: obj(fast),
-			main: obj(inherited),
-			writing: obj(inherited),
-			visual: obj(inherited),
-			image: obj(image),
-		}),
-	})
-}
-
-const privateFields = { apiKey: str() }
-const privateSchema = configSchema(privateFields)
-const configValidator = compile(privateSchema)
-const maskedSchema = configSchema({ apiKeyMasked: oneOf(['', apiKeyMasked]) })
-const configErrorSchema = obj({
-	configError: obj({ path: str(), reason: str() }),
-})
-
-function optionalFields<T extends Record<string, Schema>>(fields: T) {
-	return Object.fromEntries(
-		Object.entries(fields).map(([key, schema]) => [key, opt(schema)]),
-	) as {
-		[K in keyof T]: Optional<T[K]>
-	}
-}
-
-const fields = modelFields(privateFields)
-const inheritedPatch = obj(optionalFields(fields.inherited))
-export const configUpdateSchema = obj({
-	...optionalFields(appFields),
-	models: opt(
-		obj({
-			fast: opt(obj(optionalFields(fields.fast))),
-			main: opt(inheritedPatch),
-			writing: opt(inheritedPatch),
-			visual: opt(inheritedPatch),
-			image: opt(obj(optionalFields(fields.image))),
-		}),
-	),
-})
-
-export { configErrorSchema, maskedSchema as maskedConfigSchema }
-export type ConfigUpdate = Static<typeof configUpdateSchema>
-export type MaskedConfig = Static<typeof maskedSchema>
-export type ConfigError = Static<typeof configErrorSchema>
-type Config = Static<typeof privateSchema>
-export type TextSlot = Exclude<keyof Config['models'], 'image'>
+const configValidator = compile(privateConfigSchema)
 const updateValidator = compile(configUpdateSchema)
 
 function defaultConfig(): Config {

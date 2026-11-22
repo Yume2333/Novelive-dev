@@ -1,0 +1,12 @@
+$ NL_REPLAY=strict NL_CASSETTE_DIR="$PWD/tests/fixtures/text-models/smoke" pnpm dev
+pnpm dev Electron: clicked real Settings test; Anthropic smoke replay and API key masking passed
+
+$ NL_REPLAY=strict NL_CASSETTE_DIR="$PWD/tests/fixtures/image-models/smoke" pnpm dev:web
+Browser bridge: image generate, transparent and edit rendered HTTP thumbnails; light/dark, log directory and restart followed by strict replay passed
+
+$ NL_REPLAY=strict NL_CASSETTE_DIR="$PWD/tests/fixtures/text-models/smoke" pnpm dev:web
+Browser bridge: clicked and passed strict replay for Anthropic Messages, OpenAI Responses, and Chat Completions with vision
+
+Visual comparison at 1280×900 in Chromium: 09-settings-light.png, 09-settings-dark-image.png, 09-settings-prototype.png.
+Expanded image settings use the Settings page's shared overlay scrollbar. No system scrollbar is visible.
+No paid calls. Browser synthetic failure replay and independent milestone visual acceptance remain for the M0 gate.
