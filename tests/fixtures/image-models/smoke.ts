@@ -26,6 +26,7 @@ if (record) await access(ledger, constants.W_OK)
 
 const cacheDir = await mkdtemp(join(tmpdir(), 'novelive-image-smoke-'))
 const attempted = new Set<ImageCapability>()
+const requestedImages = 1
 try {
 	const results = await testImage(config, {
 		cacheDir,
@@ -54,7 +55,15 @@ try {
 					throw new Error('Image smoke retries are disabled')
 				attempted.add(capability)
 				let tokens: number | 'unknown' = 'unknown'
-				let images = 0
+				let images = requestedImages
+				let outcome = ' unresolved (requested image upper bound)'
+				const markTimeout = (error: unknown) => {
+					if (
+						request.signal.aborted ||
+						(error instanceof Error && /timeout/i.test(error.name))
+					)
+						outcome = ' unresolved/timeout (requested image upper bound)'
+				}
 				try {
 					const response = await globalThis.fetch(request, {
 						redirect: 'error',
@@ -62,23 +71,33 @@ try {
 					const payload = await response
 						.clone()
 						.json()
-						.catch(() => undefined)
+						.catch((error: unknown) => {
+							markTimeout(error)
+							return undefined
+						})
 					const usage = payload?.usage?.total_tokens
 					if (Number.isSafeInteger(usage) && usage >= 0) tokens = usage
 					const data = Array.isArray(payload?.data) ? payload.data : []
-					images = data.filter(
+					const returnedImages = data.filter(
 						(image: { b64_json?: string; url?: string }) =>
 							image?.b64_json || image?.url,
 					).length
-					if (response.ok && (!images || !data[0]?.b64_json))
+					if (payload !== undefined) {
+						images = returnedImages
+						outcome = ''
+					}
+					if (response.ok && (!returnedImages || !data[0]?.b64_json))
 						throw new Error('Smoke recording requires an inline image')
 					if (!response.ok)
 						console.error(`record ${capability}: HTTP ${response.status}`)
 					return response
+				} catch (error) {
+					markTimeout(error)
+					throw error
 				} finally {
 					await appendFile(
 						ledger,
-						`${new Date().toISOString().slice(0, 10)},${config.model},1,${tokens},${images},M0/12 ${capability} connection smoke\n`,
+						`${new Date().toISOString().slice(0, 10)},${config.model},1,${tokens},${images},M0/12 ${capability} connection smoke${outcome}\n`,
 					)
 				}
 			},
