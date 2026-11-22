@@ -28,7 +28,13 @@ import {
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
-import { applyPatches, existing, readBible, validatePatch } from './patch'
+import {
+	applyPatches,
+	existing,
+	proposalKeys,
+	readBible,
+	validatePatch,
+} from './patch'
 
 const fields = {
 	overview: str(),
@@ -392,7 +398,11 @@ ${packets[packet]}`,
 	const parts = state.whole ? [state.whole] : state.events
 	const skeleton = combine(volumeId, chapterIds, parts)
 	const observations = new Map<BiblePatch[number], string>()
-	const proposals = new Map<string, BiblePatch[number]>()
+	const proposals = new Map<
+		string,
+		{ item: BiblePatch[number]; content: string; chapter?: string }
+	>()
+	const located = new Set<string>()
 	let packetIndex = 0
 	for (const part of parts) {
 		const packetIds = state.whole
@@ -412,19 +422,26 @@ ${packets[packet]}`,
 					? packetIds[0]
 					: undefined
 		for (const item of part.biblePatch) {
-			const key = JSON.stringify(item)
-			const prior = proposals.get(key)
-			if (prior) {
-				if (observed && !observations.has(prior))
-					observations.set(prior, observed)
-				continue
-			}
-			proposals.set(key, item)
-			if (observed) observations.set(item, observed)
+			const { content, observation } = proposalKeys(item, observed)
+			const key = JSON.stringify([content, observation])
+			if (observation) located.add(content)
+			if (!proposals.has(key))
+				proposals.set(key, {
+					item,
+					content,
+					chapter: observation ? observed : undefined,
+				})
 		}
 		if ('is_last' in part && part.is_last) packetIndex++
 	}
-	const biblePatch = [...proposals.values()]
+	const biblePatch = [...proposals.values()].flatMap(
+		({ item, content, chapter }) => {
+			if (!chapter) return located.has(content) ? [] : [item]
+			const observed = { ...item }
+			observations.set(observed, chapter)
+			return [observed]
+		},
+	)
 	const glossaryPatch = unique(parts.flatMap((part) => part.glossaryPatch))
 	options.signal?.throwIfAborted()
 	if (

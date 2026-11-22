@@ -223,68 +223,124 @@ function unique<T>(values: T[]) {
 	return result
 }
 
+type Point = Omit<Change, 'chapterId'> & { chapterId?: string }
+type History = Map<string, Point>
+
+function temporalField(kind: keyof Bible) {
+	if (kind === 'character') return 'identity'
+	if (kind === 'relation' || kind === 'location') return 'description'
+}
+
+function changesOf(entry: Entry | undefined): Change[] {
+	const changes = (entry as { changes?: unknown } | undefined)?.changes
+	return Array.isArray(changes) ? changes : []
+}
+
+function temporalPoint(
+	kind: keyof Bible,
+	entry: Entry,
+	chapterId?: string,
+): Point | undefined {
+	const field = temporalField(kind)
+	const value = field && (entry as Entry & Record<string, unknown>)[field]
+	if (field && typeof value === 'string') return { field, value, chapterId }
+}
+
+const pointKey = ({ field, value, chapterId }: Point) =>
+	JSON.stringify([field, value, chapterId])
+
+export function proposalKeys(item: Patch, observedChapter?: string) {
+	const point =
+		item.op === 'add' || item.op === 'update'
+			? temporalPoint(item.kind, item.entry, observedChapter)
+			: undefined
+	return {
+		content: JSON.stringify(item),
+		observation: point?.chapterId ? pointKey(point) : undefined,
+	}
+}
+
+function existingHistory(
+	current: Entry | undefined,
+	kind: keyof Bible,
+): History {
+	const points: Point[] = changesOf(current).filter(
+		({ field }) => field === temporalField(kind),
+	)
+	const base = current && temporalPoint(kind, current, current.firstSeenChapter)
+	if (base) points.unshift(base)
+	return new Map(points.map((point) => [pointKey(point), point]))
+}
+
+function addPoints(history: History, points: Point[]) {
+	const additions = new Map<string, Point>()
+	for (const point of points) {
+		const key = pointKey(point)
+		if (history.has(key) || additions.has(key)) continue
+		if (
+			[...history.values(), ...additions.values()].some(
+				(prior) =>
+					prior.field === point.field &&
+					prior.chapterId === point.chapterId &&
+					prior.value !== point.value,
+			)
+		)
+			return false
+		additions.set(key, point)
+	}
+	for (const [key, point] of additions) history.set(key, point)
+	return true
+}
+
+function normalizeHistory<T extends Entry>(
+	entry: T,
+	history: History,
+	order: ReadonlyMap<string, number>,
+): T {
+	const rank = (chapter?: string) =>
+		chapter === undefined ? -1 : (order.get(chapter) ?? -1)
+	const points = [...history.values()].sort(
+		(a, b) => rank(a.chapterId) - rank(b.chapterId),
+	)
+	const base = points[0]
+	if (!base) return entry
+	const transitions = points
+		.slice(1)
+		.filter(
+			(point, index) =>
+				point.chapterId !== undefined && point.value !== points[index].value,
+		)
+	const changes = [
+		...changesOf(entry).filter(({ field }) => field !== base.field),
+		...transitions,
+	]
+	const firstSeenChapter =
+		base.chapterId && rank(base.chapterId) < rank(entry.firstSeenChapter)
+			? base.chapterId
+			: entry.firstSeenChapter
+	return {
+		...entry,
+		[base.field]: base.value,
+		...(firstSeenChapter ? { firstSeenChapter } : {}),
+		...(changes.length || 'changes' in entry ? { changes } : {}),
+	}
+}
+
 function merge<T extends Entry>(
 	current: T | undefined,
 	raw: T,
 	kind: keyof Bible,
 	observedChapter?: string,
-	chapterOrder?: ReadonlyMap<string, number>,
+	history?: History,
 ) {
 	const { conflict: _conflict, ...fields } = raw
 	const candidate = { ...fields, status: 'candidate' } as T
-	if (!current) return { entry: candidate }
-	const temporal =
-		kind === 'character'
-			? 'identity'
-			: kind === 'relation' || kind === 'location'
-				? 'description'
-				: undefined
-	const incoming = candidate as Entry & Record<string, unknown>
-	const before = current as Entry & Record<string, unknown>
-	const after = { ...current } as T & Record<string, unknown>
-	const changes = Array.isArray(incoming.changes)
-		? [...(incoming.changes as Change[])]
-		: []
-	let unscopedChange = false
-	if (temporal) {
-		const value = incoming[temporal]
-		let prior = before[temporal]
-		if (observedChapter && chapterOrder && Array.isArray(before.changes)) {
-			const cutoff = chapterOrder.get(observedChapter) ?? -1
-			let latest = -Infinity
-			for (const change of before.changes as Change[]) {
-				const position = chapterOrder.get(change.chapterId) ?? -1
-				if (
-					change.field === temporal &&
-					position <= cutoff &&
-					position >= latest
-				) {
-					prior = change.value
-					latest = position
-				}
-			}
-		}
-		if (
-			typeof value === 'string' &&
-			before[temporal] !== undefined &&
-			(value !== before[temporal] || value !== prior)
-		) {
-			if (
-				value !== prior &&
-				!changes.some(
-					(change) =>
-						change.field === temporal &&
-						change.value === value &&
-						(!observedChapter || change.chapterId === observedChapter),
-				)
-			) {
-				if (observedChapter)
-					changes.push({ chapterId: observedChapter, field: temporal, value })
-				else unscopedChange = true
-			}
-			delete incoming[temporal]
-		}
-	}
+	const temporal = temporalField(kind)
+	const incoming = { ...candidate } as Entry & Record<string, unknown>
+	const before = current as (Entry & Record<string, unknown>) | undefined
+	const after = { ...(current ?? candidate) } as T & Record<string, unknown>
+	const proposedChanges = changesOf(candidate)
+	if (temporal) delete incoming[temporal]
 	const metadata = new Set([
 		'status',
 		'conflict',
@@ -293,39 +349,58 @@ function merge<T extends Entry>(
 		'changes',
 		'knows',
 	])
-	const hasConflict =
-		current.status === 'confirmed' &&
-		(changes.some(({ field }) => field !== temporal) ||
+	const fixedConflict =
+		current?.status === 'confirmed' &&
+		(proposedChanges.some(({ field }) => field !== temporal) ||
 			Object.entries(incoming).some(
 				([key, value]) =>
-					!metadata.has(key) && !isDeepStrictEqual(before[key], value),
+					!metadata.has(key) && !isDeepStrictEqual(before?.[key], value),
 			))
-	if (hasConflict || unscopedChange)
+	const points: Point[] = proposedChanges.filter(
+		({ field }) => field === temporal,
+	)
+	const observation = temporalPoint(
+		kind,
+		candidate,
+		observedChapter ?? (!current ? candidate.firstSeenChapter : undefined),
+	)
+	if (observation && (observation.chapterId || !current))
+		points.push(observation)
+	const temporalConflict =
+		!fixedConflict && history && !addPoints(history, points)
+	if (current && (fixedConflict || temporalConflict))
 		return {
 			entry: current,
 			conflict: {
 				...candidate,
-				...fields,
-				status: 'candidate',
-				conflict: unscopedChange
-					? 'Temporal change has no observed chapter'
-					: difference,
+				conflict: fixedConflict
+					? difference
+					: 'Different temporal values claimed for the same chapter',
 			} as T,
 		}
-	if (current.status !== 'confirmed') Object.assign(after, incoming)
+	if (temporalConflict)
+		return {
+			entry: undefined,
+			conflict: {
+				...candidate,
+				conflict: 'Different temporal values claimed for the same chapter',
+			} as T,
+		}
+	if (current?.status !== 'confirmed') Object.assign(after, incoming)
 	for (const field of ['firstSeenChapter', 'revealedChapter'] as const)
-		if (current[field] !== undefined) after[field] = current[field]
-	if (changes.length)
+		if (current?.[field] !== undefined) after[field] = current[field]
+	const changes = unique([
+		...changesOf(current),
+		...proposedChanges.filter(({ field }) => field !== temporal),
+	])
+	if (changes.length || 'changes' in incoming)
 		Object.assign(after, {
-			changes: unique([
-				...(Array.isArray(before.changes) ? before.changes : []),
-				...changes,
-			]),
+			changes,
 		})
 	if (Array.isArray(incoming.knows))
 		Object.assign(after, {
 			knows: unique([
-				...(Array.isArray(before.knows) ? before.knows : []),
+				...(Array.isArray(before?.knows) ? before.knows : []),
 				...incoming.knows,
 			]),
 		})
@@ -364,6 +439,7 @@ export async function applyPatches(
 		persist: (entries: NoInfer<E>[], ids: Set<string>) => Promise<void>,
 	) {
 		const entries = new Map(original.map((entry) => [entry.id, entry]))
+		const histories = new Map<string, History>()
 		const changed = new Set<string>()
 		for (const item of patch) {
 			if (item.kind !== kind || item.op === 'none') continue
@@ -379,22 +455,35 @@ export async function applyPatches(
 					chapters.has(current.firstSeenChapter)
 				) {
 					entries.delete(current.id)
+					histories.delete(current.id)
 					changed.add(current.id)
 					if (kind === 'character') removedCharacters.add(current.id)
 				}
 				continue
 			}
+			const history =
+				histories.get(item.entry.id) ?? existingHistory(current, kind)
 			const { entry, conflict } = merge<E>(
 				current,
 				item.entry as E,
 				kind,
 				observations.get(item),
-				chapterOrder,
+				history,
 			)
 			if (conflict) conflicts.push({ ...item, entry: conflict } as Patch)
-			if (!isDeepStrictEqual(current, entry)) {
+			else if (entry && history.size) histories.set(entry.id, history)
+			if (entry && !isDeepStrictEqual(current, entry)) {
 				entries.set(entry.id, entry)
 				changed.add(entry.id)
+			}
+		}
+		for (const [id, history] of histories) {
+			const entry = entries.get(id)
+			if (!entry) continue
+			const normalized = normalizeHistory(entry, history, chapterOrder)
+			if (!isDeepStrictEqual(entry, normalized)) {
+				entries.set(id, normalized)
+				changed.add(id)
 			}
 		}
 		const survivors = [...entries.values()]
@@ -487,7 +576,7 @@ export async function applyPatches(
 		const current = terms.get(incoming.id)
 		const { entry, conflict } = merge(current, incoming, 'glossary')
 		if (conflict) glossaryConflicts.push(conflict)
-		if (!isDeepStrictEqual(current, entry)) {
+		if (entry && !isDeepStrictEqual(current, entry)) {
 			terms.set(entry.id, entry)
 			changed = true
 		}

@@ -43,6 +43,7 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 		body.model === 'fixture-long-event' && packet[1] === '1'
 	const events = Number(/^Events already extracted: (\d+)$/m.exec(prompt)?.[1])
 	const repeated = body.model === 'fixture-repeated-proposal'
+	const returning = body.model === 'fixture-returning-proposal'
 	const oversized = '🦊'.repeat(160)
 	if (firstLongEvent && events === 1) {
 		const encoded = /^Recent event summaries: (.+)$/m.exec(prompt)?.[1] ?? ''
@@ -54,7 +55,11 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 	const result = {
 		overview: 'A long journey.',
 		chapters: Array.from(
-			repeated && events > 0 ? ['c2'] : chapterIds,
+			returning
+				? [`c${events + 1}`]
+				: repeated && events > 0
+					? ['c2']
+					: chapterIds,
 			(chapterId) => ({
 				chapterId,
 				progress: 'The journey continues.',
@@ -64,16 +69,23 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 			firstLongEvent && events === 0
 				? oversized
 				: `Event ${packet[1]}:${events}`,
-		is_last: !(firstLongEvent || repeated) || events > 0,
-		biblePatch: repeated
-			? [
-					{
-						kind: 'character',
-						op: 'update',
-						entry: { ...confirmed, identity: 'Captain' },
-					},
-				]
-			: [],
+		is_last: returning
+			? events === 2
+			: !(firstLongEvent || repeated) || events > 0,
+		biblePatch:
+			repeated || returning
+				? [
+						{
+							kind: 'character',
+							op: 'update',
+							entry: {
+								...confirmed,
+								identity:
+									returning && events !== 1 ? 'Cartographer' : 'Captain',
+							},
+						},
+					]
+				: [],
 		glossaryPatch: [],
 	}
 	return new Response(
@@ -296,28 +308,52 @@ test('a minimum-context continuation retains a truncated newest event in the sam
 	expect(result.chapters.map(({ chapterId }) => chapterId)).toEqual(chapters)
 })
 
-test('duplicate proposals retain a chapter named only in the later copy', async () => {
-	await seed(root)
-	using project = await Project.open(root)
-	const result = await synthesizeVolume(project, 'v1', chapters, {
-		...options,
-		connection: { ...connection, model: 'fixture-repeated-proposal' },
-		strategy: 'events',
-		fetch: packetFetch,
-	})
-	expect(result.biblePatch).toHaveLength(1)
-	expect(result.conflicts).toEqual([])
-	expect(
-		await project.read(projectFiles.character(scope, 'ada')),
-	).toMatchObject({
-		entries: [
-			{
-				...confirmed,
-				changes: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
-			},
+test.each([
+	{
+		model: 'fixture-repeated-proposal',
+		count: 1,
+		expected: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
+	},
+	{
+		model: 'fixture-returning-proposal',
+		count: 3,
+		expected: [
+			{ chapterId: 'c2', field: 'identity', value: 'Captain' },
+			{ chapterId: 'c3', field: 'identity', value: 'Cartographer' },
 		],
-	})
-})
+	},
+])(
+	'proposal deduplication retains required chapter evidence: $model',
+	async ({ model, count, expected }) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const ids =
+			model === 'fixture-returning-proposal' ? [...chapters, 'c3'] : chapters
+		if (ids.length === 3)
+			await project.write(projectFiles.preview('c3'), {
+				...previews[0],
+				chapterId: 'c3',
+			})
+		const result = await synthesizeVolume(project, 'v1', ids, {
+			...options,
+			connection: { ...connection, model },
+			strategy: 'events',
+			fetch: packetFetch,
+		})
+		expect(result.biblePatch).toHaveLength(count)
+		expect(result.conflicts).toEqual([])
+		expect(
+			await project.read(projectFiles.character(scope, 'ada')),
+		).toMatchObject({
+			entries: [
+				{
+					...confirmed,
+					changes: expected,
+				},
+			],
+		})
+	},
+)
 
 test('automatic fallback streams all preview packets without truncation', async () => {
 	await seed(root, true)
@@ -522,84 +558,157 @@ test('a proposal cannot smuggle fixed facts onto confirmed characters as tempora
 	])
 })
 
-test('chapter-scoped location descriptions are temporal, but renaming is a conflict', async () => {
-	await seed(root)
-	using project = await Project.open(root)
-	const tower = {
-		id: 'tower',
-		name: 'Paper Tower',
-		description: 'Intact',
-		status: 'confirmed',
-		firstSeenChapter: 'c1',
-	} as const
-	const file = projectFiles.location(scope, 'tower')
-	await project.write(file, { formatVersion: 1, entries: [tower] })
-	const temporal = { chapterId: 'c2', field: 'description', value: 'Ruined' }
-	const result = await applyPatches(
-		project,
-		await readBible(project),
-		[
+test.each(['explicit', 'observed'])(
+	'location normalization accepts %s descriptions, but renaming is a conflict',
+	async (source) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const tower = {
+			id: 'tower',
+			name: 'Paper Tower',
+			description: 'Intact',
+			status: 'confirmed',
+			firstSeenChapter: 'c1',
+		} as const
+		const file = projectFiles.location(scope, 'tower')
+		await project.write(file, { formatVersion: 1, entries: [tower] })
+		const temporal = { chapterId: 'c2', field: 'description', value: 'Ruined' }
+		const update = {
+			kind: 'location',
+			op: 'update',
+			entry:
+				source === 'explicit'
+					? { ...tower, changes: [temporal] }
+					: { ...tower, description: 'Ruined' },
+		} satisfies BiblePatch[number]
+		const result = await applyPatches(
+			project,
+			await readBible(project),
+			[
+				update,
+				{
+					kind: 'location',
+					op: 'update',
+					entry: {
+						...tower,
+						changes: [{ ...temporal, field: 'name', value: 'Other Tower' }],
+					},
+				},
+			],
+			[],
+			new Set(chapters),
+			source === 'observed' ? new Map([[update, 'c2']]) : undefined,
+		)
+		expect(result.conflicts).toHaveLength(1)
+		expect(await project.read(file)).toMatchObject({
+			entries: [{ ...tower, changes: [temporal] }],
+		})
+	},
+)
+
+test.each([
+	{
+		name: 'an observation of the state already in effect does not reverse a later explicit change',
+		history: [['c1', 'Captain']],
+		proposals: [
+			{ observed: 'c2', value: 'Captain', history: [['c3', 'Admiral']] },
+		],
+		expected: [
+			['c1', 'Captain'],
+			['c3', 'Admiral'],
+		],
+	},
+	{
+		name: 'an observation that seemed redundant survives history arriving out of order',
+		history: [],
+		proposals: [
+			{ observed: 'c3', value: 'Cartographer', history: [] },
+			{ history: [['c2', 'Captain']] },
+		],
+		expected: [
+			['c2', 'Captain'],
+			['c3', 'Cartographer'],
+		],
+	},
+	{
+		name: 'returning to an old value is a new transition even with copied history',
+		history: [['c1', 'Captain']],
+		proposals: [
 			{
-				kind: 'location',
-				op: 'update',
-				entry: { ...tower, changes: [temporal] },
+				observed: 'c2',
+				value: 'Cartographer',
+				history: [['earlier', 'Cartographer']],
 			},
-			{
-				kind: 'location',
+		],
+		expected: [
+			['c1', 'Captain'],
+			['c2', 'Cartographer'],
+		],
+	},
+	{
+		name: 'the observation does not inherit the original first-seen chapter',
+		history: [],
+		proposals: [{ observed: 'c2', value: 'Captain', history: [] }],
+		expected: [['c2', 'Captain']],
+	},
+	{
+		name: 'two different temporal claims for the same chapter conflict',
+		history: [['c1', 'Captain']],
+		proposals: [{ observed: 'c1', value: 'Admiral', history: [] }],
+		expected: [['c1', 'Captain']],
+		conflict: true,
+	},
+])(
+	'temporal normalization: $name',
+	async ({ history, proposals, expected, conflict }) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const entry = { ...confirmed, aliases: [], firstSeenChapter: 'earlier' }
+		const points = (rows: string[][]) =>
+			rows.map(([chapterId, value]) => ({
+				chapterId,
+				field: 'identity',
+				value,
+			}))
+		const file = projectFiles.character(scope, 'ada')
+		await project.write(file, {
+			formatVersion: 1,
+			entries: [{ ...entry, changes: points(history) }],
+		})
+		const observations = new Map<BiblePatch[number], string>()
+		const patch = proposals.map((proposal) => {
+			const item = {
+				kind: 'character',
 				op: 'update',
 				entry: {
-					...tower,
-					changes: [{ ...temporal, field: 'name', value: 'Other Tower' }],
+					...entry,
+					identity: proposal.value,
+					changes: points(proposal.history),
 				},
-			},
-		],
-		[],
-		new Set(chapters),
-	)
-	expect(result.conflicts).toHaveLength(1)
-	expect(await project.read(file)).toMatchObject({
-		entries: [{ ...tower, changes: [temporal] }],
-	})
-})
-
-test('returning to an old value records a new transition even with copied history', async () => {
-	await seed(root)
-	using project = await Project.open(root)
-	const cartographer = {
-		chapterId: 'earlier',
-		field: 'identity',
-		value: 'Cartographer',
-	}
-	const captain = { chapterId: 'c1', field: 'identity', value: 'Captain' }
-	const file = projectFiles.character(scope, 'ada')
-	await project.write(file, {
-		formatVersion: 1,
-		entries: [{ ...confirmed, aliases: [], changes: [cartographer, captain] }],
-	})
-	const proposal = {
-		kind: 'character',
-		op: 'update',
-		entry: { ...confirmed, aliases: [], changes: [cartographer] },
-	} satisfies BiblePatch[number]
-	const result = await applyPatches(
-		project,
-		await readBible(project),
-		[proposal],
-		[],
-		new Set(chapters),
-		new Map([[proposal, 'c2']]),
-		new Set(['earlier', ...chapters]),
-	)
-	expect(result.conflicts).toEqual([])
-	expect(await project.read(file)).toMatchObject({
-		entries: [
-			{
-				...confirmed,
-				changes: [cartographer, captain, { ...cartographer, chapterId: 'c2' }],
-			},
-		],
-	})
-})
+			} satisfies BiblePatch[number]
+			if (proposal.observed) observations.set(item, proposal.observed)
+			return item
+		})
+		const result = await applyPatches(
+			project,
+			await readBible(project),
+			patch,
+			[],
+			new Set(chapters),
+			observations,
+			new Set(['earlier', ...chapters, 'c3']),
+		)
+		expect(result.conflicts).toHaveLength(conflict ? 1 : 0)
+		expect(await project.read(file)).toMatchObject({
+			entries: [
+				{
+					...entry,
+					changes: points(expected),
+				},
+			],
+		})
+	},
+)
 
 test('unresolved references trigger one repair and are never published', async () => {
 	await seed(root)
