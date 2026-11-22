@@ -123,7 +123,7 @@ export function defaultWorkSettings(): WorkSettings {
 		chapterRules: {},
 		fidelityReview: true,
 		styleReview: false,
-		confirmWithReferences: false,
+		confirmWithReferences: true,
 		customMarks: {},
 		outputResolution: '2K',
 	}

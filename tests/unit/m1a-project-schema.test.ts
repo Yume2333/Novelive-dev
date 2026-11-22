@@ -33,6 +33,10 @@ test('closes and reopens versioned documents, source bytes and queued tasks from
 		workIds: [ref.workId],
 	})
 	expect(await project.read(projectFiles.work('v1', ref.workId))).toEqual(work)
+	expect(
+		(await project.read(projectFiles.work('v1', ref.workId))).settings
+			.confirmWithReferences,
+	).toBe(true)
 	expect(await project.read(projectFiles.chapter(ref))).toMatchObject({
 		paragraphIds: ['p0001', 'p0002'],
 	})
