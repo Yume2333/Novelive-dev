@@ -39,14 +39,25 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 	const chapterIds = new Set(
 		Array.from(previews.matchAll(/^Chapter ([\w-]+):$/gm), ([, id]) => id),
 	)
+	const firstLongEvent =
+		body.model === 'fixture-long-event' && packet[1] === '1'
+	const events = Number(/^Events already extracted: (\d+)$/m.exec(prompt)?.[1])
+	const oversized = '🦊'.repeat(160)
+	if (firstLongEvent && events === 1) {
+		const encoded = /^Recent event summaries: (.+)$/m.exec(prompt)?.[1] ?? ''
+		const history: string[] = JSON.parse(encoded)
+		expect(history[0]).not.toBe('')
+		expect(oversized.startsWith(history[0])).toBe(true)
+		expect(Buffer.byteLength(encoded)).toBeLessThanOrEqual(256)
+	}
 	const result = {
 		overview: 'A long journey.',
 		chapters: Array.from(chapterIds, (chapterId) => ({
 			chapterId,
 			progress: 'The journey continues.',
 		})),
-		event: `Event ${packet[1]}`,
-		is_last: true,
+		event: firstLongEvent && events === 0 ? oversized : `Event ${packet[1]}`,
+		is_last: !firstLongEvent || events > 0,
 		biblePatch: [],
 		glossaryPatch: [],
 	}
@@ -247,6 +258,23 @@ test('automatic fallback also works at the minimum 4096-token context', async ()
 	const result = await synthesizeVolume(project, 'v1', chapters, {
 		...options,
 		connection: { ...connection, contextWindow: 4096 },
+		fetch: packetFetch,
+	})
+	expect(packetFetch.mock.calls.length).toBeGreaterThan(1)
+	expect(result.chapters.map(({ chapterId }) => chapterId)).toEqual(chapters)
+})
+
+test('a minimum-context continuation retains a truncated newest event in the same packet', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		connection: {
+			...connection,
+			contextWindow: 4096,
+			model: 'fixture-long-event',
+		},
+		strategy: 'events',
 		fetch: packetFetch,
 	})
 	expect(packetFetch.mock.calls.length).toBeGreaterThan(1)

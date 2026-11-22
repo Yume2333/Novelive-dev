@@ -103,8 +103,16 @@ function recentEvents(events: Event[], historyBudget: number) {
 	const summaries: string[] = []
 	let remaining = historyBudget - 2
 	for (let i = events.length - 1; i >= 0 && remaining > 0; i--) {
-		const summary = events[i].event.slice(0, 160)
-		const size = bytes(JSON.stringify(summary)) + 1
+		const chars = Array.from(events[i].event).slice(0, 160)
+		let summary = chars.join('')
+		const separator = summaries.length ? 1 : 0
+		let size = bytes(JSON.stringify(summary)) + separator
+		if (!summaries.length)
+			while (size > remaining && chars.length) {
+				chars.pop()
+				summary = chars.join('')
+				size = bytes(JSON.stringify(summary))
+			}
 		if (size > remaining) break
 		summaries.unshift(summary)
 		remaining -= size
