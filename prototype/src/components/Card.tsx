@@ -1,13 +1,26 @@
 import type { CSSProperties, ReactNode } from 'react'
 import type { ChapterStatus } from '../mock/types'
 import { Icon } from './Button'
+import { StatusBeacon } from './Motion'
 
 export function Card({ children, style, onClick }: { children: ReactNode; style?: CSSProperties; onClick?: () => void }) {
   return (
     <div
-      className="glass-panel"
+      className={onClick ? 'glass-panel nl-card-interactive' : 'glass-panel'}
       style={{ borderRadius: 'var(--radius-2xl)', overflow: 'hidden', ...style }}
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onClick()
+              }
+            }
+          : undefined
+      }
     >
       {children}
     </div>
@@ -39,11 +52,11 @@ export function StatusPill({ status, spin }: { status: ChapterStatus; spin?: boo
         whiteSpace: 'nowrap',
       }}
     >
-      <Icon
-        name={m.icon}
-        size={14}
-        style={spin && status === 'producing' ? { animation: 'spin 4s linear infinite' } : undefined}
-      />
+      {status === 'producing' ? (
+        <StatusBeacon tone="active" active={!!spin} size={7} />
+      ) : (
+        <Icon name={m.icon} size={14} />
+      )}
       {m.label}
     </span>
   )
@@ -75,7 +88,8 @@ export function ChapterStatusMark({ status, spin, attention }: { status: Chapter
   )
 }
 
-export function ProgressBar({ value, height = 8 }: { value: number; height?: number }) {
+export function ProgressBar({ value, height = 8, active }: { value: number; height?: number; active?: boolean }) {
+  const clamped = Math.max(0, Math.min(1, value))
   return (
     <div
       style={{
@@ -88,12 +102,13 @@ export function ProgressBar({ value, height = 8 }: { value: number; height?: num
       }}
     >
       <div
+        className={active ? 'progress-sheen' : undefined}
         style={{
           height: '100%',
-          width: `${Math.round(value * 100)}%`,
+          width: `${Math.round(clamped * 100)}%`,
           background: 'var(--color-primary)',
           borderRadius: 'var(--radius-full)',
-          transition: 'width 0.4s ease',
+          transition: 'width var(--dur-slow) var(--ease-out)',
         }}
       />
     </div>

@@ -7,8 +7,9 @@ import { EmptyState, Field, SectionLabel, textareaStyle } from '../../components
 import { Dropdown } from '../../components/Modal'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
-import { findVisualCandidates, type CandidateImage, type CharacterCandidate } from '../../mock/confirm'
+import { findVisualCandidates, type CandidateImage, type CharacterCandidate, type WorkVisualCandidates } from '../../mock/confirm'
 import { findSeries, findVolume, findWork } from '../../mock/library'
+import type { Work } from '../../mock/types'
 
 /** 小图占位块：CSS 渐变 / 剪影 + 来源标签 + 说明文字，选中时描边 + 角标 */
 function Thumb({ img, selected, onSelect, h = 180 }: {
@@ -132,15 +133,8 @@ export function ConfirmVisualPage() {
   const { id } = useParams()
   const work = findWork(id)
   const navigate = useNavigate()
-  const toast = useToast()
 
   const data = work ? findVisualCandidates(work) : null
-  const [chars, setChars] = useState<CharacterCandidate[]>(() => (work ? findVisualCandidates(work).characters : []))
-  const [styleSel, setStyleSel] = useState<string | null>(null)
-  const [stopWithRefs, setStopWithRefs] = useState(data?.stopWithRefs ?? true)
-  /** 每个造型选中的候选图 id：`charId/outfitName -> imageId` */
-  const [picked, setPicked] = useState<Record<string, string>>({})
-  const [selCharId, setSelCharId] = useState<string | null>(null)
 
   if (!work || work.kind !== 'project' || !data) {
     return (
@@ -149,6 +143,20 @@ export function ConfirmVisualPage() {
       </Page>
     )
   }
+
+  return <ConfirmVisualInner key={work.id} work={work} data={data} />
+}
+
+function ConfirmVisualInner({ work, data }: { work: Work; data: WorkVisualCandidates }) {
+  const navigate = useNavigate()
+  const toast = useToast()
+
+  const [chars, setChars] = useState<CharacterCandidate[]>(() => data.characters)
+  const [styleSel, setStyleSel] = useState<string | null>(null)
+  const [stopWithRefs, setStopWithRefs] = useState(data.stopWithRefs)
+  /** 每个造型选中的候选图 id：`charId/outfitName -> imageId` */
+  const [picked, setPicked] = useState<Record<string, string>>({})
+  const [selCharId, setSelCharId] = useState<string | null>(null)
 
   const vol = findVolume(work.volumeId)
   const ser = findSeries(work.seriesId)
@@ -161,11 +169,13 @@ export function ConfirmVisualPage() {
   return (
     <Page
       eyebrow={`${ser.title} · 第${vol.index}卷 · 确认点 1 / 2`}
-      title={`${work.title} · 角色设定 / 主视觉`}
-      subtitle={
-        <Tooltip text="确认后开始制作第一章；第一章做完会再停一次。">
-          <Icon name="info" size={15} style={{ color: 'var(--color-outline)', verticalAlign: 'middle' }} />
-        </Tooltip>
+      title={
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          <span>{work.title} · 角色设定 / 主视觉</span>
+          <Tooltip text="确认后开始制作第一章；第一章做完会再停一次。">
+            <Icon name="info" size={16} style={{ color: 'var(--color-outline)' }} />
+          </Tooltip>
+        </span>
       }
       actions={
         <>
@@ -234,9 +244,10 @@ export function ConfirmVisualPage() {
                     padding: 'var(--space-2) var(--space-3)',
                     borderRadius: 'var(--radius-lg)',
                     textAlign: 'left',
-                    background: active ? 'var(--accent-wash)' : 'transparent',
-                    border: active ? '1px solid var(--color-primary)' : '1px solid transparent',
-                    transition: 'all 0.15s ease',
+                    background: active ? 'var(--white-90)' : 'transparent',
+                    border: active ? '1px solid var(--accent-border-20)' : '1px solid transparent',
+                    boxShadow: active ? 'var(--shadow-chip)' : 'none',
+                    transition: 'all var(--dur-fast, 140ms) var(--ease-out, ease)',
                   }}
                 >
                   <span style={{ flex: 1, minWidth: 0 }}>

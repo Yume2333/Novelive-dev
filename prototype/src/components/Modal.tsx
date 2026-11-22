@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from './Button'
 import { IconButton } from './IconButton'
+import { usePresence } from './Motion'
 
 export function Modal({
   open,
@@ -18,8 +19,22 @@ export function Modal({
   footer?: ReactNode
   width?: number
 }) {
-  if (!open) return null
-  return (
+  const { mounted, state } = usePresence(open, 180)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  if (!mounted) return null
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -30,11 +45,15 @@ export function Modal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 24,
+        padding: 'var(--space-5)',
+        animation: state === 'enter' ? 'scrim-in var(--dur-fast) var(--ease-out) forwards' : 'scrim-out var(--dur-fast) var(--ease-out) forwards',
       }}
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className="glass-panel"
         style={{
           width,
@@ -43,7 +62,7 @@ export function Modal({
           overflow: 'auto',
           borderRadius: 'var(--radius-2xl)',
           background: 'var(--veil-95)',
-          animation: 'fade-up 0.2s ease',
+          animation: state === 'enter' ? 'fade-up var(--dur-base) var(--ease-out) forwards' : 'fade-down-out 160ms var(--ease-out) forwards',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -64,7 +83,7 @@ export function Modal({
             style={{
               display: 'flex',
               justifyContent: 'flex-end',
-              gap: 12,
+              gap: 'var(--space-3)',
               padding: '14px 24px',
               borderTop: '1px solid var(--white-60)',
             }}
@@ -73,7 +92,8 @@ export function Modal({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -88,6 +108,7 @@ export function Dropdown({
   const [pos, setPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 })
   const ref = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const { mounted, state } = usePresence(open, 140)
 
   useEffect(() => {
     if (!open) return
@@ -95,11 +116,19 @@ export function Dropdown({
       const t = e.target as Node
       if (ref.current && !ref.current.contains(t) && menuRef.current && !menuRef.current.contains(t)) setOpen(false)
     }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setOpen(false)
+      }
+    }
     const onScroll = () => setOpen(false)
     document.addEventListener('mousedown', onDoc)
+    window.addEventListener('keydown', onKey)
     window.addEventListener('scroll', onScroll, true)
     return () => {
       document.removeEventListener('mousedown', onDoc)
+      window.removeEventListener('keydown', onKey)
       window.removeEventListener('scroll', onScroll, true)
     }
   }, [open])
@@ -115,11 +144,12 @@ export function Dropdown({
 
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-      <div onClick={toggle}>{trigger}</div>
-      {open
+      <div onClick={toggle} aria-expanded={open} aria-haspopup="menu">{trigger}</div>
+      {mounted
         ? createPortal(
             <div
               ref={menuRef}
+              role="menu"
               className="glass-panel"
               style={{
                 position: 'fixed',
@@ -130,12 +160,15 @@ export function Dropdown({
                 borderRadius: 'var(--radius-lg)',
                 background: 'var(--veil-95)',
                 padding: 6,
-                animation: 'fade-up 0.15s ease',
+                animation: state === 'enter' ? 'fade-up var(--dur-fast) var(--ease-out) forwards' : 'fade-down-out 130ms var(--ease-out) forwards',
               }}
             >
               {items.map((it) => (
                 <button
                   key={it.label}
+                  type="button"
+                  role="menuitem"
+                  className="nl-dropdown-item"
                   onClick={(e) => { e.stopPropagation(); setOpen(false); it.onClick() }}
                   style={{
                     display: 'flex',
@@ -148,8 +181,6 @@ export function Dropdown({
                     textAlign: 'left',
                     color: it.danger ? 'var(--color-on-error-container)' : 'var(--color-on-surface)',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--white-70)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
                   {it.icon ? <Icon name={it.icon} size={16} /> : null}
                   {it.label}

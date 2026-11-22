@@ -19,7 +19,6 @@ export const inputStyle: CSSProperties = {
   padding: '10px 14px',
   fontSize: 14,
   color: 'var(--color-on-surface)',
-  outline: 'none',
   boxShadow: 'var(--shadow-glass)',
 }
 
@@ -40,6 +39,7 @@ export function TextInput({
 }) {
   return (
     <input
+      className="nl-input"
       type={type}
       style={disabled ? { ...inputStyle, opacity: 0.6, cursor: 'not-allowed' } : inputStyle}
       value={value}
@@ -61,7 +61,7 @@ export function Select({
   options: { value: string; label: string }[]
 }) {
   return (
-    <select style={{ ...inputStyle, appearance: 'none' }} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select className="nl-input" style={{ ...inputStyle, appearance: 'none' }} value={value} onChange={(e) => onChange(e.target.value)}>
       {options.map((o) => (
         <option key={o.value} value={o.value}>{o.label}</option>
       ))}
@@ -161,6 +161,9 @@ export function Tabs({
 export function Toggle({ on, onChange, title }: { on: boolean; onChange: () => void; title?: string }) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={on}
       onClick={onChange}
       title={title}
       style={{
@@ -168,7 +171,7 @@ export function Toggle({ on, onChange, title }: { on: boolean; onChange: () => v
         height: 23,
         borderRadius: 'var(--radius-full)',
         position: 'relative',
-        transition: 'background 0.2s ease',
+        transition: 'background var(--dur-base) var(--ease-out)',
         background: on ? 'var(--color-primary)' : 'var(--color-surface-container-highest)',
         flexShrink: 0,
       }}
@@ -180,9 +183,9 @@ export function Toggle({ on, onChange, title }: { on: boolean; onChange: () => v
           left: on ? 20 : 3,
           width: 17,
           height: 17,
-          borderRadius: '50%',
+          borderRadius: 'var(--radius-full)',
           background: 'var(--color-surface-container-lowest)',
-          transition: 'left 0.2s ease',
+          transition: 'left var(--dur-base) var(--ease-out)',
           boxShadow: 'var(--shadow-raised)',
         }}
       />
@@ -204,6 +207,7 @@ export function CompactSelect({
 }) {
   return (
     <select
+      className="nl-input"
       style={{
         background: 'var(--white-60)',
         border: '1px solid var(--white-80)',
@@ -211,7 +215,6 @@ export function CompactSelect({
         padding: '7px 10px',
         fontSize: 13,
         color: 'var(--color-on-surface)',
-        outline: 'none',
         ...(disabled ? { opacity: 0.6, cursor: 'not-allowed' } : null),
       }}
       value={value}
@@ -244,7 +247,6 @@ export const textareaStyle: CSSProperties = {
   fontSize: 13,
   lineHeight: 1.6,
   resize: 'vertical',
-  outline: 'none',
   color: 'var(--color-on-surface)',
 }
 
@@ -266,7 +268,7 @@ export function EmptyState({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '72px 24px',
+        padding: 'var(--space-8) var(--space-5)',
         textAlign: 'center',
         gap: 8,
       }}

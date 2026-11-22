@@ -20,6 +20,8 @@ export function Button({
   children,
   onClick,
   disabled,
+  loading,
+  type = 'button',
   style,
   title,
 }: {
@@ -30,9 +32,12 @@ export function Button({
   children?: ReactNode
   onClick?: () => void
   disabled?: boolean
+  loading?: boolean
+  type?: 'button' | 'submit' | 'reset'
   style?: CSSProperties
   title?: string
 }) {
+  const isDisabled = disabled || loading
   const base: CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -43,9 +48,14 @@ export function Button({
     fontSize: size === 'sm' ? 11 : 12,
     fontWeight: 600,
     letterSpacing: '0.08em',
-    transition: 'all 0.2s ease',
-    opacity: disabled ? 0.5 : 1,
-    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: isDisabled ? 0.5 : 1,
+    cursor: isDisabled ? 'not-allowed' : 'pointer',
+  }
+  const variantClass: Record<ButtonVariant, string> = {
+    primary: 'nl-btn nl-btn-primary',
+    secondary: 'nl-btn glass-panel',
+    ghost: 'nl-btn nl-btn-ghost',
+    danger: 'nl-btn nl-btn-danger',
   }
   const variants: Record<ButtonVariant, CSSProperties> = {
     primary: {
@@ -65,15 +75,17 @@ export function Button({
       border: '1px solid color-mix(in srgb, var(--color-on-error-container) 20%, transparent)',
     },
   }
+  const iconSize = size === 'sm' ? 14 : 18
   return (
     <button
-      className={variant === 'secondary' ? 'glass-panel' : undefined}
+      type={type}
+      className={variantClass[variant]}
       style={{ ...base, ...variants[variant], ...style }}
       onClick={onClick}
-      disabled={disabled}
+      disabled={isDisabled}
       title={title}
     >
-      {icon ? <Icon name={icon} size={size === 'sm' ? 14 : 18} /> : null}
+      {loading ? <Spinner size={iconSize} /> : icon ? <Icon name={icon} size={iconSize} /> : null}
       {children}
     </button>
   )

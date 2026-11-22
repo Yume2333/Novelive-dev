@@ -80,11 +80,20 @@ function CardBody({ work, menu }: { work: Work; menu?: ReactNode }) {
           className="label-caps label-caps-zh"
           style={{ display: 'flex', alignItems: 'center', gap: 6, color, fontSize: 11 }}
         >
-          <Icon
-            name={line.icon}
-            size={14}
-            style={work.phase === 'preview' || work.phase === 'producing' ? { animation: 'spin 4s linear infinite' } : undefined}
-          />
+          {work.phase === 'preview' || work.phase === 'producing' ? (
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: 'var(--radius-full)',
+                background: attention ? 'var(--color-on-error-container)' : 'var(--color-primary)',
+                flexShrink: 0,
+                animation: 'soft-pulse var(--dur-breath, 2200ms) var(--ease-in-out, ease-in-out) infinite alternate',
+              }}
+            />
+          ) : (
+            <Icon name={line.icon} size={14} />
+          )}
           {line.text}
         </span>
         {work.phase === 'producing' ? (
@@ -132,7 +141,7 @@ const menuBtn = (
   </button>
 )
 
-const cardGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 'var(--space-5)' }
+const cardGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 'var(--space-5)' }
 
 // ---- 导入作品包时的检查弹窗（同一作品的新版本 → 替换） ----
 

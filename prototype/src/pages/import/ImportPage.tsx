@@ -136,7 +136,13 @@ function StepFiles({
         <Field label="工程文件夹">
           <TextInput value={folder} onChange={setFolder} />
         </Field>
-        <Field label="放进哪里">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span className="label-caps label-caps-zh" style={{ color: 'var(--color-on-surface-variant)' }}>放进哪里</span>
+            <Tooltip text="加入已有系列时，新原文会成为下一卷并沿用原有角色、设定与素材。">
+              <Icon name="info" size={14} style={{ color: 'var(--color-outline)' }} />
+            </Tooltip>
+          </span>
           <RadioGroup
             value={placement.mode}
             onChange={(v) => setPlacement({ ...placement, mode: v as 'new' | 'existing' })}
@@ -145,15 +151,8 @@ function StepFiles({
               { value: 'existing', label: '加入已有系列' },
             ]}
           />
-        </Field>
+        </div>
       </div>
-
-      {placement.mode === 'existing' ? (
-        <p style={{ fontSize: 12, color: 'var(--color-on-surface-variant)', lineHeight: 1.6, margin: 0 }}>
-          新原文会成为该系列的下一卷；沿用系列已有的角色、设定和素材，预览时在原有设定上增量更新。
-        </p>
-      ) : null}
-
       {placement.mode === 'existing' ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
           <Field label="系列">
@@ -411,10 +410,12 @@ function StepSettings({
           placeholder="例如：保留主角的口头禅；海边场景多用远景。"
         />
       </Field>
-      <label
+      <div
+        onClick={() => setPauseOnRef(!pauseOnRef)}
         style={{
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: 'var(--space-4)',
           padding: 'var(--space-3) var(--space-4)',
           borderRadius: 'var(--radius-lg)',
@@ -422,11 +423,12 @@ function StepSettings({
           border: '1px solid var(--white-60)',
           cursor: 'pointer',
         }}
-        onClick={() => setPauseOnRef(!pauseOnRef)}
       >
         <span style={{ fontSize: 13, fontWeight: 600 }}>已有参考图时也停在角色设定</span>
-        <Toggle on={pauseOnRef} onChange={() => {}} />
-      </label>
+        <span onClick={(e) => e.stopPropagation()} style={{ display: 'inline-flex' }}>
+          <Toggle on={pauseOnRef} onChange={() => setPauseOnRef(!pauseOnRef)} />
+        </span>
+      </div>
     </div>
   )
 }

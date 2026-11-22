@@ -231,17 +231,7 @@ export function ProductionPage() {
     <Page
       eyebrow={`${ser.title} · 第${vol.index}卷`}
       title={`${work.title} · 制作`}
-      subtitle={
-        work.phase === 'preview'
-          ? '全书预览与按卷综合进行中'
-          : work.phase === 'done'
-            ? '全部章节已发布'
-            : isHead && running
-              ? '这部作品正在制作'
-              : pos > 0
-                ? `在制作队列里排第 ${pos + 1} 位`
-                : '未在队列中'
-      }
+      width={960}
       actions={controls}
     >
       {/* 崩溃恢复：异常退出后重开，制作保持停止，等创作者确认继续 */}
@@ -289,9 +279,6 @@ export function ProductionPage() {
               已读 {work.previewProgress.done} / {work.previewProgress.total} 章
             </h3>
             <ProgressBar value={work.previewProgress.done / work.previewProgress.total} />
-            <p style={{ marginTop: 'var(--space-3)', fontSize: 12, color: 'var(--color-outline)', lineHeight: 1.6 }}>
-              全书预览完成后按卷综合，产出剧情骨架、设定集和术语表；第一卷理解完就可以开始制作。
-            </p>
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-4)', flexWrap: 'wrap' }}>

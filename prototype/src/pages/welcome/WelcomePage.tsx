@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Icon } from '../../components/Button'
-import { RadioGroup, Tooltip } from '../../components/Extended'
+import { Tooltip } from '../../components/Extended'
 import { Field, Select, TextInput } from '../../components/Form'
 import { apiFormats, defaultBaseUrl, modelSlots, type ApiFormat } from '../../mock/settings'
 import type { CSSProperties, ReactNode } from 'react'
@@ -62,7 +62,7 @@ function PathCard({ icon, title, desc, active, onClick }: {
     <button
       onClick={onClick}
       style={{
-        flex: 1,
+        flex: '1 1 200px',
         textAlign: 'left',
         padding: 'var(--space-5)',
         borderRadius: 'var(--radius-xl)',
@@ -173,18 +173,50 @@ export function WelcomePage() {
         <StepCard>
           <Dots total={3} current={0} />
           <h1 className="headline" style={{ fontSize: 24, marginBottom: 'var(--space-5)' }}>欢迎使用 Novelive</h1>
-          <Field label="界面语言">
-            <RadioGroup
-              value={lang}
-              onChange={setLang}
-              options={[
-                { value: 'zh-Hans', label: '简体中文' },
-                { value: 'zh-Hant', label: '繁體中文' },
-                { value: 'en', label: 'English' },
-                { value: 'ja', label: '日本語' },
-              ]}
-            />
-          </Field>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span className="label-caps label-caps-zh" style={{ color: 'var(--color-on-surface-variant)' }}>界面语言</span>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              {[
+                { value: 'zh-Hans', label: '简体中文', disabled: false },
+                { value: 'zh-Hant', label: '繁體中文（待翻译）', disabled: true },
+                { value: 'en', label: 'English（待翻译）', disabled: true },
+                { value: 'ja', label: '日本語（待翻译）', disabled: true },
+              ].map((o) => {
+                const active = o.value === lang
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    disabled={o.disabled}
+                    onClick={() => !o.disabled && setLang(o.value)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      fontSize: 13,
+                      padding: 0,
+                      opacity: o.disabled ? 0.5 : 1,
+                      cursor: o.disabled ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 17,
+                        height: 17,
+                        borderRadius: '50%',
+                        border: active ? '5px solid var(--color-primary)' : '1px solid var(--color-outline-variant)',
+                        background: 'var(--white-60)',
+                        transition: 'all var(--dur-fast, 140ms) var(--ease-out, ease)',
+                        boxSizing: 'border-box',
+                        flexShrink: 0,
+                      }}
+                    />
+                    {o.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-6)' }}>
             <Button variant="primary" onClick={() => setStep(1)}>
               继续
@@ -197,7 +229,7 @@ export function WelcomePage() {
         <StepCard>
           <Dots total={3} current={1} />
           <h1 className="headline" style={{ fontSize: 24, marginBottom: 'var(--space-5)' }}>创作还是游玩</h1>
-          <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
             <PathCard
               icon="auto_stories"
               title="创作"
@@ -255,10 +287,6 @@ export function WelcomePage() {
           </div>
         </StepCard>
       ) : null}
-
-      <span className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)' }}>
-        小说 → 视觉小说 · 创作与游玩一体
-      </span>
     </div>
   )
 }

@@ -1,8 +1,9 @@
-import { useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, Icon } from './Button'
 import { IconButton } from './IconButton'
 import { Modal } from './Modal'
+import { usePresence } from './Motion'
 
 /* 扩展控件库 — 完整产品开发用。全部遵守 DESIGN.md：tokens 变量、三种质感、克制动效 */
 
@@ -20,7 +21,7 @@ export function Banner({ kind = 'info', icon, children, action }: {
     success: { icon: 'check_circle', bg: 'var(--color-success-container)', color: 'var(--color-success)' },
   }[kind]
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderRadius: 'var(--radius-lg)', background: map.bg, color: map.color, fontSize: 13 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', borderRadius: 'var(--radius-lg)', background: map.bg, color: map.color, fontSize: 13, animation: 'fade-up var(--dur-base) var(--ease-out)' }}>
       <Icon name={icon ?? map.icon} size={17} />
       <span style={{ flex: 1, minWidth: 0 }}>{children}</span>
       {action}
@@ -30,22 +31,26 @@ export function Banner({ kind = 'info', icon, children, action }: {
 
 /** 小标签胶囊（capability、分类等） */
 export function Chip({ children, active, onClick }: { children: ReactNode; active?: boolean; onClick?: () => void }) {
+  const style: CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '3px 10px',
+    borderRadius: 'var(--radius-full)',
+    background: active ? 'var(--color-primary)' : 'var(--color-tertiary-fixed)',
+    color: active ? 'var(--color-on-primary)' : 'var(--color-on-secondary-container)',
+    fontSize: 10,
+    cursor: onClick ? 'pointer' : 'default',
+    transition: 'all var(--dur-fast) var(--ease-out)',
+  }
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="label-caps label-caps-zh" style={style}>
+        {children}
+      </button>
+    )
+  }
   return (
-    <span
-      onClick={onClick}
-      className="label-caps label-caps-zh"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '3px 10px',
-        borderRadius: 'var(--radius-full)',
-        background: active ? 'var(--color-primary)' : 'var(--color-tertiary-fixed)',
-        color: active ? 'var(--color-on-primary)' : 'var(--color-on-secondary-container)',
-        fontSize: 10,
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'all 0.15s ease',
-      }}
-    >
+    <span className="label-caps label-caps-zh" style={style}>
       {children}
     </span>
   )
@@ -55,20 +60,46 @@ export function Chip({ children, active, onClick }: { children: ReactNode; activ
 export function Tooltip({ text, children }: { text: string; children: ReactNode }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const ref = useRef<HTMLSpanElement>(null)
+  const tipRef = useRef<HTMLSpanElement>(null)
+
+  const show = () => {
+    const r = ref.current?.getBoundingClientRect()
+    if (r) setPos({ x: r.left + r.width / 2, y: r.top - 8 })
+  }
+
+  useEffect(() => {
+    if (!pos) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPos(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [pos])
+
+  useLayoutEffect(() => {
+    if (!pos || !tipRef.current) return
+    const half = tipRef.current.offsetWidth / 2
+    const minX = 12 + half
+    const maxX = window.innerWidth - 12 - half
+    const clamped = minX > maxX ? window.innerWidth / 2 : Math.max(minX, Math.min(maxX, pos.x))
+    tipRef.current.style.left = `${clamped}px`
+  }, [pos, text])
+
   return (
     <span
       ref={ref}
       style={{ display: 'inline-flex' }}
-      onMouseEnter={() => {
-        const r = ref.current?.getBoundingClientRect()
-        if (r) setPos({ x: r.left + r.width / 2, y: r.top - 8 })
-      }}
+      onMouseEnter={show}
       onMouseLeave={() => setPos(null)}
+      onFocus={show}
+      onBlur={() => setPos(null)}
     >
       {children}
       {pos
         ? createPortal(
             <span
+              ref={tipRef}
+              role="tooltip"
               style={{
                 position: 'fixed',
                 left: pos.x,
@@ -82,7 +113,7 @@ export function Tooltip({ text, children }: { text: string; children: ReactNode 
                 fontSize: 12,
                 whiteSpace: 'nowrap',
                 pointerEvents: 'none',
-                animation: 'fade-up 0.15s ease',
+                animation: 'fade-up var(--dur-fast) var(--ease-out)',
               }}
             >
               {text}
@@ -98,9 +129,16 @@ export function Tooltip({ text, children }: { text: string; children: ReactNode 
 /** 复选框 */
 export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: () => void; label?: ReactNode }) {
   return (
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+    <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+      <input
+        type="checkbox"
+        className="nl-check-input"
+        checked={checked}
+        onChange={onChange}
+        style={{ position: 'absolute', opacity: 0, width: 1, height: 1, margin: 0, pointerEvents: 'none' }}
+      />
       <span
-        onClick={onChange}
+        className="nl-check-box"
         style={{
           width: 18,
           height: 18,
@@ -110,13 +148,13 @@ export function Checkbox({ checked, onChange, label }: { checked: boolean; onCha
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'all 0.15s ease',
+          transition: 'all var(--dur-fast) var(--ease-out)',
           flexShrink: 0,
         }}
       >
         {checked ? <Icon name="check" size={13} style={{ color: 'var(--color-on-primary)' }} /> : null}
       </span>
-      {label ? <span onClick={onChange}>{label}</span> : null}
+      {label ? <span>{label}</span> : null}
     </label>
   )
 }
@@ -128,19 +166,27 @@ export function RadioGroup({ value, onChange, options }: {
   options: { value: string; label: string }[]
 }) {
   return (
-    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+    <div role="radiogroup" style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
       {options.map((o) => {
         const active = o.value === value
         return (
-          <label key={o.value} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: 13 }} onClick={() => onChange(o.value)}>
+          <label key={o.value} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: 13 }}>
+            <input
+              type="radio"
+              className="nl-check-input"
+              checked={active}
+              onChange={() => onChange(o.value)}
+              style={{ position: 'absolute', opacity: 0, width: 1, height: 1, margin: 0, pointerEvents: 'none' }}
+            />
             <span
+              className="nl-check-box"
               style={{
                 width: 17,
                 height: 17,
-                borderRadius: '50%',
+                borderRadius: 'var(--radius-full)',
                 border: active ? '5px solid var(--color-primary)' : '1px solid var(--color-outline-variant)',
                 background: 'var(--white-60)',
-                transition: 'all 0.15s ease',
+                transition: 'all var(--dur-fast) var(--ease-out)',
                 boxSizing: 'border-box',
                 flexShrink: 0,
               }}
@@ -186,6 +232,7 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
     <div style={{ position: 'relative', width: '100%' }}>
       <Icon name="search" size={16} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-outline)' }} />
       <input
+        className="nl-input"
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
@@ -197,7 +244,6 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
           padding: '9px 12px 9px 34px',
           fontSize: 13,
           color: 'var(--color-on-surface)',
-          outline: 'none',
         }}
       />
       {value ? (
@@ -244,12 +290,13 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
               background: i === current ? 'var(--color-primary)' : i < current ? 'var(--accent-wash)' : 'var(--white-50)',
               color: i === current ? 'var(--color-on-primary)' : i < current ? 'var(--color-primary)' : 'var(--color-outline)',
               border: '1px solid var(--white-60)',
+              transition: 'all var(--dur-base) var(--ease-out)',
             }}
           >
             {i < current ? <Icon name="check" size={14} /> : <span style={{ fontSize: 12, fontWeight: 700 }}>{i + 1}</span>}
             <span className="label-caps label-caps-zh">{s}</span>
           </div>
-          {i < steps.length - 1 ? <div style={{ width: 24, height: 1, background: 'var(--color-outline-variant)' }} /> : null}
+          {i < steps.length - 1 ? <div style={{ width: 24, height: 1, background: i < current ? 'var(--color-primary)' : 'var(--color-outline-variant)', transition: 'background var(--dur-base) var(--ease-out)' }} /> : null}
         </div>
       ))}
     </div>
@@ -264,11 +311,35 @@ export function Drawer({ open, title, onClose, children, width = 380 }: {
   children: ReactNode
   width?: number
 }) {
-  if (!open) return null
+  const { mounted, state } = usePresence(open, 200)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  if (!mounted) return null
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 100 }} onClick={onClose}>
-      <div style={{ position: 'absolute', inset: 0, background: 'var(--scrim)', animation: 'fade-up 0.2s ease' }} />
       <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'var(--scrim)',
+          animation: state === 'enter' ? 'scrim-in var(--dur-fast) var(--ease-out) forwards' : 'scrim-out var(--dur-fast) var(--ease-out) forwards',
+        }}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className="glass-panel"
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -282,7 +353,7 @@ export function Drawer({ open, title, onClose, children, width = 380 }: {
           borderRadius: 'var(--radius-2xl) 0 0 var(--radius-2xl)',
           display: 'flex',
           flexDirection: 'column',
-          animation: 'drawer-in 0.25s ease',
+          animation: state === 'enter' ? 'drawer-in var(--dur-base) var(--ease-out) forwards' : 'drawer-out var(--dur-base) var(--ease-out) forwards',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 10px' }}>

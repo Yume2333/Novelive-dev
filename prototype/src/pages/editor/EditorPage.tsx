@@ -748,7 +748,7 @@ export function EditorPage() {
         {/* ---- 舞台列：宽屏时吸顶；窄屏限高让前几行句子露出 ---- */}
         <div style={twoCol ? { flex: 1, minWidth: 0, position: 'sticky', top: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' } : { width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', alignItems: 'center' }}>
           {/* 舞台预览 */}
-          <div style={{ ...panelStyle, background: '#0a0e13', padding: 12, width: '100%', ...(twoCol ? {} : { maxWidth: stageCap }), boxSizing: 'border-box' }}>
+          <div style={{ ...panelStyle, background: 'var(--stage-frame, #0a0e13)', padding: 12, width: '100%', ...(twoCol ? {} : { maxWidth: stageCap }), boxSizing: 'border-box' }}>
             <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', inset: 0, background: bgOverride[scene.id] ?? scene.background.gradient }} />
               <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 92%, rgba(143,180,212,0.16), transparent 62%)' }} />
@@ -792,7 +792,7 @@ export function EditorPage() {
               {/* 字幕或文本框 */}
               {line.kind === 'caption' ? (
                 <div style={{ position: 'absolute', top: '38%', left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
-                  <span style={{ background: 'color-mix(in srgb, var(--stage-text) 10%, rgba(0,0,0,0.72))', border: '1px solid var(--stage-border)', color: 'var(--stage-text)', padding: '8px 22px', borderRadius: 'var(--radius-md)', fontSize: 16, letterSpacing: '0.2em', fontFamily: 'var(--font-display)' }}>
+                  <span style={{ background: 'color-mix(in srgb, var(--stage-text) 10%, var(--stage-scrim, rgba(10, 14, 19, 0.72)))', border: '1px solid var(--stage-border)', color: 'var(--stage-text)', padding: '8px 22px', borderRadius: 'var(--radius-md)', fontSize: 16, letterSpacing: '0.2em', fontFamily: 'var(--font-display)' }}>
                     <RichText src={playing ? truncateRich(curText, typedLen) : curText} base="stage" customs={marks} />
                     {playing ? <span style={{ display: 'inline-block', width: 2, height: '1em', background: 'var(--stage-accent)', verticalAlign: '-2px', marginLeft: 1, animation: 'soft-pulse 1s infinite alternate' }} /> : null}
                   </span>
@@ -881,11 +881,11 @@ export function EditorPage() {
             </div>
             {/* 这一场的画面：背景 / 当前说话人立绘 */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-2) var(--space-1)' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 12, color: 'var(--color-on-surface-variant)', flex: '1 1 220px', minWidth: 0 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 12, color: 'color-mix(in srgb, var(--stage-text) 72%, transparent)', flex: '1 1 220px', minWidth: 0 }}>
                 <Icon name="wallpaper" size={15} style={{ flexShrink: 0 }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>背景 · {scene.background.name}</span>
                 <Dropdown
-                  trigger={<Button size="sm" variant="ghost" icon="refresh">重新生成</Button>}
+                  trigger={<Button size="sm" variant="ghost" icon="refresh" style={{ color: 'var(--stage-text)' }}>重新生成</Button>}
                   items={[
                     { label: '出一张，直接替换', icon: 'image', onClick: () => regenOnce('bg') },
                     { label: '多出几张再挑', icon: 'photo_library', onClick: () => setRegenPick('bg') },
@@ -893,11 +893,11 @@ export function EditorPage() {
                 />
               </span>
               {isSpeakerLine && speaker ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 12, color: 'var(--color-on-surface-variant)', flex: '1 1 220px', minWidth: 0 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 12, color: 'color-mix(in srgb, var(--stage-text) 72%, transparent)', flex: '1 1 220px', minWidth: 0 }}>
                   <Icon name="person" size={15} style={{ flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>立绘 · {speaker.name} / {outfitLabel} / {exprLabel}</span>
                   <Dropdown
-                    trigger={<Button size="sm" variant="ghost" icon="refresh">重新生成</Button>}
+                    trigger={<Button size="sm" variant="ghost" icon="refresh" style={{ color: 'var(--stage-text)' }}>重新生成</Button>}
                     items={[
                       { label: '出一张，直接替换', icon: 'image', onClick: () => regenOnce('portrait') },
                       { label: '多出几张再挑', icon: 'photo_library', onClick: () => setRegenPick('portrait') },
@@ -1056,7 +1056,7 @@ export function EditorPage() {
               />
             </Field>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'calc(-1 * var(--space-2))' }}>
-              <Button size="sm" variant="ghost" onClick={() => commitText(textDraft)} disabled={textDraft === curText}>
+              <Button size="sm" variant="secondary" onClick={() => commitText(textDraft)} disabled={textDraft === curText}>
                 应用文本
               </Button>
             </div>

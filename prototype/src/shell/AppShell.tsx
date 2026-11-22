@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-route
 import { Button, Icon } from '../components/Button'
 import { Drawer } from '../components/Extended'
 import { Dropdown } from '../components/Modal'
+import { StatusBeacon, usePresence } from '../components/Motion'
 import { findSeries, findVolume, findWork, works } from '../mock/library'
 import { globalStatusMeta, useProduction } from '../mock/production'
 import type { Work } from '../mock/types'
@@ -47,18 +48,19 @@ function NavItem({ to, icon, label, end, badge, onClick, active }: {
 }) {
   const body = (isActive: boolean) => (
     <span
+      className="nl-nav-item"
+      data-active={isActive ? 'true' : 'false'}
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
-        padding: '9px 12px',
+        gap: 'var(--space-3)',
+        padding: '9px var(--space-3)',
         borderRadius: 'var(--radius-lg)',
         fontSize: 14,
         fontWeight: isActive ? 600 : 500,
         color: isActive ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
         background: isActive ? 'var(--white-90)' : 'transparent',
         boxShadow: isActive ? 'var(--shadow-glass)' : 'none',
-        transition: 'all 0.15s ease',
       }}
     >
       <Icon name={icon} size={19} />
@@ -68,7 +70,7 @@ function NavItem({ to, icon, label, end, badge, onClick, active }: {
   )
   if (!to) {
     return (
-      <button onClick={onClick} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 0 }}>
+      <button type="button" onClick={onClick} style={{ display: 'block', width: '100%', textAlign: 'left', padding: 0 }}>
         {body(!!active)}
       </button>
     )
@@ -135,6 +137,7 @@ function WorkSection({ work, inside }: { work: Work; inside: boolean }) {
       </nav>
       {isProject ? (
         <button
+          type="button"
           onClick={chatOpen ? closeChat : openChat}
           className="glass-panel"
           style={{
@@ -142,13 +145,13 @@ function WorkSection({ work, inside }: { work: Work; inside: boolean }) {
             alignItems: 'center',
             gap: 10,
             margin: '14px 0 0',
-            padding: '9px 12px',
+            padding: '9px var(--space-3)',
             borderRadius: 'var(--radius-lg)',
             fontSize: 14,
             fontWeight: 600,
             color: 'var(--color-primary)',
             background: chatOpen ? 'var(--white-90)' : undefined,
-            transition: 'background 0.15s ease',
+            transition: 'background var(--dur-fast) var(--ease-out)',
           }}
         >
           <Icon name="auto_awesome" size={18} />
@@ -162,7 +165,7 @@ function WorkSection({ work, inside }: { work: Work; inside: boolean }) {
 
 /** 侧边栏底部：全局制作状态，点开看队列 */
 function GlobalStatus({ onOpen }: { onOpen: () => void }) {
-  const { status, queue, waitingConfirm } = useProduction()
+  const { status, running, queue, waitingConfirm } = useProduction()
   const meta = globalStatusMeta[status]
   const head = queue[0]
   const producingChapter = head?.chapters.find((c) => c.status === 'producing')
@@ -176,17 +179,17 @@ function GlobalStatus({ onOpen }: { onOpen: () => void }) {
         : status === 'stopped'
           ? `${queue.length} 部作品在排队`
           : '没有排队的作品'
+  const beaconTone = status === 'producing' ? 'active' : status === 'confirm' ? 'warning' : 'muted'
   return (
     <button
+      type="button"
       onClick={onOpen}
       className="glass-panel"
-      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-lg)', textAlign: 'left' }}
+      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px var(--space-3)', borderRadius: 'var(--radius-lg)', textAlign: 'left' }}
     >
-      <Icon
-        name={meta.icon}
-        size={20}
-        style={{ color: status === 'confirm' ? 'var(--color-on-error-container)' : 'var(--color-primary)', animation: status === 'producing' ? 'spin 3s linear infinite' : undefined }}
-      />
+      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, flexShrink: 0 }}>
+        <StatusBeacon tone={beaconTone} active={running && status === 'producing'} size={8} />
+      </span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600 }}>{meta.label}</span>
         <span style={{ display: 'block', fontSize: 11, color: 'var(--color-outline)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{detail}</span>
@@ -211,7 +214,7 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
   }
   return (
     <Drawer open={open} title="制作队列" onClose={onClose} width={400}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
         {!running ? (
           <Button variant="primary" icon="play_arrow" onClick={resume} style={{ width: '100%' }} disabled={!queue.length}>继续制作</Button>
         ) : confirmStop ? (
@@ -238,21 +241,21 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
 
         <section>
           <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 10 }}>排队中</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {queue.map((w, i) => (
-              <div key={w.id} className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--radius-lg)' }}>
+              <div key={w.id} className="glass-panel" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '10px var(--space-3)', borderRadius: 'var(--radius-lg)' }}>
                 <div style={{ width: 28, height: 38, borderRadius: 'var(--radius-sm)', background: w.coverGradient, flexShrink: 0 }} />
-                <button onClick={() => go(`/work/${w.id}/production`)} style={{ flex: 1, minWidth: 0, textAlign: 'left', padding: 0 }}>
+                <button type="button" onClick={() => go(`/work/${w.id}/production`)} style={{ flex: 1, minWidth: 0, textAlign: 'left', padding: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{w.title}</div>
                   <div style={{ fontSize: 12, color: 'var(--color-outline)' }}>
                     {i === 0 && running ? '正在制作' : '排队'}
                     {w.phase === 'preview' && w.previewProgress ? ` · 全书预览 ${w.previewProgress.done}/${w.previewProgress.total} 章` : ''}
                   </div>
                 </button>
-                <button title="提前" disabled={i === 0} onClick={() => move(w.id, -1)} style={{ display: 'flex', padding: 4, color: i === 0 ? 'var(--color-outline-variant)' : 'var(--color-on-surface-variant)' }}>
+                <button type="button" title="提前" disabled={i === 0} onClick={() => move(w.id, -1)} style={{ display: 'flex', padding: 'var(--space-1)', color: i === 0 ? 'var(--color-outline-variant)' : 'var(--color-on-surface-variant)' }}>
                   <Icon name="arrow_upward" size={18} />
                 </button>
-                <button title="延后" disabled={i === queue.length - 1} onClick={() => move(w.id, 1)} style={{ display: 'flex', padding: 4, color: i === queue.length - 1 ? 'var(--color-outline-variant)' : 'var(--color-on-surface-variant)' }}>
+                <button type="button" title="延后" disabled={i === queue.length - 1} onClick={() => move(w.id, 1)} style={{ display: 'flex', padding: 'var(--space-1)', color: i === queue.length - 1 ? 'var(--color-outline-variant)' : 'var(--color-on-surface-variant)' }}>
                   <Icon name="arrow_downward" size={18} />
                 </button>
               </div>
@@ -263,13 +266,14 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
         {waitingConfirm.length ? (
           <section>
             <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 10 }}>等你确认</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {waitingConfirm.map((w) => (
                 <button
                   key={w.id}
+                  type="button"
                   onClick={() => go(`/work/${w.id}/confirm/${w.phase === 'confirm-visual' ? 'visual' : 'first'}`)}
                   className="glass-panel"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--radius-lg)', textAlign: 'left' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '10px var(--space-3)', borderRadius: 'var(--radius-lg)', textAlign: 'left' }}
                 >
                   <div style={{ width: 28, height: 38, borderRadius: 'var(--radius-sm)', background: w.coverGradient, flexShrink: 0 }} />
                   <span style={{ flex: 1 }}>
@@ -303,7 +307,9 @@ function ThemeSwitch() {
         return (
           <button
             key={o.value}
+            type="button"
             title={o.title}
+            aria-label={o.title}
             onClick={() => setMode(o.value)}
             style={{
               flex: 1,
@@ -313,6 +319,7 @@ function ThemeSwitch() {
               borderRadius: 'var(--radius-full)',
               background: active ? 'var(--white-90)' : 'transparent',
               color: active ? 'var(--color-primary)' : 'var(--color-outline)',
+              transition: 'background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)',
             }}
           >
             <Icon name={o.icon} size={16} />
@@ -339,6 +346,7 @@ export function AppShell() {
   const [chatFull, setChatFull] = useState(false)
   const [chatContext, setChatContext] = useState<string | null>(null)
   const showChat = chatOpen && work?.kind === 'project'
+  const chatPresence = usePresence(showChat && !!work, 200)
 
   // 所有页面共用一个滚动容器，换页时回到顶部
   const { pathname } = useLocation()
@@ -350,15 +358,23 @@ export function AppShell() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+        if (work?.kind !== 'project') return
         e.preventDefault()
         setChatOpen((v) => !v)
+        return
       }
-      if (e.key === 'Escape') setChatFull(false)
+      if (e.key === 'Escape') {
+        if (queueOpen || document.querySelector('[role="dialog"]')) return
+        if (chatFull) {
+          setChatFull(false)
+        } else if (chatOpen) {
+          setChatOpen(false)
+        }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
+  }, [work?.kind, queueOpen, chatFull, chatOpen])
   const shell: ShellApi = {
     chatOpen: showChat,
     openChat: () => setChatOpen(true),
@@ -377,15 +393,14 @@ export function AppShell() {
           style={{
             width: SIDEBAR_WIDTH,
             flexShrink: 0,
-            margin: 12,
+            margin: 'var(--space-3)',
             marginRight: 0,
             borderRadius: 'var(--radius-2xl)',
             display: 'flex',
             flexDirection: 'column',
-            padding: '18px 12px 14px',
+            padding: '18px var(--space-3) 14px',
             overflow: 'auto',
-          }}
-        >
+          }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 12px 14px' }}>
             <img className="brand-mark-light" src="/icon/novelive-mark.svg" alt="" width={24} height={24} />
             <img className="brand-mark-dark" src="/icon/novelive-mark-dark.svg" alt="" width={24} height={24} />
@@ -413,16 +428,15 @@ export function AppShell() {
             <Outlet />
           </main>
 
-          {showChat && work ? (
+          {chatPresence.mounted && work ? (
             <aside
               className="glass-panel"
               style={{
                 position: 'absolute',
-                top: 12,
-                right: 12,
-                bottom: 12,
-                left: chatFull ? 12 : undefined,
-                width: chatFull ? undefined : CHAT_WIDTH,
+                top: 'var(--space-3)',
+                right: 'var(--space-3)',
+                bottom: 'var(--space-3)',
+                width: chatFull ? 'calc(100% - 24px)' : CHAT_WIDTH,
                 maxWidth: 'calc(100% - 24px)',
                 zIndex: 50,
                 background: 'var(--veil-95)',
@@ -431,7 +445,11 @@ export function AppShell() {
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
-                animation: 'drawer-in 0.22s ease',
+                transition: 'width var(--dur-slow) var(--ease-out)',
+                animation:
+                  chatPresence.state === 'enter'
+                    ? 'drawer-in var(--dur-base) var(--ease-out) forwards'
+                    : 'drawer-out var(--dur-base) var(--ease-out) forwards',
               }}
             >
               <ChatPanel

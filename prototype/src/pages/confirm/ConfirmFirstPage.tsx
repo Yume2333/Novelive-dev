@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Icon } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Tooltip } from '../../components/Extended'
+import { Dropdown } from '../../components/Modal'
 import { EmptyState } from '../../components/Form'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
@@ -30,16 +31,23 @@ export function ConfirmFirstPage() {
   return (
     <Page
       eyebrow={`${ser.title} · 第${vol.index}卷 · 确认点 2 / 2`}
-      title={`${work.title} · 第一章成品`}
-      subtitle={
-        <Tooltip text="确认后其余章节在后台按卷连续做，做完一章即可游玩。">
-          <Icon name="info" size={15} style={{ color: 'var(--color-outline)', verticalAlign: 'middle' }} />
-        </Tooltip>
+      title={
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          <span>{work.title} · 第一章成品</span>
+          <Tooltip text="确认后其余章节在后台按卷连续做，做完一章即可游玩。">
+            <Icon name="info" size={16} style={{ color: 'var(--color-outline)' }} />
+          </Tooltip>
+        </span>
       }
       actions={
         <>
           <Button icon="play_circle" onClick={() => navigate(`/work/${work.id}/play`)}>试玩第一章</Button>
-          <Button variant="ghost" icon="edit_note" onClick={() => navigate(`/work/${work.id}/edit`)}>进编辑器修改</Button>
+          <Dropdown
+            trigger={<Button variant="ghost" icon="more_horiz">更多</Button>}
+            items={[
+              { label: '进编辑器修改', icon: 'edit_note', onClick: () => navigate(`/work/${work.id}/edit`) },
+            ]}
+          />
           <Button
             variant="primary"
             icon="check"
@@ -65,7 +73,7 @@ export function ConfirmFirstPage() {
         {scenes.map((s, i) => (
           <Card key={s.title} style={{ overflow: 'hidden' }}>
             <div style={{ height: 104, background: s.art, position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 10, bottom: 8, padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--scrim)', color: 'var(--color-on-primary)', fontSize: 11 }}>
+              <span style={{ position: 'absolute', left: 10, bottom: 8, padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--scrim)', color: 'var(--stage-text)', fontSize: 11 }}>
                 场景 {i + 1}
               </span>
             </div>

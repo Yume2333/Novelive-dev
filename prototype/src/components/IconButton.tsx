@@ -14,6 +14,8 @@ export function IconButton({ name, icon, size = 34, iconSize = 17, onClick, disa
 }) {
   return (
     <button
+      type="button"
+      className="nl-icon-btn"
       title={name}
       aria-label={name}
       onClick={onClick}
@@ -27,11 +29,8 @@ export function IconButton({ name, icon, size = 34, iconSize = 17, onClick, disa
         justifyContent: 'center',
         borderRadius: 'var(--radius-full)',
         color: 'var(--color-on-surface-variant)',
-        transition: 'background 0.15s ease',
         ...style,
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--white-70)')}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
       <Icon name={icon} size={iconSize} />
     </button>
