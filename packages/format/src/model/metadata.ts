@@ -16,7 +16,9 @@ export const version = { formatVersion: lit(formatVersion) }
 export const open = { open: true } as const
 export const idPattern = '^[a-z0-9][a-z0-9_-]*$'
 export const entityId = str({ pattern: idPattern })
-export const paragraphId = str({ pattern: '^p(?!0000)[0-9]{4}$' })
+export const paragraphIdPattern =
+	'^p(?:000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3,4})$'
+export const paragraphId = str({ pattern: paragraphIdPattern })
 export const sceneId = str({ pattern: '^[0-9a-f]{8}$' })
 export const lineId = str({ pattern: '^[0-9a-f]{4}$' })
 export const workId = str({

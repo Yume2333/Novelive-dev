@@ -1,0 +1,34 @@
+scene 空屋
+source p0001
+@bg room/dusk fade 1.5
+@fg cg-window
+@show traveler/coat/calm left
+@move left center
+traveler as 访客: {whisper}是这里吗？{/whisper}{wait .6}{speed 0.5}我{ruby ま}等{/ruby}。{/speed} cont #a3f9
+@caption 夜幕
+@shake strong 0.4
+@caption 窗外 wait
+@zoom center 1.08 1.0 ease-out
+@particle rain 0.4 1 -25
+@mask vignette strength .7
+@camera sway
+@filter sepia .4
+@cg cg-window
+@wait
+
+scene 风过
+source p0002-p0002
+@bg duration .5 room/night
+@face traveler/sly
+traveler (inner): {wave}风声{/wave}像是从墙里传出。 {{？}
+@costume traveler/cloak
+@face traveler/calm
+@wait 0.2
+@hide traveler
+@fg none
+@cg none
+@particle none
+@filter none
+@mask none
+: 屋子静了。
+@camera reset

@@ -35,7 +35,7 @@ lin-xiao as 神秘少女: 你终于来了。 #d77e
 ```
 
 - **场景头**：`scene` 后写场景标题，`source` 写这个场景对应的原文段落范围，两行都由模型写，用于原文对照和双向跳转；应用只核对 `source` 指向本章里存在的段落。
-- **段落编号**：`source` 引用的 `pNNNN` 由导入器分配，章内从 1 起、四位零填充（段落超过 9999 时扩成 5 位），写进 `chapter.json`；各场景的 `source` 区间按序、闭区间，合起来恰好覆盖本章每段一次。重新导入原文后，越界的 `source` 范围收回到该章的有效区间。
+- **段落编号**：`source` 引用的 `pNNNN` 由导入器分配，章内从 1 起、四位零填充（编号 10000–99999 用五位），写进 `chapter.json`；各场景的 `source` 区间按序、闭区间，合起来恰好覆盖本章每段一次。`source p0001` 是 `source p0001-p0001` 的简写。重新导入时如需收回越界范围，由导入流程修正；编译器不会静默改写范围。
 - **指令词和名字用英文**：指令词（`@bg`、`@show`、`inner`）和角色、地点、素材名都用英文，剧本语言和作品语言分开；显示名写在设定集里。
 
 ### 文字
@@ -62,39 +62,42 @@ lin-xiao as 神秘少女: 你终于来了。 #d77e
 - **内置标记**：`em` 强调、`b` 加粗、`dim` 弱化、`whisper` 小声、`shout` 大喊、`glitch` 扭曲、`hl` 高亮。
 - **自定义标记**：作品自己命名（英文），样式见下文“自定义样式”。
 - **注音**：`{ruby 读音}字{/ruby}`。
-- **停顿**：`{wait 秒数}`。
-- **变速**：`{speed 倍率}…{/speed}`。
+- **停顿**：`{wait 秒数}`，非负，为单标签。
+- **变速**：`{speed 倍率}…{/speed}`，倍率大于零。
 - 字面的 `{` 写成 `{{`。
+
+除 `wait` 外，标签都要在同一句中按嵌套顺序闭合。`ruby` 的读音允许空格；自定义标记必须在作品设置中登记。
 
 ### 演出指令
 
 演出指令以 `@` 开头，写意图：只写“谁、做什么、在哪”，坐标、时长、缓动等由编译器给默认值；需要时可以在后面写参数覆盖（如上例的 `fade 1.5`、`strong 0.4`）。以后做时间线编辑器时直接改这些参数。剧本里不写逐条的行内演出指令；一句话说到一半要发生的演出拆成两句写。
 
-指令全集（M1a 实现时可再调参数默认值）：
+指令全集。保存时必填项按表中顺序写，可选项写成空格分隔的 `key value`（例如 `@bg classroom/dusk transition fade duration 1.5`）。解析时带名可选项可在必填项前后出现，也接受表中顺序的无名参数。`@zoom` 的旧写法按类型归一，第一个数字是倍率。
 
-| 指令 | 参数 | 生效类型 |
-| --- | --- | --- |
-| `@bg` | `<place/variant> [transition] [秒]` | 设置型 |
-| `@fg` | `<素材 ID>` | 设置型 |
-| `@show` | `<char/costume/expr> <slot>` | 设置型 |
-| `@hide` | `<slot>` 或 `<角色 ID>`（隐去该角色所在槽位） | 设置型 |
-| `@move` | `<slot> <target> [easing] [秒]` | 设置型 |
-| `@face` | `<char/costume/expr>` 或 `<char/expr>`（省略造型时按该角色当前造型解析）；同槽位换表情 | 设置型 |
-| `@costume` | `<char/costume>` | 设置型 |
-| `@cg` | `<cg-id>` | 设置型 |
-| `@camera` | `<动作> [easing] [秒]`（动作如 `sway`、`push-in`） | 设置型 |
-| `@zoom` | `[target] <倍率> [秒] [easing]`；词序固定，解析器把其他顺序归一 | 设置型 |
-| `@shake` | `[strong\|0-1] [秒]` | 设置型 |
-| `@particle` | `rain\|snow\|sakura\|none [强度] [速度] [角度]`；`none` 停止粒子 | 设置型 |
-| `@mask` | 参数 M1a 定稿时补 | 设置型 |
-| `@filter` | `blur\|brightness\|sepia\|glitch\|none [值]`；`none` 清除滤镜 | 设置型 |
-| `@caption` | `<text...> [wait] [#id]` | 文本型 |
-| `@wait` | 裸写等点击；`@wait N` 停 N 秒自动往下走 | 文本型 |
+| 指令 | 必填参数 | 可选参数和默认值 | 生效类型 |
+| --- | --- | --- | --- |
+| `@bg` | `<place/variant>` | `transition fade`（同地点变体默认 `none`），`duration 0.4` | 设置型 |
+| `@fg` | `<素材 ID>` 或 `none`（清除） | — | 设置型 |
+| `@show` | `<char/costume/expr> <slot>` | `transition none duration 0.2` | 设置型 |
+| `@hide` | `<slot>` 或 `<角色 ID>`（隐去该角色所在槽位） | `transition none duration 0.2` | 设置型 |
+| `@move` | `<slot> <target>`（只改变位置，不改变槽位身份） | `easing ease-in-out duration 0.3` | 设置型 |
+| `@face` | `<char/costume/expr>` 或 `<char/expr>`（按在场角色的当前造型查表） | `duration 0.2` | 设置型 |
+| `@costume` | `<char/costume>` | `duration 0.2` | 设置型 |
+| `@cg` | `<cg-id>` 或 `none`（清除） | — | 设置型 |
+| `@camera` | `sway\|push-in\|pull-out\|reset` | `easing ease-in-out duration 0.5` | 设置型 |
+| `@zoom` | `<倍率>`（大于零） | `target center duration 0.4 easing ease-out`；目标还可用 `stage`、`left`、`right` | 设置型 |
+| `@shake` | — | `strength 0.35 duration 0.3 easing ease-out`；强度 0–1，`strong` 为 1 | 设置型 |
+| `@particle` | `rain\|snow\|sakura\|none`（停止） | `intensity 0.5 speed 1 angle 0`；强度 0–1，速度非负，角度 −360–360 度 | 设置型 |
+| `@mask` | `vignette\|letterbox\|none`（清除） | `strength 0.5`，范围 0–1 | 设置型 |
+| `@filter` | `blur\|brightness\|sepia\|glitch\|none`（清除） | `value 0.5`，非负 | 设置型 |
+| `@caption` | `<text...>` | 行尾 `wait`、`#id` | 文本型 |
+| `@wait` | — | 裸写等点击，`@wait N` 停 N 秒自动往下走；行尾可加 `#id` | 文本型 |
 
 已定的参数词表：
 
 - **转场**（`@bg`、立绘进出场等）：`fade`（经黑场）、`dissolve`（交叉淡化）、`wipe-left`/`wipe-right`/`wipe-up`/`wipe-down`、`slide`、`push`、`iris`、`zoom`、`none`。
 - **缓动**（`@move`、镜头、`@shake` 等）：`linear` / `ease` / `ease-in` / `ease-out` / `ease-in-out`。
+- **数值**：有限十进制数，不用科学计数法；时长和停顿以秒计且非负。
 - **粒子**：首批内置 `rain`、`snow`、`sakura`，参数只有强度、速度、风向角度；模型写意图名和强度，不写粒子物理参数。
 - **画面滤镜**：首批 `blur`、`brightness`、`sepia`、`glitch`。
 - **槽位规则**：立绘按位置槽管理，槽位枚举 `left` / `center` / `right`，身份是“素材名 + 槽位”。`@show` 在同一槽位换表情或造型且素材身份不变时，保留该立绘已有的位置、变换和层级。
@@ -107,16 +110,33 @@ lin-xiao as 神秘少女: 你终于来了。 #d77e
 - 字幕默认不等点击，加 `wait` 才等；字幕也是句子，带句子 ID。
 - 对白、独白、旁白行尾写 `cont`（在句子 ID 前）表示这句播完不停顿、直接接下一句，用于抢话、半句切演出这类衔接。
 
-按生效方式，指令分两类：设置型指令默认随行生效、不等点击；文本型指令等点击（见上面的指令全集表）。
+编译产生按顺序播放的节拍：设置型指令合入随后第一条文本型指令，场景末尾仅有设置型指令时产出自动推进的节拍。字幕、`cont` 和定时等待按各自规则推进，不隐式等待点击。整章内跨场景保留舞台状态以解析省略的造型。
 
 ### 解析与模型输出
 
 模型直接输出剧本文本（一次一整章，内部用 `scene` 块分场），应用做剧本检查与局部修复：解析器给出带错误码和位置的诊断，代码先修代码块围栏、BOM、换行这类机械问题，再查素材名、原文段落范围、句子 ID；只把出错的场景退回写手改，不整章重写，同一场景连续 3 次退回仍不过时整章标“需要处理”。素材名未登记、`source` 段落范围越界、句子 ID 重复都退回写手，不自动改。写错的行内标签也在这一步报出。
 
+解析接受开头 BOM、CRLF，以及一对外围 Markdown 反引号围栏（无语言或 `nvs`、`text`、`txt`）；保存为无围栏 LF 文本。诊断为 `{code, line, col, message, hint}`，行与列从 1 开始，按原输入定位（列以 UTF-16 码元计，开头 BOM 不计）。
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `E_FENCE` | 围栏没有成对或位于正文 |
+| `E_SCENE` / `E_SOURCE` | 场景头缺失，或原文范围行格式错误 |
+| `E_SOURCE_RANGE` / `E_SOURCE_COVERAGE` | 段落不存在、顺序颠倒，或未按序覆盖整章 |
+| `E_LINE` / `E_COMMAND` / `E_ARGUMENT` | 无效剧本行、指令名或参数 |
+| `E_ID` / `E_DUPLICATE_ID` / `E_ID_EXHAUSTED` | ID 格式错误、重复或没有可分配的 ID |
+| `E_TAG` | 未登记或不配对的标签，或参数不合法 |
+| `E_SPEAKER` / `E_ASSET` / `E_STAGE` | 说话人不在设定集、素材未登记/歧义/种类不符，或指令引用未上场的立绘 |
+| `W_LINE_LONG` | 文字可能超过一页；不阻止编译 |
+
+素材引用用登记表校验，登记过的未绘制项也合法。别名映射到登记表的正式 ID；歧义别名报错。编译结果包含默认参数和正式素材 ID，保存文本仍保留显式参数和原素材名。
+
 ## ID 与命名
 
 - **场景和句子**：由应用自动分配随机短 ID，模型不写 ID。场景 ID 为 8 位小写十六进制，是文件名；句子 ID 为 4 位小写十六进制（`[0-9a-f]{4}`），场景内冲突重摇，写在行尾（如 `#a3f9`），每一句文字和每个 `@wait` 都带。模型输出的新行在保存时补上 ID（追加在行尾最末，`cont` 写在 ID 前）；模型改写已有的行时保留原 ID。内容改了 ID 也不变，存档、已读、修改历史都靠它对接。编辑器里移动一行算删掉再新增：剪切让原 ID 消亡，粘贴出来的行补发新 ID。
 - **素材 ID**：角色、造型、表情、地点、变体、CG 用可读英文名，创建后不改。ID 形状：地点 `place/variant`、角色 `character/costume/expression`、CG `cg-<id>`；全部登记在素材登记表里（见“目录结构”），写手、美术导演、画师、编译器、播放器都只认这一张表的 ID。剧本里的素材引用（`lin-xiao/uniform/angry`、`classroom/dusk`）查登记表，说话人 ID（`lin-xiao:` 的 `lin-xiao`）查设定集角色表，两者分开校验；同义表情合并登记的别名也走这张表解析。
+
+重存时优先传入场景文件名中的 ID；模型整章输出没有场景 ID 时用同位置、同标题的上次场景匹配。无显式句子 ID 的行用场景内非空内容行位置及其前缀匹配（文本类型、角色及显示名，或 `@wait`），未匹配的行分配新 ID。
 
 ## 自定义样式
 

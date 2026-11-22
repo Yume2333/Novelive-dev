@@ -1,0 +1,22 @@
+M1a/02 — W2 NVS parser and compiler
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1a-script.test.ts
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+
+$ NL_REPLAY=strict pnpm check
+Checked 95 files in 29ms. No fixes applied.
+Found 1 info.
+ Test Files  9 passed (9)
+      Tests  147 passed (147)
+
+The info is the existing fixture-generator template-string suggestion.
+
+$ export NL_REPLAY=strict
+$ pnpm exec tsx tests/fixtures/script/round-trip.ts "$project"
+Compiled and saved 2 .nvs files with 8 playback beats.
+Reopened the project; scene IDs, serialized sentence IDs, and canonical .nvs text round-trip.
+
+The real path uses a new local project directory and a synthetic two-scene
+chapter. The .nvs filenames are freshly allocated eight-digit hexadecimal IDs
+under volumes/v1/works/<work-id>/chapters/ch1/. No models were called.
