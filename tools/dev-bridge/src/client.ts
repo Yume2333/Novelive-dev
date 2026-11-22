@@ -161,6 +161,12 @@ export function connectDevBridge({
 			const path = prompt()?.trim()
 			return path && /^(?:\/|[a-z]:[\\/]|\\\\)/i.test(path) ? path : null
 		},
+		async pickFiles() {
+			return (prompt() ?? '')
+				.split(/[;\n]/)
+				.map((path) => path.trim())
+				.filter((path) => /^(?:\/|[a-z]:[\\/]|\\\\)/i.test(path))
+		},
 		host: {
 			async appState() {
 				await initial.promise

@@ -18,6 +18,7 @@ import {
 	maskedConfigSchema,
 	textCatalogSchema,
 } from '../config/schema'
+import { importCommands } from './import'
 import { productionCommands } from './production'
 
 export {
@@ -30,6 +31,7 @@ export {
 	type WriterPreset,
 	type WriterSettings,
 } from '../config/schema'
+export * from './import'
 export * from './production'
 
 const generation = int({ minimum: 1 })
@@ -65,6 +67,7 @@ const imageCapability = union([
 
 export const commands = {
 	...productionCommands,
+	...importCommands,
 	'config.get': {
 		input: empty,
 		output: union([maskedConfigSchema, configErrorSchema]),
@@ -162,6 +165,7 @@ export interface Novelive {
 	): () => void
 	resourceUrl(path: string): string
 	pickFolder(): Promise<string | null>
+	pickFiles(kind: 'txt' | 'image'): Promise<string[]>
 	host: {
 		appState(): Promise<HostState>
 		openLogDir(): Promise<void>

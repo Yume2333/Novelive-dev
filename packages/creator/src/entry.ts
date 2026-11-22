@@ -59,6 +59,15 @@ registry.register('model.testImage', async (_payload, signal) => {
 	})
 })
 
+registry.register('import.txt', async (payload) => {
+	const { importTxtProject } = await import('./import/wizard')
+	return importTxtProject(payload)
+})
+registry.register('import.revise', async ({ projectDir, layout }) => {
+	const { reviseTxtProject } = await import('./import/wizard')
+	return reviseTxtProject(projectDir, layout)
+})
+
 registry.register('events.list', ({ scope }) => ({
 	events: [],
 	gap: false,

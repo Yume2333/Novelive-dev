@@ -311,6 +311,7 @@ export function parseTxt(
 			if (volumeHeadings++ === 0 && !volume.chapters.length)
 				volume.title = title
 			else {
+				if (volumeHeadings === 1) volume.title = '前言'
 				if (!volume.chapters.length)
 					finding('empty-volume', i - 1, '上一卷无章节')
 				volume = {
