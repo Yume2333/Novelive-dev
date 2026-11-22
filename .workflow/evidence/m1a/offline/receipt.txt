@@ -1,0 +1,37 @@
+M1a/06 offline gate
+Base: 32ac7a7ed5c26ff485085e002d3430cfe9ad2539
+
+W1 — Project schema and separate-process SQLite reopen
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/project-schema/reopen.ts create "$schemaProject"
+Created project, saved source and hierarchy, queued preview, closed SQLite.
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/project-schema/reopen.ts reopen "$schemaProject"
+Reopened project: series/work identity and original bytes preserved.
+Chapter p0001/p0002 and queued preview preserved; SQLite integrity_check: ok.
+
+W2 — TXT boundary and script compiler suites included in full check
+$ NL_REPLAY=strict pnpm check
+Test Files  19 passed (19)
+     Tests  289 passed (289)
+
+W3 — Synthetic multi-volume TXT via the real Project API
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m1a-project.test.ts
+Test Files  1 passed (1)
+     Tests  2 passed (2)
+
+The empty-middle-volume regression verifies no model request or skeleton for the empty volume and successful synthesis of the following volume.
+
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m1a-offline/run.ts "$project" create
+create: 2 volumes, 3 chapters, original and report preserved, previews, digests, skeletons, glossary and conflict review verified; 7 replay requests.
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m1a-offline/run.ts "$project" reopen
+reopen: 2 volumes, 3 chapters, original and report preserved, previews, digests, skeletons, glossary and conflict review verified; 0 replay requests.
+
+The import-to-preview handoff lacked a loader for persisted chapters and a per-volume API returning preview and synthesis artifacts together. prepareVolume now takes the opened project, volume ID and role connections, loads the ordered source paragraphs from disk and runs preview/digest before synthesis. Later volumes default to incremental synthesis. Both desktop import commands use the pipeline module without starting model work during import.
+The confirmed character remained unchanged while the proposed rename went to conflict review; a new character and two glossary terms persisted as candidates. The second volume's synthetic cassette requires the first volume's new character in its Bible context.
+
+Electron real path — built file:// renderer through the creator IPC
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M1b TXT wizard'
+2 passed (4.5s)
+The wizard test asserts original TXT bytes and persisted chapter text immediately after import.txt; after import.revise it asserts the revised chapter and volume layout, report, work settings and copied reference image. The import-and-revise test is included in Linux Electron smoke.
+
+All model responses in this gate are checked-in synthetic SSE, authored in-process without access to an upstream provider. Paid usage: 0 calls, 0 tokens, 0 images.
+W4 (owner-book comparison) is outside this gate. Independent review skipped: no fresh reviewer or isolated session launch tool available; flow-close must cover it.
