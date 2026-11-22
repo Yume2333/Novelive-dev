@@ -74,6 +74,8 @@ lin-xiao as 神秘少女: 你终于来了。 #d77e
 
 指令全集。保存时必填项按表中顺序写，可选项写成空格分隔的 `key value`（例如 `@bg classroom/dusk transition fade duration 1.5`）。解析时带名可选项可在必填项前后出现，也接受表中顺序的无名参数。`@zoom` 的旧写法按类型归一，第一个数字是倍率。
 
+`@hide` 中的角色 ID 可以和可选参数同名。当前词既可作必填 ID 又可作参数名时，仅当后面的值合法且剩余词数足够填写必填项，才将它读为参数名；例如 `@hide duration duration 1` 隐去角色 `duration`。
+
 | 指令 | 必填参数 | 可选参数和默认值 | 生效类型 |
 | --- | --- | --- | --- |
 | `@bg` | `<place/variant>` | `transition fade`（同地点变体默认 `none`），`duration 0.4` | 设置型 |

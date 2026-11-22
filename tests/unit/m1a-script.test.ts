@@ -279,3 +279,32 @@ test('requires the registered character to be onstage before changing costume or
 		],
 	})
 })
+
+test.each(['duration', 'transition'])(
+	'round-trips a hide target named %s in the canonical grammar',
+	(name) => {
+		const original = compileScript(
+			single(`@hide duration 1 ${name} fade\n@wait`),
+			{
+				...scalarContext,
+				sceneIds: [storedIds[0]],
+			},
+		)
+		if (!original.ok) throw new Error(JSON.stringify(original.diagnostics))
+		const formatted = formatScript(original.scenes.map(({ scene }) => scene))
+		expect(formatted).toContain(`@hide ${name} transition fade duration 1\n`)
+		const reopened = compileScript(formatted, {
+			...scalarContext,
+			sceneIds: [storedIds[0]],
+		})
+		if (!reopened.ok) throw new Error(JSON.stringify(reopened.diagnostics))
+		expect(reopened.scenes[0].beats[0].actions[0].args).toEqual({
+			target: name,
+			duration: 1,
+			transition: 'fade',
+		})
+		expect(formatScript(reopened.scenes.map(({ scene }) => scene))).toBe(
+			formatted,
+		)
+	},
+)

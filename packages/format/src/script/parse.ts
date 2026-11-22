@@ -185,16 +185,19 @@ function parseAction(
 		const parameter = parameters.find(
 			(candidate) => candidate.name === token.text,
 		)
+		const next = input[i + 1]
+		const value = next && parameter?.read(next.text)
+		const required = spec.required[positional.length]
 		if (
 			!parameter ||
-			(!input[i + 1] &&
-				spec.required[positional.length]?.read(token.text) !== undefined)
+			(required?.read(token.text) !== undefined &&
+				(value === undefined ||
+					input.length - i - 2 < spec.required.length - positional.length))
 		) {
 			positional.push(token)
 			continue
 		}
-		const next = input[++i]
-		const value = next && parameter.read(next.text)
+		i++
 		if (value === undefined || Object.hasOwn(args, parameter.name))
 			report(
 				'E_ARGUMENT',
