@@ -1,0 +1,335 @@
+import { createHash } from 'node:crypto'
+import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
+import {
+	arr,
+	bool,
+	compile,
+	int,
+	nullable,
+	obj,
+	type Static,
+	str,
+} from '@earendil-works/pi-schema'
+import {
+	biblePatchSchema,
+	entityId,
+	formatVersion,
+	glossaryPatchSchema,
+	type ProjectDocument,
+	projectFiles,
+	type VolumeSkeleton,
+	version,
+} from '@novelive/format/model'
+import {
+	buildTextModel,
+	createTextStream,
+	type TextConnection,
+} from '../models/text'
+import { splitChapter } from '../preview'
+import type { Project } from '../project'
+import { applyPatches, existing, readBible, validatePatch } from './patch'
+
+const fields = {
+	overview: str(),
+	chapters: arr(obj({ chapterId: entityId, progress: str({ minLength: 1 }) })),
+	biblePatch: biblePatchSchema,
+	glossaryPatch: glossaryPatchSchema,
+}
+const outputSchema = obj(fields)
+const whole = compile(outputSchema)
+const eventSchema = obj({
+	...fields,
+	event: str({ minLength: 1 }),
+	is_last: bool(),
+})
+const nextEvent = compile(eventSchema)
+const checkpointSchema = obj({
+	...version,
+	fingerprint: str(),
+	basis: str(),
+	packet: int({ minimum: 0 }),
+	events: arr(eventSchema),
+	whole: nullable(outputSchema),
+	ready: bool(),
+	applied: bool(),
+})
+const resultSchema = obj({
+	...version,
+	volumeId: entityId,
+	...fields,
+	conflicts: biblePatchSchema,
+	glossaryConflicts: glossaryPatchSchema,
+})
+export type VolumeSynthesis = Static<typeof resultSchema>
+
+export function synthesisFiles(volumeId: string) {
+	const dir = projectFiles
+		.skeleton(volumeId)
+		.path.slice(0, -'skeleton.json'.length)
+	return {
+		checkpoint: {
+			path: `source/synthesis/${volumeId}.json`,
+			schema: checkpointSchema,
+		} satisfies ProjectDocument<Checkpoint>,
+		result: {
+			path: `${dir}synthesis.json`,
+			schema: resultSchema,
+		} satisfies ProjectDocument<VolumeSynthesis>,
+	}
+}
+
+type Checkpoint = Static<typeof checkpointSchema>
+type Output = Static<typeof outputSchema>
+type Event = Static<typeof eventSchema>
+
+export interface SynthesisOptions {
+	connection: TextConnection
+	language: string
+	requirements?: string
+	strategy?: 'auto' | 'whole' | 'events'
+	maxEvents?: number
+	incremental?: boolean
+	signal?: AbortSignal
+	fetch?: typeof globalThis.fetch
+}
+
+const eventLimit = 128
+const hash = (value: unknown) =>
+	createHash('sha256').update(JSON.stringify(value)).digest('hex')
+const bytes = (text: string) => Buffer.byteLength(text)
+const unique = <T>(items: T[]) => [
+	...new Map(items.map((item) => [JSON.stringify(item), item])).values(),
+]
+
+function combine(
+	volumeId: string,
+	chapterIds: readonly string[],
+	parts: Output[],
+): VolumeSkeleton {
+	const chapters = chapterIds.map((chapterId) => {
+		const notes = unique(
+			parts.flatMap((part) =>
+				part.chapters
+					.filter((chapter) => chapter.chapterId === chapterId)
+					.map((chapter) => chapter.progress),
+			),
+		)
+		if (!notes.length)
+			throw new Error(`Synthesis missing chapter progress: ${chapterId}`)
+		return { chapterId, progress: notes.join('；') }
+	})
+	return {
+		formatVersion,
+		volumeId,
+		overview: unique(parts.map((part) => part.overview).filter(Boolean)).join(
+			'\n\n',
+		),
+		chapters,
+	}
+}
+
+export async function synthesizeVolume(
+	project: Project,
+	volumeId: string,
+	chapterIds: readonly string[],
+	options: SynthesisOptions,
+): Promise<VolumeSynthesis> {
+	if (!chapterIds.length || new Set(chapterIds).size !== chapterIds.length)
+		throw new Error('Synthesis requires distinct ordered chapter IDs')
+	const model = buildTextModel(options.connection)
+	const stream = createTextStream({ fetch: options.fetch })
+	const limit = options.maxEvents ?? eventLimit
+	if (!Number.isInteger(limit) || limit < 1 || limit > eventLimit)
+		throw new Error(`Invalid synthesis event limit (1–${eventLimit})`)
+	const strategy = options.strategy ?? 'auto'
+	const incremental = options.incremental ?? false
+	const files = synthesisFiles(volumeId)
+	const previews = await Promise.all(
+		chapterIds.map((id) => project.read(projectFiles.preview(id))),
+	)
+	if (previews.some((preview, i) => preview.chapterId !== chapterIds[i]))
+		throw new Error('Stored preview chapter ID does not match its file')
+	const fingerprint = hash({
+		previews,
+		language: options.language,
+		requirements: options.requirements,
+		strategy,
+		incremental,
+		model: model.id,
+		context: model.contextWindow,
+	})
+	const saved = await existing(() => project.read(files.checkpoint))
+	if (saved?.fingerprint === fingerprint && saved.applied)
+		return project.read(files.result)
+
+	const bible = await readBible(project)
+	const basis = hash(bible)
+	const maxTokens = Math.min(4096, Math.floor(model.contextWindow / 4))
+	const budget = model.contextWindow - maxTokens - 1024
+	const packetText = previews.map((preview) => JSON.stringify(preview))
+	const instructions = `Synthesize the ordered chapter previews in ${options.language}. Adaptation requirements: ${options.requirements ?? ''}.
+Return only JSON with overview, chapters [{chapterId,progress}], biblePatch [{kind,op,entry}], glossaryPatch [entry].
+Bible kinds: character, relation, location, timeline, foreshadowing, style. Every entry has an id and status ("candidate"); use actual chapter IDs for provenance and relationships reference existing or extracted characters. Characters have name and aliases (mark main characters major:true); locations have name and description; relations have from, to and description; timeline has chapterId and event; foreshadowing has plantedChapter and description; style has description; glossary has original, written and category.
+Use stable IDs; record changing identities in changes with chapterId, field and value. Keep confirmed facts intact; ${incremental ? 'do not emit delete for successive volumes.' : 'delete only a mistaken candidate from this volume.'}
+Existing entries:
+${JSON.stringify(bible)}`
+	const wholePrompt = `${instructions}
+Synthesize the entire volume. Include progress for every chapter.
+Chapter previews:
+${packetText.join('\n')}`
+	const useEvents =
+		strategy === 'events' ||
+		(strategy === 'auto' && bytes(wholePrompt) + 384 > budget)
+	const packetBudget = Math.floor((budget - bytes(instructions) - 512) / 8)
+	const packets =
+		useEvents && packetBudget > 0 ? splitChapter(packetText, packetBudget) : []
+	const state: Checkpoint =
+		saved?.fingerprint === fingerprint && (saved.ready || saved.basis === basis)
+			? saved
+			: {
+					formatVersion,
+					fingerprint,
+					basis,
+					packet: 0,
+					events: [],
+					whole: null,
+					ready: false,
+					applied: false,
+				}
+	if (useEvents && !packets.length && !state.ready)
+		throw new Error('Existing Bible is too large for synthesis context')
+
+	const chapterSet = new Set(chapterIds)
+	async function request<T extends Output>(
+		prompt: string,
+		validator: {
+			validate(
+				input: unknown,
+			): { ok: true; value: T } | { ok: false; errors: unknown }
+		},
+		check: (output: T) => void,
+	): Promise<T> {
+		const messages = [{ role: 'user' as const, content: prompt, timestamp: 0 }]
+		for (let attempt = 0; ; attempt++) {
+			options.signal?.throwIfAborted()
+			if (
+				messages.reduce((total, message) => total + bytes(message.content), 0) >
+				budget
+			)
+				throw new Error('Synthesis input exceeds the model context budget')
+			const response = await stream(model, normalizeContext({ messages }), {
+				apiKey: options.connection.apiKey,
+				signal: options.signal,
+				maxTokens,
+				cacheRetention: 'none',
+			}).result()
+			if (response.stopReason !== 'stop')
+				throw new Error(
+					response.errorMessage ?? `Synthesis stopped: ${response.stopReason}`,
+				)
+			try {
+				const text = response.content
+					.flatMap((part) => (part.type === 'text' ? [part.text] : []))
+					.join('')
+				const validation = validator.validate(JSON.parse(text))
+				if (!validation.ok) throw new Error(JSON.stringify(validation.errors))
+				check(validation.value)
+				return validation.value
+			} catch (error) {
+				if (attempt === 1) throw error
+				messages.push({
+					role: 'user',
+					content: `Repair the JSON: ${String(error).slice(0, 320)}`,
+					timestamp: 0,
+				})
+			}
+		}
+	}
+
+	const check = (output: Output, prior: Output[]) => {
+		const progressIds = new Set(
+			output.chapters.map(({ chapterId }) => chapterId),
+		)
+		if (
+			progressIds.size !== output.chapters.length ||
+			[...progressIds].some((id) => !chapterSet.has(id))
+		)
+			throw new Error('Chapter progress must use distinct IDs from this volume')
+		validatePatch(
+			bible,
+			[...prior.flatMap((part) => part.biblePatch), ...output.biblePatch],
+			output.glossaryPatch,
+			chapterSet,
+			incremental,
+		)
+	}
+	if (!state.ready && !useEvents && !state.whole) {
+		state.whole = await request(wholePrompt, whole, (value) => {
+			check(value, [])
+			combine(volumeId, chapterIds, [value])
+		})
+		await project.write(files.checkpoint, state)
+	}
+	while (!state.ready && useEvents && state.packet < packets.length) {
+		if (state.events.length >= limit)
+			throw new Error(`Synthesis reached its event limit (${limit})`)
+		const packet = state.packet
+		const event = await request(
+			`${instructions}
+Extract only the next event in packet ${packet + 1}/${packets.length}. A packet can contain a fragment of a chapter preview. Include one event string, only its changes, and is_last (true if this is the last event of this packet); report progress for affected chapters.
+Previously extracted events: ${JSON.stringify(state.events.map((item) => item.event))}
+Chapter previews:
+${packets[packet]}`,
+			nextEvent,
+			(value: Event) => {
+				if (state.events.some((previous) => previous.event === value.event))
+					throw new Error('Event was already extracted; return a new event')
+				check(value, state.events)
+				if (value.is_last && packet === packets.length - 1)
+					combine(volumeId, chapterIds, [...state.events, value])
+			},
+		)
+		state.events.push(event)
+		if (event.is_last) state.packet++
+		await project.write(files.checkpoint, state)
+	}
+
+	const parts = state.whole ? [state.whole] : state.events
+	const skeleton = combine(volumeId, chapterIds, parts)
+	const biblePatch = unique(parts.flatMap((part) => part.biblePatch))
+	const glossaryPatch = unique(parts.flatMap((part) => part.glossaryPatch))
+	options.signal?.throwIfAborted()
+	if (
+		hash(
+			await Promise.all(
+				chapterIds.map((id) => project.read(projectFiles.preview(id))),
+			),
+		) !== hash(previews)
+	)
+		throw new Error('Chapter previews changed during synthesis')
+	const latest = await readBible(project)
+	if (!state.ready) {
+		if (hash(latest) !== basis)
+			throw new Error('Bible changed during synthesis')
+		state.ready = true
+		await project.write(files.checkpoint, state)
+	}
+	const { conflicts, glossaryConflicts } = await applyPatches(
+		project,
+		latest,
+		biblePatch,
+		glossaryPatch,
+		chapterSet,
+	)
+	const result: VolumeSynthesis = {
+		...skeleton,
+		biblePatch,
+		glossaryPatch,
+		conflicts,
+		glossaryConflicts,
+	}
+	await project.write(projectFiles.skeleton(volumeId), skeleton)
+	await project.write(files.result, result)
+	await project.write(files.checkpoint, { ...state, applied: true })
+	return result
+}

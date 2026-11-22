@@ -1,0 +1,21 @@
+M1a/05 — volume synthesis
+Base: f1a0090eba860b4f86937b57b09c7ab9f246b4ac
+
+Check: NL_REPLAY=strict pnpm exec vitest run tests/unit/m1a-synthesis.test.ts
+Test Files  1 passed (1)
+     Tests  5 passed (5)
+
+Regression: NL_REPLAY=strict pnpm check
+Test Files  13 passed (13)
+     Tests  217 passed (217)
+
+Real path: NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m1a-synthesis/run.ts <project-path> <step>
+Ran whole on a fresh project, then checkpoint, resume and reopen on a second project in separate processes:
+whole: 1 replay requests; 2-chapter skeleton, candidates and conflicts persisted; confirmed name preserved.
+Checkpoint saved to disk after 1 event; no partial skeleton published.
+resume: 1 replay requests; 2-chapter skeleton, candidates and conflicts persisted; confirmed name preserved.
+reopen: 0 replay requests; 2-chapter skeleton, candidates and conflicts persisted; confirmed name preserved.
+
+Replay: 20 synthetic SSE entries authored with an in-process upstream, not provider recordings. Strict runs reject network access. Paid usage: 0 calls, 0 tokens, 0 images; no ledger entries.
+W3 full multi-volume integration belongs to M1a/06. W4 real-book comparison (normalized BiblePatch F1 ≥ 0.90 and no loss of confirmed settings) remains unaccepted pending an owner-approved book and M1a/07. Synthetic replay does not measure extraction quality.
+Review: skipped — no fresh reviewer tool available.
