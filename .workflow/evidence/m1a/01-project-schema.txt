@@ -16,11 +16,12 @@ $ NL_REPLAY=strict pnpm exec vitest run --exclude tests/unit/m1a-project-schema.
  Test Files  7 passed (7)
       Tests  129 passed (129)
 
+After merging origin/main at 3ea7747 (merge eadcaea):
 $ NL_REPLAY=strict pnpm check
-tests/fixtures/cassettes/README.md format
-Found 1 error.
-The README is byte-for-byte unchanged from dc17795. PR #14 already includes
-the formatting fix; origin/main was still dc17795 when recording this receipt.
+Checked 85 files in 26ms. No fixes applied.
+Found 1 info.
+ Test Files  8 passed (8)
+      Tests  134 passed (134)
 
 $ export NL_REPLAY=strict
 $ pnpm exec tsx tests/fixtures/project-schema/reopen.ts create "$project"
