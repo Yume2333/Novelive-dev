@@ -19,4 +19,4 @@
 - Check before: `cdfc64d` 没有文本适配器或 M0/07 单测。
 - Check after: 三种 SDK 协议、带图请求、错误、两层重试和工具中止等 17 项通过。[检查日志](../../evidence/m0-skeleton/07-text-check.txt)
 - Real path: 真实中转各一次 Chat（带图）、Responses、Messages，脱敏后离线严格回放全过。共 1,694 tokens、0 张生成图片，三条调用已写入私有账本。[录制及回放凭据](../../evidence/m0-skeleton/07-text-real-path.txt)
-- Review: skipped — 当前会话未进行独立审查；设置接线及 UI 真实验收留给 09。
+- Review: pass (base cdfc64d9cf2155ee37cd665e2e10d899c9826b37, reviewer Devin Review) — [PR #10](https://github.com/Yume2333/Novelive-dev/pull/10) 独立审查通过。

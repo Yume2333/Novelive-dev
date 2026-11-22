@@ -17,4 +17,4 @@
 - Check before: `48ba8b2` 只有 08 的合成图片 cassette，没有真实中转 smoke。
 - Check after: 三个成功录制在去掉中转环境变量后严格回放；原有图片单测 77 项通过。[验收日志](../../evidence/m0-skeleton/12-image-smoke-check.txt)
 - Real path: `testImage` 实走文生图、透明底、multipart 编辑并写入原图和缩略图缓存。3 次付费请求、3 张图、19,195 tokens，逐笔记账；cassette 脱敏检查通过。[录制及回放凭据](../../evidence/m0-skeleton/12-image-smoke-check.txt)
-- Review: skipped — 当前会话未进行独立审查；设置页接线及 UI 验收由 09 完成。
+- Review: pass (base 48ba8b2404f1a543393b7dc23ab9905c7272b086, reviewer Devin Review) — [PR #11](https://github.com/Yume2333/Novelive-dev/pull/11) 独立审查通过。

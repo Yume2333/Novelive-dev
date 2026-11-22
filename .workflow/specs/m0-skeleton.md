@@ -1,6 +1,7 @@
 # M0 骨架
 
-**Status:** in progress
+**Status:** done
+**Accepted:** 2026-11-22 by agent (unattended)
 **Priority:** high
 
 ## What this is for

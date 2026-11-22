@@ -6,8 +6,8 @@ import type {
 import {
 	AlertTriangle,
 	BarChart3,
+	Contrast,
 	LibraryBig,
-	Monitor,
 	Moon,
 	Settings,
 	Sun,
@@ -25,7 +25,7 @@ const navigation = [
 const themes = [
 	{ value: 'light', icon: Sun, name: '亮色' },
 	{ value: 'dark', icon: Moon, name: '暗色' },
-	{ value: 'system', icon: Monitor, name: '跟随系统' },
+	{ value: 'system', icon: Contrast, name: '跟随系统' },
 ] as const
 export interface SettingsHost {
 	config: CommandOutput<'config.get'> | undefined

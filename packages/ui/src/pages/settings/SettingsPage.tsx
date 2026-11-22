@@ -11,13 +11,13 @@ import {
 	Cable,
 	Check,
 	ChevronDown,
+	Contrast,
 	Eye,
 	FilePenLine,
 	FolderOpen,
 	Globe,
 	Image,
 	type LucideIcon,
-	Palette,
 	Zap,
 } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
@@ -183,18 +183,31 @@ function ModelCard({
 						<strong>{title}</strong>
 						<small>{summary || '未填写模型名'}</small>
 					</span>
-					<ChevronDown aria-hidden="true" size={17} />
+					<ChevronDown
+						className={styles.chevron}
+						aria-hidden="true"
+						size={18}
+					/>
 				</button>
 				<small className={configured ? styles.success : styles.muted}>
 					{configured ? '已配置' : '未配置'}
 				</small>
 				{phase === 'testing' ? (
-					<button type="button" onClick={() => work.current?.abort()}>
+					<button
+						className={styles.testButton}
+						type="button"
+						onClick={() => work.current?.abort()}
+					>
 						取消
 					</button>
 				) : (
-					<button type="button" disabled={busy} onClick={() => void run(true)}>
-						<Cable size={15} aria-hidden="true" /> 测试
+					<button
+						className={styles.testButton}
+						type="button"
+						disabled={busy}
+						onClick={() => void run(true)}
+					>
+						<Cable size={14} aria-hidden="true" /> 测试
 					</button>
 				)}
 			</div>
@@ -372,7 +385,7 @@ export function SettingsPage() {
 					</section>
 					<section aria-labelledby="appearance-settings">
 						<h2 id="appearance-settings">界面</h2>
-						<div className={styles.card}>
+						<div className={`${styles.card} ${styles.appearance}`}>
 							<SettingRow title="界面语言" icon={Globe}>
 								<Select
 									label="界面语言"
@@ -383,7 +396,7 @@ export function SettingsPage() {
 									}
 								/>
 							</SettingRow>
-							<SettingRow title="主题" icon={Palette}>
+							<SettingRow title="主题" icon={Contrast}>
 								<Select
 									label="主题"
 									options={themes}
