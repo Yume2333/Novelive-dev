@@ -293,7 +293,7 @@ test('incremental synthesis can resolve foreshadowing planted in an earlier volu
 	})
 })
 
-test('character deletion is rejected before writing if a surviving relation references it', async () => {
+test('character deletion becomes a conflict if a surviving relation references it', async () => {
 	await seed(root)
 	using project = await Project.open(root)
 	const candidate = {
@@ -325,9 +325,22 @@ test('character deletion is rejected before writing if a surviving relation refe
 		op: 'delete',
 		entry: { ...candidate, aliases: [] },
 	} satisfies BiblePatch[number]
-	await expect(
-		applyPatches(project, bible, [patch], [], new Set(chapters)),
-	).rejects.toThrow('Cannot delete character guide: still referenced')
+	const retained = await applyPatches(
+		project,
+		bible,
+		[patch],
+		[],
+		new Set(chapters),
+	)
+	expect(retained.conflicts).toMatchObject([
+		{
+			...patch,
+			entry: {
+				id: 'guide',
+				conflict: expect.stringContaining('still referenced'),
+			},
+		},
+	])
 	expect(await readBible(project)).toEqual(bible)
 	await applyPatches(
 		project,
@@ -339,20 +352,23 @@ test('character deletion is rejected before writing if a surviving relation refe
 	const updated = await readBible(project)
 	expect(updated.character.map(({ id }) => id)).toEqual(['ada'])
 	expect(updated.relation).toEqual([])
-	await expect(
-		applyPatches(
-			project,
-			updated,
-			[
-				{ ...patch, op: 'add' },
-				patch,
-				{ kind: 'relation', op: 'add', entry: relation },
-			],
-			[],
-			new Set(chapters),
-		),
-	).rejects.toThrow('Cannot delete character guide: still referenced')
-	expect(await readBible(project)).toEqual(updated)
+	const added = await applyPatches(
+		project,
+		updated,
+		[
+			{ ...patch, op: 'add' },
+			patch,
+			{ kind: 'relation', op: 'add', entry: relation },
+		],
+		[],
+		new Set(chapters),
+	)
+	expect(added.conflicts).toHaveLength(1)
+	expect((await readBible(project)).relation).toEqual([relation])
+	expect((await readBible(project)).character.map(({ id }) => id)).toEqual([
+		'ada',
+		'guide',
+	])
 })
 
 test('a proposal cannot smuggle fixed facts onto confirmed characters as temporal changes', async () => {

@@ -249,7 +249,7 @@ export async function applyPatches(
 	patch: BiblePatch,
 	glossary: GlossaryPatch,
 	chapters: ReadonlySet<string>,
-) {
+): Promise<{ conflicts: BiblePatch; glossaryConflicts: GlossaryPatch }> {
 	const conflicts: BiblePatch = []
 	const glossaryConflicts: GlossaryPatch = []
 	const pending: (() => Promise<void>)[] = []
@@ -343,16 +343,41 @@ export async function applyPatches(
 		write(projectFiles.style(scope), entries),
 	)
 
-	for (const id of [
-		...survivingRelations.flatMap(({ from, to }) => [from, to]),
-		...survivingCharacters.flatMap(
-			({ addresses }) => addresses?.map(({ speakerId }) => speakerId) ?? [],
-		),
-	])
-		if (removedCharacters.has(id))
-			throw new Error(
-				`Cannot delete character ${id}: still referenced in the Bible`,
+	const blocked = new Set(
+		[
+			...survivingRelations.flatMap(({ from, to }) => [from, to]),
+			...survivingCharacters.flatMap(
+				({ addresses }) => addresses?.map(({ speakerId }) => speakerId) ?? [],
+			),
+		].filter((id) => removedCharacters.has(id)),
+	)
+	if (blocked.size) {
+		const allowed: BiblePatch = []
+		const rejected: BiblePatch = []
+		for (const item of patch)
+			if (
+				item.kind === 'character' &&
+				item.op === 'delete' &&
+				blocked.has(item.entry.id)
 			)
+				rejected.push({
+					...item,
+					entry: {
+						...item.entry,
+						status: 'candidate',
+						conflict: `Cannot delete character ${item.entry.id}: still referenced in the Bible`,
+					},
+				})
+			else allowed.push(item)
+		const result = await applyPatches(
+			project,
+			bible,
+			allowed,
+			glossary,
+			chapters,
+		)
+		return { ...result, conflicts: [...rejected, ...result.conflicts] }
+	}
 
 	const terms = new Map(bible.glossary.map((term) => [term.id, term]))
 	let changed = false
