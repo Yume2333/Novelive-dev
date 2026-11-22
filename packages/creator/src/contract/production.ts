@@ -76,6 +76,7 @@ export const productionCommands = {
 			registry: assetRegistrySchema,
 			speakers: arr(entityId, { uniqueItems: true }),
 			speakerNames: map(str()),
+			customMarks: arr(str(), { uniqueItems: true }),
 		}),
 	},
 	'production.get': { input: obj(work), output: productionSnapshotSchema },

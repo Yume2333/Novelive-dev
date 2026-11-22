@@ -13,6 +13,10 @@
 
 ## Progress
 
+- Review check after: 针对 `7b102ca` 的四项审查均属实，逐项独立修复：未就绪或缺失素材延至实际播放时报错；无别名文字显示三级设定集姓名；隐藏槽位优先于同名角色；编译接收作品声明的自定义标记，正文正常显示但不施加效果。`pnpm check` 通过（15 个文件、226 项测试）；严格回放最小播放器 Electron 检查 2 项通过。
+- Review real path: 合成工程包含无文件的待绘素材，无引用时正常播放，引用时显示加载错误；验证无别名对话与无立绘心声的姓名、显式别名优先、自定义标记正文，以及 `right` 同名角色保留在左槽、随后按左槽隐藏。无付费调用。
+- Review evidence: [完整检查](../../evidence/m1b-production/05-minimal-player-review-check.txt)、[定向 Electron](../../evidence/m1b-production/05-minimal-player-review-e2e.txt)。
+
 - Merge check: 合并 main 后保留播放器与制作界面两侧协议和路由；完整检查 226 项通过。经批准将设置标题定位改为精确匹配，完整 Electron 套件 17 项通过（一次滚动条拖拽偶发失败后原样重跑通过）。[合并检查](../../evidence/m1b-production/05-minimal-player-merge-check.txt)、[合并 Electron](../../evidence/m1b-production/05-minimal-player-merge-e2e.txt)。
 
 - Check after: 说话人设定集审查修复后，`pnpm check` 通过（13 个测试文件、216 项测试）；严格回放最小播放器 Electron 检查 1 项通过，覆盖无立绘素材角色的心声。

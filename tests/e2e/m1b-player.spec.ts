@@ -93,17 +93,19 @@ for (const missingAsset of [false, true]) {
 					page.locator('.nl-player-caption[data-kind="caption"]'),
 				).toHaveText('黄昏时分')
 				await advance()
-				await expect(text).toHaveText('屋子静了。')
+				await expect(text.locator('.nl-player-text')).toHaveText('屋子静了。')
+				await expect(text.locator('.nl-player-name')).toHaveText('来客')
 				await expect.poll(() => at(0.5, 0.4)).toEqual([32, 48, 96])
 				await expect.poll(() => at(0.25, 0.4)).toEqual([224, 96, 48])
 				await advance()
 				if (missingAsset)
 					await expect(page.getByRole('alert')).toHaveText('无法加载舞台素材')
-				else
+				else {
 					await expect(page.locator('.nl-player-overlay')).toHaveText(
 						'本章结束',
 					)
-				await expect.poll(() => at(0.25, 0.4)).toEqual([32, 48, 96])
+					await expect.poll(() => at(0.25, 0.4)).toEqual([32, 48, 96])
+				}
 			} finally {
 				await app.close()
 			}

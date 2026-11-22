@@ -90,6 +90,7 @@ export async function loadPlayerChapter(
 			registry: { formatVersion: 1 as const, entries: assets },
 			speakers: [...speakers.keys()],
 			speakerNames: Object.fromEntries(speakers),
+			customMarks: Object.keys(work.settings.customMarks),
 		}
 	}
 	throw { code: 'not_found', message: '工程中找不到这部作品' }

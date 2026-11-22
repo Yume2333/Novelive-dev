@@ -20,7 +20,7 @@ export function PlayerPage() {
 		setError('')
 		setLoading(true)
 		try {
-			const { script, chapter, registry, speakers, speakerNames } =
+			const { script, chapter, registry, speakers, speakerNames, customMarks } =
 				await window.novelive.call('production.playerChapter', {
 					directory,
 					workId: id,
@@ -30,6 +30,7 @@ export function PlayerPage() {
 				sceneIds: chapter.sceneIds,
 				assets: registry.entries,
 				speakers,
+				customMarks,
 			})
 			if (!result.ok)
 				throw new Error(

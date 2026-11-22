@@ -21,7 +21,7 @@ listener (inner): 我在想什么？
 @show right/coat/calm left
 @hide right
 @hide traveler
-: 屋子静了。
+traveler as 来客: {wave}屋子静了。{/wave}
 @hide left
 `
 
@@ -51,7 +51,10 @@ export async function seedPlayerProject(
 		minReaderVersion: 1,
 		appVersion: '0.1.0',
 		language: 'zh-CN',
-		settings: defaultWorkSettings(),
+		settings: {
+			...defaultWorkSettings(),
+			customMarks: { wave: { css: 'color: red', perChar: false } },
+		},
 	})
 	await project.write(projectFiles.chapter(playerRef), {
 		formatVersion: 1,

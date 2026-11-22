@@ -141,6 +141,8 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 	const result = await loadPlayerChapter(root, playerWorkId, cache)
 	expect(result.script).toBe(playerScript)
 	expect(result.chapter.sceneIds).toEqual(['aaaabbbb'])
+	const room = result.registry.entries.find((entry) => entry.id === 'room/dusk')
+	if (!room) throw new Error('Missing fixture background')
 	expect(result.speakers).toEqual(['traveler', 'listener', 'witness'])
 	expect(result.speakerNames).toEqual({
 		traveler: '旅人',
@@ -155,7 +157,19 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 		sceneIds: result.chapter.sceneIds,
 		assets: result.registry.entries,
 		speakers: result.speakers,
+		customMarks: result.customMarks,
 	})
+	expect(result.customMarks).toEqual(['wave'])
+	expect(
+		compileScript(result.script, {
+			paragraphIds: result.chapter.paragraphIds,
+			sceneIds: result.chapter.sceneIds,
+			assets: result.registry.entries,
+			speakers: result.speakers,
+		}).diagnostics,
+	).toEqual(
+		expect.arrayContaining([expect.objectContaining({ code: 'E_TAG' })]),
+	)
 	expect(compiled.ok).toBe(true)
 	if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics))
 	expect(compiled.scenes[0].beats[1].line).toMatchObject({
@@ -167,6 +181,7 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 			paragraphIds: result.chapter.paragraphIds,
 			assets: result.registry.entries,
 			speakers: ['traveler'],
+			customMarks: result.customMarks,
 		}).diagnostics,
 	).toEqual(
 		expect.arrayContaining([expect.objectContaining({ code: 'E_SPEAKER' })]),
@@ -241,9 +256,7 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 				formatVersion: 1,
 				entries: [
 					{
-						...result.registry.entries.find(
-							(entry) => entry.id === 'room/dusk',
-						)!,
+						...room,
 						path: '../outside.png',
 					},
 				],
