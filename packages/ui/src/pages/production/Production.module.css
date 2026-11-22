@@ -219,3 +219,9 @@
 .records details p {
 	white-space: pre-wrap;
 }
+
+@media (hover: hover) {
+	li:not(:hover, :focus-within) > .chapterActions:not([data-expanded="true"]) {
+		opacity: 0;
+	}
+}

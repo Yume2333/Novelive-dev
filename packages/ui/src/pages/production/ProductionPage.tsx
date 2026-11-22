@@ -35,7 +35,10 @@ function ChapterRow({
 				<ChapterState chapter={chapter} />
 			</div>
 			{issue && <p className={styles.lead}>{issue}</p>}
-			<div className={styles.actions}>
+			<div
+				className={`${styles.actions} ${styles.chapterActions}`}
+				data-expanded={showRecords}
+			>
 				{blockedChapterId === chapterId && (
 					<button
 						className={styles.button}

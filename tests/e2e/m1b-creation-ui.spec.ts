@@ -149,6 +149,7 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			await expect(page.getByRole('button', { name: '继续制作' })).toHaveCount(
 				0,
 			)
+			await failed.hover()
 			await failed.getByRole('button', { name: '运行记录' }).click()
 			const records = failed.getByRole('region', { name: '章节运行记录' })
 			await expect(records).toContainText('第二章写手请求超时')
