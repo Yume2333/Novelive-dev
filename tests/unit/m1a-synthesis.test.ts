@@ -12,7 +12,7 @@ import {
 	applyPatches,
 	readBible,
 } from '../../packages/creator/src/synthesis/patch'
-import { projectFiles } from '../../packages/format/src/model'
+import { type BiblePatch, projectFiles } from '../../packages/format/src/model'
 import {
 	chapters,
 	confirmed,
@@ -258,7 +258,7 @@ test('character deletion is rejected before writing if a surviving relation refe
 		kind: 'character',
 		op: 'delete',
 		entry: { ...candidate, aliases: [] },
-	} as const
+	} satisfies BiblePatch[number]
 	await expect(
 		applyPatches(project, bible, [patch], [], new Set(chapters)),
 	).rejects.toThrow('Cannot delete character guide: still referenced')
