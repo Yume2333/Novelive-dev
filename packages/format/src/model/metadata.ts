@@ -18,6 +18,7 @@ export const idToken = '[a-z0-9][a-z0-9_-]*'
 export const idPattern = `^${idToken}$`
 export const assetPathId = `${idToken}(?:/${idToken}){1,2}`
 export const cgId = `cg-${idToken}`
+export const assetId = str({ pattern: `^(?:${cgId}|${assetPathId})$` })
 export const entityId = str({ pattern: idPattern })
 export const paragraphIdPattern = '^p(?!0+$)[0-9]{4,}$'
 export const paragraphId = str({ pattern: paragraphIdPattern })
@@ -95,9 +96,7 @@ export const assetRegistrySchema = obj(
 		entries: arr(
 			obj(
 				{
-					id: str({
-						pattern: `^(?:${cgId}|${assetPathId})$`,
-					}),
+					id: assetId,
 					type: oneOf(['character', 'location', 'cg', 'expression', 'variant']),
 					path: str({ minLength: 1 }),
 					status: oneOf(['drawn', 'pending', 'placeholder']),

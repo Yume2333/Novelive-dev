@@ -1,0 +1,36 @@
+M1b/01 — 2026-11-22
+Base: b1581dec47e2b0d5b9ad5de6435f13834ad7c7ba
+
+Check
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-production-contract.test.ts
+Test Files  1 passed (1)
+     Tests  6 passed (6)
+
+$ NL_REPLAY=strict pnpm check
+Test Files  11 passed (11)
+     Tests  201 passed (201)
+
+Real path
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e
+✓ tests/e2e/m1b-production-contract.spec.ts:13:1 › M1b fixed scene renders two host resources in Electron (708ms)
+14 passed (10.9s)
+
+The built desktop shell loaded the fixed-scene fixture as its development
+renderer. The public player entry resolved two synthetic image IDs through
+preload's resourceUrl and Electron's cache protocol, rendered them with PixiJS
+8.23.0, and matched background and sprite pixels at distinct canvas locations.
+The complete Electron suite also exercised cache confinement and Settings
+thumbnails. This is not the W1/W2 production-flow acceptance gate.
+
+Contract decisions
+- Work confirmation phase and chapter publication are separate; an issue
+  marker does not change the status or playability of a published chapter.
+- Image queue items identify registry assets and declare the base asset of a
+  derivative. Unsupported capability is not placeholder success.
+- Creator contracts expose work-scoped IDs and cache-relative paths. A host
+  adapter turns those into URLs; player imports format, never creator.
+- PixiJS uses WebGL; the Electron cache permits CORS only for the configured
+  renderer origin (the file renderer uses the opaque origin). This keeps
+  the existing cache protocol rather than introducing another image bridge.
+
+Paid usage: 0 calls, 0 tokens, 0 images. No ledger entry.

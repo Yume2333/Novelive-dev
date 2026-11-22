@@ -18,8 +18,10 @@ import {
 	maskedConfigSchema,
 	textCatalogSchema,
 } from '../config/schema'
+import { productionCommands } from './production'
 
 export type { ConfigUpdate, MaskedConfig, TextSlot } from '../config/schema'
+export * from './production'
 
 const generation = int({ minimum: 1 })
 const scope = oneOf(['app', 'work'])
@@ -53,6 +55,7 @@ const imageCapability = union([
 ])
 
 export const commands = {
+	...productionCommands,
 	'config.get': {
 		input: empty,
 		output: union([maskedConfigSchema, configErrorSchema]),

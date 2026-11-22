@@ -1,0 +1,12 @@
+{
+	"name": "@novelive/player",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@novelive/format": "workspace:*",
+		"pixi.js": "8.23.0"
+	}
+}

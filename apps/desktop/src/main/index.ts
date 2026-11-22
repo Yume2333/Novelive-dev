@@ -22,8 +22,15 @@ const failureLimit = 3
 const handshakeTimeoutMs = 10_000
 
 protocol.registerSchemesAsPrivileged([
-	{ scheme: 'novelive', privileges: { standard: true, secure: true } },
+	{
+		scheme: 'novelive',
+		privileges: { standard: true, secure: true, corsEnabled: true },
+	},
 ])
+
+const rendererUrl = !app.isPackaged
+	? process.env.ELECTRON_RENDERER_URL
+	: undefined
 
 function logDir() {
 	return join(app.getPath('userData'), 'logs')
@@ -123,17 +130,25 @@ function openLibrary() {
 		library = undefined
 		stopCreator()
 	})
-	if (process.env.ELECTRON_RENDERER_URL && !app.isPackaged) {
-		void window.loadURL(process.env.ELECTRON_RENDERER_URL)
+	if (rendererUrl) {
+		void window.loadURL(rendererUrl)
 	} else {
 		void window.loadFile(join(import.meta.dirname, '../renderer/index.html'))
 	}
 }
 
 app.whenReady().then(() => {
-	protocol.handle('novelive', (request) =>
-		cacheResponse(join(app.getPath('userData'), 'cache'), request.url),
-	)
+	const rendererOrigin = rendererUrl ? new URL(rendererUrl).origin : 'null'
+	protocol.handle('novelive', async (request) => {
+		const response = await cacheResponse(
+			join(app.getPath('userData'), 'cache'),
+			request.url,
+		)
+		if (request.headers.get('origin') === rendererOrigin) {
+			response.headers.set('access-control-allow-origin', rendererOrigin)
+		}
+		return response
+	})
 	ipcMain.handle('novelive:state', () => appState())
 	ipcMain.handle('novelive:pick-folder', async () => {
 		const result = await dialog.showOpenDialog({
