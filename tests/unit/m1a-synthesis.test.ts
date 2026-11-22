@@ -8,6 +8,10 @@ import {
 	synthesisFiles,
 	synthesizeVolume,
 } from '../../packages/creator/src/synthesis'
+import {
+	applyPatches,
+	readBible,
+} from '../../packages/creator/src/synthesis/patch'
 import { projectFiles } from '../../packages/format/src/model'
 import {
 	chapters,
@@ -203,6 +207,54 @@ test('incremental synthesis can resolve foreshadowing planted in an earlier volu
 	expect(await project.read(projectFiles.foreshadowing(scope))).toMatchObject({
 		entries: [{ ...planted, resolvedChapter: 'c2' }],
 	})
+})
+
+test('character deletion is rejected before writing if a surviving relation references it', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const candidate = {
+		id: 'guide',
+		name: 'Guide',
+		aliases: [],
+		status: 'candidate',
+		firstSeenChapter: 'c1',
+	} as const
+	const relation = {
+		id: 'guide-ada',
+		from: 'guide',
+		to: 'ada',
+		description: 'Friends',
+		status: 'candidate',
+		firstSeenChapter: 'c1',
+	} as const
+	await project.write(projectFiles.character(scope, 'guide'), {
+		formatVersion: 1,
+		entries: [{ ...candidate, aliases: [] }],
+	})
+	await project.write(projectFiles.relations(scope), {
+		formatVersion: 1,
+		entries: [relation],
+	})
+	const bible = await readBible(project)
+	const patch = {
+		kind: 'character',
+		op: 'delete',
+		entry: { ...candidate, aliases: [] },
+	} as const
+	await expect(
+		applyPatches(project, bible, [patch], [], new Set(chapters)),
+	).rejects.toThrow('Cannot delete character guide: still referenced')
+	expect(await readBible(project)).toEqual(bible)
+	await applyPatches(
+		project,
+		bible,
+		[patch, { kind: 'relation', op: 'delete', entry: relation }],
+		[],
+		new Set(chapters),
+	)
+	const updated = await readBible(project)
+	expect(updated.character.map(({ id }) => id)).toEqual(['ada'])
+	expect(updated.relation).toEqual([])
 })
 
 test('unresolved references trigger one repair and are never published', async () => {

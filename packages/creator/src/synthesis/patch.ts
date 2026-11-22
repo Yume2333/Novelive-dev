@@ -251,6 +251,10 @@ export async function applyPatches(
 ) {
 	const conflicts: BiblePatch = []
 	const glossaryConflicts: GlossaryPatch = []
+	const pending: (() => Promise<void>)[] = []
+	const removedCharacters = new Set<string>()
+	let survivingCharacters = bible.character
+	let survivingRelations = bible.relation
 	const write = async <T>(
 		file: ProjectDocument<Collection<T>>,
 		entries: T[],
@@ -290,7 +294,14 @@ export async function applyPatches(
 				changed.add(entry.id)
 			}
 		}
-		if (changed.size) await persist([...entries.values()], changed)
+		const survivors = [...entries.values()]
+		if (kind === 'character') {
+			survivingCharacters = survivors as Character[]
+			for (const { id } of original)
+				if (!entries.has(id)) removedCharacters.add(id)
+		}
+		if (kind === 'relation') survivingRelations = survivors as Relation[]
+		if (changed.size) pending.push(() => persist(survivors, changed))
 	}
 	const perId =
 		<T extends Entry>(file: (id: string) => ProjectDocument<Collection<T>>) =>
@@ -324,6 +335,17 @@ export async function applyPatches(
 		write(projectFiles.style(scope), entries),
 	)
 
+	for (const id of [
+		...survivingRelations.flatMap(({ from, to }) => [from, to]),
+		...survivingCharacters.flatMap(
+			({ addresses }) => addresses?.map(({ speakerId }) => speakerId) ?? [],
+		),
+	])
+		if (removedCharacters.has(id))
+			throw new Error(
+				`Cannot delete character ${id}: still referenced in the Bible`,
+			)
+
 	const terms = new Map(bible.glossary.map((term) => [term.id, term]))
 	let changed = false
 	for (const incoming of glossary) {
@@ -335,6 +357,7 @@ export async function applyPatches(
 			changed = true
 		}
 	}
+	for (const persist of pending) await persist()
 	if (changed) await write(projectFiles.glossary(scope), [...terms.values()])
 	return { conflicts, glossaryConflicts }
 }
