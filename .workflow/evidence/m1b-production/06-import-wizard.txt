@@ -37,5 +37,14 @@ Review follow-up: when explicit volume headings follow text that precedes
 them, the implicit leading volume is now titled 前言 instead of a second
 第一卷; a TXT without volume headings still gets one 第一卷.
 
-No paid model calls. The organizer model pass for volume suggestions on a
-real unvolumed book is left for the main session's recording.
+Recording follow-up on main at 3e7806e:
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M1b TXT wizard'
+  2 passed (5.0s)
+
+The Electron import command dispatches to importTxtProject; importTxt writes
+volumeSuggestions from the parsed TXT structure, and the wizard's
+suggestedLayout uses the same structure. With no volume titles, only the
+parser's single default volume appears. No path calls the organizer model
+or consumes an organizer cassette. The paid recording is blocked until that
+production path is wired. No standalone prompt was recorded as a substitute
+and no paid calls were made for M1b/06.

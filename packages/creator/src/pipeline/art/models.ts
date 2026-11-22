@@ -190,7 +190,9 @@ export async function artJson<T>(
 	const text = response.content
 		.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 		.join('')
-	const validated = compile(schema).validate(JSON.parse(text))
+	const json =
+		/^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(text.trim())?.[1] ?? text
+	const validated = compile(schema).validate(JSON.parse(json))
 	if (!validated.ok) throw new Error(JSON.stringify(validated.errors))
 	return validated.value
 }

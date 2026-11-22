@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { bool, obj } from '@earendil-works/pi-schema'
 import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
 import sharp from 'sharp'
@@ -32,6 +33,29 @@ const replay = {
 		throw new Error('Offline test cannot call upstream')
 	},
 } as const
+
+test('decodes a visual-review JSON object fenced by the provider', async () => {
+	const content = '```json\n{"pass":true}\n```'
+	const chunk = {
+		choices: [{ index: 0, delta: { content }, finish_reason: 'stop' }],
+	}
+	const result = await artModels.artJson(
+		main,
+		'Review the image.',
+		obj({ pass: bool() }),
+		{
+			replay: {
+				mode: 'replay',
+				directory,
+				fetch: async () =>
+					new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+						headers: { 'content-type': 'text/event-stream' },
+					}),
+			},
+		},
+	)
+	expect(result).toEqual({ pass: true })
+})
 
 async function projectTest(run: (project: Project) => Promise<void>) {
 	const dir = await mkdtemp(join(tmpdir(), 'novelive-m1b-art-'))

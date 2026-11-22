@@ -21,3 +21,33 @@ synthetic HTTP responses. This verifies the creator service path, not Electron
 integration or the quality and availability of any real model.
 
 Paid usage: 0 calls, 0 tokens, 0 images.
+
+Provider recording follow-up on main at 3e7806e:
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-art.test.ts
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m1b-art/provider.ts
+Key visual candidates: 3
+ada/uniform/neutral: drawn
+ada/uniform/angry: unsupported
+透明底能力不支持（图片没有 alpha 通道）；请换图片模型。
+room/day: drawn
+cg-window: drawn
+Paid usage: 0 calls, 0 tokens (0 estimated), 0 images including reservations.
+
+The strict provider smoke exits 1 because the recorded expression edit
+returned no alpha, not because a cassette entry is missing. Do not count it
+as a successful transparent expression edit. The base sprite has alpha;
+the accepted CG used both the drawn costume and the classroom base.
+Gemini returned a schema-compatible JSON object in a Markdown fence.
+The production decoder now unwraps a single enclosing fence and still
+validates the object against the same schema.
+
+Paid recording total: 25 requests, 75,554 measured tokens, 9 image requests
+(including the rejected crop, RGB edit, and first CG without a costume
+base). Replayed previously captured requests before spending on new ones.
+No provider switch or fabricated alpha was used to get a passing result.
+Every inference request is in the private usage ledger. Provider cassettes
+are outside Git at $HOME/.local/novelive-tools/m1b-art-provider/cassette.
+This is a creator-service check; no human visual or Electron acceptance.
