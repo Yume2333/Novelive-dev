@@ -11,4 +11,4 @@
 
 - [ ] 按原型完成五槽、界面/工程/关于与警告横幅；配置损坏可备份重置。
 - [ ] 接入模型命令、宿主事件、错误映射和测试状态。
-- [ ] 设置页验收从 07、08 已提交的 smoke 目录分别回放文本与图片成功路径，从两任务的合成 cassette 回放失败和取消；无需等 10 的完整录制，也不调用中转。
+- [ ] 设置页的连接测试直接调用 07/08 用于 smoke 录制的适配器入口，不另构造请求。E2E 装载同一份非秘密 smoke 配置，保留相同 method、path 和 canonicalBody；点击真实按钮验证严格命中。成功用例从仓库根解析 `tests/fixtures/text-models/smoke/`、`tests/fixtures/image-models/smoke/`，分进程以 `NL_CASSETTE_DIR` 逐个指定；失败、取消用例同样分别指向对应的 `synthetic/`，不依赖默认目录或 10 的录制。
