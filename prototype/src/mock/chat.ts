@@ -1,3 +1,5 @@
+import type { ChapterStatus } from './types'
+
 // 作品级对话面板 mock。
 // 消息按树存（id / parentId）：同一 parent 下的多条消息互为分支，当前分支是从根到叶的一条路径。
 // 每部作品多个会话；长会话的开头有一条压缩摘要。
@@ -36,9 +38,11 @@ export interface SubtaskPart {
 /** 可折叠的思考 */
 export interface ThinkingPart {
   kind: 'thinking'
-  /** 界面显示「思考了 N 秒」 */
+  /** 界面显示「思考了 N 秒」或实时「正在思考 · N.Ns」 */
   seconds: number
   text: string
+  /** 是否正在思考中 */
+  active?: boolean
 }
 
 export type ConfirmKind =
@@ -513,9 +517,18 @@ export function agentReplySteps(workTitle: string, context?: string | null): {
 
 // ---- 运行记录（一章的制作过程） ----
 
+export type RunStepStatus = 'done' | 'running' | 'waiting'
+
+export interface RunRecordStep {
+  title: string
+  status?: RunStepStatus
+  parts: MessagePart[]
+  groups?: { title: string; parts: MessagePart[] }[]
+}
+
 export interface RunRecordData {
   /** 四段：写 → 审稿 → 演出 → 出图；出图段按画师分组显示 */
-  steps: { title: string; parts: MessagePart[]; groups?: { title: string; parts: MessagePart[] }[] }[]
+  steps: RunRecordStep[]
 }
 
 /**
@@ -523,152 +536,270 @@ export interface RunRecordData {
  * 演出是美术导演读剧本、插演出指令、列出图清单；
  * 出图按画师分三组，其中一张图看图不通过、重画后通过，一张沿用之前章节画好的。
  */
-export function runRecordMock(chapterTitle: string): RunRecordData {
+export function runRecordMock(chapterTitle: string, chapterStatus: ChapterStatus = 'published', chapterStep?: string): RunRecordData {
+  if (chapterStatus === 'waiting') {
+    return { steps: [] }
+  }
+
+  const completedSteps: RunRecordStep[] = [
+    {
+      title: '写',
+      status: 'done',
+      parts: [
+        { kind: 'thinking', seconds: 42, text: '先看这一章在卷骨架里的位置、涉及的人物和伏笔，再按写手预设分场……' },
+        {
+          kind: 'text',
+          text: `${chapterTitle}写完了，共 4 场 92 句。凛在这一章先不信「沉船是人为的」，结尾带着疑点离开。剧本已保存到工程。`,
+        },
+      ],
+    },
+    {
+      title: '审稿',
+      status: 'done',
+      parts: [
+        { kind: 'tool', id: 'rv-t1', title: `查看${chapterTitle}剧本`, status: 'done', args: [{ label: '章节', value: chapterTitle }], result: '通读全章，对照改编要求和人物设定。' },
+        { kind: 'tool', id: 'rv-t2', title: '读取改编要求', status: 'done', result: '「凛先怀疑再求证」「海边不写晴天」都在检查范围。' },
+        { kind: 'text', text: '提出 2 处问题：第 2 场凛的反应还是太快；第 4 场雾的描写用了旁白解释。已退回去修一轮。' },
+        { kind: 'text', text: '返修完成：第 2 场加了停顿和回避的动作，第 4 场旁白改成只写景。' },
+      ],
+    },
+    {
+      title: '演出',
+      status: 'done',
+      parts: [
+        { kind: 'thinking', seconds: 12, text: '先定每场要几张图：场景 1 用码头全景当背景，凛的立绘两张表情……' },
+        { kind: 'tool', id: 'st-t1', title: `查看${chapterTitle}剧本`, status: 'done', args: [{ label: '章节', value: chapterTitle }], result: '共 4 场，插 11 条演出指令。' },
+        { kind: 'tool', id: 'st-t2', title: '读取设定集', status: 'done', args: [{ label: '条目', value: '凛 · 外貌（截至本章）' }], result: '长马尾、邮差大衣、帆布包。新造型还不出现。' },
+        {
+          kind: 'text',
+          text: '演出补完：4 场插了 11 条演出指令。本章要用 12 张图：新画 5 张，沿用 7 张；「微笑」并入已有的「开心」。',
+        },
+        {
+          kind: 'text',
+          text: '要新画：场景 3 CG「凛在旧灯塔前」、凛立绘基准图「邮差大衣」、凛差分「怀疑」「沉默」、场景 4 背景变体「雾变浓」。',
+        },
+      ],
+    },
+    {
+      title: '出图',
+      status: 'done',
+      parts: [],
+      groups: [
+        {
+          title: '立绘',
+          parts: [
+            {
+              kind: 'tool',
+              id: 'pt-l1',
+              title: '生成图片',
+              status: 'done',
+              args: [{ label: '内容', value: '凛 · 立绘基准图 · 邮差大衣' }, { label: '格式', value: '竖版，透明底' }],
+              result: '已保存到工程。',
+              imageThumb: true,
+              checks: [
+                { label: '技术检查', pass: true, note: '透明通道正常' },
+                { label: '看图结论', pass: true, note: '造型和角色设定图一致' },
+              ],
+            },
+          ],
+        },
+        {
+          title: '场景',
+          parts: [
+            {
+              kind: 'tool',
+              id: 'pt-s1',
+              title: '生成图片',
+              status: 'done',
+              args: [{ label: '内容', value: '场景 1 背景 · 清晨的码头' }, { label: '比例', value: '16:9，主体在中间安全区' }],
+              result: '沿用第 3 章已画的码头全景，没有重画。',
+              imageThumb: true,
+            },
+            {
+              kind: 'tool',
+              id: 'pt-s2',
+              title: '生成图片',
+              status: 'failed',
+              args: [{ label: '内容', value: '场景 3 CG · 凛在旧灯塔前' }, { label: '比例', value: '16:9，主体在中间安全区' }],
+              result: '没通过检查，已丢弃。',
+              imageThumb: true,
+              checks: [
+                { label: '技术检查', pass: true, note: '尺寸、通道正常' },
+                { label: '看图结论', pass: false, note: '灯塔画成了新造型里的第三座，时间对不上' },
+              ],
+            },
+            {
+              kind: 'tool',
+              id: 'pt-s3',
+              title: '生成图片',
+              status: 'done',
+              args: [{ label: '内容', value: '场景 3 CG · 凛在旧灯塔前（重画）' }, { label: '比例', value: '16:9，主体在中间安全区' }],
+              result: '已保存到工程。',
+              imageThumb: true,
+              checks: [
+                { label: '技术检查', pass: true, note: '尺寸、通道正常' },
+                { label: '看图结论', pass: true, note: '灯塔外观和本章时间线一致' },
+              ],
+            },
+          ],
+        },
+        {
+          title: '差分',
+          parts: [
+            {
+              kind: 'tool',
+              id: 'pt-v1',
+              title: '生成图片',
+              status: 'done',
+              args: [{ label: '内容', value: '凛 · 差分 · 怀疑' }, { label: '基准', value: '凛 · 邮差大衣，只改表情' }],
+              result: '已保存到工程。',
+              imageThumb: true,
+              checks: [
+                { label: '技术检查', pass: true, note: '透明通道正常' },
+                { label: '看图结论', pass: true, note: '只改了表情，其余和基准图一致' },
+              ],
+            },
+            {
+              kind: 'tool',
+              id: 'pt-v2',
+              title: '生成图片',
+              status: 'done',
+              args: [{ label: '内容', value: '场景 4 背景变体 · 雾变浓' }, { label: '基准', value: '清晨的码头，只改雾的浓度' }],
+              result: '已保存到工程。',
+              imageThumb: true,
+              checks: [
+                { label: '技术检查', pass: true, note: '尺寸、通道正常' },
+                { label: '看图结论', pass: true, note: '只改了雾的浓度，构图不变' },
+              ],
+            },
+            {
+              kind: 'tool',
+              id: 'pt-v3',
+              title: '生成图片',
+              status: 'done',
+              args: [{ label: '内容', value: '凛 · 差分 · 沉默' }, { label: '基准', value: '凛 · 邮差大衣，只改表情' }],
+              result: '已保存到工程。',
+              imageThumb: true,
+              checks: [
+                { label: '技术检查', pass: true, note: '透明通道正常' },
+                { label: '看图结论', pass: true, note: '只改了表情，其余和基准图一致' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ]
+
+  if (chapterStatus !== 'producing') {
+    return { steps: completedSteps }
+  }
+
+  const activeIdx = chapterStep?.includes('出图')
+    ? 3
+    : chapterStep?.includes('演出')
+      ? 2
+      : chapterStep?.includes('审稿')
+        ? 1
+        : 0
+
+  const runningSteps: Record<number, RunRecordStep> = {
+    0: {
+      title: '写',
+      status: 'running',
+      parts: [
+        { kind: 'thinking', active: true, seconds: 14.2, text: '先梳理这一章在卷骨架里的伏笔与人物关系，正在组织第 3 场的对话节奏……' },
+        {
+          kind: 'tool',
+          id: 'wr-t1',
+          title: `撰写${chapterTitle}分场剧本`,
+          status: 'running',
+          args: [{ label: '章节', value: chapterTitle }, { label: '写手预设', value: '克制留白 · 推进中' }],
+        },
+      ],
+    },
+    1: {
+      title: '审稿',
+      status: 'running',
+      parts: [
+        { kind: 'tool', id: 'rv-t1', title: `查看${chapterTitle}剧本`, status: 'done', args: [{ label: '章节', value: chapterTitle }], result: '已通读全章 4 场剧本。' },
+        {
+          kind: 'tool',
+          id: 'rv-t2',
+          title: '对照原文与改编要求检查',
+          status: 'running',
+          args: [{ label: '检查项', value: '忠实度检查 · 人物语气' }],
+        },
+      ],
+    },
+    2: {
+      title: '演出',
+      status: 'running',
+      parts: [
+        { kind: 'thinking', seconds: 8, text: '先定每场要几张图：场景 1 用码头全景当背景，凛的立绘两张表情……' },
+        { kind: 'tool', id: 'st-t1', title: `查看${chapterTitle}剧本`, status: 'done', args: [{ label: '章节', value: chapterTitle }], result: '已拆出 4 个场景镜头。' },
+        {
+          kind: 'tool',
+          id: 'st-t2',
+          title: `编排${chapterTitle}演出指令与图清单`,
+          status: 'running',
+          args: [{ label: '条目', value: '立绘差分 · 背景变体' }],
+        },
+      ],
+    },
+    3: {
+      title: '出图',
+      status: 'running',
+      parts: [],
+      groups: [
+        {
+          title: '立绘',
+          parts: [
+            {
+              kind: 'tool',
+              id: 'pt-l1',
+              title: '生成图片',
+              status: 'done',
+              args: [{ label: '内容', value: '凛 · 立绘基准图 · 邮差大衣' }, { label: '格式', value: '竖版，透明底' }],
+              result: '已保存到工程。',
+              imageThumb: true,
+              checks: [
+                { label: '技术检查', pass: true, note: '透明通道正常' },
+                { label: '看图结论', pass: true, note: '造型和角色设定图一致' },
+              ],
+            },
+          ],
+        },
+        {
+          title: '场景',
+          parts: [
+            {
+              kind: 'tool',
+              id: 'pt-s1',
+              title: '生成图片',
+              status: 'done',
+              args: [{ label: '内容', value: '场景 1 背景 · 清晨的码头' }, { label: '比例', value: '16:9，主体在中间安全区' }],
+              result: '沿用第 3 章已画的码头全景，没有重画。',
+              imageThumb: true,
+            },
+            {
+              kind: 'tool',
+              id: 'pt-s2',
+              title: '生成图片',
+              status: 'running',
+              args: [{ label: '内容', value: '场景 3 CG · 凛在旧灯塔前' }, { label: '比例', value: '16:9，主体在中间安全区' }],
+            },
+          ],
+        },
+      ],
+    },
+  }
+
   return {
-    steps: [
-      {
-        title: '写',
-        parts: [
-          { kind: 'thinking', seconds: 42, text: '先看这一章在卷骨架里的位置、涉及的人物和伏笔，再按写手预设分场……' },
-          {
-            kind: 'text',
-            text: `${chapterTitle}写完了，共 4 场 92 句。凛在这一章先不信「沉船是人为的」，结尾带着疑点离开。剧本已保存到工程。`,
-          },
-        ],
-      },
-      {
-        title: '审稿',
-        parts: [
-          { kind: 'tool', id: 'rv-t1', title: `查看${chapterTitle}剧本`, status: 'done', args: [{ label: '章节', value: chapterTitle }], result: '通读全章，对照改编要求和人物设定。' },
-          { kind: 'tool', id: 'rv-t2', title: '读取改编要求', status: 'done', result: '「凛先怀疑再求证」「海边不写晴天」都在检查范围。' },
-          { kind: 'text', text: '提出 2 处问题：第 2 场凛的反应还是太快；第 4 场雾的描写用了旁白解释。已退回去修一轮。' },
-          { kind: 'text', text: '返修完成：第 2 场加了停顿和回避的动作，第 4 场旁白改成只写景。' },
-        ],
-      },
-      {
-        title: '演出',
-        parts: [
-          { kind: 'thinking', seconds: 12, text: '先定每场要几张图：场景 1 用码头全景当背景，凛的立绘两张表情……' },
-          { kind: 'tool', id: 'st-t1', title: `查看${chapterTitle}剧本`, status: 'done', args: [{ label: '章节', value: chapterTitle }], result: '共 4 场，插 11 条演出指令。' },
-          { kind: 'tool', id: 'st-t2', title: '读取设定集', status: 'done', args: [{ label: '条目', value: '凛 · 外貌（截至本章）' }], result: '长马尾、邮差大衣、帆布包。新造型还不出现。' },
-          {
-            kind: 'text',
-            text: '演出补完：4 场插了 11 条演出指令。本章要用 12 张图：新画 5 张，沿用 7 张；「微笑」并入已有的「开心」。',
-          },
-          {
-            kind: 'text',
-            text: '要新画：场景 3 CG「凛在旧灯塔前」、凛立绘基准图「邮差大衣」、凛差分「怀疑」「沉默」、场景 4 背景变体「雾变浓」。',
-          },
-        ],
-      },
-      {
-        title: '出图',
-        parts: [],
-        groups: [
-          {
-            title: '立绘',
-            parts: [
-              {
-                kind: 'tool',
-                id: 'pt-l1',
-                title: '生成图片',
-                status: 'done',
-                args: [{ label: '内容', value: '凛 · 立绘基准图 · 邮差大衣' }, { label: '格式', value: '竖版，透明底' }],
-                result: '已保存到工程。',
-                imageThumb: true,
-                checks: [
-                  { label: '技术检查', pass: true, note: '透明通道正常' },
-                  { label: '看图结论', pass: true, note: '造型和角色设定图一致' },
-                ],
-              },
-            ],
-          },
-          {
-            title: '场景',
-            parts: [
-              {
-                kind: 'tool',
-                id: 'pt-s1',
-                title: '生成图片',
-                status: 'done',
-                args: [{ label: '内容', value: '场景 1 背景 · 清晨的码头' }, { label: '比例', value: '16:9，主体在中间安全区' }],
-                result: '沿用第 3 章已画的码头全景，没有重画。',
-                imageThumb: true,
-              },
-              {
-                kind: 'tool',
-                id: 'pt-s2',
-                title: '生成图片',
-                status: 'failed',
-                args: [{ label: '内容', value: '场景 3 CG · 凛在旧灯塔前' }, { label: '比例', value: '16:9，主体在中间安全区' }],
-                result: '没通过检查，已丢弃。',
-                imageThumb: true,
-                checks: [
-                  { label: '技术检查', pass: true, note: '尺寸、通道正常' },
-                  { label: '看图结论', pass: false, note: '灯塔画成了新造型里的第三座，时间对不上' },
-                ],
-              },
-              {
-                kind: 'tool',
-                id: 'pt-s3',
-                title: '生成图片',
-                status: 'done',
-                args: [{ label: '内容', value: '场景 3 CG · 凛在旧灯塔前（重画）' }, { label: '比例', value: '16:9，主体在中间安全区' }],
-                result: '已保存到工程。',
-                imageThumb: true,
-                checks: [
-                  { label: '技术检查', pass: true, note: '尺寸、通道正常' },
-                  { label: '看图结论', pass: true, note: '灯塔外观和本章时间线一致' },
-                ],
-              },
-            ],
-          },
-          {
-            title: '差分',
-            parts: [
-              {
-                kind: 'tool',
-                id: 'pt-v1',
-                title: '生成图片',
-                status: 'done',
-                args: [{ label: '内容', value: '凛 · 差分 · 怀疑' }, { label: '基准', value: '凛 · 邮差大衣，只改表情' }],
-                result: '已保存到工程。',
-                imageThumb: true,
-                checks: [
-                  { label: '技术检查', pass: true, note: '透明通道正常' },
-                  { label: '看图结论', pass: true, note: '只改了表情，其余和基准图一致' },
-                ],
-              },
-              {
-                kind: 'tool',
-                id: 'pt-v2',
-                title: '生成图片',
-                status: 'done',
-                args: [{ label: '内容', value: '场景 4 背景变体 · 雾变浓' }, { label: '基准', value: '清晨的码头，只改雾的浓度' }],
-                result: '已保存到工程。',
-                imageThumb: true,
-                checks: [
-                  { label: '技术检查', pass: true, note: '尺寸、通道正常' },
-                  { label: '看图结论', pass: true, note: '只改了雾的浓度，构图不变' },
-                ],
-              },
-              {
-                kind: 'tool',
-                id: 'pt-v3',
-                title: '生成图片',
-                status: 'done',
-                args: [{ label: '内容', value: '凛 · 差分 · 沉默' }, { label: '基准', value: '凛 · 邮差大衣，只改表情' }],
-                result: '已保存到工程。',
-                imageThumb: true,
-                checks: [
-                  { label: '技术检查', pass: true, note: '透明通道正常' },
-                  { label: '看图结论', pass: true, note: '只改了表情，其余和基准图一致' },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    ],
+    steps: completedSteps.map((step, idx) => {
+      if (idx < activeIdx) return step
+      if (idx === activeIdx) return runningSteps[idx]
+      return { title: step.title, status: 'waiting', parts: [] }
+    }),
   }
 }

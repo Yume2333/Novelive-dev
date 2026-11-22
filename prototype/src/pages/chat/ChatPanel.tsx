@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Icon } from '../../components/Button'
 import { Chip, ConfirmDialog, Tooltip } from '../../components/Extended'
+import { inputStyle, textareaStyle } from '../../components/Form'
+import { Collapse } from '../../components/Motion'
 import { useToast } from '../../components/Toast'
 import {
   agentReplySteps,
@@ -11,6 +13,7 @@ import {
   type ChatSession,
   type ConfirmItem,
   type TextPart,
+  type ThinkingPart,
   type ToolPart,
 } from '../../mock/chat'
 import type { Work } from '../../mock/types'
@@ -133,10 +136,17 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
   // 工作流类确认卡确认前的二次弹窗
   const [confirmItem, setConfirmItem] = useState<ConfirmItem | null>(null)
 
+  const lastNode = path[path.length - 1]
+  const partsCount = lastNode?.parts.length ?? 0
+  const lastPart = partsCount ? lastNode.parts[partsCount - 1] : undefined
+  const streamLen = lastPart?.kind === 'text' ? lastPart.text.length : 0
+
   const scrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [path.length, running, session.id])
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: streamLen > 0 && running ? 'auto' : 'smooth' })
+  }, [path.length, partsCount, streamLen, running, session.id])
 
   const clearTimers = () => {
     for (const t of timers.current) window.clearTimeout(t)
@@ -201,26 +211,51 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
     rerender()
   }
 
-  /** 演示回复：思考 → 工具卡（运行中→完成）→ 正文逐字出现 → 确认卡 */
+  /** 演示回复：思考计时 → 工具卡（流光运行→完成）→ InkDots 停顿 → 正文逐字出现 → 确认卡 */
   const runReply = (userNode: ChatNode) => {
     const steps = agentReplySteps(work.title, attached)
-    const reply = appendNode(userNode.id, 'agent', [steps.thinking, steps.tool, { kind: 'text', text: '' }])
+    const reply = appendNode(userNode.id, 'agent', [{ ...steps.thinking, active: true, seconds: 0.1 }])
     setRunning(reply.id)
-    later(700, () => {
+
+    for (let k = 1; k <= 8; k++) {
+      later(k * 100, () => {
+        patchNode(reply.id, (n) => {
+          const th = n.parts.find((p): p is ThinkingPart => p.kind === 'thinking')
+          if (th && th.active) th.seconds = Number((0.1 + k * 0.1).toFixed(1))
+        })
+      })
+    }
+
+    later(950, () => {
+      patchNode(reply.id, (n) => {
+        const th = n.parts.find((p): p is ThinkingPart => p.kind === 'thinking')
+        if (th) {
+          th.active = false
+          th.seconds = 1
+        }
+        n.parts.push(steps.tool)
+      })
+    })
+
+    later(1950, () => {
       patchNode(reply.id, (n) => {
         const t = n.parts.find((p): p is ToolPart => p.kind === 'tool')
         if (t) t.status = 'done'
+        n.parts.push({ kind: 'text', text: '' })
       })
+    })
+
+    later(2300, () => {
       let i = 0
       const tick = () => {
         i += 2
         const text = steps.fullText.slice(0, i)
         patchNode(reply.id, (n) => {
           const last = n.parts[n.parts.length - 1]
-          if (last.kind === 'text') last.text = text
+          if (last?.kind === 'text') last.text = text
         })
         if (i < steps.fullText.length) {
-          timers.current.push(window.setTimeout(tick, 36))
+          later(36, tick)
         } else {
           later(250, () => {
             patchNode(reply.id, (n) => n.parts.push(steps.confirm))
@@ -275,9 +310,21 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
     clearTimers()
     if (running) {
       patchNode(running, (n) => {
-        for (const p of n.parts) if (p.kind === 'tool' && p.status === 'running') {
-          p.status = 'failed'
-          p.result = '已停止。'
+        for (const p of n.parts) {
+          if (p.kind === 'thinking' && p.active) {
+            p.active = false
+          }
+          if (p.kind === 'tool' && p.status === 'running') {
+            p.status = 'failed'
+            p.result = '已停止。'
+          }
+          if (p.kind === 'subtask' && p.status === 'running') {
+            p.status = 'failed'
+          }
+        }
+        const last = n.parts[n.parts.length - 1]
+        if (last?.kind === 'text' && last.text === '') {
+          n.parts.pop()
         }
       })
     }
@@ -307,6 +354,30 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
     onReject: (item, reason) => {
       ui.reasons[item.id] = reason
       applyStatus(item, 'rejected')
+      if (!running && !timers.current.length) {
+        const ackText = `明白了，先不改这一项。${reason ? `我记住你的要求：「${reason}」，需要调整方案随时告诉我。` : '需要换个方向随时告诉我。'}`
+        const parentId = path.length ? path[path.length - 1].id : null
+        later(350, () => {
+          const ack = appendNode(parentId, 'agent', [{ kind: 'text', text: '' }])
+          setRunning(ack.id)
+          rerender()
+          let i = 0
+          const tick = () => {
+            i += 3
+            const text = ackText.slice(0, i)
+            patchNode(ack.id, (n) => {
+              const last = n.parts[n.parts.length - 1]
+              if (last?.kind === 'text') last.text = text
+            })
+            if (i < ackText.length) {
+              later(30, tick)
+            } else {
+              setRunning(null)
+            }
+          }
+          later(180, tick)
+        })
+      }
     },
     onReset: (item) => {
       ui.cards[item.id] = 'pending'
@@ -345,19 +416,23 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
               <textarea
                 autoFocus
                 rows={2}
+                className="nl-input"
                 value={editing.text}
                 onChange={(e) => setEditing({ node: n, text: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault()
+                    resendEdit()
+                  }
+                  if (e.key === 'Escape') setEditing(null)
+                }}
                 style={{
+                  ...textareaStyle,
                   width: '88%',
-                  border: '1px solid var(--white-80)',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--white-60)',
                   padding: '9px 12px',
-                  fontSize: 13,
                   lineHeight: 1.55,
                   resize: 'none',
                   outline: 'none',
-                  color: 'var(--color-on-surface)',
                 }}
               />
               <div style={{ display: 'flex', gap: 8 }}>
@@ -449,6 +524,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
         </Tooltip>
         <textarea
           rows={2}
+          className="nl-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -466,16 +542,13 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
           }}
           placeholder="和 Agent 聊聊设定、改编要求，或让它重做某章…"
           style={{
+            ...textareaStyle,
+            width: undefined,
             flex: 1,
-            border: '1px solid var(--white-80)',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--white-60)',
             padding: '9px 12px',
-            fontSize: 13,
             lineHeight: 1.55,
             resize: 'none',
             outline: 'none',
-            color: 'var(--color-on-surface)',
           }}
         />
         {running ? (
@@ -505,6 +578,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
           {renaming && renaming.id === session.id ? (
             <input
               autoFocus
+              className="nl-input"
               value={renaming.text}
               onChange={(e) => setRenaming({ id: renaming.id, text: e.target.value })}
               onKeyDown={(e) => {
@@ -513,18 +587,17 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
               }}
               onBlur={renameSession}
               style={{
+                ...inputStyle,
+                width: 'auto',
                 flex: 1,
                 minWidth: 0,
                 fontWeight: 700,
                 fontSize: 14,
                 fontFamily: 'var(--font-display)',
                 letterSpacing: '0.04em',
-                border: '1px solid var(--white-80)',
-                borderRadius: 'var(--radius-md)',
-                background: 'var(--white-60)',
                 padding: '4px 8px',
                 outline: 'none',
-                color: 'var(--color-on-surface)',
+                boxShadow: 'none',
               }}
             />
           ) : (
@@ -545,7 +618,9 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
               }}
             >
               <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.title}</span>
-              <Icon name={listOpen ? 'expand_less' : 'expand_more'} size={16} style={{ color: 'var(--color-outline)', flexShrink: 0 }} />
+              <span className="nl-chevron" data-open={listOpen ? 'true' : 'false'} style={{ display: 'inline-flex', color: 'var(--color-outline)', flexShrink: 0 }}>
+                <Icon name="expand_more" size={16} />
+              </span>
             </button>
           )}
           <button onClick={() => { setRenaming({ id: session.id, text: session.title }) }} title="改名" style={{ display: 'flex', padding: 6, borderRadius: 'var(--radius-full)', color: 'var(--color-on-surface-variant)' }}>
@@ -560,7 +635,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
         </div>
 
         {/* 会话列表：可展开，能改名、删除、新建 */}
-        {listOpen ? (
+        <Collapse open={listOpen}>
           <div style={{ padding: '0 var(--space-3) var(--space-3)', display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 240, overflow: 'auto' }}>
             {wc.sessions.map((s) => (
               <div
@@ -573,6 +648,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
                 {renaming && renaming.id === s.id ? (
                   <input
                     autoFocus
+                    className="nl-input"
                     value={renaming.text}
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => setRenaming({ id: s.id, text: e.target.value })}
@@ -583,15 +659,14 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
                     }}
                     onBlur={renameSession}
                     style={{
+                      ...inputStyle,
+                      width: 'auto',
                       flex: 1,
                       minWidth: 0,
                       fontSize: 13,
-                      border: '1px solid var(--white-80)',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'var(--white-60)',
                       padding: '2px 6px',
                       outline: 'none',
-                      color: 'var(--color-on-surface)',
+                      boxShadow: 'none',
                     }}
                   />
                 ) : (
@@ -626,7 +701,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
               新会话
             </button>
           </div>
-        ) : null}
+        </Collapse>
       </div>
 
       {messageFlow}
@@ -669,15 +744,17 @@ function SummaryDivider({ text }: { text: string }) {
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
           <Icon name="unarchive" size={12} />
           更早的内容已压缩成摘要
-          <Icon name={open ? 'expand_less' : 'expand_more'} size={13} />
+          <span className="nl-chevron" data-open={open ? 'true' : 'false'} style={{ display: 'inline-flex' }}>
+            <Icon name="expand_more" size={13} />
+          </span>
         </span>
         <span style={{ flex: 1, height: 1, background: 'var(--divider)' }} />
       </button>
-      {open ? (
+      <Collapse open={open}>
         <div style={{ fontSize: 12, lineHeight: 1.65, color: 'var(--color-on-surface-variant)', background: 'var(--white-45)', border: '1px solid var(--white-80)', borderRadius: 'var(--radius-md)', padding: '8px 12px' }}>
           {text}
         </div>
-      ) : null}
+      </Collapse>
     </div>
   )
 }

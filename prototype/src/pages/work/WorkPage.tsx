@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Icon } from '../../components/Button'
 import { Card, ChapterStatusMark, ProgressBar } from '../../components/Card'
@@ -7,23 +7,25 @@ import { EmptyState, Select, TextInput, Toggle, inputStyle, textareaStyle } from
 import { defaultWriterPresets } from '../../mock/settings'
 import { GradientCover } from '../../components/GradientCover'
 import { Dropdown, Modal } from '../../components/Modal'
+import { FlowRail, StatusBeacon } from '../../components/Motion'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import { findSeries, findVolume, findWork, works } from '../../mock/library'
 import { useProduction } from '../../mock/production'
 import type { Chapter, Work } from '../../mock/types'
-
 /** 作品当前阶段的卡片：预览 / 两个确认点 / 制作中 / 已完成 */
 function PhaseCard({ work }: { work: Work }) {
   const navigate = useNavigate()
-  const { queue } = useProduction()
+  const { running, queue } = useProduction()
   const pos = queue.findIndex((w) => w.id === work.id)
+  const isActive = pos === 0 && running
 
   if (work.phase === 'preview' && work.previewProgress) {
     const p = work.previewProgress
     return (
-      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
-        <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-3)' }}>
+      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)', position: 'relative', overflow: 'hidden' }}>
+        <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <StatusBeacon tone={isActive ? 'active' : 'muted'} active={isActive} size={9} />
           当前阶段 · {p.stage}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
@@ -31,10 +33,11 @@ function PhaseCard({ work }: { work: Work }) {
             <h3 className="headline" style={{ fontSize: 20, marginBottom: 'var(--space-3)' }}>
               已读 {p.done} / {p.total} 章
             </h3>
-            <ProgressBar value={p.done / p.total} />
+            <ProgressBar value={p.done / p.total} active={isActive} />
           </div>
-          {pos > 0 ? <Chip>排在第 {pos + 1} 位</Chip> : pos === 0 ? <Chip active>正在处理</Chip> : null}
+          {pos > 0 ? <Chip>排在第 {pos + 1} 位</Chip> : isActive ? <Chip active>正在处理</Chip> : <Chip>已停止</Chip>}
         </div>
+        <FlowRail active={isActive} height={2} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, borderRadius: 0 }} />
       </Card>
     )
   }
@@ -46,7 +49,7 @@ function PhaseCard({ work }: { work: Work }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
           <Icon name="pending_actions" size={26} style={{ color: 'var(--color-on-error-container)', flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 220 }}>
-            <div className="label-caps label-caps-zh" style={{ color: 'var(--color-on-error-container)', marginBottom: 6 }}>
+            <div className="label-caps label-caps-zh" style={{ color: 'var(--color-on-error-container)', marginBottom: 'var(--space-2)' }}>
               待确认 · {isVisual ? '确认点 1 / 2' : '确认点 2 / 2'}
             </div>
             <h3 className="headline" style={{ fontSize: 20 }}>
@@ -64,30 +67,31 @@ function PhaseCard({ work }: { work: Work }) {
   if (work.phase === 'producing') {
     const current = work.chapters.find((c) => c.status === 'producing')
     const attention = work.chapters.filter((c) => c.issue).length
+    const doneCount = work.chapters.filter((c) => c.status === 'published').length
     return (
-      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
+      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <Icon
-            name="conveyor_belt"
-            size={26}
-            style={{ color: 'var(--color-primary)', flexShrink: 0, animation: pos === 0 ? 'soft-pulse 4s infinite alternate' : undefined }}
-          />
+          <StatusBeacon tone={isActive ? 'active' : 'muted'} active={isActive} size={9} />
           <div style={{ flex: 1, minWidth: 220 }}>
-            <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 6 }}>
-              制作中{pos === 0 ? ' · 正在制作' : pos > 0 ? ` · 排在第 ${pos + 1} 位` : ' · 未在队列'}
+            <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-2)' }}>
+              制作中{isActive ? ' · 正在制作' : pos === 0 ? ' · 已停止' : pos > 0 ? ` · 排在第 ${pos + 1} 位` : ' · 未在队列'}
             </div>
             <h3 className="headline" style={{ fontSize: 20 }}>
               {current ? `第 ${current.index} 章 · ${current.title}` : '等待下一个章节'}
               {current?.step ? <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--color-on-surface-variant)' }}>（{current.step}）</span> : null}
             </h3>
+            <div style={{ marginTop: 'var(--space-3)', maxWidth: 280 }}>
+              <ProgressBar value={doneCount / Math.max(1, work.chapters.length)} height={4} active={isActive} />
+            </div>
             {attention ? (
-              <p style={{ marginTop: 6, fontSize: 12, color: 'var(--color-on-error-container)' }}>{attention} 章需要处理</p>
+              <p style={{ marginTop: 'var(--space-2)', fontSize: 12, color: 'var(--color-on-error-container)' }}>{attention} 章需要处理</p>
             ) : null}
           </div>
           <Button icon="conveyor_belt" onClick={() => navigate(`/work/${work.id}/production`)}>
             打开制作面板
           </Button>
         </div>
+        <FlowRail active={isActive} height={2} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, borderRadius: 0 }} />
       </Card>
     )
   }
@@ -116,9 +120,6 @@ function HeroCard({ work }: { work: Work }) {
 
   const isProject = work.kind === 'project'
   const long = work.synopsis.length > 40
-  const clip: CSSProperties = expanded
-    ? {}
-    : ({ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden' } as CSSProperties)
 
   return (
     <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
@@ -136,7 +137,17 @@ function HeroCard({ work }: { work: Work }) {
             {work.sourceLanguage !== work.workLanguage ? ` · ${work.sourceLanguage} → ${work.workLanguage}` : ''}
             {isProject ? '' : ` · 作品包 v${work.version}`}
           </p>
-          <p style={{ marginTop: 'var(--space-4)', fontSize: 14, lineHeight: 1.8, color: 'var(--color-on-surface-variant)', ...clip }}>
+          <p
+            style={{
+              marginTop: 'var(--space-4)',
+              fontSize: 14,
+              lineHeight: 1.8,
+              color: 'var(--color-on-surface-variant)',
+              maxHeight: !long || expanded ? '24em' : '3.6em',
+              overflow: 'hidden',
+              transition: 'max-height var(--dur-slow) var(--ease-out)',
+            }}
+          >
             {work.synopsis}
           </p>
           {long ? (
@@ -145,7 +156,9 @@ function HeroCard({ work }: { work: Work }) {
               style={{ alignSelf: 'flex-start', marginTop: 'var(--space-1)', fontSize: 12, color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 3 }}
             >
               {expanded ? '收起' : '展开简介'}
-              <Icon name={expanded ? 'expand_less' : 'expand_more'} size={15} />
+              <span className="nl-chevron" data-open={expanded ? 'true' : 'false'} style={{ display: 'inline-flex' }}>
+                <Icon name="expand_more" size={15} />
+              </span>
             </button>
           ) : null}
           {work.reading ? (
@@ -172,7 +185,17 @@ function ChapterRow({ work, chapter, isProject, last }: { work: Work; chapter: C
   return (
     <div
       className="hover-row"
+      tabIndex={0}
+      role="button"
+      aria-disabled={!playable || undefined}
       onClick={() => playable && navigate(`/work/${work.id}/play`)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return
+        if (playable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault()
+          navigate(`/work/${work.id}/play`)
+        }
+      }}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -252,15 +275,29 @@ function ChapterList({ work, isProject }: { work: Work; isProject: boolean }) {
 /** 作品设置抽屉：改编方式、出图、播放器样式、本作品规则；平时不占页面 */
 function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; onClose: () => void }) {
   const toast = useToast()
+  const [requirement, setRequirement] = useState(work.requirement)
   const [writerPreset, setWriterPreset] = useState(work.writerPreset ?? 'default')
   const [fidelity, setFidelity] = useState(work.fidelityCheck ?? true)
   const [styleReview, setStyleReview] = useState(work.styleReview ?? false)
   const [pauseOnRef, setPauseOnRef] = useState(work.pauseOnRefImages ?? true)
   const [resolution, setResolution] = useState(work.outputResolution ?? '2K')
   const [accent, setAccent] = useState(work.accent)
+  const [hexInput, setHexInput] = useState(work.accent)
   const [marks, setMarks] = useState(work.customMarks ?? [])
   const [rules, setRules] = useState(work.rules ?? [])
   const [newRule, setNewRule] = useState('')
+  const [savedVisible, setSavedVisible] = useState(false)
+  const saveTimerRef = useRef<number | null>(null)
+
+  const markSaved = () => {
+    setSavedVisible(true)
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = window.setTimeout(() => setSavedVisible(false), 1800)
+  }
+
+  useEffect(() => () => {
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
+  }, [])
 
   const presetOptions = [
     ...defaultWriterPresets.map((p) => ({ value: p.id, label: p.name })),
@@ -278,16 +315,62 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
   }
   const smallBtn: CSSProperties = { display: 'flex', padding: 5, borderRadius: 'var(--radius-md)', color: 'var(--color-on-surface-variant)' }
 
-  const addMark = () => setMarks((m) => [...m, { id: `m${Date.now()}`, name: '新标记', perChar: false, css: '' }])
+  const addMark = () => {
+    setMarks((m) => [...m, { id: `m${Date.now()}`, name: '新标记', perChar: false, css: '' }])
+    markSaved()
+  }
   const addRule = () => {
     const text = newRule.trim()
     if (!text) return
     setRules((r) => [...r, { id: `r${Date.now()}`, text }])
     setNewRule('')
+    markSaved()
+  }
+
+  const handleHexChange = (raw: string) => {
+    setHexInput(raw)
+    const normalized = raw.startsWith('#') ? raw : `#${raw}`
+    if (/^#[0-9a-fA-F]{6}$/.test(normalized)) {
+      setAccent(normalized.toLowerCase())
+      markSaved()
+    }
   }
 
   return (
     <Drawer open={open} title="作品设置" onClose={onClose} width={520}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          minHeight: 24,
+          marginBottom: 'var(--space-2)',
+        }}
+      >
+        <span className="label-caps label-caps-zh" style={{ fontSize: 11, color: 'var(--color-outline)' }}>
+          改动实时保存
+        </span>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 'var(--space-1)',
+            fontSize: 11,
+            color: 'var(--color-success)',
+            background: 'var(--color-success-container)',
+            padding: '2px var(--space-2)',
+            borderRadius: 'var(--radius-full)',
+            opacity: savedVisible ? 1 : 0,
+            transform: savedVisible ? 'translateY(0)' : 'translateY(-2px)',
+            transition: 'opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out)',
+            pointerEvents: 'none',
+          }}
+        >
+          <Icon name="check" size={12} />
+          已自动保存
+        </span>
+      </div>
+
       <div className="glass-panel" style={{ ...panel, marginTop: 0 }}>
         <div className="label-caps label-caps-zh" style={groupLabel}>改编</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -301,14 +384,29 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
               </Button>
             </div>
           </div>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <span className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', fontSize: 11 }}>改编要求</span>
-            <textarea style={{ ...textareaStyle, minHeight: 56 }} defaultValue={work.requirement} placeholder="例如：保留主角的口头禅；海边场景多用远景。" />
+            <textarea
+              style={{ ...textareaStyle, minHeight: 56 }}
+              value={requirement}
+              onChange={(e) => {
+                setRequirement(e.target.value)
+                markSaved()
+              }}
+              placeholder="例如：保留主角的口头禅；海边场景多用远景。"
+            />
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <span className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', fontSize: 11 }}>写手预设</span>
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-              <Select value={writerPreset} onChange={setWriterPreset} options={presetOptions} />
+              <Select
+                value={writerPreset}
+                onChange={(v) => {
+                  setWriterPreset(v)
+                  markSaved()
+                }}
+                options={presetOptions}
+              />
               {writerPreset === 'custom' ? (
                 <Button size="sm" icon="edit" onClick={() => toast('这里会打开预设编辑（演示）', 'edit')}>
                   编辑
@@ -318,11 +416,23 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
           </label>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>忠实度检查</span>
-            <Toggle on={fidelity} onChange={() => setFidelity((v) => !v)} />
+            <Toggle
+              on={fidelity}
+              onChange={() => {
+                setFidelity((v) => !v)
+                markSaved()
+              }}
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>文风审稿</span>
-            <Toggle on={styleReview} onChange={() => setStyleReview((v) => !v)} />
+            <Toggle
+              on={styleReview}
+              onChange={() => {
+                setStyleReview((v) => !v)
+                markSaved()
+              }}
+            />
           </div>
         </div>
       </div>
@@ -332,13 +442,22 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>已有参考图时也停在角色设定</span>
-            <Toggle on={pauseOnRef} onChange={() => setPauseOnRef((v) => !v)} />
+            <Toggle
+              on={pauseOnRef}
+              onChange={() => {
+                setPauseOnRef((v) => !v)
+                markSaved()
+              }}
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>输出分辨率</span>
             <RadioGroup
               value={resolution}
-              onChange={(v) => setResolution(v as '2K' | '4K')}
+              onChange={(v) => {
+                setResolution(v as '2K' | '4K')
+                markSaved()
+              }}
               options={[
                 { value: '2K', label: '2K（默认）' },
                 { value: '4K', label: '4K' },
@@ -351,18 +470,34 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
       <div className="glass-panel" style={panel}>
         <div className="label-caps label-caps-zh" style={groupLabel}>播放器</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>作品主色</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 22, height: 22, borderRadius: 'var(--radius-full)', background: accent, border: '1px solid var(--white-60)' }} />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <span style={{ width: 22, height: 22, borderRadius: 'var(--radius-full)', background: accent, border: '1px solid var(--white-60)', flexShrink: 0 }} />
               <input
                 type="color"
+                aria-label="选择作品主色"
                 value={accent}
-                onChange={(e) => setAccent(e.target.value)}
-                style={{ width: 36, height: 26, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                onChange={(e) => {
+                  setAccent(e.target.value)
+                  setHexInput(e.target.value)
+                  markSaved()
+                }}
+                style={{ width: 32, height: 26, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
               />
+              <span style={{ width: 96 }}>
+                <TextInput value={hexInput} onChange={handleHexChange} placeholder="#7f9bb8" />
+              </span>
               {accent !== work.accent ? (
-                <Button size="sm" variant="ghost" onClick={() => setAccent(work.accent)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setAccent(work.accent)
+                    setHexInput(work.accent)
+                    markSaved()
+                  }}
+                >
                   还原
                 </Button>
               ) : null}
@@ -382,13 +517,29 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
                     <input
                       style={{ ...inputStyle, padding: '6px 10px', fontSize: 13, flex: 1 }}
                       value={m.name}
-                      onChange={(e) => setMarks(marks.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                      onChange={(e) => {
+                        setMarks(marks.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                        markSaved()
+                      }}
                     />
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-on-surface-variant)', flexShrink: 0 }}>
                       逐字
-                      <Toggle on={m.perChar} onChange={() => setMarks(marks.map((x, j) => (j === i ? { ...x, perChar: !x.perChar } : x)))} />
+                      <Toggle
+                        on={m.perChar}
+                        onChange={() => {
+                          setMarks(marks.map((x, j) => (j === i ? { ...x, perChar: !x.perChar } : x)))
+                          markSaved()
+                        }}
+                      />
                     </span>
-                    <button style={smallBtn} title="删除" onClick={() => setMarks(marks.filter((_, j) => j !== i))}>
+                    <button
+                      style={smallBtn}
+                      title="删除"
+                      onClick={() => {
+                        setMarks(marks.filter((_, j) => j !== i))
+                        markSaved()
+                      }}
+                    >
                       <Icon name="close" size={14} />
                     </button>
                   </div>
@@ -396,7 +547,10 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
                     style={{ ...textareaStyle, minHeight: 44, marginTop: 'var(--space-2)', fontSize: 12 }}
                     value={m.css}
                     placeholder={`.mark-${m.name || 'x'} { … }`}
-                    onChange={(e) => setMarks(marks.map((x, j) => (j === i ? { ...x, css: e.target.value } : x)))}
+                    onChange={(e) => {
+                      setMarks(marks.map((x, j) => (j === i ? { ...x, css: e.target.value } : x)))
+                      markSaved()
+                    }}
                   />
                 </div>
               ))}
@@ -412,7 +566,14 @@ function SettingsDrawer({ work, open, onClose }: { work: Work; open: boolean; on
             <div key={r.id} className="hover-row" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 36, padding: '0 var(--space-2)', borderRadius: 'var(--radius-md)' }}>
               <span style={{ flex: 1, fontSize: 13, lineHeight: 1.6 }}>{r.text}</span>
               <span className="row-actions">
-                <button style={smallBtn} title="删除" onClick={() => setRules(rules.filter((_, j) => j !== i))}>
+                <button
+                  style={smallBtn}
+                  title="删除"
+                  onClick={() => {
+                    setRules(rules.filter((_, j) => j !== i))
+                    markSaved()
+                  }}
+                >
                   <Icon name="close" size={14} />
                 </button>
               </span>

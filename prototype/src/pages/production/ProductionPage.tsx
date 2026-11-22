@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Icon } from '../../components/Button'
 import { Card, ChapterStatusMark, ProgressBar } from '../../components/Card'
 import { Banner, Chip, ConfirmDialog, Drawer, Tooltip } from '../../components/Extended'
 import { EmptyState } from '../../components/Form'
 import { Dropdown } from '../../components/Modal'
+import { FlowRail, StatusBeacon } from '../../components/Motion'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import { findSeries, findVolume, findWork } from '../../mock/library'
 import { useProduction } from '../../mock/production'
-import type { Chapter, Work } from '../../mock/types'
+import type { Chapter, ChapterStatus, Work } from '../../mock/types'
 import { RunRecordDrawer } from '../chat/RunRecord'
 
 
@@ -38,9 +39,12 @@ function staleImagesOf(chapter: Chapter): StaleImage[] {
   return list
 }
 
-function ChapterRow({ work, chapter, last, onOpenStale, onOpenRuns }: {
+function ChapterRow({ work, chapter, prevChapter, isLive, remainingStale, last, onOpenStale, onOpenRuns }: {
   work: Work
   chapter: Chapter
+  prevChapter?: Chapter
+  isLive: boolean
+  remainingStale: number
   last: boolean
   onOpenStale: (c: Chapter) => void
   onOpenRuns: (c: Chapter) => void
@@ -57,6 +61,7 @@ function ChapterRow({ work, chapter, last, onOpenStale, onOpenRuns }: {
   )
   const m = chapter.step?.match(/(\d+)\s*\/\s*(\d+)/)
   const frac = chapter.step ? (stepIdx + (m ? Math.min(1, Number(m[1]) / Math.max(1, Number(m[2]))) : 0)) / steps.length : 0
+  const waitForPrev = chapter.status === 'waiting' && (priority || prevChapter?.status === 'producing')
   return (
     <div
       className="hover-row"
@@ -74,45 +79,91 @@ function ChapterRow({ work, chapter, last, onOpenStale, onOpenRuns }: {
       </span>
       <span style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap' }}>{chapter.title}</span>
       {priority ? (
-        <span className="label-caps label-caps-zh" style={{ color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10 }}>
+        <span className="label-caps label-caps-zh" style={{ color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 10 }}>
           <Icon name="keyboard_double_arrow_up" size={13} /> 优先
         </span>
       ) : null}
-      {chapter.step ? (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
-          {steps.map((s, i) => (
-            <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {i > 0 ? <Icon name="chevron_right" size={11} style={{ color: 'var(--color-outline)' }} /> : null}
-              <span style={i === stepIdx ? undefined : { color: 'var(--color-outline)', fontWeight: 400 }}>{s}</span>
-            </span>
-          ))}
-          {m ? <span>· {chapter.step.slice(chapter.step.indexOf(m[0]))}</span> : null}
+      {waitForPrev ? (
+        <span
+          style={{
+            fontSize: 11,
+            color: 'var(--color-outline)',
+            background: 'var(--color-surface-container-high)',
+            padding: '2px var(--space-2)',
+            borderRadius: 'var(--radius-sm)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          等上一章
         </span>
       ) : null}
-      {chapter.staleImages ? (
+      {chapter.step ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 12, color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>
+          {steps.map((s, i) => {
+            const isCurrent = i === stepIdx
+            const isDone = i < stepIdx
+            return (
+              <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                {i > 0 ? <Icon name="chevron_right" size={11} style={{ color: 'var(--color-outline)' }} /> : null}
+                {isCurrent ? (
+                  <span style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', fontWeight: 600 }}>
+                    <span className={isLive ? 'ink-shimmer' : undefined} style={isLive ? undefined : { color: 'var(--color-primary)' }}>
+                      {s}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        bottom: -3,
+                        height: 2,
+                        borderRadius: 'var(--radius-full)',
+                        background: 'var(--color-primary)',
+                      }}
+                    />
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      color: isDone ? 'var(--color-on-surface-variant)' : 'var(--color-outline)',
+                      fontWeight: isDone ? 500 : 400,
+                      opacity: isDone ? 1 : 0.55,
+                    }}
+                  >
+                    {s}
+                  </span>
+                )}
+              </span>
+            )
+          })}
+          {m ? <span style={{ color: 'var(--color-on-surface-variant)' }}>· {chapter.step.slice(chapter.step.indexOf(m[0]))}</span> : null}
+        </span>
+      ) : null}
+      {remainingStale > 0 ? (
         <button
           onClick={() => onOpenStale(chapter)}
-          style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', display: 'inline-flex', alignItems: 'center', gap: 3, padding: 0 }}
+          style={{ fontSize: 11, color: 'var(--color-on-surface-variant)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', padding: 0 }}
           title="查看过期图片"
         >
-          <Icon name="broken_image" size={13} /> {chapter.staleImages} 张图过期
+          <Icon name="broken_image" size={13} /> {remainingStale} 张图过期
         </button>
       ) : null}
       <span style={{ flex: 1 }} />
       {chapter.step ? (
         <span style={{ width: 72, flexShrink: 0 }}>
-          <ProgressBar value={frac} height={4} />
+          <ProgressBar value={frac} height={4} active={chapter.status === 'producing' && isLive} />
         </span>
       ) : null}
       <span style={{ display: 'inline-flex', justifyContent: 'flex-end', flexShrink: 0 }}>
         {chapter.issue ? (
           <Tooltip text={chapter.issue}>
             <span style={{ display: 'inline-flex' }}>
-              <ChapterStatusMark status={chapter.status} spin={chapter.status === 'producing'} attention />
+              <ChapterStatusMark status={chapter.status} spin={chapter.status === 'producing' && isLive} attention />
             </span>
           </Tooltip>
         ) : (
-          <ChapterStatusMark status={chapter.status} spin={chapter.status === 'producing'} />
+          <ChapterStatusMark status={chapter.status} spin={chapter.status === 'producing' && isLive} />
         )}
       </span>
       <span className="row-actions" style={{ display: 'inline-flex', justifyContent: 'flex-end', alignItems: 'center', gap: 'var(--space-1)', minWidth: 232, flexShrink: 0 }}>
@@ -162,9 +213,14 @@ export function ProductionPage() {
   const toast = useToast()
   const { running, queue, stop, resume, crashed, simulateCrash } = useProduction()
   const [staleChapter, setStaleChapter] = useState<Chapter | null>(null)
+  const [resolvedStale, setResolvedStale] = useState<Record<string, 'redrawing' | 'kept' | 'done'>>({})
+  const staleTimersRef = useRef<number[]>([])
   const [confirmStop, setConfirmStop] = useState(false)
-  const [runsChapter, setRunsChapter] = useState<Chapter | null>(null)
+  const [runChapter, setRunChapter] = useState<{ title: string; status: ChapterStatus; step?: string } | null>(null)
 
+  useEffect(() => () => {
+    staleTimersRef.current.forEach((t) => window.clearTimeout(t))
+  }, [])
   if (!work || work.kind !== 'project') {
     return (
       <Page title="制作面板" width={760}>
@@ -269,35 +325,33 @@ export function ProductionPage() {
       ) : null}
 
       {/* 当前状态 */}
-      <Card style={{ padding: 'var(--space-5)', marginTop: attention.length && !crashed ? 'var(--space-5)' : 0 }}>
+      <Card style={{ padding: 'var(--space-5)', marginTop: attention.length && !crashed ? 'var(--space-5)' : 0, position: 'relative', overflow: 'hidden' }}>
         {work.phase === 'preview' && work.previewProgress ? (
           <div>
-            <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-3)' }}>
+            <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <StatusBeacon tone={isHead && running ? 'active' : 'muted'} active={isHead && running} size={8} />
               当前阶段 · {work.previewProgress.stage}
             </div>
             <h3 className="headline" style={{ fontSize: 20, marginBottom: 'var(--space-3)' }}>
               已读 {work.previewProgress.done} / {work.previewProgress.total} 章
             </h3>
-            <ProgressBar value={work.previewProgress.done / work.previewProgress.total} />
+            <ProgressBar value={work.previewProgress.done / work.previewProgress.total} active={isHead && running} />
           </div>
         ) : (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-            <Icon
-              name={current ? 'sync' : work.phase === 'done' ? 'check_circle' : 'schedule'}
-              size={24}
-              style={{
-                color: current ? 'var(--color-primary)' : 'var(--color-outline)',
-                animation: current && running && isHead ? 'spin 4s linear infinite' : undefined,
-                flexShrink: 0,
-                marginTop: 2,
-              }}
-            />
+            <span style={{ display: 'inline-flex', paddingTop: 'var(--space-1)', flexShrink: 0 }}>
+              <StatusBeacon
+                tone={work.phase === 'done' ? 'success' : current && isHead && running ? 'active' : 'muted'}
+                active={!!current && isHead && running}
+                size={10}
+              />
+            </span>
             <div style={{ flex: 1, minWidth: 220 }}>
-              <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 6 }}>当前章节</div>
+              <div className="label-caps label-caps-zh" style={{ color: 'var(--color-outline)', marginBottom: 'var(--space-2)' }}>当前章节</div>
               {work.phase === 'done' ? (
                 <h3 className="headline" style={{ fontSize: 20 }}>全部章节已发布</h3>
               ) : current ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                   {paintingChapter ? (
                     <h3 className="headline" style={{ fontSize: 20 }}>
                       第 {paintingChapter.index} 章 · {paintingChapter.title}
@@ -311,8 +365,14 @@ export function ProductionPage() {
                     </h3>
                   ) : null}
                   {paintingChapter ? (
-                    <div style={{ fontSize: 12, color: 'var(--color-outline)', marginTop: 2 }}>
-                      出图队列：等待 {imageQueue.waiting} 张 · 正在画 {imageQueue.painting} 张
+                    <div style={{ fontSize: 12, color: 'var(--color-outline)', marginTop: 'var(--space-1)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                      <span>出图队列：等待 {imageQueue.waiting} 张 ·</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <StatusBeacon tone={isHead && running ? 'active' : 'muted'} active={isHead && running} size={6} />
+                        <span className={isHead && running ? 'ink-shimmer' : undefined}>
+                          正在画 {imageQueue.painting} 张
+                        </span>
+                      </span>
                     </div>
                   ) : null}
                 </div>
@@ -323,6 +383,13 @@ export function ProductionPage() {
             {pos > 0 ? <Chip>排在第 {pos + 1} 位</Chip> : isHead && running ? <Chip active>正在制作</Chip> : null}
           </div>
         )}
+        {work.phase !== 'done' ? (
+          <FlowRail
+            active={isHead && running}
+            height={2}
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, borderRadius: 0 }}
+          />
+        ) : null}
       </Card>
 
       {/* 章节列表（按卷分组；原型每部作品只有一卷） */}
@@ -330,54 +397,122 @@ export function ProductionPage() {
         第{vol.index}卷 · {vol.title} · 共 {work.chapters.length} 章
       </div>
       <Card>
-        {work.chapters.map((c, i) => (
-          <ChapterRow
-            key={c.id}
-            work={work}
-            chapter={c}
-            last={i === work.chapters.length - 1}
-            onOpenStale={setStaleChapter}
-            onOpenRuns={setRunsChapter}
-          />
-        ))}
+        {work.chapters.map((c, i) => {
+          const items = staleImagesOf(c)
+          const remainingStale = items.filter((img) => resolvedStale[img.id] !== 'done' && resolvedStale[img.id] !== 'kept').length
+          return (
+            <ChapterRow
+              key={c.id}
+              work={work}
+              chapter={c}
+              prevChapter={i > 0 ? work.chapters[i - 1] : undefined}
+              isLive={isHead && running}
+              remainingStale={remainingStale}
+              last={i === work.chapters.length - 1}
+              onOpenStale={setStaleChapter}
+              onOpenRuns={(ch) => setRunChapter({ title: `第 ${ch.index} 章 · ${ch.title}`, status: ch.status, step: ch.step })}
+            />
+          )
+        })}
       </Card>
 
       {/* 过期图片抽屉 */}
       <Drawer open={staleChapter !== null} title={staleChapter ? `第 ${staleChapter.index} 章 · 过期图片` : ''} onClose={() => setStaleChapter(null)}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {staleChapter
-            ? staleImagesOf(staleChapter).map((img) => (
-                <div key={img.id} className="glass-panel" style={{ borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)' }}>
-                  <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-                    <div style={{ width: 72, height: 72, borderRadius: 'var(--radius-md)', background: staleThumb, flexShrink: 0, border: '1px solid var(--divider)' }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{img.label}</div>
-                      <div style={{ fontSize: 12, color: 'var(--color-outline)', marginTop: 4 }}>{img.kind}</div>
+            ? staleImagesOf(staleChapter).map((img) => {
+                const state = resolvedStale[img.id]
+                const isRedrawing = state === 'redrawing'
+                const isDone = state === 'done'
+                const isKept = state === 'kept'
+                return (
+                  <div
+                    key={img.id}
+                    className="glass-panel"
+                    style={{
+                      borderRadius: 'var(--radius-lg)',
+                      padding: 'var(--space-4)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      opacity: isKept ? 0.68 : 1,
+                      transition: 'opacity var(--dur-base) var(--ease-out)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+                      <div style={{ width: 72, height: 72, borderRadius: 'var(--radius-md)', background: staleThumb, flexShrink: 0, border: '1px solid var(--divider)' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{img.label}</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-outline)', marginTop: 'var(--space-1)' }}>{img.kind}</div>
+                        {isRedrawing ? (
+                          <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                            <span className="ink-shimmer" style={{ fontSize: 12, fontWeight: 600 }}>重绘中…</span>
+                            <FlowRail active height={2} />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    {img.cascade && !isDone && !isKept ? (
+                      <p style={{ marginTop: 'var(--space-3)', fontSize: 12, color: 'var(--color-on-surface-variant)', lineHeight: 1.6, display: 'flex', gap: 'var(--space-2)' }}>
+                        <Icon name="account_tree" size={15} style={{ flexShrink: 0, color: 'var(--color-outline)' }} />
+                        {img.cascade}
+                      </p>
+                    ) : null}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+                      {isDone ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 12, color: 'var(--color-success)', fontWeight: 600 }}>
+                          <Icon name="check_circle" size={14} /> 已重画
+                        </span>
+                      ) : isKept ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 12, color: 'var(--color-outline)' }}>
+                          <Icon name="keep" size={14} /> 已保留旧图
+                        </span>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            icon="refresh"
+                            loading={isRedrawing}
+                            onClick={() => {
+                              setResolvedStale((prev) => ({ ...prev, [img.id]: 'redrawing' }))
+                              const timer = window.setTimeout(() => {
+                                setResolvedStale((prev) => ({ ...prev, [img.id]: 'done' }))
+                                toast(`「${img.label}」重画完成`, 'check_circle')
+                              }, 1200)
+                              staleTimersRef.current.push(timer)
+                            }}
+                          >
+                            {isRedrawing ? '重绘中…' : '重画'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon="keep"
+                            disabled={isRedrawing}
+                            onClick={() => {
+                              setResolvedStale((prev) => ({ ...prev, [img.id]: 'kept' }))
+                              toast(`「${img.label}」保留旧图`)
+                            }}
+                          >
+                            保留
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
-                  {img.cascade ? (
-                    <p style={{ marginTop: 'var(--space-3)', fontSize: 12, color: 'var(--color-on-surface-variant)', lineHeight: 1.6, display: 'flex', gap: 6 }}>
-                      <Icon name="account_tree" size={15} style={{ flexShrink: 0, color: 'var(--color-outline)' }} />
-                      {img.cascade}
-                    </p>
-                  ) : null}
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
-                    <Button size="sm" icon="refresh" onClick={() => toast(`已把「${img.label}」加入重画`, 'refresh')}>重画</Button>
-                    <Button variant="ghost" size="sm" icon="keep" onClick={() => toast(`「${img.label}」保留旧图`)}>保留</Button>
-                  </div>
-                </div>
-              ))
+                )
+              })
             : null}
         </div>
       </Drawer>
 
       {/* 运行记录：和 Agent 面板同一套显示（另一 Agent 实现） */}
       <RunRecordDrawer
-        chapterTitle={runsChapter ? `第 ${runsChapter.index} 章 · ${runsChapter.title}` : ''}
-        open={runsChapter !== null}
-        onClose={() => setRunsChapter(null)}
+        chapterTitle={runChapter?.title ?? ''}
+        chapterStatus={runChapter?.status}
+        chapterStep={runChapter?.step}
+        open={runChapter !== null}
+        onClose={() => setRunChapter(null)}
       />
-
       <ConfirmDialog
         open={confirmStop}
         title="立即停止"
