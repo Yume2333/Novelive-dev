@@ -94,9 +94,22 @@ export interface SynthesisOptions {
 }
 
 const eventLimit = 128
+const historyBudget = 1024
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const bytes = (text: string) => Buffer.byteLength(text)
+function recentEvents(events: Event[]) {
+	const summaries: string[] = []
+	let remaining = historyBudget - 2
+	for (let i = events.length - 1; i >= 0 && remaining > 0; i--) {
+		const summary = events[i].event.slice(0, 160)
+		const size = bytes(JSON.stringify(summary)) + 1
+		if (size > remaining) break
+		summaries.unshift(summary)
+		remaining -= size
+	}
+	return JSON.stringify(summaries)
+}
 const unique = <T>(items: T[]) => [
 	...new Map(items.map((item) => [JSON.stringify(item), item])).values(),
 ]
@@ -180,7 +193,9 @@ ${packetText.join('\n')}`
 	const useEvents =
 		strategy === 'events' ||
 		(strategy === 'auto' && bytes(wholePrompt) + 384 > budget)
-	const packetBudget = Math.floor((budget - bytes(instructions) - 512) / 8)
+	const packetBudget = Math.floor(
+		(budget - bytes(instructions) - historyBudget - 1024) / 8,
+	)
 	const packets =
 		useEvents && packetBudget > 0 ? splitChapter(packetText, packetBudget) : []
 	const state: Checkpoint =
@@ -277,7 +292,8 @@ ${packetText.join('\n')}`
 		const event = await request(
 			`${instructions}
 Extract only the next event in packet ${packet + 1}/${packets.length}. A packet can contain a fragment of a chapter preview. Include one event string, only its changes, and is_last (true if this is the last event of this packet); report progress for affected chapters.
-Previously extracted events: ${JSON.stringify(state.events.map((item) => item.event))}
+Events already extracted: ${state.events.length}
+Recent event summaries: ${recentEvents(state.events)}
 Chapter previews:
 ${packets[packet]}`,
 			nextEvent,

@@ -20,9 +20,9 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 	const packet = /Extract only the next event in packet (\d+)\/(\d+)/.exec(
 		prompt,
 	)
-	const priorString = /^Previously extracted events: (.+)$/m.exec(prompt)?.[1]
-	const prior: string[] = priorString ? JSON.parse(priorString) : []
-	const eventIndex = prior.length
+	const eventIndex = Number(
+		/^Events already extracted: (\d+)$/m.exec(prompt)?.[1] ?? 0,
+	)
 	const lastPacket = packet?.[1] === packet?.[2]
 	const result = {
 		overview: 'A key opens Paper Tower.',
@@ -43,7 +43,9 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 		glossaryPatch: !packet || eventIndex === 0 ? glossaryChanges : [],
 		...(packet
 			? {
-					event: `Synthetic event ${eventIndex + 1}`,
+					event:
+						`Synthetic event ${eventIndex + 1}` +
+						(packet[2] === '1' ? '' : ' Detail.'.repeat(280)),
 					is_last: packet[2] !== '1' || eventIndex > 0,
 				}
 			: {}),

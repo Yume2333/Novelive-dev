@@ -157,6 +157,11 @@ test('automatic fallback streams all preview packets without truncation', async 
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const request = new Request(input, init)
 		const body = await request.clone().json()
+		const history = /^Recent event summaries: (.+)$/m.exec(
+			body.messages[0].content,
+		)?.[1]
+		expect(history).toBeDefined()
+		expect(Buffer.byteLength(history ?? '')).toBeLessThanOrEqual(1024)
 		segments.push(body.messages[0].content.split('Chapter previews:\n')[1])
 		return strict(request)
 	}
