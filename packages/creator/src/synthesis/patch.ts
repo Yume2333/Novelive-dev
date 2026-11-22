@@ -208,10 +208,11 @@ function merge<T extends Entry>(
 	])
 	const hasConflict =
 		current.status === 'confirmed' &&
-		Object.entries(incoming).some(
-			([key, value]) =>
-				!metadata.has(key) && !isDeepStrictEqual(before[key], value),
-		)
+		(changes.some(({ field }) => field !== temporal) ||
+			Object.entries(incoming).some(
+				([key, value]) =>
+					!metadata.has(key) && !isDeepStrictEqual(before[key], value),
+			))
 	if (hasConflict)
 		return {
 			entry: current,

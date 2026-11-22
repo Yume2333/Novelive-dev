@@ -257,6 +257,38 @@ test('character deletion is rejected before writing if a surviving relation refe
 	expect(updated.relation).toEqual([])
 })
 
+test('a proposal cannot smuggle fixed facts onto confirmed characters as temporal changes', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const bible = await readBible(project)
+	const fixed = { chapterId: 'c2', field: 'birthName', value: 'Ava' }
+	const temporal = { chapterId: 'c2', field: 'identity', value: 'Captain' }
+	const result = await applyPatches(
+		project,
+		bible,
+		[
+			{
+				kind: 'character',
+				op: 'update',
+				entry: { ...confirmed, aliases: [], changes: [fixed] },
+			},
+			{
+				kind: 'character',
+				op: 'update',
+				entry: { ...confirmed, aliases: [], changes: [temporal] },
+			},
+		],
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toMatchObject([
+		{ entry: { status: 'candidate', changes: [fixed] } },
+	])
+	expect((await readBible(project)).character).toMatchObject([
+		{ ...confirmed, changes: [temporal] },
+	])
+})
+
 test('unresolved references trigger one repair and are never published', async () => {
 	await seed(root)
 	using project = await Project.open(root)
