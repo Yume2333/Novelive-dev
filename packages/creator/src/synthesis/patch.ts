@@ -603,7 +603,12 @@ export async function applyPatches(
 				if (originalRefs.has(id) && removedCharacters.has(id)) blocked.add(id)
 				else
 					for (const proposal of accepted)
-						if (proposal.kind === kind && proposal.entry.id === entry.id)
+						if (
+							(proposal.kind === 'character' || proposal.kind === 'relation') &&
+							proposal.kind === kind &&
+							proposal.entry.id === entry.id &&
+							references(proposal.entry).includes(id)
+						)
 							invalid.set(proposal, id)
 			}
 		}

@@ -903,6 +903,45 @@ test.each(['relation', 'character'] as const)(
 	},
 )
 
+test('a later dangling reference does not reject an earlier valid proposal for the same entry', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const relation = {
+		id: 'connection',
+		status: 'candidate',
+		from: 'ada',
+		to: 'ada',
+		description: 'Trusts',
+	} as const
+	const valid = {
+		kind: 'relation',
+		op: 'add',
+		entry: relation,
+	} satisfies BiblePatch[number]
+	const invalid = {
+		kind: 'relation',
+		op: 'update',
+		entry: { ...relation, to: 'missing' },
+	} satisfies BiblePatch[number]
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[valid, invalid],
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toMatchObject([
+		{
+			...invalid,
+			entry: {
+				...invalid.entry,
+				conflict: 'Referenced character is not published: missing',
+			},
+		},
+	])
+	expect((await readBible(project)).relation).toEqual([relation])
+})
+
 test('unresolved references trigger one repair and are never published', async () => {
 	await seed(root)
 	using project = await Project.open(root)
