@@ -21,6 +21,9 @@ test('M0 library and usage navigate between real empty pages and switch theme wi
 			const nav = page.getByRole('navigation', { name: '全局导航' })
 			await expect(page.getByRole('heading', { name: '书库' })).toBeVisible()
 			await expect(page.getByText('还没有作品')).toBeVisible()
+			await expect(
+				page.getByRole('heading', { name: '书库还是空的' }),
+			).toBeVisible()
 			await expect(nav.getByRole('link', { name: '书库' })).toHaveAttribute(
 				'aria-current',
 				'page',
