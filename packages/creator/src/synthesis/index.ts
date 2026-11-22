@@ -205,7 +205,7 @@ export async function synthesizeVolume(
 	if (previews.some((preview, i) => preview.chapterId !== chapterIds[i]))
 		throw new Error('Stored preview chapter ID does not match its file')
 	const fingerprint = hash({
-		packetFormat: 1,
+		packetFormat: 2,
 		previews,
 		language: options.language,
 		requirements: options.requirements,

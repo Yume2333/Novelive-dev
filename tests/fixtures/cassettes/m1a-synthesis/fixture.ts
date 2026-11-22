@@ -16,6 +16,12 @@ export const connection: TextConnection = {
 	apiKey: 'offline-placeholder',
 }
 export const scope = { level: 'series' } as const
+export const candidateTower = {
+	id: 'tower',
+	name: 'Paper Tower',
+	description: 'A tower on the shore.',
+	status: 'candidate',
+} as const
 export const chapters = ['c1', 'c2']
 export const confirmed = {
 	id: 'ada',

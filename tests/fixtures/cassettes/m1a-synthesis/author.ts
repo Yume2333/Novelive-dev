@@ -5,13 +5,16 @@ import { join } from 'node:path'
 import { Project } from '../../../../packages/creator/src/project'
 import { createReplayFetch } from '../../../../packages/creator/src/replay'
 import { synthesizeVolume } from '../../../../packages/creator/src/synthesis'
+import { projectFiles } from '../../../../packages/format/src/model'
 import {
+	candidateTower,
 	changes,
 	chapters,
 	connection,
 	glossaryChanges,
 	planted,
 	progress,
+	scope,
 	seed,
 } from './fixture'
 
@@ -97,10 +100,16 @@ try {
 		['auto', 'auto', true],
 		['invalid', 'whole', false],
 		['cross-volume', 'whole', false],
+		['existing-candidate', 'whole', false],
 	] as const) {
 		const root = join(directory, scenario)
 		await seed(root, extended, scenario === 'cross-volume')
 		using project = await Project.open(root)
+		if (scenario === 'existing-candidate')
+			await project.write(projectFiles.location(scope, 'tower'), {
+				formatVersion: 1,
+				entries: [candidateTower],
+			})
 		const run = synthesizeVolume(project, 'v1', chapters, {
 			incremental: scenario === 'cross-volume',
 			strategy,
