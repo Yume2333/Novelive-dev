@@ -308,3 +308,39 @@ test.each(['duration', 'transition'])(
 		)
 	},
 )
+
+test.each([
+	'@shake 1.2',
+	'@particle rain 1.2',
+	'@zoom 0 1.2',
+	'@bg room/dusk 1.2',
+])(
+	'rejects an invalid positional value instead of skipping its parameter: %s',
+	(command) => {
+		const result = compileScript(single(command), scalarContext)
+		expect(result).toMatchObject({
+			ok: false,
+			diagnostics: [
+				expect.objectContaining({ code: 'E_ARGUMENT', line: 3 }),
+				...result.diagnostics.slice(1),
+			],
+		})
+	},
+)
+
+test('accepts positional strength and permits a named duration without strength', () => {
+	const result = compileScript(
+		single('@shake 1\n@shake duration 1.2\n@wait'),
+		scalarContext,
+	)
+	if (!result.ok) throw new Error(JSON.stringify(result.diagnostics))
+	expect(
+		result.scenes[0].beats[0].actions.map(({ args }) => [
+			args.strength,
+			args.duration,
+		]),
+	).toEqual([
+		[1, 0.3],
+		[0.35, 1.2],
+	])
+})

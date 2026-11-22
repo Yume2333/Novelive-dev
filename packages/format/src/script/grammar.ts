@@ -55,10 +55,11 @@ const choice =
 	(values: readonly string[]): Read =>
 	(token) =>
 		values.includes(token) ? token : undefined
+export const decimalPattern = /^-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$/
 export const numeric =
 	(minimum: number, maximum = Number.MAX_VALUE): Read =>
 	(token) => {
-		if (!/^-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$/.test(token)) return undefined
+		if (!decimalPattern.test(token)) return undefined
 		const value = Number(token)
 		return Number.isFinite(value) && value >= minimum && value <= maximum
 			? value

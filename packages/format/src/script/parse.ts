@@ -4,6 +4,7 @@ import {
 	actionNames,
 	actionSpec,
 	builtInMarks,
+	decimalPattern,
 	namePattern,
 	numeric,
 	type Value,
@@ -207,21 +208,18 @@ function parseAction(
 			)
 		else args[parameter.name] = value
 	}
-	const ordered = [...spec.required, ...parameters]
-	let cursor = 0
+	const ordered = [...spec.required, ...parameters].filter(
+		(parameter) => !Object.hasOwn(args, parameter.name),
+	)
 	for (const token of positional) {
 		const index = spec.flexible
-			? ordered.findIndex(
-					(p) =>
-						!Object.hasOwn(args, p.name) && p.read(token.text) !== undefined,
+			? ordered.findIndex((p) =>
+					p.name === 'scale' || p.name === 'duration'
+						? decimalPattern.test(token.text)
+						: p.read(token.text) !== undefined,
 				)
-			: ordered.findIndex(
-					(p, i) =>
-						i >= cursor &&
-						!Object.hasOwn(args, p.name) &&
-						(p.default === undefined || p.read(token.text) !== undefined),
-				)
-		const parameter = ordered[index]
+			: 0
+		const parameter = index < 0 ? undefined : ordered.splice(index, 1)[0]
 		const value = parameter?.read(token.text)
 		if (!parameter || value === undefined)
 			report(
@@ -230,10 +228,7 @@ function parseAction(
 				`无效参数：${token.text}`,
 				'检查参数顺序、类型和值域。',
 			)
-		else {
-			args[parameter.name] = value
-			cursor = index + 1
-		}
+		else args[parameter.name] = value
 	}
 	for (const p of spec.required)
 		if (!Object.hasOwn(args, p.name))
