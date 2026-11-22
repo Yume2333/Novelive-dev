@@ -47,6 +47,24 @@ it('refuses image hostnames whose DNS answers are private', async () => {
 	})
 })
 
+it('forwards cancellation from the replay layer’s Request to image downloads', async () => {
+	const caller = new AbortController()
+	const request = new Request('https://relay.invalid/image.png', {
+		signal: caller.signal,
+	})
+	const upstream: typeof fetch = async (_input, options) => {
+		expect(options?.signal).toBe(request.signal)
+		caller.abort()
+		options?.signal?.throwIfAborted()
+		return new Response()
+	}
+	await expect(
+		imageDownloadUpstream(base.baseUrl, upstream)(request),
+	).rejects.toMatchObject({
+		name: 'AbortError',
+	})
+})
+
 const directory = 'tests/fixtures/image-models'
 const dirs: string[] = []
 afterEach(async () => {

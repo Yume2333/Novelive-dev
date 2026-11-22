@@ -61,6 +61,8 @@ export function imageDownloadUpstream(
 	const origin = new URL(baseUrl).origin
 	return async (input, init) => {
 		let url = new URL(input instanceof Request ? input.url : input)
+		const signal =
+			init?.signal ?? (input instanceof Request ? input.signal : undefined)
 		for (let redirects = 0; redirects <= 5; redirects++) {
 			if (
 				!['http:', 'https:'].includes(url.protocol) ||
@@ -74,6 +76,7 @@ export function imageDownloadUpstream(
 				throw new Error('Image download requires a public address')
 			const options = {
 				...init,
+				signal,
 				redirect: 'manual' as const,
 				dispatcher: external ? publicAgent : undefined,
 			}
