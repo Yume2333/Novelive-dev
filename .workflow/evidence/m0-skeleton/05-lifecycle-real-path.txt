@@ -1,0 +1,1 @@
+pnpm dev Electron: manual generation restart, SQLite WAL readback, and sharp decode passed
