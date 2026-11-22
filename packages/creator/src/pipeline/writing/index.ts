@@ -274,9 +274,6 @@ export async function reviewChapter(
 	options: WriterOptions,
 ) {
 	const settings = chapter.settings ?? defaultWorkSettings()
-	const script = draft.scenes
-		.map(({ scene }) => formatScene(scene))
-		.join('\n\n')
 	if (!settings.fidelityReview && !settings.styleReview)
 		return {
 			...draft,
@@ -306,7 +303,12 @@ export async function reviewChapter(
 			)
 		}
 	}
-	const style = settings.styleReview ? await reviewStyle(reviewer, script) : []
+	const styleByScene = new Map<Scene, string[]>()
+	if (settings.styleReview) {
+		for (const { scene } of draft.scenes)
+			styleByScene.set(scene, await reviewStyle(reviewer, formatScene(scene)))
+	}
+	const style = [...styleByScene.values()].flat()
 	if (!fidelity.length && !style.length)
 		return { ...draft, fidelity, style, revised: false }
 	const writer = writingModel(options.writer, options)
@@ -325,15 +327,16 @@ export async function reviewChapter(
 			paragraphs.some(({ id }) => id === paragraphId),
 		)
 		const script = formatScene(scene)
+		const styleIssues = styleByScene.get(scene) ?? []
 		const revised =
-			issues.length || style.length
+			issues.length || styleIssues.length
 				? await reviseScene(
 						writer,
 						instructions.end,
 						script,
 						paragraphs,
 						issues,
-						style,
+						styleIssues,
 					)
 				: script
 		if (scene.id) sceneIds[previous.length] = scene.id

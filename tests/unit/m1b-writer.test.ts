@@ -293,6 +293,34 @@ describe('M1b writer', () => {
 		}
 	})
 
+	test('does not revise a scene for style findings from another scene', async () => {
+		const second = 'scene Shore\nsource p0002\n: A bell rang.'
+		const input = {
+			...chapter,
+			settings: {
+				...defaultWorkSettings(),
+				fidelityReview: false,
+				styleReview: true,
+			},
+			paragraphs: [
+				...chapter.paragraphs,
+				{ id: 'p0002', text: 'A bell rang.' },
+			],
+		}
+		const { options, requests } = responses(
+			`${scene}\n${second}`,
+			'{"issues":[]}',
+			'{"issues":["Sharpen the rhythm."]}',
+			second,
+		)
+		const draft = await writeChapter(input, options)
+		const result = await reviewChapter(input, draft, options)
+		expect(result.scenes[0].scene).toEqual(draft.scenes[0].scene)
+		expect(requests).toHaveLength(4)
+		expect(requests[3]).toContain('Sharpen the rhythm.')
+		expect(requests[3]).not.toContain('p0001')
+	})
+
 	test('keeps the first split scene and later draft scene IDs', async () => {
 		const input = {
 			...chapter,
