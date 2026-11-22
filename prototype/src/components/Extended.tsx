@@ -63,13 +63,15 @@ export function Chip({ children, active, onClick }: { children: ReactNode; activ
 
 /** 悬浮提示（简短说明放这里，不放界面正文） */
 export function Tooltip({ text, children }: { text: string; children: ReactNode }) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const [pos, setPos] = useState<{ x: number; y: number; below: boolean } | null>(null)
   const ref = useRef<HTMLSpanElement>(null)
   const tipRef = useRef<HTMLSpanElement>(null)
 
   const show = () => {
     const r = ref.current?.getBoundingClientRect()
-    if (r) setPos({ x: r.left + r.width / 2, y: r.top - 8 })
+    if (!r) return
+    const below = r.top < 44
+    setPos({ x: r.left + r.width / 2, y: below ? r.bottom + 8 : r.top - 8, below })
   }
 
   useEffect(() => {
@@ -109,19 +111,26 @@ export function Tooltip({ text, children }: { text: string; children: ReactNode 
                 position: 'fixed',
                 left: pos.x,
                 top: pos.y,
-                transform: 'translate(-50%, -100%)',
+                transform: pos.below ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
                 zIndex: 200,
-                background: 'var(--color-primary)',
-                color: 'var(--color-on-primary)',
-                padding: '5px 10px',
-                borderRadius: 'var(--radius-md)',
-                fontSize: 12,
-                whiteSpace: 'nowrap',
                 pointerEvents: 'none',
-                animation: 'fade-up var(--dur-fast) var(--ease-out)',
               }}
             >
-              {text}
+              <span
+                style={{
+                  display: 'block',
+                  background: 'var(--color-primary)',
+                  color: 'var(--color-on-primary)',
+                  padding: '5px 10px',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 12,
+                  whiteSpace: 'nowrap',
+                  boxShadow: 'var(--shadow-pop)',
+                  animation: 'fade-up var(--dur-fast) var(--ease-out)',
+                }}
+              >
+                {text}
+              </span>
             </span>,
             document.body,
           )
