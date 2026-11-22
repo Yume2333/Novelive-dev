@@ -57,7 +57,7 @@
 - **propose kind 补 `add_text_marker`**：patch 装标记名+CSS+逐字开关；主控工具补 `list_assets`、`read_chapter_manifest`、`read_task_result`（查素材名、图清单、失败原因）。（`.workflow/research/novelive-agent.md`、`decisions.md` 2026-11-20）
 - **标记提议落点**：模型提议新自定义标记进编辑器顶部横幅确认，不进对话面板确认卡；`ConfirmKind` 不加 mark。（`docs/ux.md`、prototype EditorPage）
 - **画风参考三组对比（试验，2026-11-22 延后至 M1b）**：M1b 出图实现时一并实测 `docs/visuals.md` 2.5 策略（固定句用 FXB，沿用 style-transfer 角色与场景）：① 一张参考 + 新声明句；② 一张参考 + 新声明句 + 颜色锁定句；③ 三张同画师不同角色参考 + 新声明句 + 颜色锁定句。（`docs/visuals.md` 2.5、`decisions.md` 2026-11-22「补记未写明的取代关系」）
-- **图片设置从 M1b 起生效**：M0 在设置页和 `config.json` 落齐「生图质量」（高/中/低，默认高）、「原生长边上限」（档位 1536/2048/2560/2816/3840，默认 1536）、「后处理」（关 / 放大降噪 / 双重放大降噪，默认放大降噪）和「放大档位」（默认 `realesrgan-x4plus-anime` / 快速档 `realesr-animevideov3` 注明低性能机用、画质下降）；生图质量与原生长边上限从 M1b 出图管线起使用，后处理在 M3 放大程序接入后生效（关闭时用 sharp Lanczos 缩放到目标尺寸，不降噪）。M1b 出图时遇到接口不支持的能力按 `docs/visuals.md` 3.2「接口不支持时报错」处理：不重试、整部作品暂停并报错。（`decisions.md` 2026-11-22「图片能力不声明，用到不支持时报错；长边档位和双重后处理」）
+- **图片设置从 M1b 起生效**：M0 在设置页和 `config.json` 落齐「生图质量」（高/中/低，默认高）、「原生长边上限」（档位 1536/2048/2560/2816/3840，默认 1536）、「后处理」（关 / 放大降噪 / 双重放大降噪，默认放大降噪）和「放大档位」（动漫 `realesrgan-x4plus-anime` 默认 / 快速 `realesr-animevideov3-x4` 注明低性能机用、画质下降 / 保留细节 `4x-NMKD-YandereNeo` 注明少改原画、保留纹理细节）；生图质量与原生长边上限从 M1b 出图管线起使用，后处理在 M3 放大程序接入后生效（关闭时用 sharp Lanczos 缩放到目标尺寸，不降噪）。M1b 出图时遇到接口不支持的能力按 `docs/visuals.md` 3.2「接口不支持时报错」处理：不重试、整部作品暂停并报错。（`decisions.md` 2026-11-22「图片能力不声明，用到不支持时报错；长边档位和双重后处理」、2026-11-22「放大档位三选一：动漫 / 快速 / 保留细节」）
 
 ## M2
 
@@ -68,7 +68,7 @@
 
 ## M3
 - **放大程序**：放大和降噪用 ncnn-vulkan 可执行文件（三平台都有官方预编译版），由创作端启动；输入输出走临时文件，进度和结果走标准输入输出。（`docs/architecture.md`、`decisions.md` 2026-11-21「放大降噪不用 Python」）
-- **放大模型选型**：默认 Real-ESRGAN `realesrgan-x4plus-anime`（6B，BSD-3，8.9MB；就是 Upscayl 的 `digital-art-4x`，权重逐字节相同），快速档 `realesr-animevideov3`（BSD-3，1.2MB）。程序用 `upscayl-bin`（AGPL-3.0，参数和 realesrgan-ncnn-vulkan 一致，能加载任意 ncnn 模型，自带输出重采样）。x4plus-anime 按带噪声和压缩痕迹的退化训练，放大时一并去噪，不另设降噪模型。M3 用真实生成的立绘、背景、CG 再比一次（第二轮对比图是合成的简单线稿）。不随包带 CC BY-NC 系模型（Remacri、UltraSharp、Ultramix、AnimeSharp 等）。（`decisions.md` 2026-11-21「放大默认用 Real-ESRGAN 动漫模型」、`refs/ext-2026-11-r2-upscale.md` 追加节）
+- **放大模型选型**：三档。动漫（默认）Real-ESRGAN `realesrgan-x4plus-anime`（6B，BSD-3，8.9MB；就是 Upscayl 的 `digital-art-4x`，权重逐字节相同）；快速 `realesr-animevideov3-x4`（BSD-3，1.2MB，取 realesrgan-ncnn-vulkan 20220424 包里的官方权重，不用 Upscayl 的 `upscayl-lite-4x`，后者权重不同且透明立绘输出错误）；保留细节 `4x-NMKD-YandereNeo`（ESRGAN 32nf/12nb，WTFPL，ncnn 约 10MB）。YandereNeo 没有官方 ncnn 版：构建脚本下载 OpenModelDB 原始 `.pth`、校验 sha256 `988f57dd12e63cf7aad10192fd06518e3300b449362df2a03eb1f9774a10f8b3`，用 pnnx（输入 `[1,3,64,64]`、第二输入形状 `[1,3,96,80]` 打开动态尺寸，fp16 存储）转 ncnn，再把 param 里的 `in0` / `out0` 改名 `data` / `output`；转换步骤见 `.workflow/evidence/spikes-r4/upscale/src/convert_ncnn.py`。程序用 `upscayl-bin`（AGPL-3.0，参数和 realesrgan-ncnn-vulkan 一致，能加载任意 ncnn 模型，自带输出重采样）。三档都按带噪声和压缩痕迹的退化训练，放大时一并去噪，不另设降噪模型。不随包带 CC BY-NC 系模型（Remacri、UltraSharp、Ultramix、AnimeSharp、IllustrationJaNai 等）。（`decisions.md` 2026-11-22「放大档位三选一：动漫 / 快速 / 保留细节」、`.workflow/evidence/spikes-r4/upscale/`）
 - **alpha 通道**：透明 PNG 带透明通道整图送进模型，不拆通道（实测 alpha 边缘误差 0.04/255、无白边）。（`decisions.md` 2026-11-21、`refs/ext-2026-11-r2-upscale.md`）
 - **放大目标尺寸（R3 实测）**：背景和 CG 放大到 2560×1440（可选 4K）；立绘放大到宽约 2048 像素（1024×1536 → 2048×3072），不按背景倍数；差分和它的基准图必须用同一个放大模型，换档清晰度会跳变。设置页快速档文案写「低性能机用，画质下降」。（`docs/visuals.md`、`decisions.md` 2026-11-21）
 - **stdio 协议**：行分隔 JSON；图片传临时文件路径不传 base64。（`docs/architecture.md`）

@@ -22,6 +22,7 @@ import {
   nativeMaxEdgeOptions,
   postProcessOptions,
   upscaleTierOptions,
+  upscaleTierHints,
   type CapabilityResult,
   type CapabilityState,
   type CompatPreset,
@@ -568,7 +569,7 @@ export function SettingsPage() {
               >
                 <Field
                   label="后处理"
-                  hint={image.postProcess === 'double' ? '放大降噪后缩回，再放大降噪一次，更干净也更慢' : undefined}
+                  hint={image.postProcess === 'double' ? '放大降噪后缩回，再放大降噪一次，线条更清楚也更慢' : undefined}
                 >
                   <CompactSelect
                     value={image.postProcess}
@@ -576,7 +577,7 @@ export function SettingsPage() {
                     options={postProcessOptions}
                   />
                 </Field>
-                <Field label="放大档位" hint="快速档：低性能机用，画质下降">
+                <Field label="放大档位" hint={upscaleTierHints[image.upscaleTier]}>
                   <CompactSelect
                     value={image.upscaleTier}
                     disabled={image.postProcess === 'off'}

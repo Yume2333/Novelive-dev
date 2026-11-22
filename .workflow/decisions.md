@@ -869,3 +869,11 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** 声明的四项用户大多答不上来，填错也只会在用到时出问题，直接按实际结果报错更省事。实际在用的只有 Codex 渠道和官方 API 两种，档位就能覆盖。双重放大降噪让创作者用更长的处理时间换更干净的画面。
 - **Decided by:** user
 - **Supersedes:** 2026-11-22 - 图片设置加生图质量、原生长边上限和后处理开关
+
+## 2026-11-22 - 放大档位三选一：动漫 / 快速 / 保留细节
+
+- **Decided:** 放大档位改为三档，用户在设置页选：动漫（默认，`realesrgan-x4plus-anime` = Upscayl `digital-art-4x`）、快速（`realesr-animevideov3-x4`，低性能机用、画质下降）、保留细节（`4x-NMKD-YandereNeo`，WTFPL）。三档都能配「放大降噪」和「双重放大降噪」。YandereNeo 没有官方 ncnn 版，构建时从 OpenModelDB 原始 `.pth`（sha256 `988f57dd…`）用 pnnx 转 ncnn，输入输出 blob 改名 `data` / `output`，由 `upscayl-bin` 加载。快速档用 realesrgan-ncnn-vulkan 20220424 包里的官方权重，不用 Upscayl 的 `upscayl-lite-4x`（权重不同，透明立绘输出错误）。
+- **Instead of:** 只保留动漫和快速两档；默认换成 YandereNeo 并去掉双重放大降噪（agent 的建议）；JaNai V3、UltraSharpV2、AnimeSharpV4（画质最好，但 CC-BY-NC 系许可且 DAT2 在 4060 上一张立绘约 2 分钟）；APISR（GPL，加粗线条、改画风）。
+- **Because:** 所有者看完 17 个模型 × 3 遍的真图对比：动漫风格和线条清晰度上 `digital-art-4x` 最好，它和 animevideov3 的双重放大在风格化和线条上明显更好；YandereNeo 改动原画最少，保留复杂纹理更好，适合写实或细节多的画面。证据在 `.workflow/evidence/spikes-r4/upscale/`。
+- **Decided by:** user
+- **Supersedes:** 2026-11-21 - 放大默认用 Real-ESRGAN 动漫模型

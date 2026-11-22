@@ -75,7 +75,7 @@ export const defaultTextConfig = (slot: Exclude<ModelSlot, 'image'>): TextModelC
 
 export type ImageQuality = 'high' | 'medium' | 'low'
 export type PostProcessMode = 'off' | 'single' | 'double'
-export type UpscaleTier = 'anime' | 'fast'
+export type UpscaleTier = 'anime' | 'fast' | 'detail'
 
 export interface ImageModelConfig {
   base: string
@@ -129,9 +129,16 @@ export const postProcessOptions: { value: PostProcessMode; label: string }[] = [
 ]
 
 export const upscaleTierOptions: { value: UpscaleTier; label: string }[] = [
-  { value: 'anime', label: '动漫模型（默认）' },
-  { value: 'fast', label: '快速档' },
+  { value: 'anime', label: '动漫（默认）' },
+  { value: 'fast', label: '快速' },
+  { value: 'detail', label: '保留细节' },
 ]
+
+export const upscaleTierHints: Record<UpscaleTier, string | undefined> = {
+  anime: undefined,
+  fast: '低性能机用，画质下降',
+  detail: '少改原画，保留纹理细节',
+}
 
 /** 图片模型能力测试：文生图、透明底、图片编辑三项各给一个结果 */
 export type ImageCapability = 't2i' | 'transparent' | 'edit'
