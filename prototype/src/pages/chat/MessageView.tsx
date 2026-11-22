@@ -425,11 +425,12 @@ export function MessageParts({ parts, ctx, nested, streaming }: {
  * 对话面板里的消息行：用户消息右侧气泡（可编辑、可切分支），
  * Agent 消息左侧按部分排。controls 放分支切换、编辑按钮这类行尾控件。
  */
-export function MessageRow({ node, ctx, controls, streaming }: {
+export function MessageRow({ node, ctx, controls, streaming, onPreviewImage }: {
   node: ChatNode
   ctx?: ConfirmCtx
   controls?: ReactNode
   streaming?: boolean
+  onPreviewImage?: (img: { src: string; name: string }) => void
 }) {
   const mine = node.role === 'user'
   const text = node.parts.filter((p): p is Extract<MessagePart, { kind: 'text' }> => p.kind === 'text')
@@ -448,13 +449,24 @@ export function MessageRow({ node, ctx, controls, streaming }: {
         {images.length ? (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {images.map((p) => (
-              <img
-                key={p.id}
-                src={p.src}
-                alt={p.name}
-                title={p.name}
-                style={{ maxWidth: 160, maxHeight: 110, borderRadius: 'var(--radius-md)', border: '1px solid var(--white-60)', display: 'block' }}
-              />
+              <span key={p.id} className="nl-img-thumb">
+                <button
+                  type="button"
+                  className="nl-img-thumb-btn"
+                  onClick={() => onPreviewImage?.({ src: p.src, name: p.name })}
+                  aria-label={`查看大图：${p.name}`}
+                  title={p.name}
+                >
+                  <img
+                    src={p.src}
+                    alt={p.name}
+                    style={{ maxWidth: 160, maxHeight: 110, display: 'block' }}
+                  />
+                  <span className="nl-img-thumb-mask" aria-hidden="true">
+                    <Icon name="open_in_full" size={16} />
+                  </span>
+                </button>
+              </span>
             ))}
           </div>
         ) : null}

@@ -198,6 +198,76 @@ button.glass-panel:active:not(:disabled) { box-shadow: var(--shadow-inset); }
 }
 .nl-dropdown-item:hover { background: var(--white-70); }
 
+.nl-img-thumb {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.nl-img-thumb-btn {
+  position: relative;
+  display: block;
+  padding: 0;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--white-80);
+  box-shadow: var(--shadow-glass);
+  transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.nl-img-thumb:hover .nl-img-thumb-btn {
+  box-shadow: var(--shadow-raised);
+}
+.nl-img-thumb-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  color: var(--stage-text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.nl-img-thumb:hover .nl-img-thumb-mask,
+.nl-img-thumb:focus-within .nl-img-thumb-mask {
+  opacity: 1;
+}
+.nl-img-thumb-close {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--veil-95);
+  color: var(--color-on-surface-variant);
+  border: 1px solid var(--divider);
+  box-shadow: var(--shadow-chip);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0;
+  transform: scale(0.85);
+  pointer-events: none;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.nl-img-thumb:hover .nl-img-thumb-close,
+.nl-img-thumb:focus-within .nl-img-thumb-close {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+.nl-img-thumb-close:hover {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
+}
+
 .soft-glow { animation: soft-pulse 4s infinite alternate; }
 @keyframes soft-pulse {
   0% { opacity: 0.7; box-shadow: 0 0 3px var(--glow); }

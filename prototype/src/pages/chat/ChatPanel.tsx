@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Button, Icon } from '../../components/Button'
 import { Chip, ConfirmDialog, Tooltip } from '../../components/Extended'
 import { inputStyle, textareaStyle } from '../../components/Form'
+import { Modal } from '../../components/Modal'
 import { Collapse } from '../../components/Motion'
 import { OverlayScrollbar, ScrollArea } from '../../components/ScrollArea'
 import { useToast } from '../../components/Toast'
@@ -118,6 +119,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
   const [inputExpanded, setInputExpanded] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   // 待发送的贴图：缩略图 chips，随下一条消息发出
+  const [previewImage, setPreviewImage] = useState<{ src: string; name: string } | null>(null)
   const [pendingImages, setPendingImages] = useState<{ id: string; src: string; name: string }[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const [ctxOverride, setCtxOverride] = useState<string | null | undefined>(undefined)
@@ -468,6 +470,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
             node={n}
             ctx={confirmCtx}
             streaming={running === n.id}
+            onPreviewImage={setPreviewImage}
             controls={
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {nav}
@@ -633,12 +636,28 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
       {pendingImages.length ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap', flexShrink: 0 }}>
           {pendingImages.map((img) => (
-            <span key={img.id} style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
-              <img src={img.src} alt={img.name} title={img.name} style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-md)', border: '1px solid var(--white-60)', display: 'block' }} />
+            <span key={img.id} className="nl-img-thumb">
               <button
-                onClick={() => setPendingImages((list) => list.filter((x) => x.id !== img.id))}
+                type="button"
+                className="nl-img-thumb-btn"
+                onClick={() => setPreviewImage({ src: img.src, name: img.name })}
+                aria-label={`查看原图：${img.name}`}
+                title={`点击放大 · ${img.name}`}
+              >
+                <img src={img.src} alt={img.name} style={{ width: 48, height: 48, objectFit: 'cover', display: 'block' }} />
+                <span className="nl-img-thumb-mask" aria-hidden="true">
+                  <Icon name="open_in_full" size={14} />
+                </span>
+              </button>
+              <button
+                type="button"
+                className="nl-img-thumb-close"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPendingImages((list) => list.filter((x) => x.id !== img.id))
+                }}
                 title="移除"
-                style={{ position: 'absolute', top: -6, right: -6, width: 16, height: 16, borderRadius: 'var(--radius-full)', background: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface-variant)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--divider)', padding: 0 }}
+                aria-label={`移除 ${img.name}`}
               >
                 <Icon name="close" size={10} />
               </button>
@@ -838,6 +857,32 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
         }}
         onCancel={() => setConfirmItem(null)}
       />
+      <Modal
+        open={!!previewImage}
+        title={previewImage?.name || '图片预览'}
+        onClose={() => setPreviewImage(null)}
+        width={760}
+      >
+        {previewImage ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'var(--color-surface-container-low)',
+              border: '1px solid var(--divider)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 'var(--space-3)',
+            }}
+          >
+            <img
+              src={previewImage.src}
+              alt={previewImage.name}
+              style={{ maxWidth: '100%', maxHeight: '68vh', objectFit: 'contain', borderRadius: 'var(--radius-md)', display: 'block' }}
+            />
+          </div>
+        ) : null}
+      </Modal>
     </div>
   )
 }
