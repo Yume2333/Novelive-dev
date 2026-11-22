@@ -1,0 +1,29 @@
+M1b/02 writer, review and NVS validation
+Base: e7cfb4807edabffe81fe901a7da3aa8bb2624f93
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-writer.test.ts
+Test Files  1 passed (1)
+     Tests  5 passed (5)
+
+$ NL_REPLAY=strict pnpm check
+Test Files  20 passed (20)
+     Tests  294 passed (294)
+
+The task Check exercises writer and fidelity provider cassettes, rejects an invented citation, confirms one review-driven revision with retained IDs, verifies a style-only pass, checks priority continuity and settings, segments a long input, and verifies scene-local compiler repairs and retry exhaustion.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M1b TXT wizard|M1b minimal player|M1b creation surfaces'
+Running 6 tests using 3 workers
+  6 passed (6.8s)
+These checks exercise real Electron TXT import and local first-chapter playback separately. The confirmation UI uses a projection fixture: it does not prove real scheduler dispatch. On the base and this branch, production.playerChapter is the only production handler registered in creator entry.ts. Task M1b/09 owns the creator/desktop wiring and the combined Electron gate:
+$ NL_REPLAY=strict pnpm exec playwright test --grep 'M1b make and play' --list
+Error: No tests found
+Total: 0 tests in 0 files
+
+Decisions:
+- Return compiled scenes and beats, with bounded per-scene diagnostic repair through the existing compiler, instead of a new DSL or whole-chapter retries.
+- Keep exact source quotes as the gate for fidelity issues, not a model's self-reported confidence. Style runs separately only when enabled; valid issues trigger one revision pass and no re-review.
+- Use source paragraph boundaries and carry the preceding ending as context, not a free text cut. Priority chapters take the previous preview when no previous script is available; selection remains with the caller. Red lines are supplied as mandatory instructions; evaluating arbitrary prose red lines remains human review, not a claimed automated guarantee.
+- Record one short synthetic chapter for both writer and fidelity tools; use in-process fixtures for failure paths instead of buying extra recordings.
+
+NL_REPLAY=record usage: 5 requests, 0 images. Four successful requests consumed 4,181 measured tokens (1,498 writer, 2,683 fidelity evaluator); the first writer request returned HTTP 404 because the provisioned base was missing the API path and returned no usage. Its 16,384-token reservation remains in the private ledger; conservative total 20,565 tokens. Four successful responses are in the cassette; the failed response is excluded. Relay host and credential checks on the cassette were clear.
+Independent review skipped: no fresh reviewer or isolated session launcher available; flow-close must cover it.
