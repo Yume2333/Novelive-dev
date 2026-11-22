@@ -136,7 +136,7 @@ function WorkSection({ work, inside }: { work: Work; inside: boolean }) {
       {isProject ? (
         <button
           onClick={chatOpen ? closeChat : openChat}
-          className="neu-button"
+          className="glass-panel"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -147,7 +147,8 @@ function WorkSection({ work, inside }: { work: Work; inside: boolean }) {
             fontSize: 14,
             fontWeight: 600,
             color: 'var(--color-primary)',
-            boxShadow: chatOpen ? 'var(--shadow-neu-inset)' : undefined,
+            background: chatOpen ? 'var(--white-90)' : undefined,
+            transition: 'background 0.15s ease',
           }}
         >
           <Icon name="auto_awesome" size={18} />
@@ -178,7 +179,7 @@ function GlobalStatus({ onOpen }: { onOpen: () => void }) {
   return (
     <button
       onClick={onOpen}
-      className="neu-button"
+      className="glass-panel"
       style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-lg)', textAlign: 'left' }}
     >
       <Icon
