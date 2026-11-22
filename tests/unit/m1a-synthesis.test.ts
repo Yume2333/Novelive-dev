@@ -45,6 +45,13 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 	const repeated = body.model === 'fixture-repeated-proposal'
 	const returning = body.model === 'fixture-returning-proposal'
 	const aliasUpdates = body.model === 'fixture-alias-updates'
+	const emissionOrder = body.model === 'fixture-emission-order'
+	const guide = {
+		id: 'guide',
+		name: 'Guide',
+		aliases: [],
+		status: 'candidate',
+	} as const
 	const oversized = '🦊'.repeat(160)
 	if (firstLongEvent && events === 1) {
 		const encoded = /^Recent event summaries: (.+)$/m.exec(prompt)?.[1] ?? ''
@@ -58,7 +65,7 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 		chapters: Array.from(
 			returning
 				? [`c${events + 1}`]
-				: aliasUpdates
+				: aliasUpdates || emissionOrder
 					? [events === 0 ? 'c1' : 'c2']
 					: repeated && events > 0
 						? ['c2']
@@ -72,38 +79,58 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 			firstLongEvent && events === 0
 				? oversized
 				: `Event ${packet[1]}:${events}`,
-		is_last: aliasUpdates
+		is_last: emissionOrder
 			? events === 3
-			: returning
+			: returning || aliasUpdates
 				? events === 2
 				: !(firstLongEvent || repeated) || events > 0,
-		biblePatch: aliasUpdates
+		biblePatch: emissionOrder
 			? events === 0
 				? []
 				: [
+						events === 2
+							? {
+									kind: 'character',
+									op: 'update',
+									entry: { ...guide, aliases: ['Navigator'] },
+								}
+							: { kind: 'character', op: 'add', entry: guide },
 						{
 							kind: 'character',
 							op: 'update',
 							entry: {
 								...confirmed,
-								identity: undefined,
-								aliases: [events === 2 ? 'Zulu' : 'Alpha'],
+								identity: events === 2 ? 'Admiral' : 'Captain',
 							},
 						},
 					]
-			: repeated || returning
-				? [
-						{
-							kind: 'character',
-							op: 'update',
-							entry: {
-								...confirmed,
-								identity:
-									returning && events !== 1 ? 'Cartographer' : 'Captain',
+			: aliasUpdates
+				? events === 0
+					? []
+					: [
+							{
+								kind: 'character',
+								op: 'update',
+								entry: {
+									...confirmed,
+									identity: undefined,
+									aliases: [events === 1 ? 'Zulu' : 'Alpha'],
+								},
 							},
-						},
-					]
-				: [],
+						]
+				: repeated || returning
+					? [
+							{
+								kind: 'character',
+								op: 'update',
+								entry: {
+									...confirmed,
+									identity:
+										returning && events !== 1 ? 'Cartographer' : 'Captain',
+								},
+							},
+						]
+					: [],
 		glossaryPatch: [],
 	}
 	return new Response(
@@ -380,7 +407,7 @@ test.each([
 	},
 )
 
-test('same-chapter candidate alias updates apply in event order even when the final proposal repeats', async () => {
+test('the later same-chapter candidate alias update wins', async () => {
 	await seed(root)
 	using project = await Project.open(root)
 	const file = projectFiles.character(scope, 'ada')
@@ -405,6 +432,66 @@ test('same-chapter candidate alias updates apply in event order even when the fi
 		[{ aliases: ['Alpha'] }, 'c2'],
 	])
 	expect((await project.read(file)).entries[0].aliases).toEqual(['Alpha'])
+})
+
+test('deduplication retains the first addition and the first competing identity claim', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		connection: { ...connection, model: 'fixture-emission-order' },
+		strategy: 'events',
+		fetch: packetFetch,
+	})
+	expect(result.biblePatch.map(({ entry, op }) => [entry.id, op])).toEqual([
+		['guide', 'add'],
+		['ada', 'update'],
+		['guide', 'update'],
+		['ada', 'update'],
+	])
+	expect(result.conflicts).toMatchObject([
+		{ entry: { id: 'ada', identity: 'Admiral' } },
+	])
+	const { character } = await readBible(project)
+	expect(character).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({ id: 'guide', aliases: ['Navigator'] }),
+			expect.objectContaining({
+				id: 'ada',
+				changes: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
+			}),
+		]),
+	)
+})
+
+test('an undated update follows the dated addition it depends on', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const entry = {
+		id: 'guide',
+		name: 'Guide',
+		aliases: [],
+		status: 'candidate' as const,
+	}
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		[
+			{ kind: 'character', op: 'add', entry, observedChapter: 'c2' },
+			{
+				kind: 'character',
+				op: 'update',
+				entry: { ...entry, aliases: ['Navigator'] },
+			},
+		],
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toEqual([])
+	expect((await readBible(project)).character).toContainEqual({
+		...entry,
+		aliases: ['Navigator'],
+	})
 })
 
 test('automatic fallback streams all preview packets without truncation', async () => {

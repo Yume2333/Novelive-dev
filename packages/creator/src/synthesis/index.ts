@@ -397,11 +397,13 @@ ${packets[packet]}`,
 
 	const parts = state.whole ? [state.whole] : state.events
 	const skeleton = combine(volumeId, chapterIds, parts)
-	const proposals = new Map<
-		string,
-		{ item: BiblePatch[number]; content: string; chapter?: string }
-	>()
-	const located = new Set<string>()
+	type Proposal = {
+		item: BiblePatch[number]
+		content: string
+		chapter?: string
+	}
+	const proposals = new Map<string, Proposal>()
+	const located = new Map<string, Proposal>()
 	let packetIndex = 0
 	for (const part of parts) {
 		const packetIds = state.whole
@@ -423,22 +425,26 @@ ${packets[packet]}`,
 		for (const { observedChapter: _claimed, ...item } of part.biblePatch) {
 			const { content, observation } = proposalKeys(item, observed)
 			const key = JSON.stringify([content, observation])
-			if (observation) located.add(content)
-			if (item.op === 'add' || item.op === 'update') proposals.delete(key)
-			if (!proposals.has(key))
-				proposals.set(key, {
-					item,
-					content,
-					chapter: observation ? observed : undefined,
-				})
+			if (proposals.has(key)) continue
+			const proposal = {
+				item,
+				content,
+				chapter: observation ? observed : undefined,
+			}
+			proposals.set(key, proposal)
+			if (proposal.chapter && !located.has(content))
+				located.set(content, proposal)
 		}
 		if ('is_last' in part && part.is_last) packetIndex++
 	}
-	const biblePatch = [...proposals.values()].flatMap(
-		({ item, content, chapter }) => {
-			if (!chapter) return located.has(content) ? [] : [item]
-			return [{ ...item, observedChapter: chapter }]
-		},
+	const ordered = new Set<Proposal>()
+	for (const proposal of proposals.values()) {
+		ordered.add(
+			proposal.chapter ? proposal : (located.get(proposal.content) ?? proposal),
+		)
+	}
+	const biblePatch = [...ordered].map(({ item, chapter }) =>
+		chapter ? { ...item, observedChapter: chapter } : item,
 	)
 	const glossaryPatch = unique(parts.flatMap((part) => part.glossaryPatch))
 	options.signal?.throwIfAborted()
