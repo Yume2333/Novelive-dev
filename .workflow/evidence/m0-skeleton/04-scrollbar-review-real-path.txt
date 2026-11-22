@@ -1,0 +1,1 @@
+pnpm dev Electron: overflow showed overlay; reduced motion disabled the fade; track click and thumb drag both scrolled

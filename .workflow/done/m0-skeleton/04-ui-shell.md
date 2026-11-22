@@ -17,3 +17,4 @@
 - Check after: 指定命令通过。[检查日志](../../evidence/m0-skeleton/04-ui-check.txt)
 - Real path: Electron 开发入口打开空书库、切换用量和暗色主题。[实际运行输出](../../evidence/m0-skeleton/04-ui-real-path.txt) · [亮色书库](../../evidence/m0-skeleton/04-library-light.png) · [暗色用量](../../evidence/m0-skeleton/04-usage-dark.png)
 - Review: skipped — 本会话未进行独立工作流/安全审查或 W5 原型截图对照。
+- PR #5 审查修复: 溢出时显示自定义滚动条，点击轨道与拖动滑块均可滚动；减少动态效果时停用淡入与平滑滚动。[复查日志](../../evidence/m0-skeleton/04-scrollbar-review-check.txt) · [开发入口复验](../../evidence/m0-skeleton/04-scrollbar-review-real-path.txt)
