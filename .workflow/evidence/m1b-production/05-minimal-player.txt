@@ -1,0 +1,60 @@
+M1b/05 — 2026-11-22
+Base: f1a0090eba860b4f86937b57b09c7ab9f246b4ac
+
+Check
+$ pnpm check
+Checked 124 files in 41ms. No fixes applied.
+Found 1 info.
+Test Files  13 passed (13)
+     Tests  216 passed (216)
+
+The informational useTemplate diagnostic is in the unchanged
+tests/fixtures/text-models/build-synthetic.ts:63. The command exited 0.
+Full output: 05-minimal-player-check.txt
+
+Real path
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M1b minimal player'
+✓ tests/e2e/m1b-player.spec.ts:13:1 › M1b minimal player renders local compiled beats and advances all four text kinds (1.3s)
+1 passed (1.9s)
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e
+15 passed (11.0s)
+This full-suite run preceded the bible-speaker review fix. After that fix,
+pnpm check and the targeted minimal-player Electron check were rerun as above.
+
+Full outputs: 05-minimal-player-real-path.txt, 05-minimal-player-e2e.txt
+Screenshot: 05-minimal-player.png (rendered dialogue state, visually inspected)
+
+The built file:// Electron renderer opens /work/:id/play without the shell
+sidebar. The existing native folder picker selects a real synthetic project;
+the test supplies the folder-dialog result, not the chapter or resource data.
+production.playerChapter reads the first chapter's ordered .nvs scenes and
+merges series/volume/work asset registries. UI compiles with format; the player
+receives compiled scenes and a PlayerResources adapter. Content-addressed asset
+copies are served by the unchanged preload resourceUrl/cache protocol.
+Speaker IDs come from validated bible/characters/*.json documents at series,
+volume and work scope, independently of the asset registry. The fixture's
+listener inner monologue has a volume-level bible entry and no sprite asset;
+unit coverage also checks series/work speakers, absent bible directories and
+invalid bible documents. Registry-only speakers are not accepted as a fallback.
+
+Canvas screenshots match background and character RGB values. DOM assertions
+cover dialogue/name, distinct inner monologue/name, nameless narration and an
+independent caption outside the text box. Further clicks hide the character
+and reach the chapter end. Unit coverage includes click/auto/delay ordering,
+cross-scene playback, empty input, async click exclusion, render failure,
+timer cancellation, cache bytes, missing works/chapters and unsafe asset paths.
+
+Scope choices
+- No library/project-location registry exists yet. Use the existing folder
+  picker instead of guessing work paths or repurposing the default-project
+  directory setting; play the first chapter from its beginning.
+- Keep the existing cache protocol instead of exposing arbitrary local file
+  URLs. No preload, main-process IPC channel or cache-policy changes.
+- Only bg/show/hide stage actions are implemented. Full transitions, inline
+  effects, pagination, saves and menus remain outside this minimal task.
+- Non-click text beats use a fixed two-second reading interval in this minimal
+  player; explicit wait delays retain their compiled duration.
+
+This is the minimal-player task check, not complete W2 production acceptance.
+Paid usage: 0 calls, 0 tokens, 0 images. No ledger entry.

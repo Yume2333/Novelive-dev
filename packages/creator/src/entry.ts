@@ -28,6 +28,10 @@ function strictReplayOptions(): ReplayOptions | undefined {
 registry.register('config.get', () => config.get())
 registry.register('config.update', (patch) => config.update(patch))
 registry.register('config.reset', () => config.reset())
+registry.register('production.playerChapter', async ({ directory, workId }) => {
+	const { loadPlayerChapter } = await import('./project/player')
+	return loadPlayerChapter(directory, workId, cacheDir)
+})
 registry.register('model.suggestContextWindow', async (model) => {
 	const { suggestContextWindow } = await import('./models/text')
 	return suggestContextWindow(model)

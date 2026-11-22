@@ -3,8 +3,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { LibraryPage } from './pages/library/LibraryPage'
+import { PlayerPage } from './pages/player/PlayerPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
 import { UsagePage } from './pages/usage/UsagePage'
+import { productionRoutes } from './routes/production'
 import { AppShell } from './shell/AppShell'
 import '@fontsource/hanken-grotesk/400.css'
 import '@fontsource/manrope/700.css'
@@ -24,6 +26,7 @@ if (root)
 		<StrictMode>
 			<HashRouter>
 				<Routes>
+					<Route path={productionRoutes.play} element={<PlayerPage />} />
 					<Route element={<AppShell />}>
 						<Route index element={<LibraryPage />} />
 						<Route path="usage" element={<UsagePage />} />
