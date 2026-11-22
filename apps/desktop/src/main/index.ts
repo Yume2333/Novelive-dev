@@ -7,25 +7,46 @@ import {
 	dialog,
 	ipcMain,
 	MessageChannelMain,
+	protocol,
 	shell,
 	utilityProcess,
 } from 'electron'
+import { cacheResponse } from '../../../../packages/creator/src/host-runtime/cache'
 
 let creator: Electron.UtilityProcess | undefined
 let generation = 0
 let state: HostState['creator'] = 'down'
 let library: BrowserWindow | undefined
+let failures = 0
+const failureLimit = 3
+const handshakeTimeoutMs = 10_000
+
+protocol.registerSchemesAsPrivileged([
+	{ scheme: 'novelive', privileges: { standard: true, secure: true } },
+])
 
 function logDir() {
 	return join(app.getPath('userData'), 'logs')
 }
 
 function appState(): HostState {
-	return { creator: state, generation, breakerOpen: false, logDir: logDir() }
+	return {
+		creator: state,
+		generation,
+		breakerOpen: failures >= failureLimit,
+		logDir: logDir(),
+	}
+}
+
+function stopCreator() {
+	const worker = creator
+	creator = undefined
+	worker?.kill()
 }
 
 function startCreator(window: BrowserWindow) {
-	creator?.kill()
+	if (failures >= failureLimit || window.isDestroyed()) return
+	stopCreator()
 	generation += 1
 	state = 'starting'
 	const current = generation
@@ -43,25 +64,41 @@ function startCreator(window: BrowserWindow) {
 	)
 	creator = worker
 	const { port1, port2 } = new MessageChannelMain()
+	let ready = false
+	const handshake = setTimeout(() => {
+		if (worker === creator) {
+			down()
+			worker.kill()
+		}
+	}, handshakeTimeoutMs)
+
+	function down() {
+		clearTimeout(handshake)
+		if (worker !== creator) return
+		creator = undefined
+		if (!ready) failures += 1
+		state = ready ? 'down' : 'failed'
+		if (window.isDestroyed()) return
+		window.webContents.send('novelive:down', { generation: current })
+		if (ready) startCreator(window)
+	}
 
 	worker.on('message', (message) => {
 		if (
 			worker !== creator ||
+			ready ||
 			message?.type !== 'ready' ||
 			message.generation !== current
 		)
 			return
+		clearTimeout(handshake)
+		ready = true
+		failures = 0
 		state = 'ready'
 		if (!window.isDestroyed())
 			window.webContents.send('novelive:ready', { generation: current })
 	})
-	worker.once('exit', () => {
-		if (worker !== creator) return
-		creator = undefined
-		state = 'down'
-		if (!window.isDestroyed())
-			window.webContents.send('novelive:down', { generation: current })
-	})
+	worker.once('exit', down)
 
 	worker.postMessage(null, [port1])
 	window.webContents.postMessage('novelive:port', current, [port2])
@@ -83,7 +120,7 @@ function openLibrary() {
 	window.webContents.on('did-finish-load', () => startCreator(window))
 	window.once('closed', () => {
 		library = undefined
-		creator?.kill()
+		stopCreator()
 	})
 	if (process.env.ELECTRON_RENDERER_URL && !app.isPackaged) {
 		void window.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -93,6 +130,9 @@ function openLibrary() {
 }
 
 app.whenReady().then(() => {
+	protocol.handle('novelive', (request) =>
+		cacheResponse(join(app.getPath('userData'), 'cache'), request.url),
+	)
 	ipcMain.handle('novelive:state', () => appState())
 	ipcMain.handle('novelive:pick-folder', async () => {
 		const result = await dialog.showOpenDialog({
@@ -106,6 +146,7 @@ app.whenReady().then(() => {
 		if (error) throw new Error(error)
 	})
 	ipcMain.handle('novelive:restart', () => {
+		failures = 0
 		if (library) startCreator(library)
 	})
 

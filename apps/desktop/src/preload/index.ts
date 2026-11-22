@@ -45,6 +45,9 @@ ipcRenderer.on('novelive:port', (event, current: number) => {
 	generation = current
 	const [connection] = event.ports
 	port = connection
+	connection.addEventListener('close', () => {
+		if (connection === port) disconnect()
+	})
 	connection.onmessage = ({ data }) => {
 		if (connection !== port) return
 		if (!creatorFrame.check(data)) {
