@@ -1,0 +1,228 @@
+.stack {
+	display: grid;
+	gap: var(--space-7);
+	max-width: 960px;
+	margin-top: var(--space-5);
+}
+
+.stack .stack {
+	gap: var(--space-3);
+	margin-top: 0;
+}
+
+.stack :is(h2, p, ol) {
+	margin-block: 0;
+}
+
+.stack h2 {
+	font: 700 18px var(--font-display);
+}
+
+.lead {
+	color: var(--color-on-surface-variant);
+}
+
+.card {
+	min-width: 0;
+	margin-inline: 0;
+	padding: var(--space-5);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-xl);
+	background: var(--panel-70);
+	box-shadow: var(--shadow-glass);
+}
+
+.card legend {
+	padding-inline: var(--space-2);
+	font-weight: 700;
+}
+
+.actions,
+.row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2) var(--space-3);
+}
+
+.row {
+	justify-content: space-between;
+	min-height: calc(var(--space-7) + var(--space-1));
+}
+
+.list {
+	padding: 0;
+	list-style: none;
+}
+
+.list > li {
+	padding-block: var(--space-3);
+}
+
+.list > li + li {
+	border-top: 1px solid var(--divider);
+}
+
+.primary,
+.button {
+	display: inline-flex;
+	min-height: 36px;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	padding: var(--space-1) var(--space-3);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-container);
+	color: var(--color-on-surface);
+	font: inherit;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.button:hover {
+	background: var(--color-surface-container-high);
+}
+
+.primary {
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+}
+
+.primary:hover {
+	background: var(--color-primary-container);
+}
+
+:is(.button, .primary):disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.notice {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+	padding: var(--space-3) var(--space-4);
+	border-radius: var(--radius-md);
+	background: var(--color-secondary-container);
+	color: var(--color-on-secondary-container);
+}
+
+.notice a {
+	color: var(--color-on-surface);
+}
+
+.progress {
+	display: block;
+	width: 100%;
+	accent-color: var(--color-primary);
+}
+
+.badge,
+.issue,
+.published {
+	display: inline-flex;
+	gap: var(--space-1);
+	align-items: center;
+	padding: var(--space-1) var(--space-2);
+	border-radius: var(--radius-sm);
+	background: var(--color-surface-container);
+	color: var(--color-on-surface-variant);
+}
+
+.published {
+	background: var(--color-success-container);
+	color: var(--color-success);
+}
+
+.issue {
+	background: var(--color-error-container);
+	color: var(--color-on-error-container);
+}
+
+.gallery {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-3);
+}
+
+.candidate {
+	position: relative;
+	display: grid;
+	align-content: start;
+	padding: var(--space-1);
+	border: 1px solid transparent;
+	border-radius: var(--radius-lg);
+	background: var(--color-surface-container);
+	cursor: pointer;
+}
+
+.candidate[data-selected="true"] {
+	border-color: var(--accent-border-35);
+	background: var(--color-secondary-container);
+}
+
+.candidate:has(input:focus-visible) {
+	box-shadow: var(--shadow-focus);
+}
+
+.candidate:has(input:disabled:not(:checked)) {
+	opacity: 0.55;
+	cursor: default;
+}
+
+.candidate input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+}
+
+.candidate img {
+	display: block;
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	border-radius: var(--radius-md);
+	background: var(--color-surface-container-high);
+	object-fit: contain;
+}
+
+.portraits .candidate img {
+	aspect-ratio: 2 / 3;
+}
+
+.candidate span {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-2);
+}
+
+.records {
+	margin-top: var(--space-3);
+	padding: var(--space-3);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-container-low);
+	overflow-wrap: anywhere;
+}
+
+.records time {
+	margin-inline-start: var(--space-2);
+	color: var(--color-on-surface-variant);
+}
+
+.records details {
+	margin-top: var(--space-1);
+}
+
+.records details p {
+	white-space: pre-wrap;
+}
+
+@media (hover: hover) {
+	li:not(:hover, :focus-within) > .chapterActions:not([data-expanded="true"]) {
+		opacity: 0;
+	}
+}

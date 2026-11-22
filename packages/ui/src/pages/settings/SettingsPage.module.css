@@ -46,6 +46,7 @@
 
 .page button:not(.expand),
 .page input:not([type="checkbox"]),
+.page textarea,
 .page select {
 	box-sizing: border-box;
 	padding: var(--space-2) var(--space-3);
@@ -90,6 +91,7 @@
 
 .page button:focus-visible,
 .page select:focus-visible,
+.page textarea:focus-visible,
 .page input:focus-visible {
 	outline: none;
 	box-shadow: var(--shadow-focus);
@@ -226,9 +228,34 @@
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
 	width: 100%;
 	min-width: 0;
+}
+
+.presetEditor {
+	display: grid;
+	gap: var(--space-3);
+	padding: var(--space-4);
+	border-top: 1px solid var(--divider);
+}
+
+.textArea {
+	position: relative;
+	display: grid;
+}
+
+.textArea textarea {
+	resize: none;
+	scrollbar-width: none;
+}
+
+.replacement {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+	gap: var(--space-2);
+	margin-bottom: var(--space-2);
 }
 
 .inherit,

@@ -37,5 +37,5 @@ jobs:
           pnpm install --frozen-lockfile
           node -e "require('electron')"
       - run: pnpm check
-      - name: Run Electron SQLite, sharp and player smoke under Xvfb
-        run: xvfb-run -a pnpm test:e2e --grep 'renders the empty library and connects to a real creator|M1b fixed scene'
+      - name: Run Electron SQLite, sharp, player and production UI under Xvfb
+        run: xvfb-run -a pnpm test:e2e --grep 'renders the empty library and connects to a real creator|M1b fixed scene|M1b creation surfaces'

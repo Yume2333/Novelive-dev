@@ -1,0 +1,23 @@
+M1b/03 — 2026-11-22
+Base: f1a0090eba860b4f86937b57b09c7ab9f246b4ac
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-art.test.ts
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+
+$ NL_REPLAY=strict pnpm check
+Checked 127 files in 50ms. No fixes applied.
+Found 1 info.
+ Test Files  13 passed (13)
+      Tests  217 passed (217)
+
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m1b-art/run.ts "$root"
+Stage, confirm and draw: 3 main visuals, 3 costume candidates, 6 drawn assets
+Reopen SQLite project: 6 persisted drawn assets
+Failure mapping: 4 placeholders, 1 unsupported (not substituted)
+
+The CLI uses a real local project, the production model adapters, and committed
+synthetic HTTP responses. This verifies the creator service path, not Electron
+integration or the quality and availability of any real model.
+
+Paid usage: 0 calls, 0 tokens, 0 images.

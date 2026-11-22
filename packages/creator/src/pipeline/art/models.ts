@@ -1,0 +1,196 @@
+import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
+import { compile, type Schema } from '@earendil-works/pi-schema'
+import OpenAI, { toFile } from 'openai'
+import type { CommandError } from '../../contract'
+import {
+	type ImageCapability,
+	type ImageConfig,
+	imageError,
+	imageProvider,
+} from '../../models/image'
+import { imageDownloadUpstream } from '../../models/image/download'
+import {
+	buildTextModel,
+	createTextStream,
+	type TextConnection,
+} from '../../models/text'
+import { createReplayFetch, type ReplayOptions } from '../../replay'
+import type { Dimensions } from './check'
+
+export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
+
+function checkedReplay(fetch: typeof globalThis.fetch) {
+	let failure: unknown
+	return {
+		get failure() {
+			return failure
+		},
+		fetch: (async (input, init) => {
+			try {
+				return await fetch(input, init)
+			} catch (error) {
+				if (
+					error instanceof Error &&
+					error.message.startsWith('Missing strict replay cassette:')
+				)
+					failure = error
+				throw error
+			}
+		}) satisfies typeof globalThis.fetch,
+	}
+}
+
+export function imageRenderer(config: ImageConfig, options: ModelOptions) {
+	const provider = imageProvider(config.baseUrl, config.model)
+	const replay = checkedReplay(createReplayFetch(options.replay))
+	const download = createReplayFetch({
+		...options.replay,
+		fetch: imageDownloadUpstream(config.baseUrl, options.replay?.fetch),
+	})
+	const client = new OpenAI({
+		baseURL: config.baseUrl,
+		apiKey: config.apiKey,
+		fetch: replay.fetch,
+		timeout: 90_000,
+		maxRetries: 0,
+	})
+	return async (
+		prompt: string,
+		refs: readonly Buffer[],
+		size: Dimensions,
+		transparent: boolean,
+	): Promise<{ bytes: Buffer } | { error: CommandError }> => {
+		const capability: ImageCapability = refs.length
+			? 'edit'
+			: transparent
+				? 'transparent'
+				: 'generate'
+		const parameters = {
+			model: config.model,
+			prompt,
+			size: `${size.width}x${size.height}` as const,
+		}
+		const signal = options.signal
+		const output = transparent
+			? ({ background: 'transparent', output_format: 'png' } as const)
+			: {}
+		const seedream = provider !== 'openai'
+		try {
+			signal?.throwIfAborted()
+			const response = seedream
+				? await client.images.generate(parameters, {
+						signal,
+						body: {
+							...parameters,
+							...output,
+							watermark: false,
+							response_format: 'b64_json',
+							...(refs.length
+								? {
+										image: refs.map(
+											(ref) =>
+												`data:image/png;base64,${ref.toString('base64')}`,
+										),
+									}
+								: {}),
+						},
+					})
+				: refs.length
+					? await client.images.edit(
+							{
+								...parameters,
+								...output,
+								quality: config.quality,
+								image: await Promise.all(
+									refs.map((ref, index) =>
+										toFile(ref, `ref-${index + 1}.png`, { type: 'image/png' }),
+									),
+								),
+							},
+							{ signal },
+						)
+					: await client.images.generate(
+							{ ...parameters, ...output, quality: config.quality },
+							{ signal },
+						)
+			const image = response.data?.[0] as
+				| {
+						b64_json?: string
+						url?: string
+						error?: { code: string; message: string }
+				  }
+				| undefined
+			if (seedream && image?.error && !image.b64_json && !image.url)
+				throw new OpenAI.APIError(
+					400,
+					image.error,
+					image.error.message,
+					new Headers(),
+				)
+			if (image?.b64_json)
+				return { bytes: Buffer.from(image.b64_json, 'base64') }
+			if (image?.url) {
+				const deadline = AbortSignal.timeout(90_000)
+				const response = await download(new URL(image.url), {
+					signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
+				})
+				if (response.ok)
+					return { bytes: Buffer.from(await response.arrayBuffer()) }
+				throw new OpenAI.APIConnectionError({
+					message: 'Image download failed',
+				})
+			}
+			throw new Error('Empty image response')
+		} catch (error) {
+			if (replay.failure) throw replay.failure
+			if (
+				error instanceof Error &&
+				error.message.startsWith('Missing strict replay cassette:')
+			)
+				throw error
+			return { error: imageError(error, capability, signal) }
+		}
+	}
+}
+
+export async function artJson<T>(
+	connection: TextConnection,
+	prompt: string,
+	schema: Schema<T>,
+	options: ModelOptions,
+	images: readonly Buffer[] = [],
+): Promise<T> {
+	const model = buildTextModel(connection, images.length > 0)
+	const replay = checkedReplay(createReplayFetch(options.replay))
+	const content = [
+		{ type: 'text' as const, text: prompt },
+		...images.map((png) => ({
+			type: 'image' as const,
+			mimeType: 'image/png',
+			data: png.toString('base64'),
+		})),
+	]
+	const response = await createTextStream({ fetch: replay.fetch })(
+		model,
+		normalizeContext({
+			messages: [{ role: 'user', content, timestamp: 0 }],
+		}),
+		{
+			apiKey: connection.apiKey,
+			signal: options.signal,
+			cacheRetention: 'none',
+		},
+	).result()
+	options.signal?.throwIfAborted()
+	if (replay.failure) throw replay.failure
+	if (response.stopReason !== 'stop')
+		throw new Error(
+			response.errorMessage ?? `Art model stopped: ${response.stopReason}`,
+		)
+	const text = response.content
+		.flatMap((part) => (part.type === 'text' ? [part.text] : []))
+		.join('')
+	const validated = compile(schema).validate(JSON.parse(text))
+	if (!validated.ok) throw new Error(JSON.stringify(validated.errors))
+	return validated.value
+}

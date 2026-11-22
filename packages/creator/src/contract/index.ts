@@ -21,7 +21,16 @@ import {
 import { importCommands } from './import'
 import { productionCommands } from './production'
 
-export type { ConfigUpdate, MaskedConfig, TextSlot } from '../config/schema'
+export {
+	type ConfigUpdate,
+	type MaskedConfig,
+	type ProductionRole,
+	type ProductionSettings,
+	roleModelDefaults,
+	type TextSlot,
+	type WriterPreset,
+	type WriterSettings,
+} from '../config/schema'
 export * from './import'
 export * from './production'
 
