@@ -41,7 +41,7 @@
 .cardHeader {
 	position: relative;
 	padding: var(--space-4) var(--space-5);
-	padding-inline-end: calc(var(--space-5) + 18px + var(--space-3));
+	padding-inline-end: calc(var(--space-5) + var(--space-4) + var(--space-3));
 }
 
 .page button:not(.expand),
@@ -70,8 +70,8 @@
 }
 
 .page button.testButton:not(.expand) {
-	gap: 5px;
-	padding: 5px 10px;
+	gap: var(--space-1);
+	padding: var(--space-1) var(--space-2);
 	border-color: var(--glass-border);
 	background: var(--panel-70);
 	box-shadow: var(--shadow-glass);
@@ -206,7 +206,7 @@
 }
 
 .fullField .field {
-	gap: 6px;
+	gap: var(--space-2);
 }
 
 .fullField .field > span {
@@ -239,7 +239,7 @@
 
 .inherit {
 	align-self: end;
-	min-height: 36px;
+	min-height: calc(var(--space-6) + var(--space-1));
 }
 
 .inherit input {
@@ -280,12 +280,12 @@
 }
 
 .appearance {
-	padding-block: 2px;
+	padding-block: calc(var(--space-1) / 2);
 }
 
 .appearance .row {
-	gap: 14px;
-	padding: 14px 18px;
+	gap: var(--space-3);
+	padding: var(--space-4);
 }
 
 .appearance .row + .row {
@@ -295,7 +295,7 @@
 
 .appearance .row + .row::before {
 	position: absolute;
-	inset: -1px 18px auto;
+	inset: -1px var(--space-4) auto;
 	height: 1px;
 	background: var(--divider);
 	content: "";
@@ -306,7 +306,7 @@
 }
 
 .appearance .row select {
-	padding: 7px 10px;
+	padding: var(--space-2);
 	border-color: var(--white-80);
 	background: var(--white-60);
 	font-size: 13px;
