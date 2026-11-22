@@ -248,6 +248,10 @@ export async function synthesizeVolume(
 
 	const bible = await readBible(project)
 	const basis = hash(bible)
+	const matching = saved?.fingerprint === fingerprint ? saved : undefined
+	const quarantined =
+		matching?.ready && matching.basis !== basis ? matching : undefined
+	const resumable = matching?.basis === basis ? matching : undefined
 	const maxTokens = Math.min(4096, Math.floor(model.contextWindow / 4))
 	const historyBudget = Math.min(1024, Math.floor(model.contextWindow / 16))
 	const budget = model.contextWindow - maxTokens - historyBudget
@@ -274,19 +278,17 @@ ${packetText.join('\n')}`
 			: []
 	const limit =
 		options.maxEvents ?? Math.max(minimumEventLimit, packets.length * 4)
-	const state: Checkpoint =
-		saved?.fingerprint === fingerprint && (saved.ready || saved.basis === basis)
-			? saved
-			: {
-					formatVersion,
-					fingerprint,
-					basis,
-					packet: 0,
-					events: [],
-					whole: null,
-					ready: false,
-					applied: false,
-				}
+	const state: Checkpoint = quarantined ??
+		resumable ?? {
+			formatVersion,
+			fingerprint,
+			basis,
+			packet: 0,
+			events: [],
+			whole: null,
+			ready: false,
+			applied: false,
+		}
 	if (useEvents && !packets.length && !state.ready)
 		throw new Error('Existing Bible is too large for synthesis context')
 
@@ -437,7 +439,7 @@ ${packets[packet]}`,
 		latest = await readBible(project)
 	}
 	const { conflicts, glossaryConflicts } =
-		hash(latest) === state.basis
+		!quarantined && hash(latest) === state.basis
 			? await applyPatches(
 					project,
 					latest,

@@ -618,6 +618,39 @@ test.each([false, true])(
 	},
 )
 
+test('an edit committed after the ready write but before publication is never overwritten', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const tower = projectFiles.location(scope, 'tower')
+	const write = project.write.bind(project)
+	const edited = {
+		...candidateTower,
+		description: 'Creator edit during publication',
+	}
+	vi.spyOn(project, 'write').mockImplementation(async (file, value) => {
+		await write(file, value)
+		if (
+			file.path === files.checkpoint.path &&
+			(value as { ready: boolean; applied: boolean }).ready &&
+			!(value as { applied: boolean }).applied
+		)
+			await write(tower, { formatVersion: 1, entries: [edited] })
+	})
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		strategy: 'whole',
+	})
+	expect(await project.read(tower)).toMatchObject({ entries: [edited] })
+	expect(result.conflicts).toContainEqual(
+		expect.objectContaining({
+			entry: expect.objectContaining({
+				id: 'tower',
+				conflict: 'Bible changed before synthesis publication',
+			}),
+		}),
+	)
+})
+
 test('changing a source preview during the run prevents publication', async () => {
 	await seed(root)
 	using project = await Project.open(root)
