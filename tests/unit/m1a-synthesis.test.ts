@@ -222,6 +222,23 @@ test('the default event cap can cover a volume with more than 128 packets', asyn
 	expect(result.chapters.map(({ chapterId }) => chapterId)).toEqual(ids)
 })
 
+test('automatic fallback also works at the minimum 4096-token context', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	for (const preview of previews)
+		await project.write(projectFiles.preview(preview.chapterId), {
+			...preview,
+			summary: preview.summary.repeat(70),
+		})
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		connection: { ...connection, contextWindow: 4096 },
+		fetch: packetFetch,
+	})
+	expect(packetFetch.mock.calls.length).toBeGreaterThan(1)
+	expect(result.chapters.map(({ chapterId }) => chapterId)).toEqual(chapters)
+})
+
 test('automatic fallback streams all preview packets without truncation', async () => {
 	await seed(root, true)
 	using project = await Project.open(root)

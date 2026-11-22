@@ -95,11 +95,10 @@ export interface SynthesisOptions {
 }
 
 const minimumEventLimit = 128
-const historyBudget = 1024
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const bytes = (text: string) => Buffer.byteLength(text)
-function recentEvents(events: Event[]) {
+function recentEvents(events: Event[], historyBudget: number) {
 	const summaries: string[] = []
 	let remaining = historyBudget - 2
 	for (let i = events.length - 1; i >= 0 && remaining > 0; i--) {
@@ -224,7 +223,8 @@ export async function synthesizeVolume(
 	const bible = await readBible(project)
 	const basis = hash(bible)
 	const maxTokens = Math.min(4096, Math.floor(model.contextWindow / 4))
-	const budget = model.contextWindow - maxTokens - 1024
+	const historyBudget = Math.min(1024, Math.floor(model.contextWindow / 16))
+	const budget = model.contextWindow - maxTokens - historyBudget
 	const packetText = previews.map((preview) => JSON.stringify(preview))
 	const instructions = `Synthesize the ordered chapter previews in ${options.language}. Adaptation requirements: ${options.requirements ?? ''}.
 Return only JSON with overview, chapters [{chapterId,progress}], biblePatch [{kind,op,entry}], glossaryPatch [entry].
@@ -240,7 +240,7 @@ ${packetText.join('\n')}`
 		strategy === 'events' ||
 		(strategy === 'auto' && bytes(wholePrompt) + 384 > budget)
 	const packetBudget = Math.floor(
-		(budget - bytes(instructions) - historyBudget - 1024) / 8,
+		(budget - bytes(instructions) - historyBudget - 768) / 3,
 	)
 	const packets =
 		useEvents && packetBudget > 0
@@ -344,7 +344,7 @@ ${packetText.join('\n')}`
 			`${instructions}
 Extract only the next event in packet ${packet + 1}/${packets.length}. A packet can contain a fragment of a chapter preview. Include one event string, only its changes, and is_last (true if this is the last event of this packet); report progress for affected chapters.
 Events already extracted: ${state.events.length}
-Recent event summaries: ${recentEvents(state.events)}
+Recent event summaries: ${recentEvents(state.events, historyBudget)}
 Chapter previews:
 ${packets[packet]}`,
 			nextEvent,
