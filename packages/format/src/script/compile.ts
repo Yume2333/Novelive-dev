@@ -137,6 +137,16 @@ function compileAction(
 			`舞台上找不到 ${target}`,
 			'先用 @show 将对应角色放到舞台。',
 		)
+	const changeCostume = (asset: Asset) => {
+		const [character, costume] = asset.id.split('/')
+		let onstage = false
+		for (const [key, sprite] of cast) {
+			if (sprite.character !== character) continue
+			onstage = true
+			cast.set(key, { ...sprite, costume })
+		}
+		if (!onstage) stageError(character)
+	}
 	const input = String(args.asset)
 	const slot = args.slot as Slot
 	switch (line.name) {
@@ -179,12 +189,7 @@ function compileAction(
 			const [character, second, expression] = input.split('/')
 			if (expression) {
 				const asset = resolve(input, ['character', 'expression'])
-				if (asset) {
-					const [actor, costume] = asset.id.split('/')
-					for (const [key, sprite] of cast)
-						if (sprite.character === actor)
-							cast.set(key, { ...sprite, costume })
-				}
+				if (asset) changeCostume(asset)
 			} else {
 				const matches = [...cast].filter(
 					([, sprite]) => sprite.character === character,
@@ -201,12 +206,7 @@ function compileAction(
 		}
 		case 'costume': {
 			const asset = resolve(input, ['character'])
-			if (asset) {
-				const [character, costume] = asset.id.split('/')
-				for (const [key, sprite] of cast)
-					if (sprite.character === character)
-						cast.set(key, { ...sprite, costume })
-			}
+			if (asset) changeCostume(asset)
 			break
 		}
 	}

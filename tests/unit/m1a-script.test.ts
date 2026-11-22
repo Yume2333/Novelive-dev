@@ -263,3 +263,19 @@ test('accepts digit-leading IDs from the metadata registry and speaker list', ()
 	})
 	expect(result).toMatchObject({ ok: true, diagnostics: [] })
 })
+
+test('requires the registered character to be onstage before changing costume or expression', () => {
+	const result = compileScript(
+		single(
+			'@face traveler/coat/sly\n@costume traveler/cloak\n@show traveler/coat/calm left\n@face traveler/coat/sly\n@costume traveler/cloak',
+		),
+		scalarContext,
+	)
+	expect(result).toMatchObject({
+		ok: false,
+		diagnostics: [
+			{ code: 'E_STAGE', line: 3 },
+			{ code: 'E_STAGE', line: 4 },
+		],
+	})
+})
