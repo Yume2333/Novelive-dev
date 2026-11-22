@@ -68,3 +68,19 @@ node src/postproc.mjs        # -> -D1.png，删 work/ 中间文件
 复跑命令：`node src/run.mjs 'F+X' 'T1,T3' 'r3,r4'` 与
 `node src/run.mjs 'F+X+N' 'T1,T3' 'r1,r2'`，再 `node src/postproc.mjs`、
 `.venv/bin/python src/contact_round2.py`。
+
+## Round 3（定稿末行 × 两个模型）
+
+末行只用最终采用的 FXB（`docs/visuals.md` 2.4 第 7 条原文；`node src/run_round3.mjs --print`
+打出 T1 全文可核对），场景、参考图、quality high、images.edit 同首版，每个模型每场景一次：
+
+- `gpt-image-2.6-sunburst`：请求 1024x1536 / 1536x864（同首版）
+- `gpt-image-2.6-sunburst-4k`：按最大输出请求 2336x3504 / 3840x2160
+
+产物 `gen/round3/<scene>--FXB--{sunburst,4k}.png`，raw，不做后处理。
+复跑：`node src/run_round3.mjs [sunburst,4k] [T1,T2,T3]`。
+
+2026-11-22 首跑：sunburst 三张成功（返回 1024x1536 / 1536x1024 / 1536x1024，T1 带 alpha，
+每张输出 6240 token）；4k 三张均 400（中转未放行该模型走 images 端点）。
+中转配置修好后补跑 4k 三张，全部成功：返回尺寸与请求一致（2336x3504 带 alpha /
+3840x2160 / 3840x2160），输出 97800 / 83400 / 83400 token，每张约 58 秒。
