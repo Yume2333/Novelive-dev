@@ -191,7 +191,11 @@ function classify(
 	fields: string,
 ): Code {
 	const reason = `${fields} ${message.rawStopReason ?? ''}`
-	if (moderation.test(reason) || moderation.test(message.errorMessage ?? ''))
+	if (
+		message.rawStopReason === 'sensitive' ||
+		moderation.test(reason) ||
+		moderation.test(message.errorMessage ?? '')
+	)
 		return 'moderation'
 	if (temporary.test(reason)) return 'network'
 	if (/(?:model_not_found|not_found_error)/i.test(reason) || status === 404)

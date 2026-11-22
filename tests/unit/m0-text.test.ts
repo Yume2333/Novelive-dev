@@ -205,6 +205,45 @@ describe('M0 text model adapter', () => {
 		expect(fetch).toHaveBeenCalledTimes(3)
 	})
 
+	it('maps an Anthropic sensitive stop to moderation without retrying', async () => {
+		const events = [
+			{
+				type: 'message_start',
+				message: {
+					id: 'msg_fixture',
+					role: 'assistant',
+					content: [],
+					usage: { input_tokens: 12 },
+				},
+			},
+			{
+				type: 'message_delta',
+				delta: { stop_reason: 'sensitive' },
+				usage: { output_tokens: 0 },
+			},
+			{ type: 'message_stop' },
+		]
+		const fetch = vi.fn<typeof globalThis.fetch>(
+			async () =>
+				new Response(
+					events
+						.map(
+							(event) =>
+								`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`,
+						)
+						.join(''),
+					{ headers: { 'content-type': 'text/event-stream' } },
+				),
+		)
+		await expect(
+			testTextConnection(
+				smokeConnection(smokeProfiles[2], baseUrl, 'offline-placeholder'),
+				{ fetch },
+			),
+		).rejects.toMatchObject({ code: 'moderation' })
+		expect(fetch).toHaveBeenCalledOnce()
+	})
+
 	it('does not send an already-cancelled request', async () => {
 		const fetch = vi.fn(format())
 		await expect(
