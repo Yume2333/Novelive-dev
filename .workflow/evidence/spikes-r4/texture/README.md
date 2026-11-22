@@ -84,3 +84,6 @@ node src/postproc.mjs        # -> -D1.png，删 work/ 中间文件
 每张输出 6240 token）；4k 三张均 400（中转未放行该模型走 images 端点）。
 中转配置修好后补跑 4k 三张，全部成功：返回尺寸与请求一致（2336x3504 带 alpha /
 3840x2160 / 3840x2160），输出 97800 / 83400 / 83400 token，每张约 58 秒。
+
+对照页：`.venv/bin/python src/contact_round3.py` → `contact/round3-T{n}.png`，一行三格
+（参考图 | sunburst | sunburst-4k），统一缩到同一高度（Lanczos），透明立绘铺浅灰底，标注原生尺寸。
