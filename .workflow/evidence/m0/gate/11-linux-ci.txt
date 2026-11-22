@@ -1,0 +1,21 @@
+W7 — GitHub Actions, Linux checks and Electron smoke
+
+Initial branch commit b2b0f7a, job 137332939746:
+  patchelf is already the newest version (0.18.0-1.1build1).
+  Patched sharp for Electron (linux-x64)
+  Caused by: Error: Worker exited unexpectedly with signal SIGSEGV during started state while running test file /home/runner/work/Novelive-dev/Novelive-dev/tests/unit/m0-image.test.ts
+Reproduced locally with the upstream 0.18.0 executable and an unmodified sharp
+addon in an isolated directory. Applying the same patch with 0.19.3 to a fresh
+addon let the same Node sharp PNG operation succeed. The CI job now downloads
+and verifies the SHA-256 of the 0.19.3 release archive.
+
+Branch code commit 522925ed436cdcd0eb14bb6798ecdb523454e761, job 137334144712:
+  1 passed, 0 failed, 0 pending, 0 skipped
+  Linux checks and Electron smoke
+  1 passed (2.8s)
+https://github.com/Yume2333/Novelive-dev/commit/522925ed436cdcd0eb14bb6798ecdb523454e761/checks
+
+The job ran frozen dependency installation, pnpm check, then
+xvfb-run -a pnpm test:e2e --grep 'renders the empty library and connects to a real creator'.
+The selected test checks SQLite WAL and sharp decoding in the real Electron creator process.
+No PR was opened; this is the branch push's check result.

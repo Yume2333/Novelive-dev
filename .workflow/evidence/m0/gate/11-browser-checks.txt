@@ -1,0 +1,27 @@
+W4 — Chromium via NL_REPLAY=strict pnpm dev:web
+Each section used a separate bridge process with an absolute NL_CASSETTE_DIR:
+
+  tests/fixtures/text-models/smoke/
+  W4 Chromium smoke: all three text protocols: passed
+  Screenshot: 11-browser-text.png
+
+  tests/fixtures/image-models/smoke/
+  W4 Chromium smoke: generate, transparent and edit; three loaded HTTP thumbnails: passed
+  Screenshot: 11-browser-image.png
+
+  tests/fixtures/text-models/synthetic/
+  W4 Chromium text synthetic: slow stream cancelled: passed
+  W4 Chromium text synthetic: disconnect retries exhausted as network: passed
+  Screenshot: 11-browser-network.png
+
+  tests/fixtures/image-models/
+  W4 Chromium image synthetic: edit unsupported; transparent still succeeds: passed
+  Edit reported a capability-specific error and had no thumbnail.
+  Screenshot: 11-browser-image-failure.png
+
+  tests/fixtures/text-models/smoke/ (fresh bridge after the failure runs)
+  W4 terminal: <isolated-home>/.novelive-dev/logs
+  W4 Chromium host: switched to text smoke; terminal log path and creator generation +1; Settings retest passed: passed
+  host.openLogDir() printed the expected directory; host.restartCreator() advanced the ready generation by one.
+
+Replay never used relay credentials.

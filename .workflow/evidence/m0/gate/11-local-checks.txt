@@ -1,0 +1,33 @@
+M0/11 Linux gate — strict replay, without relay credentials
+
+W1 — pnpm install --frozen-lockfile && pnpm check
+Done in 404ms using pnpm v12.21.0
+The first check failed on Biome table formatting in the committed W3 replay guide; fixed in 730163a.
+Final result:
+Checked 70 files in 30ms. No fixes applied.
+ Test Files  7 passed (7)
+      Tests  129 passed (129)
+
+W2 — NL_REPLAY=strict xvfb-run -a pnpm test:e2e
+  13 passed (11.0s)
+The executable Electron suite covered the three text and three image smoke requests,
+novelive:// thumbnails, slow cancellation, exhausted disconnect, creator_down and
+reconnection, configuration and key masking, overlay scrollbars, SQLite WAL and
+actual sharp PNG decoding. Unit assertions cover replay, model errors, config,
+creator event catch-up, cancellation, and image sizing.
+Evidence: 11-electron-library.png.
+
+W3 — audited live receipts inherited from dc17795:
+../live/10-w3-check.txt and ../live/10-w3-real-path.txt.
+The live call requirement was satisfied by M0/10; no live calls were repeated at the gate.
+Replayed tests/fixtures/cassettes/ end-to-end in actual Electron with a new profile:
+W3 Electron strict: reopened profile; three text protocols and three novelive:// thumbnails passed
+W3 Electron strict: recorded auth and synthetic moderation displayed in Settings
+Evidence: 11-electron-settings.png.
+
+W6 — temporarily inserted color: #112233 into the ScrollArea component CSS.
+packages/ui/src/components/ScrollArea.module.css
+  2:9  ✖  Disallowed hex color "#112233"  color-no-hex
+The inserted rule was removed; the final pnpm check passed as printed above.
+
+Gate paid usage: 0 calls, 0 tokens, 0 images.
