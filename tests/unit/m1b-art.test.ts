@@ -216,3 +216,29 @@ test('requests repair when a staging patch adds an image absent from the manifes
 		model.mockRestore()
 	}
 })
+
+test('preserves configured custom marks through staging and rejects unconfigured marks', async () => {
+	const marked = script.replace('窗外下雨了。', '{wave}窗外下雨了。{/wave}')
+	const model = vi.spyOn(artModels, 'artJson').mockResolvedValueOnce({
+		patch: 'PUT <4:\n@cg cg-window',
+		items: [{ id: 'cg-window', kind: 'cg', description: '窗边' }],
+		merges: {},
+	})
+	try {
+		await expect(
+			directChapterArt(marked, bible, empty, { main, replay }),
+		).rejects.toThrow('requires a valid chapter script')
+		const staged = await directChapterArt(marked, bible, empty, {
+			main,
+			replay,
+			customMarks: new Set(['wave']).values(),
+		})
+		expect(staged.script).toContain(
+			'@cg cg-window\nada: {wave}窗外下雨了。{/wave}',
+		)
+		expect(staged.cgReferences.has('cg-window')).toBe(true)
+		expect(model).toHaveBeenCalledTimes(1)
+	} finally {
+		model.mockRestore()
+	}
+})

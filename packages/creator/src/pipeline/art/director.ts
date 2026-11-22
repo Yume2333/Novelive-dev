@@ -22,8 +22,13 @@ const responseSchema = obj({
 })
 
 export type CgReferences = { costumes: readonly string[]; location?: string }
+type ScriptOptions = NonNullable<Parameters<typeof parseScript>[1]>
 
-function sceneReferences(script: string, registry: AssetRegistry) {
+function sceneReferences(
+	script: string,
+	registry: AssetRegistry,
+	options: ScriptOptions,
+) {
 	const references = new Map<string, CgReferences>()
 	const cast = new Map<string, string>()
 	let location: string | undefined
@@ -33,7 +38,7 @@ function sceneReferences(script: string, registry: AssetRegistry) {
 			(entry) => entry.type === kind && entry.id.startsWith(`${prefix}/`),
 		)?.id
 	}
-	for (const scene of parseScript(script).scenes) {
+	for (const scene of parseScript(script, options).scenes) {
 		for (const line of scene.lines) {
 			if (line.type !== 'action') continue
 			const asset = String(line.args.asset)
@@ -83,7 +88,11 @@ function sceneReferences(script: string, registry: AssetRegistry) {
 	return references
 }
 
-export function applyStagingPatch(script: string, patch: string) {
+export function applyStagingPatch(
+	script: string,
+	patch: string,
+	options?: ScriptOptions,
+) {
 	if (!patch.trim()) return script
 	const lines = script.trimEnd().split('\n')
 	const operations =
@@ -127,7 +136,7 @@ export function applyStagingPatch(script: string, patch: string) {
 	for (const { at, count, inserted } of changes.reverse())
 		lines.splice(at, count, ...inserted)
 	const output = `${lines.join('\n')}\n`
-	const parsed = parseScript(output)
+	const parsed = parseScript(output, options)
 	if (parsed.diagnostics.some((item) => item.code.startsWith('E_')))
 		throw new Error(JSON.stringify(parsed.diagnostics))
 	return output
@@ -137,9 +146,10 @@ export async function directChapterArt(
 	script: string,
 	bible: ArtBible,
 	registry: AssetRegistry,
-	options: ModelOptions & { main: TextConnection },
+	options: ModelOptions & ScriptOptions & { main: TextConnection },
 ) {
-	const parsed = parseScript(script)
+	const scriptOptions = { customMarks: [...(options.customMarks ?? [])] }
+	const parsed = parseScript(script, scriptOptions)
 	if (parsed.diagnostics.some((item) => item.code.startsWith('E_')))
 		throw new Error('The art director requires a valid chapter script')
 	const context = JSON.stringify({ bible, registry })
@@ -182,7 +192,11 @@ export async function directChapterArt(
 				options,
 			)
 			try {
-				const resultScript = applyStagingPatch(batch, result.patch)
+				const resultScript = applyStagingPatch(
+					batch,
+					result.patch,
+					scriptOptions,
+				)
 				const plan = planArt([...items, ...result.items], bible, registry, {
 					...merges,
 					...result.merges,
@@ -190,6 +204,7 @@ export async function directChapterArt(
 				const { diagnostics } = compileScript(
 					[...staged, resultScript].join('\n'),
 					{
+						...scriptOptions,
 						assets: plan.registry.entries,
 						speakers: [],
 						paragraphIds: [],
@@ -214,6 +229,6 @@ export async function directChapterArt(
 		script: output,
 		items,
 		merges,
-		cgReferences: sceneReferences(output, plan.registry),
+		cgReferences: sceneReferences(output, plan.registry, scriptOptions),
 	}
 }
