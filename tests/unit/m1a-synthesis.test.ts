@@ -35,14 +35,16 @@ const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 		prompt,
 	)
 	if (!packet) throw new Error('Expected a packet prompt')
+	const previews = prompt.split('Chapter previews:\n')[1]
+	const chapterIds = new Set(
+		Array.from(previews.matchAll(/^Chapter ([\w-]+):$/gm), ([, id]) => id),
+	)
 	const result = {
 		overview: 'A long journey.',
-		chapters: [...prompt.matchAll(/^Chapter ([\w-]+):$/gm)].map(
-			([, chapterId]) => ({
-				chapterId,
-				progress: 'The journey continues.',
-			}),
-		),
+		chapters: Array.from(chapterIds, (chapterId) => ({
+			chapterId,
+			progress: 'The journey continues.',
+		})),
 		event: `Event ${packet[1]}`,
 		is_last: true,
 		biblePatch: [],

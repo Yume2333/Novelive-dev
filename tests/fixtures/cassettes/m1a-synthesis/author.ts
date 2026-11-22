@@ -28,7 +28,12 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 		/^Events already extracted: (\d+)$/m.exec(prompt)?.[1] ?? 0,
 	)
 	const lastPacket = packet?.[1] === packet?.[2]
-	const fragmentChapter = /^Chapter (\w+):$/m.exec(prompt)?.[1]
+	const packetText = prompt.split('Chapter previews:\n')[1] ?? ''
+	const fragmentChapter = /^Chapter ([\w-]+):$/m.exec(packetText)?.[1]
+	const fragmentProgress = progress.find(
+		({ chapterId }) => chapterId === fragmentChapter,
+	)
+	if (packet && lastPacket && packet[2] !== '1') assert.ok(fragmentProgress)
 	const result = {
 		overview: 'A key opens Paper Tower.',
 		chapters: packet
@@ -36,8 +41,9 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 				? [progress[0]]
 				: lastPacket
 					? [
-							progress.find(({ chapterId }) => chapterId === fragmentChapter) ??
-								progress[1],
+							fragmentProgress && packet[2] !== '1'
+								? fragmentProgress
+								: progress[1],
 						]
 					: []
 			: progress,
