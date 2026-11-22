@@ -695,6 +695,63 @@ test.each([false, true])(
 	},
 )
 
+test('a checkpoint quarantined on resume stays quarantined even if the original Bible is restored', async () => {
+	await seed(root)
+	const tower = projectFiles.location(scope, 'tower')
+	const preview = projectFiles.preview(chapters[0])
+	const original = { formatVersion: 1 as const, entries: [candidateTower] }
+	const whole = { ...options, strategy: 'whole' as const }
+	{
+		using project = await Project.open(root)
+		await project.write(tower, original)
+		const write = project.write.bind(project)
+		const interruption = vi
+			.spyOn(project, 'write')
+			.mockImplementation(async (file, value) => {
+				await write(file, value)
+				if (
+					file.path === files.checkpoint.path &&
+					(value as { ready: boolean }).ready
+				)
+					throw new Error('Stopped after checkpoint')
+			})
+		await expect(
+			synthesizeVolume(project, 'v1', chapters, whole),
+		).rejects.toThrow('Stopped after checkpoint')
+		interruption.mockRestore()
+		await project.write(tower, {
+			...original,
+			entries: [{ ...candidateTower, description: 'Edited after stop' }],
+		})
+	}
+	{
+		using project = await Project.open(root)
+		const read = project.read.bind(project)
+		let previewReads = 0
+		vi.spyOn(project, 'read').mockImplementation(async (file) => {
+			if (file.path === preview.path && ++previewReads === 2)
+				await project.write(tower, original)
+			return read(file)
+		})
+		const fetch = vi.fn<typeof globalThis.fetch>(strict)
+		const result = await synthesizeVolume(project, 'v1', chapters, {
+			...whole,
+			fetch,
+		})
+		expect(previewReads).toBe(2)
+		expect(fetch).not.toHaveBeenCalled()
+		expect(await read(tower)).toEqual(original)
+		expect(result.conflicts).toContainEqual(
+			expect.objectContaining({
+				entry: expect.objectContaining({
+					id: 'tower',
+					conflict: 'Bible changed before synthesis publication',
+				}),
+			}),
+		)
+	}
+})
+
 test('an edit committed after the ready write but before publication is never overwritten', async () => {
 	await seed(root)
 	using project = await Project.open(root)
