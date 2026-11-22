@@ -31,3 +31,13 @@ packages/ui/src/components/ScrollArea.module.css
 The inserted rule was removed; the final pnpm check passed as printed above.
 
 Gate paid usage: 0 calls, 0 tokens, 0 images.
+
+W5 review follow-up — code commit 36571406bddd4c25d50581ddb3e914faaa2f3265
+Frozen installation: Done in 24ms using pnpm v12.21.0
+Checked 70 files in 24ms. No fixes applied.
+ Test Files  7 passed (7)
+      Tests  129 passed (129)
+  13 passed (11.2s)
+W3 Electron strict: reopened profile; three text protocols and three novelive:// thumbnails passed
+W3 Electron strict: recorded auth and synthetic moderation displayed in Settings
+W4 also reran successfully; see 11-browser-checks.txt and the refreshed screenshots.
