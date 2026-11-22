@@ -18,3 +18,12 @@ Checked 69 files in 31ms. No fixes applied.
 
 $ NL_REPLAY=strict pnpm exec playwright test --grep-invert 'M0 settings'  # run under xvfb-run
   6 passed (2.2s)
+
+Second review round (image URL validation, Request cancellation, and local redirect):
+$ NL_REPLAY=strict pnpm test:e2e --grep 'M0 settings'  # run under xvfb-run
+  7 passed (10.7s)
+
+$ NL_REPLAY=strict pnpm check
+Checked 69 files in 30ms. No fixes applied.
+ Test Files  7 passed (7)
+      Tests  129 passed (129)

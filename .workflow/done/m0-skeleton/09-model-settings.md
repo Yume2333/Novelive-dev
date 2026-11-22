@@ -19,4 +19,4 @@
 - Check after: 设置页 E2E 6 项、原有 E2E 6 项、单测 123 项通过。[检查日志](../../evidence/m0-skeleton/09-model-settings-check.txt)
 - Real path: Electron 开发入口与 Chromium 开发桥严格回放已提交的 smoke，每次只指向对应目录。未产生付费用量。[实际运行输出](../../evidence/m0-skeleton/09-model-settings-real-path.txt) · [亮色设置](../../evidence/m0-skeleton/09-settings-light.png) · [暗色及图片结果](../../evidence/m0-skeleton/09-settings-dark-image.png) · [同尺寸原型](../../evidence/m0-skeleton/09-settings-prototype.png)
 - Review: skipped — 未进行独立审查；W4 浏览器故障回放与 W5 独立对照验收留给 M0 门禁。
-- PR #12 修复后复验：设置页 E2E 7 项、单测 126 项通过。[复验日志](../../evidence/m0-skeleton/09-model-settings-review-check.txt)
+- PR #12 两轮修复后复验：设置页 E2E 7 项、单测 129 项通过。[复验日志](../../evidence/m0-skeleton/09-model-settings-review-check.txt)
