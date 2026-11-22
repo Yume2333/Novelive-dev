@@ -11,6 +11,7 @@ import {
 import {
 	applyPatches,
 	readBible,
+	validatePatch,
 } from '../../packages/creator/src/synthesis/patch'
 import { type BiblePatch, projectFiles } from '../../packages/format/src/model'
 import {
@@ -291,6 +292,40 @@ test('incremental synthesis can resolve foreshadowing planted in an earlier volu
 	expect(await project.read(projectFiles.foreshadowing(scope))).toMatchObject({
 		entries: [{ ...planted, resolvedChapter: 'c2' }],
 	})
+})
+
+test('a new timeline event cannot cite a chapter from an earlier volume', async () => {
+	await seed(root, false, true)
+	using project = await Project.open(root)
+	const bible = await readBible(project)
+	const currentVolume = new Set(chapters)
+	const series = new Set([...chapters, 'earlier'])
+	const event = {
+		id: 'old-event',
+		chapterId: 'earlier',
+		event: 'An invented event.',
+		status: 'candidate',
+	} as const
+	expect(() =>
+		validatePatch(
+			bible,
+			[{ kind: 'timeline', op: 'add', entry: event }],
+			[],
+			currentVolume,
+			series,
+			true,
+		),
+	).toThrow('Unknown chapter reference: earlier')
+	expect(() =>
+		validatePatch(
+			bible,
+			[{ kind: 'timeline', op: 'add', entry: { ...event, chapterId: 'c1' } }],
+			[],
+			currentVolume,
+			series,
+			true,
+		),
+	).not.toThrow()
 })
 
 test('character deletion becomes a conflict if a surviving relation references it', async () => {

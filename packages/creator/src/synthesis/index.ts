@@ -325,6 +325,7 @@ ${packetText.join('\n')}`
 			bible,
 			[...prior.flatMap((part) => part.biblePatch), ...output.biblePatch],
 			output.glossaryPatch,
+			chapterSet,
 			provenance,
 			incremental,
 		)

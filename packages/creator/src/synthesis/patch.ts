@@ -97,6 +97,7 @@ export function validatePatch(
 	patch: BiblePatch,
 	glossary: GlossaryPatch,
 	chapters: ReadonlySet<string>,
+	seriesChapters: ReadonlySet<string>,
 	incremental: boolean,
 ) {
 	const ids = Object.fromEntries(
@@ -107,8 +108,8 @@ export function validatePatch(
 	) as Record<keyof Bible, Set<string>>
 	for (const item of patch)
 		if (item.op === 'add') ids[item.kind].add(item.entry.id)
-	const requireChapter = (id?: string) => {
-		if (id !== undefined && !chapters.has(id))
+	const requireChapter = (id?: string, keep = false) => {
+		if (id !== undefined && !(keep ? seriesChapters : chapters).has(id))
 			throw new Error(`Unknown chapter reference: ${id}`)
 	}
 	const requireCharacter = (id: string) => {
@@ -121,37 +122,88 @@ export function validatePatch(
 			throw new Error(`Unknown ${kind} reference: ${entry.id}`)
 		if (op === 'delete' && incremental)
 			throw new Error('Incremental synthesis cannot delete entries')
-		requireChapter(entry.firstSeenChapter)
-		requireChapter(entry.revealedChapter)
+		const current = bible[kind].find(({ id }) => id === entry.id)
+		requireChapter(
+			entry.firstSeenChapter,
+			entry.firstSeenChapter === current?.firstSeenChapter,
+		)
+		requireChapter(
+			entry.revealedChapter,
+			entry.revealedChapter === current?.revealedChapter,
+		)
 		if (op === 'delete' || op === 'none') continue
 		switch (kind) {
 			case 'character':
-				for (const address of item.entry.addresses ?? [])
-					requireCharacter(address.speakerId)
-				for (const fact of item.entry.knows ?? [])
-					requireChapter(fact.chapterId)
-				for (const costume of item.entry.costumes ?? [])
-					requireChapter(costume.fromChapter)
+				{
+					const character = bible.character.find(({ id }) => id === entry.id)
+					for (const address of item.entry.addresses ?? [])
+						requireCharacter(address.speakerId)
+					for (const fact of item.entry.knows ?? [])
+						requireChapter(
+							fact.chapterId,
+							character?.knows?.some((prior) => isDeepStrictEqual(prior, fact)),
+						)
+					for (const costume of item.entry.costumes ?? [])
+						requireChapter(
+							costume.fromChapter,
+							character?.costumes?.some(
+								(prior) =>
+									prior.id === costume.id &&
+									prior.fromChapter === costume.fromChapter,
+							),
+						)
+				}
 				break
 			case 'relation':
 				requireCharacter(item.entry.from)
 				requireCharacter(item.entry.to)
 				break
 			case 'timeline':
-				requireChapter(item.entry.chapterId)
+				requireChapter(
+					item.entry.chapterId,
+					bible.timeline.some(
+						(prior) =>
+							prior.id === entry.id &&
+							prior.chapterId === item.entry.chapterId &&
+							prior.event === item.entry.event &&
+							prior.storyTime === item.entry.storyTime,
+					),
+				)
 				break
 			case 'foreshadowing':
-				requireChapter(item.entry.plantedChapter)
-				requireChapter(item.entry.resolvedChapter)
+				{
+					const hint = bible.foreshadowing.find(({ id }) => id === entry.id)
+					requireChapter(
+						item.entry.plantedChapter,
+						item.entry.plantedChapter === hint?.plantedChapter,
+					)
+					requireChapter(
+						item.entry.resolvedChapter,
+						item.entry.resolvedChapter === hint?.resolvedChapter,
+					)
+				}
 				break
 		}
 		if (kind === 'character' || kind === 'relation' || kind === 'location')
 			for (const change of item.entry.changes ?? [])
-				requireChapter(change.chapterId)
+				requireChapter(
+					change.chapterId,
+					'changes' in (current ?? {}) &&
+						(current as Character | Relation | Location).changes?.some(
+							(prior) => isDeepStrictEqual(prior, change),
+						),
+				)
 	}
 	for (const term of glossary) {
-		requireChapter(term.firstSeenChapter)
-		requireChapter(term.revealedChapter)
+		const current = bible.glossary.find(({ id }) => id === term.id)
+		requireChapter(
+			term.firstSeenChapter,
+			term.firstSeenChapter === current?.firstSeenChapter,
+		)
+		requireChapter(
+			term.revealedChapter,
+			term.revealedChapter === current?.revealedChapter,
+		)
 	}
 }
 
