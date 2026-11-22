@@ -133,6 +133,7 @@ function previewPackets(
 
 async function seriesChapterIds(
 	project: Project,
+	volumeId: string,
 	chapterIds: readonly string[],
 ) {
 	const series = await project.read(projectFiles.series)
@@ -141,15 +142,30 @@ async function seriesChapterIds(
 			existing(() => project.read(projectFiles.volume(id))),
 		),
 	)
-	const works = await Promise.all(
-		volumes.flatMap(
-			(volume) =>
-				volume?.workIds.map((id) =>
-					project.read(projectFiles.work(volume.volumeId, id)),
-				) ?? [],
+	const indexed = await Promise.all(
+		volumes.flatMap((volume) =>
+			volume
+				? [
+						Promise.all(
+							volume.workIds.map((id) =>
+								project.read(projectFiles.work(volume.volumeId, id)),
+							),
+						).then((works) => ({
+							volumeId: volume.volumeId,
+							chapters: works.flatMap((work) => work.chapterIds),
+						})),
+					]
+				: [],
 		),
 	)
-	return new Set([...chapterIds, ...works.flatMap((work) => work.chapterIds)])
+	const current = indexed.find((volume) => volume.volumeId === volumeId)
+	const currentIds = new Set(current?.chapters)
+	if (current && chapterIds.some((id) => !currentIds.has(id)))
+		throw new Error('Synthesis chapter IDs must belong to this volume')
+	return new Set([
+		...chapterIds,
+		...indexed.flatMap((volume) => volume.chapters),
+	])
 }
 const unique = <T>(items: T[]) => [
 	...new Map(items.map((item) => [JSON.stringify(item), item])).values(),
@@ -200,6 +216,7 @@ export async function synthesizeVolume(
 	const strategy = options.strategy ?? 'auto'
 	const incremental = options.incremental ?? false
 	const files = synthesisFiles(volumeId)
+	const provenance = await seriesChapterIds(project, volumeId, chapterIds)
 	const previews = await Promise.all(
 		chapterIds.map((id) => project.read(projectFiles.preview(id))),
 	)
@@ -266,7 +283,6 @@ ${packetText.join('\n')}`
 		throw new Error('Existing Bible is too large for synthesis context')
 
 	const chapterSet = new Set(chapterIds)
-	const provenance = await seriesChapterIds(project, chapterIds)
 	async function request<T extends Output>(
 		prompt: string,
 		validator: {

@@ -122,7 +122,8 @@ export function validatePatch(
 			throw new Error(`Unknown ${kind} reference: ${entry.id}`)
 		if (op === 'delete' && incremental)
 			throw new Error('Incremental synthesis cannot delete entries')
-		const current = bible[kind].find(({ id }) => id === entry.id)
+		const current =
+			op === 'add' ? undefined : bible[kind].find(({ id }) => id === entry.id)
 		requireChapter(
 			entry.firstSeenChapter,
 			entry.firstSeenChapter === current?.firstSeenChapter,
@@ -135,7 +136,10 @@ export function validatePatch(
 		switch (kind) {
 			case 'character':
 				{
-					const character = bible.character.find(({ id }) => id === entry.id)
+					const character =
+						op === 'add'
+							? undefined
+							: bible.character.find(({ id }) => id === entry.id)
 					for (const address of item.entry.addresses ?? [])
 						requireCharacter(address.speakerId)
 					for (const fact of item.entry.knows ?? [])
@@ -161,18 +165,22 @@ export function validatePatch(
 			case 'timeline':
 				requireChapter(
 					item.entry.chapterId,
-					bible.timeline.some(
-						(prior) =>
-							prior.id === entry.id &&
-							prior.chapterId === item.entry.chapterId &&
-							prior.event === item.entry.event &&
-							prior.storyTime === item.entry.storyTime,
-					),
+					op !== 'add' &&
+						bible.timeline.some(
+							(prior) =>
+								prior.id === entry.id &&
+								prior.chapterId === item.entry.chapterId &&
+								prior.event === item.entry.event &&
+								prior.storyTime === item.entry.storyTime,
+						),
 				)
 				break
 			case 'foreshadowing':
 				{
-					const hint = bible.foreshadowing.find(({ id }) => id === entry.id)
+					const hint =
+						op === 'add'
+							? undefined
+							: bible.foreshadowing.find(({ id }) => id === entry.id)
 					requireChapter(
 						item.entry.plantedChapter,
 						item.entry.plantedChapter === hint?.plantedChapter,

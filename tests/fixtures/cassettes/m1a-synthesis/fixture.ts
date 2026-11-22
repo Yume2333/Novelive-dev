@@ -93,6 +93,18 @@ export async function seed(
 			formatVersion,
 			entries: [planted],
 		})
+		await project.write(projectFiles.volume('v1'), {
+			formatVersion,
+			volumeId: 'v1',
+			title: 'Second volume',
+			workIds: [workId],
+		})
+		const work = await project.read(projectFiles.work('v0', workId))
+		await project.write(projectFiles.work('v1', workId), {
+			...work,
+			title: 'Second volume',
+			chapterIds: chapters,
+		})
 	}
 	await project.write(projectFiles.character(scope, 'ada'), {
 		formatVersion,

@@ -313,6 +313,11 @@ test('a new timeline event cannot cite a chapter from an earlier volume', async 
 	const bible = await readBible(project)
 	const currentVolume = new Set(chapters)
 	const series = new Set([...chapters, 'earlier'])
+	const fetch = vi.fn<typeof globalThis.fetch>(strict)
+	await expect(
+		synthesizeVolume(project, 'v1', ['earlier'], { ...options, fetch }),
+	).rejects.toThrow('Synthesis chapter IDs must belong to this volume')
+	expect(fetch).not.toHaveBeenCalled()
 	const event = {
 		id: 'old-event',
 		chapterId: 'earlier',
