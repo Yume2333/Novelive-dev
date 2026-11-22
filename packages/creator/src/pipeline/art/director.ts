@@ -1,6 +1,10 @@
 import { arr, map, obj, oneOf, str } from '@earendil-works/pi-schema'
 import { type AssetRegistry, assetId } from '@novelive/format/model'
-import { formatScene, parseScript } from '@novelive/format/script'
+import {
+	compileScript,
+	formatScene,
+	parseScript,
+} from '@novelive/format/script'
 import { buildTextModel, type TextConnection } from '../../models/text'
 import { artJson, type ModelOptions } from './models'
 import { type ArtBible, type ManifestItem, planArt } from './plan'
@@ -179,10 +183,21 @@ export async function directChapterArt(
 			)
 			try {
 				const resultScript = applyStagingPatch(batch, result.patch)
-				planArt([...items, ...result.items], bible, registry, {
+				const plan = planArt([...items, ...result.items], bible, registry, {
 					...merges,
 					...result.merges,
 				})
+				const { diagnostics } = compileScript(
+					[...staged, resultScript].join('\n'),
+					{
+						assets: plan.registry.entries,
+						speakers: [],
+						paragraphIds: [],
+					},
+				)
+				// The writer owns dialogue and source validation; only check image references here.
+				const missing = diagnostics.find(({ code }) => code === 'E_ASSET')
+				if (missing) throw new Error(missing.message)
 				staged.push(resultScript)
 				items.push(...result.items)
 				Object.assign(merges, result.merges)

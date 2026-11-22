@@ -4,13 +4,19 @@ import { join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
 import sharp from 'sharp'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { checkImage } from '../../packages/creator/src/pipeline/art/check'
-import { applyStagingPatch } from '../../packages/creator/src/pipeline/art/director'
+import {
+	applyStagingPatch,
+	directChapterArt,
+} from '../../packages/creator/src/pipeline/art/director'
+import * as artModels from '../../packages/creator/src/pipeline/art/models'
 import { Project } from '../../packages/creator/src/project'
 import {
 	bible,
 	directory,
+	empty,
+	main,
 	picture,
 	projectSeed,
 	runArt,
@@ -186,4 +192,27 @@ test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(
 		'Invalid staging patch',
 	)
+})
+
+test('requests repair when a staging patch adds an image absent from the manifest', async () => {
+	const patch = 'PUT <4:\n@cg cg-window'
+	const item = { id: 'cg-window', kind: 'cg', description: '窗边' }
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockResolvedValueOnce({ patch, items: [], merges: {} })
+		.mockResolvedValueOnce({ patch, items: [item], merges: {} })
+	try {
+		const staged = await directChapterArt(script, bible, empty, {
+			main,
+			replay,
+		})
+		expect(staged.items).toEqual([item])
+		expect(model).toHaveBeenCalledTimes(2)
+		expect(model.mock.calls[1][1]).toContain(
+			'Repair the staging patch and manifest',
+		)
+		expect(model.mock.calls[1][1]).toContain('cg-window')
+	} finally {
+		model.mockRestore()
+	}
 })

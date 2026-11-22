@@ -18,7 +18,7 @@ const text = {
 	format: 'openai-completions',
 	compat: 'auto',
 } as const
-const main = { ...text, model: 'fixture-art-main' }
+export const main = { ...text, model: 'fixture-art-main' }
 export const bible: ArtBible = {
 	style: { id: 'style', status: 'candidate', description: '柔和赛璐璐插画' },
 	characters: [
