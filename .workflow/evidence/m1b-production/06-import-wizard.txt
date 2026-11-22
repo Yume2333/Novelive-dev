@@ -12,7 +12,7 @@ Test Files  13 passed (13)
      Tests  216 passed (216)
 
 $ NL_REPLAY=strict pnpm test:e2e
-18 passed (12.0s)
+16 passed (11.2s)
 
 Real path
 The built Electron app opened 书库 → 导入原文. Native open dialogs were
@@ -32,6 +32,10 @@ confirmWithReferences=false in every work.json.
 Run 2: bytes a4a4 were ambiguous; the wizard listed encoding candidates and
 created no folder until Big5 was chosen, then 跳过核对 left the M1a layout
 untouched (no layout entry in the report).
+
+Review follow-up: when explicit volume headings follow text that precedes
+them, the implicit leading volume is now titled 前言 instead of a second
+第一卷; a TXT without volume headings still gets one 第一卷.
 
 No paid model calls. The organizer model pass for volume suggestions on a
 real unvolumed book is left for the main session's recording.

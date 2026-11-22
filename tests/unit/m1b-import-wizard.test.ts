@@ -79,7 +79,7 @@ test('the suggested layout reproduces the M1a import exactly', async () => {
 	expect(view.paragraphs).toBe(7)
 	expect(view.layout).toEqual(view.suggested)
 	expect(view.layout.volumes).toEqual([
-		{ title: '第一卷', start: 0 },
+		{ title: '前言', start: 0 },
 		{ title: '第一卷 风起', start: 1 },
 		{ title: '第二卷 风止', start: 4 },
 	])
