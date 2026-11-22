@@ -36,7 +36,7 @@ VERSION = "2.12.0"
 KNOWN_FIELDS = {
     "task", "effort", "task type", "base commit", "base branch", "delivers", "blocked by",
     "files", "read first", "check", "covers", "question", "time box", "priority",
-    "status", "integration branch", "resources",
+    "status", "integration branch", "resources", "executor",
 }
 TASK_TYPES = ("feature", "bugfix", "spike", "refactor")
 PRIORITY_RANK = {"critical": 0, "high": 1, "normal": 2, "low": 3}
@@ -2539,6 +2539,8 @@ def collect_queue(root, wf, target_effort=None):
                 "path": rel_path, "branch": branch_name, "files": files_list,
                 "resources": parse_resources(meta.get("resources")),
                 "start_command": "flow-implement " + ref}
+        if meta.get("executor"):
+            task["executor"] = meta.get("executor")
         ready.append((rank, int(number), len(ready), ref, task))
     ready.sort(key=lambda item: item[:3])
     started.sort(key=lambda item: (item[0], item[6], item[1]))
@@ -2673,7 +2675,11 @@ def cmd_next(args):
                 "%s [%s%s]" % (item[2], item[4], " @" + item[5] if item[5] else "")
                 for item in state["started"]))
         if state["ready"]:
-            ready_refs = [item[3] for item in state["ready"]]
+            ready_refs = [
+                "%s [Executor: %s]" % (item[3], item[4]["executor"])
+                if item[4].get("executor") else item[3]
+                for item in state["ready"]
+            ]
             lines.append("Ready (%d): %s\n" % (len(ready_refs), ", ".join(ready_refs)))
         if state["overlaps"]:
             lines.append("Overlaps: %s\n" % ", ".join(
@@ -2773,6 +2779,8 @@ def cmd_next(args):
                     shown_goal_efforts.add(task["effort"])
                 if task.get("delivers"):
                     out.append("   %sDelivers:%s %s\n" % (dim, off, task["delivers"]))
+                if task.get("executor"):
+                    out.append("   %sExecutor:%s %s\n" % (dim, off, task["executor"]))
                 out.append("   %sCheck:%s %s\n" % (dim, off, task["check"]))
                 out.append("   Start: flow-implement %s\n" % ref)
             if overlaps:
