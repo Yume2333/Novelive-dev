@@ -51,3 +51,9 @@
 .track[data-dragging="true"] .thumb {
 	background: var(--scrollbar-thumb-active);
 }
+
+@media (prefers-reduced-motion: reduce) {
+	.track {
+		transition: none;
+	}
+}

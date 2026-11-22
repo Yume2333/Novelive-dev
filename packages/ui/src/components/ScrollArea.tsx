@@ -159,7 +159,9 @@ export function OverlayScrollbar({
 		const ratio = Math.max(0, Math.min(1, clickY / maxTrack))
 		el.scrollTo({
 			top: ratio * (el.scrollHeight - el.clientHeight),
-			behavior: 'smooth',
+			behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+				? 'instant'
+				: 'smooth',
 		})
 	}
 
