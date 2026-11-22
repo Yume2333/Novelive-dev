@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Button, Icon } from '../../components/Button'
 import { Chip, ConfirmDialog, Tooltip } from '../../components/Extended'
 import { inputStyle, textareaStyle } from '../../components/Form'
@@ -114,6 +114,8 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
   const path = branchPath(session.nodes, ui.sel)
 
   const [input, setInput] = useState('')
+  const [inputExpanded, setInputExpanded] = useState(false)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   // 待发送的贴图：缩略图 chips，随下一条消息发出
   const [pendingImages, setPendingImages] = useState<{ id: string; src: string; name: string }[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
@@ -147,6 +149,22 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
     if (!el) return
     el.scrollTo({ top: el.scrollHeight, behavior: streamLen > 0 && running ? 'auto' : 'smooth' })
   }, [path.length, partsCount, streamLen, running, session.id])
+
+  const INPUT_MIN_H = 36
+  const INPUT_MAX_H = 168
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    if (inputExpanded) {
+      el.style.height = '100%'
+      el.style.overflowY = 'auto'
+      return
+    }
+    el.style.height = `${INPUT_MIN_H}px`
+    const next = Math.min(Math.max(el.scrollHeight, INPUT_MIN_H), INPUT_MAX_H)
+    el.style.height = `${next}px`
+    el.style.overflowY = el.scrollHeight > INPUT_MAX_H ? 'auto' : 'hidden'
+  }, [input, inputExpanded, full])
 
   const clearTimers = () => {
     for (const t of timers.current) window.clearTimeout(t)
@@ -292,6 +310,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
     const text = input.trim()
     if ((!text && !pendingImages.length) || running) return
     setInput('')
+    setInputExpanded(false)
     const imgs = pendingImages
     setPendingImages([])
     const body = `${attached ? `【${attached}】` : ''}${text || '（看图）'}`
@@ -477,10 +496,128 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
     </div>
   )
 
+  const expandBtn = (
+    <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex' }}>
+      <Tooltip text={inputExpanded ? '收起输入框' : '放大输入框'}>
+        <button
+          type="button"
+          className="nl-icon-btn"
+          onClick={() => {
+            setInputExpanded((v) => !v)
+            requestAnimationFrame(() => inputRef.current?.focus())
+          }}
+          aria-label={inputExpanded ? '收起输入框' : '放大输入框'}
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 'var(--radius-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--color-outline)',
+          }}
+        >
+          <Icon name={inputExpanded ? 'close_fullscreen' : 'open_in_full'} size={13} />
+        </button>
+      </Tooltip>
+    </div>
+  )
+
+  const sendOrStopBtn = running ? (
+    <Tooltip text="停止">
+      <Button variant="danger" icon="stop_circle" onClick={stop} style={{ height: INPUT_MIN_H, padding: '0 12px', flexShrink: 0 }} />
+    </Tooltip>
+  ) : (
+    <Tooltip text="发送">
+      <Button
+        variant="primary"
+        icon="send"
+        onClick={onSend}
+        disabled={!input.trim() && !pendingImages.length}
+        style={{ height: INPUT_MIN_H, padding: '0 12px', flexShrink: 0 }}
+      />
+    </Tooltip>
+  )
+
+  const imageAttachBtn = (
+    <Tooltip text="贴图给 Agent 看">
+      <Button
+        variant="ghost"
+        icon="image"
+        onClick={() => fileRef.current?.click()}
+        style={{ height: INPUT_MIN_H, padding: '0 9px', flexShrink: 0 }}
+      />
+    </Tooltip>
+  )
+
+  const composerTextarea = (
+    <div
+      style={{
+        position: 'relative',
+        flex: 1,
+        minWidth: 0,
+        minHeight: inputExpanded ? 0 : INPUT_MIN_H,
+        display: 'flex',
+      }}
+    >
+      <textarea
+        ref={inputRef}
+        rows={1}
+        className="nl-input"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && inputExpanded) {
+            e.preventDefault()
+            setInputExpanded(false)
+            return
+          }
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault()
+            onSend()
+          }
+        }}
+        onPaste={(e) => {
+          const files = Array.from(e.clipboardData?.files ?? [])
+          if (files.some((f) => f.type.startsWith('image/'))) {
+            e.preventDefault()
+            addImages(files)
+          }
+        }}
+        placeholder="和 Agent 聊聊设定或修改…"
+        style={{
+          ...textareaStyle,
+          width: '100%',
+          height: inputExpanded ? '100%' : INPUT_MIN_H,
+          minHeight: INPUT_MIN_H,
+          maxHeight: inputExpanded ? 'none' : INPUT_MAX_H,
+          padding: '7px 34px 7px 11px',
+          fontSize: 13,
+          lineHeight: '20px',
+          resize: 'none',
+          boxSizing: 'border-box',
+          transition: inputExpanded ? 'none' : 'height var(--dur-fast) var(--ease-out)',
+        }}
+      />
+      {expandBtn}
+    </div>
+  )
+
   const inputBar = (
-    <div style={{ padding: 'var(--space-3) var(--space-3) var(--space-4)', borderTop: '1px solid var(--divider)', flexShrink: 0 }}>
+    <div
+      style={{
+        padding: 'var(--space-2) var(--space-3) var(--space-3)',
+        borderTop: '1px solid var(--divider)',
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        height: inputExpanded ? '50%' : undefined,
+        minHeight: 0,
+        transition: 'height var(--dur-base) var(--ease-out)',
+      }}
+    >
       {attached ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexShrink: 0 }}>
           <Chip active>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               附带：{attached}
@@ -492,7 +629,7 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
         </div>
       ) : null}
       {pendingImages.length ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap', flexShrink: 0 }}>
           {pendingImages.map((img) => (
             <span key={img.id} style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
               <img src={img.src} alt={img.name} title={img.name} style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-md)', border: '1px solid var(--white-60)', display: 'block' }} />
@@ -518,49 +655,21 @@ export function ChatPanel({ work, context, full, onToggleFull, onClose }: {
           e.target.value = ''
         }}
       />
-      <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end' }}>
-        <Tooltip text="贴图给 Agent 看">
-          <Button variant="ghost" icon="image" onClick={() => fileRef.current?.click()} style={{ padding: '9px 10px' }} />
-        </Tooltip>
-        <textarea
-          rows={2}
-          className="nl-input"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault()
-              onSend()
-            }
-          }}
-          onPaste={(e) => {
-            const files = Array.from(e.clipboardData?.files ?? [])
-            if (files.some((f) => f.type.startsWith('image/'))) {
-              e.preventDefault()
-              addImages(files)
-            }
-          }}
-          placeholder="和 Agent 聊聊设定、改编要求，或让它重做某章…"
-          style={{
-            ...textareaStyle,
-            width: undefined,
-            flex: 1,
-            padding: '9px 12px',
-            lineHeight: 1.55,
-            resize: 'none',
-            outline: 'none',
-          }}
-        />
-        {running ? (
-          <Tooltip text="停止">
-            <Button variant="danger" icon="stop_circle" onClick={stop} style={{ padding: '9px 14px' }} />
-          </Tooltip>
-        ) : (
-          <Tooltip text="发送">
-            <Button variant="primary" icon="send" onClick={onSend} disabled={!input.trim() && !pendingImages.length} style={{ padding: '9px 14px' }} />
-          </Tooltip>
-        )}
-      </div>
+      {inputExpanded ? (
+        <>
+          {composerTextarea}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexShrink: 0 }}>
+            {imageAttachBtn}
+            {sendOrStopBtn}
+          </div>
+        </>
+      ) : (
+        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end' }}>
+          {imageAttachBtn}
+          {composerTextarea}
+          {sendOrStopBtn}
+        </div>
+      )}
     </div>
   )
 

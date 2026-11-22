@@ -362,7 +362,7 @@ export function AppShell() {
         return
       }
       if (e.key === 'Escape') {
-        if (queueOpen || document.querySelector('[role="dialog"]')) return
+        if (e.defaultPrevented || queueOpen || document.querySelector('[role="dialog"]')) return
         if (chatFull) {
           setChatFull(false)
         } else if (chatOpen) {
