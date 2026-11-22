@@ -1,0 +1,11 @@
+{
+	"name": "@novelive/format",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./model": "./src/model/index.ts"
+	},
+	"dependencies": {
+		"@earendil-works/pi-schema": "1.6.0"
+	}
+}

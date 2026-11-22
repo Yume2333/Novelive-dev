@@ -1,0 +1,34 @@
+M1a/01 — W1 project folder and SQLite
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1a-project-schema.test.ts
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+
+The disk tests checked versioned hierarchy and source preservation, writes and
+reopen in all six SQLite categories (task, usage, session entry tree, proposal,
+history, run/run_step), foreign key enforcement, and version guards.
+
+$ pnpm typecheck
+$ tsc --noEmit
+(exit 0)
+
+$ NL_REPLAY=strict pnpm exec vitest run --exclude tests/unit/m1a-project-schema.test.ts
+ Test Files  7 passed (7)
+      Tests  129 passed (129)
+
+After merging origin/main at 3ea7747 and applying PR #15's project fixes:
+$ NL_REPLAY=strict pnpm check
+Checked 85 files in 28ms. No fixes applied.
+Found 1 info.
+ Test Files  8 passed (8)
+      Tests  138 passed (138)
+
+$ export NL_REPLAY=strict
+$ pnpm exec tsx tests/fixtures/project-schema/reopen.ts create "$project"
+Created project, saved source and hierarchy, queued preview, closed SQLite.
+$ pnpm exec tsx tests/fixtures/project-schema/reopen.ts reopen "$project"
+Reopened project: series/work identity and original bytes preserved.
+Chapter p0001/p0002 and queued preview preserved; SQLite integrity_check: ok.
+
+The commands used the same new local project directory and separate processes.
+The sample's text and records are synthetic. No model calls or paid usage.

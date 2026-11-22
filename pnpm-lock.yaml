@@ -189,7 +189,7 @@ importers:
         version: 24.19.2
       openai:
         specifier: 7.62.0
-        version: 7.62.0(undici@7.30.2)
+        version: 7.62.0(@aws-sdk/credential-provider-node@3.972.98)(@smithy/signature-v4@5.7.5)(google-auth-library@10.9.1)(undici@7.30.2)
       stylelint:
         specifier: 18.1.0
         version: 18.1.0
@@ -214,16 +214,16 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: 5.1.1
-        version: 5.1.1(vite@7.2.7(@types/node@24.19.2))
+        version: 5.1.1(vite@7.2.7(@types/node@24.19.2)(tsx@4.21.0))
       electron:
         specifier: 45.4.1
         version: 45.4.1
       electron-vite:
         specifier: 6.0.0
-        version: 6.0.0(vite@7.2.7(@types/node@24.19.2))
+        version: 6.0.0(vite@7.2.7(@types/node@24.19.2)(tsx@4.21.0))
       vite:
         specifier: 7.2.7
-        version: 7.2.7(@types/node@24.19.2)
+        version: 7.2.7(@types/node@24.19.2)(tsx@4.21.0)
 
   packages/creator:
     dependencies:
@@ -236,15 +236,24 @@ importers:
       '@earendil-works/pi-schema':
         specifier: 1.6.0
         version: 1.6.0
+      '@novelive/format':
+        specifier: workspace:*
+        version: link:../format
       openai:
         specifier: 7.62.0
-        version: 7.62.0(undici@7.30.2)
+        version: 7.62.0(@aws-sdk/credential-provider-node@3.972.98)(@smithy/signature-v4@5.7.5)(google-auth-library@10.9.1)(undici@7.30.2)
       sharp:
         specifier: 0.35.5
         version: 0.35.5(@types/node@24.19.2)
       undici:
         specifier: 7.30.2
         version: 7.30.2
+
+  packages/format:
+    dependencies:
+      '@earendil-works/pi-schema':
+        specifier: 1.6.0
+        version: 1.6.0
 
   packages/ui:
     dependencies:
@@ -3207,7 +3216,7 @@ snapshots:
     dependencies:
       '@types/node': 24.19.2
 
-  '@vitejs/plugin-react@5.1.1(vite@7.2.7(@types/node@24.19.2))':
+  '@vitejs/plugin-react@5.1.1(vite@7.2.7(@types/node@24.19.2)(tsx@4.21.0))':
     dependencies:
       '@babel/core': 7.29.13
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.13)
@@ -3215,7 +3224,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.47
       '@types/babel__core': 7.20.5
       react-refresh: 0.18.0
-      vite: 7.2.7(@types/node@24.19.2)
+      vite: 7.2.7(@types/node@24.19.2)(tsx@4.21.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -3304,7 +3313,7 @@ snapshots:
 
   electron-to-chromium@1.5.492: {}
 
-  electron-vite@6.0.0(vite@7.2.7(@types/node@24.19.2)):
+  electron-vite@6.0.0(vite@7.2.7(@types/node@24.19.2)(tsx@4.21.0)):
     dependencies:
       '@babel/core': 7.29.13
       '@babel/plugin-transform-arrow-functions': 7.29.7(@babel/core@7.29.13)
@@ -3312,7 +3321,7 @@ snapshots:
       magic-string: 1.4.5
       picocolors: 1.1.1
       rolldown: 1.2.19
-      vite: 7.2.7(@types/node@24.19.2)
+      vite: 7.2.7(@types/node@24.19.2)(tsx@4.21.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -3553,8 +3562,11 @@ snapshots:
       google-auth-library: 10.9.1
       undici: 7.30.2
 
-  openai@7.62.0(undici@7.30.2):
+  openai@7.62.0(@aws-sdk/credential-provider-node@3.972.98)(@smithy/signature-v4@5.7.5)(google-auth-library@10.9.1)(undici@7.30.2):
     optionalDependencies:
+      '@aws-sdk/credential-provider-node': 3.972.98
+      '@smithy/signature-v4': 5.7.5
+      google-auth-library: 10.9.1
       undici: 7.30.2
 
   p-retry@4.6.2:
@@ -3800,18 +3812,6 @@ snapshots:
       picocolors: 1.1.1
 
   util-deprecate@1.0.2: {}
-
-  vite@7.2.7(@types/node@24.19.2):
-    dependencies:
-      esbuild: 0.25.12
-      fdir: 6.5.0(picomatch@4.0.7)
-      picomatch: 4.0.7
-      postcss: 8.5.33
-      rollup: 4.68.8
-      tinyglobby: 0.2.17
-    optionalDependencies:
-      '@types/node': 24.19.2
-      fsevents: 2.3.3
 
   vite@7.2.7(@types/node@24.19.2)(tsx@4.21.0):
     dependencies:
