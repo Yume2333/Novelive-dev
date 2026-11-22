@@ -75,6 +75,7 @@ export const productionCommands = {
 			chapter: chapterSchema,
 			registry: assetRegistrySchema,
 			speakers: arr(entityId, { uniqueItems: true }),
+			speakerNames: map(str()),
 		}),
 	},
 	'production.get': { input: obj(work), output: productionSnapshotSchema },

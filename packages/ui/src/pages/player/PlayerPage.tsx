@@ -10,6 +10,7 @@ export function PlayerPage() {
 	const [loaded, setLoaded] = useState<{
 		scenes: CompiledScene[]
 		paths: Map<string, string>
+		speakerNames: Record<string, string>
 	}>()
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
@@ -19,7 +20,7 @@ export function PlayerPage() {
 		setError('')
 		setLoading(true)
 		try {
-			const { script, chapter, registry, speakers } =
+			const { script, chapter, registry, speakers, speakerNames } =
 				await window.novelive.call('production.playerChapter', {
 					directory,
 					workId: id,
@@ -39,6 +40,7 @@ export function PlayerPage() {
 			setLoaded({
 				scenes: result.scenes,
 				paths: new Map(registry.entries.map((entry) => [entry.id, entry.path])),
+				speakerNames,
 			})
 		} catch (cause) {
 			setError(cause instanceof Error ? cause.message : '无法打开本地工程')
@@ -62,6 +64,7 @@ export function PlayerPage() {
 			},
 			controller.signal,
 			fail,
+			loaded.speakerNames,
 		).catch(fail)
 		return () => controller.abort()
 	}, [loaded])

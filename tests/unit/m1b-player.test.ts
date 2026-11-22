@@ -142,6 +142,11 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 	expect(result.script).toBe(playerScript)
 	expect(result.chapter.sceneIds).toEqual(['aaaabbbb'])
 	expect(result.speakers).toEqual(['traveler', 'listener', 'witness'])
+	expect(result.speakerNames).toEqual({
+		traveler: '旅人',
+		listener: '听者',
+		witness: '见证者',
+	})
 	expect(
 		result.registry.entries.some((entry) => entry.id.startsWith('listener/')),
 	).toBe(false)
@@ -208,6 +213,9 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 	expect((await loadPlayerChapter(root, playerWorkId, cache)).speakers).toEqual(
 		[],
 	)
+	expect(
+		(await loadPlayerChapter(root, playerWorkId, cache)).speakerNames,
+	).toEqual({})
 	{
 		using project = await Project.open(root)
 		await project.writeFile(

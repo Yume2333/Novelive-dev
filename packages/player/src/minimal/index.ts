@@ -9,6 +9,7 @@ export async function mountMinimalPlayer(
 	resources: PlayerResources,
 	signal: AbortSignal,
 	onError: (error: unknown) => void,
+	speakerNames: Readonly<Record<string, string>> = {},
 ): Promise<void> {
 	const app = new Application()
 	await app.init({ width: 960, height: 540, preference: 'webgl' })
@@ -44,7 +45,8 @@ export async function mountMinimalPlayer(
 		if (line.kind === 'dialogue' || line.kind === 'inner') {
 			const name = document.createElement('div')
 			name.className = 'nl-player-name'
-			name.textContent = line.alias ?? line.speaker ?? ''
+			name.textContent =
+				line.alias ?? speakerNames[line.speaker ?? ''] ?? line.speaker ?? ''
 			box.append(name)
 		}
 		const text = document.createElement('div')

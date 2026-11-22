@@ -27,7 +27,7 @@ export async function loadPlayerChapter(
 			),
 		)
 		const entries = new Map<string, AssetRegistry['entries'][number]>()
-		const speakers = new Set<string>()
+		const speakers = new Map<string, string>()
 		for (const scope of [
 			{ level: 'series' },
 			{ level: 'volume', volumeId },
@@ -49,7 +49,8 @@ export async function loadPlayerChapter(
 				const bible = await project.read(
 					projectFiles.character(scope, file.slice(0, -5)),
 				)
-				for (const character of bible.entries) speakers.add(character.id)
+				for (const character of bible.entries)
+					speakers.set(character.id, character.name)
 			}
 			let registry: AssetRegistry
 			try {
@@ -87,7 +88,8 @@ export async function loadPlayerChapter(
 			script: scripts.join('\n\n'),
 			chapter,
 			registry: { formatVersion: 1 as const, entries: assets },
-			speakers: [...speakers],
+			speakers: [...speakers.keys()],
+			speakerNames: Object.fromEntries(speakers),
 		}
 	}
 	throw { code: 'not_found', message: '工程中找不到这部作品' }

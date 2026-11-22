@@ -14,8 +14,8 @@ export const playerScript = `scene 空屋
 source p0001
 @bg room/dusk
 @show traveler/coat/calm center
-traveler as 旅人: 你好，世界。
-listener (inner) as 听者: 我在想什么？
+traveler: 你好，世界。
+listener (inner): 我在想什么？
 : 风从窗边吹过。
 @caption 黄昏时分 wait
 @hide traveler
