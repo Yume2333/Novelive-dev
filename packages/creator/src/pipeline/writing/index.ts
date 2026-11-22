@@ -7,6 +7,7 @@ import {
 } from '@novelive/format/script'
 import type { TextConnection } from '../../models/text'
 import {
+	TruncatedWritingError,
 	textOf,
 	userMessage,
 	type WritingTransport,
@@ -187,25 +188,37 @@ export async function writeChapter(
 	const paragraphs = chapter.paragraphs
 	if (!paragraphs.length)
 		throw new Error('Writing requires at least one source paragraph')
-	for (let from = 0; from < paragraphs.length; ) {
-		const previous = staged.at(-1)?.slice(-400) ?? ''
-		const prompt = (batch: readonly SourceParagraph[]) =>
-			[
-				instructions.instructions,
-				`Previous segment ending (context only): ${previous}`,
-				'Source paragraphs:',
-				source(batch),
-				instructions.end,
-			].join('\n')
-		let to = from + 1
-		while (
-			to < paragraphs.length &&
-			Buffer.byteLength(prompt(paragraphs.slice(from, to + 1))) <=
-				model.inputLimit
+	const prompt = (batch: readonly SourceParagraph[]) =>
+		[
+			instructions.instructions,
+			`Previous segment ending (context only): ${staged.at(-1)?.slice(-400) ?? ''}`,
+			'Source paragraphs:',
+			source(batch),
+			instructions.end,
+		].join('\n')
+	const outputEstimate = (batch: readonly SourceParagraph[]) =>
+		batch.reduce(
+			(total, { text }) =>
+				total +
+				24 +
+				Math.ceil(
+					Buffer.byteLength(text) /
+						(chapter.settings?.adaptation === 'faithful' ? 2 : 3),
+				),
+			0,
 		)
-			to++
-		const batch = paragraphs.slice(from, to)
-		const draft = await ask(model, prompt(batch))
+	async function writeBatch(batch: readonly SourceParagraph[]) {
+		let draft: string
+		try {
+			draft = await ask(model, prompt(batch))
+		} catch (error) {
+			if (!(error instanceof TruncatedWritingError) || batch.length < 2)
+				throw error
+			const middle = Math.floor(batch.length / 2)
+			await writeBatch(batch.slice(0, middle))
+			await writeBatch(batch.slice(middle))
+			return
+		}
 		const compiled = await validate(
 			model,
 			draft,
@@ -218,6 +231,19 @@ export async function writeChapter(
 			instructions,
 		)
 		staged.push(...compiled.scenes.map(({ scene }) => formatScene(scene)))
+	}
+	for (let from = 0; from < paragraphs.length; ) {
+		let to = from + 1
+		while (to < paragraphs.length) {
+			const batch = paragraphs.slice(from, to + 1)
+			if (
+				Buffer.byteLength(prompt(batch)) > model.inputLimit ||
+				outputEstimate(batch) > model.outputTokens
+			)
+				break
+			to++
+		}
+		await writeBatch(paragraphs.slice(from, to))
 		from = to
 	}
 	return validate(

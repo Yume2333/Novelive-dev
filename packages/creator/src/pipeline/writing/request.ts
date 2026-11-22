@@ -12,6 +12,12 @@ export type WritingTransport = {
 	fetch?: typeof globalThis.fetch
 }
 
+export class TruncatedWritingError extends TextModelError {
+	constructor(usage: TextModelError['usage']) {
+		super('internal', 'Writing model output was truncated', usage)
+	}
+}
+
 export function writingModel(
 	connection: TextConnection,
 	options: WritingTransport,
@@ -28,6 +34,7 @@ export function writingModel(
 		Math.floor(model.contextWindow / 4),
 	)
 	return {
+		outputTokens,
 		inputLimit: model.contextWindow - outputTokens - 256,
 		async request(context: Context) {
 			options.signal?.throwIfAborted()
@@ -46,11 +53,7 @@ export function writingModel(
 				throw new TextModelError(code ?? 'internal', message, result.usage)
 			}
 			if (result.stopReason === 'length')
-				throw new TextModelError(
-					'internal',
-					'Writing model output was truncated',
-					result.usage,
-				)
+				throw new TruncatedWritingError(result.usage)
 			return result
 		},
 	}

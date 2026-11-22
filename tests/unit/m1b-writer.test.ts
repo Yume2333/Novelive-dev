@@ -12,7 +12,10 @@ import {
 	runRecording,
 } from '../fixtures/cassettes/m1b-writer/fixture'
 
-type Reply = string | { tool: string; arguments: object }
+type Reply =
+	| string
+	| { tool: string; arguments: object }
+	| { truncated: string }
 function responses(...replies: Reply[]) {
 	const requests: string[] = []
 	const fetch: typeof globalThis.fetch = async (input, init) => {
@@ -20,7 +23,8 @@ function responses(...replies: Reply[]) {
 		requests.push(JSON.stringify(body.messages))
 		const reply = replies.shift()
 		if (reply === undefined) throw new Error('Unexpected model request')
-		const tool = typeof reply !== 'string'
+		const tool = typeof reply !== 'string' && 'tool' in reply
+		const truncated = typeof reply !== 'string' && 'truncated' in reply
 		const delta = tool
 			? {
 					tool_calls: [
@@ -35,7 +39,7 @@ function responses(...replies: Reply[]) {
 						},
 					],
 				}
-			: { content: reply }
+			: { content: truncated ? reply.truncated : reply }
 		const events = [
 			{
 				choices: [
@@ -48,7 +52,11 @@ function responses(...replies: Reply[]) {
 			},
 			{
 				choices: [
-					{ index: 0, delta: {}, finish_reason: tool ? 'tool_calls' : 'stop' },
+					{
+						index: 0,
+						delta: {},
+						finish_reason: tool ? 'tool_calls' : truncated ? 'length' : 'stop',
+					},
 				],
 			},
 		]
@@ -189,5 +197,33 @@ describe('M1b writer', () => {
 			ScriptDiagnosticsError,
 		)
 		expect(exhausted.requests).toHaveLength(4)
+	})
+
+	test('sizes faithful writes from the output budget and splits a truncated response', async () => {
+		const second = 'scene Shore\nsource p0002\n: The boat reached shore.'
+		const input = {
+			...chapter,
+			settings: { ...defaultWorkSettings(), adaptation: 'faithful' as const },
+			paragraphs: [
+				{ id: 'p0001', text: 'a'.repeat(1050) },
+				{ id: 'p0002', text: 'b'.repeat(1050) },
+			],
+		}
+		const sized = responses(scene, second)
+		await writeChapter(input, {
+			...sized.options,
+			writer: { ...sized.options.writer, contextWindow: 4096 },
+		})
+		expect(sized.requests).toHaveLength(2)
+		expect(sized.requests[0]).not.toContain('p0002:')
+		const split = responses({ truncated: scene }, scene, second)
+		const result = await writeChapter(input, split.options)
+		expect(split.requests).toHaveLength(3)
+		expect(split.requests[0]).toContain('p0002:')
+		expect(split.requests[1]).not.toContain('p0002:')
+		expect(result.scenes.map(({ scene }) => scene.source.from)).toEqual([
+			'p0001',
+			'p0002',
+		])
 	})
 })
