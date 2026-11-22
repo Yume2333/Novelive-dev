@@ -43,3 +43,5 @@ DESIGN.md takes precedence over the prototype's inline hints: both the
 native-size explanation and the conditional upscale-tier explanation now
 appear only after opening their ⓘ prompts. The wording is unchanged.
 [App with the native-size prompt open](11-w5-app-image-info.png).
+The shared `InfoTooltip` follows the prototype's viewport-clamped placement
+above the icon (below if needed), with hover and keyboard focus.

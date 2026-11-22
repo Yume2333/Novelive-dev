@@ -3,8 +3,8 @@ import type {
 	MaskedConfig,
 	TextSlot,
 } from '@novelive/creator/contract'
-import { Info } from 'lucide-react'
-import { useId, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import { InfoTooltip } from '../../components/InfoTooltip'
 import styles from './SettingsPage.module.css'
 
 type Models = MaskedConfig['models']
@@ -72,25 +72,6 @@ export function Select<T extends string | number>({
 				</option>
 			))}
 		</select>
-	)
-}
-
-function FieldInfo({ label, text }: { label: string; text: string }) {
-	const id = useId()
-	return (
-		<>
-			<button
-				aria-label={`${label}说明`}
-				className={styles.infoButton}
-				popoverTarget={id}
-				type="button"
-			>
-				<Info aria-hidden="true" size={14} />
-			</button>
-			<span className={styles.infoPrompt} id={id} popover="auto">
-				{text}
-			</span>
-		</>
 	)
 }
 
@@ -360,7 +341,7 @@ export function useImageFields(
 				<div className={styles.field}>
 					<span className={styles.fieldLabel}>
 						原生长边上限
-						<FieldInfo label="原生长边上限" text="超出部分由本地放大" />
+						<InfoTooltip label="原生长边上限说明" text="超出部分由本地放大" />
 					</span>
 					<Select
 						label="原生长边上限"
@@ -405,8 +386,8 @@ export function useImageFields(
 						<span className={styles.fieldLabel}>
 							放大档位
 							{draft.upscaleTier !== 'anime' && (
-								<FieldInfo
-									label="放大档位"
+								<InfoTooltip
+									label="放大档位说明"
 									text={
 										draft.upscaleTier === 'fast'
 											? '低性能机用，画质下降'

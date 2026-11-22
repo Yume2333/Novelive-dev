@@ -50,3 +50,9 @@ Checked 70 files in 33ms. No fixes applied.
   13 passed (12.5s)
 Electron opened both image-field info prompts and dismissed them with Escape.
 The refreshed Chromium W5 pairs show the tokenized spacing and the ⓘ prompt.
+
+Shared prototype tooltip follow-up:
+Checked 72 files in 27ms. No fixes applied.
+      Tests  129 passed (129)
+  13 passed (12.0s)
+Electron verified pointer hover, keyboard focus and Escape dismissal.
