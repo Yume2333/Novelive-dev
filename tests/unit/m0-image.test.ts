@@ -85,6 +85,24 @@ const base: ImageConfig = {
 	postProcess: 'single',
 	upscaleTier: 'anime',
 }
+
+it('reports malformed configured URLs for all image capabilities', async () => {
+	const cacheDir = await mkdtemp(join(tmpdir(), 'novelive-image-'))
+	dirs.push(cacheDir)
+	const fetch = vi.fn()
+	const results = await testImage(
+		{ ...base, baseUrl: 'not a URL', model: 'test-image' },
+		{ cacheDir, replay: { fetch } },
+	)
+	const invalid = { ok: false, error: { code: 'invalid_config' } }
+	expect(results).toMatchObject({
+		generate: invalid,
+		transparent: invalid,
+		edit: invalid,
+	})
+	expect(fetch).not.toHaveBeenCalled()
+})
+
 async function probe(scenario: string, seedream = false, signal?: AbortSignal) {
 	const cacheDir = await mkdtemp(join(tmpdir(), 'novelive-image-'))
 	dirs.push(cacheDir)

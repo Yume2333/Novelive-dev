@@ -117,13 +117,19 @@ export async function testImage(
 	options: { cacheDir: string; signal?: AbortSignal; replay?: ReplayOptions },
 ) {
 	const results = {} as Record<ImageCapability, ImageResult>
-	if (!config.baseUrl || !config.apiKey || !config.model) {
+	const baseUrl = URL.parse(config.baseUrl)
+	if (
+		!baseUrl ||
+		(baseUrl.protocol !== 'http:' && baseUrl.protocol !== 'https:') ||
+		!config.apiKey ||
+		!config.model
+	) {
 		for (const capability of ['generate', 'transparent', 'edit'] as const)
 			results[capability] = {
 				ok: false,
 				error: {
 					code: 'invalid_config',
-					message: '请填写图片接口地址、Key 和模型名。',
+					message: '请检查图片接口地址（HTTP 或 HTTPS）、Key 和模型名。',
 				},
 			}
 		return results
