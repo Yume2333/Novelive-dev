@@ -20,12 +20,16 @@ export function Page({
 export function EmptyState({
 	icon: Icon,
 	text,
+	card,
 }: {
 	icon: LucideIcon
 	text: string
+	card?: boolean
 }) {
 	return (
-		<div className={styles.empty}>
+		<div
+			className={card ? `${styles.empty} ${styles.emptyCard}` : styles.empty}
+		>
 			<span className={styles.icon}>
 				<Icon aria-hidden="true" size={28} strokeWidth={1.8} />
 			</span>
