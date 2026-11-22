@@ -144,6 +144,31 @@ function modeFromEnvironment() {
 	throw new Error('Invalid NL_REPLAY mode')
 }
 
+function terminalSse(bytes: Buffer) {
+	const lines = bytes.toString('utf8').split(/\r\n|[\r\n]/)
+	let event = ''
+	let data: string[] = []
+	for (const line of lines.slice(0, -1)) {
+		if (!line) {
+			if (
+				data.join('\n') === '[DONE]' ||
+				(data.length > 0 &&
+					/^(?:message_stop|response\.(?:completed|failed|incomplete))$/.test(
+						event,
+					))
+			)
+				return true
+			event = ''
+			data = []
+		} else if (line.startsWith('event:')) {
+			event = line.slice(6).replace(/^ /, '')
+		} else if (line.startsWith('data:')) {
+			data.push(line.slice(5).replace(/^ /, ''))
+		}
+	}
+	return false
+}
+
 function replayBody(
 	bytes: Uint8Array,
 	signal: AbortSignal,
@@ -265,16 +290,38 @@ export function createReplayFetch(
 				return response
 			}
 			const chunks: Buffer[] = []
-			const stream = response.body.pipeThrough(
-				new TransformStream<Uint8Array, Uint8Array>({
-					transform(chunk, controller) {
-						chunks.push(Buffer.from(chunk))
-						controller.enqueue(chunk)
+			const reader = response.body.getReader()
+			let cancelled = false
+			let writing: Promise<void> | undefined
+			const persist = (bytes: Buffer) =>
+				(writing ??= store(identity, response, bytes))
+			const isSse = /^text\/event-stream(?:[;\s]|$)/i.test(
+				response.headers.get('content-type') ?? '',
+			)
+			const stream = new ReadableStream<Uint8Array>(
+				{
+					async pull(controller) {
+						const { done, value } = await reader.read()
+						if (cancelled) return
+						if (done) {
+							await persist(Buffer.concat(chunks))
+							if (!cancelled) controller.close()
+							return
+						}
+						chunks.push(Buffer.from(value))
+						controller.enqueue(value)
 					},
-					async flush() {
-						await store(identity, response, Buffer.concat(chunks))
+					async cancel(reason) {
+						cancelled = true
+						const bytes = isSse ? Buffer.concat(chunks) : undefined
+						await Promise.all([
+							reader.cancel(reason),
+							writing ??
+								(bytes && terminalSse(bytes) ? persist(bytes) : undefined),
+						])
 					},
-				}),
+				},
+				{ highWaterMark: 0 },
 			)
 			return new Response(stream, {
 				status: response.status,

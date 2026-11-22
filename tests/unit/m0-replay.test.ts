@@ -157,6 +157,54 @@ test('strict misses fail closed; replay misses and the unset mode use the inject
 	}
 })
 
+test.each([
+	['OpenAI Chat Completions', 'data: [DONE]\n\n'],
+	['OpenAI Responses', 'event: response.completed\r\ndata: {}\r\n\r\n'],
+	['Anthropic Messages', 'event: message_stop\ndata: {}\n\n'],
+	['partial event', 'data: [DONE]\n'],
+])(
+	'records %s SSE on reader cancellation only after a complete terminal event',
+	async (format, event) => {
+		const cancel = vi.fn()
+		const source = new ReadableStream<Uint8Array>({
+			start(controller) {
+				const encoder = new TextEncoder()
+				controller.enqueue(encoder.encode(event.slice(0, 10)))
+				controller.enqueue(encoder.encode(event.slice(10)))
+			},
+			cancel,
+		})
+		const fetch = vi.fn(
+			async () =>
+				new Response(source, {
+					headers: { 'content-type': 'text/event-stream; charset=utf-8' },
+				}),
+		)
+		const record = createReplayFetch({ mode: 'record', directory, fetch })
+		const reader = (await record(origin)).body?.getReader()
+		if (!reader) throw new Error('Expected a streaming recording')
+		await reader.read()
+		await reader.read()
+		const pending = format === 'partial event' ? reader.read() : undefined
+		await reader.cancel('consumer finished')
+		if (pending) await expect(pending).resolves.toMatchObject({ done: true })
+		expect(cancel).toHaveBeenCalledWith('consumer finished')
+		const strict = createReplayFetch({ mode: 'strict', directory, fetch })
+		if (format === 'partial event') {
+			await expect(strict(origin)).rejects.toThrow(
+				'Missing strict replay cassette',
+			)
+		} else {
+			expect(await (await strict(origin)).text()).toBe(event)
+			const rows = (await readFile(join(directory, rowFile), 'utf8'))
+				.trim()
+				.split('\n')
+			expect(rows).toHaveLength(1)
+		}
+		expect(fetch).toHaveBeenCalledTimes(1)
+	},
+)
+
 test('stream faults and abort during a delayed pull do not change the recording', async () => {
 	const fetch = vi.fn(
 		async () =>
