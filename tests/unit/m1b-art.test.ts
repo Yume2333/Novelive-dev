@@ -242,3 +242,57 @@ test('preserves configured custom marks through staging and rejects unconfigured
 		model.mockRestore()
 	}
 })
+
+test('uses a supplied character design in both costume candidate rendering and auditing', async () => {
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(async (_prompt, _refs, size, alpha) => ({
+			bytes: await picture(size.width, size.height, alpha),
+		}))
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: '窗光' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const path = 'assets/ada-design.png'
+			const design = await picture(64, 96, true)
+			await project.writeFile(path, design)
+			const art = service(project, replay)
+			await art.candidates(
+				{
+					...bible,
+					characters: [
+						{
+							...bible.characters[0],
+							references: [{ path, description: '创作者设定图' }],
+						},
+					],
+				},
+				['c1'],
+			)
+			const portraits = render.mock.calls.filter((call) => call[3])
+			expect(portraits).toHaveLength(3)
+			for (const [prompt, refs] of portraits) {
+				expect(prompt).toContain('ada character design reference')
+				expect(refs).toHaveLength(1)
+				expect(await sharp(refs[0]).metadata()).toMatchObject({
+					width: 64,
+					height: 96,
+				})
+			}
+			const audits = model.mock.calls.filter(([, prompt]) =>
+				prompt.includes('ada character design reference'),
+			)
+			expect(audits).toHaveLength(3)
+			for (const call of audits) expect(call[4]).toHaveLength(2)
+		})
+	} finally {
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+}, 30_000)

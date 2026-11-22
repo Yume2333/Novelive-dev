@@ -198,6 +198,7 @@ export class ArtProduction {
 			? bible.characters.find((item) => item.id === entity)
 			: undefined
 		const location = bible.locations.find((item) => item.id === entity)
+		const designReference = character && characterDesignReference(character)
 		const priorCostume =
 			job.kind === 'character'
 				? entries
@@ -236,12 +237,7 @@ export class ArtProduction {
 				path: foundBase.path,
 				label: `${foundBase.id} base image`,
 			})
-		else if (character?.references?.[0])
-			drawing.references.push({
-				role: 'identity',
-				path: character.references[0].path,
-				label: `${entity} character design reference`,
-			})
+		else if (designReference) drawing.references.push(designReference)
 		else if (priorCostume)
 			drawing.references.push({
 				role: 'identity',
@@ -473,6 +469,9 @@ export class ArtProduction {
 				continue
 			for (const costume of character.costumes ?? []) {
 				const candidates: Candidate[] = []
+				const references = this.styleReferences(bible.style)
+				const designReference = characterDesignReference(character)
+				if (designReference) references.push(designReference)
 				for (const i of [1, 2, 3]) {
 					const id = `costume-${i}`
 					candidates.push(
@@ -482,7 +481,7 @@ export class ArtProduction {
 								kind: 'character',
 								description: `造型候选 ${i}：${costume.description}`,
 								style,
-								references: this.styleReferences(bible.style),
+								references,
 								characters: [character],
 								keep: [],
 							},
@@ -598,4 +597,16 @@ export class ArtProduction {
 		})
 		return chosen
 	}
+}
+
+function characterDesignReference(
+	character: ArtBible['characters'][number],
+): Drawing['references'][number] | undefined {
+	const reference = character.references?.[0]
+	if (reference)
+		return {
+			role: 'identity',
+			path: reference.path,
+			label: `${character.id} character design reference`,
+		}
 }
