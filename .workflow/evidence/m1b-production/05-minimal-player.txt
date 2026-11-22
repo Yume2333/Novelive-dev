@@ -58,3 +58,20 @@ Scope choices
 
 This is the minimal-player task check, not complete W2 production acceptance.
 Paid usage: 0 calls, 0 tokens, 0 images. No ledger entry.
+
+Main integration — 2026-11-22
+Merged origin/main d5a9794efd6c4c9c5d0dcee334ba9ee920824741.
+Resolved production contract imports by retaining chapterSchema and
+chapterStepSchema; retained both standalone player and production UI routes.
+The approved exact settings-heading locator avoids matching 高级设置.
+
+$ pnpm check
+Test Files  15 passed (15)
+     Tests  226 passed (226)
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e
+17 passed (11.6s)
+
+The first post-selector-fix full run encountered an intermittent scrollbar
+thumb drag failure (data-dragging remained false); the unchanged full suite
+passed on retry. No scrollbar production code or drag assertions were changed.
+Full logs: 05-minimal-player-merge-check.txt, 05-minimal-player-merge-e2e.txt.

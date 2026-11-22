@@ -52,7 +52,9 @@ test('M0 library and usage navigate between real empty pages and switch theme wi
 			}
 			await page.screenshot({ path: test.info().outputPath('usage-dark.png') })
 			await nav.getByRole('link', { name: '设置' }).click()
-			await expect(page.getByRole('heading', { name: '设置' })).toBeVisible()
+			await expect(
+				page.getByRole('heading', { name: '设置', exact: true }),
+			).toBeVisible()
 			await page.reload()
 			await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 			await nav.getByRole('link', { name: '书库' }).click()

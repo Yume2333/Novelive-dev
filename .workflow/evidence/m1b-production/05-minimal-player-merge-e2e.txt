@@ -1,0 +1,112 @@
+$ pnpm build && playwright test
+$ pnpm --filter @novelive/desktop build
+$ electron-vite build
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 1289 modules transformed.
+rendering chunks...
+out/main/chunks/sanitize-unicode-BvtkLirb.js                      0.18 kB
+out/main/chunks/session-resources-Cy7gaMpB.js                     0.27 kB
+out/main/chunks/openai-prompt-cache-COP8flKD.js                   0.35 kB
+out/main/chunks/node-CuXhTfv0.js                                  0.39 kB
+out/main/chunks/hash-RwksDas4.js                                  0.50 kB
+out/main/chunks/headers-dI3nc1Mq.js                               0.67 kB
+out/main/chunks/github-copilot-headers-eBo5GwLf.js                0.85 kB
+out/main/chunks/abort-signals-DeiSNi7A.js                         0.97 kB
+out/main/chunks/openrouter-cost-2NkAUD0d.js                       1.15 kB
+out/main/chunks/typesafe-system-one-Kbpvoq5K.js                   1.29 kB
+out/main/chunks/cloudflare-workers-ai-system-one-DaDyLX6F.js      2.02 kB
+out/main/chunks/provider-retry-WJkqjyes.js                        3.20 kB
+out/main/chunks/classifier-shared-Bk5xSumK.js                     3.49 kB
+out/main/chunks/error-body-B6ksIuQ1.js                            3.68 kB
+out/main/chunks/openrouter-images-DS7KAFgd.js                     4.99 kB
+out/main/chunks/system-one-shared-CJtXZ3OS.js                     5.52 kB
+out/main/chunks/openai-decisions-DJ3VF3hL.js                      5.71 kB
+out/main/index.js                                                 5.82 kB
+out/main/chunks/multipart-parser-B0LCIKmg.js                     10.88 kB
+out/main/chunks/pi-messages-CAHBB1O8.js                          11.07 kB
+out/main/chunks/openai-responses-Bw-FwXi3.js                     14.12 kB
+out/main/chunks/google-generative-ai-nMRayiWc.js                 14.31 kB
+out/main/chunks/azure-openai-responses-BdKdy2X9.js               14.57 kB
+out/main/chunks/google-vertex-UvVqMnGF.js                        16.53 kB
+out/main/chunks/player-B215iRh-.js                               17.96 kB
+out/main/chunks/transform-messages-wPGqzXUC.js                   22.41 kB
+out/main/chunks/streaming-json-6gNt-JGQ.js                       25.65 kB
+out/main/chunks/mistral-conversations-xUY48MMk.js                26.10 kB
+out/main/chunks/openai-responses-shared-BYpTeMyK.js              28.17 kB
+out/main/chunks/index-Cit94trg.js                                36.19 kB
+out/main/chunks/openai-completions-BajPUTao.js                   49.82 kB
+out/main/chunks/openai-codex-responses-DNl6HB7Y.js               52.63 kB
+out/main/chunks/node-vDWu_fyy.js                                 89.71 kB
+out/main/creator.js                                             134.28 kB
+out/main/chunks/src-CoeAsqd5.js                                 241.28 kB
+out/main/chunks/anthropic-messages-D748Enq5.js                  570.57 kB
+out/main/chunks/client-B_wyAP3K.js                              954.72 kB
+out/main/chunks/index-BKm6Em_I.js                             1,227.42 kB
+out/main/chunks/google-shared-DJBRrjZZ.js                     1,527.42 kB
+out/main/chunks/image-B0i-3VoX.js                             2,001.93 kB
+✓ built in 4.15s
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 20 modules transformed.
+rendering chunks...
+out/preload/index.cjs  106.36 kB
+✓ built in 121ms
+vite v7.2.7 building client environment for production...
+transforming...
+✓ 2958 modules transformed.
+rendering chunks...
+../../apps/desktop/out/renderer/index.html                                                            0.40 kB
+../../apps/desktop/out/renderer/assets/manrope-vietnamese-700-normal-CUqMx5-1.woff2                   4.55 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-vietnamese-400-normal-BLrFBAHj.woff2            4.65 kB
+../../apps/desktop/out/renderer/assets/manrope-greek-700-normal-CHUG9PD8.woff2                        5.24 kB
+../../apps/desktop/out/renderer/assets/manrope-vietnamese-700-normal-pt65Fn2Z.woff                    6.36 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-vietnamese-400-normal-C-iWyKLC.woff             6.50 kB
+../../apps/desktop/out/renderer/assets/manrope-greek-700-normal-DyfsrCpP.woff                         6.74 kB
+../../apps/desktop/out/renderer/assets/manrope-cyrillic-700-normal-Dw_fZAg2.woff2                     7.85 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-ext-700-normal-DYOwVNan.woff2                    8.28 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-ext-400-normal-DR7lHpW4.woff2             9.05 kB
+../../apps/desktop/out/renderer/assets/manrope-cyrillic-700-normal-7JNVKxyl.woff                     10.00 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-ext-700-normal-eVCcYqtJ.woff                    11.35 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-ext-400-normal-DI-aIsWt.woff             12.55 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-400-normal-BG6hkEXj.woff2                13.46 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-700-normal-BZp_XxE4.woff2                       14.21 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-400-normal-CjyVwvJV.woff                 17.24 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-700-normal-DGRFkw-m.woff                        18.41 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-Ba7eOkfT.woff2  1,142.55 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-CN8EQoOj.woff   1,564.08 kB
+../../apps/desktop/out/renderer/assets/index-DtP-RUDb.css                                            39.99 kB
+../../apps/desktop/out/renderer/assets/getTextureBatchBindGroup-BQvdXWGh.js                           0.94 kB
+../../apps/desktop/out/renderer/assets/canvasUtils-Cwm19yWZ.js                                       13.47 kB
+../../apps/desktop/out/renderer/assets/getTexelRangeRects-CEUwXSlA.js                                19.18 kB
+../../apps/desktop/out/renderer/assets/webworkerAll-BZrmuNrl.js                                      34.97 kB
+../../apps/desktop/out/renderer/assets/CanvasPool-CVZMcrYD.js                                        64.92 kB
+../../apps/desktop/out/renderer/assets/browserAll-DVcJpNOn.js                                       102.79 kB
+../../apps/desktop/out/renderer/assets/WebGPURenderer-mZE-nqJQ.js                                   123.79 kB
+../../apps/desktop/out/renderer/assets/WebGLRenderer-AaWvG5Vf.js                                    152.19 kB
+../../apps/desktop/out/renderer/assets/RenderTargetSystem-RPu6ONPR.js                               167.68 kB
+../../apps/desktop/out/renderer/assets/CanvasRenderer-16hzh5H9.js                                   281.00 kB
+../../apps/desktop/out/renderer/assets/index-zuRZafqu.js                                          1,341.40 kB
+✓ built in 2.83s
+
+Running 17 tests using 4 workers
+
+  ✓   2 tests/e2e/m0-shell.spec.ts:36:1 › M0 desktop shell renders the empty library and connects to a real creator (687ms)
+  ✓   3 tests/e2e/m0-lifecycle.spec.ts:11:1 › M0 creator lifecycle and protocol recovers an interrupted generation and confines cache images (739ms)
+  ✓   5 tests/e2e/m0-shell.spec.ts:70:1 › M0 desktop shell does not register debug commands without NL_E2E (366ms)
+  ✓   1 tests/e2e/m0-ui-shell.spec.ts:11:1 › M0 library and usage navigate between real empty pages and switch theme without native scrollbars (1.2s)
+  ✓   6 tests/e2e/m0-lifecycle.spec.ts:107:1 › M0 creator lifecycle and protocol stops after three failed handshakes until manually restarted (1.1s)
+  ✓   8 tests/e2e/m0-ui-shell.spec.ts:70:1 › M0 library and usage scroll overflowing content using the overlay track and thumb (643ms)
+  ✓   7 tests/e2e/m1b-creation-ui.spec.ts:43:1 › M1b creation surfaces show the two gates, blocked chapters and live records (1.3s)
+  ✓   4 tests/e2e/m0-settings.spec.ts:75:1 › M0 settings saves five slots and runs recorded text and vision requests (2.4s)
+  ✓  12 tests/e2e/m0-settings.spec.ts:159:1 › M0 settings preserves a manual context limit when inheritance keeps the catalog provider (995ms)
+  ✓   9 tests/e2e/m1b-player.spec.ts:13:1 › M1b minimal player renders local compiled beats and advances all four text kinds (1.6s)
+  ✓  11 tests/e2e/m1b-creation-ui.spec.ts:186:1 › M1b creation surfaces persist role models and writer presets through the creator (1.5s)
+  ✓  13 tests/e2e/m0-settings.spec.ts:201:1 › M0 settings shows recorded image capabilities and loads their protocol thumbnails (1.5s)
+  ✓  10 tests/e2e/m1b-production-contract.spec.ts:14:1 › M1b fixed scene renders two host resources from the built Electron renderer (3.2s)
+  ✓  14 tests/e2e/m0-settings.spec.ts:253:1 › M0 settings cancels a slow test, reports creator interruption and retests after restart (4.2s)
+  ✓  15 tests/e2e/m0-settings.spec.ts:327:1 › M0 settings reports exhausted disconnection in the UI (618ms)
+  ✓  16 tests/e2e/m0-settings.spec.ts:352:1 › M0 settings keeps other image results when the edit endpoint is unsupported (727ms)
+  ✓  17 tests/e2e/m0-settings.spec.ts:389:1 › M0 settings backs up a damaged config before resetting it (414ms)
+
+  17 passed (11.6s)

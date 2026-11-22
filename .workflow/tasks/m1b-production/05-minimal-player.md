@@ -13,6 +13,8 @@
 
 ## Progress
 
+- Merge check: 合并 main 后保留播放器与制作界面两侧协议和路由；完整检查 226 项通过。经批准将设置标题定位改为精确匹配，完整 Electron 套件 17 项通过（一次滚动条拖拽偶发失败后原样重跑通过）。[合并检查](../../evidence/m1b-production/05-minimal-player-merge-check.txt)、[合并 Electron](../../evidence/m1b-production/05-minimal-player-merge-e2e.txt)。
+
 - Check after: 说话人设定集审查修复后，`pnpm check` 通过（13 个测试文件、216 项测试）；严格回放最小播放器 Electron 检查 1 项通过，覆盖无立绘素材角色的心声。
 - Real path: 从 `/work/:id/play` 选择本地合成工程，经创作端读取首章 `.nvs`、界面端编译；Electron 内 PixiJS 背景/立绘像素匹配，验证对话、心声、旁白、独立字幕与点击推进、隐藏立绘和章末；完整 Electron 套件 15 项通过。
 - Evidence: [检查与真实路径](../../evidence/m1b-production/05-minimal-player.txt)、[完整检查](../../evidence/m1b-production/05-minimal-player-check.txt)、[真实路径日志](../../evidence/m1b-production/05-minimal-player-real-path.txt)、[完整 Electron 套件](../../evidence/m1b-production/05-minimal-player-e2e.txt)、[播放器截图](../../evidence/m1b-production/05-minimal-player.png)。无付费调用。
