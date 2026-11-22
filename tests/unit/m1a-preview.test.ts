@@ -210,6 +210,40 @@ test('adding a chapter invalidates its volume digest without redoing finished ch
 	expect(result.digests[0].characters).toContainEqual({ name: 'Cy' })
 })
 
+test('a summary-only digest valid under the shared schema is stale rather than invalid', async () => {
+	using project = await Project.open(root)
+	await previewBook(project, chapters, {
+		connection,
+		language: 'en',
+		fetch: replay(),
+	})
+	await project.write(projectFiles.digest('v1'), {
+		formatVersion: 1,
+		volumeId: 'v1',
+		summary: 'An older summary.',
+	})
+	const strict = replay()
+	const prompts: string[] = []
+	const result = await previewBook(project, chapters, {
+		connection,
+		language: 'en',
+		fetch: async (input, init) => {
+			const request = new Request(input, init)
+			prompts.push((await request.clone().json()).messages[0].content)
+			return strict(request)
+		},
+	})
+	expect(prompts.length).toBeGreaterThan(0)
+	expect(
+		prompts.every((prompt) => prompt.startsWith('Summarize volume previews')),
+	).toBe(true)
+	expect(result.digests[0].characters).toContainEqual({ name: 'Ada' })
+	expect(await project.read(projectFiles.digest('v1'))).toMatchObject({
+		inputFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+		characters: expect.any(Array),
+	})
+})
+
 test('empty input makes no calls; cancellation and strict misses do not persist unfinished chapters', async () => {
 	using project = await Project.open(root)
 	const fetch = vi.fn(replay())

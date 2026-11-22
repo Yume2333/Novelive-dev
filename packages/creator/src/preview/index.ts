@@ -210,11 +210,11 @@ export async function previewBook(
 			volume.push(preview)
 			previews.push(preview)
 		}
-		const file = {
-			path: projectFiles.digest(volumeId).path,
-			schema: storedDigestSchema,
-		}
-		let digest = await existing(() => project.read(file))
+		const file = projectFiles.digest(volumeId)
+		const cachedDigest = await existing(() => project.read(file))
+		let digest = compile(storedDigestSchema).check(cachedDigest)
+			? cachedDigest
+			: undefined
 		const inputFingerprint = fingerprint({ volume, language: options.language })
 		if (!digest || digest.inputFingerprint !== inputFingerprint) {
 			const details = merge(volume)

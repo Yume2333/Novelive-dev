@@ -34,5 +34,5 @@ tests/fixtures/text-models/build-synthetic.ts:63:3 lint/style/useTemplate  FIXAB
      85  85 │   }
 
 
-Checked 91 files in 28ms. No fixes applied.
+Checked 91 files in 30ms. No fixes applied.
 Found 1 info.
