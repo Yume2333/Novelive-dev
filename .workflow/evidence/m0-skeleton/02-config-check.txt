@@ -1,0 +1,8 @@
+
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev
+
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  17:51:05
+   Duration  193ms (tests 39%, transform 38%, import 18%, worker 6%)
