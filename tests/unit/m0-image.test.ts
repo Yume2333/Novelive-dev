@@ -148,6 +148,21 @@ it('uses intersected size range for opaque Ark endpoint ids', async () => {
 	expect(Object.values(results).every((result) => result.ok)).toBe(true)
 })
 
+it.each([
+	['item-unsupported', 'unsupported'],
+	['item-sensitive', 'moderation'],
+	['item-risk', 'moderation'],
+	['item-rate-limit', 'network'],
+	['item-overloaded', 'network'],
+] as const)(
+	'classifies Seedream per-item error %s as %s',
+	async (scenario, code) => {
+		const { results } = await probe(scenario, true)
+		for (const result of Object.values(results))
+			expect(result).toMatchObject({ ok: false, error: { code } })
+	},
+)
+
 for (const seedream of [false, true])
 	describe(seedream ? 'Seedream' : 'OpenAI', () => {
 		it('three independent capabilities and protocol-readable images + thumbnails (synthetic)', async () => {

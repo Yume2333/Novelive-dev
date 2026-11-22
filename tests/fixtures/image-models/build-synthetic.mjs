@@ -37,6 +37,11 @@ for (const scenario of [
 	'url-error',
 	'relay',
 	'endpoint',
+	'item-unsupported',
+	'item-sensitive',
+	'item-risk',
+	'item-rate-limit',
+	'item-overloaded',
 ]) {
 	for (const seedream of [false, true]) {
 		const model =
@@ -103,6 +108,24 @@ for (const scenario of [
 						}
 					}
 					if (scenario === 'empty') body = { data: [] }
+					const itemCodes = {
+						'item-unsupported': 'InvalidParameter.UnsupportedParameter',
+						'item-sensitive': 'OutputImageSensitiveContentDetected',
+						'item-risk': 'InputImageRiskDetection',
+						'item-rate-limit': 'RateLimitExceeded',
+						'item-overloaded': 'ServerOverloaded',
+					}
+					if (scenario in itemCodes)
+						body = {
+							data: [
+								{
+									error: {
+										code: itemCodes[scenario],
+										message: 'Synthetic item failure',
+									},
+								},
+							],
+						}
 					if (scenario === 'bad-image')
 						body = {
 							data: [

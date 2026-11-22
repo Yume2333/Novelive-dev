@@ -13,8 +13,9 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m0-image.test.ts` — 58 passed；`.workflow/evidence/m0-skeleton/08-image-check.txt`。
-- `NL_REPLAY=strict pnpm check` — typecheck、Biome、Stylelint、77 tests passed；`.workflow/evidence/m0-skeleton/08-pnpm-check.txt`。
+- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m0-image.test.ts` — 77 passed；`.workflow/evidence/m0-skeleton/08-review-fixes-check.txt`。
+- `NL_REPLAY=strict pnpm check` — typecheck、Biome、Stylelint、96 tests passed；`.workflow/evidence/m0-skeleton/08-review-fixes-pnpm-check.txt`。
+- PR #9 review fixes: 仅按地址选协议（中转上的 Seedream 名称仍走 OpenAI）；Ark 不明版本尺寸取交集 3686400–4624220；URL 下载加 90 秒期限并合并调用者取消；Seedream `data[].error` 复用 API 错误分类。新增 strict synthetic 用例，未发真实网络请求。
 - Real path: Node 调用 `testImage` 服务入口，OpenAI 与 Seedream 各三项通过 SDK strict replay → sharp → 应用缓存 → `cacheResponse(novelive://cache/...)`，六组原图/缩略图均 200；`.workflow/evidence/m0-skeleton/08-image-real-path.txt`。未接 UI/IPC，未做 Electron 界面验收。
 - Missing recordings (for main session to record): OpenAI 开发中转 `gpt-image-2.6-sunburst` 文生图、透明底、multipart 编辑真实成功；Seedream 5.5 文生图、透明底、generations + image 编辑真实成功；Seedream 4.5 低档向上吸附尺寸真实成功。现有成功用例全部标 synthetic，不算 W3 真实验收；本分支从未调用付费接口或读取 NL_IMAGE_* 凭据。
 - Review: pass (base 8b98df4519f44c0ddccfb4fb9439a007f55a4141, reviewer lead session) — independent review of diff vs 8b98df4 by lead session (no blocking findings; checked size snapping vs docs/visuals.md §3.2, Seedream fixed params, error mapping, data[].background check).

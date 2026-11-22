@@ -194,7 +194,19 @@ export async function testImage(
 							},
 							request,
 						)
-			const image = response.data?.[0]
+			const image = response.data?.[0] as
+				| (NonNullable<typeof response.data>[number] & {
+						error?: { code: string; message: string }
+				  })
+				| undefined
+			if (seedream && image?.error && !image.b64_json && !image.url) {
+				throw new OpenAI.APIError(
+					400,
+					image.error,
+					image.error.message,
+					new Headers(),
+				)
+			}
 			let bytes: Buffer
 			if (image?.b64_json) bytes = Buffer.from(image.b64_json, 'base64')
 			else if (image?.url) {
