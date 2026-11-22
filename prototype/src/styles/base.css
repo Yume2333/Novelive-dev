@@ -111,13 +111,13 @@ input[type='range']:focus-visible,
   outline-offset: 2px;
 }
 
-input:not([type='range']):not([type='checkbox']):not([type='radio']):focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-.nl-input:focus-visible {
+input:not([type='range']):not([type='checkbox']):not([type='radio']):focus,
+select:focus,
+textarea:focus,
+.nl-input:focus {
   outline: none;
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 2px var(--accent-wash) !important;
+  background: var(--white-90) !important;
+  box-shadow: var(--shadow-focus) !important;
 }
 
 .nl-check-input:focus-visible + .nl-check-box {
