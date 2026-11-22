@@ -279,6 +279,38 @@ function existingHistory(
 	return new Map(points.map((point) => [pointKey(point), point]))
 }
 
+function orderedProposals(items: Patch[], order: ReadonlyMap<string, number>) {
+	const groups = new Map<string, Patch[]>()
+	for (const item of items) {
+		const group = groups.get(item.entry.id) ?? []
+		group.push(item)
+		groups.set(item.entry.id, group)
+	}
+	const rank = ({ observedChapter, entry }: Patch) => {
+		const chapter = observedChapter ?? entry.firstSeenChapter
+		return chapter === undefined ? -1 : (order.get(chapter) ?? -1)
+	}
+	const compare = (a: Patch, b: Patch) => {
+		const chronological =
+			Number(b.op === 'add') - Number(a.op === 'add') || rank(a) - rank(b)
+		if (chronological) return chronological
+		const left = JSON.stringify(a)
+		const right = JSON.stringify(b)
+		return left < right ? -1 : Number(left > right)
+	}
+	return [...groups.keys()].sort().flatMap((id) => {
+		const ordered: Patch[] = []
+		let pending: Patch[] = []
+		for (const item of groups.get(id) ?? []) {
+			if (item.op === 'delete') {
+				ordered.push(...pending.sort(compare), item)
+				pending = []
+			} else pending.push(item)
+		}
+		return [...ordered, ...pending.sort(compare)]
+	})
+}
+
 function addPoints(history: History, points: Point[]) {
 	const next = new Map(history)
 	for (const point of points) {
@@ -476,8 +508,12 @@ export async function applyPatches(
 		const entries = new Map(original.map((entry) => [entry.id, entry]))
 		const histories = new Map<string, History>()
 		const changed = new Set<string>()
-		for (const item of patch) {
-			if (item.kind !== kind || item.op === 'none') continue
+		const proposals = patch.filter(
+			(item) => item.kind === kind && item.op !== 'none',
+		)
+		for (const item of temporalField(kind)
+			? orderedProposals(proposals, chapterOrder)
+			: proposals) {
 			const current = entries.get(item.entry.id)
 			if (item.op === 'delete') {
 				if (current?.status === 'confirmed')

@@ -821,11 +821,11 @@ test('an undated whole-volume proposal retains its base through a later return',
 	]
 	const entry = {
 		...confirmed,
-		status: 'candidate',
+		status: 'candidate' as const,
 		id: 'new',
 		aliases: [],
 		changes: history,
-	} as const
+	}
 	const result = await applyPatches(
 		project,
 		await readBible(project),
@@ -941,6 +941,150 @@ test('a later dangling reference does not reject an earlier valid proposal for t
 	])
 	expect((await readBible(project)).relation).toEqual([relation])
 })
+
+test('seeded timeline merges preserve confirmed facts, chapter values and published references across permutations', async () => {
+	let state = 0x4e4c
+	const next = (limit: number) => {
+		state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+		return state % limit
+	}
+	const ids = ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6']
+	const order = new Set(ids)
+	const values = [confirmed.identity, 'Captain', 'Admiral']
+	const base = { ...confirmed, aliases: [] }
+	const file = projectFiles.character(scope, base.id)
+	const observe = (chapter: string, value: string) =>
+		({
+			kind: 'character',
+			op: 'update',
+			observedChapter: chapter,
+			entry: { ...base, identity: value },
+		}) satisfies BiblePatch[number]
+	const validRelation = {
+		id: 'connection',
+		status: 'candidate',
+		from: 'ada',
+		to: 'ada',
+		description: 'Trusts',
+	} as const
+	const valid = {
+		kind: 'relation',
+		op: 'add',
+		entry: validRelation,
+	} satisfies BiblePatch[number]
+	const dangling = {
+		kind: 'relation',
+		op: 'update',
+		entry: { ...validRelation, to: 'missing' },
+	} satisfies BiblePatch[number]
+	for (let trial = 0; trial < 20; trial++) {
+		const observations = ids
+			.slice(2)
+			.flatMap((id) =>
+				next(3) === 0 ? [] : [observe(id, values[next(values.length)])],
+			)
+		if (trial % 2 === 0) {
+			observations.push(observe('c3', 'Captain'), observe('c3', 'Admiral'))
+		}
+		if (trial % 3 === 0) {
+			observations.push(observe('c4', 'Café'), observe('c4', 'Cafe\u0301'))
+		}
+		const earlier = observe('c0', 'Impostor')
+		const atStart = observe('c1', 'Impostor')
+		const moved = {
+			...observe('c2', 'Impostor'),
+			entry: { ...base, firstSeenChapter: 'c0', identity: 'Impostor' },
+		} satisfies BiblePatch[number]
+		const fixed = {
+			...observe('c2', 'Impostor'),
+			entry: { ...base, name: 'Impostor' },
+		} satisfies BiblePatch[number]
+		const proposals: BiblePatch = [
+			...observations,
+			earlier,
+			atStart,
+			moved,
+			fixed,
+			valid,
+			dangling,
+		]
+		const shuffled = [...proposals]
+		for (let index = shuffled.length - 1; index > 0; index--) {
+			const other = next(index + 1)
+			;[shuffled[index], shuffled[other]] = [shuffled[other], shuffled[index]]
+		}
+		const outcomes = []
+		for (const [permutation, patch] of [proposals, shuffled].entries()) {
+			const path = join(directory, `timeline-${trial}-${permutation}`)
+			await seed(path)
+			using project = await Project.open(path)
+			const { conflicts } = await applyPatches(
+				project,
+				await readBible(project),
+				patch,
+				[],
+				order,
+			)
+			const [published] = (await project.read(file)).entries
+			expect(published).toMatchObject(base)
+			for (const rejected of [earlier, atStart, moved, fixed, dangling]) {
+				const { entry, ...proposal } = rejected
+				expect(conflicts).toContainEqual(
+					expect.objectContaining({
+						...proposal,
+						entry: expect.objectContaining({
+							...entry,
+							status: 'candidate',
+							conflict: expect.any(String),
+						}),
+					}),
+				)
+			}
+			const valid = observations.filter(
+				({ observedChapter, entry }) =>
+					!conflicts.some(
+						(conflict) =>
+							conflict.kind === 'character' &&
+							conflict.observedChapter === observedChapter &&
+							conflict.entry.identity === entry.identity,
+					),
+			)
+			for (const [index, id] of ids.entries()) {
+				const before = ids.slice(0, index + 1)
+				const expected =
+					before
+						.flatMap((chapter) =>
+							valid.filter(
+								({ observedChapter }) => observedChapter === chapter,
+							),
+						)
+						.at(-1)?.entry.identity ?? base.identity
+				const actual =
+					published.changes
+						?.filter(({ chapterId }) => before.includes(chapterId))
+						.at(-1)?.value ?? published.identity
+				if (id !== 'c0')
+					expect(actual, `trial ${trial}, chapter ${id}`).toBe(expected)
+			}
+			const { character, relation } = await readBible(project)
+			const publishedIds = new Set(character.map(({ id }) => id))
+			expect(relation).toEqual([validRelation])
+			for (const id of [
+				...relation.flatMap(({ from, to }) => [from, to]),
+				...character.flatMap(
+					({ addresses }) => addresses?.map(({ speakerId }) => speakerId) ?? [],
+				),
+			]) {
+				expect(publishedIds.has(id)).toBe(true)
+			}
+			outcomes.push({
+				published,
+				conflicts: conflicts.map((conflict) => JSON.stringify(conflict)).sort(),
+			})
+		}
+		expect(outcomes[0], `trial ${trial}`).toEqual(outcomes[1])
+	}
+}, 15_000)
 
 test('unresolved references trigger one repair and are never published', async () => {
 	await seed(root)
