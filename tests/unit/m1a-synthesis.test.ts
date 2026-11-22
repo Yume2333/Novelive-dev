@@ -673,6 +673,15 @@ test.each([
 		conflict: true,
 	},
 	{
+		name: 'a stored first-chapter change wins over the confirmed base and can be repeated',
+		firstSeen: 'c1',
+		history: [['c1', 'Captain']],
+		proposals: [
+			{ observed: 'c1', value: 'Captain', history: [['c1', 'Captain']] },
+		],
+		expected: [['c1', 'Captain']],
+	},
+	{
 		name: 'an earlier observation cannot move a confirmed base',
 		firstSeen: 'c2',
 		history: [],

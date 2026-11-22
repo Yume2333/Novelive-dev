@@ -268,15 +268,18 @@ function existingHistory(
 	current: Entry | undefined,
 	kind: keyof Bible,
 ): History {
-	const points: Point[] = changesOf(current).filter(
-		({ field }) => field === temporalField(kind),
-	)
+	const byChapter = new Map<string | undefined, Point>()
 	const base =
 		current?.status === 'confirmed' && current.firstSeenChapter
 			? temporalPoint(kind, current, current.firstSeenChapter)
 			: undefined
-	if (base) points.unshift(base)
-	return new Map(points.map((point) => [pointKey(point), point]))
+	if (base) byChapter.set(base.chapterId, base)
+	for (const change of changesOf(current))
+		if (change.field === temporalField(kind))
+			byChapter.set(change.chapterId, change)
+	return new Map(
+		Array.from(byChapter.values(), (point) => [pointKey(point), point]),
+	)
 }
 
 function orderedProposals(items: Patch[], order: ReadonlyMap<string, number>) {
