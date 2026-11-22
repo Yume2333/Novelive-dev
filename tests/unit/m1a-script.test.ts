@@ -178,23 +178,29 @@ test('rejects out-of-range, overlapping, uncovered, and reversed source ranges',
 		})
 })
 
-test('uses the same five-digit paragraph IDs in scene source and chapter metadata', () => {
-	const result = compileScript('scene 末尾\nsource p9999-p10000\n: 话', {
-		...context,
-		paragraphIds: ['p9999', 'p10000'],
-	})
-	expect(result.ok).toBe(true)
-	expect(
-		compile(chapterSchema).check({
-			formatVersion: 1,
-			chapterId: 'chapter1',
-			title: '末尾',
-			paragraphIds: ['p9999', 'p10000'],
-			sceneIds: [],
-			cg: [],
-		}),
-	).toBe(true)
-})
+test.each([
+	['p9999', 'p10000'],
+	['p99999', 'p100000'],
+])(
+	'uses the same paragraph IDs in scene source and chapter metadata: %s–%s',
+	(from, to) => {
+		const result = compileScript(`scene 末尾\nsource ${from}-${to}\n: 话`, {
+			...context,
+			paragraphIds: [from, to],
+		})
+		expect(result.ok).toBe(true)
+		expect(
+			compile(chapterSchema).check({
+				formatVersion: 1,
+				chapterId: 'chapter1',
+				title: '末尾',
+				paragraphIds: [from, to],
+				sceneIds: [],
+				cg: [],
+			}),
+		).toBe(true)
+	},
+)
 
 test('validates asset types, ambiguous aliases, stage presence and speakers separately', () => {
 	const result = compileScript(
