@@ -25,18 +25,15 @@ export interface PreviewChapter {
 
 const fields = compile(obj(chapterPreviewFields))
 const digestFields = compile(obj({ summary: str() }))
-const storedPreviewSchema = obj({
-	...version,
-	chapterId: entityId,
-	...chapterPreviewFields,
-	inputFingerprint: opt(str()),
-})
-const storedDigestSchema = obj({
-	...version,
-	volumeId: entityId,
-	...chapterPreviewFields,
-	inputFingerprint: opt(str()),
-})
+const storedDigestSchema = obj(
+	{
+		...version,
+		volumeId: entityId,
+		...chapterPreviewFields,
+		inputFingerprint: opt(str()),
+	},
+	{ open: true },
+)
 type Details = Omit<ChapterPreview, 'chapterId' | 'formatVersion'>
 export type PreviewDigest = VolumeDigest & Omit<Details, 'summary'>
 
@@ -178,16 +175,17 @@ export async function previewBook(
 			(chapter) => chapter.volumeId === volumeId,
 		)) {
 			options.signal?.throwIfAborted()
-			const file = {
-				path: projectFiles.preview(chapter.chapterId).path,
-				schema: storedPreviewSchema,
-			}
+			const file = projectFiles.preview(chapter.chapterId)
 			const inputFingerprint = fingerprint({
 				paragraphs: chapter.paragraphs,
 				language: options.language,
 			})
 			let preview = await existing(() => project.read(file))
-			if (!preview || preview.inputFingerprint !== inputFingerprint) {
+			if (
+				!preview ||
+				!('inputFingerprint' in preview) ||
+				preview.inputFingerprint !== inputFingerprint
+			) {
 				const parts: Details[] = []
 				let previous = ''
 				for (const segment of splitChapter(chapter.paragraphs, budget)) {
@@ -199,13 +197,14 @@ export async function previewBook(
 					)
 					previous = segment.slice(-128)
 				}
-				preview = {
+				const completed: ChapterPreview & { inputFingerprint: string } = {
 					formatVersion,
 					chapterId: chapter.chapterId,
 					...merge(parts),
 					inputFingerprint,
 				}
-				await project.write(file, preview)
+				await project.write(file, completed)
+				preview = completed
 			}
 			volume.push(preview)
 			previews.push(preview)

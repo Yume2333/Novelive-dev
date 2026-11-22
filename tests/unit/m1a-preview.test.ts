@@ -244,6 +244,56 @@ test('a summary-only digest valid under the shared schema is stale rather than i
 	})
 })
 
+test('shared-schema previews with extra fields regenerate if unfingerprinted, while compatible digests remain reusable', async () => {
+	using project = await Project.open(root)
+	await previewBook(project, chapters, {
+		connection,
+		language: 'en',
+		fetch: replay(),
+	})
+	const legacyPreview = {
+		formatVersion: 1 as const,
+		chapterId: 'c1',
+		summary: 'Legacy preview',
+		characters: [],
+		locations: [],
+		timelineNotes: [],
+		foreshadowingHints: [],
+		annotation: 'extension from another producer',
+	}
+	await project.write(projectFiles.preview('c1'), legacyPreview)
+	const strict = replay()
+	const prompts: string[] = []
+	const result = await previewBook(project, chapters, {
+		connection,
+		language: 'en',
+		fetch: async (input, init) => {
+			const request = new Request(input, init)
+			prompts.push((await request.clone().json()).messages[0].content)
+			return strict(request)
+		},
+	})
+	expect(prompts.filter((prompt) => prompt.includes('\nText:\n'))).toHaveLength(
+		2,
+	)
+	expect(result.previews[0].characters).toContainEqual({ name: 'Ada' })
+	expect(result.previews[0]).toMatchObject({
+		inputFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+	})
+	const compatibleDigest = {
+		...(await project.read(projectFiles.digest('v1'))),
+		annotation: 'compatible digest extension',
+	}
+	await project.write(projectFiles.digest('v1'), compatibleDigest)
+	const unused = vi.fn(replay())
+	await previewBook(project, chapters, {
+		connection,
+		language: 'en',
+		fetch: unused,
+	})
+	expect(unused).not.toHaveBeenCalled()
+})
+
 test('empty input makes no calls; cancellation and strict misses do not persist unfinished chapters', async () => {
 	using project = await Project.open(root)
 	const fetch = vi.fn(replay())
