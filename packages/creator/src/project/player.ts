@@ -62,7 +62,19 @@ export async function loadPlayerChapter(
 		}
 		const assets = await Promise.all(
 			[...entries.values()].map(async (entry) => {
-				const bytes = await project.readFile(entry.path)
+				const missing = () => ({
+					...entry,
+					path: `player/unavailable/${createHash('sha256').update(`${project.root}/${entry.id}`).digest('hex')}${extname(entry.path)}`,
+				})
+				if (entry.status === 'pending') return missing()
+				let bytes: Buffer
+				try {
+					bytes = await project.readFile(entry.path)
+				} catch (error) {
+					if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+						return missing()
+					throw error
+				}
 				const hash = createHash('sha256').update(bytes).digest('hex')
 				const path = `player/${hash}${extname(entry.path)}`
 				const destination = join(cacheDir, path)

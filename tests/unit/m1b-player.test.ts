@@ -167,8 +167,31 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 		expect.arrayContaining([expect.objectContaining({ code: 'E_SPEAKER' })]),
 	)
 	expect(
-		await readFile(join(cache, result.registry.entries[0].path), 'utf8'),
+		await readFile(
+			join(
+				cache,
+				result.registry.entries.find((entry) => entry.id === 'room/dusk')
+					?.path ?? '',
+			),
+			'utf8',
+		),
 	).toBe('background')
+	const pending = result.registry.entries.find(
+		(entry) => entry.id === 'future/day',
+	)
+	expect(pending).toMatchObject({
+		status: 'pending',
+		path: expect.stringContaining('player/unavailable/'),
+	})
+	await expect(
+		readFile(join(cache, pending?.path ?? '')),
+	).rejects.toMatchObject({ code: 'ENOENT' })
+	await rm(join(root, 'assets/traveler.png'))
+	const missing = await loadPlayerChapter(root, playerWorkId, cache)
+	expect(
+		missing.registry.entries.find((entry) => entry.id === 'traveler/coat/calm')
+			?.path,
+	).toContain('player/unavailable/')
 	await expect(
 		loadPlayerChapter(root, '00000000-0000-0000-0000-000000000000', cache),
 	).rejects.toMatchObject({ code: 'not_found' })
@@ -208,7 +231,14 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 			}),
 			{
 				formatVersion: 1,
-				entries: [{ ...result.registry.entries[0], path: '../outside.png' }],
+				entries: [
+					{
+						...result.registry.entries.find(
+							(entry) => entry.id === 'room/dusk',
+						)!,
+						path: '../outside.png',
+					},
+				],
 			},
 		)
 	}

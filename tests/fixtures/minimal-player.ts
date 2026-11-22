@@ -80,6 +80,13 @@ export async function seedPlayerProject(
 		formatVersion: 1,
 		entries: [
 			{
+				id: 'future/day',
+				type: 'location',
+				path: 'assets/future.png',
+				aliases: [],
+				status: 'pending',
+			},
+			{
 				id: 'room/dusk',
 				type: 'location',
 				path: 'assets/room.png',
