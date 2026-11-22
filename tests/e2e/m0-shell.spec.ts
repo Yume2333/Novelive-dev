@@ -37,7 +37,9 @@ test('M0 desktop shell renders the empty library and connects to a real creator'
 	const run = await launch(true)
 	try {
 		const page = await run.desktop.firstWindow()
-		await expect(page.getByRole('heading', { name: '书库' })).toBeVisible()
+		await expect(
+			page.getByRole('heading', { name: '书库', exact: true }),
+		).toBeVisible()
 		await expect(page.getByText('还没有作品')).toBeVisible()
 		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
 

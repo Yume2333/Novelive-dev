@@ -187,6 +187,10 @@
 	grid-column: 1 / -1;
 }
 
+.fields:has(.postProcess) {
+	align-items: start;
+}
+
 .postProcess {
 	align-items: start;
 	gap: var(--space-4);
@@ -308,14 +312,14 @@
 	font-size: 13px;
 }
 
-.appearance .row strong {
-	font-size: 13.5px;
-	font-weight: 600;
-}
-
 .row strong,
 .about .row span:nth-child(2) {
 	flex: 1;
+}
+
+.appearance .row strong {
+	font-size: 13.5px;
+	font-weight: 600;
 }
 
 .aboutLinks {

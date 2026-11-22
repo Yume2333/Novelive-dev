@@ -19,7 +19,9 @@ test('M0 library and usage navigate between real empty pages and switch theme wi
 		try {
 			const page = await app.firstWindow()
 			const nav = page.getByRole('navigation', { name: '全局导航' })
-			await expect(page.getByRole('heading', { name: '书库' })).toBeVisible()
+			await expect(
+				page.getByRole('heading', { name: '书库', exact: true }),
+			).toBeVisible()
 			await expect(page.getByText('还没有作品')).toBeVisible()
 			await expect(
 				page.getByRole('heading', { name: '书库还是空的' }),
@@ -76,7 +78,9 @@ test('M0 library and usage scroll overflowing content using the overlay track an
 			const viewport = page.locator('main [data-scroll-viewport]')
 			const track = page.locator('main [data-dragging]')
 			const scrollTop = () => viewport.evaluate((element) => element.scrollTop)
-			await expect(page.getByRole('heading', { name: '书库' })).toBeVisible()
+			await expect(
+				page.getByRole('heading', { name: '书库', exact: true }),
+			).toBeVisible()
 			await expect(track).toHaveCount(0)
 			await page.addStyleTag({ content: 'main section { min-height: 300vh; }' })
 			expect(
