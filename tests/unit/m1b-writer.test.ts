@@ -226,4 +226,33 @@ describe('M1b writer', () => {
 			'p0002',
 		])
 	})
+
+	test('reviews each scene separately and rejects source requests outside its scene', async () => {
+		const second = 'scene Shore\nsource p0002\n: A bell rang.'
+		const input = {
+			...chapter,
+			paragraphs: [
+				...chapter.paragraphs,
+				{ id: 'p0002', text: 'A bell rang at noon.' },
+			],
+		}
+		const { options, requests } = responses(
+			`${scene}\n${second}`,
+			{ tool: 'read_source_range', arguments: { from: 'p0001', to: 'p0002' } },
+			{ tool: 'submit_review', arguments: { issues: [] } },
+			{ tool: 'read_source_range', arguments: { from: 'p0002', to: 'p0002' } },
+			{ tool: 'submit_review', arguments: { issues: [] } },
+		)
+		const result = await reviewChapter(
+			input,
+			await writeChapter(input, options),
+			options,
+		)
+		expect(result.revised).toBe(false)
+		expect(requests).toHaveLength(5)
+		expect(requests[1]).not.toContain('scene Shore')
+		expect(requests[2]).toContain('Invalid source range')
+		expect(requests[3]).not.toContain('scene Bridge')
+		expect(requests[4]).toContain('A bell rang at noon.')
+	})
 })

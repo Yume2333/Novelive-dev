@@ -84,22 +84,121 @@ const tools: Tool[] = [
 	},
 ]
 
+function splitText(text: string, limit: number) {
+	const parts: string[] = []
+	let part = ''
+	let size = 0
+	for (const char of text) {
+		const bytes = Buffer.byteLength(char)
+		if (size + bytes > limit && part) {
+			parts.push(part)
+			part = ''
+			size = 0
+		}
+		part += char
+		size += bytes
+	}
+	if (part) parts.push(part)
+	return parts
+}
+
+const sizeOf = (value: unknown) => Buffer.byteLength(JSON.stringify(value))
+const toolsSize = sizeOf(tools)
+
+function fidelityPrompt(
+	chapter: ReviewContext,
+	script: string,
+	partial: boolean,
+) {
+	return [
+		'Check source fidelity only: omissions, inventions, changed dialogue, speaker attribution, downgraded inner speech, sequence, and Bible contradictions. Do not review prose style.',
+		'Use read_source_range to check the source. Each issue must cite a non-blank verbatim quote inside the named paragraph. Call submit_review when done, even if there are zero issues.',
+		`Source paragraph IDs: ${chapter.paragraphs.map(({ id }) => id).join(', ')}`,
+		...(partial
+			? [
+					'This is an excerpt of a scene. Only report findings supported by the available script and source; do not infer omissions from the excerpt boundaries.',
+				]
+			: []),
+		script,
+	].join('\n')
+}
+
 export async function reviewFidelity(
 	model: ReturnType<typeof writingModel>,
 	chapter: ReviewContext,
 	script: string,
 ) {
+	const available =
+		model.inputLimit -
+		toolsSize -
+		sizeOf(fidelityPrompt({ paragraphs: [] }, '', true)) -
+		320
+	if (available < 128) throw new Error('Insufficient fidelity review context')
+	const window = Math.floor(available / 3)
+	if (sizeOf(script) <= window && sizeOf(chapter.paragraphs) <= window)
+		return reviewWindow(model, chapter, script, false)
+
+	const scripts = splitText(script, Math.max(16, Math.floor(window / 2)))
+	const windows: SourceParagraph[][] = []
+	let batch: SourceParagraph[] = []
+	for (const paragraph of chapter.paragraphs) {
+		for (const text of splitText(
+			paragraph.text,
+			Math.max(16, Math.floor(window / 4)),
+		)) {
+			const part = { ...paragraph, text }
+			if (
+				batch.length &&
+				(batch.some(({ id }) => id === part.id) ||
+					sizeOf([...batch, part]) > window)
+			) {
+				windows.push(batch)
+				batch = []
+			}
+			batch.push(part)
+		}
+	}
+	if (batch.length || !windows.length) windows.push(batch)
+	const count = Math.max(scripts.length, windows.length)
+	const issues = new Map<string, FidelityIssue>()
+	for (let i = 0; i < count; i++) {
+		const scenePart = scripts[Math.floor((i * scripts.length) / count)] ?? ''
+		const paragraphs = windows[Math.floor((i * windows.length) / count)]
+		for (const issue of await reviewWindow(
+			model,
+			{ ...chapter, paragraphs },
+			scenePart,
+			true,
+		))
+			issues.set(JSON.stringify(issue), issue)
+	}
+	return [...issues.values()]
+}
+
+function messageSize(message: Message) {
+	return message.role === 'assistant'
+		? sizeOf(message.content.filter(({ type }) => type !== 'thinking')) + 64
+		: sizeOf(message)
+}
+
+async function reviewWindow(
+	model: ReturnType<typeof writingModel>,
+	chapter: ReviewContext,
+	script: string,
+	partial: boolean,
+) {
 	const messages: Message[] = [
-		userMessage(
-			[
-				'Check source fidelity only: omissions, inventions, changed dialogue, speaker attribution, downgraded inner speech, sequence, and Bible contradictions. Do not review prose style.',
-				'Use read_source_range to check the source. Each issue must cite a non-blank verbatim quote inside the named paragraph. Call submit_review when done, even if there are zero issues.',
-				`Source paragraph IDs: ${chapter.paragraphs.map(({ id }) => id).join(', ')}`,
-				script,
-			].join('\n'),
-		),
+		userMessage(fidelityPrompt(chapter, script, partial)),
 	]
+	const remaining = () =>
+		model.inputLimit -
+		toolsSize -
+		messages.reduce((bytes, message) => bytes + messageSize(message), 0)
 	for (let turn = 0; turn < 8; turn++) {
+		if (remaining() < 0)
+			throw new Error(
+				'Fidelity review exceeded its context budget without submitting',
+			)
 		const result = await model.request({ messages, tools })
 		messages.push(result)
 		let submitted: FidelityIssue[] | undefined
@@ -170,12 +269,21 @@ export async function reviewFidelity(
 				default:
 					error = 'Unknown review tool.'
 			}
+			const reply = error ?? JSON.stringify(value)
+			const fits = sizeOf(reply) + 240 <= remaining()
 			messages.push({
 				role: 'toolResult',
 				toolCallId: part.id,
 				toolName: part.name,
-				isError: error !== undefined,
-				content: [{ type: 'text', text: error ?? JSON.stringify(value) }],
+				isError: error !== undefined || !fits,
+				content: [
+					{
+						type: 'text',
+						text: fits
+							? reply
+							: 'Tool result exceeds the remaining context. Request a smaller range or submit now.',
+					},
+				],
 				timestamp: 0,
 			})
 		}

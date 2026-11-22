@@ -272,9 +272,27 @@ export async function reviewChapter(
 			revised: false,
 		}
 	const reviewer = writingModel(options.reviewer, options)
-	const fidelity = settings.fidelityReview
-		? await reviewFidelity(reviewer, chapter, script)
-		: []
+	const fidelity: FidelityIssue[] = []
+	if (settings.fidelityReview) {
+		for (const { scene } of draft.scenes) {
+			const from = chapter.paragraphs.findIndex(
+				({ id }) => id === scene.source.from,
+			)
+			const to = chapter.paragraphs.findIndex(
+				({ id }) => id === scene.source.to,
+			)
+			fidelity.push(
+				...(await reviewFidelity(
+					reviewer,
+					{
+						...chapter,
+						paragraphs: chapter.paragraphs.slice(from, to + 1),
+					},
+					formatScene(scene),
+				)),
+			)
+		}
+	}
 	const style = settings.styleReview ? await reviewStyle(reviewer, script) : []
 	if (!fidelity.length && !style.length)
 		return { ...draft, fidelity, style, revised: false }
