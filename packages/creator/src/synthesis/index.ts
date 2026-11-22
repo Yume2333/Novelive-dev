@@ -94,7 +94,7 @@ export interface SynthesisOptions {
 	fetch?: typeof globalThis.fetch
 }
 
-const eventLimit = 128
+const minimumEventLimit = 128
 const historyBudget = 1024
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -192,9 +192,11 @@ export async function synthesizeVolume(
 		throw new Error('Synthesis requires distinct ordered chapter IDs')
 	const model = buildTextModel(options.connection)
 	const stream = createTextStream({ fetch: options.fetch })
-	const limit = options.maxEvents ?? eventLimit
-	if (!Number.isInteger(limit) || limit < 1 || limit > eventLimit)
-		throw new Error(`Invalid synthesis event limit (1–${eventLimit})`)
+	if (
+		options.maxEvents !== undefined &&
+		(!Number.isSafeInteger(options.maxEvents) || options.maxEvents < 1)
+	)
+		throw new Error('Synthesis event limit must be a positive integer')
 	const strategy = options.strategy ?? 'auto'
 	const incremental = options.incremental ?? false
 	const files = synthesisFiles(volumeId)
@@ -244,6 +246,8 @@ ${packetText.join('\n')}`
 		useEvents && packetBudget > 0
 			? previewPackets(packetText, chapterIds, packetBudget)
 			: []
+	const limit =
+		options.maxEvents ?? Math.max(minimumEventLimit, packets.length * 4)
 	const state: Checkpoint =
 		saved?.fingerprint === fingerprint && (saved.ready || saved.basis === basis)
 			? saved

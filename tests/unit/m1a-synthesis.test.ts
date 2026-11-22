@@ -26,6 +26,33 @@ import {
 
 let directory: string
 let root: string
+const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+	const body = await new Request(input, init).json()
+	const prompt: string = body.messages[0].content
+	const packet = /Extract only the next event in packet (\d+)\/(\d+)/.exec(
+		prompt,
+	)
+	if (!packet) throw new Error('Expected a packet prompt')
+	const result = {
+		overview: 'A long journey.',
+		chapters: [...prompt.matchAll(/^Chapter ([\w-]+):$/gm)].map(
+			([, chapterId]) => ({
+				chapterId,
+				progress: 'The journey continues.',
+			}),
+		),
+		event: `Event ${packet[1]}`,
+		is_last: true,
+		biblePatch: [],
+		glossaryPatch: [],
+	}
+	return new Response(
+		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+		{
+			headers: { 'content-type': 'text/event-stream' },
+		},
+	)
+})
 const network = vi.fn<typeof globalThis.fetch>(async () => {
 	throw new Error('Network forbidden')
 })
@@ -41,6 +68,7 @@ beforeEach(async () => {
 	directory = await mkdtemp(join(tmpdir(), 'novelive-synthesis-test-'))
 	root = join(directory, 'project')
 	network.mockClear()
+	packetFetch.mockClear()
 })
 
 afterEach(async () => {
@@ -171,6 +199,27 @@ test('a hard stop persists exactly one event and resumes after reopening without
 		).toEqual(result)
 		expect(fetch).toHaveBeenCalledTimes(2)
 	}
+})
+
+test('the default event cap can cover a volume with more than 128 packets', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const ids = Array.from({ length: 130 }, (_, i) => `long-${i}`)
+	await Promise.all(
+		ids.map((chapterId) =>
+			project.write(projectFiles.preview(chapterId), {
+				...previews[0],
+				chapterId,
+				summary: 'A'.repeat(7200),
+			}),
+		),
+	)
+	const result = await synthesizeVolume(project, 'v1', ids, {
+		...options,
+		fetch: packetFetch,
+	})
+	expect(packetFetch.mock.calls.length).toBeGreaterThan(128)
+	expect(result.chapters.map(({ chapterId }) => chapterId)).toEqual(ids)
 })
 
 test('automatic fallback streams all preview packets without truncation', async () => {
