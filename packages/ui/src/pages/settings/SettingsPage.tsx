@@ -183,18 +183,31 @@ function ModelCard({
 						<strong>{title}</strong>
 						<small>{summary || '未填写模型名'}</small>
 					</span>
-					<ChevronDown aria-hidden="true" size={17} />
+					<ChevronDown
+						className={styles.chevron}
+						aria-hidden="true"
+						size={18}
+					/>
 				</button>
 				<small className={configured ? styles.success : styles.muted}>
 					{configured ? '已配置' : '未配置'}
 				</small>
 				{phase === 'testing' ? (
-					<button type="button" onClick={() => work.current?.abort()}>
+					<button
+						className={styles.testButton}
+						type="button"
+						onClick={() => work.current?.abort()}
+					>
 						取消
 					</button>
 				) : (
-					<button type="button" disabled={busy} onClick={() => void run(true)}>
-						<Cable size={15} aria-hidden="true" /> 测试
+					<button
+						className={styles.testButton}
+						type="button"
+						disabled={busy}
+						onClick={() => void run(true)}
+					>
+						<Cable size={14} aria-hidden="true" /> 测试
 					</button>
 				)}
 			</div>
