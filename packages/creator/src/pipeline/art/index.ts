@@ -348,11 +348,8 @@ export class ArtProduction {
 		let issue = '没有生成可用图片。'
 		let feedback = ''
 		let moderated = false
-		for (
-			let attempt = 0;
-			attempt <= this.options.image.retries || feedback === moderationHint;
-			attempt++
-		) {
+		let attempt = 0
+		while (attempt <= this.options.image.retries) {
 			const content = await artJson(
 				painter,
 				[
@@ -381,9 +378,12 @@ export class ArtProduction {
 					if (moderated) break
 					moderated = true
 					feedback = moderationHint
+					continue
 				}
+				attempt++
 				continue
 			}
+			attempt++
 			const checked = await checkImage(result.bytes, target, {
 				transparent,
 				base: derived ? refs[0] : undefined,

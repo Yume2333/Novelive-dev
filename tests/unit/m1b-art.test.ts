@@ -167,6 +167,42 @@ test('missing strict cassettes fail closed, not as asset placeholders', async ()
 	})
 })
 
+test('a moderation rewrite does not consume the technical redraw budget', async () => {
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockResolvedValueOnce({
+			error: { code: 'moderation', message: '内容审核拒绝' },
+		})
+		.mockResolvedValueOnce({ bytes: Buffer.from('not an image') })
+		.mockImplementationOnce(async (_prompt, _refs, size, alpha) => ({
+			bytes: await picture(size.width, size.height, alpha),
+		}))
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: '柔和的窗光' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay)
+			const [job] = await art.register(
+				[{ id: 'cg-moderated-redraw', kind: 'cg', description: '窗边' }],
+				bible,
+			)
+			expect(await art.draw(job, bible)).toEqual({ status: 'drawn' })
+			expect(render).toHaveBeenCalledTimes(3)
+			expect(render.mock.calls[1][0]).toContain('请收敛描写')
+			expect(render.mock.calls[2][0]).toContain('图片无法解码')
+		})
+	} finally {
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('rejects mismatched derivation sizes and RGB transparency, not legitimate RGBA PNG sprites', async () => {
 	const target = { width: 64, height: 96 }
 	const png = await picture(64, 96, true)
