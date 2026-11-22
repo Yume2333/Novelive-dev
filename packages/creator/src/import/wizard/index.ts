@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, rm } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rename, rm } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import {
 	formatVersion,
@@ -160,14 +160,19 @@ export function applyLayout(
 
 function findingParagraphs(structure: TxtStructure) {
 	const sources = originals(structure)
-	return structure.findings.map((finding) => ({
-		paragraph: (
+	return structure.findings.map((finding) => {
+		const { chapter, start } =
 			sources.findLast(({ chapter }) => chapter.line <= finding.line) ??
 			sources[0]
-		).start,
-		note: finding.title ? `${finding.note}：${finding.title}` : finding.note,
-		record: `${finding.code}: ${finding.note} (line ${finding.line}: ${finding.title})`,
-	}))
+		const offset = chapter.paragraphs.findIndex(
+			(paragraph) => paragraph.text === finding.title.trim(),
+		)
+		return {
+			paragraph: start + Math.max(offset, 0),
+			note: finding.title ? `${finding.note}：${finding.title}` : finding.note,
+			record: `${finding.code}: ${finding.note} (line ${finding.line}: ${finding.title})`,
+		}
+	})
 }
 
 async function workIds(project: Project) {
@@ -306,17 +311,30 @@ export async function reviseTxtProject(
 		confirmWithReferences: layout.confirmWithReferences,
 	}
 	const title = layout.title.trim()
-	await rm(join(project.root, 'volumes'), { recursive: true, force: true })
-	await rm(join(project.root, 'source/chapters'), {
-		recursive: true,
-		force: true,
-	})
-	await writeTxtLayout(project, volumes, {
-		title,
-		language: layout.language,
-		workIds: ids,
-		settings,
-	})
+	const staged = ['volumes', 'source/chapters'].map((path) => [
+		join(project.root, path),
+		join(project.root, `${path}.previous`),
+	])
+	for (const [path, previous] of staged) {
+		await rm(previous, { recursive: true, force: true })
+		await rename(path, previous)
+	}
+	try {
+		await writeTxtLayout(project, volumes, {
+			title,
+			language: layout.language,
+			workIds: ids,
+			settings,
+		})
+	} catch (error) {
+		for (const [path, previous] of staged) {
+			await rm(path, { recursive: true, force: true })
+			await rename(previous, path)
+		}
+		throw error
+	}
+	for (const [, previous] of staged)
+		await rm(previous, { recursive: true, force: true })
 	const chapters = volumes.flatMap((volume) => volume.chapters)
 	const starts = layout.chapters.map((chapter) => chapter.start)
 	const next: WizardReport = {
