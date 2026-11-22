@@ -43,7 +43,11 @@ async function probe(scenario: string, seedream = false) {
 	const results = await testImage(
 		{
 			...base,
-			model: `${seedream ? 'seedream-5.5' : 'gpt-image'}-synthetic-${scenario}`,
+			baseUrl: seedream ? 'https://ark.cn-beijing.volces.com/v1' : base.baseUrl,
+			model:
+				scenario === 'endpoint'
+					? 'ep-synthetic-endpoint'
+					: `${seedream || scenario === 'relay' ? 'seedream-5.5' : 'gpt-image'}-synthetic-${scenario}`,
 		},
 		{ cacheDir, replay: { mode: 'strict', directory } },
 	)
@@ -52,7 +56,12 @@ async function probe(scenario: string, seedream = false) {
 }
 
 describe('native sizes', () => {
-	for (const provider of ['openai', 'seedream-5.5', 'seedream-4.5'] as const) {
+	for (const provider of [
+		'openai',
+		'seedream-5.5',
+		'seedream-4.5',
+		'seedream-unknown',
+	] as const) {
 		for (const tier of [1536, 2048, 2560, 2816, 3840] as const) {
 			for (const portrait of [false, true])
 				it(`${provider} ${tier} portrait=${portrait}`, () => {
@@ -63,19 +72,19 @@ describe('native sizes', () => {
 					expect(pixels).toBeLessThanOrEqual(
 						provider === 'openai'
 							? 8294400
-							: provider === 'seedream-5.5'
+							: provider === 'seedream-5.5' || provider === 'seedream-unknown'
 								? 4624220
 								: 16777216,
 					)
 					expect(pixels).toBeGreaterThanOrEqual(
-						provider === 'seedream-4.5'
+						provider === 'seedream-4.5' || provider === 'seedream-unknown'
 							? 3686400
 							: provider === 'seedream-5.5'
 								? 921600
 								: 0,
 					)
 					expect(width / height).toBeCloseTo(portrait ? 2 / 3 : 16 / 9, 1)
-					if (provider !== 'seedream-4.5')
+					if (provider !== 'seedream-4.5' && provider !== 'seedream-unknown')
 						expect(Math.max(width, height)).toBeLessThanOrEqual(tier)
 				})
 		}
@@ -93,11 +102,27 @@ describe('native sizes', () => {
 		})
 		expect(
 			imageProvider('https://ark.cn-beijing.volces.com/api/v3', 'endpoint-id'),
-		).toBe('seedream-5.5')
-		expect(imageProvider(base.baseUrl, 'doubao-seedream-4-5')).toBe(
-			'seedream-4.5',
-		)
+		).toBe('seedream-unknown')
+		expect(
+			imageProvider(
+				'https://ark.cn-beijing.volces.com/api/v3',
+				'doubao-seedream-4-5',
+			),
+		).toBe('seedream-4.5')
+		expect(imageProvider(base.baseUrl, 'seedream-5.5')).toBe('openai')
+		expect(
+			imageProvider('https://volces.com.example.org/v1', 'seedream-5.5'),
+		).toBe('openai')
 	})
+})
+
+it('uses OpenAI multipart edits for Seedream-named models on a relay', async () => {
+	const { results } = await probe('relay')
+	expect(Object.values(results).every((result) => result.ok)).toBe(true)
+})
+it('uses intersected size range for opaque Ark endpoint ids', async () => {
+	const { results } = await probe('endpoint', true)
+	expect(Object.values(results).every((result) => result.ok)).toBe(true)
 })
 
 for (const seedream of [false, true])

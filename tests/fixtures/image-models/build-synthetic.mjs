@@ -35,9 +35,14 @@ for (const scenario of [
 	'bad-image',
 	'url',
 	'url-error',
+	'relay',
+	'endpoint',
 ]) {
 	for (const seedream of [false, true]) {
-		const model = `${seedream ? 'seedream-5.5' : 'gpt-image'}-synthetic-${scenario}`
+		const model =
+			scenario === 'endpoint'
+				? 'ep-synthetic-endpoint'
+				: `${seedream || scenario === 'relay' ? 'seedream-5.5' : 'gpt-image'}-synthetic-${scenario}`
 		let capability = 0
 		const client = new OpenAI({
 			baseURL: 'https://relay.invalid/v1',
@@ -124,7 +129,11 @@ for (const scenario of [
 			}),
 		})
 		for (capability = 0; capability < 3; capability++) {
-			const common = { model, prompt: prompts[capability], size: '1536x864' }
+			const common = {
+				model,
+				prompt: prompts[capability],
+				size: scenario === 'endpoint' && seedream ? '2560x1440' : '1536x864',
+			}
 			try {
 				const response = seedream
 					? await client.images.generate(common, {

@@ -3,17 +3,18 @@ export type ImageProvider =
 	| 'seedream-5.5'
 	| 'seedream-4.5'
 	| 'seedream-4.0'
+	| 'seedream-unknown'
 export type NativeMaxEdge = 1536 | 2048 | 2560 | 2816 | 3840
 
 export function imageProvider(baseUrl: string, model: string): ImageProvider {
 	if (
-		!/seedream/i.test(model) &&
-		!/volces\.com|volcengine\.com/i.test(new URL(baseUrl).hostname)
+		!/(?:^|\.)(?:volces\.com|volcengine\.com)$/i.test(new URL(baseUrl).hostname)
 	)
 		return 'openai'
 	if (/4[.-]5|5[.-]0.*lite/i.test(model)) return 'seedream-4.5'
 	if (/4[.-]0/i.test(model)) return 'seedream-4.0'
-	return 'seedream-5.5'
+	if (/5[.-]5|5[.-]0.*(?:pro|flash)/i.test(model)) return 'seedream-5.5'
+	return 'seedream-unknown'
 }
 
 export function imageSize(
@@ -23,9 +24,13 @@ export function imageSize(
 ) {
 	const ratio = portrait ? 2 / 3 : 9 / 16
 	const min =
-		provider === 'seedream-4.5' ? 3686400 : provider === 'openai' ? 0 : 921600
+		provider === 'seedream-4.5' || provider === 'seedream-unknown'
+			? 3686400
+			: provider === 'openai'
+				? 0
+				: 921600
 	const max =
-		provider === 'seedream-5.5'
+		provider === 'seedream-5.5' || provider === 'seedream-unknown'
 			? 4624220
 			: provider === 'openai'
 				? 3840 * 2160
