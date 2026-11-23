@@ -519,6 +519,16 @@ test('retries an expression with only the base after a composition failure', asy
 				styled,
 			)
 			expect(await art.draw(base, styled)).toEqual({ status: 'drawn' })
+			expect(render.mock.calls[0][1]).toEqual([])
+			expect(render.mock.calls[0][0]).toContain(styled.style.description)
+			const audit = model.mock.calls.find(([, prompt]) =>
+				prompt.startsWith('Visually audit'),
+			)
+			expect(audit?.[1]).toContain('Image 2 is a style reference only.')
+			expect(audit?.[1]).toContain(
+				'Describe style differences and concrete corrections in words; do not refer to reference images by number.',
+			)
+			expect(audit?.[4]?.slice(1)).toEqual([await project.readFile(path)])
 			expect(await art.draw(expression, styled)).toEqual({ status: 'drawn' })
 			expect(render.mock.calls[1][1]).toHaveLength(2)
 			expect(render.mock.calls[2][1]).toEqual([render.mock.calls[1][1][0]])
@@ -570,12 +580,19 @@ test('removes an opaque sprite background before validating and auditing the res
 					.raw()
 					.toBuffer({ resolveWithObject: true })
 				if (info.height > info.width) {
-					expect(info.channels).toBe(4)
-					expect(data[3]).toBe(0)
+					expect(prompt).toContain('checkerboard in Image 1 shows transparency')
+					expect(info.channels).toBe(3)
+					expect([...data.subarray(0, 3)]).toEqual([170, 170, 170])
+					const tile = Math.round(info.width / 24)
+					expect([...data.subarray(tile * 3, (tile + 1) * 3)]).toEqual([
+						221, 221, 221,
+					])
 					const center =
 						Math.floor(info.height / 2) * info.width +
 						Math.floor(info.width / 2)
-					expect(data[center * 4 + 3]).toBe(255)
+					expect(data[center * 3]).not.toBe(data[center * 3 + 1])
+				} else {
+					expect(prompt).not.toContain('checkerboard')
 				}
 				return { pass: true, failedChecks: [], feedback: '' }
 			},
@@ -674,6 +691,15 @@ test('removes an opaque sprite background before validating and auditing the res
 				bible,
 			)
 			expect(await art.draw(sprite, bible)).toEqual({ status: 'drawn' })
+			const drawn = (await art.registry()).entries.find(
+				({ id }) => id === sprite.assetId,
+			)
+			if (!drawn) throw new Error('Missing drawn sprite')
+			const { data } = await sharp(await project.readFile(drawn.path))
+				.ensureAlpha()
+				.raw()
+				.toBuffer({ resolveWithObject: true })
+			expect(data[3]).toBe(0)
 		})
 	} finally {
 		vi.unstubAllEnvs()
@@ -774,6 +800,87 @@ test('skips an isolated opaque RGBA candidate when matting is unavailable and re
 	} finally {
 		matte.mockRestore()
 		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
+test('style-only sprite candidates do not share the opaque-edit cutoff', async () => {
+	const opaque = await picture(320, 480, false)
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const portraitReferences: number[] = []
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, refs, _size, transparent) => {
+			if (!transparent) return { bytes: landscape }
+			portraitReferences.push(refs.length)
+			return {
+				bytes:
+					refs.length || portraitReferences.length === 2 ? opaque : portrait,
+			}
+		})
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: 'Ada' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay, undefined, undefined, undefined, 0)
+			const path = 'assets/style.png'
+			const illustration = 'source/references/illustration.png'
+			await project.writeFile(path, landscape)
+			await project.writeFile(illustration, landscape)
+			const [ada] = bible.characters
+			const pool = await art.candidates(
+				{
+					...bible,
+					style: {
+						...bible.style,
+						references: [{ path, description: 'Style' }],
+					},
+					characters: [
+						{
+							...ada,
+							costumes: [
+								...(ada.costumes ?? []),
+								{ id: 'coat', description: 'Coat' },
+							],
+						},
+					],
+				},
+				['c1'],
+				'assets/main.webp',
+				[],
+				new Map([['ada', { id: 'illustration', cachePath: illustration }]]),
+			)
+			expect(portraitReferences).toEqual([2, 0, 0, 0, 2, 0, 0, 0])
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [
+					{
+						costumeId: 'uniform',
+						candidates: [{ id: 'costume-2' }, { id: 'costume-3' }],
+					},
+					{
+						costumeId: 'coat',
+						candidates: [
+							{ id: 'costume-1' },
+							{ id: 'costume-2' },
+							{ id: 'costume-3' },
+						],
+					},
+				],
+			})
+		})
+	} finally {
+		renderer.mockRestore()
+		matte.mockRestore()
 		model.mockRestore()
 	}
 })

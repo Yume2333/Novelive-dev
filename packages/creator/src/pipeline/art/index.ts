@@ -82,6 +82,33 @@ const auditSchema = obj({
 	feedback: str(),
 })
 const contentSchema = obj({ content: str({ minLength: 1 }) })
+
+function generationReferenceFilter(drawing: Drawing) {
+	const useStyle =
+		drawing.kind !== 'character' ||
+		drawing.references.some(({ role }) => role === 'identity')
+	return ({ role }: Drawing['references'][number]) =>
+		useStyle || role !== 'style'
+}
+
+async function auditPreview(png: Buffer) {
+	const { hasAlpha, width, height } = await sharp(png).metadata()
+	if (!hasAlpha) return { png }
+	const tile = Math.max(1, Math.round(Math.min(width, height) / 24))
+	const checkerboard = Buffer.from(
+		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><pattern id="checker" width="${tile * 2}" height="${tile * 2}" patternUnits="userSpaceOnUse"><rect width="${tile * 2}" height="${tile * 2}" fill="#ddd"/><path d="M0 0h${tile}v${tile}H0z M${tile} ${tile}h${tile}v${tile}h-${tile}z" fill="#aaa"/></pattern></defs><rect width="100%" height="100%" fill="url(#checker)"/></svg>`,
+	)
+	return {
+		png: await sharp(checkerboard)
+			.composite([{ input: png }])
+			.removeAlpha()
+			.png()
+			.toBuffer(),
+		transparencyHint:
+			'The gray checkerboard in Image 1 shows transparency; it is not part of the artwork.',
+	}
+}
+
 const isMissing = (error: unknown) =>
 	error instanceof Error && 'code' in error && error.code === 'ENOENT'
 const moderationHint = '上一次生成被内容审核拒绝，请收敛描写'
@@ -506,8 +533,9 @@ export class ArtProduction {
 	) {
 		this.render ??= imageRenderer(this.options.image, this.options)
 		const render = this.render
-		const refs = await Promise.all(
-			drawing.references.slice(0, 16).map(async (ref, i) => {
+		const references = drawing.references.slice(0, 16)
+		const auditRefs = await Promise.all(
+			references.map(async (ref, i) => {
 				const image = sharp(await this.project.readFile(ref.path))
 				return (
 					derived && i === 0 ? image.resize({ ...target, fit: 'fill' }) : image
@@ -516,9 +544,14 @@ export class ArtProduction {
 					.toBuffer()
 			}),
 		)
+		const auditDrawing = { ...drawing, references }
+		const forGeneration = generationReferenceFilter(auditDrawing)
+		const refs = auditRefs.filter((_, index) =>
+			forGeneration(references[index]),
+		)
 		const promptDrawing = {
 			...drawing,
-			references: drawing.references.slice(0, refs.length),
+			references: references.filter(forGeneration),
 		}
 		const painter = derived
 			? this.options.fast
@@ -554,10 +587,14 @@ export class ArtProduction {
 				this.options,
 			)
 			const editReferences = baseOnly ? refs.slice(0, 1) : refs
-			const describe = (firstReference: number, issue = '') =>
+			const describe = (
+				firstReference: number,
+				issue = '',
+				input = promptDrawing,
+			) =>
 				baseOnly
 					? `Edit only the brows, eyes and mouth of Image ${firstReference}: ${content.content} ${issue} Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face.`
-					: drawingPrompt(promptDrawing, content.content, issue, firstReference)
+					: drawingPrompt(input, content.content, issue, firstReference)
 			const result = await render(
 				describe(1, feedback),
 				editReferences,
@@ -651,17 +688,24 @@ export class ArtProduction {
 				continue
 			}
 			reviewed = checked.png
+			const preview = await auditPreview(checked.png)
 			const judge = await artJson(
 				this.options.visual,
 				[
 					'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
+					preview.transparencyHint,
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
+					refs.length < auditRefs.length
+						? 'The painter cannot see the style images. Describe style differences and concrete corrections in words; do not refer to reference images by number.'
+						: undefined,
 					`Original image brief (verify independently of the painter's rewrite): ${drawing.description}`,
-					describe(2),
-				].join('\n'),
+					describe(2, '', auditDrawing),
+				]
+					.filter(Boolean)
+					.join('\n'),
 				auditSchema,
 				this.options,
-				[checked.png, ...editReferences],
+				[preview.png, ...(baseOnly ? editReferences : auditRefs)],
 			)
 			if (judge.pass && judge.failedChecks.length === 0) return checked
 			issue = feedback =
@@ -773,7 +817,10 @@ export class ArtProduction {
 						fallback ??= { id, cachePath: fallbackPath }
 						return false
 					}
-					const mode = drawing.references.length ? budget.edit : budget.generate
+					const usesEdit = drawing.references.some(
+						generationReferenceFilter(drawing),
+					)
+					const mode = usesEdit ? budget.edit : budget.generate
 					if (mode.matting.error && mode.opaqueStreak >= opaqueCandidateLimit)
 						return false
 					const result = await this.paint(
