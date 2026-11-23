@@ -266,6 +266,7 @@ function loadProduction() {
 			config,
 			process.env.NL_PRODUCTION_CASSETTE_DIR
 				? {
+						...strictReplayOptions(),
 						directory: process.env.NL_PRODUCTION_CASSETTE_DIR,
 						fallbackDirectory: process.env.NL_PRODUCTION_FALLBACK_DIR,
 						normalizeIds: true,

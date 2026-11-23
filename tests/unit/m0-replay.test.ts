@@ -10,6 +10,57 @@ const rowFile = 'cassette.jsonl'
 const stream =
 	'data: {"delta":"first"}\n\ndata: {"delta":"second"}\n\ndata: [DONE]\n\n'
 
+test('normalized replay rebinds UUID-bearing chapter IDs in authored responses', async () => {
+	const oldId = '11111111-1111-4111-8111-111111111111'
+	const newId = '22222222-2222-4222-8222-222222222222'
+	const upstream = vi.fn(async () =>
+		Response.json({ chapterId: `joined-${oldId}-ch1` }),
+	)
+	const request = (id: string) =>
+		new Request(origin + path, {
+			method: 'POST',
+			body: JSON.stringify({ chapterId: `joined-${id}-ch1` }),
+		})
+	const record = createReplayFetch({
+		mode: 'record',
+		directory,
+		normalizeIds: true,
+		rebindIds: true,
+		fetch: upstream,
+	})
+	await (await record(request(oldId))).text()
+	const replay = createReplayFetch({
+		mode: 'strict',
+		directory,
+		normalizeIds: true,
+		rebindIds: true,
+		fetch: upstream,
+	})
+	expect(await (await replay(request(newId))).json()).toEqual({
+		chapterId: `joined-${newId}-ch1`,
+	})
+	expect(upstream).toHaveBeenCalledTimes(1)
+})
+
+test('response rebinding preserves empty responses and strict misses never call upstream', async () => {
+	const upstream = vi.fn(async () => new Response(null, { status: 204 }))
+	const options = {
+		directory,
+		normalizeIds: true,
+		rebindIds: true,
+		fetch: upstream,
+	}
+	await (await createReplayFetch({ ...options, mode: 'record' })(origin)).text()
+	const replay = createReplayFetch({ ...options, mode: 'strict' })
+	const response = await replay(origin)
+	expect(response.status).toBe(204)
+	expect(await response.text()).toBe('')
+	await expect(replay(`${origin}/missing`)).rejects.toThrow(
+		'Missing strict replay cassette:',
+	)
+	expect(upstream).toHaveBeenCalledTimes(1)
+})
+
 test('resuming a gate recording reuses successful identities and records only missing requests', async () => {
 	const upstream = vi.fn(async () => new Response('response'))
 	const options = {
