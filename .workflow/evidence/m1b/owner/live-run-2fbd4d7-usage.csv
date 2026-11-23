@@ -1,0 +1,5 @@
+model,admitted_calls,settled_tokens,settled_images,unresolved_tokens,unresolved_images
+deepseek-v4.1-flash,6,98050,0,0,0
+devin-swe-2,34,297136,0,0,0
+gemini-3.8-flash,17,329437,0,0,0
+gpt-image-2.6-sunburst,3,20808,3,0,0
