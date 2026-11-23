@@ -13,6 +13,35 @@ import {
 
 export const privateRoot = join(homedir(), '.local/novelive-epub-provider')
 
+export function providerUsage(
+	value:
+		| {
+				prompt_tokens?: number
+				completion_tokens?: number
+				total_tokens?: number
+		  }
+		| undefined,
+) {
+	if (
+		!value ||
+		!Number.isSafeInteger(value.prompt_tokens) ||
+		!Number.isSafeInteger(value.completion_tokens) ||
+		(value.prompt_tokens ?? -1) < 0 ||
+		(value.completion_tokens ?? -1) < 0
+	)
+		return undefined
+	const inputTokens = value.prompt_tokens as number
+	const outputTokens = value.completion_tokens as number
+	const measured = inputTokens + outputTokens
+	if (measured <= 0) return undefined
+	const total =
+		Number.isSafeInteger(value.total_tokens) &&
+		(value.total_tokens ?? 0) >= measured
+			? (value.total_tokens as number)
+			: measured
+	return { inputTokens, outputTokens, total }
+}
+
 export async function runProviderCases(
 	mode: 'record' | 'strict' | 'synthetic',
 ) {
@@ -73,11 +102,13 @@ export async function runProviderCases(
 						(line) => line.startsWith('data: ') && !line.includes('[DONE]'),
 					)
 					.map((line) => JSON.parse(line.slice(6)))
-				const usage = events.findLast((event) => event.usage)?.usage
+				const usage = providerUsage(
+					events.findLast((event) => event.usage)?.usage,
+				)
 				if (usage) {
-					inputTokens = usage.prompt_tokens
-					outputTokens = usage.completion_tokens
-					total = usage.total_tokens ?? (inputTokens ?? 0) + (outputTokens ?? 0)
+					inputTokens = usage.inputTokens
+					outputTokens = usage.outputTokens
+					total = usage.total
 				}
 				return response
 			} finally {

@@ -15,7 +15,10 @@ import {
 	syntheticDirectory,
 	visualConnection,
 } from '../fixtures/source/epub/classification'
-import { runProviderCases } from '../fixtures/source/epub/provider'
+import {
+	providerUsage,
+	runProviderCases,
+} from '../fixtures/source/epub/provider'
 
 vi.mock('../../packages/creator/src/pipeline/art/models', async (original) => {
 	const module =
@@ -100,6 +103,20 @@ test
 		expect(fetch).not.toHaveBeenCalled()
 	},
 )
+
+test('keeps usage reservation when provider token counts are incomplete', () => {
+	expect(providerUsage({})).toBeUndefined()
+	expect(providerUsage({ prompt_tokens: 10 })).toBeUndefined()
+	expect(providerUsage({ completion_tokens: 5 })).toBeUndefined()
+	expect(providerUsage({ prompt_tokens: 10, completion_tokens: 5 })).toEqual({
+		inputTokens: 10,
+		outputTokens: 5,
+		total: 15,
+	})
+	expect(
+		providerUsage({ prompt_tokens: -1, completion_tokens: 5 }),
+	).toBeUndefined()
+})
 
 test('keeps chapter blocks inside article wrappers', async () => {
 	const { book } = await extractEpub(
