@@ -24,12 +24,13 @@ const matterHeading =
 const annotation =
 	/^(?:[【[]?(?:注释|注釋|脚注|腳註|附注|附註|译者注|譯者註|作者注|编者注|編者註|版权|版權|著作权|著作權)|[【[]?[注註]\s*[:：】\]])/
 const sentenceEnd = /[。！？…」』”）]$/
+const midSentence = /[，、；：,;:]$/
 const wide =
 	/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef“”‘’…—]/u
 // Marks a hard line break inside extracted text.
 const hard = '\u0000'
 
-const yamlLine = /^(?:#|\s|-(?:\s|$)|[^\s#:-][^:]*:(?:\s|$))/
+const yamlLine = /^(?:#|\s|[\]}]|-(?:\s|$)|[^\s#:-][^:]*:(?:\s|$))/
 const yamlKey = /^[^\s#:-][^:]*:(?:\s|$)/
 
 function scalar(raw: string, rest: string[]) {
@@ -109,27 +110,29 @@ function phrasing(nodes: PhrasingContent[], refs: string[] = []): string {
 
 // Soft breaks join wrapped lines. A hard break, or a soft break after a CJK
 // sentence end, starts a new paragraph, as in line-per-paragraph novel text.
-// An annotation line is always a paragraph of its own.
+// An annotation starts a paragraph of its own and runs on only while its
+// line ends mid-sentence.
 function paragraphs(text: string) {
 	const out: string[] = []
 	for (const part of text.split(hard)) {
 		let current = ''
+		let inNote = false
+		let noteEnded = false
 		for (const raw of part.split('\n')) {
 			const line = raw.trim()
 			if (!line) continue
-			const alone = annotation.test(line)
-			if (current && (alone || sentenceEnd.test(current))) {
+			const marked = annotation.test(line)
+			if (current && (marked || noteEnded || sentenceEnd.test(current))) {
 				out.push(current)
 				current = ''
+				inNote = false
 			}
 			current +=
 				!current || wide.test(current.at(-1) ?? '') || wide.test(line[0])
 					? line
 					: ` ${line}`
-			if (alone) {
-				out.push(current)
-				current = ''
-			}
+			if (marked) inNote = true
+			noteEnded = inNote && !midSentence.test(current)
 		}
 		if (current) out.push(current)
 	}
