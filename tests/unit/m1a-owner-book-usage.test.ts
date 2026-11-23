@@ -6,28 +6,44 @@ import {
 	reserveOwnerBookSelection,
 } from '../acceptance/owner-book-usage'
 
-test('selection reserves input bytes and maximum output before spending the last tokens', () => {
-	const text = '小說'
+test('selection reserves decoded input and maximum output before spending the last tokens', () => {
+	const messages = [{ role: 'user', content: '小說' }]
 	const output = 8_192
-	const reserve = Buffer.byteLength(text) + output + 1024
+	const reserve = Buffer.byteLength('user小說') + output + 1024
 	const used = ownerBookSelectionCap - reserve
-	expect(reserveOwnerBookSelection(used, text, output)).toBe(reserve)
-	expect(reserveOwnerBookSelection(used + 1, text, output)).toBeUndefined()
+	expect(reserveOwnerBookSelection(used, messages, output)?.reserved).toBe(
+		reserve,
+	)
+	expect(reserveOwnerBookSelection(used + 1, messages, output)).toBeUndefined()
 })
 
-test('the selection batch reserves within one 300k limit across fresh attempts', () => {
-	const body = 'a'.repeat(198_000)
+test('uses the larger tokenizer estimate with 15% margin and rejects unknown message framing', () => {
+	const messages = [{ role: 'user', content: '小說' }]
+	expect(reserveOwnerBookSelection(0, messages, 100)).toEqual({
+		estimatedInput: 1029,
+		estimate: 1129,
+		reserved: 1134,
+	})
+	expect(() =>
+		reserveOwnerBookSelection(0, [{ ...messages[0], name: 'extra' }], 100),
+	).toThrow('Selection reservation requires plain text chat messages')
+})
+
+test('the selection batch uses decoded text rather than JSON escapes, but enforces the ceiling', () => {
+	const messages = [{ role: 'user', content: '"a\n'.repeat(60_000) }]
 	const output = 24_576
-	expect(
-		reserveOwnerBookSelection(0, body, output, ownerBookSelectionBatchCap),
-	).toBe(223_600)
-	expect(
-		reserveOwnerBookSelection(70_000, body, output, ownerBookSelectionBatchCap),
-	).toBe(223_600)
+	const second = reserveOwnerBookSelection(
+		80_047,
+		messages,
+		output,
+		ownerBookSelectionBatchCap,
+	)
+	expect(second?.reserved).toBe(205_604)
+	expect(second?.estimate).toBeLessThan(second?.reserved ?? 0)
 	expect(
 		reserveOwnerBookSelection(
-			140_000,
-			body,
+			160_094,
+			messages,
 			output,
 			ownerBookSelectionBatchCap,
 		),

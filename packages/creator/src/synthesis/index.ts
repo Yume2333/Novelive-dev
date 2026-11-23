@@ -146,7 +146,7 @@ export interface SynthesisOptions {
 
 const minimumEventLimit = 128
 const packetFormat = 7
-const selectionVersion = 6
+const selectionVersion = 7
 const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -880,7 +880,7 @@ ${packets[packet]}`
 			return `${instructions}
 ${selection.instructions}
 Select from these canonical candidates across the whole volume. Compare evidence from early and late chapters. Observations are evidence about the same entry, not separate choices. Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
-${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. You may exceed a kind's target only with a justification. For each kind over target, return its kind and a brief reason tied to the inclusion rules in justifications.\n` : ''}Respond with only the JSON object, with no commentary before or after it.
+${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. Judge inclusion before counting. When candidates compete for space, prefer a specific setting where a consequential event happens over a broader place that merely contains it, and a distinctive term needed to understand a consequential action over a generic expression. Do not stop at the target if a distinct candidate still meets the inclusion criteria. You may exceed a kind's target only with a justification. For each kind over target, return its kind and a brief reason tied to the inclusion rules in justifications.\n` : ''}Respond with only the JSON object, with no commentary before or after it.
 Chapter progress:
 ${progress}
 Candidates:

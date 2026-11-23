@@ -191,6 +191,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				candidates: number
 				bytes: number
 				outputCap: number
+				estimatedInput: number
+				estimate: number
+				reserved: number
 			}[],
 		}
 		let used = 0
@@ -237,9 +240,24 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				controller.abort()
 				throw new Error('Resume attempted a paid preview request')
 			}
+			if (
+				checkpointSource &&
+				['tools', 'functions', 'response_format', 'prediction', 'n'].some(
+					(key) => Object.hasOwn(payload, key),
+				)
+			)
+				throw new Error('Unexpected prompt data outside selection messages')
 			if (dryRun === 'cap') used = selectionCap
+			const selectionReserve = checkpointSource
+				? reserveOwnerBookSelection(
+						used,
+						payload.messages,
+						outputCap,
+						selectionCap,
+					)
+				: undefined
 			const reserve = checkpointSource
-				? reserveOwnerBookSelection(used, text, outputCap, selectionCap)
+				? selectionReserve?.reserved
 				: Buffer.byteLength(text) + outputCap + 1024
 			if (
 				reserve === undefined ||
@@ -251,12 +269,13 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			}
 			used += reserve
 			const call = ++stats.calls
-			if (checkpointSource) {
+			if (selectionReserve) {
 				const lines = prompt.split('\nCandidates:\n')[1].split('\n')
 				stats.selectionPrompts.push({
 					candidates: lines.length,
 					bytes: Buffer.byteLength(prompt),
 					outputCap,
+					...selectionReserve,
 				})
 			}
 			stats.previewCalls += Number(!isSynthesis)

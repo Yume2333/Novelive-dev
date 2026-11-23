@@ -975,13 +975,13 @@ test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
 				packet: 1,
 				selections: [[1, 3]],
 				ready: false,
-				selectionVersion: 6,
+				selectionVersion: 7,
 			})
 			if (version === 'previous' || version === 'unversioned') {
 				const { selectionVersion: _version, ...old } = checkpoint
 				await project.write(files.checkpoint, {
 					...old,
-					...(version === 'previous' ? { selectionVersion: 5 } : {}),
+					...(version === 'previous' ? { selectionVersion: 6 } : {}),
 					selections: [[2]],
 				})
 			}
@@ -1047,6 +1047,10 @@ test('soft size targets require a reason for exceeding a kind but do not trim ju
 		selectionCalls++
 		expect(messages[0].content).toContain(
 			'Soft size targets for kept candidates (not quotas): character: 1, glossary: 1',
+		)
+		expect(messages[0].content).toContain('Judge inclusion before counting.')
+		expect(messages[0].content).toContain(
+			'Do not stop at the target if a distinct candidate still meets the inclusion criteria.',
 		)
 		expect(messages[0].content).toContain(
 			"You may exceed a kind's target only with a justification.",
