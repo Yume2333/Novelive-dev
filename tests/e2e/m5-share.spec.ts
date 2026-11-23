@@ -342,6 +342,12 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 			workId: playerWorkId,
 			version: 2,
 		})
+		const openedEditor = await page.evaluate(
+			(input) => window.novelive.call('editor.open', input).promise,
+			{ workId: forked.works[0].work.workId, chapterId: playerRef.chapterId },
+		)
+		expect(openedEditor.chapter.paragraphs).toEqual([{ id: 'p0001', text: '' }])
+		expect(openedEditor.chapter.scenes[0].nvs).toContain('你好，世界。')
 	} finally {
 		await Promise.allSettled([...opened].map((app) => app.close()))
 		await rm(directory, { recursive: true, force: true })

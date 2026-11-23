@@ -381,18 +381,20 @@ export class ProjectEditor {
 		if (!work.chapterIds.includes(chapterId))
 			throw { code: 'not_found', message: '作品中找不到这一章。' }
 		const ref = this.chapterRef(chapterId)
+		const readSource = () =>
+			project.readFile(projectFiles.chapterText(chapterId))
 		const [chapter, body, { assets, speakerNames }] = await Promise.all([
 			project.read(projectFiles.chapter(ref)),
-			project.readFile(projectFiles.chapterText(chapterId)),
+			work.derivedFrom ? existing(readSource) : readSource(),
 			this.resources(),
 		])
 		const source = body
-			.toString('utf8')
+			?.toString('utf8')
 			.trimEnd()
 			.split(/\r?\n\r?\n/)
 		const paragraphs = chapter.paragraphIds.map((id, index) => ({
 			id,
-			text: source[index],
+			text: source ? source[index] : '',
 		}))
 		const scripts = await Promise.all(
 			chapter.sceneIds.map(async (sceneId) => ({
