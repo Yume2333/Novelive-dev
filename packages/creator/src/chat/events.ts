@@ -3,7 +3,7 @@ import type { EventEnvelope } from '../contract'
 export class EventReplay {
 	private readonly entries: { event: EventEnvelope; bytes: number }[] = []
 	private bytes = 0
-	private droppedThrough = 0
+	private readonly droppedThrough = new Map<string, number>()
 
 	constructor(
 		private readonly maxEntries = 256,
@@ -13,7 +13,7 @@ export class EventReplay {
 	append(event: EventEnvelope) {
 		const bytes = Buffer.byteLength(JSON.stringify(event))
 		if (bytes > this.maxBytes) {
-			this.droppedThrough = event.seq
+			this.dropped(event)
 			return
 		}
 		this.entries.push({ event, bytes })
@@ -25,18 +25,35 @@ export class EventReplay {
 			const removed = this.entries[0]
 			this.entries.shift()
 			this.bytes -= removed.bytes
-			this.droppedThrough = Math.max(this.droppedThrough, removed.event.seq)
+			this.dropped(removed.event)
 		}
 	}
 
-	list(scopeId: string, afterSeq: number) {
+	private dropped(event: EventEnvelope) {
+		const key = JSON.stringify([event.scope, event.scopeId])
+		this.droppedThrough.set(
+			key,
+			Math.max(this.droppedThrough.get(key) ?? 0, event.seq),
+		)
+	}
+
+	list(
+		scopeId: string,
+		afterSeq: number,
+		scope: EventEnvelope['scope'] = 'work',
+	) {
 		return {
 			events: this.entries
 				.filter(
-					({ event }) => event.scopeId === scopeId && event.seq > afterSeq,
+					({ event }) =>
+						event.scope === scope &&
+						event.scopeId === scopeId &&
+						event.seq > afterSeq,
 				)
 				.map(({ event }) => event),
-			gap: afterSeq < this.droppedThrough,
+			gap:
+				afterSeq <
+				(this.droppedThrough.get(JSON.stringify([scope, scopeId])) ?? 0),
 		}
 	}
 }

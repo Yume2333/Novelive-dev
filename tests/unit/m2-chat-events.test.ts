@@ -54,3 +54,34 @@ test('an oversized snapshot is not retained and tells reconnecting consumers to 
 	replay.append(event(2))
 	expect(replay.list('work', 1)).toEqual({ events: [event(2)], gap: false })
 })
+
+test('eviction and oversized snapshots report gaps only for the affected scope', () => {
+	const replay = new EventReplay(2, 1024)
+	replay.append(event(1, 'first', 'a'))
+	replay.append(event(2, 'second', 'b'))
+	replay.append(event(3, 'third', 'a'))
+	expect(replay.list('a', 0).gap).toBe(true)
+	expect(replay.list('b', 0)).toEqual({
+		events: [event(2, 'second', 'b')],
+		gap: false,
+	})
+	expect(replay.list('unopened', 0)).toEqual({ events: [], gap: false })
+	replay.append(event(4, 'x'.repeat(2048), 'a'))
+	expect(replay.list('a', 3).gap).toBe(true)
+	expect(replay.list('b', 0).gap).toBe(false)
+	replay.append(event(5, 'fifth', 'a'))
+	expect(replay.list('b', 0).gap).toBe(true)
+	expect(replay.list('a', 4).gap).toBe(false)
+})
+
+test('app and work scopes with the same ID have separate dropped watermarks', () => {
+	const replay = new EventReplay(1)
+	replay.append(event(1))
+	const appEvent = { ...event(2), scope: 'app' as const }
+	replay.append(appEvent)
+	expect(replay.list('work', 0)).toEqual({ events: [], gap: true })
+	expect(replay.list('work', 0, 'app')).toEqual({
+		events: [appEvent],
+		gap: false,
+	})
+})
