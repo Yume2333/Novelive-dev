@@ -16,6 +16,7 @@ import {
 	textResultError,
 } from '../../models/text'
 import { createReplayFetch, type ReplayOptions } from '../../replay'
+import { recordImageUsage } from '../../usage'
 import type { Dimensions } from './check'
 
 export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
@@ -114,6 +115,11 @@ export function imageRenderer(config: ImageConfig, options: ModelOptions) {
 							{ ...parameters, ...output, quality: config.quality },
 							{ signal },
 						)
+			recordImageUsage(
+				config.model,
+				response.data?.filter((image) => image.b64_json || image.url).length ??
+					0,
+			)
 			const image = response.data?.[0] as
 				| {
 						b64_json?: string

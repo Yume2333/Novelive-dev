@@ -18,6 +18,7 @@ import {
 	maskedConfigSchema,
 	textCatalogSchema,
 } from '../config/schema'
+import { usageCommands } from '../usage/contract'
 import { chatCommands } from './chat'
 import { editorCommands } from './editor'
 import { importCommands } from './import'
@@ -73,6 +74,7 @@ const imageCapability = union([
 ])
 
 export const commands = {
+	...usageCommands,
 	...chatCommands,
 	...editorCommands,
 	...productionCommands,

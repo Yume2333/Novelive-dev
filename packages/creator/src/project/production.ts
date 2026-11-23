@@ -19,6 +19,7 @@ import {
 	WorkQueue,
 } from '../scheduler/work-queue'
 import { existing } from '../synthesis/patch'
+import { withUsage } from '../usage'
 import { Project } from './index'
 import { loadPlayerChapter } from './player'
 import {
@@ -260,12 +261,18 @@ export function createProduction(
 			}
 			if (!started || queue.snapshot(workId).phase === 'confirm-visual') {
 				if (!started) {
-					const { synthesis } = await prepareVolume(project, volumeId, {
-						previewConnection: models.organizer,
-						synthesisConnection: models.director,
-						language: work.language,
-						fetch: createReplayFetch(replay),
-					})
+					const { synthesis } = await withUsage(
+						project,
+						workId,
+						'synthesize',
+						() =>
+							prepareVolume(project, volumeId, {
+								previewConnection: models.organizer,
+								synthesisConnection: models.director,
+								language: work.language,
+								fetch: createReplayFetch(replay),
+							}),
+					)
 					summary = synthesis.overview
 				}
 				const bible = (await productionBible(project)).art
