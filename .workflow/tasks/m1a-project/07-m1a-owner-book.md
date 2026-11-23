@@ -22,3 +22,4 @@
 - 严格 `pnpm check` → `Tests  342 passed (342)`。累计付费 20 次、190,995 tokens、0 张图。
 - [脱敏凭据](../../evidence/m1a/owner/receipt.txt)
 - 部分交付：schema 契约修复的严格检查为 `Tests  344 passed (344)`。复用首卷预览，第一包综合已保存；第二包修复报 `reasoning_limit`。W4 未通过。
+- 未完成：[#68](https://github.com/Yume2333/Novelive-dev/pull/68) 三次整卷共识阈值 0.90；目前 0.80–0.85，缺 `chunked-run.json`、重启零调用、CI 和 review，交接已停付费。
