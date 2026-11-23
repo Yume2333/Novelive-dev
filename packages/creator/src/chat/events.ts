@@ -22,7 +22,8 @@ export class EventReplay {
 			this.entries.length > this.maxEntries ||
 			this.bytes > this.maxBytes
 		) {
-			const removed = this.entries.shift()!
+			const removed = this.entries[0]
+			this.entries.shift()
 			this.bytes -= removed.bytes
 			this.droppedThrough = Math.max(this.droppedThrough, removed.event.seq)
 		}
