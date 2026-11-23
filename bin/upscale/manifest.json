@@ -1,0 +1,62 @@
+{
+  "platforms": {
+    "linux": {
+      "url": "https://github.com/upscayl/upscayl-ncnn/releases/download/20251207-174704/upscayl-bin-20251207-174704-linux.zip",
+      "sha256": "a9fab3c770b62f2b7a35d8d6d61eb4e8b3aef79128b665c919d080b85a2292f2",
+      "executable": "upscayl-bin-20251207-174704-linux/upscayl-bin",
+      "binarySha256": "8b0980197d5bdb6fc4fbc0cc50dae721f3df18d91d0d912ec0a3aeea6495367e"
+    },
+    "darwin": {
+      "url": "https://github.com/upscayl/upscayl-ncnn/releases/download/20251207-174704/upscayl-bin-20251207-174704-macos.zip",
+      "sha256": "277419791281a56eae0c739c70120b974d7267cf7c2de8e86dc09798d4b314db",
+      "executable": "upscayl-bin-20251207-174704-macos/upscayl-bin",
+      "binarySha256": "b7f54f362fc10d5f334e587fb90917e95a5557ec1cfefbddce78657dd3fee055"
+    },
+    "win32": {
+      "url": "https://github.com/upscayl/upscayl-ncnn/releases/download/20251207-174704/upscayl-bin-20251207-174704-windows.zip",
+      "sha256": "1f0f65c5d2ade866555e2ac467d35952c35a47080a4060fe56a1ab028f67258a",
+      "executable": "upscayl-bin-20251207-174704-windows/upscayl-bin.exe",
+      "binarySha256": "294d31be8f29d047c0d91a8dcd5e739616ece56bce3188ac688f9a52d70abe60"
+    }
+  },
+  "models": [
+    {
+      "path": "models/4x-NMKD-YandereNeo.bin",
+      "sha256": "26d708ea452ed8f17e4479ab33bc09dd3e9102651f8c799d162bb71ff220aac0",
+      "url": "https://objectstorage.us-phoenix-1.oraclecloud.com/n/ax6ygfvpvzka/b/open-modeldb-files/o/4x-NMKD-YandereNeo.pth"
+    },
+    {
+      "path": "models/4x-NMKD-YandereNeo.param",
+      "sha256": "8850a8b3701977df13cf891b0f9e4b82f88e67303837aa6c6d19f1edf3f5d056",
+      "url": "https://objectstorage.us-phoenix-1.oraclecloud.com/n/ax6ygfvpvzka/b/open-modeldb-files/o/4x-NMKD-YandereNeo.pth"
+    },
+    {
+      "path": "models/realesr-animevideov3-x4.bin",
+      "sha256": "548a36f9c3f4ab8da56cd3b13badf23968bee207b396dad14d04b830e5f2ab2d",
+      "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip"
+    },
+    {
+      "path": "models/realesr-animevideov3-x4.param",
+      "sha256": "850a248e7c14c27e5bd8cf7265113a9441036a7db63963bb8aa5169d788a435e",
+      "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip"
+    },
+    {
+      "path": "models/realesrgan-x4plus-anime.bin",
+      "sha256": "fe01c269cfd10cdef8e018ab66ebe750cf79c7af4d1f9c16c737e1295229bacc",
+      "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip"
+    },
+    {
+      "path": "models/realesrgan-x4plus-anime.param",
+      "sha256": "2b8fb6e0ae4d2d85704ca08c119a2f5ea40add4f2ecd512eb7f4cd44b6127ed4",
+      "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip"
+    }
+  ],
+  "conversion": {
+    "script": "tools/upscale/convert_yandereneo.py",
+    "sourceSha256": "988f57dd12e63cf7aad10192fd06518e3300b449362df2a03eb1f9774a10f8b3",
+    "torch": "2.14.1+cpu",
+    "spandrel": "0.4.2",
+    "pnnx": "20261020",
+    "fp16": true
+  }
+}
