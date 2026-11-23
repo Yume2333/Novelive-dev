@@ -207,7 +207,7 @@ export function PlayerControls({
 						onKeyDown={(event) => {
 							if (event.key === 'Tab') {
 								const nodes = event.currentTarget.querySelectorAll<HTMLElement>(
-									'button, input, select',
+									'button:not(:disabled), input:not(:disabled), select:not(:disabled)',
 								)
 								const first = nodes[0]
 								const last = nodes[nodes.length - 1]

@@ -301,6 +301,11 @@ test.describe('M3 player controls', () => {
 					await expect(
 						page.getByRole('button', { name: '在编辑器中打开这里' }),
 					).toBeDisabled()
+					await page.getByRole('button', { name: '返回游戏' }).focus()
+					await page.keyboard.press('Shift+Tab')
+					await expect(page.getByRole('button', { name: '设置', exact: true })).toBeFocused()
+					await page.keyboard.press('Tab')
+					await expect(page.getByRole('button', { name: '返回游戏' })).toBeFocused()
 					await expect(
 						page.getByRole('button', { name: '在编辑器中打开这里' }),
 					).toHaveAttribute('title', '请先将本地工程关联到作品')
