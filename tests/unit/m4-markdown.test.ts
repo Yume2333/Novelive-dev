@@ -231,6 +231,19 @@ test('a leading thematic break is not front matter; YAML comments, escapes and b
 		).volumes[0].chapters[0].paragraphs,
 	).toEqual(['Transcript: [ 08:00: Operator: All clear. ]', 'The ship left.'])
 	expect(
+		extract(
+			'---\nauthor: Ada\n---\n\n# 第一卷\n\n### 第一章\n\n甲。\n\n### 第二章\n\n乙。\n',
+		).volumes,
+	).toEqual([
+		{
+			title: '第一卷',
+			chapters: [
+				{ title: '第一章', paragraphs: ['甲。'], notes: [] },
+				{ title: '第二章', paragraphs: ['乙。'], notes: [] },
+			],
+		},
+	])
+	expect(
 		extract('---\ntitle: Matching a literal ]\nlang: en\n---\nText.\n')
 			.metadata,
 	).toEqual({ title: 'Matching a literal ]', language: 'en' })

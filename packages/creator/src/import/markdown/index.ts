@@ -59,7 +59,8 @@ function scalar(raw: string, rest: string[]) {
 // YAML; otherwise it is a thematic break and the text stays in the body. A
 // closing `]` or `}` may sit at the margin only while the latest top-level
 // key, or a key nested under it, opened a flow collection. A block with no
-// title or language stays in the body, so unreadable text is never dropped.
+// title or language is dropped only when a key follows `---` directly, so
+// prose between thematic breaks is never lost.
 function frontMatter(text: string) {
 	const metadata: MarkdownBook['metadata'] = {}
 	const block = text.match(
@@ -84,7 +85,8 @@ function frontMatter(text: string) {
 		if (field[1] === 'title') metadata.title = value
 		else metadata.language = value
 	}
-	if (!metadata.title && !metadata.language) return { body: text, metadata: {} }
+	if (!metadata.title && !metadata.language && !yamlKey.test(lines[0]))
+		return { body: text, metadata }
 	return { body: text.slice(block[0].length), metadata }
 }
 
