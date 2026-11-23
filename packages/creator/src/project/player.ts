@@ -8,6 +8,7 @@ export async function loadPlayerChapter(
 	directory: string,
 	workId: string,
 	cacheDir: string,
+	selectedChapterId?: string,
 ) {
 	using project = await Project.open(directory)
 	const series = await project.read(projectFiles.series)
@@ -15,8 +16,49 @@ export async function loadPlayerChapter(
 		const volume = await project.read(projectFiles.volume(volumeId))
 		if (!volume.workIds.includes(workId)) continue
 		const work = await project.read(projectFiles.work(volumeId, workId))
-		const chapterId = work.chapterIds[0]
+		const states = project.database
+			.prepare('SELECT chapter_id, user_state FROM chapter WHERE work_id = ?')
+			.all(workId)
+		const chapters = await Promise.all(
+			work.chapterIds.map(async (chapterId) => {
+				const document = await project.read(
+					projectFiles.chapter({ volumeId, workId, chapterId }),
+				)
+				const state = states.find(
+					(row) => row.chapter_id === chapterId,
+				)?.user_state
+				const task = project.database
+					.prepare(
+						"SELECT phase FROM task WHERE work_id = ? AND ref_id = ? AND kind IN ('chapter', 'redo_chapter') ORDER BY seq DESC LIMIT 1",
+					)
+					.get(workId, chapterId)
+				const phases: Record<string, string> = {
+					write: '写作',
+					review: '审稿',
+					stage: '演出',
+					await_draw: '出图',
+					queued: '等待',
+					done: '完成',
+				}
+				return {
+					chapterId,
+					title: document.title,
+					published:
+						state === 'published' ||
+						(states.length === 0 && document.sceneIds.length > 0),
+					progress:
+						state === 'producing'
+							? `制作中 · ${phases[String(task?.phase)] ?? '等待'}`
+							: state === 'published'
+								? '已发布'
+								: '等待',
+				}
+			}),
+		)
+		const chapterId = selectedChapterId ?? work.chapterIds[0]
 		if (!chapterId) throw { code: 'not_found', message: '作品还没有章节' }
+		if (!chapters.find((chapter) => chapter.chapterId === chapterId)?.published)
+			throw { code: 'not_found', message: '章节尚未发布' }
 		const ref = { volumeId, workId, chapterId }
 		const chapter = await project.read(projectFiles.chapter(ref))
 		const scripts = await Promise.all(
@@ -85,6 +127,7 @@ export async function loadPlayerChapter(
 			}),
 		)
 		return {
+			chapters,
 			script: scripts.join('\n\n'),
 			chapter,
 			registry: { formatVersion: 1 as const, entries: assets },

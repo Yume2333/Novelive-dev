@@ -16,6 +16,93 @@ import {
 import { context } from '../fixtures/script/context'
 
 const directories: string[] = []
+
+test('player chapter selection defaults to first and only admits published production chapters', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-chapter-selection-'))
+	directories.push(directory)
+	const root = join(directory, 'project')
+	const cache = join(directory, 'cache')
+	await seedPlayerProject(
+		root,
+		Buffer.from('background'),
+		Buffer.from('portrait'),
+	)
+	{
+		using project = await Project.open(root)
+		const file = projectFiles.work('v1', playerWorkId)
+		await project.write(file, {
+			...(await project.read(file)),
+			chapterIds: ['ch1', 'ch2'],
+		})
+		await project.write(
+			projectFiles.chapter({ ...playerRef, chapterId: 'ch2' }),
+			{
+				...(await project.read(projectFiles.chapter(playerRef))),
+				chapterId: 'ch2',
+				title: '第二章',
+			},
+		)
+		await project.writeFile(
+			projectFiles.scene({ ...playerRef, chapterId: 'ch2' }, 'aaaabbbb'),
+			playerScript,
+		)
+		project.database
+			.prepare(
+				'INSERT INTO work (work_id, title, queue_pos, created_at) VALUES (?, ?, 0, 0)',
+			)
+			.run(playerWorkId, '测试')
+		project.database
+			.prepare(
+				"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, 'ch1', 1, 'published'), (?, 'ch2', 2, 'producing')",
+			)
+			.run(playerWorkId, playerWorkId)
+		project.database
+			.prepare(
+				"INSERT INTO task (task_id, work_id, kind, ref_id, seq, created_at, phase) VALUES ('next-chapter', ?, 'chapter', 'ch2', 1, 0, 'review')",
+			)
+			.run(playerWorkId)
+	}
+	const first = await loadPlayerChapter(root, playerWorkId, cache)
+	expect(first.chapter.chapterId).toBe('ch1')
+	expect(first.chapters).toEqual([
+		{ chapterId: 'ch1', title: '空屋', published: true, progress: '已发布' },
+		{
+			chapterId: 'ch2',
+			title: '第二章',
+			published: false,
+			progress: '制作中 · 审稿',
+		},
+	])
+	await expect(
+		loadPlayerChapter(root, playerWorkId, cache, 'ch2'),
+	).rejects.toMatchObject({ code: 'not_found' })
+	await expect(
+		loadPlayerChapter(root, playerWorkId, cache, 'missing'),
+	).rejects.toMatchObject({ code: 'not_found' })
+	{
+		using project = await Project.open(root)
+		project.database
+			.prepare(
+				"UPDATE chapter SET user_state = 'published' WHERE chapter_id = 'ch2'",
+			)
+			.run()
+	}
+	expect(
+		(await loadPlayerChapter(root, playerWorkId, cache, 'ch2')).chapter
+			.chapterId,
+	).toBe('ch2')
+	{
+		using project = await Project.open(root)
+		project.database
+			.prepare(
+				"UPDATE chapter SET user_state = 'waiting' WHERE chapter_id = 'ch1'",
+			)
+			.run()
+	}
+	await expect(
+		loadPlayerChapter(root, playerWorkId, cache),
+	).rejects.toMatchObject({ code: 'not_found' })
+})
 afterEach(async () => {
 	vi.useRealTimers()
 	await Promise.all(

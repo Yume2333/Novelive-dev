@@ -1,0 +1,121 @@
+.nl-controls-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--scrim);
+	font-family: var(--font-body);
+}
+
+.nl-controls-panel {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	width: 320px;
+	max-height: 90%;
+	padding: var(--space-6);
+	gap: var(--space-3);
+	border: var(--glass-border);
+	border-radius: var(--radius-xl);
+	background: var(--veil-95);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-surface);
+}
+
+.nl-controls-page {
+	width: min(760px, 90%);
+	height: 90%;
+}
+
+.nl-controls-panel h2 {
+	font-family: var(--font-display);
+	margin: 0;
+}
+
+.nl-controls-dismiss {
+	position: absolute;
+	inset: 0;
+	border: none;
+	background: transparent;
+}
+
+.nl-controls-panel button,
+.nl-control-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	min-height: 52px;
+	padding: var(--space-3);
+	gap: var(--space-3);
+	border: none;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+}
+
+.nl-controls-panel button:hover,
+.nl-controls-panel button:focus-visible {
+	background: var(--white-90);
+	box-shadow: var(--shadow-focus);
+}
+
+.nl-controls-panel button {
+	justify-content: flex-start;
+}
+
+.nl-controls-panel button:disabled {
+	color: var(--color-outline);
+}
+
+.nl-control-row select {
+	background: var(--color-surface-container);
+	color: inherit;
+	font: inherit;
+	border: none;
+	border-radius: var(--radius-sm);
+	padding: var(--space-2);
+}
+
+.nl-chapter-wait {
+	position: absolute;
+	z-index: 2;
+	inset: var(--space-6) auto auto var(--space-6);
+	padding: var(--space-6);
+	border: var(--glass-border);
+	border-radius: var(--radius-xl);
+	background: var(--veil-95);
+	font-family: var(--font-body);
+}
+
+.nl-chapter-wait button {
+	font: inherit;
+	color: inherit;
+	background: transparent;
+	border: none;
+}
+
+.nl-player-surface[data-ui-hidden="true"] .nl-player-overlay {
+	visibility: hidden;
+}
+
+.nl-player .nl-player-textbox {
+	font-size: var(--player-font-size, 30px);
+	background: color-mix(
+		in srgb,
+		var(--color-background) calc(var(--player-dialogue-opacity, 0.9) * 100%),
+		transparent
+	);
+}
+
+.nl-player-surface[data-dialogue-style="paper"] .nl-player-textbox {
+	width: 78%;
+	margin-bottom: var(--space-6);
+	border: var(--glass-border);
+	border-radius: var(--radius-xl);
+	box-shadow: var(--shadow-glass);
+}

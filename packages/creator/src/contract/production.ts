@@ -1,5 +1,6 @@
 import {
 	arr,
+	bool,
 	compile,
 	int,
 	lit,
@@ -69,8 +70,20 @@ export const productionSnapshotSchema = obj({
 
 export const productionCommands = {
 	'production.playerChapter': {
-		input: obj({ ...work, directory: opt(str({ minLength: 1 })) }),
+		input: obj({
+			...work,
+			directory: opt(str({ minLength: 1 })),
+			chapterId: opt(entityId),
+		}),
 		output: obj({
+			chapters: arr(
+				obj({
+					chapterId: entityId,
+					title: str(),
+					published: bool(),
+					progress: str(),
+				}),
+			),
 			script: str(),
 			chapter: chapterSchema,
 			registry: assetRegistrySchema,
