@@ -97,6 +97,10 @@ test('M3 stage directions render the direction set and four landscape fill crops
 				(effect) => [`@filter ${effect} value 0.5`, effect] as [string, string],
 			),
 			['@filter none\n@hide traveler', '空场'],
+			[
+				'@cg cg-test\n@particle sakura intensity 0.8\n@filter sepia value 0.5',
+				'合成演出',
+			],
 		]
 		await project.writeFile(
 			projectFiles.scene(playerRef, 'aaaabbbb'),
@@ -104,11 +108,25 @@ test('M3 stage directions render the direction set and four landscape fill crops
 		)
 		const app = await electron.launch({
 			executablePath: require('electron'),
-			args: ['apps/desktop', `--user-data-dir=${join(directory, 'profile')}`],
+			args: [
+				'apps/desktop',
+				'--enable-unsafe-swiftshader',
+				'--use-gl=angle',
+				'--use-angle=swiftshader',
+				`--user-data-dir=${join(directory, 'profile')}`,
+			],
 			env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
 		})
 		try {
 			const page = await app.firstWindow()
+			const errors: string[] = []
+			page.on('pageerror', (error) => {
+				errors.push(error.message)
+				console.error(error.stack)
+			})
+			page.on('console', (message) => {
+				if (message.type() === 'error') console.error(message.text())
+			})
 			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
 			await app.evaluate(({ dialog }, path) => {
 				dialog.showOpenDialog = async () => ({
@@ -122,8 +140,6 @@ test('M3 stage directions render the direction set and four landscape fill crops
 			await page.getByRole('button', { name: '打开本地工程' }).click()
 			const text = page.locator('.nl-player-text')
 			const canvas = page.locator('.nl-player canvas')
-			const errors: string[] = []
-			page.on('pageerror', (error) => errors.push(error.message))
 			async function pixel(x: number, y: number) {
 				const shot = await sharp(
 					await page.locator('.nl-player-stage').screenshot(),
@@ -137,7 +153,8 @@ test('M3 stage directions render the direction set and four landscape fill crops
 				return [...shot.data.subarray(offset, offset + 3)]
 			}
 			await expect(text).toHaveText('基准。')
-			const evidence = '.workflow/evidence/m3-playback'
+			const evidence =
+				process.env.NL_STAGE_SHOTS ?? '.workflow/evidence/m3-playback'
 			await mkdir(evidence, { recursive: true })
 			for (const [name, width, height] of [
 				['16-10', 1280, 800],
@@ -174,10 +191,15 @@ test('M3 stage directions render the direction set and four landscape fill crops
 					await expect.poll(() => pixel(0.5, 0.4)).toEqual([64, 128, 32])
 				if (label === '宽银幕')
 					await expect.poll(() => pixel(0.5, 0.01)).toEqual([0, 0, 0])
+				if (label === 'brightness')
+					await expect.poll(() => pixel(0.8, 0.3)).toEqual([16, 24, 48])
 				if (['sakura', '暗角', 'glitch'].includes(label))
 					await page.screenshot({ path: `${evidence}/stage-${label}.png` })
+				if (label === '合成演出')
+					await page.screenshot({ path: `${evidence}/stage-composite.png` })
+				if (label === '空场')
+					await expect.poll(() => pixel(0.25, 0.4)).toEqual([32, 48, 96])
 			}
-			await expect.poll(() => pixel(0.25, 0.4)).toEqual([32, 48, 96])
 			await expect(page.getByRole('alert')).toHaveCount(0)
 			expect(errors).toEqual([])
 		} finally {

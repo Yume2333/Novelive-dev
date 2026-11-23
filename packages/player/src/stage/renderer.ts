@@ -39,6 +39,7 @@ export class PixiStage {
 	private masks = new Graphics()
 	private tweens: Tween[] = []
 	private particles: Particle[] = []
+	private particleTexture: Texture | undefined
 	private state: StageState | undefined
 	private time = 0
 	private observer: ResizeObserver | undefined
@@ -56,12 +57,19 @@ export class PixiStage {
 		this.observer = new ResizeObserver(() => {
 			const { width, height } = host.getBoundingClientRect()
 			const scale = Math.max(width / 960, height / 540)
+			this.app.renderer.resize(width, height)
+			this.app.stage.scale.set(scale)
+			this.app.stage.position.set(
+				(width - 960 * scale) / 2,
+				(height - 540 * scale) / 2,
+			)
+			this.drawMask()
 			Object.assign(this.app.canvas.style, {
 				position: 'absolute',
-				width: `${960 * scale}px`,
-				height: `${540 * scale}px`,
-				left: `${(width - 960 * scale) / 2}px`,
-				top: `${(height - 540 * scale) / 2}px`,
+				width: `${width}px`,
+				height: `${height}px`,
+				left: '0',
+				top: '0',
 				objectFit: 'fill',
 			})
 		})
@@ -199,23 +207,7 @@ export class PixiStage {
 			this.setFilter(state)
 		if (JSON.stringify(previous?.particle) !== JSON.stringify(state.particle))
 			this.setParticles(state)
-		this.masks.clear()
-		if (state.mask?.shape === 'letterbox') {
-			const height = state.mask.strength * 100
-			this.masks
-				.rect(0, 0, 960, height)
-				.rect(0, 540 - height, 960, height)
-				.fill(0x000000)
-		} else if (state.mask) {
-			for (let i = 0; i < 24; i++) {
-				const inset = i * 4
-				this.masks.rect(inset, inset, 960 - inset * 2, 540 - inset * 2).stroke({
-					width: 8,
-					color: 0x000000,
-					alpha: state.mask.strength * (1 - i / 24) * 0.2,
-				})
-			}
-		}
+		this.drawMask()
 		const zoom = state.camera.zoom
 		const focus = zoom.target === 'stage' ? 480 : slotX[zoom.target]
 		const scale =
@@ -262,6 +254,33 @@ export class PixiStage {
 		)
 	}
 
+	private drawMask() {
+		this.masks.clear()
+		const mask = this.state?.mask
+		if (!mask) return
+		const width = this.app.screen.width / this.app.stage.scale.x
+		const height = this.app.screen.height / this.app.stage.scale.y
+		const x = (960 - width) / 2
+		const y = (540 - height) / 2
+		if (mask.shape === 'letterbox') {
+			const bar = height * mask.strength * 0.185
+			this.masks
+				.rect(x, y, width, bar)
+				.rect(x, y + height - bar, width, bar)
+				.fill(0x000000)
+		} else
+			for (let i = 0; i < 24; i++) {
+				const inset = (i * height) / 135
+				this.masks
+					.rect(x + inset, y + inset, width - inset * 2, height - inset * 2)
+					.stroke({
+						width: height / 67.5,
+						color: 0x000000,
+						alpha: mask.strength * (1 - i / 24) * 0.2,
+					})
+			}
+	}
+
 	private setFilter(state: StageState) {
 		for (const filter of this.world.filters ?? []) filter.destroy()
 		const filter = state.filter
@@ -295,13 +314,26 @@ export class PixiStage {
 		this.weather.removeParticles()
 		this.particles = []
 		if (!state.particle) return
+		if (!this.particleTexture) {
+			const canvas = document.createElement('canvas')
+			canvas.width = canvas.height = 8
+			const context = canvas.getContext('2d')
+			if (!context) throw new Error('无法创建粒子纹理')
+			context.fillStyle = '#ffffff'
+			context.beginPath()
+			context.ellipse(4, 4, 4, 3, 0, 0, Math.PI * 2)
+			context.fill()
+			this.particleTexture = Texture.from(canvas, true)
+		}
 		for (let i = 0; i < Math.round(state.particle.intensity * 160); i++) {
+			const randomX = Math.sin((i + 1) * 127.1) * 43758.5453
+			const randomY = Math.sin((i + 1) * 311.7) * 96453.9127
 			const particle = new Particle({
-				texture: Texture.WHITE,
-				x: (i * 173.3) % 960,
-				y: (i * 97.7) % 540,
-				scaleX: state.particle.effect === 'rain' ? 1 : 5,
-				scaleY: state.particle.effect === 'rain' ? 18 : 5,
+				texture: this.particleTexture,
+				x: (randomX - Math.floor(randomX)) * 960,
+				y: (randomY - Math.floor(randomY)) * 540,
+				scaleX: (state.particle.effect === 'rain' ? 1 : 5) / 8,
+				scaleY: (state.particle.effect === 'rain' ? 18 : 5) / 8,
 				tint: state.particle.effect === 'sakura' ? 0xffb7d5 : 0xffffff,
 				alpha: 0.7,
 			})
@@ -347,5 +379,6 @@ export class PixiStage {
 		this.complete()
 		this.observer?.disconnect()
 		this.app.destroy({ removeView: true }, { children: true })
+		this.particleTexture?.destroy(true)
 	}
 }

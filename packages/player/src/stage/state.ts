@@ -81,7 +81,11 @@ export function direct(state: StageState, action: CompiledAction): StageState {
 			break
 		case 'hide':
 			for (const [key, sprite] of Object.entries(next.sprites))
-				if (key === a.target || sprite.assetId.split('/')[0] === a.target)
+				if (
+					Object.hasOwn(slotX, String(a.target))
+						? key === a.target
+						: sprite.assetId.split('/')[0] === a.target
+				)
 					delete next.sprites[key as StageSlot]
 			break
 		case 'move':

@@ -9,6 +9,18 @@ const action = (
 ): CompiledAction => ({ type: 'action', line: 1, col: 1, name, args, assets })
 
 describe('stage direction state', () => {
+	it('gives hide slot names precedence over character IDs', () => {
+		const state = direct(
+			emptyStage(),
+			action('show', { slot: 'left' }, [
+				{ id: 'right/coat/calm', slot: 'left' },
+			]),
+		)
+		expect(direct(state, action('hide', { target: 'right' }))).toEqual(state)
+		expect(direct(state, action('hide', { target: 'left' })).sprites).toEqual(
+			{},
+		)
+	})
 	it('keeps empty stages serializable and ignores missing relative targets', () => {
 		expect(stageAssets(emptyStage())).toEqual([])
 		expect(

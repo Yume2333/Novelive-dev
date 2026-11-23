@@ -3,6 +3,7 @@ import type { PlaybackBeat } from '../contract/playback'
 import { assetLookahead, type PlayerResources } from '../contract/stage'
 
 extensions.add({
+	id: 'noveliveImage',
 	extension: { type: ExtensionType.LoadParser, name: 'noveliveImage' },
 	async load(url: string) {
 		const image = new Image()
@@ -25,7 +26,7 @@ async function acquire(url: string) {
 	let entry = shared.get(url)
 	if (!entry) {
 		entry = {
-			texture: Assets.load<Texture>({ src: url, loadParser: 'noveliveImage' }),
+			texture: Assets.load<Texture>({ src: url, parser: 'noveliveImage' }),
 			references: 0,
 		}
 		shared.set(url, entry)
