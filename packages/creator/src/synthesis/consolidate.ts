@@ -165,7 +165,9 @@ export async function selectAdditions(
 			[
 				...bible[kind].map(({ id }) => id),
 				...selected.flatMap((item) =>
-					item.kind === kind && !dropped.has(item) ? [item.entry.id] : [],
+					item.kind === kind && item.op === 'add' && !dropped.has(item)
+						? [item.entry.id]
+						: [],
 				),
 			].filter(Boolean),
 		)

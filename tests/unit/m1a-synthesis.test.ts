@@ -876,9 +876,9 @@ test('deduplication retains the first addition and the first competing identity 
 	expect(result.biblePatch.map(({ entry, op }) => [entry.id, op])).toEqual([
 		['guide', 'add'],
 		['ada', 'update'],
-		['guide', 'update'],
 		['ada', 'update'],
 	])
+	expect(result.biblePatch[0].entry).toMatchObject({ aliases: ['Navigator'] })
 	expect(result.conflicts).toMatchObject([
 		{ entry: { id: 'ada', identity: 'Admiral' } },
 	])
