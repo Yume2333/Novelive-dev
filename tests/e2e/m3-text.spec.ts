@@ -55,7 +55,7 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 			using project = await Project.open(root)
 			await project.writeFile(
 				projectFiles.scene(playerRef, 'aaaabbbb'),
-				`scene 空屋\nsource p0001\n: 春{wait 2}{ruby chūn tiān}春{wait 1}天{/ruby}{speed 0.2}{b}「山川、河流与风，静静地等待旅人。」${'山川与河流，正在等待春天。'.repeat(30)}{/b}{/speed}\n: {speed 0.2}慢慢{/speed}{wait 1}{speed 10}快快快快快快快快快快{/speed} cont\n: {speed 100}${'自动翻页，风从山间吹过。'.repeat(9)}{/speed} cont\n: 结束。\n`,
+				`scene 空屋\nsource p0001\n: 春{wait 2}{ruby chūn tiān}春{wait 1}天{/ruby}{speed 0.2}{b}「山川、河流与风，静静地等待旅人。」${'山川与河流，正在等待春天。'.repeat(30)}{/b}{/speed}\n: {speed 0.2}慢慢{/speed}{wait 1}{speed 10}快快快快快快快快快快{/speed} cont\n: {speed 100}${'自动翻页，风从山间吹过。'.repeat(9)}{/speed} cont\n: {speed 0.1}点击补全后等第二次点击。{/speed} cont\n: 结束。\n`,
 			)
 		}
 		const app = await electron.launch({
@@ -172,7 +172,8 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 			await page.evaluate(
 				() =>
 					new Promise<void>((resolve) => {
-						const overlay = document.querySelector('.nl-player-overlay')!
+						const overlay = document.querySelector('.nl-player-overlay')
+						if (!overlay) throw new Error('Missing player overlay')
 						const check = () => {
 							const viewport =
 								overlay.querySelector<HTMLElement>('.nl-player-text')
@@ -196,9 +197,15 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 						check()
 					}),
 			)
-			await expect(page.locator('.nl-text-display')).toHaveText('结束。', {
+			await expect(display).toHaveText('点击补全后等第二次点击。', {
 				timeout: 10000,
 			})
+			await advance()
+			await expect(text).toHaveAttribute('data-revealed', '12')
+			await page.waitForTimeout(250)
+			await expect(display).toHaveText('点击补全后等第二次点击。')
+			await advance()
+			await expect(display).toHaveText('结束。', { timeout: 1000 })
 		} finally {
 			await app.close()
 		}
