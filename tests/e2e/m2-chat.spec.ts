@@ -391,24 +391,6 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 			await expect(
 				panel.getByRole('button', { name: '思考过程' }).last(),
 			).toHaveCSS('font-family', /Noto Sans CJK SC/)
-			if (process.env.NL_CJK_EVIDENCE) {
-				console.log(
-					'CJK computed fonts',
-					await panel.evaluate((root) =>
-						Array.from(root.querySelectorAll('pre, button'))
-							.filter(
-								(el) =>
-									el.tagName === 'PRE' ||
-									/思考过程|compare_image/.test(el.textContent ?? ''),
-							)
-							.map((el) => ({
-								text: el.textContent,
-								font: getComputedStyle(el).fontFamily,
-							})),
-					),
-				)
-				await page.screenshot({ path: process.env.NL_CJK_EVIDENCE })
-			}
 
 			await panel.getByRole('button', { name: '停止', exact: true }).click()
 			await expect(
