@@ -191,13 +191,7 @@ function sameEntry(a: Entry, b: Entry) {
 	return sameAction(a.action, b.action)
 }
 
-export function scoreBiblePatches(
-	whole: Patch,
-	chunked: Patch,
-	existing: readonly CharacterNames[] = [],
-) {
-	const left = content(whole, existing)
-	const right = content(chunked, existing)
+function scoreEntries(left: Entry[], right: Entry[]) {
 	const shared = matchCount(left, right, sameEntry)
 	return {
 		whole: left.length,
@@ -209,5 +203,72 @@ export function scoreBiblePatches(
 			left.length + right.length
 				? (2 * shared) / (left.length + right.length)
 				: 0,
+	}
+}
+
+export function scoreBiblePatches(
+	whole: Patch,
+	chunked: Patch,
+	existing: readonly CharacterNames[] = [],
+) {
+	return scoreEntries(content(whole, existing), content(chunked, existing))
+}
+
+// Entries that at least `quorum` runs produce, each counted once.
+function consensus(runs: Entry[][], quorum: number) {
+	const claimed = runs.map(() => new Set<number>())
+	const agreed: Entry[] = []
+	for (const [r, run] of runs.entries())
+		for (const [i, entry] of run.entries()) {
+			if (claimed[r].has(i)) continue
+			const matches = runs.flatMap((other, o) => {
+				if (o <= r) return []
+				const j = other.findIndex(
+					(candidate, k) => !claimed[o].has(k) && sameEntry(entry, candidate),
+				)
+				return j < 0 ? [] : [[o, j] as const]
+			})
+			if (matches.length + 1 < quorum) continue
+			claimed[r].add(i)
+			for (const [o, j] of matches) claimed[o].add(j)
+			agreed.push(entry)
+		}
+	return agreed
+}
+
+/**
+ * Scores a chunked patch against the majority consensus of repeated
+ * whole-volume runs, normalized by how well each whole run agrees with the
+ * consensus of the others.
+ */
+export function scoreAgainstConsensus(
+	wholeRuns: readonly Patch[],
+	chunked: Patch,
+	existing: readonly CharacterNames[] = [],
+) {
+	if (wholeRuns.length < 3)
+		throw new Error('Consensus scoring needs at least three whole runs')
+	const runs = wholeRuns.map((run) => content(run, existing))
+	const quorum = Math.floor(runs.length / 2) + 1
+	const reference = consensus(runs, quorum)
+	const leaveOneOut = runs.map(
+		(run, i) =>
+			scoreEntries(
+				consensus(
+					runs.filter((_, j) => j !== i),
+					Math.min(quorum, runs.length - 1),
+				),
+				run,
+			).f1,
+	)
+	const baseline =
+		leaveOneOut.reduce((sum, f1) => sum + f1, 0) / leaveOneOut.length
+	const score = scoreEntries(reference, content(chunked, existing))
+	return {
+		...score,
+		reference: reference.length,
+		leaveOneOut,
+		baseline,
+		normalized: baseline ? score.f1 / baseline : 0,
 	}
 }

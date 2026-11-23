@@ -1,4 +1,4 @@
-import type { BiblePatch } from '@novelive/format/model'
+import type { BiblePatch, GlossaryPatch } from '@novelive/format/model'
 import type { readBible } from './patch'
 
 const nameKey = (name: string) =>
@@ -124,4 +124,218 @@ export function reconcileNamedAdditions(
 				return item
 		}
 	})
+}
+
+const selectionKinds = [
+	'character',
+	'location',
+	'relation',
+	'timeline',
+	'foreshadowing',
+	'style',
+] as const
+
+export type SelectionGroup = {
+	kind: (typeof selectionKinds)[number] | 'glossary'
+	entries: readonly { id: string }[]
+}
+
+function groupRelationAdditions(additions: BiblePatch) {
+	const groups = new Map<string, BiblePatch>()
+	for (const item of additions) {
+		if (item.kind !== 'relation') continue
+		const key = JSON.stringify([item.entry.from, item.entry.to].sort())
+		const group = groups.get(key) ?? []
+		group.push(item)
+		groups.set(key, group)
+	}
+	return [...groups.values()].flat()
+}
+
+function selectionCandidates(proposals: BiblePatch, additions: BiblePatch) {
+	const first = new Map<string, BiblePatch[number]>()
+	for (const item of additions)
+		if (!first.has(item.entry.id)) first.set(item.entry.id, item)
+
+	const observations = new Map<
+		string,
+		Map<string, { chapterId?: string; fact: string }>
+	>()
+	for (const item of proposals) {
+		const { entry, observedChapter } = item
+		const initial = first.get(entry.id)
+		if (!initial || (item.op !== 'add' && item.op !== 'update')) continue
+		const evidence = observations.get(entry.id) ?? new Map()
+		const note = (fact?: string, chapterId?: string) => {
+			if (fact)
+				evidence.set(JSON.stringify([chapterId, fact]), { chapterId, fact })
+		}
+		if (item !== initial) {
+			const chapter = observedChapter ?? entry.firstSeenChapter
+			switch (item.kind) {
+				case 'character':
+					note(item.entry.identity, chapter)
+					break
+				case 'location':
+				case 'relation':
+				case 'style':
+					note(item.entry.description, chapter)
+					break
+				case 'timeline':
+					note(item.entry.event, item.entry.chapterId)
+					break
+				case 'foreshadowing':
+					note(item.entry.description, item.entry.plantedChapter)
+					break
+			}
+		}
+		if (item.kind === 'character')
+			for (const { chapterId, fact } of item.entry.knows ?? [])
+				note(fact, chapterId)
+		if (
+			item.kind === 'character' ||
+			item.kind === 'location' ||
+			item.kind === 'relation'
+		)
+			for (const { chapterId, field, value } of item.entry.changes ?? [])
+				note(`${field}: ${value}`, chapterId)
+		observations.set(entry.id, evidence)
+	}
+	return [...first.values()].map(({ entry, observedChapter }) => {
+		const notes = [...(observations.get(entry.id)?.values() ?? [])]
+		return {
+			...(notes.length && {
+				observations:
+					notes.length <= 4
+						? notes
+						: [...notes.slice(0, 2), ...notes.slice(-2)],
+			}),
+			...entry,
+			...(observedChapter && { observedChapter }),
+		}
+	})
+}
+
+export function deduplicateNewTerms(
+	glossary: GlossaryPatch,
+	existing: GlossaryPatch,
+) {
+	const key = ({ original, written, pronunciation }: GlossaryPatch[number]) =>
+		JSON.stringify([
+			original.normalize('NFKC').trim(),
+			written.normalize('NFKC').trim(),
+			pronunciation?.normalize('NFKC').trim() ?? '',
+		])
+	const existingIds = new Set(existing.map(({ id }) => id))
+	const existingSpellings = new Set(existing.map(key))
+	const result: GlossaryPatch = []
+	const grouped = new Map<string, { index: number; notes: Set<string> }>()
+	for (const term of glossary) {
+		if (existingIds.has(term.id)) {
+			result.push(term)
+			continue
+		}
+		const name = key(term)
+		if (existingSpellings.has(name)) continue
+		const prior = grouped.get(name)
+		if (!prior) {
+			grouped.set(name, {
+				index: result.length,
+				notes: new Set(term.note ? [term.note] : []),
+			})
+			result.push(term)
+		} else if (term.note && !prior.notes.has(term.note)) {
+			prior.notes.add(term.note)
+			result[prior.index] = {
+				...result[prior.index],
+				note: [...prior.notes].join('\n\n'),
+			}
+		}
+	}
+	return result
+}
+
+/**
+ * Lets `choose` compare all additions, then removes changes
+ * and references that only pointed at a dropped addition.
+ */
+export async function selectAdditions(
+	patch: BiblePatch,
+	glossary: GlossaryPatch,
+	bible: Awaited<ReturnType<typeof readBible>>,
+	choose: (groups: readonly SelectionGroup[]) => Promise<Set<number>>,
+) {
+	const groups: SelectionGroup[] = []
+	for (const kind of selectionKinds) {
+		const proposed = patch.filter((item) => item.kind === kind)
+		const additions = proposed.filter(({ op }) => op === 'add')
+		if (!additions.length) continue
+		groups.push({
+			kind,
+			entries: selectionCandidates(
+				proposed,
+				kind === 'relation' ? groupRelationAdditions(additions) : additions,
+			),
+		})
+	}
+	const uniqueGlossary = deduplicateNewTerms(glossary, bible.glossary)
+	const existingTerms = new Set(bible.glossary.map(({ id }) => id))
+	const terms = uniqueGlossary.filter(({ id }) => !existingTerms.has(id))
+	if (terms.length) groups.push({ kind: 'glossary', entries: terms })
+	if (!groups.length)
+		return { biblePatch: patch, glossaryPatch: uniqueGlossary }
+	const kept = await choose(groups)
+	const dropped = new Map<SelectionGroup['kind'], Set<string>>()
+	const gone = new Map<SelectionGroup['kind'], Set<string>>()
+	const keptTerms = new Set<(typeof terms)[number]>()
+	let position = 0
+	for (const { kind, entries } of groups) {
+		if (kind === 'glossary') {
+			for (const term of terms) if (kept.has(++position)) keptTerms.add(term)
+			continue
+		}
+		const rejected = new Set(
+			entries.flatMap(({ id }) => (kept.has(++position) ? [] : [id])),
+		)
+		const existing = new Set(bible[kind].map(({ id }) => id))
+		dropped.set(kind, rejected)
+		gone.set(kind, new Set([...rejected].filter((id) => !existing.has(id))))
+	}
+	const missingCharacters = gone.get('character')
+	return {
+		biblePatch: patch.flatMap((item): BiblePatch => {
+			const { kind, op, entry } = item
+			if (
+				(op === 'add' && dropped.get(kind)?.has(entry.id)) ||
+				gone.get(kind)?.has(entry.id)
+			)
+				return []
+			if (
+				item.kind === 'relation' &&
+				(missingCharacters?.has(item.entry.from) ||
+					missingCharacters?.has(item.entry.to))
+			)
+				return []
+			if (
+				item.kind === 'character' &&
+				item.entry.addresses &&
+				missingCharacters?.size
+			)
+				return [
+					{
+						...item,
+						entry: {
+							...item.entry,
+							addresses: item.entry.addresses.filter(
+								({ speakerId }) => !missingCharacters.has(speakerId),
+							),
+						},
+					} as typeof item,
+				]
+			return [item]
+		}),
+		glossaryPatch: uniqueGlossary.filter(
+			(term) => existingTerms.has(term.id) || keptTerms.has(term),
+		),
+	}
 }

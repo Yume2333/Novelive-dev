@@ -2,13 +2,15 @@ import { createHash } from 'node:crypto'
 import {
 	access,
 	appendFile,
+	cp,
 	mkdir,
 	mkdtemp,
 	readFile,
 	writeFile,
 } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
 import { headingRules } from '../../packages/creator/src/import/txt'
 import {
@@ -25,22 +27,39 @@ import {
 import { createReplayFetch } from '../../packages/creator/src/replay'
 import {
 	synthesisFiles,
-	synthesizeVolume,
 	type VolumeSynthesis,
 } from '../../packages/creator/src/synthesis'
 import { projectFiles } from '../../packages/format/src/model'
-import { scoreBiblePatches } from './bible-patch-score'
-import { observeOwnerBookUsage } from './owner-book-usage'
+import { scoreAgainstConsensus } from './bible-patch-score'
+import { writeOwnerBookEvidence } from './owner-book-evidence'
+import { checkOwnerBookResumePrompt } from './owner-book-resume'
+import {
+	type WholeBookRun,
+	wholeBookSelectionTargets,
+} from './owner-book-targets'
+import {
+	observeOwnerBookUsage,
+	ownerBookSelectionBatchCap,
+	ownerBookSelectionCap,
+	reserveOwnerBookSelection,
+} from './owner-book-usage'
 
 const home = homedir()
 const source = join(home, 'novelive-testbooks', 'yesou-puyan.txt')
 const root = join(home, '.local/novelive-tools/m1a-owner-book')
 const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
-const purpose = 'M1a/07 owner book with shared inclusion criteria'
+const fullPurpose = 'M1a/07 owner book with shared inclusion criteria'
+const selectionPurpose = 'M1a/07 W4 selection-only 700k'
+const batchPurpose = 'M1a/07 W4 aligned selection batch 300k'
+const savedEvents = 81
+const savedPackets = 7
 const previewModel = 'gemini-3.8-flash'
 const cap = 5_000_000
 const eventContextWindow = 16_384
 const wholeContextWindow = 256_000
+const repo = join(dirname(fileURLToPath(import.meta.url)), '../..')
+const fixtures = join(repo, 'tests/fixtures/m1a-owner-book')
+const evidence = join(repo, '.workflow/evidence/m1a/owner')
 const series = {
 	formatVersion: 1,
 	seriesId: 'yesou-puyan',
@@ -67,12 +86,9 @@ const digest = (body: Uint8Array) =>
 // Allow for the relay's startup and for output at one-third of the observed rate.
 const requestTimeout = (outputTokens: number) =>
 	90_000 + Math.ceil(outputTokens / 40) * 1000
-// Budget for the eight observed events and whole control, each with a repair.
+// Budget for up to twenty-four events, each with a repair.
 const volumeTimeout =
-	requestTimeout(0) +
-	2 *
-		(8 * requestTimeout(eventContextWindow / 2) +
-			requestTimeout(wholeContextWindow / 2))
+	requestTimeout(0) + 2 * 24 * requestTimeout(eventContextWindow / 2)
 
 function requestFailure(signal: AbortSignal, error: unknown) {
 	if (signal.aborted)
@@ -92,9 +108,45 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		)
 			throw new Error('Unexpected synthesis model')
 		const mustResume = process.env.NL_OWNER_BOOK_EXPECT_RESUME === '1'
+		const checkpointSource = process.env.NL_OWNER_BOOK_SELECTION_SOURCE
+		const runDirectory = process.env.NL_OWNER_BOOK_RUN_DIR
+		const dryRun = process.env.NL_OWNER_BOOK_SELECTION_STUB
+		const batch = process.env.NL_OWNER_BOOK_SELECTION_BATCH === '1'
+		const selectionCap = batch
+			? ownerBookSelectionBatchCap
+			: ownerBookSelectionCap
+		const purpose = batch
+			? batchPurpose
+			: checkpointSource
+				? selectionPurpose
+				: fullPurpose
+		if (
+			(batch && !checkpointSource) ||
+			(dryRun &&
+				(!checkpointSource || !['complete', 'cap'].includes(dryRun))) ||
+			(checkpointSource &&
+				(!runDirectory ||
+					resolve(checkpointSource) === resolve(runDirectory, 'events') ||
+					synthesisModel !== 'devin-swe-2' ||
+					mustResume))
+		)
+			throw new Error(
+				'Selection-only requires a separate run directory and the saved main model',
+			)
+		const recorded: { volumeId: string; runs: WholeBookRun[] } = JSON.parse(
+			await readFile(join(fixtures, 'whole-runs.json'), 'utf8'),
+		)
+		const selectionTargets = wholeBookSelectionTargets(recorded.runs)
+		const stubLedger =
+			dryRun && batch && runDirectory
+				? join(dirname(runDirectory), 'stub-usage.csv')
+				: undefined
+		const usageLedger = stubLedger ?? ledger
 		let expectedResume: { packet: number; events: number } | undefined
-		const baseUrl = process.env.NL_IMAGE_BASE_URL
-		const apiKey = process.env.NL_IMAGE_API_KEY
+		const baseUrl = dryRun
+			? 'https://relay.invalid'
+			: process.env.NL_IMAGE_BASE_URL
+		const apiKey = dryRun ? 'offline-stub' : process.env.NL_IMAGE_API_KEY
 		if (!baseUrl || !apiKey)
 			throw new Error('The provisioned relay environment is unavailable')
 		const endpoint = new URL(baseUrl)
@@ -120,6 +172,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			...synthesisConnection,
 			contextWindow: eventContextWindow,
 		}
+		const selectionConnection = {
+			...synthesisConnection,
+			maxOutputTokens: 32_768,
+		}
 		const timeoutFor = (slot: TextConnection) =>
 			requestTimeout(outputTokenBudget(buildTextModel(slot)))
 		const stats = {
@@ -132,15 +188,33 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			packetCount: 0,
 			resumedPacket: 0,
 			resumedEvents: 0,
+			selectionPrompts: [] as {
+				candidates: number
+				bytes: number
+				outputCap: number
+				estimatedInput: number
+				estimate: number
+				reserved: number
+			}[],
 		}
 		let used = 0
+		let capReached = false
 		const pendingUsage = new Set<Promise<void>>()
 		let ledgerFailed = false
-		for (const line of (await readFile(ledger, 'utf8')).split('\n')) {
+		let reservationExceeded = false
+		const priorUsage =
+			dryRun && !stubLedger
+				? ''
+				: await readFile(usageLedger, 'utf8').catch((error) => {
+						if (stubLedger && error.code === 'ENOENT') return ''
+						throw error
+					})
+		for (const line of priorUsage.split('\n')) {
 			const [, , , tokens, , reason] = line.split(',')
 			if (reason?.startsWith(purpose)) used += Number(tokens)
 		}
 		const paid: typeof globalThis.fetch = async (input, init) => {
+			if (checkpointSource) await Promise.all(pendingUsage)
 			controller.signal.throwIfAborted()
 			const request = new Request(input, init)
 			if (
@@ -151,16 +225,14 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			const text = await request.clone().text()
 			const payload = JSON.parse(text)
 			const model: string = payload.model
-			if (model !== previewModel && model !== synthesisModel)
+			if (
+				model !== synthesisModel &&
+				(checkpointSource || model !== previewModel)
+			)
 				throw new Error('Unexpected real-book provider model')
 			const outputCap = payload.max_completion_tokens ?? payload.max_tokens
 			if (!Number.isSafeInteger(outputCap) || outputCap < 1)
 				throw new Error('Real-book request has no valid output cap')
-			const reserve = Buffer.byteLength(text) + outputCap + 1024
-			if (used + reserve > cap) {
-				controller.abort()
-				throw new Error('Real-book token cap reached')
-			}
 			const prompt = payload.messages[0]?.content
 			const isSynthesis =
 				typeof prompt === 'string' &&
@@ -169,8 +241,44 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				controller.abort()
 				throw new Error('Resume attempted a paid preview request')
 			}
+			if (
+				checkpointSource &&
+				['tools', 'functions', 'response_format', 'prediction', 'n'].some(
+					(key) => Object.hasOwn(payload, key),
+				)
+			)
+				throw new Error('Unexpected prompt data outside selection messages')
+			if (dryRun === 'cap') used = selectionCap
+			const selectionReserve = checkpointSource
+				? reserveOwnerBookSelection(
+						used,
+						payload.messages,
+						outputCap,
+						selectionCap,
+					)
+				: undefined
+			const reserve = checkpointSource
+				? selectionReserve?.reserved
+				: Buffer.byteLength(text) + outputCap + 1024
+			if (
+				reserve === undefined ||
+				(!checkpointSource && used + reserve > cap)
+			) {
+				capReached = true
+				controller.abort()
+				throw new Error('Real-book token cap reached')
+			}
 			used += reserve
 			const call = ++stats.calls
+			if (selectionReserve) {
+				const lines = prompt.split('\nCandidates:\n')[1].split('\n')
+				stats.selectionPrompts.push({
+					candidates: lines.length,
+					bytes: Buffer.byteLength(prompt),
+					outputCap,
+					...selectionReserve,
+				})
+			}
 			stats.previewCalls += Number(!isSynthesis)
 			stats.synthesisCalls += Number(isSynthesis)
 			const match = /Extract only the next event in packet \d+\/(\d+)/.exec(
@@ -193,18 +301,44 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				used += tokens - reserve
 				stats.tokens += tokens
 				stats.reserved += Number(measured === undefined)
+				if (dryRun && !stubLedger) return
 				try {
 					await appendFile(
-						ledger,
+						usageLedger,
 						`${new Date().toISOString().slice(0, 10)},${model},1,${tokens},0,${purpose}${measured === undefined ? ' (reserved upper bound)' : ''}\n`,
 					)
 				} catch {
 					ledgerFailed = true
 					controller.abort()
 				}
+				if (checkpointSource && tokens > reserve) {
+					reservationExceeded = true
+					controller.abort()
+				}
 			}
 			try {
-				const response = await fetch(request, { signal })
+				const response = dryRun
+					? new Response(
+							`data: ${JSON.stringify({
+								id: 'selection-stub',
+								object: 'chat.completion.chunk',
+								model,
+								choices: [
+									{
+										index: 0,
+										delta: { content: '{"keep":[]}' },
+										finish_reason: 'stop',
+									},
+								],
+								usage: {
+									prompt_tokens: batch ? 69_999 : 1,
+									completion_tokens: 1,
+									total_tokens: batch ? 70_000 : 2,
+								},
+							})}\n\ndata: [DONE]\n\n`,
+							{ headers: { 'content-type': 'text/event-stream' } },
+						)
+					: await fetch(request, { signal })
 				if (!response.ok) {
 					console.log(`${model} HTTP ${response.status}`)
 					if ([401, 403, 404, 429, 503].includes(response.status))
@@ -232,8 +366,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			),
 		)
 		expect(sha256).toBe(manifest.sha256)
-		const run =
-			process.env.NL_OWNER_BOOK_RUN_DIR ?? (await mkdtemp(join(root, 'run-')))
+		const run = runDirectory ?? (await mkdtemp(join(root, 'run-')))
+		if (checkpointSource) await mkdir(run, { recursive: true, mode: 0o700 })
 		const directory = join(run, 'events')
 		const cassette = {
 			directory: join(root, 'cassette'),
@@ -252,19 +386,20 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		})
 		const fetchReplay: typeof globalThis.fetch = async (input, init) => {
 			const request = new Request(input, init)
+			if (checkpointSource) {
+				checkOwnerBookResumePrompt(
+					(await request.clone().json()).messages[0]?.content,
+				)
+				return dryRun ? paid(request) : upstream(request)
+			}
 			if (expectedResume) {
 				const prompt = (await request.clone().json()).messages[0]?.content
-				const packet = /Extract only the next event in packet (\d+)\/\d+/.exec(
-					prompt,
-				)
-				const events = /^Events already extracted: (\d+)$/m.exec(prompt)
 				if (
-					Number(packet?.[1]) !== expectedResume.packet ||
-					Number(events?.[1]) !== expectedResume.events
-				)
-					throw new Error('Request did not resume the saved synthesis packet')
-				stats.resumedPacket = expectedResume.packet
-				stats.resumedEvents = expectedResume.events
+					checkOwnerBookResumePrompt(prompt, expectedResume) === 'extraction'
+				) {
+					stats.resumedPacket = expectedResume.packet
+					stats.resumedEvents = expectedResume.events
+				}
 				expectedResume = undefined
 			}
 			return replay(request)
@@ -272,7 +407,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const options = {
 			previewConnection,
 			synthesisConnection: eventConnection,
-			requestTimeoutMs: timeoutFor(eventConnection),
+			selectionConnection,
+			selectionTargets,
+			requestTimeoutMs: timeoutFor(selectionConnection),
 			language,
 			strategy: 'events' as const,
 			fetch: fetchReplay,
@@ -292,6 +429,47 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					expect(
 						digest(await project.readFile(projectFiles.original('txt'))),
 					).toBe(sha256)
+					return project
+				} catch (error) {
+					project.close()
+					throw error
+				}
+			}
+			if (checkpointSource) {
+				using archived = await Project.open(checkpointSource)
+				expect(
+					digest(await archived.readFile(projectFiles.original('txt'))),
+				).toBe(sha256)
+				const { volumeIds } = await archived.read(projectFiles.series)
+				expect(volumeIds).toHaveLength(20)
+				const files = synthesisFiles(volumeIds[0])
+				const saved = await archived.read(files.checkpoint)
+				expect(saved).toMatchObject({
+					ready: true,
+					applied: true,
+					packet: savedPackets,
+					whole: null,
+				})
+				expect(saved.events).toHaveLength(savedEvents)
+				const exclusions = [
+					'bible',
+					projectFiles.glossary({ level: 'series' }).path,
+					files.result.path,
+					files.checkpoint.path,
+				].map((name) => resolve(checkpointSource, name))
+				await cp(checkpointSource, path, {
+					recursive: true,
+					filter: (name) => !exclusions.includes(resolve(name)),
+				})
+				const project = await Project.open(path)
+				try {
+					await project.write(confirmed, initialCharacters)
+					const { selectedPatch: _frozen, ...extraction } = saved
+					await project.write(files.checkpoint, {
+						...extraction,
+						applied: false,
+						selections: [],
+					})
 					return project
 				} catch (error) {
 					project.close()
@@ -333,6 +511,22 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					await first.read(projectFiles.work(volumeId, volume.workIds[0]))
 				).chapterIds
 				expect(chapterIds).toHaveLength(7)
+				const files = synthesisFiles(volumeId)
+				const selectionStart = checkpointSource
+					? await first.read(files.checkpoint)
+					: undefined
+				if (selectionStart) {
+					expect(selectionStart.packet).toBe(savedPackets)
+					expect(selectionStart.events).toHaveLength(savedEvents)
+					expect(selectionStart.whole).toBe(null)
+					if (!selectionStart.applied) {
+						expect(selectionStart.ready).toBe(true)
+						expect(selectionStart.selections).toBeDefined()
+						expect(selectionStart.selectedPatch).toBeUndefined()
+					}
+					stats.resumedPacket = selectionStart.packet
+					stats.resumedEvents = selectionStart.events.length
+				}
 				if (mustResume) {
 					const saved = await first.read(synthesisFiles(volumeId).checkpoint)
 					expect(saved.applied).toBe(false)
@@ -343,41 +537,62 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					}
 				}
 				phase = 'preview and chunked synthesis'
-				const result = await prepareVolume(first, volumeId, options)
+				const result = await prepareVolume(first, volumeId, options).catch(
+					async (error) => {
+						if (!capReached || !selectionStart) throw error
+						const paused = await first.read(files.checkpoint)
+						expect(paused).toMatchObject({
+							events: selectionStart.events,
+							packet: selectionStart.packet,
+							basis: selectionStart.basis,
+							applied: false,
+						})
+						expect(paused.selections?.length).toBeGreaterThanOrEqual(
+							selectionStart.selections?.length ?? 0,
+						)
+						if (dryRun === 'cap') expect(paused.selections).toEqual([])
+						await Promise.all(pendingUsage)
+						if (ledgerFailed)
+							throw new Error('Could not write the private usage ledger')
+						const report = {
+							status: 'paused at token cap',
+							used,
+							cap: selectionCap,
+							selections: paused.selections?.length,
+							stats,
+						}
+						await writeFile(
+							join(run, 'selection-result.json'),
+							JSON.stringify(report, null, 2),
+						)
+						console.log(JSON.stringify(report))
+					},
+				)
+				if (!result) return
 				chunked = result.synthesis
 				previewBytes = result.previews.reduce(
 					(sum, preview) => sum + Buffer.byteLength(JSON.stringify(preview)),
 					0,
 				)
-				const checkpoint = await first.read(synthesisFiles(volumeId).checkpoint)
+				const checkpoint = await first.read(files.checkpoint)
+				if (selectionStart) {
+					expect(checkpoint.events).toEqual(selectionStart.events)
+					expect(checkpoint.packet).toBe(selectionStart.packet)
+					expect(stats.previewCalls).toBe(0)
+				}
 				expect(checkpoint.packet).toBeGreaterThan(1)
 				expect(checkpoint.applied).toBe(true)
-				phase = 'whole-volume control'
-				using whole = await provision(join(run, 'whole'))
-				for (const id of chapterIds)
-					await whole.write(
-						projectFiles.preview(id),
-						await first.read(projectFiles.preview(id)),
-					)
-				const reference = await synthesizeVolume(whole, volumeId, chapterIds, {
-					connection: synthesisConnection,
-					requestTimeoutMs: timeoutFor(synthesisConnection),
-					language,
-					strategy: 'whole',
-					fetch: fetchReplay,
-					signal: controller.signal,
-				})
-				const score = scoreBiblePatches(
-					reference,
+				phase = 'consensus comparison'
+				expect(recorded.volumeId).toBe(volumeId)
+				const score = scoreAgainstConsensus(
+					recorded.runs,
 					chunked,
 					initialCharacters.entries,
 				)
 				const expected = initialCharacters
 				const confirmedIntact =
-					JSON.stringify(await whole.read(confirmed)) ===
-						JSON.stringify(expected) &&
 					JSON.stringify(await first.read(confirmed)) ===
-						JSON.stringify(expected)
+					JSON.stringify(expected)
 				phase = 'restart'
 				first.close()
 				closed = true
@@ -400,7 +615,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				await Promise.all(pendingUsage)
 				if (ledgerFailed)
 					throw new Error('Could not write the private usage ledger')
+				if (reservationExceeded) controller.signal.throwIfAborted()
 				const report = {
+					status: score.normalized >= 0.9 ? 'passed' : 'below W4 threshold',
 					sha256,
 					chapters: 154,
 					volumes: 20,
@@ -414,21 +631,49 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					restartIntact,
 					stats,
 				}
-				await writeFile(
-					join(root, 'redacted-result.json'),
-					JSON.stringify(report, null, 2),
-				)
+				const fixture = `${JSON.stringify(
+					{
+						formatVersion: 1,
+						volumeId,
+						model: synthesisModel,
+						biblePatch: chunked.biblePatch,
+						glossaryPatch: chunked.glossaryPatch,
+					},
+					null,
+					'\t',
+				)}\n`
+				if (checkpointSource) {
+					await writeFile(
+						join(run, 'selection-result.json'),
+						JSON.stringify(report, null, 2),
+					)
+					await writeFile(join(run, 'chunked-run.json'), fixture)
+					if (dryRun) {
+						expect(confirmedIntact && restartIntact).toBe(true)
+						console.log(JSON.stringify(report))
+						return
+					}
+				} else {
+					await writeFile(
+						join(root, 'redacted-result.json'),
+						JSON.stringify(report, null, 2),
+					)
+				}
 				console.log(JSON.stringify(report))
-				expect(confirmedIntact && restartIntact).toBe(true)
-				phase = 'normalized BiblePatch F1'
-				expect(score.f1).toBeGreaterThanOrEqual(0.9)
+				phase = 'W4 acceptance and evidence publication'
+				await writeOwnerBookEvidence(fixtures, evidence, fixture, report)
 			} finally {
 				if (!closed) first.close()
 			}
 		} catch (error) {
+			if (reservationExceeded)
+				throw new Error(
+					'Selection usage exceeded the request reservation; check the private ledger',
+				)
 			const code = error instanceof TextModelError ? ` [${error.code}]` : ''
 			throw new Error(
 				`M1a/07 did not pass during ${phase}${code}; see the redacted result and usage`,
+				dryRun ? { cause: error } : undefined,
 			)
 		} finally {
 			controller.abort()

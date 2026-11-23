@@ -1,5 +1,54 @@
 import { expect, test, vi } from 'vitest'
-import { observeOwnerBookUsage } from '../acceptance/owner-book-usage'
+import {
+	observeOwnerBookUsage,
+	ownerBookSelectionBatchCap,
+	ownerBookSelectionCap,
+	reserveOwnerBookSelection,
+} from '../acceptance/owner-book-usage'
+
+test('selection reserves decoded input and maximum output before spending the last tokens', () => {
+	const messages = [{ role: 'user', content: '小說' }]
+	const output = 8_192
+	const reserve = Buffer.byteLength('user小說') + output + 1024
+	const used = ownerBookSelectionCap - reserve
+	expect(reserveOwnerBookSelection(used, messages, output)?.reserved).toBe(
+		reserve,
+	)
+	expect(reserveOwnerBookSelection(used + 1, messages, output)).toBeUndefined()
+})
+
+test('uses the larger tokenizer estimate with 15% margin and rejects unknown message framing', () => {
+	const messages = [{ role: 'user', content: '小說' }]
+	expect(reserveOwnerBookSelection(0, messages, 100)).toEqual({
+		estimatedInput: 1029,
+		estimate: 1129,
+		reserved: 1134,
+	})
+	expect(() =>
+		reserveOwnerBookSelection(0, [{ ...messages[0], name: 'extra' }], 100),
+	).toThrow('Selection reservation requires plain text chat messages')
+})
+
+test('the selection batch uses decoded text rather than JSON escapes, but enforces the ceiling', () => {
+	const messages = [{ role: 'user', content: '"a\n'.repeat(60_000) }]
+	const output = 24_576
+	const second = reserveOwnerBookSelection(
+		80_047,
+		messages,
+		output,
+		ownerBookSelectionBatchCap,
+	)
+	expect(second?.reserved).toBe(205_604)
+	expect(second?.estimate).toBeLessThan(second?.reserved ?? 0)
+	expect(
+		reserveOwnerBookSelection(
+			160_094,
+			messages,
+			output,
+			ownerBookSelectionBatchCap,
+		),
+	).toBeUndefined()
+})
 
 test('owner-book usage accounting leaves the first SSE frame available before the stream finishes', async () => {
 	const encoder = new TextEncoder()

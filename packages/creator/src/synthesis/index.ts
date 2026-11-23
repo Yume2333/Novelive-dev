@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import {
 	arr,
@@ -35,7 +36,12 @@ import {
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
-import { reconcileNamedAdditions } from './consolidate'
+import { canonicalizeAdditions } from './canonicalize'
+import {
+	reconcileNamedAdditions,
+	type SelectionGroup,
+	selectAdditions,
+} from './consolidate'
 import { scopedOnlyBrief } from './incremental/context'
 import { synthesisInstructions, synthesisOutput } from './output'
 import {
@@ -68,6 +74,13 @@ const eventFields = {
 }
 const eventSchema = obj(eventFields)
 const nextEvent = synthesisOutput(eventSchema)
+const keepPositions = arr(int({ minimum: 1 }))
+const selection = synthesisOutput(
+	obj({
+		keep: keepPositions,
+		justifications: opt(arr(obj({ kind: str(), reason: str() }))),
+	}),
+)
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
 const checkpointSchema = obj({
@@ -77,6 +90,12 @@ const checkpointSchema = obj({
 	basis: str(),
 	packet: int({ minimum: 0 }),
 	events: arr(eventSchema),
+	selections: opt(arr(arr(int({ minimum: 1 })))),
+	selectionVersion: opt(int({ minimum: 1 })),
+	selectionPlan: opt(str()),
+	selectedPatch: opt(
+		obj({ biblePatch: biblePatchSchema, glossaryPatch: glossaryPatchSchema }),
+	),
 	whole: nullable(outputSchema),
 	ready: bool(),
 	applied: bool(),
@@ -116,6 +135,8 @@ type Event = Static<typeof eventSchema>
 
 export interface SynthesisOptions {
 	connection: TextConnection
+	selectionConnection?: TextConnection
+	selectionTargets?: Readonly<Partial<Record<SelectionGroup['kind'], number>>>
 	language: string
 	requirements?: string
 	strategy?: 'auto' | 'whole' | 'events'
@@ -130,8 +151,9 @@ export interface SynthesisOptions {
 }
 
 const minimumEventLimit = 128
-const packetFormat = 6
-const legacyPacketFormats = [1, 2, 3, 4, 5]
+const packetFormat = 7
+const selectionVersion = 12
+const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const bytes = (text: string) => Buffer.byteLength(text)
@@ -142,12 +164,18 @@ function fitBytes(text: string, limit: number) {
 		stream: true,
 	})
 }
-function recentEvents(events: Event[], historyBudget: number) {
+function recentEvents(
+	events: Event[],
+	historyBudget: number,
+	distinct = false,
+) {
 	const summaries: string[] = []
+	const seen = new Set<string>()
 	let remaining = historyBudget - 2
 	for (let i = events.length - 1; i >= 0 && remaining > 0; i--) {
 		const chars = Array.from(events[i].event).slice(0, 160)
 		let summary = chars.join('')
+		if (distinct && seen.has(summary)) continue
 		const separator = summaries.length ? 1 : 0
 		let size = bytes(JSON.stringify(summary)) + separator
 		if (!summaries.length)
@@ -157,10 +185,98 @@ function recentEvents(events: Event[], historyBudget: number) {
 				size = bytes(JSON.stringify(summary))
 			}
 		if (size > remaining) break
+		seen.add(summary)
 		summaries.unshift(summary)
 		remaining -= size
 	}
 	return JSON.stringify(summaries)
+}
+function repeatsPacketEvent(event: Event, packetEvents: Event[]) {
+	const matching = packetEvents.filter(
+		(previous) => previous.event === event.event,
+	)
+	return (
+		matching.length > 0 &&
+		(['chapters', 'biblePatch', 'glossaryPatch'] as const).every((field) =>
+			event[field].every((item) =>
+				matching.some((previous) =>
+					previous[field].some((saved) => isDeepStrictEqual(item, saved)),
+				),
+			),
+		)
+	)
+}
+function proposedEntries(
+	events: Event[],
+	packetEvents: Event[],
+	budget: number,
+) {
+	const lines = new Map<string, string>()
+	const items = events.flatMap((event) => event.biblePatch)
+	for (const kind of [
+		'character',
+		'location',
+		'relation',
+		'timeline',
+		'foreshadowing',
+		'style',
+	])
+		for (const item of items) {
+			if (item.kind !== kind || item.op === 'delete') continue
+			const label =
+				item.kind === 'character'
+					? [item.entry.name, ...(item.entry.aliases ?? [])].join('/')
+					: item.kind === 'location'
+						? item.entry.name
+						: item.kind === 'relation'
+							? `${item.entry.from}>${item.entry.to}`
+							: item.kind === 'timeline'
+								? item.entry.chapterId
+								: item.kind === 'foreshadowing'
+									? item.entry.plantedChapter
+									: ''
+			lines.set(`${kind}:${item.entry.id}`, `${kind} ${item.entry.id} ${label}`)
+		}
+	for (const entry of events.flatMap((event) => event.glossaryPatch))
+		lines.set(`glossary:${entry.original}`, `glossary ${entry.original}`)
+	const full = [...lines.values()].join('\n')
+	if (bytes(full) <= budget) return { text: full, compact: false }
+
+	const ordered = new Set<string>()
+	for (const event of [...packetEvents].reverse()) {
+		for (const item of event.biblePatch)
+			if (item.op !== 'delete') ordered.add(`${item.kind}:${item.entry.id}`)
+		for (const entry of event.glossaryPatch)
+			ordered.add(`glossary:${entry.original}`)
+	}
+	for (const key of lines.keys()) ordered.add(key)
+	const groups = new Map<string, string[]>()
+	for (const key of ordered) {
+		const colon = key.indexOf(':')
+		const kind = key.slice(0, colon)
+		const id = key.slice(colon + 1)
+		if (!groups.has(kind)) groups.set(kind, [])
+		groups.get(kind)?.push(kind === 'glossary' ? JSON.stringify(id) : id)
+	}
+	const kept = new Map<string, string>()
+	let remaining = budget
+	const pending = [...groups].map(([kind, ids]) => ({ kind, ids, index: 0 }))
+	while (pending.length) {
+		for (let i = 0; i < pending.length; ) {
+			const group = pending[i]
+			const id = group.ids[group.index++]
+			const line = kept.get(group.kind)
+			const text = line === undefined ? `${group.kind}: ${id}` : ` ${id}`
+			const size = bytes(text) + Number(line === undefined && kept.size > 0)
+			if (size <= remaining) {
+				kept.set(group.kind, (line ?? '') + text)
+				remaining -= size
+			}
+			if (group.index === group.ids.length) pending.splice(i, 1)
+			else i++
+		}
+	}
+	return { text: [...kept.values()].join('\n'), compact: true }
 }
 function previewPackets(
 	previews: readonly string[],
@@ -186,7 +302,12 @@ const packetChapters = (packet = '') =>
 	new Set(Array.from(packet.matchAll(/^Chapter ([\w-]+):$/gm), ([, id]) => id))
 
 function matchesRecordedPackets(checkpoint: Checkpoint, packets: string[]) {
-	if (!packets.length || packets.length !== checkpoint.packet) return false
+	if (
+		!packets.length ||
+		checkpoint.packet > packets.length ||
+		(checkpoint.ready && checkpoint.packet !== packets.length)
+	)
+		return false
 	const recorded = new Set<string>()
 	let index = 0
 	for (const event of checkpoint.events) {
@@ -202,7 +323,12 @@ function matchesRecordedPackets(checkpoint: Checkpoint, packets: string[]) {
 			return false
 		recorded.clear()
 	}
-	return index === packets.length
+	return (
+		index === checkpoint.packet &&
+		[...recorded].every((chapter) =>
+			packetChapters(packets[index]).has(chapter),
+		)
+	)
 }
 
 function eventPacketBudget(
@@ -229,9 +355,12 @@ function legacyEventPacketBudget(
 	bible: Awaited<ReturnType<typeof readBible>>,
 ) {
 	if (format >= 4) {
-		const contract = synthesisInstructions(
-			obj({ ...eventFields, biblePatch: completeBiblePatchSchema }),
-		)
+		const contract =
+			format === 6
+				? nextEvent.instructions
+				: synthesisInstructions(
+						obj({ ...eventFields, biblePatch: completeBiblePatchSchema }),
+					)
 		return eventPacketBudget(
 			context,
 			history,
@@ -336,6 +465,9 @@ export async function synthesizeVolume(
 	if (!chapterIds.length || new Set(chapterIds).size !== chapterIds.length)
 		throw new Error('Synthesis requires distinct ordered chapter IDs')
 	const model = buildTextModel(options.connection)
+	const selector = options.selectionConnection
+		? buildTextModel(options.selectionConnection)
+		: model
 	const stream = createTextStream({ fetch: options.fetch })
 	if (
 		options.maxEvents !== undefined &&
@@ -389,7 +521,7 @@ export async function synthesizeVolume(
 	)
 		return project.read(files.result)
 	const legacyFormat =
-		saved?.ready && !saved.applied
+		saved && !saved.applied && (saved.ready || saved.events.length > 0)
 			? legacyPacketFormats.find((format) => matchesPacket(saved, [format]))
 			: undefined
 	const bible = await readBible(project)
@@ -398,6 +530,10 @@ export async function synthesizeVolume(
 		: bible
 	const outputLimit = outputTokenBudget(model)
 	const historyBudget = Math.min(1024, Math.floor(model.contextWindow / 16))
+	const registryBudget = Math.max(
+		0,
+		Math.min(2048, Math.floor(model.contextWindow / 8) - 512),
+	)
 	const packetOutputReserve = Math.min(
 		4096,
 		Math.floor(model.contextWindow / 4),
@@ -431,14 +567,17 @@ ${packetText.join('\n')}`
 					),
 				)
 			: undefined
-	const legacyReady =
+	const basis = hash(bible)
+	const legacyState =
 		legacyFormat !== undefined &&
 		saved &&
+		(saved.ready || saved.basis === basis) &&
 		(saved.whole ||
 			(legacyPackets && matchesRecordedPackets(saved, legacyPackets)))
 			? saved
 			: undefined
-	const useEvents = legacyReady
+	const legacyReady = legacyState?.ready ? legacyState : undefined
+	const useEvents = legacyState
 		? savedMode === 'events'
 		: strategy === 'events' ||
 			(strategy === 'auto' &&
@@ -446,13 +585,16 @@ ${packetText.join('\n')}`
 	const inputs = inputsFor(useEvents ? 'events' : 'whole')
 	const inputFingerprint = hash(inputs)
 	const fingerprint = hash({ packetFormat, ...inputs })
-	const basis = hash(bible)
-	const matching = saved?.fingerprint === fingerprint ? saved : legacyReady
+	const matching = saved?.fingerprint === fingerprint ? saved : legacyState
 	let quarantineReason =
 		matching?.ready && matching.basis !== basis
 			? 'Bible changed before synthesis publication'
 			: undefined
 	const resumable = matching?.basis === basis ? matching : undefined
+	if (quarantineReason && matching?.selections && !matching.selectedPatch)
+		throw new Error(
+			'Cannot recover saved synthesis picks against a changed Bible',
+		)
 	const eventPrompt = `${instructions}
 ${nextEvent.instructions}`
 	const outputReserve = useEvents
@@ -460,19 +602,23 @@ ${nextEvent.instructions}`
 				packetOutputReserve,
 				Math.max(
 					512,
-					model.contextWindow - bytes(eventPrompt) - historyBudget - 768,
+					model.contextWindow -
+						bytes(eventPrompt) -
+						historyBudget -
+						registryBudget -
+						768,
 				),
 			)
 		: packetOutputReserve
 	const budget = model.contextWindow - outputReserve
 	const packetBudget = eventPacketBudget(
 		model.contextWindow,
-		historyBudget,
+		historyBudget + registryBudget,
 		packetOutputReserve,
 		bytes(eventPrompt),
 	)
 	const packets =
-		legacyReady && legacyPackets
+		legacyState && legacyPackets
 			? legacyPackets
 			: useEvents && packetBudget > 0
 				? previewPackets(packetText, chapterIds, packetBudget)
@@ -494,29 +640,44 @@ ${nextEvent.instructions}`
 		throw new Error('Existing Bible is too large for synthesis context')
 
 	const chapterSet = new Set(chapterIds)
-	async function request<T extends Output>(
+	async function request<T>(
 		prompt: string,
 		contract: ReturnType<typeof synthesisOutput<T>>,
 		check: (output: T) => void,
+		focusedPrompt?: string,
+		{
+			connection = options.connection,
+			requestModel = model,
+			inputBudget = budget,
+			requestOutputLimit = outputLimit,
+		} = {},
 	): Promise<T> {
-		const repairBudget = budget - bytes(prompt) - bytes(repairPrefix)
+		const repairBudget = inputBudget - bytes(prompt) - bytes(repairPrefix)
 		if (repairBudget <= 0)
 			throw new Error('Synthesis input exceeds the model context budget')
 		const messages = [{ role: 'user' as const, content: prompt, timestamp: 0 }]
 		for (let attempt = 0; ; attempt++) {
 			options.signal?.throwIfAborted()
-			const response = await stream(model, normalizeContext({ messages }), {
-				apiKey: options.connection.apiKey,
-				signal: options.signal,
-				timeoutMs: options.requestTimeoutMs,
-				outputLimit,
-				cacheRetention: 'none',
-			}).result()
-			if (response.stopReason !== 'stop')
-				throw textResultError(
+			const response = await stream(
+				requestModel,
+				normalizeContext({ messages }),
+				{
+					apiKey: connection.apiKey,
+					signal: options.signal,
+					timeoutMs: options.requestTimeoutMs,
+					outputLimit: requestOutputLimit,
+					cacheRetention: 'none',
+				},
+			).result()
+			if (response.stopReason !== 'stop') {
+				const error = textResultError(
 					response,
 					`Synthesis stopped: ${response.stopReason}`,
 				)
+				if (focusedPrompt && error.code === 'reasoning_limit')
+					return request(focusedPrompt, contract, check)
+				throw error
+			}
 			try {
 				const text = response.content
 					.flatMap((part) => (part.type === 'text' ? [part.text] : []))
@@ -572,21 +733,101 @@ ${nextEvent.instructions}`
 		if (state.events.length >= limit)
 			throw new Error(`Synthesis reached its event limit (${limit})`)
 		const packet = state.packet
-		const event = await request(
-			`${eventPrompt}
-Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and qualifying new facts, not repeated background. Set is_last when done.
+		const packetEvents = state.events.slice(
+			state.events.findLastIndex(({ is_last }) => is_last) + 1,
+		)
+		const registry = proposedEntries(
+			state.events,
+			packetEvents,
+			legacyState
+				? Math.max(
+						0,
+						Math.min(
+							registryBudget,
+							budget -
+								bytes(eventPrompt) -
+								bytes(packets[packet]) -
+								historyBudget -
+								768,
+						),
+					)
+				: registryBudget,
+		)
+		const summaries = recentEvents(
+			registry.compact ? packetEvents : state.events,
+			historyBudget,
+			registry.compact,
+		)
+		const complete =
+			'When no distinct event or new fact remains in this packet, use is_last:true and empty arrays instead of restating it.'
+		const prompt = (
+			instruction: string,
+			entries = registry.text,
+			history = summaries,
+		) => `${eventPrompt}
+Extract only the next event in packet ${packet + 1}/${packets.length}. ${instruction}
 Events already extracted: ${state.events.length}
-Recent event summaries: ${recentEvents(state.events, historyBudget)}
+Already proposed entries:
+${entries}
+Recent event summaries: ${history}
 Chapter previews:
-${packets[packet]}`,
+${packets[packet]}`
+		let extractionPrompt = prompt(
+			registry.compact
+				? `Compare this packet with the saved events and proposed IDs below. Skip restatements, including rewordings; return progress and qualifying facts only for the next uncovered event. Describe relations as standing relationships, naming their kind first. ${complete}`
+				: 'Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Describe a relation as the standing relationship between the pair, naming its kind first, not the scene that shows it. Set is_last when done.',
+		)
+		let focusedPrompt = prompt(
+			`Return one short JSON answer: the next uncovered plot event, its progress and only its new qualifying facts. Do not rescan for earlier events or restate proposed entries. Describe relations as standing relationships, naming their kind first. ${complete}`,
+		)
+		if (
+			legacyState &&
+			Math.max(bytes(extractionPrompt), bytes(focusedPrompt)) +
+				bytes(repairPrefix) >=
+				budget
+		) {
+			const extract =
+				'Return the next uncovered event, its progress and new facts. Reuse proposed IDs. Set is_last when the packet is complete.'
+			const focus =
+				'Return short JSON for the next uncovered event. Reuse proposed IDs. Set is_last if done.'
+			const messageRoom = budget - bytes(repairPrefix) - 1
+			const contextRoom =
+				messageRoom -
+				Math.max(bytes(prompt(extract, '', '')), bytes(prompt(focus, '', '')))
+			const historyShare = recentEvents(
+				state.events,
+				Math.min(historyBudget, Math.floor(contextRoom / 2)),
+				true,
+			)
+			const { text: entries } = proposedEntries(
+				state.events,
+				packetEvents,
+				Math.max(
+					0,
+					Math.min(registryBudget, contextRoom - bytes(historyShare)),
+				),
+			)
+			const history = recentEvents(
+				state.events,
+				Math.min(historyBudget, contextRoom - bytes(entries)),
+				true,
+			)
+			extractionPrompt = prompt(extract, entries, history)
+			focusedPrompt = prompt(focus, entries, history)
+		}
+		const event = await request(
+			extractionPrompt,
 			nextEvent,
 			(value: Event) => {
-				if (state.events.some((previous) => previous.event === value.event))
-					throw new Error('Event was already extracted; return a new event')
+				if (!value.is_last && repeatsPacketEvent(value, packetEvents))
+					throw new Error(
+						`This packet already has that event with the same progress and facts. Return the next event with new information, or set is_last if this packet is complete. Repeated event: ${JSON.stringify(value.event)}`,
+					)
 				check(value, state.events)
 				if (value.is_last && packet === packets.length - 1)
 					combine(volumeId, chapterIds, [...state.events, value])
 			},
+			focusedPrompt,
 		)
 		state.events.push(event)
 		if (event.is_last) state.packet++
@@ -660,13 +901,173 @@ ${packets[packet]}`,
 			proposal.chapter ? proposal : (located.get(proposal.content) ?? proposal),
 		)
 	}
-	const biblePatch = reconcileNamedAdditions(
-		[...ordered].map(({ item, chapter }) =>
-			chapter ? { ...item, observedChapter: chapter } : item,
-		),
-		bible,
-	)
-	const glossaryPatch = unique(parts.flatMap((part) => part.glossaryPatch))
+	async function selectPatch() {
+		const reconciled = reconcileNamedAdditions(
+			[...ordered].map(({ item, chapter }) =>
+				chapter ? { ...item, observedChapter: chapter } : item,
+			),
+			bible,
+		)
+		const terms = unique(parts.flatMap((part) => part.glossaryPatch))
+		return state.whole || (state.ready && !state.selections)
+			? { biblePatch: reconciled, glossaryPatch: terms }
+			: selectAdditions(
+					canonicalizeAdditions(reconciled, bible, chapterIds),
+					terms,
+					bible,
+					choose,
+				)
+	}
+	if (
+		!state.selectedPatch &&
+		state.selections &&
+		state.selectionVersion !== selectionVersion
+	) {
+		state.selections = []
+		state.selectionVersion = selectionVersion
+	}
+	async function choose(groups: readonly SelectionGroup[]) {
+		const selectionOutput = outputTokenBudget(selector)
+		const selectionBudget = selector.contextWindow - selectionOutput - 1024
+		const progressBudget = Math.min(
+			8192,
+			Math.floor(selector.contextWindow / 8),
+		)
+		const chapterRoom = Math.floor(progressBudget / skeleton.chapters.length)
+		const progress = skeleton.chapters
+			.map(({ chapterId, progress }) => {
+				const label = `${chapterId}: `
+				return `${label}${fitBytes(progress, Math.max(0, chapterRoom - bytes(label) - 1))}`
+			})
+			.join('\n')
+		let position = 0
+		const numbered = groups.map(({ kind, entries }) => {
+			const first = position + 1
+			const target = options.selectionTargets?.[kind]
+			if (target !== undefined && (!Number.isSafeInteger(target) || target < 0))
+				throw new Error(`Invalid selection target for ${kind}`)
+			const lines = entries.map(
+				(entry) => `${++position} ${JSON.stringify({ kind, ...entry })}`,
+			)
+			return { kind, first, last: position, target, lines }
+		})
+		const promptFor = (scopes: typeof numbered) => {
+			const targets = scopes.flatMap(({ kind, target }) =>
+				target === undefined ? [] : [`${kind}: ${target}`],
+			)
+			return `${instructions}
+${selection.instructions}
+Select from these canonical candidates across the whole volume. Compare evidence from early and late chapters. Observations are evidence about the same entry, not separate choices. Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
+${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. Judge inclusion before counting. When candidates compete for space, prefer a specific setting where a consequential event happens over a broader place that merely contains it, and a distinctive term needed to understand a consequential action over a generic expression. Do not stop at the target if a distinct candidate still meets the inclusion criteria. You may exceed a kind's target only with a justification. For each kind over target, return its kind and a brief reason tied to the inclusion rules in justifications.\n` : ''}Respond with only the JSON object, with no commentary before or after it.
+Chapter progress:
+${progress}
+Candidates:
+${scopes.flatMap(({ lines }) => lines).join('\n')}`
+		}
+		const fits = (prompt: string) =>
+			bytes(prompt) + bytes(repairPrefix) < selectionBudget
+		const whole = promptFor(numbered)
+		const batches: (typeof numbered)[] = []
+		const addBatch = (group: (typeof numbered)[number]) => {
+			if (fits(promptFor([group]))) {
+				batches.push([group])
+				return
+			}
+			if (group.lines.length === 1)
+				throw new Error(
+					`A ${group.kind} candidate exceeds the selection context budget`,
+				)
+			const middle = Math.floor(group.lines.length / 2)
+			addBatch({
+				...group,
+				last: group.first + middle - 1,
+				lines: group.lines.slice(0, middle),
+			})
+			addBatch({
+				...group,
+				first: group.first + middle,
+				lines: group.lines.slice(middle),
+			})
+		}
+		if (fits(whole)) batches.push(numbered)
+		else for (const group of numbered) addBatch(group)
+		const plan = hash(
+			batches.map((scopes) =>
+				scopes.map(({ kind, first, last, target }) => [
+					kind,
+					first,
+					last,
+					target,
+				]),
+			),
+		)
+		if (state.selectionPlan !== plan) state.selections = []
+		state.selectionPlan = plan
+		const kept = new Set<number>()
+		const keptByKind = new Map<SelectionGroup['kind'], number>()
+		for (const [index, batch] of batches.entries()) {
+			const scopes = batch.map((scope) => ({
+				...scope,
+				target:
+					scope.target === undefined
+						? undefined
+						: Math.max(0, scope.target - (keptByKind.get(scope.kind) ?? 0)),
+			}))
+			const { first } = scopes[0]
+			const { last } = scopes[scopes.length - 1]
+			let keep = state.selections?.[index]
+			if (!keep) {
+				const answer = await request(
+					promptFor(scopes),
+					selection,
+					(value) => {
+						if (
+							new Set(value.keep).size !== value.keep.length ||
+							value.keep.some((n) => n < first || n > last)
+						)
+							throw new Error(
+								`keep must list distinct candidate numbers from ${first} to ${last}`,
+							)
+						for (const scope of scopes) {
+							const { kind, target } = scope
+							if (
+								target !== undefined &&
+								value.keep.filter((n) => n >= scope.first && n <= scope.last)
+									.length > target &&
+								!value.justifications?.some(
+									(item) => item.kind === kind && item.reason.trim(),
+								)
+							)
+								throw new Error(
+									`Justify keeping more than ${target} ${kind} candidates`,
+								)
+						}
+					},
+					undefined,
+					{
+						connection: options.selectionConnection,
+						requestModel: selector,
+						inputBudget: selectionBudget,
+						requestOutputLimit: selectionOutput,
+					},
+				)
+				keep = answer.keep
+				state.selections = [...(state.selections ?? []), keep]
+				state.selectionVersion = selectionVersion
+				await project.write(files.checkpoint, state)
+			}
+			for (const n of keep) kept.add(n)
+			for (const { kind, first, last } of scopes)
+				keptByKind.set(
+					kind,
+					(keptByKind.get(kind) ?? 0) +
+						keep.filter((n) => n >= first && n <= last).length,
+				)
+		}
+		return kept
+	}
+	const selectedPatch = state.selectedPatch ?? (await selectPatch())
+	const { biblePatch, glossaryPatch } = selectedPatch
 	options.signal?.throwIfAborted()
 	if (
 		hash(
@@ -677,9 +1078,17 @@ ${packets[packet]}`,
 	)
 		throw new Error('Chapter previews changed during synthesis')
 	let latest = await readBible(project)
-	if (!state.ready) {
-		if (hash(latest) !== state.basis)
-			throw new BibleChangedDuringSynthesisError()
+	const basisUnchanged = hash(latest) === state.basis
+	if (!state.ready && !basisUnchanged)
+		throw new BibleChangedDuringSynthesisError()
+	if (
+		!state.ready ||
+		(!state.whole &&
+			!state.selectedPatch &&
+			!quarantineReason &&
+			basisUnchanged)
+	) {
+		if (!state.whole) state.selectedPatch = selectedPatch
 		state.ready = true
 		await project.write(files.checkpoint, state)
 		latest = await readBible(project)
@@ -688,7 +1097,7 @@ ${packets[packet]}`,
 	const conflictReason =
 		quarantineReason ?? 'Bible changed before synthesis publication'
 	let publicationBase: ReturnType<typeof bibleEntryBases> | undefined
-	const { conflicts, glossaryConflicts, consolidatedAdds } = canPublish
+	const { conflicts, glossaryConflicts, consolidated } = canPublish
 		? await applyPatches(
 				project,
 				latest,
@@ -701,7 +1110,7 @@ ${packets[packet]}`,
 				},
 			)
 		: {
-				consolidatedAdds: undefined,
+				consolidated: undefined,
 				conflicts: biblePatch
 					.filter(({ op }) => op !== 'none')
 					.map((item) => ({
@@ -722,8 +1131,8 @@ ${packets[packet]}`,
 	const result: VolumeSynthesis = {
 		...skeleton,
 		biblePatch: biblePatch.flatMap((item) => {
-			const consolidated = consolidatedAdds?.get(item)
-			return consolidated === null ? [] : [consolidated ?? item]
+			const merged = consolidated?.get(item)
+			return merged === null ? [] : [merged ?? item]
 		}),
 		glossaryPatch,
 		conflicts,
