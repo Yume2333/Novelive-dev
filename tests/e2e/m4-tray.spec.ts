@@ -100,7 +100,12 @@ test('M4 desktop lifecycle confirms active quit, cancels safely and cleans up on
 						window(): undefined
 						active(): boolean
 						cleanup(): void
-					}) => unknown
+					}) => {
+						quit(
+							exit: () => void,
+							canQuit: () => Promise<boolean>,
+						): Promise<void>
+					}
 				} = {}
 				const load = process
 					.getBuiltinModule('module')
@@ -118,7 +123,7 @@ test('M4 desktop lifecycle confirms active quit, cancels safely and cleans up on
 				app.quit = () => {
 					quits += 1
 				}
-				exported.installLifecycle?.({
+				const lifecycle = exported.installLifecycle?.({
 					window: () => undefined,
 					active: () => true,
 					cleanup: () => {
@@ -132,12 +137,20 @@ test('M4 desktop lifecycle confirms active quit, cancels safely and cleans up on
 				await new Promise((resolve) => setImmediate(resolve))
 				const cancelled = { cleaned, prompts, quits }
 				response = 1
+				await lifecycle?.quit(
+					() => {
+						quits += 1
+					},
+					async () => false,
+				)
+				const updateDenied = { cleaned, prompts, quits }
 				requestQuit()
 				await new Promise((resolve) => setImmediate(resolve))
 				app.quit = realQuit
 				return {
 					menuPreserved,
 					cancelled,
+					updateDenied,
 					accepted: { cleaned, prompts, quits },
 				}
 			},
@@ -146,7 +159,8 @@ test('M4 desktop lifecycle confirms active quit, cancels safely and cleans up on
 		expect(result).toEqual({
 			menuPreserved: true,
 			cancelled: { cleaned: 0, prompts: 1, quits: 0 },
-			accepted: { cleaned: 1, prompts: 2, quits: 1 },
+			updateDenied: { cleaned: 0, prompts: 2, quits: 0 },
+			accepted: { cleaned: 1, prompts: 3, quits: 1 },
 		})
 	} finally {
 		await desktop.evaluate(({ BrowserWindow }) => {

@@ -1,15 +1,18 @@
+import { access, constants } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { app, type BrowserWindow, dialog, shell } from 'electron'
 import updaters from 'electron-updater'
 import { checkUpdate, updatePolicy } from './policy'
 
 export function installUpdates(options: {
 	window: () => BrowserWindow | undefined
-	quit: (exit: () => void) => Promise<void>
+	quit: (exit: () => void, canQuit?: () => Promise<boolean>) => Promise<void>
 }) {
+	const appImage = process.env.APPIMAGE
 	const policy = updatePolicy(
 		app.isPackaged,
 		process.platform,
-		Boolean(process.env.APPIMAGE),
+		Boolean(appImage),
 		process.env.NL_UPDATE_URL,
 	)
 	const Updater =
@@ -45,6 +48,18 @@ export function installUpdates(options: {
 		return response === 1
 	}
 
+	async function canInstall() {
+		if (policy?.mode !== 'appimage' || !appImage) return true
+		try {
+			await access(dirname(appImage), constants.W_OK | constants.X_OK)
+			return true
+		} catch (error) {
+			console.error('Novelive AppImage directory is not writable', error)
+			await prompt('无法替换 AppImage。请将其移至可写目录后再重试更新。')
+			return false
+		}
+	}
+
 	async function check(manual: boolean) {
 		if (!policy || !engine) {
 			if (manual) await prompt('未配置应用更新源。')
@@ -68,7 +83,7 @@ export function installUpdates(options: {
 					'重启安装',
 				)
 			) {
-				await options.quit(() => engine.quitAndInstall(false, true))
+				await options.quit(() => engine.quitAndInstall(false, true), canInstall)
 			}
 		} catch (error) {
 			console.error('Novelive update check failed', error)
