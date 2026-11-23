@@ -9,6 +9,8 @@ Regenerate from the repository root:
 
 ```sh
 NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m4-gate/author.ts
+# Separate small catalogue for the real Electron EPUB screening and confirmation:
+NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m4-gate/author.ts --epub
 ```
 
 UUID normalization includes response rebinding for joined chapter IDs. All

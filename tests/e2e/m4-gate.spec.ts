@@ -19,6 +19,7 @@ import {
 	type Page,
 	test,
 } from '@playwright/test'
+import sharp from 'sharp'
 import { bibleRevision } from '../../packages/creator/src/bible/editing'
 import type {
 	CommandInput,
@@ -28,13 +29,18 @@ import type {
 import { Project } from '../../packages/creator/src/project'
 import { readBible } from '../../packages/creator/src/synthesis/patch'
 import { projectFiles } from '../../packages/format/src/model'
-import { writeFormatBooks } from '../fixtures/cassettes/m4-gate/books'
+import {
+	writeFormatBooks,
+	writeScreeningEpub,
+} from '../fixtures/cassettes/m4-gate/books'
 import {
 	configuration,
 	directory,
 	first,
 	joined,
 	other,
+	screeningDirectory,
+	screeningReason,
 } from '../fixtures/cassettes/m4-gate/fixture'
 
 const require = createRequire(
@@ -97,7 +103,11 @@ async function importBook(
 	}
 	await page.getByRole('button', { name: '导入', exact: true }).click()
 }
-async function launch(root: string, production = false) {
+async function launch(
+	root: string,
+	production = false,
+	cassetteDir = directory,
+) {
 	const app = await electron.launch({
 		executablePath: require('electron'),
 		args: ['apps/desktop', `--user-data-dir=${join(root, 'profile')}`],
@@ -109,7 +119,7 @@ async function launch(root: string, production = false) {
 			NL_REPLAY_MISSING_LOG: join(root, 'missing.log'),
 			...(production
 				? {
-						NL_PRODUCTION_CASSETTE_DIR: directory,
+						NL_PRODUCTION_CASSETTE_DIR: cassetteDir,
 						NL_REPLAY_REBIND_IDS: '1',
 						NL_REPLAY_DELAY_MS: '80',
 					}
@@ -122,6 +132,108 @@ async function launch(root: string, production = false) {
 }
 
 test.describe('M4 longform and queue', () => {
+	test('EPUB screening survives reopening and saves a manually overridden illustration', async () => {
+		test.setTimeout(65_000)
+		const root = await mkdtemp(join(homedir(), '.m4-epub-screening-'))
+		try {
+			const folder = join(root, 'projects')
+			await mkdir(folder)
+			const source = await writeScreeningEpub(root)
+			const firstRun = await launch(root, true, screeningDirectory)
+			let pendingRoute: string
+			try {
+				const { app, page } = firstRun
+				await call(page, 'config.update', configuration)
+				await importBook(app, page, source, folder)
+				await page.getByRole('button', { name: '跳过核对' }).click()
+				await page
+					.getByRole('link', { name: '选择主视觉' })
+					.click({ timeout: 30_000 })
+				await expect(
+					page.getByRole('radio', { name: 'EPUB 参考方案' }),
+				).toBeVisible()
+				pendingRoute = new URL(page.url()).hash
+			} finally {
+				await firstRun.app.close()
+			}
+
+			const rows = (
+				await readFile(join(screeningDirectory, 'cassette.jsonl'), 'utf8')
+			)
+				.trim()
+				.split('\n')
+			const withoutScreening = rows.filter((line) => {
+				const { body } = JSON.parse(line)
+				return (
+					!body.b64 ||
+					!Buffer.from(body.b64, 'base64').includes(screeningReason)
+				)
+			})
+			expect(rows.length - withoutScreening.length).toBe(2)
+			const reopenedCassette = join(root, 'without-screening')
+			await mkdir(reopenedCassette)
+			await writeFile(
+				join(reopenedCassette, 'cassette.jsonl'),
+				withoutScreening.join('\n'),
+			)
+
+			const { app, page } = await launch(root, true, reopenedCassette)
+			try {
+				await pick(app, [])
+				await page.evaluate((hash) => {
+					location.hash = hash
+				}, pendingRoute)
+				const character = page.getByRole('group', { name: /Ada/ })
+				const epubCostume = character.getByRole('radio', {
+					name: 'EPUB 参考方案',
+				})
+				await character.getByRole('radio').nth(1).press('Space')
+				await expect(epubCostume).not.toBeChecked()
+				await epubCostume.press('Space')
+				await expect(epubCostume).toBeChecked()
+				const visuals = page.getByRole('group', { name: '主视觉', exact: true })
+				await expect(
+					visuals.getByRole('radio', { name: '推荐 · EPUB 插图 1' }),
+				).toBeChecked()
+				const missing = await readdir(root)
+				expect(missing).not.toContain('missing.log')
+				const override = visuals.getByRole('radio', {
+					name: 'EPUB 插图 2',
+					exact: true,
+				})
+				await expect(override).toHaveCount(0)
+				await page.getByRole('button', { name: '显示全部 EPUB 插图' }).click()
+				await override.check()
+				await page.getByRole('button', { name: '确认并制作第一章' }).click()
+				await expect(page).toHaveURL(/\/production$/, { timeout: 25_000 })
+
+				using project = await Project.open(join(folder, 'epub-screening'))
+				const style = await project.read(
+					projectFiles.style({ level: 'series' }),
+				)
+				const [reference] =
+					style.entries.find(({ status }) => status === 'confirmed')
+						?.references ?? []
+				expect(reference?.description).toBe('主视觉')
+				const chosen = await project.readFile(reference.path)
+				const { width, height } = await sharp(chosen).metadata()
+				const expected = await sharp(
+					await project.readFile(
+						'source/imports/illustrations/illustration-2.png',
+					),
+				)
+					.resize({ width, height, fit: 'cover', kernel: 'lanczos3' })
+					.webp({ quality: 90 })
+					.toBuffer()
+				expect(chosen.equals(expected)).toBe(true)
+			} finally {
+				await app.close()
+			}
+		} finally {
+			await rm(root, { recursive: true, force: true })
+		}
+	})
+
 	test('W3 native quit drains the real creator and the same project resumes after reopening', async () => {
 		test.setTimeout(90_000)
 		const root = await mkdtemp(join(homedir(), '.m4-gate-quit-'))

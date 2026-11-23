@@ -9,7 +9,7 @@ import type {
 	ProductionSnapshot,
 } from '../contract'
 import type { ProductionQueue } from '../contract/queue'
-import { readImportWizard } from '../import/wizard'
+import { readImportWizard, screenImportedIllustrations } from '../import/wizard'
 import { createReplayFetch, type ReplayOptions } from '../replay'
 import { ChapterScheduler, recoverChapterWork } from '../scheduler/chapter'
 import {
@@ -19,6 +19,7 @@ import {
 } from '../scheduler/work-queue'
 import { prepareSeries } from '../synthesis/incremental'
 import { existing } from '../synthesis/patch'
+import { withUsage } from '../usage'
 import { Project } from './index'
 import { loadPlayerChapter, loadPlayerStatus } from './player'
 import {
@@ -521,9 +522,11 @@ export function createProduction(
 				admitted = true
 				await refresh()
 				const bible = (await productionBible(project, volumeId, workId)).art
-				const references = (await readImportWizard(project)).references.map(
-					(cachePath, i) => ({ id: `reference-${i + 1}`, cachePath }),
-				)
+				const wizard = await readImportWizard(project)
+				const references = wizard.references.map((cachePath, i) => ({
+					id: `reference-${i + 1}`,
+					cachePath,
+				}))
 				if (inherited) {
 					if (!started) queue.start(workId, work.chapterIds)
 					queue.confirmVisual(workId)
@@ -544,11 +547,44 @@ export function createProduction(
 					if (!started) queue.start(workId, work.chapterIds)
 					queue.confirmVisual(workId)
 				} else {
+					const imported = await withUsage(project, workId, 'draw', () =>
+						screenImportedIllustrations(
+							project,
+							JSON.stringify(bible),
+							() => config.resolveRoleModel('illustration-screening'),
+							{ replay, signal: shutdown.signal },
+							bible.characters
+								.filter(
+									({ major, firstSeenChapter }) =>
+										major &&
+										firstSeenChapter &&
+										work.chapterIds.includes(firstSeenChapter),
+								)
+								.map(({ id }) => id),
+						),
+					)
+					const characterReferences = new Map<
+						string,
+						{ id: string; cachePath: string }
+					>()
+					for (const candidate of imported?.candidates ?? []) {
+						const { characterId } = candidate
+						if (characterId && !characterReferences.has(characterId))
+							characterReferences.set(characterId, candidate)
+					}
 					pool = await art(shutdown.signal).candidates(
 						bible,
 						work.chapterIds,
 						undefined,
-						references,
+						imported
+							? references.filter(
+									({ cachePath }) =>
+										!wizard.selectedIllustrations.some(
+											(id) => cachePath === `source/references/${id}.png`,
+										),
+								)
+							: references,
+						characterReferences,
 					)
 					const candidate = async ({
 						id,
@@ -561,6 +597,18 @@ export function createProduction(
 						cachePath: await cache(project, cachePath),
 					})
 					visual = {
+						...(imported && {
+							importedIllustrations: {
+								fallback: imported.fallback,
+								selected: wizard.selectedIllustrations,
+								recommended: imported.candidates
+									.filter(({ recommended }) => recommended)
+									.map(({ id }) => id),
+								candidates: await Promise.all(
+									imported.candidates.map(candidate),
+								),
+							},
+						}),
 						mainVisuals: await Promise.all(pool.mainVisuals.map(candidate)),
 						supplemental: await Promise.all(pool.supplemental.map(candidate)),
 						characters: await Promise.all(
@@ -575,6 +623,10 @@ export function createProduction(
 								}
 							}),
 						),
+					}
+					if (imported) {
+						pool.mainVisuals.push(...imported.candidates)
+						pool.supplemental.push(...imported.candidates)
 					}
 					await refresh()
 					if (!started) queue.start(workId, work.chapterIds)

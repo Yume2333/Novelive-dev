@@ -192,7 +192,10 @@ test('M1b creation surfaces persist role models and writer presets through the c
 			const advanced = page.getByRole('button', { name: '高级设置' })
 			await advanced.click()
 			const roles = page.getByRole('region', { name: '角色模型配置' })
-			await expect(roles.getByRole('combobox')).toHaveCount(9)
+			await expect(roles.getByRole('combobox')).toHaveCount(10)
+			await expect(
+				roles.getByRole('combobox', { name: 'EPUB 插图筛选' }),
+			).toHaveValue('visual')
 			const writer = roles.getByRole('combobox', { name: '写手模型' })
 			await expect(writer).toHaveValue('writing')
 			await writer.selectOption('main')
