@@ -22,8 +22,8 @@ Tests 563 passed | 1 skipped (564)
 ```
 
 ```text
-✓ tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (11.3s)
-1 passed (12.9s)
+✓ tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (9.3s)
+1 passed (10.6s)
 ```
 
 Round 3 Linux checks and Electron smoke passed before this final push. The

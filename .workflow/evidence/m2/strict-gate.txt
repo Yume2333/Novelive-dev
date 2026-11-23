@@ -59,13 +59,13 @@ out/main/chunks/client-B_wyAP3K.js                              954.72 kB
 out/main/chunks/index-BgS5ybJj.js                             1,240.29 kB
 out/main/chunks/google-shared-DSHGrtMa.js                     1,527.42 kB
 out/main/chunks/index-v6jqN50r.js                             2,002.54 kB
-✓ built in 5.07s
+✓ built in 5.26s
 vite v7.2.7 building ssr environment for production...
 transforming...
 ✓ 27 modules transformed.
 rendering chunks...
 out/preload/index.cjs  120.62 kB
-✓ built in 132ms
+✓ built in 146ms
 vite v7.2.7 building client environment for production...
 transforming...
 ✓ 3288 modules transformed.
@@ -102,10 +102,10 @@ rendering chunks...
 ../../apps/desktop/out/renderer/assets/RenderTargetSystem-CdtrhjMG.js                               167.68 kB
 ../../apps/desktop/out/renderer/assets/CanvasRenderer-ZZ781lBC.js                                   281.00 kB
 ../../apps/desktop/out/renderer/assets/index-DQmddScd.js                                          3,025.44 kB
-✓ built in 7.53s
+✓ built in 4.69s
 
 Running 1 test using 1 worker
 
-  ✓  1 tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (11.3s)
+  ✓  1 tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (9.3s)
 
-  1 passed (12.9s)
+  1 passed (10.6s)

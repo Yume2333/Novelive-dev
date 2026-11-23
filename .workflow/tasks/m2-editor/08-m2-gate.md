@@ -13,7 +13,7 @@
 
 ## Progress
 
-- PR #57 第四轮：确认起始 HEAD 29da1b4；J 复现采用候选后残留生成提示，切换图片/采用候选时清理旧状态；门禁覆盖两条清理路径，新增 `08-image-candidate-applied.png`。严格 check → 43 files / 563 passed / 1 skipped；严格门禁 → 1 passed (12.9s)。第三轮 Linux CI 已通过；本轮无付费调用、无重录。
+- PR #57 第四轮：确认起始 HEAD 29da1b4；J 复现采用候选后残留生成提示，切换图片/采用候选时清理旧状态；门禁覆盖两条清理路径，新增 `08-image-candidate-applied.png`，等待播放器文本就绪再截图。严格 check → 43 files / 563 passed / 1 skipped；严格门禁 → 1 passed (10.6s)。第三轮 Linux CI 已通过；本轮无付费调用、无重录。
 
 - PR #57 第三轮：确认起始 HEAD 5bbcdab；H 保留重绘完成/失败状态到 aria-busy 解除后，I 用 renderer 实际 decode 的图片 URL/hash 校验单张替换与候选采用，跳过 UI 缓存刷新会使测试失败。兼容 main 新文本渲染器的隐藏测量副本，精确断言可见 innerText。严格 check → 43 files / 563 passed / 1 skipped；严格门禁 → 1 passed (14.5s)，更新截图和 receipt。无新增录制或付费调用。
 

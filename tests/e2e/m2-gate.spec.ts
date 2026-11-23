@@ -503,6 +503,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 					).entries.filter((entry) => entry.kind === 'image').length,
 			)
 			.toBe(2)
+		await expect(page.locator('.nl-player-text')).toContainText('暮色里')
 		await capture(page, '08-image-candidate-applied')
 	} finally {
 		await app.close()
