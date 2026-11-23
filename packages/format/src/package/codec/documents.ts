@@ -67,10 +67,18 @@ export function isWorkDocument(path: string) {
 	return /^volumes\/[^/]+\/works\/[^/]+\/work\.json$/.test(path)
 }
 
-export function checkPackageDocument(path: string, document: PackageJson) {
-	const relative = path
+function relativeDocumentPath(path: string) {
+	return path
 		.replace(/^volumes\/[^/]+\/(?:works\/[^/]+\/)?/, '')
 		.replace(/^chapters\/[^/]+\//, 'chapters/')
+}
+
+export function isFixedPackageDocument(path: string) {
+	return schemas.has(relativeDocumentPath(path))
+}
+
+export function checkPackageDocument(path: string, document: PackageJson) {
+	const relative = relativeDocumentPath(path)
 	const check =
 		schemas.get(relative) ??
 		(/^source\/preview\/[^/]+\.json$/.test(relative)

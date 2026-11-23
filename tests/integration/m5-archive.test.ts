@@ -185,6 +185,18 @@ describe('M5 .novelive archive', () => {
 		)
 	})
 
+	it('allows resource folders with file extensions in their names', async () => {
+		const art: RawEntry = ['assets/album.webp/cover.webp', 'cover']
+		const lore: RawEntry = [
+			'bible/notes.json/detail.json',
+			JSON.stringify({ formatVersion: 1 }),
+		]
+		await rawArchive([marker, ...releasedEntries(), art, lore])
+		using archive = await openPackage(destination)
+		expect(await text(await archive.openEntry(art[0]))).toBe(art[1])
+		expect(await text(await archive.openEntry(lore[0]))).toBe(lore[1])
+	})
+
 	it('does not overwrite an existing destination after an export error', async () => {
 		await writeFile(destination, 'previous export')
 		await rm(join(projectRoot, scenePath))

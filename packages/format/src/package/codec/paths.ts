@@ -1,4 +1,5 @@
 import { packageEntry } from '../contract'
+import { isFixedPackageDocument } from './documents'
 import { corrupt } from './error'
 
 const windowsDevice =
@@ -22,8 +23,11 @@ export class PackagePaths {
 			const file = index === parts.length - 1
 			if (existing && (existing.name !== name || file || existing.file))
 				throw corrupt(path, 'duplicate or conflicting entry name')
-			if (!file && packageEntry(name.toLowerCase()))
-				throw corrupt(path, 'file path used as a directory')
+			if (!file) {
+				const canonical = name.toLowerCase()
+				if (isFixedPackageDocument(canonical) && packageEntry(canonical))
+					throw corrupt(path, 'file path used as a directory')
+			}
 			this.paths.set(key, { name, file })
 		}
 		return rule

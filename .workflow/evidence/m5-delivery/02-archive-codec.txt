@@ -6,6 +6,6 @@ Model usage: 0 images and 0 tokens. Desktop share acceptance is M5/07.
 
 
  Test Files  1 passed (1)
-      Tests  36 passed (36)
-   Start at  10:00:15
-   Duration  566ms (tests 84%, transform 8%, import 7%, worker 1%)
+      Tests  37 passed (37)
+   Start at  10:03:03
+   Duration  528ms (tests 83%, transform 10%, import 7%, worker 1%)

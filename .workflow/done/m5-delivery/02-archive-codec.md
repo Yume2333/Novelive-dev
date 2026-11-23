@@ -12,7 +12,7 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/integration/m5-archive.test.ts` → 36 项通过；[回执](../../evidence/m5-delivery/02-archive-codec.txt)覆盖实际 ZIP 导出、索引读取和解包。
+- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/integration/m5-archive.test.ts` → 37 项通过；[回执](../../evidence/m5-delivery/02-archive-codec.txt)覆盖实际 ZIP 导出、索引读取和解包。
 - 接线：`@novelive/format/package/codec` 提供 `exportPackage`、`openPackage`、条目流和新目录解包。导出仅写归档，不改工程；共享接线在成功后持久化返回的作品版本。
 - 字体裁剪由创作端导出准备处理；编解码器原样归档字体，不解析原文或转换资源。
 - Review: pass (base e10725ed62a8c41308a373b35d1a7fc6d92aa5cb, reviewer Devin Review)
