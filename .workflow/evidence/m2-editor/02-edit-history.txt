@@ -1,0 +1,9 @@
+NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-history.test.ts
+
+ RUN  v5.1.1
+
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  01:01:54
+   Duration  385ms (tests 60%, transform 25%, import 14%, worker 1%)

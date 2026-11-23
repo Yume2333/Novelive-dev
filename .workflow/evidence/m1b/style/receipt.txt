@@ -1,0 +1,32 @@
+M1b/10 — FXB 画风参考对照
+Base: ea99733e566c72be5873d6507a07de37ef7b40ba
+
+NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1b-style.test.ts
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  135.51s (tests 100%)
+
+NL_REPLAY=strict NL_STYLE_REPLAY=1 pnpm exec vitest run tests/acceptance/m1b-style.test.ts
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+
+NL_REPLAY=strict pnpm check
+ Test Files  22 passed (22)
+      Tests  333 passed (333)
+
+同一位短金发、绿眼、毛衣和长裙的咖啡馆写作者与同一场景；每组仅一张横版 CG（1536×864），固定 FXB 内容和质量 high，由生产提示词组装器和 gpt-image-2.6-sunburst 出图。单参考组用同一主图，三参考组把另两幅图分别追加，只有所声明的参考数量和颜色锁不同。未找回旧试验的私人第三方参考图，保留旧角色与场景，改用同一位画师 John William Waterhouse（1849–1917）的三幅公版画；三幅原图私存，本实验证据不含图像或供应方响应。
+
+原图来源（Wikimedia Commons，下载原图后统一等比缩放，未裁切）：
+https://commons.wikimedia.org/wiki/File:John_William_Waterhouse_-_The_Lady_of_Shalott_-_Google_Art_Project.jpg
+https://commons.wikimedia.org/wiki/File:J._W._Waterhouse_-_Circe_Invidiosa_-_Google_Art_Project.jpg
+https://commons.wikimedia.org/wiki/File:John_William_Waterhouse_-_The_Soul_of_the_Rose,_1903FXD.jpg
+源文件的 SHA-256 固定在测试内。
+
+同一 gemini-3.8-flash 调用收到三幅公共参考及匿名 A/B/C，未收到组别或设置。分数（0–4；画风／锚点／构图）：
+A 三参考＋锁色   3 / 3 / 3  油画质感、衣着、咖啡杯蛋糕及星形发卡吻合；低头使瞳色大多不可核实。
+B 单参考        3 / 2 / 2  画法相符，评审指出缺少蛋糕。
+C 单参考＋锁色   3 / 3 / 3  笔触和暖光吻合，服装、蛋糕和罐子以及姿态均可见。
+此样本没有显示三参考优于单参考加锁；一个样本无法分离随机差异，也不能据此宣称锁色改善瞳色。不改产品默认，也未做人工视觉验收。
+
+私有账本：实测 33,412 tokens；首次请求返回 HTTP 404，未返回图片或用量，保留 100,000 token／1 张的保守预留；后续使用规范化的基址完成。共 5 次请求、133,412 账面 tokens；3 张实际成图，图片账面 4（含一次失败）。预算 2,000,000 tokens／30 张。严格回放未调用上游。
+原图、生成图和录制在 ~/.local/novelive-tools/m1b-style/，不入 Git；未改产品默认。
