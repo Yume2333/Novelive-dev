@@ -22,6 +22,7 @@
 	"已取消": "Canceled",
 	"已完成": "Completed",
 	"已暂停": "Paused",
+	"已暂停：模型预算不足": "Paused: model budget exhausted",
 	"延后：{{title}}": "Move down: {{title}}",
 	"异常退出后已暂停": "Paused after unexpected exit",
 	"待确认": "Pending confirmation",

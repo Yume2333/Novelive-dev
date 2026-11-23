@@ -4,11 +4,14 @@ import { join } from 'node:path'
 import { compile } from '@earendil-works/pi-schema'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { productionSnapshotSchema } from '../../packages/creator/src/contract/production'
+import { productionQueueSchema } from '../../packages/creator/src/contract/queue'
 import { Project } from '../../packages/creator/src/project'
 import {
 	ChapterScheduler,
 	ProductionTaskError,
 } from '../../packages/creator/src/scheduler/chapter'
+import { readQueueWork } from '../../packages/creator/src/scheduler/work-queue'
+import { SpendBudgetError } from '../../packages/creator/src/usage/spend'
 import type { ImageQueueItem } from '../../packages/format/src/model'
 import { ref, series } from '../fixtures/project-schema/seed'
 import { ScriptedWorker } from '../fixtures/scheduler/m1b/worker'
@@ -387,6 +390,36 @@ test('a single-chapter work still stops at the first-chapter confirmation', asyn
 	await target.idle()
 	expect(snapshot().phase).toBe('confirm-first')
 	expect(target.continue(workId).phase).toBe('done')
+})
+
+test('a budget refusal pauses the queue explicitly and retains the image for continuation', async () => {
+	const worker = new ScriptedWorker({ ch1: [cg('cg-budget')] })
+	const refused = new SpendBudgetError('超出工程预算')
+	const draw = vi.spyOn(worker, 'draw').mockRejectedValueOnce(refused)
+	const target = open(worker)
+	target.start(workId, ['ch1'])
+	target.confirmVisual(workId)
+	await target.idle()
+
+	const entry = readQueueWork(project.database, {
+		title: series.title,
+		link: { workId, volumeId: ref.volumeId, seriesId: series.seriesId },
+		projectDir: root,
+	})
+	expect(entry).toMatchObject({ status: 'paused', reason: 'budget_paused' })
+	expect(
+		compile(productionQueueSchema).check({
+			active: null,
+			queued: [],
+			inactive: [entry],
+		}),
+	).toBe(true)
+	expect(snapshot().chapters[0]).toMatchObject({ issue: refused.message })
+	expect(worker.count('placeholder:cg-budget')).toBe(0)
+	target.continue(workId)
+	await target.idle()
+	expect(draw).toHaveBeenCalledTimes(2)
+	expect(snapshot().chapters[0]).toMatchObject({ status: 'published' })
 })
 
 test('crash recovery keeps confirmed work, skips saved images and leaves a replayable run log', async () => {

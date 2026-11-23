@@ -32,6 +32,8 @@ function inactiveLabel(work: InactiveRow) {
 			return t('章节需要处理')
 		case 'image_unsupported':
 			return t('出图需要处理')
+		case 'budget_paused':
+			return t('已暂停：模型预算不足')
 		case 'crashed':
 			return t('异常退出后已暂停')
 		default:
