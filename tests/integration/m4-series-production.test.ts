@@ -133,9 +133,11 @@ const synthetic: typeof fetch = async (input, init) => {
 	}
 	if (prompt.startsWith('Summarize volume'))
 		return sse({ summary: 'Earlier digest' })
-	const ids = prompt.includes('ch0003')
-		? ['ch0003', 'ch0004']
-		: ['ch0001', 'ch0002']
+	const ids = prompt.includes('ch0005')
+		? ['ch0005']
+		: prompt.includes('ch0003')
+			? ['ch0003', 'ch0004']
+			: ['ch0001', 'ch0002']
 	return sse({
 		overview: 'Arrival',
 		chapters: ids.map((chapterId) => ({ chapterId, progress: 'Arrived' })),
@@ -154,11 +156,11 @@ function production() {
 	hosts.push(host)
 	return host
 }
-async function seed() {
+async function seed(append = '') {
 	const sourcePath = join(root, 'book.txt')
 	await writeFile(
 		sourcePath,
-		'第一卷 出发\n第一章 门\n她推开了门。\n第二章 路\n她走过山路。\n第二卷 归来\n第三章 后卷\n后卷的风吹起。\n第四章 后卷\n后卷的灯亮了。',
+		`第一卷 出发\n第一章 门\n她推开了门。\n第二章 路\n她走过山路。\n第二卷 归来\n第三章 后卷\n后卷的风吹起。\n第四章 后卷\n后卷的灯亮了。${append}`,
 	)
 	const imported = await importFileProject({
 		sourcePath,
@@ -403,6 +405,45 @@ test('reconnecting and resuming the first volume leaves an unstarted sequel unpr
 	await sequel.continue()
 	await laterEntered.promise
 	await vi.waitFor(() => expect(workers.get(b)?.count('write:ch0003')).toBe(1))
+})
+
+test('cannot resume a later volume before a crash-paused predecessor has a digest', async () => {
+	const book = await seed('\n第三卷 重逢\n第五章 重逢\n她们终于重逢。')
+	const [a, b, c] = book.workIds
+	{
+		using project = await Project.open(book.projectDir)
+		for (const workId of book.workIds)
+			project.tasks.registerWork({ workId, title: workId })
+		project.database
+			.prepare("UPDATE work SET status = 'paused', pause_reason = 'crashed'")
+			.run()
+		await project.write(projectFiles.digest('v0001'), {
+			formatVersion: 1,
+			volumeId: 'v0001',
+			summary: 'First volume digest',
+		})
+		await project.write(projectFiles.style({ level: 'series' }), {
+			formatVersion: 1,
+			entries: [approvedStyle],
+		})
+	}
+	const host = production()
+	for (const id of [a, b, c]) await host.remember(id, book.projectDir)
+	const third = await host.get(c)
+	await expect(third.continue()).rejects.toMatchObject({
+		code: 'invalid_config',
+		message: expect.stringContaining('归来'),
+	})
+	expect(requests).toEqual([])
+	expect(third.snapshot()).toMatchObject({ status: 'stopped', chapters: [] })
+	await (await host.get(b)).continue()
+	await third.continue()
+	await vi.waitFor(() => expect(workers.get(c)?.count('write:ch0005')).toBe(1))
+	expect(
+		requests.find(
+			(prompt) => prompt.startsWith('Synthesize') && prompt.includes('ch0005'),
+		),
+	).toContain('"volumeId":"v0002","summary":"Earlier digest"')
 })
 
 test('skipping visual confirmation selects all imported references in order', async () => {

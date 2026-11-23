@@ -233,11 +233,13 @@ export function createProduction(
 			string,
 			ReturnType<typeof Promise.withResolvers<void>>
 		>()
+		const blocked = new Map<string, string>()
 		loading++
 		publishBusy()
 		const running = (async () => {
 			using project = await Project.open(root)
 			const series = await project.read(projectFiles.series)
+			let missingDigest: string | undefined
 			for (const volumeId of series.volumeIds) {
 				const volume = await project.read(projectFiles.volume(volumeId))
 				for (const workId of volume.workIds) {
@@ -249,11 +251,20 @@ export function createProduction(
 					)
 						project.tasks.registerWork({ workId, title: work.title })
 				}
-				if (
+				if (missingDigest !== undefined) {
+					blocked.set(volumeId, missingDigest)
+					continue
+				}
+				const paused =
 					volumeId !== resumingVolume &&
 					volume.workIds.some((id) => crashPaused(project, id))
-				)
+				if (paused) {
+					const digest = await existing(() =>
+						project.read(projectFiles.digest(volumeId)),
+					)
+					if (!digest) missingDigest = volume.title
 					continue
+				}
 				const gate = Promise.withResolvers<void>()
 				void gate.promise.catch(() => {})
 				volumes.set(volumeId, gate)
@@ -307,6 +318,9 @@ export function createProduction(
 			},
 			async volume(volumeId: string) {
 				await initialized.promise
+				const prerequisite = blocked.get(volumeId)
+				if (prerequisite !== undefined)
+					fail('invalid_config', `请先继续制作前卷：${prerequisite}`)
 				await volumes.get(volumeId)?.promise
 			},
 		}
@@ -367,7 +381,7 @@ export function createProduction(
 			async function prepare(resuming = false) {
 				const currentModels = await settings()
 				let preparation = preparations.get(project.root)
-				if (preparation && !(await preparation.has(volumeId))) {
+				while (preparation && !(await preparation.has(volumeId))) {
 					await preparation.running
 					if (preparations.get(project.root) === preparation)
 						preparations.delete(project.root)
