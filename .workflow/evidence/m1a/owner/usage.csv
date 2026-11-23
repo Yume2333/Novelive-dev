@@ -1,0 +1,6 @@
+date,model,calls,tokens,images,purpose
+2026-11-23,gemini-3.8-flash,8,85634,0,W4 preview usage measured from relay responses
+2026-11-23,devin-swe-2,26,237808,0,W4 synthesis usage measured from relay responses
+2026-11-23,gemini-3.8-flash,2,0,0,HTTP 401 before inference; released 150034 reserved tokens
+2026-11-23,devin-swe-2,0,0,0,Three local pilot cutoffs before relay dispatch; released 52158 reserved tokens
+2026-11-23,devin-swe-2,0,131072,0,Reservation only for one possibly interrupted request; relay usage unverified
