@@ -330,6 +330,58 @@ test('preserves configured custom marks through staging and rejects unconfigured
 	}
 })
 
+test('keeps the last usable visual after audit retries and reuses saved candidates', async () => {
+	const frames: Buffer[] = []
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(async (_prompt, _refs, size) => {
+			const bytes = await sharp({
+				create: {
+					...size,
+					channels: 3,
+					background: { r: 40 + 50 * frames.length, g: 80, b: 120 },
+				},
+			})
+				.png()
+				.toBuffer()
+			frames.push(bytes)
+			return { bytes }
+		})
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: '窗光' }
+			return prompt.includes('构图候选 2：')
+				? { pass: false, failedChecks: ['style'], feedback: '收敛画风' }
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay)
+			const input = { ...bible, characters: [] }
+			const pool = await art.candidates(input, ['c1'])
+			expect(pool.mainVisuals.map(({ id }) => id)).toEqual([
+				'visual-1',
+				'visual-2',
+				'visual-3',
+			])
+			expect(render).toHaveBeenCalledTimes(4)
+			expect(render.mock.calls[2][0]).toContain('收敛画风')
+			const saved = await project.readFile(pool.mainVisuals[1].cachePath)
+			const pixel = async (bytes: Buffer) =>
+				(await sharp(bytes).resize(1, 1).raw().toBuffer())[0]
+			expect(await pixel(saved)).toBeCloseTo(await pixel(frames[2]), -1)
+			expect(await pixel(saved)).not.toBeCloseTo(await pixel(frames[1]), -1)
+			expect(await art.candidates(input, ['c1'])).toEqual(pool)
+			expect(render).toHaveBeenCalledTimes(4)
+		})
+	} finally {
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+}, 30_000)
+
 test('uses a supplied character design in both costume candidate rendering and auditing', async () => {
 	const render = vi
 		.fn<ReturnType<typeof artModels.imageRenderer>>()
