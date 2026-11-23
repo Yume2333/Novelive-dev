@@ -508,7 +508,6 @@
 	gap: var(--space-2);
 }
 
-.inputRow > .iconButton,
 .input[data-capped="true"] {
 	padding-inline-end: var(--space-6);
 }
@@ -525,6 +524,7 @@
 	height: 24px;
 }
 
+.inputRow > .iconButton,
 .send {
 	width: 36px;
 	height: 36px;
