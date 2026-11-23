@@ -128,7 +128,10 @@ function sameAction(a: string, b: string) {
 }
 
 const timelineWording = (event: string) =>
-	event.normalize('NFKC').trim().replace(/\s+/gu, ' ')
+	event
+		.normalize('NFKC')
+		.replace(/[\p{P}\s]+/gu, ' ')
+		.trim()
 
 function normalizeNames(patch: BiblePatch, bible: Bible): BiblePatch {
 	const existingCharacters = names(bible.character)
@@ -391,7 +394,9 @@ export function canonicalizeAdditions(
 		)
 			continue
 		const text =
-			item.kind === 'timeline' ? item.entry.event : item.entry.description
+			item.kind === 'timeline'
+				? item.entry.event.normalize('NFKC')
+				: item.entry.description
 		const participants = new Set<string>()
 		const action = characters.text(text, ({ id, name }) => {
 			participants.add(id)

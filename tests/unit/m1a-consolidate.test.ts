@@ -337,6 +337,32 @@ test.each([
 	},
 )
 
+test('merges exact timeline wording despite punctuation, width, and spacing', () => {
+	const bible = {
+		...emptyBible,
+		character: ['Ada', '田氏'].map((name, index) => ({
+			id: `character-${index}`,
+			name,
+			aliases: [],
+			status: 'confirmed' as const,
+		})),
+	}
+	const patch: BiblePatch = [
+		'Ada 扶田氏登上 A 號渡船',
+		'Ａｄａ 扶田氏登上　Ａ  號渡船。',
+	].map((event, index) => ({
+		kind: 'timeline',
+		op: 'add',
+		entry: {
+			id: `beat-${index}`,
+			chapterId: 'c1',
+			event,
+			status: 'candidate',
+		},
+	}))
+	expect(canonicalizeAdditions(patch, bible, ['c1'])).toEqual([patch[0]])
+})
+
 test('does not merge similar same-chapter timeline actions with different outcomes', () => {
 	const bible = {
 		...emptyBible,
