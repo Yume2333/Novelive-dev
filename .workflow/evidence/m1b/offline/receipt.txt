@@ -3,10 +3,10 @@ Base e297472b1cc3e4460b159c6637863efbfb8d1798
 
 Checks (Node 24, pnpm 12, Electron 45; Electron under Xvfb):
   NL_REPLAY=strict pnpm test:e2e --grep 'M1b make and play'
-    1 passed (20.3s)
+    1 passed (20.1s)
   NL_REPLAY=strict pnpm check
     Test Files  22 passed (22)
-         Tests  329 passed (329)
+         Tests  332 passed (332)
   NL_REPLAY=strict pnpm exec playwright test tests/e2e/m1b-wizard.spec.ts tests/e2e/m1b-creation-ui.spec.ts tests/e2e/m1b-player.spec.ts tests/e2e/m1b-production-contract.spec.ts
     7 passed (3.9s)
 
@@ -34,6 +34,9 @@ Production regressions:
   registry updates, on-disk WebP placeholders for failed base and variant
   images, a reused pending image added to the next chapter's dependencies, and
   manually interrupted chapter records emitted as cancelled after reopen.
+  Invalid staging leaves no registry entry without drawing instructions,
+  a reused variant waits for its base even when the base has no queue entry,
+  and a settings save during writing changes the next review request.
 
 Full viewport visual evidence (1280 x 800; set NL_M1B_GATE_EVIDENCE to regenerate):
   01-import.png
