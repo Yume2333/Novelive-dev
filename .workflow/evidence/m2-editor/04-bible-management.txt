@@ -32,3 +32,19 @@ Visual receipts inspected: 04-bible-before.png, 04-bible-after.png (1440x1000).
 Integration: packages/creator/src/entry.ts:5-10 imports; :60-71 registers bible.get, proposal.get and proposal.resolve. M2/03 should keep the lifecycle owner and dispatch Bible/glossary approval to applyBibleProposal(project, proposal), returning 'applied' or 'stale'. This helper does not resolve/persist a proposal; resolveBibleProposal is the independently runnable Bible-only persistence adapter. Both use the same process-local per-project serialization. Other proposal kinds remain owned by M2/03.
 UI volume defaults to import's v0001 convention, with explicit volume ID field and ?volume= override. No volume-discovery contract was added.
 Review: skipped — no independent reviewer/subagent tool available; milestone closeout must review this task.
+
+PR #35 UI regressions
+- Volume input keeps a local draft; only Enter or 切换卷 commits the route. Electron asserts End/Backspace/2 produces v0002 without losing focus or changing the active volume, then exercises missing-volume error and restoration.
+- Approval notice inspects actual Bible field changes. Glossary-only approval says exactly 已接受候选。; image propagation text appears only for changed appearance/costume/location fields, and style text only for a style change.
+- AppShell.tsx workNavigation adds one Bible entry; Electron opens Bible through the visible 设定集 link.
+- Updated before/after screenshots inspected; sidebar entry and glossary-only success text are visible.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (2.5s)
+Exit code: 0
+$ NL_REPLAY=strict pnpm check
+ Test Files  23 passed (23)
+      Tests  337 passed (337)
+   Start at  01:00:14
+   Duration  10.94s (tests 94%, import 5%, transform 1%)
+Exit code: 0

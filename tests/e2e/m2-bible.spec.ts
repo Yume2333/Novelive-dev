@@ -257,11 +257,30 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 				BrowserWindow.getAllWindows()[0].setContentSize(1440, 1000),
 			)
 			await page.evaluate((id) => {
-				window.location.hash = `/work/${id}/bible`
+				window.location.hash = `/work/${id}/edit`
 			}, workId)
+			await page
+				.getByRole('navigation', { name: '作品导航' })
+				.getByRole('link', { name: '设定集', exact: true })
+				.click()
 			await expect(
 				page.getByRole('heading', { name: '设定集', exact: true }),
 			).toBeVisible()
+			const volumeInput = page.getByRole('textbox', { name: '卷 ID' })
+			await volumeInput.focus()
+			await volumeInput.press('End')
+			await volumeInput.press('Backspace')
+			await volumeInput.press('2')
+			await expect(volumeInput).toBeFocused()
+			await expect(volumeInput).toHaveValue('v0002')
+			expect(page.url()).not.toContain('volume=v0002')
+			await volumeInput.press('Enter')
+			await expect(page.getByRole('alert')).toHaveText(
+				'工程中找不到这部作品或卷',
+			)
+			await expect(volumeInput).toHaveValue('v0002')
+			await volumeInput.fill(volumeId)
+			await page.getByRole('button', { name: '切换卷' }).click()
 			const missing = await page.evaluate(async (workId) => {
 				try {
 					await window.novelive.call('proposal.get', {
@@ -358,6 +377,9 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 				.getByRole('article', { name: '确认术语', exact: true })
 				.getByRole('button', { name: '接受候选' })
 				.click()
+			await expect(
+				page.getByRole('status').filter({ hasText: '已接受候选' }),
+			).toHaveText('已接受候选。')
 			await page.getByRole('button', { name: /^术语/ }).click()
 			await expect(
 				confirmed.getByRole('heading', { name: '灯船', exact: true }),

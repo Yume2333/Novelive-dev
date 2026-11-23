@@ -17,3 +17,4 @@
 - Evidence: `.workflow/evidence/m2-editor/04-bible-management.txt`、`04-typecheck.txt`、`04-bible-before.png`、`04-bible-after.png`。
 - Integration: M2/03 可调用 applyBibleProposal；entry.ts 仅增加必要 imports 与三条注册，不改共用契约或数据库结构。界面默认卷 v0001，可显式输入卷 ID 或使用 volume 查询参数。
 - Review: skipped — 无可用的独立 reviewer/subagent 启动工具，留待里程碑关闭复核。
+- PR #35 Check after: 修复卷 ID 逐字输入失焦、术语批准错误图片/风格提示，并在 AppShell.tsx 的 workNavigation 单行补设定集入口；真实 Electron 新断言通过（1 passed / 2.5s），`NL_REPLAY=strict pnpm check` → 23 files / 337 tests passed；截图及说明更新于原 evidence 路径。

@@ -99,6 +99,45 @@ const collection = {
 	style: 'styles',
 } as const
 
+function approvalNotice(proposal: Proposal, bible: Bible) {
+	let images = false
+	let style = false
+	if (proposal.payload.kind === 'bible') {
+		for (const { kind, op, entry } of proposal.payload.changes) {
+			if (op === 'none') continue
+			if (kind === 'character') {
+				const current = bible.characters.find(({ id }) => id === entry.id)
+				images ||=
+					!!current &&
+					(op === 'delete' ||
+						JSON.stringify(current.appearance) !==
+							JSON.stringify(entry.appearance) ||
+						(current.costumes ?? []).some(
+							(costume) =>
+								costume.description !==
+								entry.costumes?.find(({ id }) => id === costume.id)
+									?.description,
+						))
+			} else if (kind === 'location') {
+				const current = bible.locations.find(({ id }) => id === entry.id)
+				images ||=
+					!!current &&
+					(op === 'delete' || current.description !== entry.description)
+			} else if (kind === 'style') {
+				const current = bible.styles.find(({ id }) => id === entry.id)
+				style ||=
+					op === 'delete' ||
+					!current ||
+					(['description', 'narration', 'references'] as const).some(
+						(field) =>
+							JSON.stringify(current[field]) !== JSON.stringify(entry[field]),
+					)
+			}
+		}
+	}
+	return `已接受候选${images ? '；受影响的已有图片已标记过期。' : '。'}${style ? '风格变更仅提示，不自动过期。' : ''}`
+}
+
 function Fields({ entry }: { entry: Entry }) {
 	return (
 		<dl className={styles.fields}>
@@ -283,6 +322,7 @@ function BibleProjection({
 	const [error, setError] = useState('')
 	const [notice, setNotice] = useState('')
 	const [busy, setBusy] = useState(false)
+	const [volumeDraft, setVolumeDraft] = useState(volumeId)
 	useEffect(() => {
 		if (!workId) return
 		let active = true
@@ -334,7 +374,9 @@ function BibleProjection({
 				result.status === 'stale'
 					? '候选已过期，未修改已确认内容。'
 					: reason === undefined
-						? '已接受候选；受影响的已有图片已标记过期。风格变更仅提示，不自动过期。'
+						? bible
+							? approvalNotice(result.proposal, bible)
+							: '已接受候选。'
 						: '已拒绝候选，理由已保存。',
 			)
 			const next = await window.novelive.call('bible.get', { workId, volumeId })
@@ -357,19 +399,28 @@ function BibleProjection({
 	return (
 		<Page title="设定集">
 			<div className={styles.layout}>
-				<div className={styles.actions}>
+				<form
+					className={styles.actions}
+					onSubmit={(event) => {
+						event.preventDefault()
+						changeVolume(volumeDraft)
+					}}
+				>
 					<label>
 						卷 ID
 						<input
 							aria-label="卷 ID"
-							value={volumeId}
-							onChange={(event) => changeVolume(event.target.value)}
+							value={volumeDraft}
+							onChange={(event) => setVolumeDraft(event.target.value)}
 						/>
 					</label>
+					<button type="submit" disabled={busy}>
+						切换卷
+					</button>
 					<button type="button" disabled={busy} onClick={refresh}>
 						刷新
 					</button>
-				</div>
+				</form>
 				{error && <p role="alert">{error}</p>}
 				{notice && <p role="status">{notice}</p>}
 				{!bible && !error && <p role="status">正在读取设定集…</p>}
