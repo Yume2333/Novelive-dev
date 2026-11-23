@@ -37,6 +37,7 @@ export type ProposalSource = {
 	path: string
 	revision: string
 	entry?: { kind: string; id: string }
+	bases?: { kind: string; id: string; revision: string }[]
 }
 type ProposalData = Pick<Proposal, 'chapterIds' | 'payload'> & {
 	rewrite?: RewriteProposal
@@ -262,6 +263,16 @@ export class ChatStore {
 				JSON.stringify({ chapterIds, payload, source }),
 				Date.now(),
 			)
+		const existing = this.proposal(id)
+		if (
+			existing.proposal.status === 'pending' &&
+			!existing.source?.bases &&
+			source.bases
+		)
+			this.db
+				.prepare(`UPDATE proposal SET payload = json_set(payload, '$.source.bases', json(?))
+			WHERE proposal_id = ? AND work_id = ? AND status = 'pending'`)
+				.run(JSON.stringify(source.bases), id, this.workId)
 		return this.proposal(id)
 	}
 

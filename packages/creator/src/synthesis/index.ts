@@ -31,6 +31,7 @@ import { splitChapter } from '../preview'
 import type { Project } from '../project'
 import {
 	applyPatches,
+	bibleEntryBases,
 	existing,
 	proposalKeys,
 	readBible,
@@ -68,6 +69,7 @@ const resultSchema = obj({
 	conflicts: biblePatchSchema,
 	glossaryConflicts: glossaryPatchSchema,
 	bibleRevision: opt(str()),
+	bibleBase: opt(arr(obj({ kind: str(), id: str(), revision: str() }))),
 })
 export type VolumeSynthesis = Static<typeof resultSchema>
 
@@ -493,6 +495,7 @@ ${packets[packet]}`,
 						conflict: 'Bible changed before synthesis publication',
 					})),
 				}
+	const publishedBible = await readBible(project)
 	const result: VolumeSynthesis = {
 		...skeleton,
 		biblePatch,
@@ -501,8 +504,9 @@ ${packets[packet]}`,
 		glossaryConflicts,
 		bibleRevision:
 			!quarantined && hash(latest) === state.basis
-				? hash(await readBible(project))
+				? hash(publishedBible)
 				: state.basis,
+		bibleBase: bibleEntryBases(publishedBible),
 	}
 	await project.write(projectFiles.skeleton(volumeId), skeleton)
 	await project.write(files.result, result)

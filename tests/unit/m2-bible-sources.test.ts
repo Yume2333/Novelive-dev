@@ -14,7 +14,10 @@ import {
 	synthesisFiles,
 	type VolumeSynthesis,
 } from '../../packages/creator/src/synthesis'
-import { readBible } from '../../packages/creator/src/synthesis/patch'
+import {
+	bibleEntryBases,
+	readBible,
+} from '../../packages/creator/src/synthesis/patch'
 import { formatVersion, projectFiles } from '../../packages/format/src/model'
 import { ref, scope, seed } from '../fixtures/project-schema/seed'
 
@@ -61,6 +64,7 @@ async function publish() {
 			{ ...bible.glossary[0], written: '铁门', conflict: 'Term conflict' },
 		],
 		bibleRevision: bibleRevision(bible),
+		bibleBase: bibleEntryBases(bible),
 	}
 	await project.write(file, result)
 	return result
@@ -132,19 +136,28 @@ test('synthesis proposals persist source revisions, resolve through chat and nev
 	).toEqual({ n: 2 })
 })
 
-test('old synthesis is stale even when first discovered after a newer confirmed revision', async () => {
+test('a targeted entry changed before discovery makes its published synthesis conflict stale', async () => {
 	const result = await publish()
-	await project.write(projectFiles.style(scope), {
-		formatVersion,
-		entries: [
-			{ id: 'new', description: 'New confirmed style', status: 'confirmed' },
-		],
+	const character = await project.read(
+		projectFiles.character(scope, 'traveler'),
+	)
+	await project.write(projectFiles.character(scope, 'traveler'), {
+		...character,
+		entries: character.entries.map((entry) => ({
+			...entry,
+			name: 'Newer confirmed name',
+		})),
 	})
 	const first = await getBible(project, input)
 	const before = await readBible(project)
 	const service = chat()
 	try {
 		for (const id of first.proposalIds) {
+			if (
+				new ChatStore(project.database, ref.workId).proposal(id).proposal
+					.payload.kind !== 'bible'
+			)
+				continue
 			expect(
 				new ChatStore(project.database, ref.workId).proposal(id).proposal
 					.payload,
@@ -197,11 +210,10 @@ test('replaced or missing synthesis source cannot apply an old proposal even if 
 	}
 })
 
-test('unversioned legacy conflicts remain visible but cannot overwrite confirmed content', async () => {
-	const { bibleRevision: _, ...legacy } = await publish()
+test('unversioned legacy conflicts capture targeted bases once and can be reviewed sequentially', async () => {
+	const { bibleRevision: _, bibleBase: __, ...legacy } = await publish()
 	await project.write(file, legacy)
 	const first = await getBible(project, input)
-	const before = await readBible(project)
 	const service = chat()
 	try {
 		for (const id of first.proposalIds)
@@ -210,11 +222,11 @@ test('unversioned legacy conflicts remain visible but cannot overwrite confirmed
 					{ ...input, proposalId: id, decision: { kind: 'approve' } },
 					new AbortController().signal,
 				),
-			).toMatchObject({ status: 'stale' })
+			).toMatchObject({ status: 'resolved', proposal: { status: 'approved' } })
 	} finally {
 		await service.close()
 	}
-	expect(await readBible(project)).toEqual(before)
+	expect((await readBible(project)).character[0].name).toBe('新旅人')
 })
 
 test('candidate deduplication survives rejection, unrelated collection edits and reopen', async () => {
@@ -291,8 +303,8 @@ test('a pending file candidate can be approved through the unified resolver', as
 	expect((await getBible(project, input)).proposalIds).not.toContain(term.id)
 })
 
-test('legacy synthesis uses its saved basis instead of stamping discovery-time Bible revision', async () => {
-	const { bibleRevision: basis, ...legacy } = await publish()
+test('legacy synthesis uses post-merge targeted bases instead of its pre-merge checkpoint hash', async () => {
+	const { bibleRevision: basis, bibleBase: _, ...legacy } = await publish()
 	await project.write(file, legacy)
 	await project.write(synthesisFiles(ref.volumeId).checkpoint, {
 		formatVersion,
@@ -304,11 +316,22 @@ test('legacy synthesis uses its saved basis instead of stamping discovery-time B
 		ready: true,
 		applied: true,
 	})
+	await project.write(projectFiles.style(scope), {
+		formatVersion,
+		entries: [
+			{
+				id: 'merged',
+				status: 'candidate',
+				description: 'Synthesis merged style',
+			},
+		],
+	})
 	const first = await getBible(project, input)
+	expect(first.revision).not.toBe(basis)
 	for (const id of first.proposalIds)
 		expect(
 			new ChatStore(project.database, ref.workId).proposal(id).proposal.payload,
-		).toMatchObject({ expectedRevision: basis })
+		).toMatchObject({ expectedRevision: first.revision })
 	await project.write(projectFiles.style(scope), {
 		formatVersion,
 		entries: [{ id: 'new', status: 'confirmed', description: 'Newer style' }],
@@ -319,15 +342,22 @@ test('legacy synthesis uses its saved basis instead of stamping discovery-time B
 	for (const id of first.proposalIds)
 		expect(
 			new ChatStore(project.database, ref.workId).proposal(id).proposal.payload,
-		).toMatchObject({ expectedRevision: basis })
+		).toMatchObject({ expectedRevision: first.revision })
 })
 
-test('an unfinished replacement checkpoint cannot rebase legacy conflicts onto a newer Bible', async () => {
-	const { bibleRevision: _, ...legacy } = await publish()
+test('an unfinished replacement checkpoint cannot rebase previously bridged target snapshots', async () => {
+	const { bibleRevision: _, bibleBase: __, ...legacy } = await publish()
 	await project.write(file, legacy)
-	await project.write(projectFiles.style(scope), {
-		formatVersion,
-		entries: [{ id: 'new', status: 'confirmed', description: 'Newer style' }],
+	const first = await getBible(project, input)
+	const character = await project.read(
+		projectFiles.character(scope, 'traveler'),
+	)
+	await project.write(projectFiles.character(scope, 'traveler'), {
+		...character,
+		entries: character.entries.map((entry) => ({
+			...entry,
+			name: 'Newer name',
+		})),
 	})
 	await project.write(synthesisFiles(ref.volumeId).checkpoint, {
 		formatVersion,
@@ -339,14 +369,15 @@ test('an unfinished replacement checkpoint cannot rebase legacy conflicts onto a
 		ready: true,
 		applied: false,
 	})
-	const first = await getBible(project, input)
+	await getBible(project, input)
 	const service = chat()
 	try {
 		for (const id of first.proposalIds) {
-			expect(
+			if (
 				new ChatStore(project.database, ref.workId).proposal(id).proposal
-					.payload,
-			).toMatchObject({ expectedRevision: 'unversioned-synthesis' })
+					.payload.kind !== 'bible'
+			)
+				continue
 			expect(
 				await service.resolve(
 					{ ...input, proposalId: id, decision: { kind: 'approve' } },
@@ -354,6 +385,23 @@ test('an unfinished replacement checkpoint cannot rebase legacy conflicts onto a
 				),
 			).toMatchObject({ status: 'stale' })
 		}
+	} finally {
+		await service.close()
+	}
+})
+
+test('independent conflicts from one synthesis can both be approved sequentially', async () => {
+	await publish()
+	const first = await getBible(project, input)
+	const service = chat()
+	try {
+		for (const id of first.proposalIds)
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject({ status: 'resolved', proposal: { status: 'approved' } })
 	} finally {
 		await service.close()
 	}

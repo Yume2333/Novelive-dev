@@ -4,7 +4,11 @@ import { projectFiles } from '@novelive/format/model'
 import { ChatStore, type ProposalSource } from '../../chat/store'
 import type { CommandInput, Proposal } from '../../contract'
 import type { Project } from '../../project'
-import { existing, type readBible } from '../../synthesis/patch'
+import {
+	bibleEntryBases,
+	existing,
+	type readBible,
+} from '../../synthesis/patch'
 
 type Bible = Awaited<ReturnType<typeof readBible>>
 type Kind = keyof Bible
@@ -50,6 +54,18 @@ export async function sourceIsCurrent(
 		: sourceRevision(value) === source.revision
 }
 
+export function basesAreCurrent(
+	bible: Bible,
+	bases: NonNullable<ProposalSource['bases']>,
+) {
+	return bases.every(
+		({ kind, id, revision }) =>
+			kind in bible &&
+			sourceRevision(bible[kind as Kind].filter((entry) => entry.id === id)) ===
+				revision,
+	)
+}
+
 export async function bridgeBibleSources(
 	project: Project,
 	input: CommandInput<'bible.get'>,
@@ -60,8 +76,26 @@ export async function bridgeBibleSources(
 	const files = synthesisFiles(input.volumeId)
 	const result = await existing(() => project.read(files.result))
 	const store = new ChatStore(project.database, input.workId)
-	function record(source: ProposalSource, key: string, payload: Payload) {
+	const currentBases = bibleEntryBases(bible)
+	function record(
+		source: ProposalSource,
+		key: string,
+		payload: Payload,
+		baseline: NonNullable<ProposalSource['bases']> = currentBases,
+	) {
 		const id = `bible-source:${sourceRevision([input.workId, input.volumeId, source, key])}`
+		const targets =
+			payload.kind === 'bible'
+				? payload.changes.map(({ kind, entry }) => ({ kind, id: entry.id }))
+				: payload.changes.map(({ id }) => ({ kind: 'glossary', id }))
+		const bases = targets.map(
+			({ kind, id }) =>
+				baseline.find((base) => base.kind === kind && base.id === id) ?? {
+					kind,
+					id,
+					revision: sourceRevision([]),
+				},
+		)
 		store.recordStandaloneProposal(
 			{
 				id,
@@ -72,40 +106,43 @@ export async function bridgeBibleSources(
 				chapterIds,
 				payload,
 			},
-			source,
+			{ ...source, bases },
 		)
 	}
 	const conflicts = new Set<string>()
 	if (result) {
-		const checkpoint = result.bibleRevision
-			? undefined
-			: await existing(() => project.read(files.checkpoint))
-		const expectedRevision =
-			result.bibleRevision ??
-			(checkpoint?.applied && checkpoint.ready
-				? checkpoint.basis
-				: 'unversioned-synthesis')
+		const expectedRevision = result.bibleRevision ?? sourceRevision(bible)
 		const source = { path: files.result.path, revision: sourceRevision(result) }
 		for (const change of result.conflicts) {
 			if (change.op === 'none') continue
 			const key = `${change.kind}/${change.entry.id}`
 			conflicts.add(key)
-			record(source, `${key}/${sourceRevision(change)}`, {
-				kind: 'bible',
-				volumeId: input.volumeId,
-				expectedRevision,
-				changes: [change],
-			})
+			record(
+				source,
+				`${key}/${sourceRevision(change)}`,
+				{
+					kind: 'bible',
+					volumeId: input.volumeId,
+					expectedRevision,
+					changes: [change],
+				},
+				result.bibleBase ?? currentBases,
+			)
 		}
 		for (const entry of result.glossaryConflicts) {
 			const key = `glossary/${entry.id}`
 			conflicts.add(key)
-			record(source, `${key}/${sourceRevision(entry)}`, {
-				kind: 'glossary',
-				volumeId: input.volumeId,
-				expectedRevision,
-				changes: [entry],
-			})
+			record(
+				source,
+				`${key}/${sourceRevision(entry)}`,
+				{
+					kind: 'glossary',
+					volumeId: input.volumeId,
+					expectedRevision,
+					changes: [entry],
+				},
+				result.bibleBase ?? currentBases,
+			)
 		}
 	}
 	for (const kind of Object.keys(bible) as Kind[]) {
@@ -117,11 +154,7 @@ export async function bridgeBibleSources(
 				revision: sourceRevision(entry),
 				entry: { kind, id: entry.id },
 			}
-			const expectedRevision = bible[kind].some(
-				(other) => other.id === entry.id && other.status === 'confirmed',
-			)
-				? 'unversioned-conflict'
-				: sourceRevision(bible)
+			const expectedRevision = sourceRevision(bible)
 			record(source, `${kind}/${entry.id}`, {
 				volumeId: input.volumeId,
 				expectedRevision,

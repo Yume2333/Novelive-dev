@@ -7,6 +7,7 @@ import type { CommandInput, CommandOutput, Proposal } from '../../contract'
 import { Project } from '../../project'
 import { existing, readBible, validatePatch } from '../../synthesis/patch'
 import {
+	basesAreCurrent,
 	bridgeBibleSources,
 	fileFor,
 	sourceIsCurrent,
@@ -171,9 +172,19 @@ function stalePrefixes(before: Bible, after: Bible) {
 	return prefixes
 }
 
-async function apply(project: Project, workId: string, payload: Payload) {
+async function apply(
+	project: Project,
+	workId: string,
+	payload: Payload,
+	bases?: { kind: string; id: string; revision: string }[],
+) {
 	const before = await readBible(project)
-	if (bibleRevision(before) !== payload.expectedRevision) return false
+	if (
+		bases
+			? !basesAreCurrent(before, bases)
+			: bibleRevision(before) !== payload.expectedRevision
+	)
+		return false
 	await workContext(project, workId, payload.volumeId)
 	const chapters = new Set<string>()
 	const series = await project.read(projectFiles.series)
@@ -269,7 +280,7 @@ export async function applyBibleProposal(
 			proposal.workId,
 		).proposal(proposal.id)
 		if (source && !(await sourceIsCurrent(project, source))) return 'stale'
-		return (await apply(project, proposal.workId, payload))
+		return (await apply(project, proposal.workId, payload, source?.bases))
 			? 'applied'
 			: 'stale'
 	})

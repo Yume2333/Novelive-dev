@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
@@ -27,6 +28,18 @@ type Bible = {
 }
 type Patch = BiblePatch[number]
 type Entry = Bible[keyof Bible][number]
+
+export function bibleEntryBases(bible: Bible) {
+	return (Object.keys(bible) as (keyof Bible)[]).flatMap((kind) =>
+		[...new Set(bible[kind].map(({ id }) => id))].map((id) => ({
+			kind,
+			id,
+			revision: createHash('sha256')
+				.update(JSON.stringify(bible[kind].filter((entry) => entry.id === id)))
+				.digest('hex'),
+		})),
+	)
+}
 type Collection<T> = { formatVersion: typeof formatVersion; entries: T[] }
 type Change = NonNullable<Character['changes']>[number]
 const scope = { level: 'series' } as const
