@@ -3,6 +3,7 @@ import { chatMessageEvent } from '../../packages/creator/src/contract'
 import {
 	createChatFixture,
 	image,
+	model,
 	prompts,
 	rejectedReason,
 	workId,
@@ -150,6 +151,23 @@ test('persists a branch-local summary without deleting the original history', as
 		third,
 		fork,
 	])
+})
+
+test('uses the catalog context window when the model limit is automatic', async () => {
+	const chat = await openFixture({
+		mainModel: () => ({ ...model, model: 'gpt-4.1', contextWindow: null }),
+	})
+	const { session } = await chat.call('chat.create', { workId })
+	const { sessionId } = session
+	const long = `Remember this motif: ${'paper boats. '.repeat(4100)}`
+	const first = await chat.send(sessionId, long)
+	await chat.done(first)
+	const second = await chat.send(sessionId, prompts.plan, first)
+	await chat.done(second)
+	const third = await chat.send(sessionId, prompts.compact, second)
+	await chat.done(third)
+	const snapshot = await chat.call('chat.get', { workId, sessionId })
+	expect(snapshot.entries.every((entry) => entry.kind === 'message')).toBe(true)
 })
 
 test('only applies human-approved current proposals and returns rejection feedback after reopening', async () => {

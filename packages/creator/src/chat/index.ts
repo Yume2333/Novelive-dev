@@ -3,7 +3,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { contentText } from '@earendil-works/pi-ai'
 import type { CommandInput, CommandOutput, Proposal } from '../contract'
-import type { TextConnection } from '../models/text'
+import { buildTextModel, type TextConnection } from '../models/text'
 import type { createRegistry } from '../registry'
 import type { ReplayOptions } from '../replay'
 import { ChatAttachments } from './attachments'
@@ -390,7 +390,7 @@ export class ChatService {
 				sessionId,
 				historyHead,
 			)
-			const window = connection.contextWindow ?? 16_384
+			const window = buildTextModel(connection).contextWindow
 			const messages = await compact(
 				this.store,
 				sessionId,
