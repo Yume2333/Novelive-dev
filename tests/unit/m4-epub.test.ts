@@ -171,6 +171,31 @@ test('keeps chapter blocks inside article wrappers', async () => {
 	])
 })
 
+test('does not persist HTTP failures that would poison later recording attempts', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-epub-http-'))
+	const fetch = vi
+		.fn()
+		.mockResolvedValueOnce(new Response('temporary failure', { status: 500 }))
+		.mockResolvedValueOnce(new Response('recovered'))
+	const request = () =>
+		createReplayFetch(providerReplay(directory, fetch, 'offline-http'))(
+			'https://relay.invalid/v1/chat/completions',
+		)
+	try {
+		await expect(request()).rejects.toThrow('Provider HTTP 500')
+		expect(await (await request()).text()).toBe('recovered')
+		expect(await (await request()).text()).toBe('recovered')
+		expect(fetch).toHaveBeenCalledTimes(2)
+		expect(
+			(await readFile(join(directory, 'cassette.jsonl'), 'utf8'))
+				.trim()
+				.split('\n'),
+		).toHaveLength(1)
+	} finally {
+		await rm(directory, { recursive: true, force: true })
+	}
+})
+
 test('keeps TOC chapter breaks at inline anchors', async () => {
 	const { book } = await extractEpub(
 		await epub({

@@ -28,7 +28,14 @@ export function providerReplay(
 		fetch: createReplayFetch({
 			mode: 'record',
 			directory,
-			fetch,
+			fetch: async (input, init) => {
+				const response = await fetch(input, init)
+				if (!response.ok)
+					throw new Error(
+						`Provider HTTP ${response.status}; response not recorded`,
+					)
+				return response
+			},
 			case: name,
 			tags: ['private-provider', 'm4-02'],
 		}),
@@ -75,7 +82,9 @@ export async function runProviderCases(
 	const apiKey = record ? process.env.NL_IMAGE_API_KEY : visualConnection.apiKey
 	assert.ok(baseUrl && apiKey, 'Recording credentials must be provisioned')
 	const directory =
-		mode === 'synthetic' ? syntheticDirectory : join(privateRoot, 'cassette')
+		mode === 'synthetic'
+			? syntheticDirectory
+			: (process.env.NL_EPUB_CASSETTE_DIR ?? join(privateRoot, 'cassette'))
 	const ledger = join(homedir(), 'memory/poke_5b9601/files/novelive/usage.csv')
 	const receipts: object[] = []
 	const receiptPath = join(privateRoot, `receipt-${Date.now()}.json`)
