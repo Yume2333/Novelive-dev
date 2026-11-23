@@ -1,0 +1,16 @@
+m2-editor/03 — 供应商录制
+Base: 5ea3d49acbdb1f0a33431c53e2edfab57c01ca9d (main)
+录制脚本、聊天请求构建、模型适配、回放及依赖锁与 fc1517e 一致。
+
+NL_REPLAY=record pnpm --filter @novelive/desktop exec tsx ../../tests/fixtures/cassettes/m2-chat/record.ts
+M2 chat recording stopped after 4 calls. Check the private cassette for the last completed request.
+四条 devin-swe-2 响应均为 HTTP 200 / finish_reason=length，只含推理，
+没有回答或工具调用。使用私有 cassette 严格回放复现：附图及两次文本请求
+进入 done，但没有文字；压缩报「会话压缩未返回摘要」。未执行提议、
+拒绝后续或取消路径。未替换合成 fixture，私有录制不提交。
+
+NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+
+私有账本：4 次调用，16,853 实测 tokens，0 张生成图片。附图是输入。
