@@ -235,6 +235,49 @@ test('only queued entries are reordered, and chapter priority does not take the 
 	}
 })
 
+test('a resumed work draining a stopped request cannot jump the queue', async () => {
+	const host = openProduction()
+	const a = await seed(host, 'alpha')
+	const b = await seed(host, 'beta')
+	const first = await host.get(a.workId)
+	const second = await host.get(b.workId)
+	const drain = Promise.withResolvers<void>()
+	const write = a.worker.write.bind(a.worker)
+	a.worker.write = async (context) => {
+		try {
+			await write(context)
+		} catch (reason) {
+			await drain.promise
+			throw reason
+		}
+	}
+	a.worker.hold('write:ch2')
+	b.worker.hold('write:ch2')
+	try {
+		await first.continue()
+		await second.continue()
+		first.queue.stop(a.workId)
+		await first.continue()
+		await host.moveQueueWork(a.workId, 1)
+		expect(await queueState(host)).toMatchObject({
+			owner: undefined,
+			order: ['beta', 'alpha'],
+		})
+		drain.resolve()
+		await vi.waitFor(async () =>
+			expect(await queueState(host)).toMatchObject({
+				owner: 'beta',
+				order: ['alpha'],
+			}),
+		)
+		expect(a.worker.count('write:ch2')).toBe(1)
+	} finally {
+		drain.resolve()
+		a.worker.release('write:ch2')
+		b.worker.release('write:ch2')
+	}
+})
+
 const crashScript = `
 	import { createServer } from 'vite'
 	const server = await createServer({

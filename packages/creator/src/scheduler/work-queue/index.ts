@@ -68,7 +68,9 @@ export class WorkQueue {
 		const entry = item?.read()
 		return (
 			entry?.status === 'active' ||
-			(entry?.status === 'queued' && !item?.busy())
+			(entry?.status === 'queued' &&
+				!item?.busy() &&
+				this.syncOrder()[0]?.link.workId === workId)
 		)
 	}
 
