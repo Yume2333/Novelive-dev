@@ -126,7 +126,7 @@ export function PlayerPage() {
 		if (directory) await loadProject(directory)
 	}
 	useEffect(() => {
-		if (!loaded || !host.current) return
+		if (!loaded || awaitingClick || !host.current) return
 		const controller = new AbortController()
 		const controls = minimalControlsController(
 			host.current,
@@ -166,7 +166,7 @@ export function PlayerPage() {
 			unsubscribe()
 			controller.abort()
 		}
-	}, [loaded])
+	}, [loaded, awaitingClick])
 	const nextChapter = loaded
 		? chapters[
 				chapters.findIndex(

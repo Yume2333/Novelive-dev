@@ -137,7 +137,9 @@ test.describe('M3 player controls', () => {
 				)
 				await project.writeFile(
 					projectFiles.scene({ ...playerRef, chapterId: 'ch2' }, 'aaaabbbb'),
-					playerScript.replace('你好，世界。', '第二章开始。'),
+					playerScript
+						.replace('你好，世界。', '第二章开始。')
+						.replace('source p0001', 'source p0001\n@caption 自动开场'),
 				)
 				project.database
 					.prepare(
@@ -318,7 +320,10 @@ test.describe('M3 player controls', () => {
 							)
 							.run()
 					}
-					await expect(text).toHaveText('第二章开始。', { timeout: 15000 })
+					await expect(
+						page.getByRole('button', { name: '下一章已就绪，点击开始' }),
+					).toBeVisible({ timeout: 15000 })
+					await expect(canvas).toHaveCount(0)
 					await expect(page.locator('body')).toHaveAttribute(
 						'data-player-waiting',
 						'null',
@@ -332,6 +337,7 @@ test.describe('M3 player controls', () => {
 					await page
 						.getByRole('button', { name: '下一章已就绪，点击开始' })
 						.click()
+					await expect(text).toHaveText('自动开场')
 					await expect(text).toHaveText('第二章开始。')
 					await advance()
 					await expect(text).toHaveText('我在想什么？')
