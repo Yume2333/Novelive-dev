@@ -84,6 +84,12 @@ export class ScriptedWorker implements ProductionWorker {
 		}
 	}
 
+	async placeholder(job: DrawJob, issue: string, signal: AbortSignal) {
+		signal.throwIfAborted()
+		this.calls.push(`placeholder:${job.assetId}`)
+		return { status: 'placeholder', issue } as const
+	}
+
 	private async step(
 		key: string,
 		context: { desensitized: boolean; signal: AbortSignal },

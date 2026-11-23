@@ -317,6 +317,8 @@ test('image failures fall back to placeholders but unsupported capabilities paus
 		],
 	})
 	expect(worker.count('draw:hero/default/smile')).toBe(0)
+	expect(worker.count('placeholder:hero/default/smile')).toBe(1)
+	expect(worker.count('placeholder:cg-a')).toBe(1)
 	expect(worker.count('draw:cg-a')).toBe(3)
 	expect(worker.desensitized).toEqual(['draw:cg-b'])
 

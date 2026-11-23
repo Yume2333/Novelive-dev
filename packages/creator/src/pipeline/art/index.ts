@@ -156,6 +156,22 @@ export class ArtProduction {
 		return task
 	}
 
+	async savePlaceholder(id: string, issue: string): Promise<ImageJobResult> {
+		const entry = (await this.registry()).entries.find((item) => item.id === id)
+		if (!entry) throw new Error(`Unregistered asset: ${id}`)
+		const family =
+			entry.type === 'character' || entry.type === 'expression'
+				? 'character'
+				: entry.type === 'cg'
+					? 'cg'
+					: 'location'
+		const bytes = await placeholder(family)
+		this.options.signal?.throwIfAborted()
+		await this.project.writeFile(entry.path, bytes)
+		await this.saveStatus(entry.id, 'placeholder')
+		return { status: 'placeholder', issue }
+	}
+
 	private async drawRegistered(
 		job: ArtJob,
 		bible: ArtBible,
@@ -173,11 +189,6 @@ export class ArtProduction {
 			return { status: 'drawn' }
 		}
 		const portrait = job.kind === 'character' || job.kind === 'expression'
-		const family = portrait
-			? 'character'
-			: job.kind === 'cg'
-				? 'cg'
-				: 'location'
 		const target = this.nativeSize(portrait)
 		const foundBase =
 			'baseAssetId' in job
@@ -187,15 +198,8 @@ export class ArtProduction {
 			foundBase?.status === 'drawn'
 				? await this.file(foundBase.path)
 				: undefined
-		const fallback = async (issue: string): Promise<ImageJobResult> => {
-			const bytes = await placeholder(family)
-			signal?.throwIfAborted()
-			await this.project.writeFile(entry.path, bytes)
-			await this.saveStatus(entry.id, 'placeholder')
-			return { status: 'placeholder', issue }
-		}
 		if ('baseAssetId' in job && (!base || !foundBase))
-			return fallback('基准图未成功生成。')
+			return this.savePlaceholder(entry.id, '基准图未成功生成。')
 		const [entity, costume] = job.assetId.split('/')
 		const character = portrait
 			? bible.characters.find((item) => item.id === entity)
@@ -289,7 +293,7 @@ export class ArtProduction {
 		if ('issue' in result) {
 			return result.unsupported
 				? { status: 'unsupported', issue: result.issue }
-				: fallback(result.issue)
+				: this.savePlaceholder(entry.id, result.issue)
 		}
 		await this.saveWebp(entry.path, result.png, output)
 		await this.saveStatus(entry.id, 'drawn')

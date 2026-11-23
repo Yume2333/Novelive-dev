@@ -316,6 +316,9 @@ export function chapterWorker(
 				metadata.cg,
 			)
 		},
+		placeholder(job, issue, signal) {
+			return art(signal).savePlaceholder(job.assetId, issue)
+		},
 	}
 	return {
 		worker,
