@@ -2,8 +2,10 @@ import type { Novelive } from '@novelive/creator/contract'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BiblePage } from './pages/bible/BiblePage'
 import { ConfirmFirstPage } from './pages/confirm/ConfirmFirstPage'
 import { ConfirmVisualPage } from './pages/confirm/ConfirmVisualPage'
+import { EditorPage } from './pages/editor/EditorPage'
 import { ImportPage } from './pages/import/ImportPage'
 import { LibraryPage } from './pages/library/LibraryPage'
 import { PlayerPage } from './pages/player/PlayerPage'
@@ -38,6 +40,8 @@ if (root)
 						<Route path="import" element={<ImportPage />} />
 						<Route path="usage" element={<UsagePage />} />
 						<Route path="settings" element={<SettingsPage />} />
+						<Route path={productionRoutes.editor} element={<EditorPage />} />
+						<Route path={productionRoutes.bible} element={<BiblePage />} />
 						<Route element={<WorkProduction />}>
 							<Route path={productionRoutes.work} element={<WorkPage />} />
 							<Route

@@ -1,0 +1,18 @@
+m2-editor/01 — 编辑、重写及会话契约
+Base: ea99733e566c72be5873d6507a07de37ef7b40ba
+
+NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-contract.test.ts
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+
+NL_REPLAY=strict pnpm check
+ Test Files  23 passed (23)
+      Tests  337 passed (337)
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 contract routes'
+  1 passed (1.2s)
+使用本机已有 Electron 45.4.1 二进制（ELECTRON_OVERRIDE_DIST_PATH）。真实桌面入口验证编辑器和设定集路由及后退；未做样式验收。
+
+契约只定义请求、结果、事件和路由，不注册功能处理器或增设数据库表。Agent 的批准与应用选中的重写差异分成两步；编辑器内的新标记不作为聊天提议。聊天推送整条消息快照，不推送文本增量。
+
+付费调用 0，token 0，图像 0。当前会话无独立审查工具，留待里程碑验收。

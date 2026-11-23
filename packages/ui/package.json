@@ -3,6 +3,9 @@
 	"private": true,
 	"type": "module",
 	"dependencies": {
+		"@assistant-ui/react": "0.15.37",
+		"@codemirror/state": "6.7.6",
+		"@codemirror/view": "6.43.15",
 		"@novelive/format": "workspace:*",
 		"@novelive/player": "workspace:*",
 		"@fontsource/hanken-grotesk": "5.3.0",
@@ -12,7 +15,8 @@
 		"lucide-react": "1.77.0",
 		"react": "19.3.1",
 		"react-dom": "19.3.1",
-		"react-router-dom": "6.30.6"
+		"react-router-dom": "6.30.6",
+		"streamdown": "2.8.0"
 	},
 	"devDependencies": {
 		"@types/react": "19.3.0",
