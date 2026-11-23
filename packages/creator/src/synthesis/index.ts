@@ -24,7 +24,9 @@ import {
 import {
 	buildTextModel,
 	createTextStream,
+	outputTokenBudget,
 	type TextConnection,
+	textResultError,
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
@@ -258,7 +260,7 @@ export async function synthesizeVolume(
 	const quarantined =
 		matching?.ready && matching.basis !== basis ? matching : undefined
 	const resumable = matching?.basis === basis ? matching : undefined
-	const maxTokens = Math.min(4096, Math.floor(model.contextWindow / 4))
+	const maxTokens = outputTokenBudget(model)
 	const historyBudget = Math.min(1024, Math.floor(model.contextWindow / 16))
 	const budget = model.contextWindow - maxTokens - historyBudget
 	const packetText = previews.map((preview) => JSON.stringify(preview))
@@ -319,12 +321,13 @@ ${packetText.join('\n')}`
 			const response = await stream(model, normalizeContext({ messages }), {
 				apiKey: options.connection.apiKey,
 				signal: options.signal,
-				maxTokens,
+				outputLimit: maxTokens,
 				cacheRetention: 'none',
 			}).result()
 			if (response.stopReason !== 'stop')
-				throw new Error(
-					response.errorMessage ?? `Synthesis stopped: ${response.stopReason}`,
+				throw textResultError(
+					response,
+					`Synthesis stopped: ${response.stopReason}`,
 				)
 			try {
 				const text = response.content

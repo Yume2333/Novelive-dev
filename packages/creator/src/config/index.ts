@@ -74,11 +74,8 @@ function textModel(config: Config, slot: TextSlot): Config['models']['fast'] {
 	if (slot === 'fast') return models.fast
 	const { inheritFast, ...model } = models[slot]
 	if (!inheritFast) return model
-	return {
-		...models.fast,
-		model: model.model,
-		contextWindow: model.contextWindow,
-	}
+	const { format, compat, baseUrl, apiKey } = models.fast
+	return { ...model, format, compat, baseUrl, apiKey }
 }
 
 function defaultConfig(): Config {

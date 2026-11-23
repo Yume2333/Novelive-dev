@@ -4,13 +4,16 @@ import {
 	fauxAssistantMessage,
 	fauxToolCall,
 } from '@earendil-works/pi-ai/providers/faux'
+import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import { obj } from '@earendil-works/pi-schema'
 import { describe, expect, it, vi } from 'vitest'
 import {
 	buildTextModel,
 	createTextStream,
+	outputTokenBudget,
 	suggestContextWindow,
 	testTextConnection,
+	textResultError,
 } from '../../packages/creator/src/models/text/index.js'
 import { createReplayFetch } from '../../packages/creator/src/replay/index.js'
 import {
@@ -34,6 +37,92 @@ const format = (options: Parameters<typeof createReplayFetch>[0] = {}) =>
 	})
 
 describe('M0 text model adapter', () => {
+	it('uses catalog output limits and bounds private-model slots by their configured cap', () => {
+		const gemini = buildTextModel(configured)
+		expect(gemini.maxTokens).toBe(64_000)
+		expect(outputTokenBudget(gemini)).toBe(gemini.maxTokens)
+		const privateModel = {
+			...configured,
+			model: 'devin-swe-2',
+			contextWindow: 32_768,
+		}
+		expect(outputTokenBudget(buildTextModel(privateModel))).toBe(16_384)
+		expect(
+			outputTokenBudget(
+				buildTextModel({ ...privateModel, maxOutputTokens: 12_000 }),
+			),
+		).toBe(12_000)
+	})
+
+	it.each([
+		['length', false, 1_000_000],
+		['stop', false, 1_000_000],
+		['length', true, 4096],
+	] as const)(
+		'retries a reasoning-only %s once (answer on retry: %s, context: %d)',
+		async (finish, succeeds, contextWindow) => {
+			const model = buildTextModel({
+				...configured,
+				model: 'devin-swe-2',
+				contextWindow,
+				maxOutputTokens: 16_000,
+			})
+			const budgets: number[] = []
+			const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+				const body = await new Request(input, init).json()
+				budgets.push(body.max_completion_tokens)
+				const answer = succeeds && budgets.length === 2
+				const chunks = [
+					{
+						choices: [
+							{
+								index: 0,
+								delta: answer
+									? { content: 'OK' }
+									: { reasoning_content: 'Thinking' },
+							},
+						],
+					},
+					{
+						choices: [
+							{ index: 0, delta: {}, finish_reason: answer ? 'stop' : finish },
+						],
+					},
+				]
+				return new Response(
+					`${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
+					{ headers: { 'content-type': 'text/event-stream' } },
+				)
+			})
+			const events: string[] = []
+			const stream = createTextStream({ fetch, streaming: true })(
+				model,
+				normalizeContext({
+					messages: [{ role: 'user', content: 'Reply OK', timestamp: 0 }],
+				}),
+				{ apiKey: 'offline-placeholder' },
+			)
+			for await (const event of stream) events.push(event.type)
+			const result = await stream.result()
+			expect(budgets).toEqual(
+				contextWindow === 4096 ? [1536, 2048] : [12_000, 16_000],
+			)
+			expect(events).not.toContain('thinking_delta')
+			if (succeeds) {
+				expect(events).toContain('text_delta')
+				expect(result).toMatchObject({
+					stopReason: 'stop',
+					content: [{ type: 'text', text: 'OK' }],
+				})
+			} else {
+				expect(events).toEqual(['error'])
+				expect(textResultError(result, 'Model error').code).toBe(
+					'reasoning_limit',
+				)
+			}
+		},
+	)
+
 	it.each(smokeProfiles)(
 		'runs the $format SDK against strict replay',
 		async (profile) => {

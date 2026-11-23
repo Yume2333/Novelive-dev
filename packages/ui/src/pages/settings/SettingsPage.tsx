@@ -61,6 +61,7 @@ function readableError(error: unknown): CommandError {
 		network: '连接中断或服务暂不可用，请检查接口地址、API Key 和模型名后重试。',
 		moderation: '请求被内容审核拒绝。',
 		context_limit: '内容超出模型的上下文限制，请选择上下文更长的模型。',
+		reasoning_limit: '模型用完了推理额度，未返回答案。请尝试其他模型。',
 		stale_revision: '内容已改变，请刷新后重试。',
 		invalid_config:
 			failure?.message && /[\u3400-\u9fff]/.test(failure.message)

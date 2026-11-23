@@ -26,11 +26,13 @@ export function fixtureOptions(
 		baseUrl: 'https://relay.invalid/v1',
 		apiKey: 'offline-placeholder',
 	},
+	maxOutputTokens?: number,
 ): WriterOptions {
 	const connection = {
 		...endpoint,
 		format: 'openai-completions',
 		contextWindow,
+		maxOutputTokens,
 		compat: 'auto',
 	} as const
 	let id = 0

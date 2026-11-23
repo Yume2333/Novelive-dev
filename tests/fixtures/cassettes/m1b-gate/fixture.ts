@@ -18,13 +18,19 @@ const text = {
 	apiKey: 'offline-placeholder',
 	format: 'openai-completions',
 	contextWindow: 12_000,
+	maxOutputTokens: 4096,
 	compat: 'auto',
 } as const
 export const configuration = {
 	models: {
 		fast: { ...text, model: 'fixture-art-fast' },
 		main: { ...text, model: 'fixture-art-main', inheritFast: false },
-		writing: { ...text, model: 'devin-swe-2', inheritFast: false },
+		writing: {
+			...text,
+			model: 'devin-swe-2',
+			maxOutputTokens: 3000,
+			inheritFast: false,
+		},
 		visual: { ...text, model: 'fixture-art-visual', inheritFast: false },
 		image: {
 			baseUrl: text.baseUrl,

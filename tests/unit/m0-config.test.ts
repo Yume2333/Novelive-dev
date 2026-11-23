@@ -142,6 +142,21 @@ describe('M0 configuration store', () => {
 			model: 'main-model',
 			contextWindow: 4096,
 		})
+		await store.update({
+			models: {
+				fast: { maxOutputTokens: 1024 },
+				main: { inheritFast: true, maxOutputTokens: 2048 },
+			},
+		})
+		expect(await store.resolveTextModel('fast')).toMatchObject({
+			maxOutputTokens: 1024,
+		})
+		expect(await store.resolveTextModel('main')).toMatchObject({
+			maxOutputTokens: 2048,
+		})
+		expect(await store.resolveTextModel('writing')).not.toHaveProperty(
+			'maxOutputTokens',
+		)
 		expect(await store.resolveImageModel()).toMatchObject({
 			baseUrl: 'https://image.example.test',
 			model: 'image-model',

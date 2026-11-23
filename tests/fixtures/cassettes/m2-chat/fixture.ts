@@ -27,6 +27,7 @@ export const model = {
 	contextWindow: 4096,
 	compat: 'auto',
 } as const
+const syntheticModel = { ...model, maxOutputTokens: 1 } as const
 export const image =
 	'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII='
 export const prompts = {
@@ -65,10 +66,10 @@ export async function createChatFixture(
 			database: db,
 			workId,
 			cacheDir: join(directory, 'cache'),
-			mainModel: () => model,
+			mainModel: () => syntheticModel,
 			children: {
 				reviewer: {
-					model: () => model,
+					model: () => syntheticModel,
 					instructions: 'Review continuity. Do not make changes.',
 				},
 			},

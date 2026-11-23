@@ -41,6 +41,22 @@ User waivers of a `Check` or a review finding are recorded in the task file
 
 ## Entries
 
+## 2026-11-23 - 共用文本输出预算和推理耗尽重试
+
+- **Decided:** 使用模型目录的输出上限和各槽位可选的真实输出上限；无目录或设置时，仅按上下文估算安全预算，不将估算冒充供应商上限。不默认发送未经证实的低推理参数。只有无正文或工具输出的推理回复才可用更高预算重试一次。
+- **Instead of:** 给所有角色同一个 4,096 token 输出上限，或在中转接口默认发送低推理参数。
+- **Because:** 三次单请求探针均收到 HTTP 200，各同时发送 `max_tokens: 32` 与 `max_completion_tokens: 64`。结果未证明任何模型降低了推理强度：
+
+  | 模型 | 请求推理参数 | 可证实的结果 |
+  | --- | --- | --- |
+  | devin-swe-2 | `reasoning_effort: "minimal"` | 782 输出，仍有推理，两个输出上限都未生效；总计 1,264。 |
+  | gemini-3.8-flash | `reasoning: {effort: "low"}` | 1,215 输出，统计中仍有 124 个推理 token；两个输出上限都未生效；总计 1,236。 |
+  | deepseek-v4.1-flash | `reasoning_effort: "low"` | 64 输出全部为推理，无正文；与 `max_completion_tokens` 相符，本次未采用更短的 `max_tokens`；总计 112。 |
+
+  前两次因中转未按所发上限约束而超过预计的 1,000-token 探针预算，已按实际用量记账，未补发探针。这不是对未发送参数或单独发送任一上限的验证。
+
+  pi-ai 的固定 4,096-token 预留会把 4,096 上下文的 Completions 输出压到 1 token。小上下文的推理模型改用输入估算和比例预留，在同一上下文内给回答留空间，不伪报模型上下文。
+
 ## 2026-11-20 - 新仓库重建，旧仓库只读封存
 
 - **Decided:** 旧实现封存到 `Novelive-legacy`（分支 `archive/mvp1-10-legacy`），在新仓库从头开始；旧代码的取用见“旧仓库代码按需取用”。
