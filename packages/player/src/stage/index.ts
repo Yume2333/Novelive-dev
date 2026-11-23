@@ -1,4 +1,9 @@
-import type { CompiledAction, CompiledScene } from '@novelive/format/script'
+import type { WorkSettings } from '@novelive/format/model'
+import type {
+	Beat,
+	CompiledAction,
+	CompiledScene,
+} from '@novelive/format/script'
 import { toPlaybackBeats } from '../contract/playback'
 import type {
 	ActivePerformance,
@@ -12,6 +17,7 @@ import {
 	restoreSnapshot,
 	type SnapshotRenderer,
 } from '../progress'
+import { mountText } from '../text'
 import { AssetWindow, lookahead } from './assets'
 import { PixiStage } from './renderer'
 import { direct, emptyStage, previewOpening, stageAssets } from './state'
@@ -97,8 +103,13 @@ export async function mountMinimalPlayer(
 	signal: AbortSignal,
 	onError: (error: unknown) => void,
 	speakerNames: Readonly<Record<string, string>> = {},
+	onBeat?: (beat: Beat | undefined) => void,
 	options: {
+		customMarks?: WorkSettings['customMarks']
 		chapterId?: string
+		restore?: StageSnapshot
+		start?: StageSnapshot['position']
+		onSnapshot?(snapshot: StageSnapshot): void
 		progress?: PlaybackProgress
 		initialActions?: readonly CompiledAction[]
 	} = {},
@@ -113,7 +124,9 @@ export async function mountMinimalPlayer(
 		overflow: 'hidden',
 	})
 	element.append(viewport)
-	const stage = await mountStage(viewport, resources, renderText)
+	const stage = await mountStage(viewport, resources, (text) =>
+		renderText(text),
+	)
 	if (signal.aborted) {
 		element.remove()
 		await stage.destroy()
@@ -142,11 +155,34 @@ export async function mountMinimalPlayer(
 		if (box) resizeObserver.observe(box)
 		clipViewport()
 	}
-	const beats = toPlaybackBeats(
-		options.chapterId ?? 'local',
-		scenes,
-		speakerNames,
-	)
+	const chapterId =
+		options.chapterId ??
+		options.restore?.position.chapterId ??
+		options.start?.chapterId ??
+		'local'
+	const beats = toPlaybackBeats(chapterId, scenes, speakerNames)
+	const sourceBeats = scenes.flatMap((scene) => scene.beats)
+	const start = options.restore?.position ?? options.start
+	const startIndex = start
+		? beats.findIndex(
+				(beat) =>
+					beat.cue.kind === 'text' &&
+					beat.cue.position.sceneId === start.sceneId &&
+					beat.cue.position.sentenceId === start.sentenceId,
+			)
+		: 0
+	if (startIndex < 0) {
+		element.remove()
+		resizeObserver.disconnect()
+		await stage.destroy()
+		throw new Error('存档中的句子已不存在')
+	}
+	const initialActions =
+		options.initialActions ??
+		(startIndex > 0
+			? sourceBeats.slice(0, startIndex).flatMap((beat) => beat.actions)
+			: undefined)
+	let restoring = options.restore
 	const positions = beats.flatMap((beat) =>
 		beat.cue.kind === 'text' ? [beat.cue.position] : [],
 	)
@@ -154,28 +190,52 @@ export async function mountMinimalPlayer(
 		positions.findIndex((entry) => samePosition(entry, position))
 	const progress =
 		options.progress ?? new PlaybackProgress((a, b) => order(a) - order(b))
-	progress.openChapter(options.chapterId ?? 'local')
+	progress.openChapter(chapterId)
 	let snapshot: StageSnapshot | null = null
-	let index = -1
+	let index = startIndex - 1
 	let busy = false
 	function setBusy(value: boolean) {
 		busy = value
 		element.ariaBusy = String(value)
 	}
 	let timer: ReturnType<typeof setTimeout> | undefined
-	function schedule(beat: (typeof beats)[number]) {
+	let scheduleId = 0
+	let textRenderer: ReturnType<typeof mountText> | undefined
+	let displayedText: StageState['text'] = null
+	let displayedAuto = false
+	let displayedSkip = false
+	let textSpeed = 30
+	function setting(name: string, fallback: number) {
+		const value = Number.parseFloat(host.style.getPropertyValue(name))
+		return Number.isFinite(value) ? value : fallback
+	}
+	async function schedule(beat: (typeof beats)[number]) {
+		const id = ++scheduleId
 		clearTimeout(timer)
-		if (beat.advance.kind !== 'click' && !signal.aborted)
+		if (beat.advance.kind !== 'click' && !signal.aborted) {
+			let current: typeof textRenderer
+			do {
+				current = textRenderer
+				await current?.finished
+			} while (current !== textRenderer && !signal.aborted && id === scheduleId)
+			if (signal.aborted || id !== scheduleId) return
 			timer = setTimeout(
 				() => void advance(),
-				beat.advance.kind === 'delay'
-					? beat.advance.seconds * 1000
-					: beat.cue.kind === 'text'
-						? 2000
-						: 0,
+				beat.advance.kind === 'delay' ? beat.advance.seconds * 1000 : 0,
 			)
+		}
 	}
-	function renderText(text: StageState['text']) {
+	function renderText(
+		text: StageState['text'],
+		auto = beats[index]?.advance.kind !== 'click',
+		skip = false,
+	) {
+		textRenderer?.dispose()
+		textRenderer = undefined
+		displayedText = text
+		displayedAuto = auto
+		displayedSkip = skip
+		textSpeed = setting('--player-text-delay', 30)
 		overlay.replaceChildren()
 		if (text) {
 			const box = document.createElement('div')
@@ -190,11 +250,39 @@ export async function mountMinimalPlayer(
 			}
 			const content = document.createElement('div')
 			content.className = 'nl-player-text'
-			content.textContent = text.content
-				.map((part) => (part.type === 'text' ? part.text : ''))
-				.join('')
+			content.dataset.textFinished = 'false'
 			box.append(content)
 			overlay.append(box)
+			textRenderer = mountText(content, text.content, {
+				customMarks: options.customMarks,
+				viewport: {
+					element: overlay,
+					textHeight() {
+						const above =
+							content.getBoundingClientRect().top -
+							box.getBoundingClientRect().top
+						const style = getComputedStyle(box)
+						return (
+							overlay.clientHeight -
+							above -
+							Number.parseFloat(style.paddingBottom) -
+							Number.parseFloat(style.borderBottomWidth)
+						)
+					},
+				},
+				millisecondsPerCharacter: textSpeed,
+				auto,
+				continueImmediately: auto && text.kind !== 'caption',
+				skip,
+				get autoSpeedMultiplier() {
+					return 1 / setting('--player-auto-multiplier', 1)
+				},
+			})
+			const current = textRenderer
+			void current.finished.then(() => {
+				if (textRenderer === current && !signal.aborted)
+					content.dataset.textFinished = 'true'
+			})
 		}
 		observeOverlay()
 	}
@@ -204,52 +292,61 @@ export async function mountMinimalPlayer(
 		try {
 			const beat = beats[++index]
 			if (!beat) {
+				renderText(null)
 				overlay.textContent = '本章结束'
 				observeOverlay()
+				onBeat?.(undefined)
 				return
 			}
-			let state = stage.state
-			if (index === 0 && options.initialActions) {
-				for (const action of options.initialActions ?? [])
-					state = direct(state, action)
-				state = previewOpening(state, beat.actions)
-				await stage.commit(state, lookahead(beats, index + 1), [], true)
-			}
-			for (const action of beat.actions) state = direct(state, action)
-			state.text = beat.cue.kind === 'text' ? beat.cue.text : null
-			let incoming: StageSnapshot | null = null
-			if (beat.cue.kind === 'text') {
-				const active: ActivePerformance[] = beat.actions.map((action) =>
-					['move', 'shake'].includes(action.name)
-						? { restore: 'skip-relative' }
-						: { restore: 'replay-state', action },
+			if (restoring) {
+				const saved = restoring
+				restoring = undefined
+				await stage.restore(saved, lookahead(beats, index + 1))
+			} else {
+				let state = stage.state
+				if (index === startIndex && initialActions) {
+					for (const action of initialActions) state = direct(state, action)
+					state = previewOpening(state, beat.actions)
+					await stage.commit(state, lookahead(beats, index + 1), [], true)
+				}
+				for (const action of beat.actions) state = direct(state, action)
+				state.text = beat.cue.kind === 'text' ? beat.cue.text : null
+				let incoming: StageSnapshot | null = null
+				if (beat.cue.kind === 'text') {
+					const active: ActivePerformance[] = beat.actions.map((action) =>
+						['move', 'shake'].includes(action.name)
+							? { restore: 'skip-relative' }
+							: { restore: 'replay-state', action },
+					)
+					incoming = captureSnapshot(
+						beat.cue.position,
+						{ ...state, text: beat.cue.text },
+						[...active, { restore: 'restart-text' }],
+					)
+				}
+				await stage.commit(
+					state,
+					lookahead(beats, index + 1),
+					beat.actions,
+					false,
+					() => {
+						if (incoming) snapshot = incoming
+						renderText(state.text)
+					},
 				)
-				incoming = captureSnapshot(
-					beat.cue.position,
-					{ ...state, text: beat.cue.text },
-					[...active, { restore: 'restart-text' }],
-				)
 			}
-			await stage.commit(
-				state,
-				lookahead(beats, index + 1),
-				beat.actions,
-				false,
-				() => {
-					if (incoming) snapshot = incoming
-					renderText(state.text)
-				},
-			)
 			if (signal.aborted) return
+			onBeat?.(sourceBeats[index])
 			if (beat.cue.kind === 'text') {
 				snapshot = captureSnapshot(
 					beat.cue.position,
-					{ ...stage.state, text: beat.cue.text },
+					{ ...stage.state, text: stage.state.text ?? beat.cue.text },
 					[{ restore: 'restart-text' }],
 				)
 				progress.record(snapshot)
+				options.onSnapshot?.(structuredClone(snapshot))
 			}
-			schedule(beat)
+			void schedule(beat)
 		} catch (error) {
 			onError(error)
 		} finally {
@@ -258,15 +355,30 @@ export async function mountMinimalPlayer(
 	}
 	const click = () => {
 		if (busy) stage.complete()
-		else if (beats[index]?.advance.kind === 'click') void advance()
+		else if (!textRenderer?.click() && beats[index]?.advance.kind === 'click')
+			void advance()
+	}
+	const settingsChanged = () => {
+		if (displayedText && textSpeed !== setting('--player-text-delay', 30))
+			renderText(displayedText, displayedAuto, displayedSkip)
+	}
+	const skip = () => {
+		if (displayedText && displayedAuto && !displayedSkip)
+			renderText(displayedText, true, true)
 	}
 	host.addEventListener('click', click)
+	host.addEventListener('novelive:player-settings', settingsChanged)
+	host.addEventListener('novelive:player-skip', skip)
 	signal.addEventListener(
 		'abort',
 		() => {
+			++scheduleId
 			clearTimeout(timer)
+			textRenderer?.dispose()
 			resizeObserver.disconnect()
 			host.removeEventListener('click', click)
+			host.removeEventListener('novelive:player-settings', settingsChanged)
+			host.removeEventListener('novelive:player-skip', skip)
 			element.remove()
 			void stage.destroy()
 		},
@@ -302,16 +414,19 @@ export async function mountMinimalPlayer(
 			if (restoredIndex < 0) throw new Error('存档句子不在当前章节')
 			if (busy) throw new Error('舞台正在切换')
 			setBusy(true)
+			++scheduleId
 			clearTimeout(timer)
 			try {
 				await stage.restore(saved, lookahead(beats, restoredIndex + 1))
 				index = restoredIndex
-				schedule(beats[index])
 				snapshot = captureSnapshot(
 					saved.position,
 					{ ...stage.state, text: saved.stage.text },
 					[{ restore: 'restart-text' }],
 				)
+				onBeat?.(sourceBeats[index])
+				options.onSnapshot?.(structuredClone(snapshot))
+				void schedule(beats[index])
 			} finally {
 				setBusy(false)
 			}

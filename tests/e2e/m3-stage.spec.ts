@@ -59,7 +59,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 	if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics))
 	const last = compiled.scenes[0].beats.at(-1)
 	if (!last) throw new Error('Missing automatic sentence fixture')
-	last.advance = { kind: 'auto' }
+	last.advance = { kind: 'delay', seconds: 1 }
 	const background = (
 		await sharp({
 			create: { width: 960, height: 540, channels: 3, background: '#203060' },
@@ -90,6 +90,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 				const runtime = globalThis as unknown as StageHarness
 				const host = document.createElement('div')
 				host.className = 'nl-player'
+				host.style.setProperty('--player-text-delay', '0ms')
 				document.body.replaceChildren(host)
 				runtime.abort = new AbortController()
 				const player = await runtime.StageTest.mountMinimalPlayer(
@@ -107,6 +108,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 						throw error
 					},
 					{},
+					undefined,
 					{
 						chapterId: 'chapter',
 						initialActions: [
@@ -135,7 +137,9 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			},
 			{ scenes: compiled.scenes, background, portrait },
 		)
-		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'First',
+		)
 		console.log(
 			'Default renderer:',
 			await page
@@ -166,8 +170,12 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 		for (const [channel, expected] of [224, 96, 48].entries())
 			expect(Math.abs(portraitPixel[channel] - expected)).toBeLessThanOrEqual(4)
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
-		await expect(page.locator('.nl-player-text')).toHaveCount(0)
-		await expect(page.locator('.nl-player-text')).toHaveText('Second')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveCount(
+			0,
+		)
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'Second',
+		)
 		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
 			'aria-busy',
 			'false',
@@ -196,19 +204,25 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			const { player, saved } = globalThis as unknown as StageHarness
 			await player.restore(saved)
 		})
-		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'First',
+		)
 		await page.evaluate(async () => {
 			const { player, saved } = globalThis as unknown as StageHarness
 			await player.restore(saved)
 		})
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
-		await expect(page.locator('.nl-player-text')).toHaveText('Second')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'Second',
+		)
 		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
 			'aria-busy',
 			'false',
 		)
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
-		await expect(page.locator('.nl-player-text')).toHaveText('Dim')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'Dim',
+		)
 		await expect
 			.poll(async () => [
 				...(await sharp(await page.screenshot())
@@ -264,20 +278,26 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 				() => (globalThis as unknown as StageHarness).player.state.filter,
 			),
 		).toEqual({ effect: 'brightness', value: 0.5 })
-		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'First',
+		)
 		await page.evaluate(() =>
 			(globalThis as unknown as StageHarness).player.restore(
 				(globalThis as unknown as StageHarness).saved,
 			),
 		)
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
-		await expect(page.locator('.nl-player-text')).toHaveText('Second')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'Second',
+		)
 		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
 			'aria-busy',
 			'false',
 		)
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
-		await expect(page.locator('.nl-player-text')).toHaveText('Dim')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'Dim',
+		)
 		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
 			'aria-busy',
 			'false',
@@ -286,7 +306,9 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			() => (globalThis as unknown as StageHarness).player.snapshot,
 		)
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
-		await expect(page.locator('.nl-player-text')).toHaveCount(0)
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveCount(
+			0,
+		)
 		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
 			'aria-busy',
 			'false',
@@ -297,7 +319,9 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			),
 		).toEqual(lastSentence)
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
-		await expect(page.locator('.nl-player-text')).toHaveText('Auto')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'Auto',
+		)
 		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
 			'aria-busy',
 			'false',
@@ -340,6 +364,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 				]
 				const host = document.createElement('div')
 				host.className = 'nl-player'
+				host.style.setProperty('--player-text-delay', '0ms')
 				document.body.replaceChildren(host)
 				runtime.abort = new AbortController()
 				const commit = runtime.StageTest.PixiStage.prototype.commit
@@ -368,6 +393,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 						throw error
 					},
 					{},
+					undefined,
 					{
 						initialActions: [
 							{
@@ -392,7 +418,9 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			},
 			{ scenes: compiled.scenes, background, portrait },
 		)
-		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		await expect(page.locator('.nl-player-text .nl-text-display')).toHaveText(
+			'First',
+		)
 		const previewPixel = async (x: number) => {
 			const point = await page.evaluate(async (x) => {
 				await new Promise<void>((resolve) =>
@@ -569,7 +597,11 @@ test('M3 stage directions render the direction set and four landscape fill crops
 				window.location.hash = `/work/${id}/play`
 			}, playerWorkId)
 			await page.getByRole('button', { name: '打开本地工程' }).click()
-			const text = page.locator('.nl-player-text')
+			await page.locator('.nl-player').evaluate((host) => {
+				host.style.setProperty('--player-text-delay', '0ms')
+				host.dispatchEvent(new Event('novelive:player-settings'))
+			})
+			const text = page.locator('.nl-player-text .nl-text-display')
 			const canvas = page.locator('.nl-player canvas')
 			let panelWithoutParticles = Buffer.alloc(0)
 			async function panelPixels() {
