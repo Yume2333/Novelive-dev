@@ -56,6 +56,7 @@ const isMissing = (error: unknown) =>
 	error instanceof Error && 'code' in error && error.code === 'ENOENT'
 const moderationHint = '上一次生成被内容审核拒绝，请收敛描写'
 const baseKeep = ['脸型', '发型', '瞳色', '服装', '姿势', '取景', '画风']
+const registryWrites = new Map<string, Promise<unknown>>()
 
 export class ArtProduction {
 	private readonly render
@@ -139,18 +140,19 @@ export class ArtProduction {
 		return task
 	}
 
-	private registryWrite: Promise<void> = Promise.resolve()
-
 	private saveStatus(id: string, status: RegistryEntry['status']) {
 		return this.writeRegistry(() => this.update(id, status))
 	}
 
 	private writeRegistry<T>(operation: () => Promise<T>) {
-		const task = this.registryWrite.then(operation)
-		this.registryWrite = task.then(
-			() => {},
-			() => {},
-		)
+		const key = `${this.project.root}/${this.registryFile.path}`
+		const previous = registryWrites.get(key)
+		const task = previous ? previous.then(operation, operation) : operation()
+		registryWrites.set(key, task)
+		const clear = () => {
+			if (registryWrites.get(key) === task) registryWrites.delete(key)
+		}
+		void task.then(clear, clear)
 		return task
 	}
 
@@ -565,27 +567,29 @@ export class ArtProduction {
 				description: i === 0 ? '主视觉' : '补充画风参考',
 			})
 		}
-		const registry = await this.registry()
-		for (const { id, path } of costumes) {
-			const existing = registry.entries.find((entry) => entry.id === id)
-			const destination =
-				existing?.path ?? this.scoped(`assets/characters/${id}.webp`)
-			await this.saveWebp(
-				destination,
-				await this.project.readFile(path),
-				this.outputSize(true),
-			)
-			if (existing) existing.status = 'drawn'
-			else
-				registry.entries.push({
-					id,
-					path: destination,
-					type: 'character',
-					status: 'drawn',
-					aliases: [],
-				})
-		}
-		await this.project.write(this.registryFile, registry)
+		await this.writeRegistry(async () => {
+			const registry = await this.registry()
+			for (const { id, path } of costumes) {
+				const existing = registry.entries.find((entry) => entry.id === id)
+				const destination =
+					existing?.path ?? this.scoped(`assets/characters/${id}.webp`)
+				await this.saveWebp(
+					destination,
+					await this.project.readFile(path),
+					this.outputSize(true),
+				)
+				if (existing) existing.status = 'drawn'
+				else
+					registry.entries.push({
+						id,
+						path: destination,
+						type: 'character',
+						status: 'drawn',
+						aliases: [],
+					})
+			}
+			await this.project.write(this.registryFile, registry)
+		})
 		const chosen: Style = { ...style, status: 'confirmed', references }
 		const file = projectFiles.style(this.scope)
 		let entries: Style[] = []
