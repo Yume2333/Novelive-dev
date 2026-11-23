@@ -14,6 +14,6 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict pnpm test:e2e --grep 'M1b make and play'` → `1 passed (21.3s)`；`NL_REPLAY=strict pnpm check` → `Tests  323 passed (323)`。
+- Check after: `NL_REPLAY=strict pnpm test:e2e --grep 'M1b make and play'` → `1 passed (20.7s)`；`NL_REPLAY=strict pnpm check` → `Tests  324 passed (324)`。
 - Real path: Electron 导入 TXT → 确认角色和主视觉 → 停止并恢复 → 第一章发布并试玩 → 确认继续 → 重试第二章 → 占位发布；SQLite 确认第二章未提前发布。截图和使用量见 [receipt](../../evidence/m1b/offline/receipt.txt)。
 - Review: skipped — no fresh independent reviewer available.

@@ -152,11 +152,18 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			await page.getByRole('button', { name: '继续制作' }).click()
 			const second = page.getByRole('listitem').filter({ hasText: '灯火' })
 			await expect(second.getByRole('button', { name: '重试' })).toBeVisible()
+			await expect(second.getByText(/\[invalid_config\]/)).toBeVisible()
 			await second.getByRole('button', { name: '重试' }).click()
 			await expect(second.getByText('已发布', { exact: true })).toBeVisible({
 				timeout: 20_000,
 			})
 			await expect(second.getByText('需要处理', { exact: true })).toBeVisible()
+			await expect(second.getByText('1 张图用了占位图')).toBeVisible()
+			await expect(second.getByText(/\[invalid_config\]/)).toHaveCount(0)
+			await expect(
+				page.getByText('1 章需要处理', { exact: true }),
+			).toBeVisible()
+			await expect(page.getByText(/制作已暂停/)).toHaveCount(0)
 			await second.getByRole('button', { name: '运行记录' }).click()
 			await expect(
 				second

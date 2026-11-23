@@ -1049,9 +1049,9 @@ export class ChapterScheduler {
 	private chapterIssue(row: { task_id: string; placeholder: number }) {
 		const failure = this.get<{ error_message: string | null }>(
 			`SELECT r.error_message FROM run r
-			WHERE r.status = 'needs_attention' AND json_extract(r.meta, '$.taskId') IN (
-				SELECT ? UNION SELECT d.depends_on FROM task_dep d JOIN task t ON t.task_id = d.depends_on
-				WHERE d.task_id = ? AND t.status = 'needs_attention')
+			JOIN task t ON t.task_id = json_extract(r.meta, '$.taskId')
+			WHERE r.status = 'needs_attention' AND t.status = 'needs_attention'
+				AND (t.task_id = ? OR t.task_id IN (SELECT depends_on FROM task_dep WHERE task_id = ?))
 			ORDER BY r.started_at DESC, r.rowid DESC LIMIT 1`,
 			row.task_id,
 			row.task_id,

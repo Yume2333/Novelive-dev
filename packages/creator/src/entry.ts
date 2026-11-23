@@ -4,18 +4,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createConfigStore } from './config'
 import { type CreatorFrame, clientFrame, creatorCommandError } from './contract'
-import { createProduction } from './project/production'
 import { createRegistry } from './registry'
 import { createReplayFetch, type ReplayOptions } from './replay'
 
 const parent = process.parentPort
 const generation = Number(process.env.NL_CREATOR_GENERATION)
 const registry = createRegistry()
-const dataDir = process.env.NL_CREATOR_DATA_DIR
-assert(dataDir, 'Creator data directory is required')
+const configuredDataDir = process.env.NL_CREATOR_DATA_DIR
+assert(configuredDataDir, 'Creator data directory is required')
+const dataDir = configuredDataDir
 const config = createConfigStore(dataDir)
 const cacheDir = join(dataDir, 'cache')
 let sendEvent: ((frame: CreatorFrame) => void) | undefined
+let production: ReturnType<typeof loadProduction> | undefined
 
 function strictReplayOptions(): ReplayOptions | undefined {
 	if (process.env.NL_REPLAY !== 'strict') return undefined
@@ -27,48 +28,61 @@ function strictReplayOptions(): ReplayOptions | undefined {
 	}
 }
 
-const production = createProduction(
-	dataDir,
-	config,
-	strictReplayOptions(),
-	(envelope) => sendEvent?.({ type: 'event', generation, envelope }),
-	(active) =>
-		parent.postMessage({ type: 'production.active', generation, active }),
-)
+function loadProduction() {
+	return import('./project/production').then(({ createProduction }) =>
+		createProduction(
+			dataDir,
+			config,
+			strictReplayOptions(),
+			(envelope) => sendEvent?.({ type: 'event', generation, envelope }),
+			(active) =>
+				parent.postMessage({ type: 'production.active', generation, active }),
+		),
+	)
+}
+
+function getProduction() {
+	production ??= loadProduction()
+	return production
+}
+
+async function productionSession(workId: string) {
+	return (await getProduction()).get(workId)
+}
 
 registry.register('config.get', () => config.get())
 registry.register('config.update', (patch) => config.update(patch))
 registry.register('config.reset', () => config.reset())
-registry.register('production.playerChapter', ({ directory, workId }) =>
-	production.player(workId, directory),
+registry.register('production.playerChapter', async ({ directory, workId }) =>
+	(await getProduction()).player(workId, directory),
 )
 registry.register('production.get', async ({ workId }) =>
-	(await production.get(workId)).snapshot(),
+	(await productionSession(workId)).snapshot(),
 )
 registry.register('production.resolveAsset', async ({ workId, assetId }) =>
-	(await production.get(workId)).asset(assetId),
+	(await productionSession(workId)).asset(assetId),
 )
 registry.register('production.confirmVisual', async (input) =>
-	(await production.get(input.workId)).confirm(input),
+	(await productionSession(input.workId)).confirm(input),
 )
 registry.register('production.continue', async ({ workId }) => {
-	const session = await production.get(workId)
+	const session = await productionSession(workId)
 	session.queue.continue(workId)
 	return session.snapshot()
 })
 registry.register('production.stop', async ({ workId }) =>
-	(await production.get(workId)).queue.stop(workId),
+	(await productionSession(workId)).queue.stop(workId),
 )
 registry.register(
 	'production.prioritizeChapter',
 	async ({ workId, chapterId }) => {
-		const session = await production.get(workId)
+		const session = await productionSession(workId)
 		session.queue.prioritizeChapter(workId, chapterId)
 		return session.snapshot()
 	},
 )
 registry.register('production.retryChapter', async ({ workId, chapterId }) => {
-	const session = await production.get(workId)
+	const session = await productionSession(workId)
 	session.queue.retryChapter(workId, chapterId)
 	return session.snapshot()
 })
@@ -107,20 +121,20 @@ registry.register('import.txt', async (payload) => {
 	const { importTxtProject } = await import('./project-pipeline')
 	const result = await importTxtProject(payload)
 	if (result.status === 'ready')
-		await production.remember(result.workId, result.projectDir)
+		await (await getProduction()).remember(result.workId, result.projectDir)
 	return result
 })
 registry.register('import.revise', async ({ projectDir, layout }) => {
 	const { reviseTxtProject } = await import('./project-pipeline')
 	const result = await reviseTxtProject(projectDir, layout)
-	await production.remember(result.workId, result.projectDir)
+	await (await getProduction()).remember(result.workId, result.projectDir)
 	return result
 })
 
 registry.register('events.list', async ({ scope, scopeId, afterSeq }) => ({
 	events:
 		scope === 'work'
-			? (await production.get(scopeId)).records.filter(
+			? (await productionSession(scopeId)).records.filter(
 					({ seq }) => seq > afterSeq,
 				)
 			: [],
@@ -206,7 +220,7 @@ parent.once('message', ({ ports }) => {
 		sendEvent = undefined
 		for (const controller of pending.values()) controller.abort()
 		pending.clear()
-		void production.close()
+		void production?.then((session) => session.close())
 	})
 	port.start()
 	parent.postMessage({ type: 'ready', generation })
