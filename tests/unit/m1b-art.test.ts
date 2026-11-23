@@ -727,6 +727,57 @@ test('an opaque RGBA response counts toward the unavailable-matting candidate li
 	}
 })
 
+test('skips an isolated opaque RGBA candidate when matting is unavailable and retries are off', async () => {
+	const rgb = await picture(320, 480, false)
+	const rgba = await sharp(rgb).ensureAlpha().png().toBuffer()
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const responses = [rgb, rgb, rgba, portrait, portrait]
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(async (_prompt, _refs, _size, transparent) => {
+			const bytes = transparent ? responses.shift() : landscape
+			if (!bytes) throw new Error('Unexpected extra portrait request')
+			return { bytes }
+		})
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: 'Ada' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay, undefined, undefined, undefined, 0)
+			const [ada] = bible.characters
+			const pool = await art.candidates(
+				{ ...bible, characters: [ada, { ...ada, id: 'bea', name: 'Bea' }] },
+				['c1'],
+				'assets/main.webp',
+			)
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [
+					{
+						characterId: 'bea',
+						candidates: [{ id: 'costume-2' }, { id: 'costume-3' }],
+					},
+				],
+			})
+			expect(responses).toHaveLength(0)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(
 		'Invalid staging patch',

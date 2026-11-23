@@ -568,21 +568,25 @@ export class ArtProduction {
 				base: derived ? refs[0] : undefined,
 				variant: drawing.kind === 'variant',
 			}
+			let nativeTransparency: boolean | undefined
 			let checked = await checkImage(result.bytes, target, {
 				...checks,
 				onTransparency: candidateBudget
 					? (transparentEnough) => {
-							candidateBudget.opaqueStreak = transparentEnough
-								? 0
-								: candidateBudget.opaqueStreak + 1
+							nativeTransparency = transparentEnough
 						}
 					: undefined,
 			})
-			if (
-				candidateBudget?.matting.error &&
-				candidateBudget.opaqueStreak >= opaqueCandidateLimit
-			)
-				throw candidateBudget.matting.error
+			if (candidateBudget && nativeTransparency !== undefined) {
+				candidateBudget.opaqueStreak = nativeTransparency
+					? 0
+					: candidateBudget.opaqueStreak + 1
+				if (
+					candidateBudget.matting.error &&
+					candidateBudget.opaqueStreak >= opaqueCandidateLimit
+				)
+					throw candidateBudget.matting.error
+			}
 			if ('issue' in checked && checked.unsupported) {
 				let recovered: Buffer
 				try {
@@ -599,6 +603,13 @@ export class ArtProduction {
 			}
 			if ('issue' in checked) {
 				if (checked.unsupported) return checked
+				if (
+					nativeTransparency === false &&
+					candidateBudget?.matting.error &&
+					attempt > this.options.image.retries &&
+					!reviewed
+				)
+					throw candidateBudget.matting.error
 				if (
 					drawing.kind === 'expression' &&
 					(checked.issue === spriteFrameIssue ||
