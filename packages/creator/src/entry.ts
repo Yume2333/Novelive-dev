@@ -65,11 +65,9 @@ registry.register('production.resolveAsset', async ({ workId, assetId }) =>
 registry.register('production.confirmVisual', async (input) =>
 	(await productionSession(input.workId)).confirm(input),
 )
-registry.register('production.continue', async ({ workId }) => {
-	const session = await productionSession(workId)
-	session.queue.continue(workId)
-	return session.snapshot()
-})
+registry.register('production.continue', async ({ workId }) =>
+	(await productionSession(workId)).continue(),
+)
 registry.register('production.stop', async ({ workId }) =>
 	(await productionSession(workId)).queue.stop(workId),
 )
@@ -81,11 +79,9 @@ registry.register(
 		return session.snapshot()
 	},
 )
-registry.register('production.retryChapter', async ({ workId, chapterId }) => {
-	const session = await productionSession(workId)
-	session.queue.retryChapter(workId, chapterId)
-	return session.snapshot()
-})
+registry.register('production.retryChapter', async ({ workId, chapterId }) =>
+	(await productionSession(workId)).retry(chapterId),
+)
 registry.register('model.suggestContextWindow', async (model) => {
 	const { suggestContextWindow } = await import('./models/text')
 	return suggestContextWindow(model)

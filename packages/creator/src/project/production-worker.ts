@@ -25,6 +25,7 @@ const drawing = (id: string) => `source/production/art/${id}.json`
 
 export async function productionModels(
 	config: ReturnType<typeof createConfigStore>,
+	presetId?: string,
 ) {
 	const [
 		organizer,
@@ -49,7 +50,7 @@ export async function productionModels(
 		config.resolveRoleModel('painter-variant'),
 		config.resolveRoleModel('reviewer-visual'),
 		config.resolveImageModel(),
-		config.resolveWriterPreset(),
+		config.resolveWriterPreset(presetId),
 	])
 	return {
 		organizer,
@@ -316,5 +317,11 @@ export function chapterWorker(
 			)
 		},
 	}
-	return { worker, art }
+	return {
+		worker,
+		art,
+		setModels(next: typeof models) {
+			models = next
+		},
+	}
 }

@@ -88,8 +88,10 @@ export function createProduction(
 					]),
 				),
 			)
-			const models = await productionModels(config)
-			const { art, worker } = chapterWorker(
+			const settings = () =>
+				productionModels(config, work.settings.writerPresetId)
+			const models = await settings()
+			const { art, worker, setModels } = chapterWorker(
 				project,
 				volumeId,
 				work,
@@ -163,6 +165,11 @@ export function createProduction(
 				onChange: emit,
 			})
 			scheduler = queue
+			async function refresh() {
+				const next = await settings()
+				setModels(next)
+				queue.setImageConcurrency(next.image.concurrency)
+			}
 			if (!started || queue.snapshot(workId).phase === 'confirm-visual') {
 				if (!started) {
 					const { synthesis } = await prepareVolume(project, volumeId, {
@@ -234,12 +241,23 @@ export function createProduction(
 				records,
 				async confirm(input: CommandInput<'production.confirmVisual'>) {
 					if (snapshot().phase !== 'confirm-visual' || !pool) return snapshot()
-					await service.confirmVisual(
+					await refresh()
+					await art().confirmVisual(
 						(await productionBible(project)).art.style,
 						pool,
 						input,
 					)
 					queue.confirmVisual(workId)
+					return snapshot()
+				},
+				async continue() {
+					await refresh()
+					queue.continue(workId)
+					return snapshot()
+				},
+				async retry(chapterId: string) {
+					await refresh()
+					queue.retryChapter(workId, chapterId)
 					return snapshot()
 				},
 				async asset(id: string) {

@@ -13,6 +13,8 @@ import {
 	combineCassettes,
 	configuration,
 	original,
+	recoveredWriter,
+	rejectedWriter,
 } from '../fixtures/cassettes/m1b-gate/fixture'
 
 const require = createRequire(
@@ -78,6 +80,14 @@ test('M1b make and play publishes through both confirmation points in real Elect
 				[source, projects],
 			)
 			const page = await app.firstWindow()
+			const setWritingModel = (model: string) =>
+				page.evaluate(
+					(model) =>
+						window.novelive.call('config.update', {
+							models: { writing: { model } },
+						}).promise,
+					model,
+				)
 			await expect(page.getByText('创作端已就绪')).toBeAttached()
 			await page.evaluate(
 				(patch) => window.novelive.call('config.update', patch).promise,
@@ -149,10 +159,12 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			await expect(page.locator('canvas')).toBeVisible()
 			await capture(page, '04-play-chapter-one')
 			await page.goBack()
+			await setWritingModel(rejectedWriter)
 			await page.getByRole('button', { name: '继续制作' }).click()
 			const second = page.getByRole('listitem').filter({ hasText: '灯火' })
 			await expect(second.getByRole('button', { name: '重试' })).toBeVisible()
 			await expect(second.getByText(/\[invalid_config\]/)).toBeVisible()
+			await setWritingModel(recoveredWriter)
 			await second.getByRole('button', { name: '重试' }).click()
 			await expect(second.getByText('已发布', { exact: true })).toBeVisible({
 				timeout: 20_000,

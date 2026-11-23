@@ -10,6 +10,9 @@ export const original = [
 	'',
 ].join('\n')
 
+export const rejectedWriter = 'gate-writer-rejected'
+export const recoveredWriter = 'gate-writer-recovered'
+
 const text = {
 	baseUrl: 'https://relay.invalid/v1',
 	apiKey: 'offline-placeholder',

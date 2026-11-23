@@ -7,11 +7,17 @@ import { importTxtProject } from '../../../../packages/creator/src/import/wizard
 import { createProduction } from '../../../../packages/creator/src/project/production'
 import { createReplayFetch } from '../../../../packages/creator/src/replay'
 import { bible, picture } from '../m1b-art/fixture'
-import { artDirectory, configuration, gateDirectory, original } from './fixture'
+import {
+	artDirectory,
+	configuration,
+	gateDirectory,
+	original,
+	recoveredWriter,
+	rejectedWriter,
+} from './fixture'
 
 const existing = createReplayFetch({ mode: 'strict', directory: artDirectory })
 let hits = 0
-let secondAttempts = 0
 function completion(content: string, tool?: string) {
 	const delta = tool
 		? {
@@ -74,11 +80,12 @@ const synthetic: typeof globalThis.fetch = async (input, init) => {
 		return completion('{"issues":[]}', 'submit_review')
 	if (prompt.startsWith('Write a visual novel adaptation')) {
 		const second = prompt.includes('p0001: 桥边的灯亮了')
-		if (second && ++secondAttempts === 1)
+		if (second && body.model === rejectedWriter)
 			return Response.json(
 				{ error: { message: 'Temporary fixture rejection' } },
 				{ status: 400 },
 			)
+		if (second) assert.equal(body.model, recoveredWriter)
 		return completion(
 			second
 				? 'scene 灯火\nsource p0001\n\n: 桥边的灯亮了，纸船继续向前漂。'
@@ -235,14 +242,16 @@ try {
 			'confirm-first',
 			JSON.stringify(session.snapshot()),
 		)
-		session.queue.continue(workId)
+		await config.update({ models: { writing: { model: rejectedWriter } } })
+		await session.continue()
 		await session.queue.idle()
 		assert.equal(
 			session.snapshot().blockedChapterId,
 			'ch0002',
 			JSON.stringify(session.snapshot()),
 		)
-		session.queue.retryChapter(workId, 'ch0002')
+		await config.update({ models: { writing: { model: recoveredWriter } } })
+		await session.retry('ch0002')
 		await session.queue.idle()
 		assert.equal(
 			session.snapshot().phase,

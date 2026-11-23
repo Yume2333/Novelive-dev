@@ -119,7 +119,7 @@ const assetKind = {
 export class ChapterScheduler {
 	private readonly inflight = new Map<string, Inflight>()
 	private readonly running = new Set<Promise<void>>()
-	private readonly imageConcurrency: number
+	private imageConcurrency: number
 	private readonly now: () => number
 	private readonly onChange?: () => void
 	private disposed = false
@@ -133,6 +133,10 @@ export class ChapterScheduler {
 		this.now = options.now ?? Date.now
 		this.onChange = options.onChange
 		this.recover()
+	}
+
+	setImageConcurrency(limit: number) {
+		this.imageConcurrency = limit
 	}
 
 	start(
