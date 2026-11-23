@@ -28,6 +28,18 @@ const ruleSyntax = /[{}@\\<>]|\/\*/
 const indirectValue =
 	/\b(?:url|src|(?:-webkit-)?image-set|image|expression|paint|var|attr)\s*\(/i
 
+export const glyphProperties = new Set([
+	'background-color',
+	'opacity',
+	'text-decoration',
+	'text-decoration-color',
+	'text-decoration-line',
+	'text-decoration-style',
+	'text-decoration-thickness',
+	'transform',
+	'transform-origin',
+])
+
 type Declaration = [property: string, value: string, priority: string]
 
 export function markDeclarations(name: string, css: string): Declaration[] {

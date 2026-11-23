@@ -1,6 +1,6 @@
 import type { WorkSettings } from '@novelive/format/model'
 import type { Inline } from '@novelive/format/script'
-import { markDeclarations } from './custom-marks'
+import { glyphProperties, markDeclarations } from './custom-marks'
 import { textTiming } from './timing'
 import './text.css'
 
@@ -49,7 +49,10 @@ export function mountText(
 			if (mark && !styles.has(part.name))
 				styles.set(part.name, markDeclarations(part.name, mark.css))
 			const styled = !!styles.get(part.name)?.length
-			if (styled && !mark?.perChar) element.dataset.markStyle = part.name
+			if (styled) {
+				if (mark?.perChar) element.dataset.markInheritance = part.name
+				else element.dataset.markStyle = part.name
+			}
 			current.append(element)
 			stack.push({
 				element,
@@ -88,11 +91,15 @@ export function mountText(
 	display.removeAttribute('aria-hidden')
 	for (const layer of [layout, display]) {
 		for (const element of layer.querySelectorAll<HTMLElement>(
-			'[data-mark-style]',
+			'[data-mark-style], [data-mark-inheritance]',
 		)) {
+			const inherited = element.dataset.markInheritance
+			const glyph = element.classList.contains('nl-text-mark-char')
 			for (const [property, value, priority] of styles.get(
-				element.dataset.markStyle ?? '',
+				element.dataset.markStyle ?? inherited ?? '',
 			) ?? []) {
+				if (glyph && !glyphProperties.has(property)) continue
+				if (inherited && glyphProperties.has(property)) continue
 				if (priority || !element.style.getPropertyPriority(property))
 					element.style.setProperty(property, value, priority)
 			}

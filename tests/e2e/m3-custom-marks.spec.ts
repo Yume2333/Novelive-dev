@@ -73,6 +73,11 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 							perChar: false,
 						},
 						unsafe: { css: 'color: red; } body { opacity: 0', perChar: false },
+						large: {
+							css: 'font-size: 72px; letter-spacing: 0.04em',
+							perChar: true,
+						},
+						shift: { css: 'transform: translateX(12px)', perChar: false },
 					},
 				},
 			})
@@ -94,7 +99,10 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			)
 			await project.writeFile(
 				projectFiles.scene(playerRef, 'aaaabbbb'),
-				'scene 夜空\nsource p0001\n@bg room/dusk\n: 萤火{unsafe}照亮了{/unsafe}{wave}夜空{/wave}。 #0001\n',
+				'scene 夜空\nsource p0001\n@bg room/dusk\n: 萤火{unsafe}照亮了{/unsafe}{wave}夜空{/wave}。 #0001\n' +
+					': {speed 100}前{large}大字{/large}后{/speed} #0002\n' +
+					`: {speed 100}{shift}${'山川'.repeat(20)}{/shift}{/speed} #0003\n` +
+					': {speed 100}萤火{wave}夜空{/wave}{/speed} #0004\n',
 			)
 		}
 		await mkdir(join(profile, 'projects'), { recursive: true })
@@ -128,6 +136,18 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			await expect(save).toBeEnabled()
 			await save.click()
 			await expect(save).toBeDisabled()
+			await page.getByRole('button', { name: '快捷位置', exact: true }).click()
+			await page.getByRole('menuitem', { name: /^7 ·/ }).click()
+			await script.press('End')
+			await script.press('Shift+Home')
+			await page.keyboard.insertText(
+				': {speed 100}{glow}萤火{wave}夜空{/wave}{/glow}{/speed} #0004',
+			)
+			await expect(save).toBeEnabled()
+			await save.click()
+			await expect(save).toBeDisabled()
+			await page.getByRole('button', { name: '快捷位置', exact: true }).click()
+			await line.click()
 			await page.getByRole('button', { name: '从当前句预览' }).click()
 			const preview = page.locator('.editor-stage .nl-player-text')
 			await expectMarks(preview)
@@ -141,6 +161,60 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			await expectMarks(playback)
 			await expect(playback).toHaveAttribute('data-text-finished', 'true')
 			await page.screenshot({ path: `${evidence}/08-custom-mark-playback.png` })
+			const advance = () =>
+				page.locator('.nl-player canvas').click({ position: { x: 20, y: 20 } })
+			const display = playback.locator('.nl-text-display')
+			await advance()
+			await expect(display).toHaveText('前大字后')
+			await expect(playback).toHaveAttribute('data-text-finished', 'true')
+			const large = display.locator('[data-mark-style="large"]').first()
+			const fits = await large.evaluate((element) => {
+				const glyph = element.getBoundingClientRect()
+				const clip = element.closest('.nl-text-window')?.getBoundingClientRect()
+				return !!clip && clip.top <= glyph.top && clip.bottom >= glyph.bottom
+			})
+			expect
+				.soft(fits, 'enlarged glyph is inside the visible text window')
+				.toBe(true)
+
+			await advance()
+			await expect(display).toHaveText('山川'.repeat(20))
+			const shift = display.locator('[data-mark-style="shift"]')
+			const shiftStyle = await shift.evaluate((element) => ({
+				left: element.getBoundingClientRect().left,
+				layoutLeft: document
+					.querySelector('.nl-text-layout [data-mark-style="shift"]')
+					?.getBoundingClientRect().left,
+				lines: new Set(
+					Array.from(element.querySelectorAll('[data-glyph]'), (glyph) =>
+						Math.round(glyph.getBoundingClientRect().top),
+					),
+				).size,
+			}))
+			expect
+				.soft(
+					shiftStyle.left - (shiftStyle.layoutLeft ?? 0),
+					'run translation is painted',
+				)
+				.toBeCloseTo(12)
+			expect
+				.soft(shiftStyle.lines, 'transformed run still wraps')
+				.toBeGreaterThan(1)
+			await expect(playback).toHaveAttribute('data-text-finished', 'true')
+			await advance()
+			await expect(display).toHaveText('萤火夜空')
+			const innerGlyph = display
+				.locator('[data-mark-style="wave"] [data-glyph]')
+				.first()
+			expect
+				.soft(
+					await innerGlyph.evaluate(
+						(element) =>
+							getComputedStyle(element.firstElementChild ?? element).color,
+					),
+					'innermost mark supplies glyph color',
+				)
+				.toBe('rgb(142, 232, 255)')
 		} finally {
 			await app.close()
 		}
