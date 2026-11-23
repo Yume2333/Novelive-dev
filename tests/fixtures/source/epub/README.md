@@ -10,7 +10,7 @@
 NL_REPLAY=strict NL_EPUB_PROVIDER_MODE=strict pnpm exec vitest run tests/unit/m4-epub.test.ts -t 'EPUB classification provider driver'
 ```
 
-录制模式先回放现有请求，只为缺档付费并追加。若确需替换旧响应，须经协调者重新授权并选择新的私有目录，而不是向同 key 重复录制。缺少完整输入/输出用量时继续保留 40000-token 预留，直到对账。
+录制模式先回放现有请求，只为缺档付费并追加；新的非成功 HTTP 响应不会写入 cassette，但其用量或预留仍记账。若确需替换旧响应或历史错误，须经协调者重新授权并以 `NL_EPUB_CASSETTE_DIR` 选择新的私有目录，而不是向同 key 重复录制；历史响应不删除。缺少完整输入/输出用量时继续保留 40000-token 预留，直到对账。
 
 离线重建合成 cassette（不调用供应商，但重绘 PNG 的字体可能随主机变化；重新生成后须复核）：
 
