@@ -457,9 +457,8 @@ export function createTextStream(
 							status = undefined
 							fields = ''
 							if (spendError) throw spendError
-							const pending = guarded
-								? fetch((request = new Request(input, init)))
-								: fetch(input, init)
+							request = guarded ? new Request(input, init) : undefined
+							const pending = request ? fetch(request) : fetch(input, init)
 							const response = await pending.catch((error) => {
 								if (error instanceof SpendBudgetError) spendError = error
 								throw error
