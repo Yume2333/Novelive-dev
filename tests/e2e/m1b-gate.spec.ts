@@ -415,7 +415,8 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 					...process.env,
 					ELECTRON_RENDERER_URL: '',
 					NL_REPLAY: 'record',
-					NL_PRODUCTION_CASSETTE_DIR: cassette,
+					NL_CASSETTE_DIR: cassette,
+					NL_PRODUCTION_CASSETTE_DIR: '',
 					NL_PRODUCTION_FALLBACK_DIR: fallback,
 					NL_IMAGE_BASE_URL: baseUrl,
 					NL_IMAGE_API_KEY: 'offline-placeholder',
@@ -501,6 +502,11 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 			expect(calls).toHaveLength(malformedAttempts + 1)
 			expect(calls[malformedAttempts]).toEqual(calls[0])
 			expect(unexpected).toEqual([])
+			expect(
+				(await readFile(join(cassette, 'cassette.jsonl'), 'utf8'))
+					.trim()
+					.split('\n'),
+			).toHaveLength(malformedAttempts + 1)
 			await capture(page, '08-writing-budget-paused')
 		} finally {
 			await close(app)
