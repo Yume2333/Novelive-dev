@@ -72,3 +72,19 @@
 - 2026-11-23 m1b-production/11：主视觉审核耗尽保留最后可用候选（见 `decisions.md` 同名条目）。
 - 2026-11-23 m1b-production/11：演出清单严格校验后定向修复（见 `decisions.md` 同名条目）。
 - 2026-11-23 m4-longform/10：M4 闸门用合成回放和串行系列确认（见 `decisions.md` 同名条目）。
+- 2026-11-23 m4-longform/04：DOCX 按 Word 结构导入（#46）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m3-playback/06：放大资源与子进程协议（#44）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m4-longform/07：后台队列单槽不抢占（#52）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m3-playback/04：玩家进度与截图存储（#55）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m4-longform/09：生产用量归属与素材过期（#54）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m4-longform/08：桌面托盘与通知（#51）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m4-longform/06：系列、卷与作品分层（#50）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m4-longform/05：PDF 保留排版结构、不做 OCR（#47）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m4-longform/02：EPUB 章节和插图分离（#48）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m3-playback/03：按 Chromium 实际排版分页（#53）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m2-editor/08：编辑器与 Agent 共用修订入口（#57）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m3-playback/05：播放控件查询与恢复（#56）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m4-longform/03：Markdown 本地解析（#49）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m2-editor/09：写手标记是章节提议（#61）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m3-playback/08：自定义标记通过 CSSOM 白名单渲染（#63）（见 `decisions.md` 同名条目）。
+- 2026-11-23 m3-playback/02：Pixi 舞台与快照（#58）（见 `decisions.md` 同名条目）。

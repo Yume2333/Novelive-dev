@@ -931,8 +931,8 @@ User waivers of a `Check` or a review finding are recorded in the task file
 
 ## 2026-11-23 - 真卷 W4 用三次整卷共识
 
-- **Decided:** 分块对照三个整卷输出形成的共识；名称或别名和变更动作归一匹配，F1 门槛保持 0.90。每批先参考已提出条目，按全卷尺度选取并保存 checkpoint。
-- **Instead of:** 单次整卷输出作唯一真值、字面完全相等、为达标降低门槛或调整 scorer。
+- **Decided:** 对至少 2/3 整卷结果支持的条目建共识；按名称或别名和变更动作归一匹配，分块对共识 F1 除以整卷留一平均 F1，门槛仍为 0.90。还需已确认设定零丢失、修过度拆分。复用整卷录制，不增调用；每批参考已提出条目并按全卷尺度挑选。
+- **Instead of:** 单次整卷作为真值（固定温度和 seed 的整卷两两 F1 也仅 0.51/0.60/0.61），另跑一次作为分母同样不稳且增成本；不降门槛。
 - **Because:** 整卷输出自身有波动（37 条共识，留一基线 0.650）；实际分块 0.80–0.85 仍未通过。
 - **Decided by:** agent (m1a-project/07)
 
@@ -945,9 +945,9 @@ User waivers of a `Check` or a review finding are recorded in the task file
 
 ## 2026-11-23 - 综合结构与缓存指纹
 
-- **Decided:** 允许未输出的可选集合保持空；已有约束继续校验。自动策略指纹包含实际策略/输入，避免错误复用已有综合。
+- **Decided:** aliases 等可选集合缺失时默认为空，实质字段继续严格校验。更新保留别名；auto 指纹解析到实际策略，跨重启稳定。老 checkpoint 若章节分组不符，重跑而不猜分组（#59）。
 - **Instead of:** 强制模型补空字段，或把自动策略和其他策略共用不可区分的缓存键。
-- **Because:** 减少无实质变化的结构修复，同时不把不匹配的 checkpoint 当有效结果。
+- **Because:** 只为补空字段重复请求浪费 token；猜分组可能把设定放到错章，宁可多一次调用。
 - **Decided by:** agent (m1a-project/05)
 
 ## 2026-11-23 - 推理耗尽走专用错误
@@ -967,14 +967,14 @@ User waivers of a `Check` or a review finding are recorded in the task file
 ## 2026-11-23 - 忠实度引用限定原文窗口
 
 - **Decided:** 区分草稿行与原文段落，默认枚举窗口原文 ID，只有最小单位因枚举超预算时用固定格式，仍验证范围与原文逐字引文。
-- **Instead of:** 接受草稿行或放宽引文校验；对所有窗口改用格式模式。
+- **Instead of:** 接受草稿行、放宽逐字引文校验，或更换模型来掩盖工具歧义；不对所有窗口改用格式模式。
 - **Because:** 真实记录中的模型引用了草稿，未发现源文本归一缺陷。
 - **Decided by:** user
 
 ## 2026-11-23 - 演出清单严格校验后定向修复
 
 - **Decided:** 格式失败单独修一次，指导由 planArt 同一规则生成，提供拒绝回包；之后 staging 重试编辑最近失败的回包。
-- **Instead of:** 放宽 ID 规则或重写原始旧回包。
+- **Instead of:** 放宽地点 ID 必须带 /variant 的规则、无上限重试或重写原始旧回包。
 - **Because:** 裸地点 ID 来自模型，不是产品的中文转换；修复后两个地点都可供 @bg 引用。
 - **Decided by:** agent (m1b-production/11)
 
@@ -990,6 +990,7 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Decided:** 差分默认基准在前、画风在后。表情结果无 alpha 时只用透明基准重试一次并记录 styleRefsDropped，审核仍对照原画风；仍无 alpha 暂停。
 - **Instead of:** 全面移除画风、改 FXB、在本地色键抠图或直接通过不透明立绘。
 - **Because:** 同一生产 Sunburst 请求用透明基准加不透明主视觉返回不透明，探测只移除主视觉后原始 PNG 带 alpha。
+- **Evidence:** 先按原规范暂停并试 Flare，仍不透明；至多三张图的参数/中继探查（实际两张）确认透明 PNG 字段与原始 alpha 均能通过。不把单次成功当作适用于所有请求的结论。
 - **Decided by:** user
 
 ## 2026-11-23 - M4 闸门用合成回放和串行系列确认
@@ -998,3 +999,115 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 付费重录确定性场景、乐观重试、给批准记录加来源元数据。
 - **Because:** 固定回放输入；来源元数据方案不断出现漏洞且不兼容已批准的旧工程，按序兼容既有记录。
 - **Decided by:** agent (m4-longform/10)
+
+## 2026-11-23 - DOCX 按 Word 结构导入（#46）
+
+- **Decided:** 复用 @zip.js/zip.js 和 saxes 在内存解析，拒绝 DOCTYPE。用 outlineLvl、Heading N/标题 N 和 basedOn 识别标题，多级时最浅层作卷。脚注/尾注归到引用章的备注；初版跳过修订、图片、文本框，复用 TXT 清理。插图候选与向导由 M4/10 接线。
+- **Instead of:** mammoth/HTML 加依赖且丢层级；纯文本猜标题易误判；按格式分设清理会分叉。
+- **Because:** 取舍见上述替代方案限制及 m4-longform/04 的对应 PR 记录。
+- **Decided by:** agent (m4-longform/04)
+
+## 2026-11-23 - 放大资源与子进程协议（#44）
+
+- **Decided:** 使用真实 upscayl-bin/ncnn-vulkan，固定三套权重共 19.4 MiB，临时文件加标准输入输出、不开放端口。
+- **Instead of:** PyTorch/ONNX Runtime 过大，不用 Lite 权重或单独放大 alpha。
+- **Because:** 取舍见上述替代方案限制及 m3-playback/06 的对应 PR 记录。
+- **Decided by:** agent (m3-playback/06)
+
+## 2026-11-23 - 后台队列单槽不抢占（#52）
+
+- **Decided:** 契约不变，SQLite checkpoint 支撑单槽非抢占式调度。M4/10 接入 creator 启动前的桌面单实例锁，并让 events.list 从持久化章节补回被其他作品挤出的历史。
+- **Instead of:** 确认时抢占和重启后自动恢复都不用；继续制作须主动选择，避免意外付费。
+- **Because:** 取舍见上述替代方案限制及 m4-longform/07 的对应 PR 记录。
+- **Decided by:** agent (m4-longform/07)
+
+## 2026-11-23 - 玩家进度与截图存储（#55）
+
+- **Decided:** 每作品 JSON 串行写入并原子重命名；宿主比较器决定句序，480×270 WebP 缩略图按内容哈希保存。M3/07 将 PlaybackProgress、SnapshotRenderer 和 createDesktopProgressStore 接到舞台与菜单。
+- **Instead of:** SQLite 过重，句 ID 不保证有序，按槽覆盖会破坏旧截图引用。
+- **Because:** 取舍见上述替代方案限制及 m3-playback/04 的对应 PR 记录。
+- **Decided by:** agent (m3-playback/04)
+
+## 2026-11-23 - 生产用量归属与素材过期（#54）
+
+- **Decided:** 现有 project.db usage 表与 ProductionUsage 契约；入口用 AsyncLocalStorage 加 Proxy，只记供应方用量，不估算或执行预算停止。外貌影响所有立绘，服装仅该套，地点含基准与差分，CG 不变，风格只提示；隔离不可读项目。
+- **Instead of:** 不另建重复账本或把 workId/phase 贯穿并行接口；ID 前缀无法区分同名角色、地点。
+- **Because:** 取舍见上述替代方案限制及 m4-longform/09 的对应 PR 记录。
+- **Decided by:** agent (m4-longform/09)
+
+## 2026-11-23 - 桌面托盘与通知（#51）
+
+- **Decided:** Linux 用 gdbus 查 StatusNotifierWatcher，否则最小化；复用 stopCreator 和防休眠。主进程接 preload 转发的 production.snapshot，去重、核对发送者与长度、去标签，保留默认菜单。M3/05 在 novelive:player-waiting 入/出发 workId/null，M4/10 验证链路；完成通知曾卡第二章回放，无托盘仅 e2e，原生 CJK 字体待 M5 验证。
+- **Instead of:** Tray.getBounds 不覆盖 Linux；猜 XEmbed 易藏窗；creator 不能发桌面通知；自定义菜单损失 macOS 编辑快捷键。
+- **Because:** 取舍见上述替代方案限制及 m4-longform/08 的对应 PR 记录。
+- **Decided by:** agent (m4-longform/08)
+
+## 2026-11-23 - 系列、卷与作品分层（#50）
+
+- **Decided:** 按 ID 整条覆盖并串接 CSS；登记表写分层增量，新增素材进系列，编辑写回生效层。join 不收设定补丁；增量综合按系列根设定加补丁验证，跨语言复用 work.language。M4/10 接导入、向导、队列 onReady 与 Electron W2。
+- **Instead of:** 深合并破坏覆盖，持久化合并副本固化上层；不先收再拒补丁、不推迟到发布才验证、不新增翻译阶段。
+- **Because:** 取舍见上述替代方案限制及 m4-longform/06 的对应 PR 记录。
+- **Decided by:** agent (m4-longform/06)
+
+## 2026-11-23 - PDF 保留排版结构、不做 OCR（#47）
+
+- **Decided:** 固定 pdfjs-dist 与本地 CMap/字体，按坐标拼行、跨行跨页合段再调用 parseTxt；页码至少三页同步才移除，并去重复页眉。扫描件返回 no_extractable_text，无段落页丢弃，桌面接线归 M4/10。
+- **Instead of:** pdf-parse 增依赖而缺所需布局坐标；OCR 超范围。
+- **Because:** 取舍见上述替代方案限制及 m4-longform/05 的对应 PR 记录。
+- **Decided by:** agent (m4-longform/05)
+
+## 2026-11-23 - EPUB 章节和插图分离（#48）
+
+- **Decided:** 章节定位顺序 nav → NCX → h1/h2 → spine；saxes 限深并拒 DTD。内存插图按章/段定位，视觉只建议，不自动勾选或删除。
+- **Instead of:** 不用正则 XML、仅 TOC 或合并未匹配 spine；不借首章上下文误导分类，也不重试 404。
+- **Because:** 取舍见上述替代方案限制及 m4-longform/02 的对应 PR 记录。
+- **Decided by:** agent (m4-longform/02)
+
+## 2026-11-23 - 按 Chromium 实际排版分页（#53）
+
+- **Decided:** line-break:strict 禁则；隐藏全句测量层与克隆显示层，切换可见性逐字揭示、平移分页。每页最多三行，按标点断；缩放按首字恢复，注音首字显示。Noto Sans SC 正文，30ms/字，自动 1.2s 加 0.08s/字。
+- **Instead of:** 不手写禁则、不逐字插 DOM 导致重排、不按字符数忽略字体和宽度。
+- **Because:** 取舍见上述替代方案限制及 m3-playback/03 的对应 PR 记录。
+- **Decided by:** agent (m3-playback/03)
+
+## 2026-11-23 - 编辑器与 Agent 共用修订入口（#57）
+
+- **Decided:** 共用 createProduction 的 CreativeRevisions；真实聊天接线在独立 m2-gate 回放，代码块按 DESIGN token 并支持 CJK 换行。原 resolveMark 仅注册返回 not_found，后由 M2/09 #61 实现。
+- **Instead of:** 不复制 Agent 重写、不用假回复绕过 chat、不追加影响 m2-chat 哈希，不用 Tailwind 替代 token。
+- **Because:** 取舍见上述替代方案限制及 m2-editor/08 的对应 PR 记录。
+- **Decided by:** agent (m2-editor/08)
+
+## 2026-11-23 - 播放控件查询与恢复（#56）
+
+- **Decided:** production.playerChapter 接可选 chapterId 和只轮询元数据；自动/跳过由 PlayerControlsController 控制；过期句 ID 回退章首，另传 startIndex。设置只在内存，调速从本句第一页重挂；镜头、特效、音频快照归 M3/02 并由 07 验收。
+- **Instead of:** 纯 UI 切章不支持目录与接续，DOM 变化推断漏掉无文本节拍。
+- **Because:** 取舍见上述替代方案限制及 m3-playback/05 的对应 PR 记录。
+- **Decided by:** agent (m3-playback/05)
+
+## 2026-11-23 - Markdown 本地解析（#49）
+
+- **Decided:** 本地 mdast + GFM 脚注，复用 TXT 标题规则；逐行识别 YAML front matter。
+- **Instead of:** 不用 Pandoc、在线转换或模型切段；任务范围内不新增完整 YAML 解析依赖。
+- **Because:** 取舍见上述替代方案限制及 m4-longform/03 的对应 PR 记录。
+- **Decided by:** agent (m4-longform/03)
+
+## 2026-11-23 - 写手标记是章节提议（#61）
+
+- **Decided:** 独立 @propose-mark 行验证后从 NVS 剥离；复用按章节提议表，聊天查询排除。批准后写作品设置，重跑替换本章 pending；章节版本只哈希本章用到的标记。
+- **Instead of:** 额外调用耗费并动提示哈希；新表需迁移；先写后撤会留脏数据；哈希全作品会误使其他章过期。
+- **Because:** 取舍见上述替代方案限制及 m2-editor/09 的对应 PR 记录。
+- **Decided by:** agent (m2-editor/09)
+
+## 2026-11-23 - 自定义标记通过 CSSOM 白名单渲染（#63）
+
+- **Decided:** 测量和显示层均用 style.setProperty，只允许文本外观属性；遇花括号、@、反斜线、尖括号或注释整段拒绝，丢弃 URL/image/var/attr/expression 函数，保护内置名。按真实字形分页，内层优先；旧截图由 M3/07 复核。
+- **Instead of:** 注入样式表还需约束选择器、at-rule，且可能放松 CSP；transform 会导致分页裁切。
+- **Because:** 取舍见上述替代方案限制及 m3-playback/08 的对应 PR 记录。
+- **Decided by:** agent (m3-playback/08)
+
+## 2026-11-23 - Pixi 舞台与快照（#58）
+
+- **Decided:** Pixi 直渲，幂等 JSON 指令 reducer、自定义资产解析和引用计数预载窗口；Canvas 用 CSS filter 降级，图层裁到对白边界。快照保存标准最终状态和 480×270 WebP 缩图。
+- **Instead of:** React-Pixi 增一层；Canvas 空间切片 glitch 成本高；不重播半完成转场，避免重复指令。
+- **Because:** 取舍见上述替代方案限制及 m3-playback/02 的对应 PR 记录。
+- **Decided by:** agent (m3-playback/02)
