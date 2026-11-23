@@ -38,6 +38,11 @@ export { directChapterArt } from './director'
 export { type ArtBible, type ArtJob, type ManifestItem, planArt } from './plan'
 
 type RegistryEntry = AssetRegistry['entries'][number]
+type CostumeCandidateBudget = {
+	opaqueStreak: number
+	mattingError?: MattingUnavailableError
+}
+const opaqueCandidateLimit = 2
 type Candidate = { id: string; cachePath: string }
 type VisualCandidates = {
 	mainVisuals: Candidate[]
@@ -489,6 +494,7 @@ export class ArtProduction {
 		transparent: boolean,
 		derived = false,
 		optionalReference = false,
+		candidateBudget?: CostumeCandidateBudget,
 	) {
 		const refs = await Promise.all(
 			drawing.references.slice(0, 16).map(async (ref, i) => {
@@ -562,14 +568,31 @@ export class ArtProduction {
 				base: derived ? refs[0] : undefined,
 				variant: drawing.kind === 'variant',
 			}
-			let checked = await checkImage(result.bytes, target, checks)
+			let checked = await checkImage(result.bytes, target, {
+				...checks,
+				onAlpha: candidateBudget
+					? (hasAlpha) => {
+							candidateBudget.opaqueStreak = hasAlpha
+								? 0
+								: candidateBudget.opaqueStreak + 1
+						}
+					: undefined,
+			})
 			if ('issue' in checked && checked.unsupported) {
+				if (
+					candidateBudget?.mattingError &&
+					candidateBudget.opaqueStreak >= opaqueCandidateLimit
+				)
+					throw candidateBudget.mattingError
 				let recovered: Buffer
 				try {
 					recovered = await removeBackground(result.bytes, this.options.signal)
 				} catch (error) {
 					this.options.signal?.throwIfAborted()
-					if (error instanceof MattingUnavailableError) throw error
+					if (error instanceof MattingUnavailableError) {
+						if (candidateBudget) candidateBudget.mattingError = error
+						throw error
+					}
 					return checked
 				}
 				checked = await checkImage(recovered, target, checks)
@@ -621,6 +644,7 @@ export class ArtProduction {
 		)
 		const cachePath = (path: string) =>
 			projectFiles.style(styleScope).path.replace('bible/style.json', path)
+		const candidateBudget: CostumeCandidateBudget = { opaqueStreak: 0 }
 		const saveCandidate = async (
 			drawing: Drawing,
 			path: string,
@@ -628,12 +652,19 @@ export class ArtProduction {
 			optionalReference = false,
 		) => {
 			if (!(await this.file(path))) {
+				if (
+					portrait &&
+					candidateBudget.mattingError &&
+					candidateBudget.opaqueStreak >= opaqueCandidateLimit
+				)
+					return false
 				const result = await this.paint(
 					drawing,
 					this.nativeSize(portrait),
 					portrait,
 					false,
 					optionalReference,
+					portrait ? candidateBudget : undefined,
 				)
 				let png: Buffer
 				if ('issue' in result) {
@@ -688,7 +719,6 @@ export class ArtProduction {
 			)
 		}
 		const characters: VisualCandidates['characters'] = []
-		let mattingUnavailable: true | undefined
 		const saveCostumeCandidate = async (
 			drawing: Drawing,
 			path: string,
@@ -698,7 +728,6 @@ export class ArtProduction {
 				return await saveCandidate(drawing, path, true, optionalReference)
 			} catch (error) {
 				if (!(error instanceof MattingUnavailableError)) throw error
-				mattingUnavailable = true
 				return false
 			}
 		}
@@ -771,7 +800,7 @@ export class ArtProduction {
 			mainVisuals,
 			characters,
 			supplemental,
-			...(mattingUnavailable ? { mattingUnavailable } : {}),
+			...(candidateBudget.mattingError ? { mattingUnavailable: true } : {}),
 		}
 	}
 

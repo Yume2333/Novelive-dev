@@ -141,10 +141,16 @@ async function safeArea(input: Buffer) {
 export async function checkImage(
 	input: Buffer,
 	target: Dimensions,
-	options: { transparent: boolean; base?: Buffer; variant: boolean },
+	options: {
+		transparent: boolean
+		base?: Buffer
+		variant: boolean
+		onAlpha?: (hasAlpha: boolean) => void
+	},
 ): Promise<{ png: Buffer } | { issue: string; unsupported?: true }> {
 	try {
 		const { width, height, hasAlpha } = await sharp(input).metadata()
+		options.onAlpha?.(hasAlpha)
 		if (options.transparent && !hasAlpha)
 			return {
 				issue: '透明底能力不支持（图片没有 alpha 通道）；请换图片模型。',

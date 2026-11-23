@@ -536,22 +536,25 @@ test('removes an opaque sprite background before validating and auditing the res
 	const opaque = await sharp(svg).removeAlpha().png().toBuffer()
 	const landscape = await picture(320, 180, false)
 	let nativeCandidate = false
-	const renderer = vi
-		.spyOn(artModels, 'imageRenderer')
-		.mockReturnValue(async (prompt, _refs, { width, height }, transparent) => ({
-			bytes: !transparent
-				? landscape
-				: nativeCandidate && prompt.includes('造型候选 2')
-					? await picture(width, height, true)
-					: opaque,
-		}))
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(
+			async (prompt, refs, { width, height }, transparent) => ({
+				bytes: !transparent
+					? landscape
+					: nativeCandidate && !refs.length && prompt.includes('造型候选 1')
+						? await picture(width, height, true)
+						: opaque,
+			}),
+		)
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
 	const model = vi
 		.spyOn(artModels, 'artJson')
 		.mockImplementation(
 			async (_connection, prompt, _schema, _options, images) => {
 				if (!prompt.startsWith('Visually audit'))
 					return {
-						content: prompt.includes('造型候选 2') ? '造型候选 2' : 'Ada',
+						content: prompt.includes('造型候选 1') ? '造型候选 1' : 'Ada',
 					}
 				const { data, info } = await sharp(images?.[0])
 					.raw()
@@ -570,14 +573,36 @@ test('removes an opaque sprite background before validating and auditing the res
 	try {
 		await projectTest(async (project) => {
 			const art = service(project, replay)
+			const [ada] = bible.characters
+			const twoCostumes = {
+				...bible,
+				characters: [
+					{
+						...ada,
+						costumes: [
+							...(ada.costumes ?? []),
+							{ id: 'coat', description: '外套' },
+						],
+					},
+				],
+			}
+			const portraitRequests = () =>
+				render.mock.calls.filter(([, , , portrait]) => portrait)
 			vi.stubEnv('NL_MATTING_DIR', join(project.root, 'missing-matting'))
-			const pool = await art.candidates(bible, ['c1'], 'assets/main.webp', [])
+			const pool = await art.candidates(
+				twoCostumes,
+				['c1'],
+				'assets/main.webp',
+				[],
+			)
 			expect(pool).toMatchObject({ mattingUnavailable: true, characters: [] })
+			expect(portraitRequests()).toHaveLength(2)
 			const illustration = 'source/references/illustration-1.png'
 			await project.writeFile(illustration, landscape)
+			render.mockClear()
 			nativeCandidate = true
 			const withIllustration = await art.candidates(
-				bible,
+				twoCostumes,
 				['c1'],
 				'assets/main.webp',
 				[],
@@ -585,8 +610,13 @@ test('removes an opaque sprite background before validating and auditing the res
 			)
 			expect(withIllustration).toMatchObject({
 				mattingUnavailable: true,
-				characters: [{ candidates: [{ id: 'costume-2' }] }],
+				characters: [
+					{ costumeId: 'uniform', candidates: [{ id: 'costume-1' }] },
+				],
 			})
+			expect(portraitRequests().map(([, refs]) => refs.length)).toEqual([
+				1, 0, 0, 0,
+			])
 			nativeCandidate = false
 			const [fallback] = await art.register(
 				[{ id: 'ada/coat/neutral', kind: 'character', description: 'Ada' }],
