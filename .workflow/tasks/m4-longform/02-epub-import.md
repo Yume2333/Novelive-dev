@@ -15,7 +15,8 @@
 
 - 实现 `extractEpub(bytes)`，结果兼容 M4/01 的 `ImportExtraction` / `ExtractedBook`；附内存图片字节表，不落盘。参考 `.workflow/research/snippets/import/epub.mjs` 的四级链，使用现有 zip.js / saxes，保留段落、同文件锚点、嵌套卷、前言和 spine 顺序；合成 EPUB 覆盖真实解包入口，不含私有数据。
 - 插图定位保留章内附近段落；manifest 未内联图片保留为无段落位置候选。`illustrationCandidates` 无模型也能手选；`classifyIllustrations` 复用现有 `artJson` 与 strict replay，分类不会自动选中或删除无关图片。未增加依赖，未改应用接线。
-- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-epub.test.ts` → `Test Files 1 passed (1)` / `Tests 19 passed (19)`。解包、nav → NCX → heading → spine、图片定位已实跑；分类标签用 mock 验证，真实 strict 缺档拒绝及零网络调用已验证，**成功视觉分类回放尚缺 cassette，不视为完成该项验收**。
-- `pnpm typecheck` 退出 0；`pnpm lint` 退出 0（既有 `tests/fixtures/text-models/build-synthetic.ts:63:3 lint/style/useTemplate` info 未改）。导入关联测试 `m1a-txt`、`m1b-import-wizard`、`m4-import-contract`、`m1b-production-worker` 连同当时 17 项 EPUB 测试：`Test Files 5 passed (5)` / `Tests 84 passed (84)`；新增两项 EPUB 用例后目标 19 项通过。
-- 缺档交接：需要协调者提供 EPUB 插图分类的「角色匹配设定集」「场景匹配设定集」「无关装饰」三个成功 cassette（可补错误 JSON 用例）。请求包含合成图片经 sharp 转 PNG、设定集及附近正文；使用本模块固定提示词与指定视觉模型录制后，再补成功 strict 回放断言。没有录制任何 cassette，没有付费调用。当前仅证明缺档时不会联网，不以不相关旧 cassette 伪装成功分类。
-- Review: skipped — 当前宿主未提供独立审查工具，交主线独立复核；未进行 Electron 导入接线或界面验收（不在本任务允许修改范围）。
+- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-epub.test.ts` → `Test Files 1 passed (1)` / `Tests 30 passed | 1 skipped (31)`；跳过的是需显式选择模式的供应商驱动，默认 CI 成功回放三个公开合成分类 cassette，并验证缺档零网络降级。
+- 协调者于 2026-11-23 授权录制后，视觉模型 `gemini-3.8-flash` 的角色/场景/无关三类真实录制均成功；`NL_REPLAY=strict NL_EPUB_PROVIDER_MODE=strict pnpm exec vitest run tests/unit/m4-epub.test.ts -t 'EPUB classification provider driver'` → `Tests 1 passed | 30 skipped (31)`，实跑三个私有成功分类、无网络。原始供应商 cassette 留在 `~/.local/novelive-epub-provider/`；公开仅提交合成 cassette、固定 PNG 和回执 `tests/fixtures/source/epub/receipt.md`，不混淆二者证据。
+- 用量逐调用追加到私有 `usage.csv`：三个成功请求共输入 3666 + 输出 655 = 4321 tokens，另一次 HTTP 404 保留 40000-token 上界。共 4 次请求、4 张输入图片、0 张生成图片；计入预留 44321 tokens。无缺失成功 cassette。
+- `pnpm typecheck`、`pnpm lint` 均退出 0（既有 `tests/fixtures/text-models/build-synthetic.ts:63:3 lint/style/useTemplate` info 未改）。导入关联测试 `m1a-txt`、`m1b-import-wizard`、`m4-import-contract`、`m1b-production-worker` 与最初 EPUB 测试曾合计 `Tests 84 passed (84)`。
+- Review: PR #48 Devin Review 的八项均先用具体输入复现，再分别修复并提交：article 段落合并、行内锚点丢章、混合正文丢失、源码换行伪分段、脚注未入附注、插图独页错配第一章、未定位图片伪上下文、标题回退超出文档。对应 `93fd55a`、`7452eef`、`de9100b`、`e1623cc`、`6ba3255`、`f00eba2`、`d0459e1`、`539531f`。未进行 Electron 导入接线或界面验收（不在本任务允许修改范围）。

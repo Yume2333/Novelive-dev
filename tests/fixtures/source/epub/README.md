@@ -2,4 +2,16 @@
 
 `tests/unit/m4-epub.test.ts` 使用已安装的 zip.js 在内存生成小型 EPUB，不含真书、私有数据或网络资源。正文、目录、NCX 与 2×2 SVG 均为合成内容；修改条目覆盖四级回退、同文件锚点、分卷、跨文件顺序、图片位置与错误输入。
 
-视觉分类复用 `artJson` → `createReplayFetch`；单元测试的三个标签用显式 mock 验证，另有真实 strict 缺档拒绝测试，禁止网络降级。这不等于成功模型回放。尚需协调者提供角色匹配、场景匹配、无关装饰三个 EPUB 分类 cassette；未录制新 cassette，未调用付费模型。
+视觉分类复用 `artJson` → `createReplayFetch`。`synthetic/` 包含三个固定 PNG 和纯本地 SSE 生成的合成 cassette，普通单元测试 strict 回放三个成功标签并禁止网络。这些不是供应商响应，也不证明模型视觉质量；固定 PNG 避免机器字体差异改变请求哈希。
+
+真实供应商录制仅在协调者授权下进行，使用视觉槽规定的 `gemini-3.8-flash`。私有 cassette、原始响应与明细保存在 `$HOME/.local/novelive-epub-provider/`，不提交。公开回执见 `receipt.md`。私有成功回放命令：
+
+```sh
+NL_REPLAY=strict NL_EPUB_PROVIDER_MODE=strict pnpm exec vitest run tests/unit/m4-epub.test.ts -t 'EPUB classification provider driver'
+```
+
+离线重建合成 cassette（不调用供应商，但重绘 PNG 的字体可能随主机变化；重新生成后须复核）：
+
+```sh
+NL_REPLAY=strict NL_EPUB_PROVIDER_MODE=synthetic pnpm exec vitest run tests/unit/m4-epub.test.ts -t 'EPUB classification provider driver'
+```

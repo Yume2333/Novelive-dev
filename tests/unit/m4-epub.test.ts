@@ -9,6 +9,13 @@ import {
 } from '../../packages/creator/src/import/epub/illustrations'
 import type { TextConnection } from '../../packages/creator/src/models/text'
 import { artJson } from '../../packages/creator/src/pipeline/art/models'
+import {
+	classificationCases,
+	classificationExtraction,
+	syntheticDirectory,
+	visualConnection,
+} from '../fixtures/source/epub/classification'
+import { runProviderCases } from '../fixtures/source/epub/provider'
 
 vi.mock('../../packages/creator/src/pipeline/art/models', async (original) => {
 	const module =
@@ -60,6 +67,39 @@ async function epub(overrides: Record<string, string | undefined> = {}) {
 beforeEach(() => {
 	vi.mocked(artJson).mockClear()
 })
+
+test.skipIf(!process.env.NL_EPUB_PROVIDER_MODE)(
+	'EPUB classification provider driver',
+	async () => {
+		const mode = process.env.NL_EPUB_PROVIDER_MODE
+		if (mode !== 'record' && mode !== 'strict' && mode !== 'synthetic')
+			throw new Error('Invalid provider mode')
+		await runProviderCases(mode)
+	},
+	180_000,
+)
+
+test
+	.skipIf(process.env.NL_EPUB_PROVIDER_MODE !== undefined)
+	.each(classificationCases)(
+	'strict synthetic visual replay: $label',
+	async (sample) => {
+		const fetch = vi.fn(() => {
+			throw new Error('Network must not run')
+		})
+		const candidates = await classifyIllustrations(
+			classificationExtraction(sample),
+			sample.bible,
+			visualConnection,
+			{ replay: { mode: 'strict', directory: syntheticDirectory, fetch } },
+		)
+		expect(candidates[0]).toMatchObject({
+			label: sample.label,
+			selected: false,
+		})
+		expect(fetch).not.toHaveBeenCalled()
+	},
+)
 
 test('keeps chapter blocks inside article wrappers', async () => {
 	const { book } = await extractEpub(
