@@ -323,6 +323,7 @@ export async function extractEpub(
 						? [{ doc: index, block: offset, title: block.text }]
 						: [],
 				)
+				if (index > 0 && headings.length) headings[0].block = 0
 				return headings.length
 					? headings
 					: [

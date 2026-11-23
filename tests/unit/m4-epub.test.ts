@@ -349,6 +349,28 @@ test('excludes cover and notes-only files from heading coverage', async () => {
 	expect(book.volumes[0].chapters[0].notes).toContain('Copyright note.')
 })
 
+test('keeps a later spine file epigraph with that file chapter', async () => {
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/book.opf':
+				'<package><manifest><item id="one" href="chapter.xhtml"/><item id="two" href="second.xhtml"/></manifest><spine><itemref idref="one"/><itemref idref="two"/></spine></package>',
+			'OPS/chapter.xhtml': xhtml('<h1>Chapter One</h1><p>First.</p>'),
+			'OPS/second.xhtml': xhtml(
+				'<p>Second epigraph.</p><h1>Chapter Two</h1><p>Second.</p>',
+			),
+		}),
+	)
+	expect(book.volumes[0].chapters[0].paragraphs).toEqual([
+		'Chapter One',
+		'First.',
+	])
+	expect(book.volumes[0].chapters[1].paragraphs).toEqual([
+		'Second epigraph.',
+		'Chapter Two',
+		'Second.',
+	])
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)
