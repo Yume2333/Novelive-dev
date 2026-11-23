@@ -9,7 +9,7 @@ import {
 	TextModelError,
 	textResultError,
 } from '../../models/text'
-import { fitPrompt, promptFits } from './budget'
+import { ContextLimitError, fitPrompt, promptFits } from './budget'
 
 export type WritingTransport = {
 	signal?: AbortSignal
@@ -94,6 +94,23 @@ export const userMessage = (content: string) => ({
 	timestamp: 0,
 })
 
+function jsonRepairContext(prompt: string) {
+	return {
+		messages: [
+			userMessage(
+				`${prompt}\nThe previous reply was invalid. Return only corrected JSON matching the requested format.`,
+			),
+		],
+	}
+}
+
+export function writingJsonPromptFits(
+	model: ReturnType<typeof writingModel>,
+	prompt: string,
+) {
+	return promptFits(model, jsonRepairContext(prompt))
+}
+
 export async function requestWritingJson<T>(
 	model: ReturnType<typeof writingModel>,
 	prompt: string,
@@ -101,6 +118,8 @@ export async function requestWritingJson<T>(
 	validate: (value: unknown) => T | undefined,
 	invalidShape: string,
 ): Promise<T> {
+	const repair = jsonRepairContext(prompt)
+	if (!promptFits(model, repair)) throw new ContextLimitError(phase)
 	const request = async (
 		context: Context,
 	): Promise<{ issue: string } | { value: T }> => {
@@ -117,14 +136,6 @@ export async function requestWritingJson<T>(
 	}
 	const first = await request({ messages: [userMessage(prompt)] })
 	if ('value' in first) return first.value
-	const repair = {
-		messages: [
-			userMessage(
-				`${prompt}\n${first.issue}. Return only corrected JSON matching the requested format.`,
-			),
-		],
-	}
-	if (!promptFits(model, repair)) throw new Error(first.issue)
 	const second = await request(repair)
 	if ('value' in second) return second.value
 	throw new Error(second.issue)

@@ -1,6 +1,11 @@
 import { arr, bool, compile, int, obj } from '@earendil-works/pi-schema'
 import { ContextLimitError, promptFits } from './budget'
-import { requestWritingJson, userMessage, type writingModel } from './request'
+import {
+	requestWritingJson,
+	userMessage,
+	writingJsonPromptFits,
+	type writingModel,
+} from './request'
 
 export type SourceParagraph = { id: string; text: string }
 export type ScopedFinding = {
@@ -29,7 +34,6 @@ const plan = compile(
 )
 const boundary = compile(obj({ lineCount: count, complete: bool() }))
 const phase = 'Scene source alignment'
-const messages = (prompt: string) => ({ messages: [userMessage(prompt)] })
 
 export function sceneBody(script: string) {
 	const [heading, , , ...lines] = script.trimEnd().split('\n')
@@ -62,7 +66,7 @@ export async function scopeScene(
 		]
 	const aligner = model()
 	const prompt = alignmentPrompt(paragraphs, lines, findings, false)
-	if (promptFits(aligner, messages(prompt)))
+	if (writingJsonPromptFits(aligner, prompt))
 		return align(aligner, prompt, paragraphs, lines, findings, false)
 	if (paragraphs.length < 2) throw new ContextLimitError(phase)
 
@@ -84,7 +88,7 @@ export async function scopeScene(
 		const local = relevant.map(({ finding }) => finding)
 		const localPrompt = alignmentPrompt([paragraph], body, local, true)
 		// Check the actual paragraph and body, not the candidate prefix used to find its boundary.
-		if (!promptFits(aligner, messages(localPrompt)))
+		if (!promptFits(aligner, { messages: [userMessage(localPrompt)] }))
 			throw new ContextLimitError(phase)
 		const scoped = local.some(({ paragraphId }) => !paragraphId)
 			? await align(aligner, localPrompt, [paragraph], body, local, true)
@@ -149,7 +153,7 @@ async function paragraphBoundary(
 	let to = 1
 	while (
 		to < lines.length &&
-		promptFits(model, messages(render(lines.slice(0, to + 1))))
+		writingJsonPromptFits(model, render(lines.slice(0, to + 1)))
 	)
 		to++
 	const checked = await requestWritingJson(

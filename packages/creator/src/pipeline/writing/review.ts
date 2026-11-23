@@ -2,7 +2,12 @@ import type { Message, Tool } from '@earendil-works/pi-ai'
 import { arr, compile, obj, oneOf, str } from '@earendil-works/pi-schema'
 import { paragraphIdPattern } from '@novelive/format/model'
 import { ContextLimitError, fitUnits, promptFits } from './budget'
-import { requestWritingJson, userMessage, type writingModel } from './request'
+import {
+	requestWritingJson,
+	userMessage,
+	writingJsonPromptFits,
+	type writingModel,
+} from './request'
 import {
 	type SourceParagraph,
 	sceneBody,
@@ -445,8 +450,7 @@ export async function reviewStyle(
 ) {
 	const prompt = (draft: string) =>
 		`Review prose style only (voice, rhythm and wording). Do not evaluate fidelity or plot. Return JSON {"issues":["..."]}; use an empty array when no issues.\n${draft}`
-	const fits = (draft: string) =>
-		promptFits(model, { messages: [userMessage(prompt(draft))] })
+	const fits = (draft: string) => writingJsonPromptFits(model, prompt(draft))
 	const request = (draft: string, phase: string) =>
 		requestWritingJson(
 			model,

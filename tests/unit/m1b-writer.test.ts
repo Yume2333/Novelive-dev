@@ -121,7 +121,33 @@ test('repairs source alignment JSON before validating ranges', async () => {
 		scopeScene(() => model, scene.replace('\n:', '\n\n:'), paragraphs),
 	).resolves.toMatchObject([{ paragraphs }])
 	expect(requests).toHaveLength(2)
-	expect(requests[1]).toContain('Scene source alignment returned invalid JSON')
+	expect(requests[1]).toContain('Return only corrected JSON')
+})
+
+test('leaves room to repair a style review split near the model limit', async () => {
+	const { options, requests } = responses(
+		'{"issues":["tone" "rhythm"]}',
+		'{"issues":[]}',
+		'{"issues":[]}',
+	)
+	const model = writingModel(
+		{ ...options.writer, contextWindow: 4096 },
+		options,
+	)
+	const draft = [
+		'scene Bridge',
+		'source p0001-p0001',
+		'',
+		`: first ${'a'.repeat(1260)}`,
+		`: second ${'b'.repeat(1260)}`,
+	].join('\n')
+	await expect(reviewStyle(model, draft)).resolves.toEqual([])
+	expect(requests).toHaveLength(3)
+	expect(requests[0]).toContain(': first')
+	expect(requests[0]).not.toContain(': second')
+	expect(requests[1]).toContain(': first')
+	expect(requests[1]).toContain('Return only corrected JSON')
+	expect(requests[2]).toContain(': second')
 })
 
 test('stops without a style repair when the malformed reply did not settle', async () => {
