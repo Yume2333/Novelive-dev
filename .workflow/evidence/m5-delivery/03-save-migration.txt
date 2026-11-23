@@ -1,0 +1,19 @@
+NL_REPLAY=strict pnpm exec vitest run tests/integration/m5-saves.test.ts
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+
+Linux Electron 45.4.1 under Xvfb; two process launches against one app data directory:
+Electron seed: wrote a save and thumbnail to app.getPath(userData)
+Electron reopen: migrated to versioned legacy storage, decoded 480x270 WebP, and deleted the legacy slot
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'renders the empty library and connects to a real creator|M1b fixed scene|M1b creation surfaces|M1b TXT wizard reviews findings|M2 revise a work'
+  6 passed (13.0s)
+
+NL_REPLAY=strict pnpm check (Mesa lavapipe software Vulkan driver selected via VK_ICD_FILENAMES)
+$ tsc --noEmit
+Checked 375 files in 175ms. No fixes applied.
+Found 1 info.
+ Test Files  59 passed (59)
+      Tests  735 passed | 1 skipped (736)
+
+No paid API calls; no UI or native release acceptance for M5/07.

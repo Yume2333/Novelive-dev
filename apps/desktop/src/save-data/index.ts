@@ -11,6 +11,10 @@ import {
 import { join } from 'node:path'
 import sharp from 'sharp'
 import {
+	type LegacySaveGroup,
+	type PlaybackBeat,
+	type ProgressMigrationInput,
+	type ProgressMigrationResult,
 	type ProgressStore,
 	type SaveEntry,
 	type SaveSlot,
@@ -19,6 +23,9 @@ import {
 	type WorkProgress,
 } from '../../../../packages/player/src/contract'
 import { slotKey } from '../../../../packages/player/src/progress'
+import { migrateProgress } from '../../../../packages/player/src/progress/migrations'
+
+type ProgressFile = WorkProgress & { legacySaves?: readonly LegacySaveGroup[] }
 
 export class FileProgressStore implements ProgressStore {
 	private pending: Promise<unknown> = Promise.resolve()
@@ -41,33 +48,121 @@ export class FileProgressStore implements ProgressStore {
 
 	async load(workId: string): Promise<WorkProgress | null> {
 		await this.pending
-		return this.read(workId)
+		return (await this.read(workId))?.progress ?? null
 	}
 
-	private async read(workId: string): Promise<WorkProgress | null> {
+	private async read(workId: string): Promise<ProgressMigrationResult | null> {
 		try {
-			return JSON.parse(
+			const { legacySaves = [], ...progress } = JSON.parse(
 				await readFile(join(this.directory(workId), 'progress.json'), 'utf8'),
-			) as WorkProgress
+			) as ProgressFile
+			return { progress, legacySaves }
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
 			throw error
 		}
 	}
 
-	private async write(workId: string, progress: WorkProgress): Promise<void> {
+	private async write(
+		workId: string,
+		{ progress, legacySaves }: ProgressMigrationResult,
+	): Promise<void> {
 		const slots = progress.saves.map((entry) => slotKey(entry.slot))
 		if (new Set(slots).size !== slots.length) throw new Error('存档槽位重复')
 		const directory = this.directory(workId)
 		await mkdir(directory, { recursive: true })
 		const temporary = join(directory, `${randomUUID()}.tmp`)
-		await writeFile(temporary, JSON.stringify(progress), 'utf8')
+		const file = legacySaves.length ? { ...progress, legacySaves } : progress
+		await writeFile(temporary, JSON.stringify(file), 'utf8')
 		await rename(temporary, join(directory, 'progress.json'))
 	}
 
 	save(workId: string, progress: WorkProgress): Promise<void> {
 		const copy = structuredClone(progress)
-		return this.enqueue(() => this.write(workId, copy))
+		return this.enqueue(async () => {
+			const stored = await this.read(workId)
+			await this.write(workId, {
+				progress: copy,
+				legacySaves: stored?.legacySaves ?? [],
+			})
+		})
+	}
+
+	migrate(
+		input: Omit<
+			ProgressMigrationInput,
+			'positions' | 'progress' | 'legacySaves'
+		> & {
+			chapters: readonly (readonly PlaybackBeat[])[]
+		},
+	): Promise<ProgressMigrationResult> {
+		const { chapters, ...update } = structuredClone(input)
+		return this.enqueue(async () => {
+			const stored = await this.read(update.workId)
+			if (!stored)
+				return {
+					progress: { mainline: null, read: [], saves: [] },
+					legacySaves: [],
+				}
+			const positions = chapters.flatMap((chapter) =>
+				chapter.flatMap(({ cue }) =>
+					cue.kind === 'text' ? [cue.position] : [],
+				),
+			)
+			const migrated = migrateProgress(
+				{ ...update, ...stored, positions },
+				chapters,
+			)
+			await this.write(update.workId, migrated)
+			return migrated
+		})
+	}
+
+	async loadLegacySaves(workId: string): Promise<readonly LegacySaveGroup[]> {
+		await this.pending
+		return (await this.read(workId))?.legacySaves ?? []
+	}
+
+	deleteLegacySave(
+		workId: string,
+		version: number,
+		slot: SaveSlot,
+	): Promise<void> {
+		const name = slotKey(slot)
+		return this.enqueue(async () => {
+			const stored = await this.read(workId)
+			if (!stored) return
+			const legacySaves = stored.legacySaves
+				.map((group) =>
+					group.version === version
+						? {
+								...group,
+								saves: group.saves.filter(
+									(entry) => slotKey(entry.slot) !== name,
+								),
+							}
+						: group,
+				)
+				.filter((group) => group.saves.length > 0)
+			const remaining = { ...stored, legacySaves }
+			await this.write(workId, remaining)
+			await this.cleanThumbnails(workId, remaining)
+		})
+	}
+
+	private async cleanThumbnails(
+		workId: string,
+		{ progress, legacySaves }: ProgressMigrationResult,
+	): Promise<void> {
+		const referenced = new Set(progress.saves.map((save) => save.thumbnailRef))
+		for (const group of legacySaves)
+			for (const save of group.saves) referenced.add(save.thumbnailRef)
+		const directory = this.directory(workId)
+		const files = await readdir(directory).catch(() => [])
+		for (const file of files) {
+			if (file.endsWith('.webp') && !referenced.has(file))
+				await unlink(join(directory, file)).catch(() => {})
+		}
 	}
 
 	saveSlot(
@@ -100,24 +195,16 @@ export class FileProgressStore implements ProgressStore {
 				savedAt: new Date().toISOString(),
 				thumbnailRef,
 			}
-			const progress = (await this.read(workId)) ?? {
-				mainline: null,
-				read: [],
-				saves: [],
+			const stored = (await this.read(workId)) ?? {
+				progress: { mainline: null, read: [], saves: [] },
+				legacySaves: [],
 			}
-			progress.saves = [
-				...progress.saves.filter((save) => slotKey(save.slot) !== name),
+			stored.progress.saves = [
+				...stored.progress.saves.filter((save) => slotKey(save.slot) !== name),
 				entry,
 			]
-			await this.write(workId, progress)
-			const referenced = new Set(
-				progress.saves.map((save) => save.thumbnailRef),
-			)
-			const files = await readdir(this.directory(workId)).catch(() => [])
-			for (const file of files) {
-				if (file.endsWith('.webp') && !referenced.has(file))
-					await unlink(join(this.directory(workId), file)).catch(() => {})
-			}
+			await this.write(workId, stored)
+			await this.cleanThumbnails(workId, stored)
 			return entry
 		})
 	}
@@ -129,8 +216,11 @@ export class FileProgressStore implements ProgressStore {
 	}
 }
 
+let desktopProgressStore: FileProgressStore | undefined
+
 export async function createDesktopProgressStore(): Promise<FileProgressStore> {
 	const { app } = await import('electron')
 	await app.whenReady()
-	return new FileProgressStore(app.getPath('userData'))
+	desktopProgressStore ??= new FileProgressStore(app.getPath('userData'))
+	return desktopProgressStore
 }
