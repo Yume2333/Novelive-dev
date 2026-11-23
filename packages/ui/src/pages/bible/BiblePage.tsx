@@ -112,7 +112,12 @@ const collection = {
 	style: 'styles',
 } as const
 
-function approvalNotice(proposal: Proposal, bible: Bible) {
+function characterDescription(entry: Entry | ProposalEntry) {
+	if ('description' in entry && typeof entry.description === 'string')
+		return entry.description
+}
+
+export function approvalNotice(proposal: Proposal, bible: Bible) {
 	let images = false
 	let style = false
 	if (proposal.payload.kind === 'bible') {
@@ -123,6 +128,7 @@ function approvalNotice(proposal: Proposal, bible: Bible) {
 				images ||=
 					!!current &&
 					(op === 'delete' ||
+						characterDescription(current) !== characterDescription(entry) ||
 						JSON.stringify(current.appearance) !==
 							JSON.stringify(entry.appearance) ||
 						(current.costumes ?? []).some(

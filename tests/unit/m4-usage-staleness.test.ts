@@ -11,6 +11,7 @@ import { expect, test, vi } from 'vitest'
 import {
 	applyBibleProposal,
 	bibleRevision,
+	getBible,
 } from '../../packages/creator/src/bible/editing'
 import { propagateStaleness } from '../../packages/creator/src/bible/staleness'
 import { ChatStore } from '../../packages/creator/src/chat/store'
@@ -29,6 +30,7 @@ import {
 	recordTextUsage,
 	withUsage,
 } from '../../packages/creator/src/usage'
+import { approvalNotice } from '../../packages/ui/src/pages/bible/BiblePage'
 import { bible } from '../fixtures/cassettes/m1b-art/fixture'
 import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
 
@@ -456,7 +458,7 @@ test('text provider usage preserves resolved slots even when every slot uses the
 	}
 })
 
-test('approving a general character description marks the base sprite and expression stale', async () => {
+test('approving a general character description marks the base sprite and expression stale and reports it', async () => {
 	await fixture(async (project, profile) => {
 		const character = {
 			id: 'ada',
@@ -503,9 +505,13 @@ test('approving a general character description marks the base sprite and expres
 		const { proposal } = new ChatStore(project.database, workId).proposal(
 			'edit',
 		)
+		const before = await getBible(project, { workId, volumeId: 'v1' })
 		await expect(applyBibleProposal(project, proposal)).resolves.toEqual({
 			status: 'applied',
 		})
+		expect(approvalNotice(proposal, before)).toBe(
+			'已接受候选；受影响的已有图片已标记过期。',
+		)
 		expect((await project.read(file)).entries).toEqual([updated])
 		expect((await listUsage(profile)).staleAssets).toEqual([
 			{ workId, assetKey: expression },
