@@ -1,5 +1,6 @@
 import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
+import { parseScript } from '@novelive/format/script'
 import { useEffect, useRef } from 'react'
 import { OverlayScrollbar } from '../../components/ScrollArea'
 
@@ -99,12 +100,18 @@ export function ScriptEditor({
 		if (!editor || !insert) return
 		const selection = editor.state.selection.main
 		const line = editor.state.doc.lineAt(selection.head)
-		const prefix = line.text.startsWith('@caption ')
-			? 9
-			: line.text.indexOf(': ') + 2
+		const parsed = parseScript(editor.state.doc.toString())
+			.scenes.flatMap((scene) => scene.lines)
+			.find((item) => item.line === line.number)
+		if (parsed?.type !== 'text') return
+		const delimiter =
+			parsed.kind === 'caption'
+				? parsed.col - 1 + '@caption'.length
+				: line.text.indexOf(':', parsed.col - 1) + 1
+		const prefix =
+			line.text.length - line.text.slice(delimiter).trimStart().length
 		const suffix = line.text.search(/(?: cont| wait)? #[0-9a-f]{4}\s*$/)
 		if (
-			prefix < 2 ||
 			suffix < prefix ||
 			editor.state.doc.lineAt(selection.from).number !== line.number
 		)

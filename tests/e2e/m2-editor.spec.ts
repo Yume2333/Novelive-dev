@@ -269,6 +269,7 @@ test.describe('contract-render', () => {
 		if (window.fixtureMode === 'empty') chapter.scenes = [];
 		if (window.fixtureMode === 'crlf') chapter.scenes.forEach(scene => scene.nvs = scene.nvs.replaceAll(${JSON.stringify('\n')}, ${JSON.stringify('\r\n')}));
 		if (window.fixtureMode === 'leading') chapter.scenes.forEach(scene => scene.nvs = ${JSON.stringify('\n\n')} + scene.nvs);
+		if (window.fixtureMode === 'effects') chapter.scenes[0].nvs = ${JSON.stringify('scene 空屋\nsource p0001\n  @caption 标题 wait #0001\n\t:旁白 #0002\n:你好 #0003\n  hero (inner) as 来客:\t你好 #0004\n')};
 		let history = [], revision = 1;
 		window.fixtureCalls = [];
 		window.novelive = {call(command, input) {
@@ -327,6 +328,7 @@ test.describe('contract-render', () => {
 		'stale',
 		'crlf',
 		'leading',
+		'effects',
 	]) {
 		test(`M2 editor contract fixture ${mode}`, async () => {
 			const profile = await mkdtemp(
@@ -362,6 +364,48 @@ test.describe('contract-render', () => {
 				}
 				if (mode === 'failure') {
 					await expect(page.getByRole('alert')).toHaveText('版本已改变')
+					return
+				}
+				if (mode === 'effects') {
+					const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
+					await expect(editor).toContainText('标题')
+					for (const [line, next] of [
+						['3', '  @caption {em}{/em}标题 wait #0001'],
+						['4', '\t:{em}{/em}旁白 #0002'],
+						['5', ':{em}{/em}你好 #0003'],
+						['6', '  hero (inner) as 来客:\t{em}{/em}你好 #0004'],
+					]) {
+						await page
+							.getByLabel('快捷位置', { exact: true })
+							.selectOption(line)
+						await page
+							.getByRole('button', { name: '强调', exact: true })
+							.click()
+						await expect(editor).toContainText('{em}{/em}')
+						await page.getByRole('button', { name: '保存当前句' }).click()
+						await expect(
+							page.getByRole('button', { name: '保存当前句' }),
+						).toBeDisabled()
+						const calls = await page.evaluate(
+							() =>
+								(
+									window as unknown as {
+										fixtureCalls: {
+											command: string
+											input: { edit: { next: string } }
+										}[]
+									}
+								).fixtureCalls,
+						)
+						expect(
+							calls.filter((call) => call.command === 'editor.editLine').at(-1)
+								?.input.edit.next,
+						).toBe(next)
+						await page
+							.getByRole('button', { name: '撤销', exact: true })
+							.click()
+						await expect(editor).not.toContainText('{em}{/em}')
+					}
 					return
 				}
 				if (mode === 'leading') {
