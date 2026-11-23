@@ -9,12 +9,15 @@
 	"scripts": {
 		"dev": "electron-vite dev",
 		"build": "electron-vite build",
-		"package:linux": "electron-vite build && node ../../tools/upscale/fetch.mjs linux && electron-builder --linux AppImage",
+		"package:linux": "node ../../tools/package/build.mjs linux",
+		"package:windows": "node ../../tools/package/build.mjs win32",
+		"package:macos": "node ../../tools/package/build.mjs darwin",
 		"postinstall": "node ../../tools/patch-sharp.mjs"
 	},
 	"dependencies": {
 		"@novelive/creator": "workspace:*",
 		"@novelive/ui": "workspace:*",
+		"electron-updater": "6.8.11",
 		"sharp": "0.35.5"
 	},
 	"devDependencies": {

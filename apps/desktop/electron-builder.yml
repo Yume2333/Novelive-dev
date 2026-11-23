@@ -1,12 +1,28 @@
 appId: dev.novelive.desktop
 productName: Novelive
+icon: ../../prototype/public/icon/novelive-icon-light.svg
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 files:
   - out/**
+  - "!out/licenses/**"
 asar: false
 npmRebuild: false
+publish:
+  provider: generic
+  url: https://updates.invalid/
+  channel: latest
 extraResources:
   - from: ../../bin/matting
     to: matting
+  - from: ../../bin/upscale
+    to: upscale
+    filter:
+      - models/**
+      - licenses/**
+  - from: ../../LICENSE
+    to: licenses/LICENSE.txt
+  - from: out/licenses/THIRD_PARTY_NOTICES.txt
+    to: licenses/THIRD_PARTY_NOTICES.txt
 linux:
   target: AppImage
   executableName: novelive
@@ -16,5 +32,22 @@ linux:
       to: upscale
       filter:
         - linux/upscayl-bin
-        - models/**
-        - licenses/**
+win:
+  target: nsis
+  signExecutable: false
+  extraResources:
+    - from: ../../bin/upscale
+      to: upscale
+      filter:
+        - win32/upscayl-bin.exe
+mac:
+  target: [dmg, zip]
+  identity: null
+  notarize: false
+  extraResources:
+    - from: ../../bin/upscale
+      to: upscale
+      filter:
+        - darwin/upscayl-bin
+dmg:
+  sign: false

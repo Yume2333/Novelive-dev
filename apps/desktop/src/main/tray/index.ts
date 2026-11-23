@@ -50,7 +50,10 @@ export function installLifecycle(options: {
 		window.show()
 		window.focus()
 	}
-	const quit = async () => {
+	const quit = async (
+		exit = () => app.quit(),
+		canQuit?: () => Promise<boolean>,
+	) => {
 		if (quitting || prompting) return
 		prompting = true
 		try {
@@ -66,10 +69,11 @@ export function installLifecycle(options: {
 				})
 				if (response !== 1) return
 			}
+			if (canQuit && !(await canQuit())) return
 			await options.cleanup()
 			quitting = true
 			tray?.destroy()
-			app.quit()
+			exit()
 		} finally {
 			prompting = false
 		}
@@ -106,6 +110,7 @@ export function installLifecycle(options: {
 		void quit()
 	})
 	return {
+		quit,
 		show,
 		attach(window: BrowserWindow) {
 			window.on('close', (event) => {

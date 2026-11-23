@@ -61,7 +61,7 @@
 | 测试 | Vitest；Playwright 的 Electron 支持做少量冒烟用例；`registerFauxProvider` 假模型与 fetch 注入按录制文件回放流式响应和错误 |
 | Lint 与格式化 | Biome；类型检查用 `tsc --noEmit` |
 | CI | GitHub Actions，Linux 上跑类型检查、lint、单元测试；三平台打包到 M5 再加（M3 先在 Linux 上手动试打一次安装包） |
-| 应用更新 | electron-builder 的自动更新，从 GitHub Releases 检查（M5）；Windows（NSIS）和 Linux AppImage 自动下载安装，macOS 未签名包和 Linux deb 只检查新版本、提示手动下载（未签名的 macOS 包 Squirrel.Mac 验签会静默失败） |
+| 应用更新 | electron-updater 从显式配置的测试源检查（M5 默认不联网）；Windows NSIS 和 Linux AppImage 自动下载，用户确认后重启安装；未签名 macOS 包和 Linux deb 只提示手动下载 |
 
 **进程通信细节**
 
@@ -82,6 +82,12 @@
 - `asarUnpack` 必须同时覆盖 `**/*.node` 和 `**/*.so*`（libvips-cpp.so 留在 asar 里 dlopen 失败），sharp 相关目录一并 unpack。
 - sharp 在 Electron 的 Linux 版里一解码就崩（Electron#46323，glib 符号冲突，上游未修）：Linux 版用仓库里的补丁脚本（`tools/patch-sharp.mjs`）自己打——链接层隐藏 libvips 内嵌 glib 符号并强制加载同目录 `.so`；脚本是幂等的，已打过补丁就跳过，需要 patchelf 和 objcopy。sharp 每次升级重新打，跟踪 Electron#46323，上游修好后换回官方 sharp；其他平台用官方 sharp。CI 的 Linux 冒烟测试要实际启动 Electron 解码一张图，守住补丁和 sharp 升级。
 - 打包产物自带 Electron `LICENSE` 和 `LICENSES.chromium.html`（含 FFmpeg LGPL-2.1 等组件通知），不删；`THIRD_PARTY_NOTICES` 由构建脚本生成。从上游拷贝或改写的文件，文件头保留版权行和原许可并指向 THIRD_PARTY_NOTICES（规则见 `.workflow/research/refs/ext-2026-11-r2-licenses.md`）。
+
+**本地交付与更新复验**
+
+- 在对应系统上运行 `pnpm --filter @novelive/desktop run package:linux`（x64 AppImage）、`package:windows`（x64 NSIS）或 `package:macos`（原生架构 DMG + ZIP）。打包命令打印 `apps/desktop/dist/` 下的交付目录，包含安装包、更新元数据、`BUILD.txt` 与 `SHA256SUMS`。GitHub Actions 的 **Native packages** 可手动构建三平台并保留同样的产物；不签名、不公证、不发 Release。
+- 更新必须使用可信的通用更新源：启动已安装应用时传入 `NL_UPDATE_URL`（HTTPS；仅回环地址允许 HTTP）。把较新版本的打包产物中对应的 `latest.yml`（Windows）、`latest-linux.yml`（Linux x64）或 `latest-mac.yml`（macOS）以及元数据引用的文件放在源目录，运行较旧版本后等待启动检查或在设置「关于」点击「检查更新」。Windows/AppImage 下载完成后须用户确认；DMG/deb 不下载或安装，提示打开元数据中对应的手动包链接，缺少对应文件时打开源目录。M5 不产出 deb。
+- 设置「关于」提供版本号、源码和许可证入口。打包保留 Electron 原始许可并附应用的 AGPL 全文和第三方许可清单（包括 libvips 源码指引、放大侧车与模型权重）。
 
 **版本锁定**（2026-11-21 定稿）：
 

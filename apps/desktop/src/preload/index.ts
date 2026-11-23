@@ -132,6 +132,11 @@ const api: Novelive = {
 	pickPackageDestination: () =>
 		ipcRenderer.invoke('novelive:pick-package-destination'),
 	host: {
+		about: {
+			info: () => ipcRenderer.invoke('novelive:about'),
+			open: (kind) => ipcRenderer.invoke('novelive:about-open', kind),
+			checkUpdates: () => ipcRenderer.invoke('novelive:check-updates'),
+		},
 		progress: {
 			load: (workId) =>
 				ipcRenderer.invoke('novelive:progress', { operation: 'load', workId }),

@@ -16,6 +16,7 @@ import { cacheResponse } from '../../../../packages/creator/src/host-runtime/cac
 import { installProgressIpc } from '../progress-ipc'
 import { installNotifications } from './notifications'
 import { installLifecycle } from './tray'
+import { installUpdates } from './update'
 
 let creator: Electron.UtilityProcess | undefined
 let creatorDraining = false
@@ -194,6 +195,30 @@ app.whenReady().then(async () => {
 		},
 	})
 	closeNotifications = installNotifications(() => library, lifecycle.show)
+	const checkUpdates = installUpdates({
+		window: () => library,
+		quit: lifecycle.quit,
+	})
+	ipcMain.handle('novelive:about', () => ({
+		version: app.getVersion(),
+		packaged: app.isPackaged,
+	}))
+	ipcMain.handle('novelive:about-open', async (_event, kind: unknown) => {
+		if (kind === 'source')
+			return shell.openExternal('https://github.com/Yume2333/Novelive-dev')
+		if (kind !== 'license' && kind !== 'notices') return
+		if (kind === 'notices' && !app.isPackaged) return
+		const file = app.isPackaged
+			? join(
+					process.resourcesPath,
+					'licenses',
+					kind === 'license' ? 'LICENSE.txt' : 'THIRD_PARTY_NOTICES.txt',
+				)
+			: join(app.getAppPath(), '../../LICENSE')
+		const error = await shell.openPath(file)
+		if (error) throw new Error(error)
+	})
+	ipcMain.handle('novelive:check-updates', () => checkUpdates(true))
 	const rendererOrigin = rendererUrl ? new URL(rendererUrl).origin : 'null'
 	protocol.handle('novelive', async (request) => {
 		const response = await cacheResponse(
@@ -273,6 +298,7 @@ app.whenReady().then(async () => {
 	})
 
 	openLibrary()
+	void checkUpdates(false)
 	app.on('activate', () => {
 		if (!library) openLibrary()
 		else lifecycle.show()

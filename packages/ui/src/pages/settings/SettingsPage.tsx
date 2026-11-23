@@ -332,6 +332,12 @@ export function SettingsPage() {
 	const { config, updateConfig, resetConfig } = useOutletContext<SettingsHost>()
 	const [error, setError] = useState('')
 	const [resetting, setResetting] = useState(false)
+	const [about, setAbout] = useState<{ version: string; packaged: boolean }>()
+	const [checkingUpdates, setCheckingUpdates] = useState(false)
+	const aboutHost = window.novelive.host.about
+	useEffect(() => {
+		void aboutHost?.info().then(setAbout, () => setAbout(undefined))
+	}, [aboutHost])
 	async function apply(action: () => Promise<unknown>) {
 		setError('')
 		try {
@@ -438,25 +444,57 @@ export function SettingsPage() {
 							</SettingRow>
 						</div>
 					</section>
-					<section aria-labelledby="about-settings">
-						<h2 id="about-settings">关于</h2>
-						<div className={`${styles.card} ${styles.about}`}>
-							<div className={styles.row}>
-								<IconTile icon={BookOpen} />
-								<span>
-									<strong>Novelive</strong>
-									<small>把小说改编为视觉小说并直接游玩。</small>
-								</span>
-								<small>v0.1.0 · AGPL-3.0</small>
-							</div>
-							<div className={styles.aboutLinks}>
-								<span>第三方许可（待提供）</span>
-								<span>源代码（待接入）</span>
-							</div>
-						</div>
-					</section>
 				</>
 			)}
+			<section aria-labelledby="about-settings">
+				<h2 id="about-settings">关于</h2>
+				<div className={`${styles.card} ${styles.about}`}>
+					<div className={styles.row}>
+						<IconTile icon={BookOpen} />
+						<span>
+							<strong>Novelive</strong>
+							<small>把小说改编为视觉小说并直接游玩。</small>
+						</span>
+						<small>{about && `v${about.version} · `}AGPL-3.0</small>
+					</div>
+					{aboutHost && (
+						<div className={styles.aboutLinks}>
+							<button
+								type="button"
+								onClick={() => void apply(() => aboutHost.open('license'))}
+							>
+								开源许可
+							</button>
+							{about?.packaged && (
+								<button
+									type="button"
+									onClick={() => void apply(() => aboutHost.open('notices'))}
+								>
+									第三方许可
+								</button>
+							)}
+							<button
+								type="button"
+								onClick={() => void apply(() => aboutHost.open('source'))}
+							>
+								源代码
+							</button>
+							<button
+								type="button"
+								disabled={checkingUpdates}
+								onClick={() => {
+									setCheckingUpdates(true)
+									void apply(() => aboutHost.checkUpdates()).finally(() =>
+										setCheckingUpdates(false),
+									)
+								}}
+							>
+								{checkingUpdates ? '正在检查…' : '检查更新'}
+							</button>
+						</div>
+					)}
+				</div>
+			</section>
 		</section>
 	)
 }
