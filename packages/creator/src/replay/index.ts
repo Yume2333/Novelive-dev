@@ -299,14 +299,17 @@ export function createReplayFetch(
 		if (input instanceof Request) dispatchedRequests.add(input)
 		return send(admitted)
 	}
-	const upstream: typeof fetch = spend
-		? (input, init) =>
-				spend(new Request(input, init), (admitted) =>
-					sendAdmitted(input, admitted),
-				)
-		: send
-	if (spend && mode !== 'strict') spendGuardedFetches.add(upstream)
-	if (!mode) return upstream
+	const sendLive = (request: Request, original: RequestInfo | URL) =>
+		spend
+			? spend(request, (admitted) => sendAdmitted(original, admitted))
+			: send(request)
+	if (!mode) {
+		if (!spend) return send
+		const upstream: typeof fetch = (input, init) =>
+			sendLive(new Request(input, init), input)
+		spendGuardedFetches.add(upstream)
+		return upstream
+	}
 	const directory =
 		options.directory ??
 		process.env.NL_CASSETTE_DIR ??
@@ -529,7 +532,7 @@ export function createReplayFetch(
 					await appendFile(process.env.NL_REPLAY_MISSING_LOG, `${message}\n`)
 				throw new Error(message)
 			}
-			return upstream(request)
+			return sendLive(request, input)
 		}
 		const position = positions.get(identity.key) ?? 0
 		const row = rows[Math.min(position, rows.length - 1)]

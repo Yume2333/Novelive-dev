@@ -570,23 +570,24 @@ test.each([
 	},
 )
 
-test.each([200, 429])(
-	'synthesis HTTP %s without usage only blocks reopening if ambiguous',
+test.each([200, 429, 'replay miss'])(
+	'synthesis %s without usage only blocks reopening if ambiguous',
 	async (status) => {
 		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
 		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
 		vi.stubEnv('NL_USAGE_CSV', '')
 		try {
 			await seed(root)
-			const send = vi.fn(async () =>
-				status === 200 ? stream({}) : Response.json({}, { status }),
-			)
+			const send = vi.fn(async () => {
+				if (status === 'replay miss') throw new Error('Connection terminated')
+				return status === 200 ? stream({}) : Response.json({}, { status })
+			})
 			const run = (project: Project) =>
 				synthesizeVolume(project, 'v1', chapters, {
 					...options,
 					strategy: 'whole',
 					fetch: createReplayFetch({
-						mode: 'record',
+						mode: status === 'replay miss' ? 'replay' : 'record',
 						directory: join(directory, 'recordings'),
 						fetch: send,
 						spend: projectSpend(project.database),
@@ -598,7 +599,9 @@ test.each([200, 429])(
 					: {
 							code: 'internal',
 							message: expect.stringContaining(
-								'HTTP 200: successful response did not report billable usage',
+								status === 'replay miss'
+									? 'no HTTP status: connection or stream interrupted'
+									: 'HTTP 200: successful response did not report billable usage',
 							),
 						}
 			{
