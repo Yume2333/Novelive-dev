@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+	mkdir,
+	mkdtemp,
+	readFile,
+	rename,
+	rm,
+	writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
@@ -142,6 +149,53 @@ test('restores every work’s progress and legacy saves when package publication
 			})),
 		),
 	).toEqual(before)
+})
+
+test('blocks writes for an unresolved migration until its backup is recovered', async () => {
+	const { directory, store } = await createStore()
+	const image = await capture('#123456')
+	await store.saveSlot(workId, quick, snapshot(first), image)
+	const before = await store.load(workId)
+	const path = join(directory, 'progress.json')
+	const staged = join(directory, 'staged-progress.json')
+	await expect(
+		store.migrateAndPublish(
+			[
+				{
+					workId,
+					fromVersion: 1,
+					toVersion: 2,
+					chapters: [[textBeat(otherChapter)]],
+				},
+			],
+			async () => {
+				await rename(path, staged)
+				await mkdir(path)
+				throw new Error('publish failed')
+			},
+		),
+	).rejects.toThrow('Save migration rollback failed')
+	await rm(path, { recursive: true })
+	await rename(staged, path)
+	await expect(
+		store.save(workId, { mainline: first, read: [], saves: [] }),
+	).rejects.toThrow('Restart Novelive')
+	await expect(
+		store.saveSlot(workId, quick, snapshot(otherChapter), image),
+	).rejects.toThrow('Restart Novelive')
+	await expect(store.deleteLegacySave(workId, 1, quick)).rejects.toThrow(
+		'Restart Novelive',
+	)
+	await expect(
+		store.save('other-work', { mainline: null, read: [], saves: [] }),
+	).resolves.toBeUndefined()
+	await store.recoverPackageMigration(
+		(id, version) => id === workId && version === 1,
+	)
+	expect(await store.load(workId)).toEqual(before)
+	await expect(
+		store.saveSlot(workId, quick, snapshot(otherChapter), image),
+	).resolves.toBeDefined()
 })
 
 test.each([false, true])(
