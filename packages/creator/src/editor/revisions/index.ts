@@ -212,9 +212,24 @@ export class CreativeRevisions {
 		chapterId: string
 		expectedRevision: string
 	}) {
-		return this.editor.whileCurrent(input, () =>
-			this.worker.redo(input.chapterId),
+		return this.editor.whileCurrent(input, async () => {
+			await this.requireRedoSource(input.chapterId)
+			return this.worker.redo(input.chapterId)
+		})
+	}
+
+	async redoChapterRevision(chapterId: string) {
+		const revision = await this.chapterRevision(chapterId)
+		await this.requireRedoSource(chapterId)
+		return revision
+	}
+
+	private async requireRedoSource(chapterId: string) {
+		const source = await existing(() =>
+			this.project.readFile(projectFiles.chapterText(chapterId)),
 		)
+		if (!source)
+			throw { code: 'unsupported', message: '没有章节原文，无法重做。' }
 	}
 
 	chapterRevision(chapterId: string) {

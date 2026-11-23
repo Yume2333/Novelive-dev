@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
 import { parseScript } from '@novelive/format/script'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { projectProposals } from '../../packages/creator/src/chat/project'
 import { listHistory } from '../../packages/creator/src/editor/history/storage'
 import { CreativeRevisions } from '../../packages/creator/src/editor/revisions'
 import * as artModels from '../../packages/creator/src/pipeline/art/models'
@@ -146,6 +147,32 @@ test('both entries rewrite one scene through the writer, apply only checked hunk
 	} finally {
 		project.close()
 	}
+})
+
+test('does not propose or redo a shared chapter without source text', async () => {
+	const { project, workId, ref, editor, revisions, redone } =
+		await revisionProject(directory, { directory: cassettes, mode: 'strict' })
+	using imported = project
+	const file = projectFiles.work(ref.volumeId, workId)
+	await imported.write(file, {
+		...(await imported.read(file)),
+		derivedFrom: { workId, version: 1 },
+	})
+	await rm(join(imported.root, projectFiles.chapterText(chapterId)))
+	const target = { workId, chapterId }
+	const snapshot = await editor.snapshot(target)
+	const signal = new AbortController().signal
+	await expect(
+		projectProposals(imported, workId, revisions).prepare(
+			{ kind: 'redoChapter', chapterId, reason: 'Redo' },
+			signal,
+		),
+	).rejects.toMatchObject({ code: 'unsupported' })
+	await expect(
+		revisions.redoChapter({ ...target, expectedRevision: snapshot.revision }),
+	).rejects.toMatchObject({ code: 'unsupported' })
+	expect(redone).toEqual([])
+	expect(await editor.snapshot(target)).toEqual(snapshot)
 })
 
 test('regeneration reports unavailable matting without replacing the original image', async () => {
