@@ -202,6 +202,11 @@ export interface Novelive {
 	host: {
 		progress?: DesktopProgressApi
 		share?: DesktopShareApi
+		about?: {
+			info(): Promise<{ version: string; packaged: boolean }>
+			open(kind: 'license' | 'notices' | 'source'): Promise<void>
+			checkUpdates(): Promise<void>
+		}
 		appState(): Promise<HostState>
 		openLogDir(): Promise<void>
 		restartCreator(): Promise<void>

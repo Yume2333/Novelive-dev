@@ -130,6 +130,11 @@ const api: Novelive = {
 	pickFolder: () => ipcRenderer.invoke('novelive:pick-folder'),
 	pickFiles: (kind) => ipcRenderer.invoke('novelive:pick-files', kind),
 	host: {
+		about: {
+			info: () => ipcRenderer.invoke('novelive:about'),
+			open: (kind) => ipcRenderer.invoke('novelive:about-open', kind),
+			checkUpdates: () => ipcRenderer.invoke('novelive:check-updates'),
+		},
 		progress: {
 			load: (workId) =>
 				ipcRenderer.invoke('novelive:progress', { operation: 'load', workId }),

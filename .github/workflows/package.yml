@@ -1,0 +1,48 @@
+name: Native packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-24.04
+          - platform: windows
+            runner: windows-2025
+          - platform: macos
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.3
+          cache: pnpm
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils
+          curl --fail --silent --show-error --location \
+            https://github.com/NixOS/patchelf/releases/download/0.19.3/patchelf-0.19.3-x86_64.tar.gz \
+            --output "$RUNNER_TEMP/patchelf.tar.gz"
+          echo "38861b171079e440b25ac86483284f690d0ee7921dba98b0c8fe04a9b0a11667  $RUNNER_TEMP/patchelf.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/patchelf.tar.gz" -C "$RUNNER_TEMP" ./bin/patchelf
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @novelive/desktop run package:${{ matrix.platform }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: novelive-${{ matrix.platform }}-${{ runner.arch }}
+          path: apps/desktop/dist/*/artifacts/
+          if-no-files-found: error
+          retention-days: 14
