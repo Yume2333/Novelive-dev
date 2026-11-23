@@ -81,12 +81,19 @@ const record = (value: unknown): Record<string, unknown> | undefined =>
 function variants(schema: Shape, value: unknown): Shape[] {
 	if (!schema.anyOf) return [schema]
 	const fields = record(value)
-	const matching = schema.anyOf.filter((variant) =>
-		Object.entries(variant.properties ?? {}).some(
-			([key, field]) =>
-				Object.hasOwn(field, 'const') && field.const === fields?.[key],
-		),
-	)
+	const matching = schema.anyOf.filter((variant) => {
+		const discriminators = Object.entries(variant.properties ?? {}).filter(
+			([, field]) => Object.hasOwn(field, 'const') || field.enum,
+		)
+		return (
+			discriminators.length > 0 &&
+			discriminators.every(([key, field]) =>
+				field.enum
+					? field.enum.includes(fields?.[key])
+					: field.const === fields?.[key],
+			)
+		)
+	})
 	return matching.length ? matching : schema.anyOf
 }
 
@@ -128,7 +135,12 @@ function modelShape(shape: Shape): Shape {
 	if (shape.properties) {
 		const properties = Object.entries(shape.properties).map(([key, field]) => {
 			const child = modelShape(field)
-			if (emptyCollections.has(key) && child.items && !child.minItems)
+			if (
+				shape.required?.includes(key) &&
+				emptyCollections.has(key) &&
+				child.items &&
+				!child.minItems
+			)
 				child.default = []
 			return [key, child] as const
 		})

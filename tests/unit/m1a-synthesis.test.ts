@@ -200,6 +200,45 @@ test.each([false, true])(
 	},
 )
 
+test('published character updates do not clear omitted aliases or reject them on confirmed entries', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const confirmedFile = projectFiles.character(scope, confirmed.id)
+	const guide = { id: 'guide', name: 'Guide', status: 'candidate' } as const
+	const candidateFile = projectFiles.character(scope, guide.id)
+	await project.write(confirmedFile, {
+		formatVersion: 1,
+		entries: [{ ...confirmed, aliases: ['Captain'] }],
+	})
+	await project.write(candidateFile, {
+		formatVersion: 1,
+		entries: [{ ...guide, aliases: ['Navigator'] }],
+	})
+	const { aliases: _, ...withoutAliases } = confirmed
+	const patch: BiblePatch = [
+		{ kind: 'character', op: 'update', entry: withoutAliases },
+		{
+			kind: 'character',
+			op: 'update',
+			entry: { ...guide, personality: 'Curious' },
+		},
+	]
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		patch,
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toEqual([])
+	expect(await project.read(confirmedFile)).toMatchObject({
+		entries: [{ aliases: ['Captain'] }],
+	})
+	expect(await project.read(candidateFile)).toMatchObject({
+		entries: [{ aliases: ['Navigator'], personality: 'Curious' }],
+	})
+})
+
 test('whole synthesis requests a complete chapter-by-chapter patch, not a shortlist', async () => {
 	await seed(root)
 	using project = await Project.open(root)

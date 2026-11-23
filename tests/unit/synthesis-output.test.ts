@@ -52,3 +52,15 @@ test('fills missing empty collections in the redacted 24-character whole-volume 
 		]),
 	})
 })
+
+test('leaves aliases absent on character updates but preserves explicit edits', () => {
+	const contract = synthesisOutput(obj({ biblePatch: biblePatchSchema }))
+	const entry = { id: 'guide', name: 'Guide', status: 'confirmed' }
+	const update = { kind: 'character', op: 'update', entry }
+	const clear = { ...update, entry: { ...entry, aliases: [] } }
+	expect(contract.parse({ biblePatch: [update, clear] })).toEqual({
+		ok: true,
+		value: { biblePatch: [{ ...update, entry: { ...entry } }, clear] },
+	})
+	expect(update.entry).not.toHaveProperty('aliases')
+})

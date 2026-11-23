@@ -47,8 +47,18 @@ export function prepareBiblePatch(
 			if (index >= 0) entries.splice(index, 1)
 			continue
 		}
-		const { conflict: _, ...fields } = entry
-		const confirmed = { ...fields, status: 'confirmed' as const }
+		let confirmed: Entry
+		if (kind === 'character') {
+			const { conflict: _, ...fields } = entry
+			confirmed = {
+				...fields,
+				aliases: entry.aliases ?? after.character[index]?.aliases ?? [],
+				status: 'confirmed',
+			}
+		} else {
+			const { conflict: _, ...fields } = entry
+			confirmed = { ...fields, status: 'confirmed' }
+		}
 		if (index >= 0) entries[index] = confirmed
 		else entries.push(confirmed)
 	}
