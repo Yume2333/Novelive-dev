@@ -287,29 +287,33 @@ const crashScript = `
 	const { Project } = await server.ssrLoadModule('/packages/creator/src/project/index.ts')
 	const { ChapterScheduler } = await server.ssrLoadModule('/packages/creator/src/scheduler/chapter/index.ts')
 	const { ScriptedWorker } = await server.ssrLoadModule('/tests/fixtures/scheduler/m1b/worker.ts')
-	const [activeDir, activeId, queuedDir, queuedId] = process.argv.slice(1)
+	const [activeDir, activeId, queuedDir, queuedId, checkpoint] = process.argv.slice(1)
 	const active = await Project.open(activeDir)
 	const queued = await Project.open(queuedDir)
-	const worker = new ScriptedWorker()
-	worker.hold('review:ch2')
-	const scheduler = new ChapterScheduler(active.database, worker)
+	const worker = new ScriptedWorker({
+		ch2: checkpoint === 'draw:in-flight'
+			? [{ assetId: 'saved', kind: 'cg' }, { assetId: 'in-flight', kind: 'cg' }]
+			: [],
+	})
+	worker.hold(checkpoint)
+	const scheduler = new ChapterScheduler(active.database, worker, { imageConcurrency: 1 })
 	const waiting = new ChapterScheduler(queued.database, new ScriptedWorker(), {
 		slot: { workId: queuedId, granted: () => false, enqueueFirst: () => {} },
 	})
 	scheduler.continue(activeId)
 	waiting.continue(queuedId)
-	while (!worker.calls.includes('review:ch2')) {
+	while (!worker.calls.includes(checkpoint)) {
 		await new Promise((resolve) => setTimeout(resolve, 5))
 	}
 	process.send('running')
 	setInterval(() => {}, 1000)
 `
 
-test('real process death preserves checkpoints and pauses active and queued work until explicitly resumed', async () => {
-	const original = openProduction()
-	const a = await seed(original, 'alpha')
-	const b = await seed(original, 'beta')
-	await seed(original, 'gamma')
+async function killAtCheckpoint(
+	a: { root: string; workId: string },
+	b: { root: string; workId: string },
+	checkpoint: string,
+) {
 	const child = spawn(
 		process.execPath,
 		[
@@ -320,6 +324,7 @@ test('real process death preserves checkpoints and pauses active and queued work
 			a.workId,
 			b.root,
 			b.workId,
+			checkpoint,
 		],
 		{ stdio: ['ignore', 'ignore', 'pipe', 'ipc'] },
 	)
@@ -341,7 +346,14 @@ test('real process death preserves checkpoints and pauses active and queued work
 		child.kill('SIGKILL')
 		await exited
 	}
+}
 
+test('real process death preserves checkpoints and pauses active and queued work until explicitly resumed', async () => {
+	const original = openProduction()
+	const a = await seed(original, 'alpha')
+	const b = await seed(original, 'beta')
+	await seed(original, 'gamma')
+	await killAtCheckpoint(a, b, 'review:ch2')
 	const host = openProduction()
 	expect(await queueState(host)).toEqual({
 		owner: undefined,
@@ -387,4 +399,49 @@ test('real process death preserves checkpoints and pauses active and queued work
 			}),
 		]),
 	)
+}, 15000)
+
+test('recovering a process killed during drawing only retries the unfinished image', async () => {
+	const original = openProduction()
+	const a = await seed(original, 'alpha')
+	const b = await seed(original, 'beta')
+	await killAtCheckpoint(a, b, 'draw:in-flight')
+
+	const host = openProduction()
+	const first = await host.get(a.workId)
+	const images = () =>
+		first.project.database
+			.prepare(
+				'SELECT asset_key, status, draw_count FROM asset WHERE work_id = ? ORDER BY asset_key',
+			)
+			.all(a.workId)
+	expect(first.snapshot().status).toBe('stopped')
+	expect(a.worker.calls).toEqual([])
+	expect(images()).toEqual([
+		{ asset_key: 'in-flight', status: 'pending', draw_count: 0 },
+		{ asset_key: 'saved', status: 'drawn', draw_count: 1 },
+	])
+	expect(first.queue.runLog(a.workId)).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				kind: 'image',
+				ref: 'in-flight',
+				status: 'interrupted',
+				steps: [
+					expect.objectContaining({ purpose: 'draw', status: 'cancelled' }),
+				],
+			}),
+		]),
+	)
+	await first.continue()
+	await vi.waitFor(async () =>
+		expect((await queueState(host)).inactive.alpha).toBe('done'),
+	)
+	expect(a.worker.calls.filter((call) => call.startsWith('draw:'))).toEqual([
+		'draw:in-flight',
+	])
+	expect(images()).toEqual([
+		{ asset_key: 'in-flight', status: 'drawn', draw_count: 1 },
+		{ asset_key: 'saved', status: 'drawn', draw_count: 1 },
+	])
 }, 15000)
