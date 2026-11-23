@@ -450,6 +450,12 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(page.locator('canvas')).toBeVisible()
 		await expect(page.locator('.nl-player-text')).toContainText('暮色里')
 		await capture(page, '07-image-redrawn')
+		await page
+			.getByRole('combobox', { name: '图片', exact: true })
+			.selectOption('ada/uniform/neutral')
+		await expect(
+			page.getByRole('region', { name: '场景图片' }).getByRole('status'),
+		).toHaveCount(0)
 		await page.getByRole('textbox', { name: '重绘要求' }).fill('')
 		await page
 			.getByRole('button', { name: '多出几张再挑', exact: true })
@@ -475,6 +481,9 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			.getByRole('button', { name: '选择版本 2', exact: true })
 			.click()
 		await expect(candidates).toHaveCount(0)
+		await expect(
+			page.getByRole('region', { name: '场景图片' }).getByRole('status'),
+		).toHaveCount(0)
 		await expect
 			.poll(async () =>
 				(await page.locator('body').getAttribute('data-preview-image-src'))
@@ -494,6 +503,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 					).entries.filter((entry) => entry.kind === 'image').length,
 			)
 			.toBe(2)
+		await capture(page, '08-image-candidate-applied')
 	} finally {
 		await app.close()
 		await rm(root, { recursive: true, force: true })

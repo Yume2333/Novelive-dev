@@ -87,6 +87,7 @@ export function SceneImages({
 						onChange={(event) => {
 							setSelection(event.target.value)
 							setChoices(undefined)
+							setGenerationStatus('')
 						}}
 					>
 						{assets.map((asset) => (
@@ -132,6 +133,7 @@ export function SceneImages({
 										candidateId: candidate.id,
 									}).promise
 									setChoices(undefined)
+									setGenerationStatus('')
 									await onApplied(assetId)
 								})
 							}
