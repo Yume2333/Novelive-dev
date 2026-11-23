@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -75,6 +75,10 @@ test('M5 locales switch the interface through four languages and persist', async
 			}
 			if (locale === 'ja') {
 				await app.close()
+				expect(
+					JSON.parse(await readFile(join(profile, 'config.json'), 'utf8'))
+						.language,
+				).toBe('ja')
 				;({ app, page } = await launch(profile))
 				await expect(page.locator('html')).toHaveAttribute('lang', 'ja')
 				await expect(
