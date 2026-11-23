@@ -353,3 +353,16 @@ test('incremental preparation reports volume one before later work, passes diges
 	await prepareSeries(p, { ...options, onReady: undefined })
 	expect(requests).toHaveLength(count)
 })
+
+test('art registration persists local entries without freezing inherited rows', async () => {
+	using p = await project()
+	const joined = await joinSeries(p, book)
+	const scope = { level: 'work', volumeId: joined.volumeId, workId: joined.workId } as const
+	await p.write(projectFiles.assetRegistry(series), { formatVersion: 1, entries: [{ id: 'room/day', type: 'location', path: 'assets/room.webp', status: 'drawn', aliases: [] }] })
+	const { art } = await productionBible(p, joined.volumeId, joined.workId)
+	const service = new ArtProduction(p, { scope, main: connection, fast: connection, visual: connection, image: { baseUrl: 'https://relay.invalid/v1', apiKey: 'offline', model: 'fixture-image', concurrency: 1, retries: 0, quality: 'low', nativeMaxEdge: 1536, postProcess: 'off', upscaleTier: 'anime' } })
+	await service.register([{ id: 'cg-local', kind: 'cg', description: 'Local scene' }], art)
+	expect((await p.read(projectFiles.assetRegistry(scope))).entries.map(({ id }) => id)).toEqual(['cg-local'])
+	await p.write(projectFiles.assetRegistry(series), { formatVersion: 1, entries: [{ id: 'room/day', type: 'location', path: 'assets/updated.webp', status: 'drawn', aliases: [] }] })
+	expect((await service.registry()).entries.find(({ id }) => id === 'room/day')?.path).toBe('assets/updated.webp')
+})

@@ -1,8 +1,10 @@
+import { isDeepStrictEqual } from 'node:util'
 import { arr, bool, obj, oneOf, str } from '@earendil-works/pi-schema'
 import {
 	type AssetRegistry,
 	type ChapterRef,
 	formatVersion,
+	overlayEntries,
 	type ImageJobResult,
 	type ProjectScope,
 	projectFiles,
@@ -12,7 +14,7 @@ import sharp from 'sharp'
 import { type ImageConfig, imageProvider, imageSize } from '../../models/image'
 import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
-import { resolveRegistry } from '../../project/series/resolve'
+import { optionalFile, resolveRegistry } from '../../project/series/resolve'
 import { checkImage, type Dimensions, placeholder } from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
@@ -82,6 +84,18 @@ export class ArtProduction {
 		return resolveRegistry(this.project, this.options.readScope ?? this.scope)
 	}
 
+	private async persistRegistry(registry: AssetRegistry) {
+		const local = await optionalFile(() => this.project.read(this.registryFile))
+		const resolved = await this.registry()
+		const changed = registry.entries.filter((entry) => !isDeepStrictEqual(
+			entry, resolved.entries.find((existing) => existing.id === entry.id),
+		))
+		await this.project.write(this.registryFile, {
+			formatVersion,
+			entries: overlayEntries(local?.entries ?? [], changed),
+		})
+	}
+
 	async register(
 		items: readonly ManifestItem[],
 		bible: ArtBible,
@@ -96,7 +110,7 @@ export class ArtProduction {
 			for (const entry of plan.registry.entries)
 				if (!existing.has(entry.id)) entry.path = this.scoped(entry.path)
 			await beforeCommit?.(plan)
-			await this.project.write(this.registryFile, plan.registry)
+			await this.persistRegistry(plan.registry)
 			if (chapter) {
 				const file = projectFiles.chapter(chapter)
 				const metadata = await this.project.read(file)
@@ -120,7 +134,7 @@ export class ArtProduction {
 		const entry = registry.entries.find((item) => item.id === id)
 		if (!entry) throw new Error(`Unregistered asset: ${id}`)
 		entry.status = status
-		await this.project.write(this.registryFile, registry)
+		await this.persistRegistry(registry)
 	}
 
 	private readonly pendingDraws = new Map<string, Promise<ImageJobResult>>()
@@ -190,7 +204,7 @@ export class ArtProduction {
 				await this.project.readFile(source),
 			)
 			entry.status = 'drawn'
-			await this.project.write(this.registryFile, registry)
+			await this.persistRegistry(registry)
 			return entry.path
 		})
 	}
@@ -622,7 +636,7 @@ export class ArtProduction {
 						aliases: [],
 					})
 			}
-			await this.project.write(this.registryFile, registry)
+			await this.persistRegistry(registry)
 		})
 		const chosen: Style = { ...style, status: 'confirmed', references }
 		const file = projectFiles.style(this.scope)
