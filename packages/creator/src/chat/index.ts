@@ -288,6 +288,7 @@ export class ChatService {
 				signal,
 			)
 			if (result.status === 'stale') return { status: 'stale', proposal }
+			if (result.status === 'restricted') return { ...result, proposal }
 			resolved = this.store.resolve(
 				proposal,
 				'approved',

@@ -17,6 +17,10 @@ type Bible = Awaited<ReturnType<typeof readBible>>
 type Kind = keyof Bible
 type Entry = Bible[Kind][number]
 type Payload = Extract<Proposal['payload'], { kind: 'bible' | 'glossary' }>
+type ApplicationResult =
+	| { status: 'applied' }
+	| { status: 'stale' }
+	| { status: 'restricted'; reason: string }
 const locks = new Map<string, Promise<unknown>>()
 
 async function exclusive<T>(
@@ -189,12 +193,13 @@ async function apply(
 	proposal: Proposal,
 	payload: Payload,
 	source?: ProposalSource,
-) {
+): Promise<ApplicationResult> {
 	const before = await readBible(project)
-	if (
-		!(await proposalActionability(project, proposal, before, source)).canApprove
-	)
-		return false
+	const action = await proposalActionability(project, proposal, before, source)
+	if (!action.canApprove)
+		return action.status === 'restricted'
+			? { status: 'restricted', reason: action.reason }
+			: { status: 'stale' }
 	const workId = proposal.workId
 	await workContext(project, workId, payload.volumeId)
 	const after = structuredClone(before)
@@ -257,13 +262,13 @@ async function apply(
 					"UPDATE asset SET status = 'stale' WHERE work_id = ? AND asset_key = ?",
 				)
 				.run(asset.work_id, asset.asset_key)
-	return true
+	return { status: 'applied' }
 }
 
 export async function applyBibleProposal(
 	project: Project,
 	proposal: Proposal,
-): Promise<'applied' | 'stale'> {
+): Promise<ApplicationResult> {
 	const payload = proposal.payload
 	if (payload.kind !== 'bible' && payload.kind !== 'glossary')
 		throw { code: 'unsupported', message: '不是设定或术语候选' }
@@ -272,8 +277,6 @@ export async function applyBibleProposal(
 			project.database,
 			proposal.workId,
 		).proposal(proposal.id)
-		return (await apply(project, proposal, payload, source))
-			? 'applied'
-			: 'stale'
+		return apply(project, proposal, payload, source)
 	})
 }

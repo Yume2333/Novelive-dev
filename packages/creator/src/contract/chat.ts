@@ -213,6 +213,11 @@ export const chatCommands = {
 				rewrite: opt(rewriteProposalSchema),
 			}),
 			obj({ status: lit('stale'), proposal: proposalSchema }),
+			obj({
+				status: lit('restricted'),
+				proposal: proposalSchema,
+				reason: str(),
+			}),
 		]),
 	},
 } as const

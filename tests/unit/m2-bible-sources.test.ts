@@ -458,7 +458,10 @@ test('chapter-scoped synthesis conflicts cannot replace global facts but can be 
 				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
 				new AbortController().signal,
 			),
-		).toMatchObject({ status: 'stale' })
+		).toMatchObject({
+			status: 'restricted',
+			reason: expect.stringContaining('暂不支持按章应用'),
+		})
 		expect(await readBible(project)).toEqual(before)
 		expect(
 			await service.resolve(
@@ -518,7 +521,10 @@ test('relation conflicts with unpublished character dependencies cannot be appro
 				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
 				new AbortController().signal,
 			),
-		).toMatchObject({ status: 'stale' })
+		).toMatchObject({
+			status: 'restricted',
+			reason: 'Unknown character reference: missing',
+		})
 		expect(await readBible(project)).toEqual(before)
 		await project.write(projectFiles.character(scope, 'missing'), {
 			formatVersion,
@@ -669,4 +675,32 @@ test('real patch preflight blocks missing speakers without writing confirmed con
 		reason: 'Unknown character reference: unpublished-speaker',
 	})
 	expect(await readBible(project)).toEqual(before)
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({
+			status: 'restricted',
+			reason: 'Unknown character reference: unpublished-speaker',
+			proposal: { status: 'pending' },
+		})
+		expect(
+			await service.resolve(
+				{
+					...input,
+					proposalId: proposal.id,
+					decision: { kind: 'reject', reason: 'Publish the speaker first' },
+				},
+				new AbortController().signal,
+			),
+		).toMatchObject({
+			status: 'resolved',
+			proposal: { status: 'rejected', feedback: 'Publish the speaker first' },
+		})
+	} finally {
+		await service.close()
+	}
 })

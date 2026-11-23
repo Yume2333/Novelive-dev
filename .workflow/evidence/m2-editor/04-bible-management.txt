@@ -7,6 +7,20 @@ $ tsc --noEmit
 Exit code: 0
 
 PR #35 review follow-up (baseline d1ea43a verified as HEAD ancestor)
+Safety review on 0b44b9f (supersedes bridge-time legacy snapshots and hand-written reference restrictions below):
+- Quarantine overwrite: c5cf200. applyPatches now optionally exposes its in-memory merged result, derived solely from the validated read and its own merge. Normal synthesis hashes those entries without reading potentially newer on-disk entry snapshots. Quarantined output has no entry bases and an explicit quarantine marker; it cannot become approvable even if the old Bible later reappears. Legacy bases without the new provenance version are only reconstructed when their saved whole-Bible revision matches current contents exactly. Actual interrupted/ready checkpoint synthesis tests assert no quarantined bases; adapter regression asserts even a quarantined source containing newer hashes cannot overwrite the creator edit.
+- Backfill overwrite: c947782. Before fix, the concrete pending-character regression removed old bases, edited the confirmed duplicate while preserving the candidate, reopened, and incorrectly obtained a new targeted hash (expected undefined). Backfill now requires the existing saved expectedRevision, current whole-Bible revision and supplied provenance revision to match. Untrusted/missing metadata is never allowed to bypass a mismatching saved revision. Matching-revision enrichment and rejected-state preservation are tested.
+- Missing speakers: 3e4d0ee. Before fix, a proposal with addresses.speakerId = unpublished-speaker incorrectly projected canApprove: true. Reference checks now run real validatePatch as a dry-run, with exactly its error as the reason; this also covers relations, chapters, costumes, knowledge and future validator rules. No parallel hand-maintained dependency validator remains.
+- Chat hides rejection: restricted outcomes now travel through the contract, ChatService and adapter as {status: restricted, proposal, reason}; only real revision/source failures are stale. Chat displays the restriction, disables confirmation and keeps rejection; Bible uses the same actionability and retains rejection. Electron covers restricted approval followed by reasoned rejection and separately confirms true stale hides chat actions. Backend tests verify restricted proposals stay pending until rejected and never write confirmed content.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary|M2 chat panel'
+  4 passed (4.4s)
+$ NL_REPLAY=strict pnpm check
+Checked 233 files in 109ms. No fixes applied.
+Found 1 info.
+ Test Files  28 passed (28)
+      Tests  375 passed (375)
+Both exited 0. Existing info remains tests/fixtures/text-models/build-synthetic.ts:63. Logs: 04-pr35-safety-{e2e,check}.log; before-fix receipts: 04-pr35-{backfill,speaker}-before.log. Strict replay only, no paid model calls. Scheduler untouched; M2/07 handoff unchanged.
+
 Bridge review on c89626b (supersedes whole-Bible bridge checks and legacy checkpoint behavior below):
 1+3: 299467a. Concrete independent-conflict regression failed before fix with expected resolved/approved, received stale/pending. Synthesis now persists entry bases after its merge. Bridge rows freeze the bases of only their targeted entries; legacy results without publication bases snapshot targets once at first bridge, never from the pre-merge checkpoint. Reopen does not rebase pending entries or resurrect terminal ones. Chat proposals still use their original whole-Bible expectedRevision. Existing pending bridge rows lacking bases can be enriched without changing terminal states or their IDs.
 2: 133724e. Concrete observedChapter approval returned resolved before fix and would replace a global fact. The current approval writer does not implement chapter-specific mutations; these candidates are now rejection-only, with a visible reason naming the chapter. Backend direct approval is blocked too.

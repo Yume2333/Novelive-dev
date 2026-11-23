@@ -96,7 +96,10 @@ const tide: Snapshot = {
 	],
 }
 
-async function installChatProjection(app: ElectronApplication) {
+async function installChatProjection(
+	app: ElectronApplication,
+	approvalStatus: 'restricted' | 'stale' = 'restricted',
+) {
 	await app.evaluate(
 		({ BrowserWindow, MessageChannelMain }, fixture) => {
 			const window = BrowserWindow.getAllWindows()[0]
@@ -237,6 +240,19 @@ async function installChatProjection(app: ElectronApplication) {
 							.flatMap((entry) => (entry.kind === 'message' ? entry.parts : []))
 							.find((part) => part.type === 'proposal')
 						if (proposal?.type !== 'proposal') throw new Error('No proposal')
+						if (resolve.decision.kind === 'approve') {
+							respond({
+								status: fixture.approvalStatus,
+								proposal: proposal.proposal,
+								...(fixture.approvalStatus === 'restricted'
+									? {
+											reason:
+												'Unknown character reference: unpublished-speaker',
+										}
+									: {}),
+							})
+							break
+						}
 						respond({
 							status: 'resolved',
 							proposal: {
@@ -260,7 +276,7 @@ async function installChatProjection(app: ElectronApplication) {
 			window.webContents.postMessage('novelive:port', generation, [port2])
 			window.webContents.send('novelive:ready', { generation })
 		},
-		{ keeper, tide, workId, at },
+		{ keeper, tide, workId, at, approvalStatus },
 	)
 }
 
@@ -407,11 +423,22 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 				.click()
 			const card = panel.getByRole('region', { name: '确认卡' })
 			await expect(card.getByText('影响：潮汐')).toBeVisible()
+			await card.getByRole('button', { name: '确认', exact: true }).click()
+			await expect(card.getByRole('status')).toHaveText(
+				'Unknown character reference: unpublished-speaker',
+			)
+			await expect(
+				card.getByRole('button', { name: '确认', exact: true }),
+			).toBeDisabled()
+			await expect(
+				card.getByRole('button', { name: '拒绝', exact: true }),
+			).toBeEnabled()
 			await card.getByRole('button', { name: '拒绝', exact: true }).click()
 			await card.getByRole('textbox', { name: '拒绝理由' }).fill('先保留独白')
 			await card.getByRole('button', { name: '确认拒绝' }).click()
 			await expect(card.getByText('已拒绝：先保留独白')).toBeVisible()
 			expect(await calls(app, 'proposal.resolve')).toEqual([
+				{ workId, proposalId: 'proposal-1', decision: { kind: 'approve' } },
 				{
 					workId,
 					proposalId: 'proposal-1',
@@ -430,6 +457,43 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 			await expect(panel).toBeVisible()
 			await page.keyboard.press('Escape')
 			await expect(panel).toHaveCount(0)
+		} finally {
+			await app.close()
+		}
+	} finally {
+		await rm(profile, { recursive: true, force: true })
+	}
+})
+
+test('M2 chat panel hides actions only for a truly stale proposal', async () => {
+	const profile = await mkdtemp(join(tmpdir(), 'novelive-m2-chat-stale-'))
+	try {
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${profile}`],
+			env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
+		})
+		try {
+			const page = await app.firstWindow()
+			await expect(page.getByText('创作端已就绪')).toBeAttached()
+			await installChatProjection(app, 'stale')
+			await page.evaluate((id) => {
+				window.location.hash = `/work/${id}/bible`
+			}, workId)
+			await page.keyboard.press('Control+J')
+			const panel = page.getByRole('complementary', { name: 'Agent' })
+			await panel.getByRole('button', { name: '切换会话' }).click()
+			await panel
+				.getByRole('button', { name: '第二章节奏', exact: true })
+				.click()
+			const card = panel.getByRole('region', { name: '确认卡' })
+			await card.getByRole('button', { name: '确认', exact: true }).click()
+			await expect(card.getByRole('status')).toHaveText(
+				'内容已经变了，这张卡已过期',
+			)
+			await expect(
+				card.getByRole('button', { name: '拒绝', exact: true }),
+			).toHaveCount(0)
 		} finally {
 			await app.close()
 		}

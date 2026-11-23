@@ -108,13 +108,21 @@ export async function proposalActionability(
 	proposal: Proposal,
 	bible: Bible,
 	source?: ProposalSource,
-): Promise<{ canApprove: boolean; reason?: string }> {
+): Promise<
+	| { canApprove: true }
+	| { canApprove: false; status: 'stale' | 'restricted'; reason: string }
+> {
 	const payload = proposal.payload
 	if (payload.kind !== 'bible' && payload.kind !== 'glossary')
-		return { canApprove: false, reason: '不是设定或术语候选。' }
+		return {
+			canApprove: false,
+			status: 'restricted',
+			reason: '不是设定或术语候选。',
+		}
 	if (source && !(await sourceIsCurrent(project, source)))
 		return {
 			canApprove: false,
+			status: 'stale',
 			reason: '候选来源已被替换或移除，请查看新的综合候选；仍可拒绝此候选。',
 		}
 	if (
@@ -123,6 +131,7 @@ export async function proposalActionability(
 	)
 		return {
 			canApprove: false,
+			status: 'stale',
 			reason: '候选已过期：缺少可信的原始条目快照，请重新提出。',
 		}
 	if (
@@ -132,10 +141,13 @@ export async function proposalActionability(
 	)
 		return {
 			canApprove: false,
+			status: 'stale',
 			reason: '候选已过期：目标条目已变更，请重新提出；已确认内容保持不变。',
 		}
 	const reason = await proposalRestriction(project, payload, bible)
-	return reason ? { canApprove: false, reason } : { canApprove: true }
+	return reason
+		? { canApprove: false, status: 'restricted', reason }
+		: { canApprove: true }
 }
 
 export async function bridgeBibleSources(

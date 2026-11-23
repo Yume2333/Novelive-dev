@@ -397,11 +397,13 @@ function BibleProjection({
 			setNotice(
 				result.status === 'stale'
 					? '候选已过期，未修改已确认内容。'
-					: reason === undefined
-						? bible
-							? approvalNotice(result.proposal, bible)
-							: '已接受候选。'
-						: '已拒绝候选，理由已保存。',
+					: result.status === 'restricted'
+						? result.reason
+						: reason === undefined
+							? bible
+								? approvalNotice(result.proposal, bible)
+								: '已接受候选。'
+							: '已拒绝候选，理由已保存。',
 			)
 			const next = await window.novelive.call('bible.get', { workId, volumeId })
 				.promise

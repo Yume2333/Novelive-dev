@@ -58,7 +58,7 @@ export function projectProposals(
 				proposal.payload.kind !== 'glossary'
 			)
 				throw { code: 'unsupported', message: '此类提议的工程执行器尚未接通' }
-			return { status: await applyBibleProposal(project, proposal) }
+			return applyBibleProposal(project, proposal)
 		},
 	}
 }
