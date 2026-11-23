@@ -10,12 +10,19 @@ import {
 } from '../../packages/creator/src/bible/editing'
 import type { Proposal } from '../../packages/creator/src/contract'
 import { Project } from '../../packages/creator/src/project'
+import { createReplayFetch } from '../../packages/creator/src/replay'
+import { synthesizeVolume } from '../../packages/creator/src/synthesis'
 import { readBible } from '../../packages/creator/src/synthesis/patch'
 import {
 	defaultWorkSettings,
 	formatVersion,
 	projectFiles,
 } from '../../packages/format/src/model'
+import {
+	chapters,
+	connection,
+	seed as seedSynthesis,
+} from '../fixtures/cassettes/m1a-synthesis/fixture'
 
 const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
@@ -462,6 +469,136 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 					await readFile(join(directory, 'bible/characters/xia.json'), 'utf8'),
 				).entries[0].appearance.description,
 			).toBe('银发')
+		} finally {
+			await app.close()
+		}
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
+test('M2 bible and glossary bridges a synthesized conflict into persistent approval and rejection controls', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'novelive-m2-synthesized-bible-'))
+	const directory = join(root, 'project')
+	const profile = join(root, 'profile')
+	try {
+		await seedSynthesis(directory)
+		using project = await Project.open(directory)
+		const synthesis = await synthesizeVolume(project, 'v1', chapters, {
+			connection,
+			language: 'en',
+			strategy: 'whole',
+			fetch: createReplayFetch({
+				mode: 'strict',
+				directory: 'tests/fixtures/cassettes/m1a-synthesis',
+				async fetch() {
+					throw new Error('Network forbidden')
+				},
+			}),
+		})
+		expect(synthesis.conflicts).toHaveLength(1)
+		expect(synthesis.glossaryConflicts).toHaveLength(1)
+		await project.write(projectFiles.volume('v1'), {
+			formatVersion,
+			volumeId: 'v1',
+			title: 'Synthesized volume',
+			workIds: [workId],
+		})
+		await project.write(projectFiles.work('v1', workId), {
+			formatVersion,
+			workId,
+			title: 'Synthesized work',
+			chapterIds: chapters,
+			version: 0,
+			minReaderVersion: 1,
+			appVersion: '0.1.0',
+			language: 'en',
+			settings: defaultWorkSettings(),
+		})
+		for (const chapterId of chapters) {
+			await project.write(
+				projectFiles.chapter({ volumeId: 'v1', workId, chapterId }),
+				{
+					formatVersion,
+					chapterId,
+					title: chapterId,
+					sceneIds: [],
+					paragraphIds: ['p0001'],
+					cg: [],
+				},
+			)
+			await project.writeFile(
+				projectFiles.chapterText(chapterId),
+				'Ada visits Paper Tower.\n',
+			)
+		}
+		expect(
+			project.database.prepare('SELECT COUNT(*) AS n FROM proposal').get(),
+		).toEqual({ n: 0 })
+		await mkdir(join(profile, 'projects'), { recursive: true })
+		await writeFile(join(profile, 'projects', workId), directory)
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${profile}`],
+			env: {
+				...process.env,
+				ELECTRON_RENDERER_URL: '',
+				NL_E2E: '1',
+				NL_REPLAY: 'strict',
+			},
+		})
+		try {
+			const page = await app.firstWindow()
+			await expect(page.getByText('创作端已就绪')).toBeAttached()
+			await page.evaluate((id) => {
+				window.location.hash = `/work/${id}/bible?volume=v1`
+			}, workId)
+			const character = page.getByRole('article', {
+				name: /^综合候选：character\/ada\//,
+			})
+			await expect(
+				character.getByRole('button', { name: '接受候选' }),
+			).toBeEnabled()
+			await expect(
+				character.getByRole('button', { name: '拒绝候选' }),
+			).toBeEnabled()
+			await expect(character).toContainText('Ada → Ava')
+			await page.getByRole('button', { name: /^术语/ }).click()
+			const glossary = page.getByRole('article', {
+				name: /^综合候选：glossary\/tower\//,
+			})
+			await glossary
+				.getByRole('textbox', { name: '拒绝理由' })
+				.fill('Keep Paper Tower')
+			await glossary.getByRole('button', { name: '拒绝候选' }).click()
+			await expect(glossary).toHaveCount(0)
+			await page.getByRole('button', { name: /^角色/ }).click()
+			await character.getByRole('button', { name: '接受候选' }).click()
+			await expect(character).toHaveCount(0)
+			await expect(
+				page
+					.getByRole('region', { name: '已登记内容' })
+					.getByRole('heading', { name: 'Ava', exact: true }),
+			).toBeVisible()
+			await page.reload()
+			await expect(
+				page
+					.getByRole('region', { name: '已登记内容' })
+					.getByRole('heading', { name: 'Ava', exact: true }),
+			).toBeVisible()
+			await expect(character).toHaveCount(0)
+			await page.getByRole('button', { name: /^术语/ }).click()
+			await expect(glossary).toHaveCount(0)
+			expect(
+				(await project.read(projectFiles.character(scope, 'ada'))).entries[0],
+			).toMatchObject({ name: 'Ava', status: 'confirmed' })
+			expect(
+				project.database
+					.prepare(
+						"SELECT status, feedback FROM proposal WHERE kind = 'glossary'",
+					)
+					.get(),
+			).toMatchObject({ status: 'rejected', feedback: 'Keep Paper Tower' })
 		} finally {
 			await app.close()
 		}

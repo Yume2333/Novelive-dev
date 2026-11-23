@@ -7,6 +7,7 @@ import {
 	int,
 	nullable,
 	obj,
+	opt,
 	type Static,
 	str,
 } from '@earendil-works/pi-schema'
@@ -66,6 +67,7 @@ const resultSchema = obj({
 	...fields,
 	conflicts: biblePatchSchema,
 	glossaryConflicts: glossaryPatchSchema,
+	bibleRevision: opt(str()),
 })
 export type VolumeSynthesis = Static<typeof resultSchema>
 
@@ -497,6 +499,10 @@ ${packets[packet]}`,
 		glossaryPatch,
 		conflicts,
 		glossaryConflicts,
+		bibleRevision:
+			!quarantined && hash(latest) === state.basis
+				? hash(await readBible(project))
+				: state.basis,
 	}
 	await project.write(projectFiles.skeleton(volumeId), skeleton)
 	await project.write(files.result, result)

@@ -7,6 +7,23 @@ $ tsc --noEmit
 Exit code: 0
 
 PR #35 review follow-up (baseline d1ea43a verified as HEAD ancestor)
+Finding 4 follow-up implementation (supersedes investigation-only status below):
+- Lazy bridge of persisted synthesis conflicts and pending Bible/glossary entries through ChatStore.recordStandaloneProposal. Deterministic source-bound IDs and INSERT OR IGNORE preserve approvals, rejections, reasons and original expectedRevision on reopen.
+- Provenance stays in existing proposal JSON (no table/contract migration). Resolution preserves it and checks the current source revision as well as the original Bible revision.
+- Synthesis now writes an optional publication Bible revision. Legacy synthesis can use its completed checkpoint basis; missing/incomplete provenance stays stale rather than using discovery-time confirmed content. Pending file candidates without a conflicting confirmed entry are stamped once on discovery; duplicate confirmed/candidate IDs never bypass revision safety.
+- New Electron case runs actual synthesizeVolume with the existing strict whole-volume cassette, starts with zero proposals, reaches visible conflict accept/reject controls, rejects glossary, approves the character, and reloads without resurrecting either proposal. No model network calls.
+- Nine unit cases cover deduplication, source persistence, imported-work FK initialization, unified approval/rejection, stale-before-first-discovery, changed/deleted sources, unversioned legacy safety, completed versus unfinished checkpoint provenance, candidate approval/rejection across reopen, empty and malformed sources.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary|M2 chat panel'
+  3 passed (4.1s)
+$ NL_REPLAY=strict pnpm check
+Checked 233 files in 110ms. No fixes applied.
+Found 1 info.
+ Test Files  28 passed (28)
+      Tests  368 passed (368)
+Both commands exited 0. Existing informational lint diagnostic is tests/fixtures/text-models/build-synthetic.ts:63.
+Logs: 04-pr35-source-e2e.log and 04-pr35-source-check.log.
+Finding 3 remains deferred to M2/07; scheduler code untouched. Progress records the agreed stale-base dependency/redraw handoff.
+
 Latest CI job 137432434548 failed in m0-dev-bridge startup polling, not canvas:
 AssertionError: expected 'starting' to be 'ready' // Object.is equality
 tests/unit/m0-dev-bridge.test.ts:88:6; Matcher did not succeed in time.

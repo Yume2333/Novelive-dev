@@ -12,6 +12,9 @@
 
 ## Progress
 
+- M2/07 handoff: approvals mark base images stale without resetting completed tasks, so dependent expressions/variants queue until redraw; agreed behavior is that a stale base with an old image may serve as a dependency, while redraw belongs to M2/07. Scheduler is untouched in #35.
+- Finding 4 fixed: bible.get lazily persists deduplicated synthesis-conflict and file-candidate proposals through ChatStore; immutable source identity/revision and expectedRevision survive approval/rejection/reopen. New synthesis publications stamp their Bible revision; legacy sources use a completed checkpoint basis, otherwise remain safely stale. Check after: strict Bible + chat Electron grep → 3 passed (4.1s); strict pnpm check → 28 files / 368 tests passed, including nine source-adapter tests. Evidence: `.workflow/evidence/m2-editor/04-bible-management.txt`.
+
 - Implemented: 复用 readBible、现有 proposal/asset 表；版本冲突不写入，拒绝理由持久化；开放条目提供跨章原文段落定位；页面按分类查看并处理候选。
 - Check after: `NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'` → 1 passed (2.9s)，真实 Electron 验证查看、接受、拒绝、过期不覆盖及图片过期映射，截图已检查；`pnpm typecheck` exit 0；`NL_REPLAY=strict pnpm check` → 23 files / 337 tests passed。
 - Evidence: `.workflow/evidence/m2-editor/04-bible-management.txt`、`04-typecheck.txt`、`04-bible-before.png`、`04-bible-after.png`。

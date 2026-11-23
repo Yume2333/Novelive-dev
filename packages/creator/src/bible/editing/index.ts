@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
@@ -7,12 +6,17 @@ import { ChatStore } from '../../chat/store'
 import type { CommandInput, CommandOutput, Proposal } from '../../contract'
 import { Project } from '../../project'
 import { existing, readBible, validatePatch } from '../../synthesis/patch'
+import {
+	bridgeBibleSources,
+	fileFor,
+	sourceIsCurrent,
+	sourceRevision,
+} from './sources'
 
 type Bible = Awaited<ReturnType<typeof readBible>>
 type Kind = keyof Bible
 type Entry = Bible[Kind][number]
 type Payload = Extract<Proposal['payload'], { kind: 'bible' | 'glossary' }>
-const scope = { level: 'series' } as const
 const locks = new Map<string, Promise<unknown>>()
 
 async function exclusive<T>(
@@ -30,7 +34,7 @@ async function exclusive<T>(
 }
 
 export function bibleRevision(bible: Bible): string {
-	return createHash('sha256').update(JSON.stringify(bible)).digest('hex')
+	return sourceRevision(bible)
 }
 
 export async function openBibleProject(dataDir: string, workId: string) {
@@ -67,6 +71,12 @@ export async function getBible(
 ): Promise<CommandOutput<'bible.get'>> {
 	const work = await workContext(project, input.workId, input.volumeId)
 	const bible = await readBible(project)
+	project.database
+		.prepare(
+			'INSERT OR IGNORE INTO work (work_id, title, queue_pos, created_at) VALUES (?, ?, 0, ?)',
+		)
+		.run(input.workId, work.title, Date.now())
+	await bridgeBibleSources(project, input, bible, work.chapterIds)
 	const paragraphs = await Promise.all(
 		work.chapterIds.map(async (chapterId) => {
 			const body = await existing(() =>
@@ -133,25 +143,6 @@ export async function getBible(
 		styles: bible.style.map(locate),
 		glossary: bible.glossary.map(locate),
 		proposalIds,
-	}
-}
-
-function fileFor(kind: Kind, id: string) {
-	switch (kind) {
-		case 'character':
-			return projectFiles.character(scope, id).path
-		case 'location':
-			return projectFiles.location(scope, id).path
-		case 'relation':
-			return projectFiles.relations(scope).path
-		case 'timeline':
-			return projectFiles.timeline(scope).path
-		case 'foreshadowing':
-			return projectFiles.foreshadowing(scope).path
-		case 'style':
-			return projectFiles.style(scope).path
-		case 'glossary':
-			return projectFiles.glossary(scope).path
 	}
 }
 
@@ -272,7 +263,14 @@ export async function applyBibleProposal(
 	const payload = proposal.payload
 	if (payload.kind !== 'bible' && payload.kind !== 'glossary')
 		throw { code: 'unsupported', message: '不是设定或术语候选' }
-	return exclusive(project, async () =>
-		(await apply(project, proposal.workId, payload)) ? 'applied' : 'stale',
-	)
+	return exclusive(project, async () => {
+		const { source } = new ChatStore(
+			project.database,
+			proposal.workId,
+		).proposal(proposal.id)
+		if (source && !(await sourceIsCurrent(project, source))) return 'stale'
+		return (await apply(project, proposal.workId, payload))
+			? 'applied'
+			: 'stale'
+	})
 }
