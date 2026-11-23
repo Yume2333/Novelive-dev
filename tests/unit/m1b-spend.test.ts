@@ -1,0 +1,111 @@
+import { DatabaseSync } from 'node:sqlite'
+import { obj } from '@earendil-works/pi-schema'
+import { afterEach, expect, test, vi } from 'vitest'
+import {
+	artJson,
+	imageRenderer,
+} from '../../packages/creator/src/pipeline/art/models'
+import { createReplayFetch } from '../../packages/creator/src/replay'
+import { projectSpend } from '../../packages/creator/src/usage/spend'
+import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
+
+afterEach(() => vi.unstubAllEnvs())
+
+test('each dispatch reserves again, failed attempts stay reserved, and terminal usage settles', async () => {
+	vi.stubEnv('NL_REPLAY', '')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+	using database = new DatabaseSync(':memory:')
+	const send = vi
+		.fn<typeof globalThis.fetch>()
+		.mockResolvedValueOnce(
+			new Response('data: {"usage":{"total_tokens":50}}\n\ndata: [DONE]\n\n', {
+				headers: { 'content-type': 'text/event-stream' },
+			}),
+		)
+		.mockRejectedValueOnce(new Error('disconnected after dispatch'))
+	const dispatch = () =>
+		createReplayFetch({ fetch: send, spend: projectSpend(database) })(
+			'https://example.invalid/v1/chat/completions',
+			{
+				method: 'POST',
+				body: JSON.stringify({
+					max_tokens: 300,
+					messages: [
+						{ role: 'user', content: 'Same request on each attempt.' },
+					],
+				}),
+			},
+		)
+	await (await dispatch()).text()
+	await expect(dispatch()).rejects.toThrow('disconnected after dispatch')
+	await expect(dispatch()).rejects.toThrow('超出工程预算')
+	expect(send).toHaveBeenCalledTimes(2)
+	expect(
+		database
+			.prepare('SELECT actual_tokens FROM spend_reservation ORDER BY id')
+			.all(),
+	).toEqual([{ actual_tokens: 50 }, { actual_tokens: null }])
+})
+
+test('exhausted image and token caps block image edits, generation, and visual review', async () => {
+	vi.stubEnv('NL_REPLAY', '')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '0')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+	using database = new DatabaseSync(':memory:')
+	const fetch = vi
+		.fn<typeof globalThis.fetch>()
+		.mockRejectedValue(new Error('The provider must not be called'))
+	const replay = { fetch, spend: projectSpend(database) }
+	const image = imageRenderer(
+		{
+			...configuration.models.image,
+			baseUrl: 'https://api.openai.com/v1',
+			apiKey: 'fixture',
+			model: 'gpt-image-1',
+			upscaleTier: 'anime',
+		},
+		{ replay },
+	)
+	const size = { width: 1024, height: 1024 }
+	await expect(image('first', [], size, false)).rejects.toThrow('超出工程预算')
+	await expect(
+		image('edit', [Buffer.from('fixture')], size, false),
+	).rejects.toThrow('超出工程预算')
+	await expect(
+		artJson(configuration.models.visual, 'review', obj({}), { replay }, [
+			Buffer.from('fixture'),
+		]),
+	).rejects.toThrow('超出工程预算')
+	expect(fetch).not.toHaveBeenCalled()
+})
+
+test('image reservations settle the returned image count and any measured token usage', async () => {
+	vi.stubEnv('NL_REPLAY', '')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '2')
+	using database = new DatabaseSync(':memory:')
+	const send = vi.fn<typeof globalThis.fetch>().mockImplementation(async () =>
+		Response.json({
+			data: [{ b64_json: 'fixture' }],
+			usage: { input_tokens: 10, output_tokens: 20 },
+		}),
+	)
+	const dispatch = (n: number) =>
+		createReplayFetch({ fetch: send, spend: projectSpend(database) })(
+			'https://example.invalid/v1/images/generations',
+			{ method: 'POST', body: JSON.stringify({ n }) },
+		)
+	await dispatch(2)
+	await dispatch(1)
+	await expect(dispatch(1)).rejects.toThrow('超出工程预算')
+	expect(send).toHaveBeenCalledTimes(2)
+	expect(
+		database
+			.prepare('SELECT actual_tokens, actual_images FROM spend_reservation')
+			.all(),
+	).toEqual([
+		{ actual_tokens: 30, actual_images: 1 },
+		{ actual_tokens: 30, actual_images: 1 },
+	])
+})

@@ -7,6 +7,7 @@ import type {
 	WorkPhase,
 } from '@novelive/format/model'
 import type { ProductionSnapshot } from '../../contract/production'
+import { SpendBudgetError } from '../../usage/spend'
 
 export const transientRetries = 2
 export const defaultImageConcurrency = 8
@@ -817,6 +818,8 @@ export class ChapterScheduler {
 		if (!result) return
 		let outcome: ImageJobResult
 		if (result.ok) outcome = result.value
+		else if (result.error instanceof SpendBudgetError)
+			outcome = { status: 'unsupported', issue: result.error.message }
 		else {
 			const signal = this.inflight.get(task.task_id)?.controller.signal
 			if (!signal) return

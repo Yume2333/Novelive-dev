@@ -18,6 +18,7 @@ import {
 } from '../../models/text'
 import { createReplayFetch, type ReplayOptions } from '../../replay'
 import { recordImageUsage } from '../../usage'
+import { SpendBudgetError } from '../../usage/spend'
 import type { Dimensions } from './check'
 
 export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
@@ -42,8 +43,9 @@ function checkedReplay(fetch: typeof globalThis.fetch) {
 				return await fetch(input, init)
 			} catch (error) {
 				if (
-					error instanceof Error &&
-					error.message.startsWith('Missing strict replay cassette:')
+					error instanceof SpendBudgetError ||
+					(error instanceof Error &&
+						error.message.startsWith('Missing strict replay cassette:'))
 				)
 					failure = error
 				throw error
@@ -58,6 +60,7 @@ export function imageRenderer(config: ImageConfig, options: ModelOptions) {
 	const download = createReplayFetch({
 		...options.replay,
 		fetch: imageDownloadUpstream(config.baseUrl, options.replay?.fetch),
+		spend: undefined,
 	})
 	const client = new OpenAI({
 		baseURL: config.baseUrl,

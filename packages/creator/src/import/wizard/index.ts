@@ -15,6 +15,7 @@ import type { TextConnection } from '../../models/text'
 import type { ModelOptions } from '../../pipeline/art/models'
 import { Project } from '../../project'
 import { existing } from '../../synthesis/patch'
+import { SpendBudgetError } from '../../usage/spend'
 import { extractDocx } from '../docx'
 import { extractEpub } from '../epub'
 import { classifyIllustrations } from '../epub/illustrations'
@@ -334,7 +335,8 @@ export async function screenImportedIllustrations(
 		)
 		await project.writeFile(path, JSON.stringify(matches))
 		return output(matches)
-	} catch {
+	} catch (error) {
+		if (error instanceof SpendBudgetError) throw error
 		options.signal?.throwIfAborted()
 		return {
 			fallback: true,

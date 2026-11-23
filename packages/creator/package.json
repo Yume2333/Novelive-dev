@@ -11,6 +11,7 @@
 		"@earendil-works/pi-schema": "1.6.0",
 		"@novelive/format": "workspace:*",
 		"@zip.js/zip.js": "2.24.0",
+		"js-tiktoken": "1.0.21",
 		"mdast-util-from-markdown": "2.1.0",
 		"mdast-util-gfm-footnote": "2.1.0",
 		"micromark-extension-gfm-footnote": "2.1.0",

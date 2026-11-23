@@ -24,6 +24,7 @@ import type { TextConnection } from '../../packages/creator/src/models/text'
 import { artJson } from '../../packages/creator/src/pipeline/art/models'
 import { Project } from '../../packages/creator/src/project'
 import { createReplayFetch } from '../../packages/creator/src/replay'
+import { projectSpend } from '../../packages/creator/src/usage/spend'
 import {
 	classificationCases,
 	classificationExtraction,
@@ -757,6 +758,31 @@ test.each(classificationCases)(
 				fallback: true,
 				candidates: [{ ...candidate, recommended: false }],
 			})
+			vi.stubEnv('NL_RUN_TOKEN_CAP', '0')
+			vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+			try {
+				using project = await Project.open(view.projectDir)
+				await expect(
+					screenImportedIllustrations(
+						project,
+						sample.bible,
+						async () => ({
+							...visualConnection,
+							model: 'another-visual-model',
+						}),
+						{
+							replay: {
+								mode: 'replay',
+								directory: folder,
+								fetch,
+								spend: projectSpend(project.database),
+							},
+						},
+					),
+				).rejects.toThrow('超出工程预算')
+			} finally {
+				vi.unstubAllEnvs()
+			}
 			expect(fetch).not.toHaveBeenCalled()
 		} finally {
 			await rm(folder, { recursive: true, force: true })
