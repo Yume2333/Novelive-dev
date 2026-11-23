@@ -359,8 +359,7 @@ function applyHunks(nvs: string, hunks: readonly Hunk[]) {
 		const positions = hunk.before.map((line) => {
 			const id = line.match(idSuffix)?.[1]
 			const position = id === undefined ? undefined : at(id)
-			if (position === undefined || raw[position].trim() !== line)
-				throw stale('剧本行已改变，请重新生成重写。')
+			if (position === undefined) throw stale('剧本行已改变，请重新生成重写。')
 			removed.add(position)
 			return position
 		})
