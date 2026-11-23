@@ -426,6 +426,7 @@ export function chapterWorker(
 				metadata.job,
 				(await productionBible(project, volumeId, work.workId)).art,
 				metadata.cg,
+				ctx.resumingBudget,
 			)
 		},
 		placeholder(job, issue, signal) {

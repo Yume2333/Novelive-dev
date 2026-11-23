@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { arr, bool, obj, oneOf, str } from '@earendil-works/pi-schema'
 import {
 	type AssetRegistry,
@@ -14,6 +16,7 @@ import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
 import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
 import { resolveRegistry } from '../../project/series/resolve'
+import { SpendBudgetError } from '../../usage/spend'
 import {
 	checkVariantProfile,
 	type Profile,
@@ -41,6 +44,17 @@ type RegistryEntry = AssetRegistry['entries'][number]
 type CostumeCandidateBudget = {
 	opaqueStreak: number
 	matting: { error?: MattingUnavailableError }
+}
+type ReviewCheckpoint = {
+	path: string
+	resume: boolean
+}
+type PendingReview = {
+	png: string
+	prompt: string
+	attempt: number
+	baseOnly: boolean
+	moderated: boolean
 }
 const opaqueCandidateLimit = 2
 type PaintStop =
@@ -202,12 +216,17 @@ export class ArtProduction {
 		job: ArtJob,
 		bible: ArtBible,
 		cg?: CgReferences,
+		resumingBudget = false,
 	): Promise<ImageJobResult> {
 		const pending = this.pendingDraws.get(job.assetId)
 		if (pending) return pending
-		const task = this.drawRegistered(job, bible, cg).finally(() =>
-			this.pendingDraws.delete(job.assetId),
-		)
+		const task = this.drawRegistered(
+			job,
+			bible,
+			cg,
+			undefined,
+			resumingBudget,
+		).finally(() => this.pendingDraws.delete(job.assetId))
 		this.pendingDraws.set(job.assetId, task)
 		return task
 	}
@@ -288,6 +307,7 @@ export class ArtProduction {
 		bible: ArtBible,
 		cg?: CgReferences,
 		redraw?: { path: string; instruction?: string },
+		resumingBudget = false,
 	): Promise<ImageJobResult> {
 		const signal = this.options.signal
 		signal?.throwIfAborted()
@@ -415,6 +435,16 @@ export class ArtProduction {
 			target,
 			portrait,
 			Boolean(base),
+			false,
+			undefined,
+			redraw
+				? undefined
+				: {
+						path: this.scoped(
+							`source/production/art/${createHash('sha256').update(entry.path).digest('hex')}.pending-review.json`,
+						),
+						resume: resumingBudget,
+					},
 		).catch((error: unknown) => {
 			if (!(error instanceof MattingUnavailableError)) throw error
 			return { issue: error.message, reason: 'matting_unavailable' } as const
@@ -530,6 +560,7 @@ export class ArtProduction {
 		derived = false,
 		optionalReference = false,
 		candidateBudget?: CostumeCandidateBudget,
+		checkpoint?: ReviewCheckpoint,
 	) {
 		this.render ??= imageRenderer(this.options.image, this.options)
 		const render = this.render
@@ -573,6 +604,56 @@ export class ArtProduction {
 		let moderated = false
 		let attempt = 0
 		let baseOnly = false
+		const clearReview = async () => {
+			if (checkpoint)
+				await rm(join(this.project.root, checkpoint.path), { force: true })
+		}
+		const audit = async (
+			png: Buffer,
+			prompt: string,
+			preview: Awaited<ReturnType<typeof auditPreview>>,
+		) => {
+			try {
+				const judge = await artJson(
+					this.options.visual,
+					prompt,
+					auditSchema,
+					this.options,
+					[preview.png, ...(baseOnly ? refs.slice(0, 1) : auditRefs)],
+				)
+				await clearReview()
+				if (judge.pass && judge.failedChecks.length === 0) return true
+				issue = feedback =
+					judge.feedback || `视觉审核未通过：${judge.failedChecks.join('、')}`
+				return false
+			} catch (error) {
+				if (error instanceof SpendBudgetError && checkpoint) {
+					const pending: PendingReview = {
+						png: png.toString('base64'),
+						prompt,
+						attempt,
+						baseOnly,
+						moderated,
+					}
+					await this.project.writeFile(checkpoint.path, JSON.stringify(pending))
+				}
+				throw error
+			}
+		}
+		if (checkpoint?.resume) {
+			const saved = await this.file(checkpoint.path)
+			if (saved) {
+				const pending: PendingReview = JSON.parse(saved.toString())
+				attempt = pending.attempt
+				baseOnly = pending.baseOnly
+				moderated = pending.moderated
+				reviewed = Buffer.from(pending.png, 'base64')
+				if (await audit(reviewed, pending.prompt, await auditPreview(reviewed)))
+					return { png: reviewed }
+			}
+		} else {
+			await clearReview()
+		}
 		while (attempt <= this.options.image.retries) {
 			const content = await artJson(
 				painter,
@@ -689,8 +770,8 @@ export class ArtProduction {
 			}
 			reviewed = checked.png
 			const preview = await auditPreview(checked.png)
-			const judge = await artJson(
-				this.options.visual,
+			const passed = await audit(
+				checked.png,
 				[
 					'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
 					preview.transparencyHint,
@@ -703,13 +784,9 @@ export class ArtProduction {
 				]
 					.filter(Boolean)
 					.join('\n'),
-				auditSchema,
-				this.options,
-				[preview.png, ...(baseOnly ? editReferences : auditRefs)],
+				preview,
 			)
-			if (judge.pass && judge.failedChecks.length === 0) return checked
-			issue = feedback =
-				judge.feedback || `视觉审核未通过：${judge.failedChecks.join('、')}`
+			if (passed) return checked
 		}
 		return stopped('retries')
 	}

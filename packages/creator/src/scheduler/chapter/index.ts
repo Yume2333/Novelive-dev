@@ -30,6 +30,7 @@ export type DrawJob = {
 export type DrawContext = {
 	workId: string
 	desensitized: boolean
+	resumingBudget?: boolean
 	signal: AbortSignal
 }
 export interface ProductionWorker {
@@ -286,7 +287,7 @@ export class ChapterScheduler {
 					workId,
 				)) {
 					this.exec(
-						"UPDATE task SET status = 'queued', attempts = 0, desensitized = 0, error_type = NULL WHERE task_id = ?",
+						"UPDATE task SET status = 'queued', attempts = 0, desensitized = 0, error_type = CASE WHEN error_type = 'budget_paused' THEN error_type END WHERE task_id = ?",
 						task.task_id,
 					)
 					this.exec(
@@ -835,6 +836,7 @@ export class ChapterScheduler {
 						: this.worker.draw(job, {
 								workId: task.work_id,
 								desensitized,
+								resumingBudget: task.error_type === 'budget_paused',
 								signal,
 							}),
 		)

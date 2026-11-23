@@ -22,6 +22,7 @@ import {
 	productionModels,
 } from '../../packages/creator/src/project/production-worker'
 import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
+import { SpendBudgetError } from '../../packages/creator/src/usage/spend'
 import { bible } from '../fixtures/cassettes/m1b-art/fixture'
 import { configuration, original } from '../fixtures/cassettes/m1b-gate/fixture'
 import { ScriptedWorker } from '../fixtures/scheduler/m1b/worker'
@@ -532,6 +533,93 @@ test('a settings save changes the next step of an active production session', as
 	} finally {
 		releaseWriter.resolve()
 		await production.close()
+	}
+})
+
+test('recording resumes an image budget pause at visual review after reopening the project', async () => {
+	const { projectDir, workId } = await fixture()
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const models = await productionModels(config)
+	const assetId = 'room/day'
+	const requests: string[] = []
+	let allowReview = false
+	const open = async () => {
+		const project = await Project.open(projectDir)
+		const work = await project.read(projectFiles.work('v0001', workId))
+		const { worker, art } = chapterWorker(project, 'v0001', work, models, {
+			mode: 'record',
+			directory: join(directory, 'cassettes'),
+			async spend(request, send) {
+				if (
+					request.url.endsWith('/chat/completions') &&
+					(await request.clone().json()).model === models.visual.model &&
+					!allowReview
+				)
+					throw new SpendBudgetError('超出工程预算')
+				return send(request)
+			},
+			async fetch(input, init) {
+				const request = new Request(input, init)
+				const body = await request.json()
+				requests.push(body.model)
+				if (request.url.endsWith('/images/generations')) {
+					const png = await sharp({
+						create: { width: 64, height: 36, channels: 3, background: 'red' },
+					})
+						.png()
+						.toBuffer()
+					return Response.json({ data: [{ b64_json: png.toString('base64') }] })
+				}
+				return body.model === models.visual.model
+					? completion({ pass: true, failedChecks: [], feedback: '' })
+					: completion({ content: 'A sunny room.' })
+			},
+		})
+		const queue = new ChapterScheduler(project.database, {
+			...worker,
+			write: async () => {},
+			review: async () => {},
+			stage: async () => [{ assetId, kind: 'location' }],
+		})
+		return { project, queue, art }
+	}
+	{
+		const { project, queue, art } = await open()
+		try {
+			const [job] = await art().register(
+				[{ id: assetId, kind: 'location', description: 'Room in sunlight' }],
+				bible,
+			)
+			await project.writeFile(
+				`source/production/art/${job.assetId}.json`,
+				JSON.stringify({ job }),
+			)
+			project.tasks.registerWork({ workId, title: 'Paper boat' })
+			queue.start(workId, ['ch0001'])
+			queue.confirmVisual(workId)
+			await queue.idle()
+			expect(queue.snapshot(workId).chapters[0].issue).toMatch(/超出工程预算/)
+			expect(requests).toEqual([models.main.model, models.image.model])
+		} finally {
+			queue.dispose()
+			project.close()
+		}
+	}
+	allowReview = true
+	const { project, queue } = await open()
+	try {
+		queue.continue(workId)
+		await queue.idle()
+		expect(requests).toEqual([
+			models.main.model,
+			models.image.model,
+			models.visual.model,
+		])
+		expect(queue.snapshot(workId).chapters[0].status).toBe('published')
+	} finally {
+		queue.dispose()
+		project.close()
 	}
 })
 
