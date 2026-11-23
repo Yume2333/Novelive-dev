@@ -86,3 +86,64 @@ test('visual-confirmation portraits without drawing tasks appear in the stale pr
 		])
 	})
 })
+
+test('characters and locations with the same Bible id invalidate only their own asset family', async () => {
+	await fixture(async (project, profile) => {
+		const before = await readBible(project)
+		before.character = [
+			{
+				id: 'shared',
+				name: 'Ada',
+				aliases: [],
+				status: 'confirmed',
+				appearance: { description: 'Black hair' },
+			},
+		]
+		before.location = [
+			{
+				id: 'shared',
+				name: 'Room',
+				status: 'confirmed',
+				description: 'Old room',
+			},
+		]
+		await project.write(projectFiles.assetRegistry({ level: 'series' }), {
+			formatVersion,
+			entries: [
+				{
+					id: 'shared/uniform/neutral',
+					type: 'character',
+					path: 'assets/portrait.webp',
+					status: 'drawn',
+					aliases: [],
+				},
+				{
+					id: 'shared/day',
+					type: 'location',
+					path: 'assets/room.webp',
+					status: 'drawn',
+					aliases: [],
+				},
+			],
+		})
+		for (const id of ['shared/uniform/neutral', 'shared/day'])
+			project.database
+				.prepare(
+					"INSERT INTO asset(work_id, asset_key, kind, status) VALUES (?, ?, 'base', 'drawn')",
+				)
+				.run(workId, id)
+		const appearance = structuredClone(before)
+		appearance.character[0].appearance = { description: 'Silver hair' }
+		await propagateStaleness(project, before, appearance)
+		expect(
+			(await listUsage(profile)).staleAssets.map((row) => row.assetKey),
+		).toEqual(['shared/uniform/neutral'])
+		project.database.exec("UPDATE asset SET status = 'drawn'")
+		const location = structuredClone(before)
+		location.location[0].description = 'New room'
+		await propagateStaleness(project, before, location)
+		expect(
+			(await listUsage(profile)).staleAssets.map((row) => row.assetKey),
+		).toEqual(['shared/day'])
+	})
+})
