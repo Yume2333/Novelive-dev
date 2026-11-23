@@ -18,7 +18,7 @@ import {
 	sentenceKey,
 } from './controls/minimal-controller'
 import { type ControlChapter, PlayerControls } from './controls/PlayerControls'
-import { containsSentence } from './controls/position'
+import { containsSentence, restoredChapterMode } from './controls/position'
 import { useChapterWait } from './controls/useChapterWait'
 import './player.css'
 
@@ -272,7 +272,7 @@ export function PlayerPage() {
 			await loadProject(
 				undefined,
 				snapshot.position.chapterId,
-				progress.current.mode,
+				restoredChapterMode(progress.current.data, snapshot.position.chapterId),
 				false,
 				snapshot,
 			)

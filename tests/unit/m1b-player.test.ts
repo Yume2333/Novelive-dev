@@ -11,7 +11,10 @@ import {
 import { projectFiles } from '../../packages/format/src/model'
 import { type Beat, compileScript } from '../../packages/format/src/script'
 import { createPlayback } from '../../packages/player/src/minimal/playback'
-import { containsSentence } from '../../packages/ui/src/pages/player/controls/position'
+import {
+	containsSentence,
+	restoredChapterMode,
+} from '../../packages/ui/src/pages/player/controls/position'
 import {
 	playerRef,
 	playerScript,
@@ -21,6 +24,18 @@ import {
 import { context } from '../fixtures/script/context'
 
 const directories: string[] = []
+
+test('restoring history selects main mode for the mainline and unread chapters', () => {
+	const first = { chapterId: 'ch1', sceneId: 'scene', sentenceId: 'line' }
+	const second = { ...first, chapterId: 'ch2' }
+	const progress = { mainline: second, read: [first, second], saves: [] }
+	expect(restoredChapterMode(progress, 'ch1')).toBe('reread')
+	expect(restoredChapterMode(progress, 'ch2')).toBe('main')
+	expect(restoredChapterMode(progress, 'ch3')).toBe('main')
+	expect(
+		restoredChapterMode({ mainline: null, read: [], saves: [] }, 'ch1'),
+	).toBe('main')
+})
 
 test('persisted resume positions are checked against the current chapter', () => {
 	const result = compileScript('scene 空屋\n: 开始。', {

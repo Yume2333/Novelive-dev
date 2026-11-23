@@ -1,5 +1,19 @@
 import type { CompiledScene } from '@novelive/format/script'
-import type { SentenceRef } from '../../../../../player/src/contract'
+import type {
+	PlaybackMode,
+	SentenceRef,
+	WorkProgress,
+} from '../../../../../player/src/contract'
+
+export function restoredChapterMode(
+	progress: WorkProgress,
+	chapterId: string,
+): PlaybackMode {
+	return progress.mainline?.chapterId !== chapterId &&
+		progress.read.some((position) => position.chapterId === chapterId)
+		? 'reread'
+		: 'main'
+}
 
 export function containsSentence(
 	scenes: readonly CompiledScene[],

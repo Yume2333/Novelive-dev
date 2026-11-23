@@ -141,9 +141,31 @@ test.describe('M3 player controls', () => {
 				await expect(text()).toHaveText(line)
 			}
 			await menu()
+			await page.getByRole('button', { name: '章节', exact: true }).click()
+			await page.getByRole('button', { name: /空屋/ }).click()
+			await expect(page.getByRole('main')).toHaveAttribute(
+				'data-mode',
+				'reread',
+			)
+			await menu()
+			await page.getByRole('button', { name: '历史记录', exact: true }).click()
+			await page
+				.getByRole('button', { name: '3. 第二章开始。', exact: true })
+				.click()
+			await expect(page.getByRole('main')).toHaveAttribute('data-mode', 'main')
+			const previousMainline = await page
+				.getByRole('main')
+				.getAttribute('data-mainline')
+			await advance()
+			await expect(text()).toHaveText('我在想什么？')
+			await expect(page.getByRole('main')).not.toHaveAttribute(
+				'data-mainline',
+				previousMainline ?? '',
+			)
+			await menu()
 			await page.getByRole('button', { name: '历史记录', exact: true }).click()
 			await page.getByRole('button', { name: '后退一句', exact: true }).click()
-			await expect(text()).toHaveText('我在想什么？')
+			await expect(text()).toHaveText('第二章开始。')
 			const mainline = await page
 				.getByRole('main')
 				.getAttribute('data-mainline')
@@ -160,7 +182,7 @@ test.describe('M3 player controls', () => {
 				.toBe(mainline)
 			await app.close()
 			;({ app, page } = await open())
-			await expect(text()).toHaveText('第二章开始。')
+			await expect(text()).toHaveText('我在想什么？')
 			await menu()
 			await page.getByRole('button', { name: '读档', exact: true }).click()
 			await expect(page.getByAltText('槽位 1 缩略图')).toHaveJSProperty(
