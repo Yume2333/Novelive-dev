@@ -75,7 +75,8 @@ function frontMatter(text: string) {
 		if (flow && /^[\]}][\]},\s]*(?:#.*)?$/.test(line)) continue
 		if (!yamlLine.test(line) || (/^-(?:\s|$)/.test(line) && !list))
 			return { body: text, metadata }
-		if (yamlKey.test(line)) list = /:\s*(?:[&!]\S*\s*)*(?:#.*)?$/.test(line)
+		if (yamlKey.test(line))
+			list = /:\s*(?:&[\w-]+\s*)?(?:![\w!:/.-]*\s*)?(?:#.*)?$/.test(line)
 		const opens = /^\s*[^\s#:-][^:]*:\s*[[{]/.test(line)
 		if (yamlKey.test(line)) flow = opens
 		else if (opens) flow = true

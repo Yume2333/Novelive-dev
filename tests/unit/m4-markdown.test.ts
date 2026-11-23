@@ -254,6 +254,15 @@ test('a leading thematic break is not front matter; YAML comments, escapes and b
 		).metadata,
 	).toEqual({ title: '港' })
 	expect(
+		extract('---\nPlates: ![a](a.png) ![b](b.png)\n- one\n\n---\n\nEnd.\n')
+			.volumes[0].chapters[0].paragraphs,
+	).toEqual(['Plates:', 'one', 'End.'])
+	const started = performance.now()
+	extract(
+		`---\nIllustration: !Map ${Array.from({ length: 26 }, (_, i) => `a${i}=1`).join('&')} of the harbor.\n- x\n---\nEnd.\n`,
+	)
+	expect(performance.now() - started).toBeLessThan(500)
+	expect(
 		extract('---\ntitle: Matching a literal ]\nlang: en\n---\nText.\n')
 			.metadata,
 	).toEqual({ title: 'Matching a literal ]', language: 'en' })
