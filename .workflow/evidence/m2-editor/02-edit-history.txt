@@ -7,4 +7,3 @@ NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-history.test.ts
       Tests  7 passed (7)
    Start at  00:56:41
    Duration  338ms (tests 62%, transform 22%, import 15%, worker 1%)
-
