@@ -13,6 +13,12 @@ import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
 import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
 import { resolveRegistry } from '../../project/series/resolve'
+import {
+	type Profile,
+	postprocess,
+	readProfiles,
+	recordProfile,
+} from '../postprocess'
 import { checkImage, type Dimensions, placeholder } from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
@@ -199,6 +205,8 @@ export class ArtProduction {
 				entry.path,
 				await this.project.readFile(source),
 			)
+			const profile = (await readProfiles(this.project))[source]?.profile
+			if (profile) await recordProfile(this.project, entry.path, profile)
 			entry.status = 'drawn'
 			await this.persistRegistry(registry)
 			return entry.path
@@ -335,8 +343,22 @@ export class ArtProduction {
 					}
 				: this.savePlaceholder(entry.id, result.issue)
 		}
-		await this.saveWebp(redraw?.path ?? entry.path, result.png, output)
-		if (!redraw) await this.saveStatus(entry.id, 'drawn')
+		const configured = {
+			mode: this.options.image.postProcess,
+			tier: this.options.image.upscaleTier,
+		}
+		const profile = foundBase
+			? ((await readProfiles(this.project))[foundBase.path]?.profile ?? {
+					...configured,
+					mode: 'off' as const,
+				})
+			: configured
+		const path = redraw?.path ?? entry.path
+		await this.saveWebp(path, result.png, output, profile)
+		await this.writeRegistry(async () => {
+			await recordProfile(this.project, path, profile)
+			if (!redraw) await this.update(entry.id, 'drawn')
+		})
 		return { status: 'drawn' }
 	}
 
@@ -362,9 +384,24 @@ export class ArtProduction {
 			}))
 	}
 
-	private async saveWebp(path: string, png: Buffer, size: Dimensions) {
-		const bytes = await sharp(png)
-			.resize({ ...size, fit: 'cover', kernel: 'lanczos3' })
+	private async saveWebp(
+		path: string,
+		png: Buffer,
+		size: Dimensions,
+		profile?: Profile,
+	) {
+		const target = { width: size.width, height: size.height }
+		const image =
+			profile && profile.mode !== 'off'
+				? sharp(
+						await postprocess(
+							png,
+							{ ...profile, target, fit: 'cover' },
+							{ signal: this.options.signal },
+						),
+					)
+				: sharp(png).resize({ ...target, fit: 'cover', kernel: 'lanczos3' })
+		const bytes = await image
 			.webp({ quality: 90, lossless: this.options.lossless })
 			.toBuffer()
 		this.options.signal?.throwIfAborted()

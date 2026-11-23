@@ -1,0 +1,17 @@
+appId: dev.novelive.desktop
+productName: Novelive
+files:
+  - out/**
+asar: false
+npmRebuild: false
+linux:
+  target: AppImage
+  executableName: novelive
+  category: Game
+  extraResources:
+    - from: ../../bin/upscale
+      to: upscale
+      filter:
+        - linux/upscayl-bin
+        - models/**
+        - licenses/**

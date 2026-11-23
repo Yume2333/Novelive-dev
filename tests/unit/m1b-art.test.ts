@@ -12,6 +12,7 @@ import {
 	directChapterArt,
 } from '../../packages/creator/src/pipeline/art/director'
 import * as artModels from '../../packages/creator/src/pipeline/art/models'
+import { readProfiles } from '../../packages/creator/src/pipeline/postprocess'
 import { Project } from '../../packages/creator/src/project'
 import {
 	bible,
@@ -129,6 +130,12 @@ test('confirms three main visuals and costumes, stages the chapter and draws can
 		])
 		expect(results).toEqual(jobs.map(() => ({ status: 'drawn' })))
 		const { entries } = await art.registry()
+		const profiles = await readProfiles(project)
+		for (const entry of entries.filter(({ id }) => id.startsWith('room/')))
+			expect(profiles[entry.path]?.profile).toEqual({
+				mode: 'off',
+				tier: 'anime',
+			})
 		const stagedCostume = manifest.script.replace(
 			'@show ada/coat/neutral center',
 			'@costume ada/coat',

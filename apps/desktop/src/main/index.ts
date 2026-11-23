@@ -82,6 +82,9 @@ function startCreator(window: BrowserWindow) {
 				...process.env,
 				NL_CREATOR_GENERATION: String(current),
 				NL_CREATOR_DATA_DIR: app.getPath('userData'),
+				NL_UPSCALE_DIR: app.isPackaged
+					? join(process.resourcesPath, 'upscale')
+					: join(app.getAppPath(), '../../bin/upscale'),
 				NL_E2E: !app.isPackaged && process.env.NL_E2E === '1' ? '1' : '0',
 			},
 			serviceName: 'Novelive Creator',

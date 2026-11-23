@@ -1,11 +1,15 @@
 {
 	"name": "@novelive/desktop",
+	"version": "0.0.0",
+	"description": "Novelive desktop",
+	"author": "Novelive",
 	"private": true,
 	"type": "module",
 	"main": "./out/main/index.js",
 	"scripts": {
 		"dev": "electron-vite dev",
 		"build": "electron-vite build",
+		"package:linux": "electron-vite build && node ../../tools/upscale/fetch.mjs linux && electron-builder --linux AppImage",
 		"postinstall": "node ../../tools/patch-sharp.mjs"
 	},
 	"dependencies": {
@@ -16,6 +20,7 @@
 	"devDependencies": {
 		"@vitejs/plugin-react": "5.1.1",
 		"electron": "45.4.1",
+		"electron-builder": "26.18.0",
 		"electron-vite": "6.0.0",
 		"vite": "7.2.7"
 	}
