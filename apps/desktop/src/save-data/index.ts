@@ -26,6 +26,22 @@ import { slotKey } from '../../../../packages/player/src/progress'
 import { migrateProgress } from '../../../../packages/player/src/progress/migrations'
 
 type ProgressFile = WorkProgress & { legacySaves?: readonly LegacySaveGroup[] }
+type StoredMigration = Omit<
+	ProgressMigrationInput,
+	'positions' | 'progress' | 'legacySaves'
+> & {
+	chapters: readonly (readonly PlaybackBeat[])[]
+}
+
+function migratedProgress(
+	{ chapters, ...update }: StoredMigration,
+	stored: ProgressMigrationResult,
+) {
+	const positions = chapters.flatMap((chapter) =>
+		chapter.flatMap(({ cue }) => (cue.kind === 'text' ? [cue.position] : [])),
+	)
+	return migrateProgress({ ...update, ...stored, positions }, chapters)
+}
 
 export class FileProgressStore implements ProgressStore {
 	private pending: Promise<unknown> = Promise.resolve()
@@ -88,15 +104,8 @@ export class FileProgressStore implements ProgressStore {
 		})
 	}
 
-	migrate(
-		input: Omit<
-			ProgressMigrationInput,
-			'positions' | 'progress' | 'legacySaves'
-		> & {
-			chapters: readonly (readonly PlaybackBeat[])[]
-		},
-	): Promise<ProgressMigrationResult> {
-		const { chapters, ...update } = structuredClone(input)
+	migrate(input: StoredMigration): Promise<ProgressMigrationResult> {
+		const update = structuredClone(input)
 		return this.enqueue(async () => {
 			const stored = await this.read(update.workId)
 			if (!stored)
@@ -104,17 +113,41 @@ export class FileProgressStore implements ProgressStore {
 					progress: { mainline: null, read: [], saves: [] },
 					legacySaves: [],
 				}
-			const positions = chapters.flatMap((chapter) =>
-				chapter.flatMap(({ cue }) =>
-					cue.kind === 'text' ? [cue.position] : [],
-				),
-			)
-			const migrated = migrateProgress(
-				{ ...update, ...stored, positions },
-				chapters,
-			)
+			const migrated = migratedProgress(update, stored)
 			await this.write(update.workId, migrated)
 			return migrated
+		})
+	}
+
+	migrateAndPublish(
+		inputs: readonly StoredMigration[],
+		publish: () => Promise<void>,
+	) {
+		const updates = structuredClone(inputs)
+		return this.enqueue(async () => {
+			const backups = new Map<string, ProgressMigrationResult>()
+			try {
+				for (const update of updates) {
+					const stored = await this.read(update.workId)
+					if (!stored) continue
+					await this.write(update.workId, migratedProgress(update, stored))
+					backups.set(update.workId, stored)
+				}
+				await publish()
+			} catch (error) {
+				const restored = await Promise.allSettled(
+					[...backups].map(([workId, stored]) => this.write(workId, stored)),
+				)
+				const failures = restored.flatMap((result) =>
+					result.status === 'rejected' ? [result.reason] : [],
+				)
+				if (failures.length)
+					throw new AggregateError(
+						[error, ...failures],
+						'Save migration rollback failed',
+					)
+				throw error
+			}
 		})
 	}
 

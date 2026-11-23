@@ -94,6 +94,56 @@ function spriteDirection(
 	}
 }
 
+test('restores every work’s progress and legacy saves when package publication fails', async () => {
+	const { directory, store } = await createStore()
+	const ids = [workId, 'another-work']
+	for (const id of ids) {
+		await store.saveSlot(id, quick, snapshot(first), await capture('#123456'))
+		await store.saveSlot(
+			id,
+			manual,
+			snapshot(removedChapter),
+			await capture('#654321'),
+		)
+		await store.migrate({
+			workId: id,
+			fromVersion: 1,
+			toVersion: 2,
+			chapters: [[textBeat(first)]],
+		})
+	}
+	const before = await Promise.all(
+		ids.map(async (id) => ({
+			progress: await store.load(id),
+			legacy: await store.loadLegacySaves(id),
+		})),
+	)
+	const original = await readFile(join(directory, 'progress.json'), 'utf8')
+	await expect(
+		store.migrateAndPublish(
+			ids.map((id) => ({
+				workId: id,
+				fromVersion: 2,
+				toVersion: 3,
+				chapters: [[textBeat(otherChapter)]],
+			})),
+			async () => {
+				const staged = await readFile(join(directory, 'progress.json'), 'utf8')
+				expect(staged).not.toEqual(original)
+				throw new Error('publish failed')
+			},
+		),
+	).rejects.toThrow('publish failed')
+	expect(
+		await Promise.all(
+			ids.map(async (id) => ({
+				progress: await store.load(id),
+				legacy: await store.loadLegacySaves(id),
+			})),
+		),
+	).toEqual(before)
+})
+
 test('restores the new release sprite in time for its next expression change', async () => {
 	const { store } = await createStore()
 	const saved = snapshot(first)

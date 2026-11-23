@@ -76,19 +76,22 @@ export async function installShareIpc(
 							const workIds = migrations.map(({ workId }) => workId)
 							await writes.stopAndDrain(workIds)
 							try {
-								for (const {
-									workId,
-									installedVersion,
-									incomingVersion,
-									chapters,
-								} of migrations)
-									await store.migrate({
-										workId: packageProgressId(workId),
-										fromVersion: installedVersion,
-										toVersion: incomingVersion,
-										chapters,
-									})
-								await publish()
+								await store.migrateAndPublish(
+									migrations.map(
+										({
+											workId,
+											installedVersion,
+											incomingVersion,
+											chapters,
+										}) => ({
+											workId: packageProgressId(workId),
+											fromVersion: installedVersion,
+											toVersion: incomingVersion,
+											chapters,
+										}),
+									),
+									publish,
+								)
 							} finally {
 								writes.resume(workIds)
 							}
