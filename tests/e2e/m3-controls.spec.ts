@@ -199,6 +199,7 @@ test.describe('M3 player controls', () => {
 				.getByRole('button', { name: '读档槽位 1', exact: true })
 				.click()
 			await expect(text()).toHaveText('你好，世界。')
+			await expect(page.getByRole('main')).toHaveAttribute('data-mode', 'main')
 			await expect(page.getByRole('main')).toHaveAttribute(
 				'data-mainline',
 				mainline ?? '',

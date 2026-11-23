@@ -77,7 +77,7 @@ export function PlayerPage() {
 			mode: PlaybackMode = 'main',
 			waitForClick = false,
 			restore?: StageSnapshot,
-			onValidated?: () => void,
+			onValidated?: () => PlaybackMode,
 		) => {
 			if (!id) return
 			setError('')
@@ -127,7 +127,7 @@ export function PlayerPage() {
 					throw new Error('本章还没有可播放的剧本')
 				if (restore && !containsSentence(result.scenes, restore.position))
 					throw new Error('存档中的句子已不存在')
-				onValidated?.()
+				const validatedMode = onValidated?.() ?? mode
 				compiledChapters.current.set(chapter.chapterId, result.scenes)
 				chapterOrder.current = chapters.map((chapter) => chapter.chapterId)
 				let rank = 0
@@ -163,7 +163,7 @@ export function PlayerPage() {
 							: undefined,
 					linked,
 					chapterId: chapter.chapterId,
-					mode,
+					mode: validatedMode,
 					scenes: result.scenes,
 					paths: new Map(
 						registry.entries.map((entry) => [entry.id, entry.path]),
@@ -275,13 +275,13 @@ export function PlayerPage() {
 	}
 	async function restore(
 		snapshot: StageSnapshot | null,
-		onValidated: () => void,
+		onValidated: () => PlaybackMode,
 	) {
 		if (snapshot) {
 			const loaded = await loadProject(
 				undefined,
 				snapshot.position.chapterId,
-				restoredChapterMode(progress.current.data, snapshot.position.chapterId),
+				progress.current.mode,
 				false,
 				snapshot,
 				onValidated,
@@ -294,6 +294,10 @@ export function PlayerPage() {
 		if (snapshot)
 			void restore(snapshot, () => {
 				progress.current.jump(index)
+				return restoredChapterMode(
+					progress.current.data,
+					snapshot.position.chapterId,
+				)
 			}).catch(() => setError('无法读取历史记录'))
 	}
 	const nextChapter = loaded
@@ -350,6 +354,7 @@ export function PlayerPage() {
 							)?.snapshot ?? null,
 							() => {
 								progress.current.loadSave(slot)
+								return progress.current.mode
 							},
 						)
 					}
