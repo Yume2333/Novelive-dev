@@ -1,0 +1,23 @@
+M4/10 handoff verification — PR #66
+
+Node 24.22.3, pnpm 12.21.0, Electron 45.4.1, Xvfb, Mesa software Vulkan (lavapipe).
+Strict replay in Electron; model transport synthetic or replayed. No paid requests.
+
+$ NL_REPLAY=strict pnpm check
+Checked 350 files in 146ms. No fixes applied.
+ Test Files  50 passed (50)
+      Tests  661 passed | 1 skipped (662)
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 longform and queue'
+  3 passed (1.3m)
+
+$ NL_REPLAY=strict xvfb-run -a pnpm exec playwright test
+  58 passed (1.8m)
+
+The full suite reused the same Electron build as the gate.
+- W1: the wizard disables the other embedded illustration at two external plus one embedded; deselecting re-enables it. After confirmation the EPUB import report and saved bytes contain only the chosen illustration plus any external references. See gate-w1-epub-nav.png.
+- W2: two queued works reorder in both directions in the drawer and creator queue without replacing the active worker. See gate-w2-reordered.png.
+- Integration: the later volume's real painter submission carries the approved key visual bytes even with a same-ID unapproved volume style. The injected transport never reaches a provider.
+- Running art is aborted and awaited before its database closes; a waiting sequel rejects with cancelled at shutdown. First-volume candidate failure reaches the sequel, and retry opens a fresh attempt. Settings refresh completes before the sequel's visual wait ends.
+
+As before, the headless gate does not visually verify OS notification bubbles or a physical tray, or evaluate real model quality.

@@ -57,12 +57,15 @@ async function call<K extends keyof typeof commands>(
 		{ command, input },
 	) as Promise<CommandOutput<K>>
 }
-async function pick(app: ElectronApplication, answers: string[]) {
+async function pick(app: ElectronApplication, answers: (string | string[])[]) {
 	await app.evaluate(({ dialog, BrowserWindow }, paths) => {
-		dialog.showOpenDialog = async () => ({
-			canceled: false,
-			filePaths: [paths.shift() ?? ''],
-		})
+		dialog.showOpenDialog = async () => {
+			const next = paths.shift()
+			return {
+				canceled: !next,
+				filePaths: Array.isArray(next) ? next : next ? [next] : [],
+			}
+		}
 		dialog.showMessageBox = async () => ({
 			response: 1,
 			checkboxChecked: false,
@@ -76,8 +79,9 @@ async function importBook(
 	source: string,
 	folder: string,
 	joinExisting = false,
+	references: string[] = [],
 ) {
-	await pick(app, [source, folder])
+	await pick(app, [source, folder, references])
 	await page.evaluate(() => {
 		location.hash = '/import'
 	})
@@ -85,7 +89,11 @@ async function importBook(
 	if (joinExisting) {
 		await page.getByLabel('加入已有系列').check()
 		await page.getByRole('button', { name: '选择已有工程' }).click()
-	} else await page.getByRole('button', { name: '选择文件夹' }).click()
+	} else {
+		await page.getByRole('button', { name: '选择文件夹' }).click()
+		if (references.length)
+			await page.getByRole('button', { name: '添加图片' }).click()
+	}
 	await page.getByRole('button', { name: '导入', exact: true }).click()
 }
 async function launch(root: string, production = false) {
@@ -122,7 +130,17 @@ test.describe('M4 longform and queue', () => {
 		const { app, page } = await launch(root)
 		try {
 			for (const book of books) {
-				await importBook(app, page, book.path, projects)
+				const external =
+					book.name === 'epub-nav'
+						? ['character.png', 'scene.png'].map((name) =>
+								join(
+									process.cwd(),
+									'tests/fixtures/source/epub/synthetic',
+									name,
+								),
+							)
+						: []
+				await importBook(app, page, book.path, projects, false, external)
 				await expect(
 					page.getByRole('heading', { name: '核对导入' }),
 				).toBeVisible()
@@ -139,8 +157,15 @@ test.describe('M4 longform and queue', () => {
 				if (book.name === 'docx' || book.name.startsWith('epub')) {
 					await expect(images).toHaveCount(2)
 					await expect(images.first()).not.toBeChecked()
-					expect(report.references).toEqual([])
+					expect(report.references).toHaveLength(external.length)
 					await images.first().check()
+					if (external.length) {
+						await expect(images.last()).toBeDisabled()
+						await expect(images.last()).not.toBeChecked()
+						await images.first().uncheck()
+						await expect(images.last()).toBeEnabled()
+						await images.first().check()
+					}
 				}
 				await capture(page, `w1-${book.name}`)
 				await page.getByRole('button', { name: '确认', exact: true }).click()
@@ -179,6 +204,22 @@ test.describe('M4 longform and queue', () => {
 				expect(saved.selectedIllustrations).toHaveLength(
 					book.name === 'docx' || book.name.startsWith('epub') ? 1 : 0,
 				)
+				if (book.name.startsWith('epub')) {
+					const [selected, skipped] = report.illustrations
+					expect(saved.selectedIllustrations).toEqual([selected.id])
+					const embedded = `source/references/${selected.id}.png`
+					expect(saved.references).toEqual([...report.references, embedded])
+					expect(await project.readFile(embedded)).toEqual(
+						await project.readFile(selected.cachePath),
+					)
+					for (const [index, source] of external.entries())
+						expect(await project.readFile(report.references[index])).toEqual(
+							await readFile(source),
+						)
+					expect(
+						await readdir(join(projectDir, 'source/references')),
+					).not.toContain(`${skipped.id}.png`)
+				}
 			}
 			await importBook(app, page, join(root, 'scan.pdf'), projects)
 			await expect(
@@ -329,16 +370,37 @@ test.describe('M4 longform and queue', () => {
 			expect(ordered.active?.link.workId).toBe(b)
 			expect(ordered.queued.map((work) => work.link.workId)).toEqual([a, a2])
 			await page.getByRole('button', { name: /全局制作状态/ }).click()
-			await page
+			const queuedRows = page
 				.getByRole('list', { name: '排队中' })
 				.getByRole('listitem')
-				.last()
-				.hover()
-			await page.getByRole('button', { name: /提前/ }).last().click()
+			const titles = ordered.queued.map(({ title }) => title)
+			await expect(queuedRows).toHaveText(
+				titles.map((title) => new RegExp(title)),
+			)
+			await queuedRows.last().hover()
+			await queuedRows.last().getByRole('button', { name: /提前/ }).click()
+			await expect(queuedRows).toHaveText(
+				[...titles].reverse().map((title) => new RegExp(title)),
+			)
 			expect((await queue()).queued.map((work) => work.link.workId)).toEqual([
 				a2,
 				a,
 			])
+			await queuedRows.first().hover()
+			await queuedRows.first().getByRole('button', { name: /延后/ }).click()
+			await expect(queuedRows).toHaveText(
+				titles.map((title) => new RegExp(title)),
+			)
+			expect((await queue()).queued.map((work) => work.link.workId)).toEqual([
+				a,
+				a2,
+			])
+			await queuedRows.last().hover()
+			await queuedRows.last().getByRole('button', { name: /提前/ }).click()
+			await expect(queuedRows).toHaveText(
+				[...titles].reverse().map((title) => new RegExp(title)),
+			)
+			expect((await queue()).active?.link.workId).toBe(b)
 			await capture(page, 'w2-reordered')
 			const before = await page.evaluate(() => window.novelive.host.appState())
 			await app.evaluate(({ app }) => {

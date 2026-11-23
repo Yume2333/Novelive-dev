@@ -45,6 +45,10 @@ export function createProduction(
 	const bindingsDir = join(dataDir, 'projects')
 	const binding = (workId: string) => join(bindingsDir, workId)
 	const sessions = new Map<string, ReturnType<typeof open>>()
+	const settingsRefreshers = new Set<() => Promise<void>>()
+	const schedulers = new Set<ChapterScheduler>()
+	const jobs = new Set<Promise<unknown>>()
+	const shutdown = new AbortController()
 	const chapterRecords = new Map<string, EventEnvelope[]>()
 	const recoveredProjects = new Set<string>()
 	const preparations = new Map<string, ReturnType<typeof startPreparation>>()
@@ -54,14 +58,26 @@ export function createProduction(
 	>()
 	let loading = 0
 	let awaitingVisual = 0
-	let closing = false
 	let seq = 0
 	let restored: Promise<void> | undefined
 	let lastQueue: string | undefined
 	const workQueue = new WorkQueue(publishQueue)
 
 	function publishBusy() {
-		active(!closing && (loading > awaitingVisual || workQueue.busy))
+		active(
+			!shutdown.signal.aborted && (loading > awaitingVisual || workQueue.busy),
+		)
+	}
+
+	function checkOpen() {
+		if (shutdown.signal.aborted) fail('cancelled', '创作服务正在关闭')
+	}
+
+	function runJob<T>(operation: () => Promise<T>): Promise<T> {
+		checkOpen()
+		const job = operation().finally(() => jobs.delete(job))
+		jobs.add(job)
+		return job
 	}
 
 	function visualChanged(root: string) {
@@ -87,14 +103,14 @@ export function createProduction(
 
 	async function admitVisual(project: Project, workId: string) {
 		for (;;) {
-			if (closing) fail('cancelled', '创作服务正在关闭')
+			checkOpen()
 			let change = visualChanges.get(project.root)
 			if (!change) {
 				change = Promise.withResolvers<void>()
 				visualChanges.set(project.root, change)
 			}
 			const approved = await approvedVisual(project)
-			if (closing) fail('cancelled', '创作服务正在关闭')
+			checkOpen()
 			if (approved) {
 				visualChanged(project.root)
 				return approved
@@ -102,11 +118,14 @@ export function createProduction(
 			const owner = await visualOwner(project)
 			if (owner === workId) return undefined
 			await remember(owner, project.root)
-			if (!closing) void get(owner).catch(() => {})
+			checkOpen()
 			awaitingVisual++
 			publishBusy()
 			try {
-				await change.promise
+				await Promise.race([
+					change.promise,
+					get(owner).then(() => change.promise),
+				])
 			} finally {
 				awaitingVisual--
 				publishBusy()
@@ -245,7 +264,7 @@ export function createProduction(
 					const volume = await project.read(projectFiles.volume(volumeId))
 					for (const id of volume.workIds) {
 						await remember(id, root)
-						if (!closing) void get(id).catch(() => {})
+						if (!shutdown.signal.aborted) void get(id).catch(() => {})
 					}
 				},
 			})
@@ -309,7 +328,7 @@ export function createProduction(
 			const models = await settings()
 			const { art, worker, setModels, rewriteScene, redraw, adoptImage } =
 				chapterWorker(project, volumeId, work, models, replay)
-			const service = art()
+			const service = art(shutdown.signal)
 			const data = project.database
 			data
 				.prepare(
@@ -326,6 +345,7 @@ export function createProduction(
 					preparations.delete(project.root)
 				preparation = preparations.get(project.root)
 			}
+			checkOpen()
 			if (!preparation) {
 				preparation = startPreparation(project.root, work.language, models)
 				preparations.set(project.root, preparation)
@@ -360,7 +380,7 @@ export function createProduction(
 				}
 			}
 			function emit() {
-				if (closing) return
+				if (shutdown.signal.aborted) return
 				const status = snapshot()
 				workQueue.changed()
 				for (const run of queue.runLog(workId)) {
@@ -400,6 +420,7 @@ export function createProduction(
 				},
 			})
 			scheduler = queue
+			schedulers.add(queue)
 			workQueue.attach(workId, {
 				read: () =>
 					admitted
@@ -414,13 +435,14 @@ export function createProduction(
 			})
 			async function refresh() {
 				const next = await settings()
+				checkOpen()
 				setModels(next)
 				queue.setImageConcurrency(next.image.concurrency)
 			}
 			async function confirmSeriesVisual(
 				...args: Parameters<typeof service.confirmVisual>
 			) {
-				const chosen = await art().confirmVisual(...args)
+				const chosen = await art(shutdown.signal).confirmVisual(...args)
 				if (!(await approvedVisual(project))) {
 					const file = projectFiles.style({ level: 'series' })
 					const document = await existing(() => project.read(file))
@@ -464,7 +486,7 @@ export function createProduction(
 					if (!started) queue.start(workId, work.chapterIds)
 					queue.confirmVisual(workId)
 				} else {
-					pool = await service.candidates(
+					pool = await art(shutdown.signal).candidates(
 						bible,
 						work.chapterIds,
 						undefined,
@@ -496,65 +518,71 @@ export function createProduction(
 							}),
 						),
 					}
+					await refresh()
 					if (!started) queue.start(workId, work.chapterIds)
 				}
 			}
+			checkOpen()
 			admitted = true
 			emit()
 			chapterRecords.set(workId, records)
+			settingsRefreshers.add(refresh)
 			return {
 				workId,
 				project,
 				queue,
 				snapshot,
 				records,
-				refreshSettings: refresh,
-				async confirm(input: CommandInput<'production.confirmVisual'>) {
-					const choices = pool
-					if (
-						snapshot().phase !== 'confirm-visual' ||
-						!choices ||
-						confirmingVisual
-					)
-						return fail(
-							'invalid_config',
-							'当前没有可提交的主视觉确认，请刷新后重试',
-						)
-					confirmingVisual = true
-					try {
-						await refresh()
+				confirm: (input: CommandInput<'production.confirmVisual'>) =>
+					runJob(async () => {
+						const choices = pool
 						if (
-							(await approvedVisual(project)) ||
-							(await visualOwner(project)) !== workId
-						) {
+							snapshot().phase !== 'confirm-visual' ||
+							!choices ||
+							confirmingVisual
+						)
+							return fail(
+								'invalid_config',
+								'当前没有可提交的主视觉确认，请刷新后重试',
+							)
+						confirmingVisual = true
+						try {
+							await refresh()
+							if (
+								(await approvedVisual(project)) ||
+								(await visualOwner(project)) !== workId
+							) {
+								visualChanged(project.root)
+								fail('invalid_config', '系列主视觉确认状态已变化，请刷新后重试')
+							}
+							const style = (await productionBible(project, volumeId, workId))
+								.art.style
+							await confirmSeriesVisual(style, choices, input)
+							queue.confirmVisual(workId)
 							visualChanged(project.root)
-							fail('invalid_config', '系列主视觉确认状态已变化，请刷新后重试')
+							return snapshot()
+						} finally {
+							confirmingVisual = false
 						}
-						const style = (await productionBible(project, volumeId, workId)).art
-							.style
-						await confirmSeriesVisual(style, choices, input)
-						queue.confirmVisual(workId)
-						visualChanged(project.root)
+					}),
+				continue: () =>
+					runJob(async () => {
+						await refresh()
+						queue.continue(workId)
 						return snapshot()
-					} finally {
-						confirmingVisual = false
-					}
-				},
-				async continue() {
-					await refresh()
-					queue.continue(workId)
-					return snapshot()
-				},
-				async retry(chapterId: string) {
-					await refresh()
-					queue.retryChapter(workId, chapterId)
-					return snapshot()
-				},
-				async redo(chapterId: string) {
-					await refresh()
-					queue.redoChapter(workId, chapterId)
-					return snapshot()
-				},
+					}),
+				retry: (chapterId: string) =>
+					runJob(async () => {
+						await refresh()
+						queue.retryChapter(workId, chapterId)
+						return snapshot()
+					}),
+				redo: (chapterId: string) =>
+					runJob(async () => {
+						await refresh()
+						queue.redoChapter(workId, chapterId)
+						return snapshot()
+					}),
 				rewriteScene,
 				redraw,
 				adoptImage,
@@ -566,17 +594,21 @@ export function createProduction(
 				},
 			}
 		} catch (error) {
-			scheduler?.dispose()
-			await scheduler?.idle()
+			if (scheduler) {
+				scheduler.dispose()
+				await scheduler.idle()
+				schedulers.delete(scheduler)
+			}
 			workQueue.detach(workId)
 			project.close()
+			checkOpen()
 			throw error
 		}
 	}
 
 	async function get(workId: string) {
 		await ready()
-		if (closing) throw { code: 'cancelled', message: '创作端正在关闭' }
+		checkOpen()
 		const session = sessions.get(workId)
 		if (session) return session
 		loading++
@@ -612,10 +644,9 @@ export function createProduction(
 			return workQueue.move(workId, direction)
 		},
 		async refreshSettings() {
+			checkOpen()
 			await Promise.all(
-				[...sessions.values()].map(async (session) =>
-					(await session).refreshSettings(),
-				),
+				[...settingsRefreshers].map((refresh) => runJob(refresh)),
 			)
 		},
 		async playerStatus(workId: string, selected?: string) {
@@ -638,22 +669,29 @@ export function createProduction(
 			}
 		},
 		async close() {
-			closing = true
+			shutdown.abort()
+			publishBusy()
 			for (const root of visualChanges.keys()) visualChanged(root)
 			chapterRecords.clear()
 			workQueue.close()
+			for (const scheduler of schedulers) scheduler.dispose()
 			for (const preparation of preparations.values())
 				preparation.controller.abort()
-			await Promise.allSettled(
-				[...preparations.values()].map((preparation) => preparation.running),
-			)
-			const results = await Promise.allSettled(sessions.values())
+			const [results] = await Promise.all([
+				Promise.allSettled(sessions.values()),
+				Promise.allSettled([
+					...jobs,
+					...[...preparations.values()].map(
+						(preparation) => preparation.running,
+					),
+				]),
+			])
 			await Promise.all(
 				results.map(async (result) => {
 					if (result.status !== 'fulfilled') return
-					const { queue, project } = result.value
-					queue.dispose()
+					const { queue, project, workId } = result.value
 					await queue.idle()
+					workQueue.detach(workId)
 					project.close()
 				}),
 			)

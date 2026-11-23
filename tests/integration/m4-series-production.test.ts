@@ -1,6 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import sharp from 'sharp'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createConfigStore } from '../../packages/creator/src/config'
 import type { EventEnvelope } from '../../packages/creator/src/contract'
@@ -9,10 +10,23 @@ import { Project } from '../../packages/creator/src/project'
 import { createProduction } from '../../packages/creator/src/project/production'
 import { projectFiles, type Work } from '../../packages/format/src/model'
 import { connection } from '../fixtures/cassettes/m1a-synthesis/fixture'
+import { picture } from '../fixtures/cassettes/m1b-art/fixture'
+import {
+	completion,
+	configuration,
+} from '../fixtures/cassettes/m4-gate/fixture'
 import { ScriptedWorker } from '../fixtures/scheduler/m1b/worker'
 
 const workers = new Map<string, ScriptedWorker>()
-const candidates = vi.fn()
+const setModels = vi.fn()
+const candidates =
+	vi.fn<
+		(
+			workId: string,
+			signal?: AbortSignal,
+			project?: Project,
+		) => void | Promise<void>
+	>()
 const approvedStyle = {
 	id: 'style',
 	status: 'confirmed' as const,
@@ -37,9 +51,9 @@ vi.mock('../../packages/creator/src/project/production-worker', () => ({
 		},
 	}),
 	chapterWorker: (project: Project, _volumeId: string, work: Work) => ({
-		art: () => ({
+		art: (signal?: AbortSignal) => ({
 			candidates: async () => {
-				candidates(work.workId)
+				await candidates(work.workId, signal, project)
 				await project.writeFile(
 					'assets/candidate.png',
 					new Uint8Array([1, 2, 3]),
@@ -56,7 +70,7 @@ vi.mock('../../packages/creator/src/project/production-worker', () => ({
 			confirmVisual: async () => approveVisual(project, _volumeId),
 		}),
 		worker: workers.get(work.workId),
-		setModels: () => {},
+		setModels: () => setModels(work.workId),
 	}),
 }))
 
@@ -76,7 +90,8 @@ beforeEach(async () => {
 	hostBusy = new Map()
 	laterEntered = Promise.withResolvers<void>()
 	laterRelease = undefined
-	candidates.mockClear()
+	candidates.mockReset()
+	setModels.mockClear()
 	approveVisual.mockReset()
 })
 afterEach(async () => {
@@ -403,10 +418,204 @@ test('closing while a sequel waits for series approval cancels its unopened gate
 	const cancelled = expect(later).rejects.toMatchObject({ code: 'cancelled' })
 	await host.get(book.workIds[0])
 	await laterEntered.promise
+	await vi.waitFor(() => expect(hostBusy.get(host)).toBe(false))
 	await host.close()
 	await cancelled
 	hosts.splice(hosts.indexOf(host), 1)
 	expect(candidates.mock.calls.map(([id]) => id)).toEqual([book.workIds[0]])
+})
+
+test('closing aborts running visual work and waits for its cleanup before closing the database', async () => {
+	const book = await seed()
+	const host = production()
+	const [first] = book.workIds
+	await host.remember(first, book.projectDir)
+	const entered = Promise.withResolvers<void>()
+	const aborted = Promise.withResolvers<void>()
+	const cleanup = Promise.withResolvers<void>()
+	candidates.mockImplementationOnce(async (_id, signal, project) => {
+		if (!signal || !project) throw new Error('Missing visual job context')
+		signal.addEventListener('abort', () => aborted.resolve(), { once: true })
+		entered.resolve()
+		await cleanup.promise
+		expect(project.database.prepare('SELECT 1 AS open').get()).toEqual({
+			open: 1,
+		})
+		signal.throwIfAborted()
+	})
+	const cancelled = expect(host.get(first)).rejects.toMatchObject({
+		code: 'cancelled',
+	})
+	await entered.promise
+	const closed = vi.fn()
+	const closing = host.close().then(closed)
+	try {
+		await vi.waitFor(() => expect(hostBusy.get(host)).toBe(false))
+		await aborted.promise
+		expect(closed).not.toHaveBeenCalled()
+	} finally {
+		cleanup.resolve()
+	}
+	await cancelled
+	await closing
+	hosts.splice(hosts.indexOf(host), 1)
+})
+
+test('first-volume candidate failure rejects the waiting sequel and either work can restart the gate', async () => {
+	const book = await seed()
+	const [first, later] = book.workIds
+	const original = production()
+	for (const id of book.workIds) await original.remember(id, book.projectDir)
+	await original.get(first)
+	await original.close()
+	hosts.splice(hosts.indexOf(original), 1)
+	candidates.mockClear()
+
+	const host = production()
+	const failure = new Error('first visual generation failed')
+	candidates.mockImplementationOnce(async () => {
+		throw failure
+	})
+	await expect(host.get(later)).rejects.toBe(failure)
+	const retry = host.get(later)
+	const owner = await host.get(first)
+	expect(owner.snapshot().phase).toBe('confirm-visual')
+	await owner.confirm({
+		workId: first,
+		mainVisualId: 'one',
+		supplementalIds: [],
+		characters: [],
+	})
+	expect((await retry).snapshot().visual).toBeNull()
+	expect(candidates.mock.calls.map(([id]) => id)).toEqual([first, first])
+})
+
+test('refreshing saved settings does not wait for a sequel to finish visual admission', async () => {
+	const book = await seed()
+	const host = production()
+	const [first, later] = book.workIds
+	for (const id of book.workIds) await host.remember(id, book.projectDir)
+	const pending = host.get(later)
+	const ready = vi.fn()
+	void pending.then(ready, () => {})
+	const owner = await host.get(first)
+	await vi.waitFor(() => expect(hostBusy.get(host)).toBe(false))
+	const config = createConfigStore(join(root, 'profile'))
+	await config.update(configuration)
+	setModels.mockClear()
+	const refreshed = vi.fn()
+	const refresh = host.refreshSettings().then(refreshed)
+	try {
+		await vi.waitFor(() => expect(refreshed).toHaveBeenCalledOnce())
+		expect(ready).not.toHaveBeenCalled()
+		expect(setModels.mock.calls).toEqual([[first]])
+	} finally {
+		await owner.confirm({
+			workId: first,
+			mainVisualId: 'one',
+			supplementalIds: [],
+			characters: [],
+		})
+		await pending
+		await refresh
+	}
+})
+
+test('the sequel painter sends only the approved key visual, not a cached candidate', async () => {
+	const book = await seed()
+	const host = production()
+	const [first, later] = book.workIds
+	for (const id of book.workIds) await host.remember(id, book.projectDir)
+	const owner = await host.get(first)
+	const keyVisual = await sharp({
+		create: { width: 32, height: 24, channels: 3, background: '#ad592f' },
+	})
+		.webp()
+		.toBuffer()
+	approveVisual.mockImplementationOnce(async (project) => {
+		await project.writeFile(approvedStyle.references[0].path, keyVisual)
+		return approvedStyle
+	})
+	await owner.confirm({
+		workId: first,
+		mainVisualId: 'one',
+		supplementalIds: [],
+		characters: [],
+	})
+	const { project } = await host.get(later)
+	const volumeId = 'v0002'
+	const work = await project.read(projectFiles.work(volumeId, later))
+	const { chapterWorker, productionModels } = await vi.importActual<
+		typeof import('../../packages/creator/src/project/production-worker')
+	>('../../packages/creator/src/project/production-worker')
+	const config = createConfigStore(join(root, 'profile'))
+	await config.update(configuration)
+	const references: Buffer[][] = []
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		const url = new URL(request.url)
+		expect(url.origin).toBe('https://relay.invalid')
+		if (url.pathname.includes('/images/')) {
+			const form = await request.formData()
+			references.push(
+				await Promise.all(
+					form.getAll('image[]').map(async (image) => {
+						if (typeof image === 'string')
+							throw new Error('Expected painter image input')
+						return Buffer.from(await image.arrayBuffer())
+					}),
+				),
+			)
+			const [width, height] = String(form.get('size')).split('x').map(Number)
+			return Response.json({
+				data: [
+					{
+						b64_json: (await picture(width, height, false)).toString('base64'),
+					},
+				],
+			})
+		}
+		const { model } = await request.json()
+		if (model === configuration.models.main.model)
+			return completion({ content: 'A riverbank.' })
+		expect(model).toBe(configuration.models.visual.model)
+		return completion({ pass: true, failedChecks: [], feedback: '' })
+	}
+	const { art, worker } = chapterWorker(
+		project,
+		volumeId,
+		work,
+		await productionModels(config),
+		{ mode: 'record', directory: join(root, 'sequel-art'), fetch },
+	)
+	const candidate = {
+		id: 'style',
+		status: 'candidate' as const,
+		description: 'Unapproved draft',
+	}
+	await project.write(projectFiles.style({ level: 'volume', volumeId }), {
+		formatVersion: 1,
+		entries: [candidate],
+	})
+	const [job] = await art().register(
+		[{ id: 'sequel-room/day', kind: 'location', description: 'A riverbank' }],
+		{ style: candidate, characters: [], locations: [] },
+	)
+	await project.writeFile(
+		`source/production/art/${job.assetId}.json`,
+		JSON.stringify({ job }),
+	)
+	const result = await worker.draw(
+		{ assetId: job.assetId, kind: 'base' },
+		{
+			workId: later,
+			desensitized: false,
+			signal: new AbortController().signal,
+		},
+	)
+	expect(result.status).toBe('drawn')
+	expect(references).toEqual([[await sharp(keyVisual).png().toBuffer()]])
+	expect(candidates.mock.calls.map(([id]) => id)).toEqual([first])
 })
 
 test('empty queue and failed preparation reject cleanly and can retry without duplicate sessions', async () => {
