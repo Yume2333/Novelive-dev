@@ -5,6 +5,7 @@
 	"exports": {
 		"./model": "./src/model/index.ts",
 		"./package": "./src/package/contract.ts",
+		"./package/codec": "./src/package/codec/index.ts",
 		"./script": "./src/script/index.ts"
 	},
 	"dependencies": {
