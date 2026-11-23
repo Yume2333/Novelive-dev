@@ -8,6 +8,18 @@ import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
 
+test('removes consecutive running headers and footers, keeping the first chapter heading', async () => {
+	const result = await extractPdf(await fixture('running-edges'))
+	if (result.status !== 'ready') throw new Error('Expected text PDF')
+	expect(result.book.volumes[0].chapters).toEqual([
+		{
+			title: 'Chapter 2',
+			paragraphs: ['The story begins and continues to its ending.'],
+			notes: [],
+		},
+	])
+})
+
 test('preserves bare-number chapter headings but removes sequenced offset page numbers', async () => {
 	const chapters = await extractPdf(await fixture('numbered-chapters'))
 	if (chapters.status !== 'ready') throw new Error('Expected text PDF')

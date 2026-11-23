@@ -17,6 +17,11 @@ interface Line {
 	left: number
 }
 
+const heading = (text: string) =>
+	headingRules.some(
+		(rule) => rule.enable && rule.kind !== 'exclude' && rule.pattern.test(text),
+	)
+
 function mergeLines(lines: Line[]) {
 	const paragraphs: string[] = []
 	const notes = lines.map((line) =>
@@ -24,11 +29,6 @@ function mergeLines(lines: Line[]) {
 			volume.chapters.some((chapter) => chapter.notes.length > 0),
 		),
 	)
-	const heading = (text: string) =>
-		headingRules.some(
-			(rule) =>
-				rule.enable && rule.kind !== 'exclude' && rule.pattern.test(text),
-		)
 	for (const [i, line] of lines.entries()) {
 		const previous = lines[i - 1]
 		const boundary =
@@ -79,6 +79,28 @@ function stripPageNumbers(lines: Line[]) {
 				other.x - other.left > other.height * 2 &&
 				Number(other.text) - other.page === Number(line.text) - line.page,
 		)
+	})
+}
+
+function stripRunningEdges(lines: Line[]) {
+	const tops = new Map<number, Line>()
+	const bottoms = new Map<number, Line>()
+	for (const line of lines) {
+		if (!tops.has(line.page)) tops.set(line.page, line)
+		bottoms.set(line.page, line)
+	}
+	return lines.filter((line) => {
+		for (const edges of [tops, bottoms]) {
+			if (edges.get(line.page) !== line) continue
+			const previous = edges.get(line.page - 1)?.text === line.text
+			const next = edges.get(line.page + 1)?.text === line.text
+			if (
+				(previous || next) &&
+				!(edges === tops && !previous && heading(line.text))
+			)
+				return false
+		}
+		return true
 	})
 }
 
@@ -141,7 +163,7 @@ export async function extractPdf(bytes: Uint8Array): Promise<ImportExtraction> {
 				page.cleanup()
 			}
 		}
-		const text = mergeLines(stripPageNumbers(lines))
+		const text = mergeLines(stripRunningEdges(stripPageNumbers(lines)))
 		if (!text.trim())
 			return {
 				status: 'unsupported',

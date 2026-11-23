@@ -49,6 +49,15 @@ function pdf(pages, image = false, cjk = false) {
 
 for (const [name, pages, image, cjk] of [
 	[
+		'running-edges',
+		[
+			['Chapter 2', 'The story begins', 'A local novel'],
+			['Chapter 2', 'and continues', 'A local novel'],
+			['Chapter 2', 'to its ending.', 'A local novel'],
+		],
+		false,
+	],
+	[
 		'text',
 		[
 			['Chapter 1', 'The first page ends here.'],
