@@ -60,6 +60,20 @@ for (const [name, pages, image, cjk] of [
 	['blank', [[]], false],
 	['plain', [['No heading on this page.'], ['Still the same chapter.']], false],
 	[
+		'notes',
+		[
+			[
+				'Chapter 1',
+				'Unfinished prose',
+				'[1] Translator note',
+				'Body continues.',
+				'www.example.com',
+				'Last body sentence.',
+			],
+		],
+		false,
+	],
+	[
 		'cjk-wrap',
 		[
 			['第一章 风起', '他走过长长的街道', '看见远处的灯火正在'],

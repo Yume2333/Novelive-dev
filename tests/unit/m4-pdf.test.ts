@@ -3,9 +3,27 @@ import { compile } from '@earendil-works/pi-schema'
 import { expect, test } from 'vitest'
 import { importExtractionSchema } from '../../packages/creator/src/contract/import'
 import { extractPdf } from '../../packages/creator/src/import/pdf'
+import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
+
+test('isolates note starts and watermarks without swallowing adjacent prose', async () => {
+	const result = await extractPdf(await fixture('notes'))
+	if (result.status !== 'ready') throw new Error('Expected text PDF')
+	const chapter = result.book.volumes[0].chapters[0]
+	expect(chapter.paragraphs).toEqual([
+		'Unfinished prose',
+		'Body continues.',
+		'Last body sentence.',
+	])
+	expect(chapter.notes).toEqual(['[1] Translator note', 'www.example.com'])
+	const txt = parseTxt(
+		'Chapter 1\n\nUnfinished prose\n\n[1] Translator note\n\nBody continues.\n\nwww.example.com\n\nLast body sentence.',
+	).volumes[0].chapters[0]
+	expect(chapter.paragraphs).toEqual(txt.paragraphs.map(({ text }) => text))
+	expect(chapter.notes).toEqual(txt.notes)
+})
 
 test('extracts body and metadata, merging pages before recognizing chapters', async () => {
 	const bytes = await fixture('text')

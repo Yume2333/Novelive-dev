@@ -19,6 +19,11 @@ interface Line {
 
 function mergeLines(lines: Line[]) {
 	const paragraphs: string[] = []
+	const notes = lines.map((line) =>
+		parseTxt(line.text).volumes.some((volume) =>
+			volume.chapters.some((chapter) => chapter.notes.length > 0),
+		),
+	)
 	const heading = (text: string) =>
 		headingRules.some(
 			(rule) =>
@@ -28,6 +33,8 @@ function mergeLines(lines: Line[]) {
 		const previous = lines[i - 1]
 		const boundary =
 			!previous ||
+			notes[i] ||
+			notes[i - 1] ||
 			heading(line.text) ||
 			heading(previous.text) ||
 			/[。！？…」』”".!?][\s）)\]’']*$/u.test(previous.text) ||
@@ -51,7 +58,7 @@ function mergeLines(lines: Line[]) {
 						: ` ${line.text}`
 		}
 	}
-	return paragraphs.join('\n')
+	return paragraphs.join('\n\n')
 }
 
 export async function extractPdf(bytes: Uint8Array): Promise<ImportExtraction> {
