@@ -215,6 +215,27 @@ test('does not promote subsection or non-chapter headings', async () => {
 	expect(book.volumes[0].chapters).toHaveLength(1)
 })
 
+test('heading fallback does not merge a spine document with an unmatched title', async () => {
+	const opf =
+		'<package><manifest><item id="one" href="chapter.xhtml"/><item id="two" href="second.xhtml"/></manifest><spine><itemref idref="one"/><itemref idref="two"/></spine></package>'
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/book.opf': opf,
+			'OPS/chapter.xhtml': xhtml('<h1>Chapter One</h1><p>First.</p>'),
+			'OPS/second.xhtml': xhtml('<h1>The Crossing</h1><p>Second.</p>'),
+		}),
+	)
+	expect(book.navigation).toBe('heading')
+	expect(book.volumes[0].chapters.map((chapter) => chapter.title)).toEqual([
+		'Chapter One',
+		'The Crossing',
+	])
+	expect(book.volumes[0].chapters[1].paragraphs).toEqual([
+		'The Crossing',
+		'Second.',
+	])
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)

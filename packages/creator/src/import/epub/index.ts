@@ -23,6 +23,9 @@ interface Marker {
 	volume?: string
 }
 
+const chapterKeyword =
+	/^(?:第.{1,12}[章节回卷]|chapter\b|序|楔子|尾[聲声]|番外|后[記记])/i
+
 function archivePath(path: string) {
 	if (
 		!path ||
@@ -152,11 +155,7 @@ function document(path: string, root: Element): Document {
 				.filter(Boolean))
 				blocks.push({
 					text: paragraph,
-					heading:
-						/^h[12]$/.test(node.name) &&
-						/^(?:第.{1,12}[章节回卷]|chapter\b|序|楔子|尾[聲声]|番外|后[記记])/i.test(
-							paragraph,
-						),
+					heading: /^h[12]$/.test(node.name),
 				})
 			for (const image of [...all(node, 'img'), ...all(node, 'image')])
 				visit(image)
@@ -309,11 +308,30 @@ export async function extractEpub(
 	}
 	if (!markers.length) {
 		method = 'heading'
-		markers = docs.flatMap((doc, index) =>
-			doc.blocks.flatMap((block, offset) =>
-				block.heading ? [{ doc: index, block: offset, title: block.text }] : [],
-			),
-		)
+		const hasSignal = (block: Block) =>
+			block.heading && chapterKeyword.test(block.text)
+		if (
+			docs.filter((doc) => doc.blocks.some(hasSignal)).length >=
+			Math.max(1, docs.length / 2)
+		) {
+			markers = docs.flatMap((doc, index) => {
+				const headings = doc.blocks.flatMap((block, offset) =>
+					hasSignal(block)
+						? [{ doc: index, block: offset, title: block.text }]
+						: [],
+				)
+				return headings.length
+					? headings
+					: [
+							{
+								doc: index,
+								block: 0,
+								title:
+									doc.blocks.find((block) => block.heading)?.text ?? doc.path,
+							},
+						]
+			})
+		}
 	}
 	if (!markers.length) {
 		method = 'spine'
