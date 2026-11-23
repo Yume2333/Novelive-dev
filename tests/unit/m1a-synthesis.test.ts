@@ -2064,6 +2064,93 @@ test.each([true, false])(
 	},
 )
 
+test.each([2, 5])(
+	'restores packet chapter scope when legacy events omit progress (format: %s)',
+	async (packetFormat) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const expanded = previews.map((preview) => ({
+			...preview,
+			summary: 'A'.repeat(1900),
+		}))
+		await Promise.all(
+			expanded.map((preview) =>
+				project.write(projectFiles.preview(preview.chapterId), preview),
+			),
+		)
+		const fingerprint = (value: unknown) =>
+			createHash('sha256').update(JSON.stringify(value)).digest('hex')
+		await project.write(files.checkpoint, {
+			formatVersion: 1,
+			fingerprint: fingerprint({
+				packetFormat,
+				previews: expanded,
+				language: options.language,
+				strategy: 'events',
+				incremental: false,
+				model: connection.model,
+				context: connection.contextWindow,
+			}),
+			basis: fingerprint(await readBible(project)),
+			packet: 2,
+			events: [
+				{
+					event: 'Discovery',
+					overview: 'The tower is found.',
+					chapters: [],
+					biblePatch: [{ kind: 'location', op: 'add', entry: candidateTower }],
+					glossaryPatch: [],
+					is_last: false,
+				},
+				...chapters.map((chapterId) => ({
+					event: chapterId,
+					overview: '',
+					chapters: [{ chapterId, progress: 'The journey continues.' }],
+					biblePatch: [],
+					glossaryPatch: [],
+					is_last: true,
+				})),
+			],
+			whole: null,
+			ready: true,
+			applied: false,
+		})
+		const offline = vi.fn<typeof globalThis.fetch>(async () => {
+			throw new Error('Ready events should not be extracted again')
+		})
+		const result = await synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			strategy: 'events',
+			fetch: offline,
+		})
+		expect(offline).not.toHaveBeenCalled()
+		expect(result.quarantined).toBe(false)
+		expect(result.biblePatch).toEqual([
+			{
+				kind: 'location',
+				op: 'add',
+				observedChapter: chapters[0],
+				entry: candidateTower,
+			},
+		])
+		const { entries } = await project.read(
+			projectFiles.location(scope, candidateTower.id),
+		)
+		expect(entries).toMatchObject([
+			{
+				description: '',
+				changes: [
+					{
+						chapterId: chapters[0],
+						field: 'description',
+						value: candidateTower.description,
+					},
+				],
+			},
+		])
+	},
+)
+
 test('a checkpoint quarantined on resume stays quarantined even if the original Bible is restored', async () => {
 	await seed(root)
 	const tower = projectFiles.location(scope, 'tower')

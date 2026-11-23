@@ -14,6 +14,7 @@ import {
 import {
 	type BiblePatch,
 	biblePatchSchema,
+	completeBiblePatchSchema,
 	entityId,
 	formatVersion,
 	glossaryPatchSchema,
@@ -36,7 +37,7 @@ import { splitChapter } from '../preview'
 import type { Project } from '../project'
 import { reconcileNamedAdditions } from './consolidate'
 import { scopedOnlyBrief } from './incremental/context'
-import { synthesisOutput } from './output'
+import { synthesisInstructions, synthesisOutput } from './output'
 import {
 	applyPatches,
 	bibleEntryBases,
@@ -54,11 +55,12 @@ const fields = {
 }
 const outputSchema = obj(fields)
 const whole = synthesisOutput(outputSchema)
-const eventSchema = obj({
+const eventFields = {
 	...fields,
 	event: str({ minLength: 1 }),
 	is_last: bool(),
-})
+}
+const eventSchema = obj(eventFields)
 const nextEvent = synthesisOutput(eventSchema)
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
@@ -172,6 +174,61 @@ function previewPackets(
 		}
 	}
 	return packets
+}
+
+function eventPacketBudget(
+	context: number,
+	history: number,
+	reserve: number,
+	prompt: number,
+) {
+	const output = Math.min(
+		reserve,
+		Math.max(512, context - prompt - history - 768),
+	)
+	return Math.floor((context - output - prompt - history - 384) / 3)
+}
+
+function legacyEventPacketBudget(
+	format: number,
+	context: number,
+	history: number,
+	reserve: number,
+	incremental: boolean,
+	prefix: string,
+	instructions: string,
+	bible: Awaited<ReturnType<typeof readBible>>,
+) {
+	if (format >= 4) {
+		const contract = synthesisInstructions(
+			obj({ ...eventFields, biblePatch: completeBiblePatchSchema }),
+		)
+		return eventPacketBudget(
+			context,
+			history,
+			reserve,
+			bytes(`${instructions}\n${contract}`),
+		)
+	}
+	const existing = `Existing entries:\n${JSON.stringify(bible)}`
+	if (format === 3) {
+		const contract = synthesisInstructions(
+			obj({ ...eventFields, biblePatch: completeBiblePatchSchema }),
+		)
+		const prompt = `${prefix}
+Return one JSON object. Use stable IDs, actual chapter IDs for provenance, and existing or extracted character IDs for relations. Mark main characters as major and new entries as candidate. Preserve confirmed facts; ${incremental ? 'do not delete in successive volumes.' : 'delete only mistaken candidates from this volume.'}
+${existing}
+${contract}`
+		return eventPacketBudget(context, history, reserve, bytes(prompt))
+	}
+	const prompt = `${prefix}
+Return only JSON with overview, chapters [{chapterId,progress}], biblePatch [{kind,op,entry}], glossaryPatch [entry].
+Bible kinds: character, relation, location, timeline, foreshadowing, style. Every entry has an id and status ("candidate"); use actual chapter IDs for provenance and relationships reference existing or extracted characters. Characters have name and aliases (mark main characters major:true); locations have name and description; relations have from, to and description; timeline has chapterId and event; foreshadowing has plantedChapter and description; style has description; glossary has original, written and category.
+Use stable IDs; record changing identities in changes with chapterId, field and value. Keep confirmed facts intact; ${incremental ? 'do not emit delete for successive volumes.' : 'delete only a mistaken candidate from this volume.'}
+${existing}`
+	return format === 1
+		? Math.floor((context - reserve - bytes(prompt) - 3072) / 8)
+		: Math.floor((context - reserve - bytes(prompt) - 2 * history - 768) / 3)
 }
 
 async function seriesChapterIds(
@@ -302,10 +359,11 @@ export async function synthesizeVolume(
 			: matchesPacket(saved, legacyPacketFormats))
 	)
 		return project.read(files.result)
-	const legacyReady =
-		saved?.ready && !saved.applied && matchesPacket(saved, legacyPacketFormats)
-			? saved
+	const legacyFormat =
+		saved?.ready && !saved.applied
+			? legacyPacketFormats.find((format) => matchesPacket(saved, [format]))
 			: undefined
+	const legacyReady = legacyFormat === undefined ? undefined : saved
 	const bible = await readBible(project)
 	const contextBible = options.scope
 		? await readBible(project, options.scope)
@@ -317,7 +375,8 @@ export async function synthesizeVolume(
 		Math.floor(model.contextWindow / 4),
 	)
 	const packetText = previews.map((preview) => JSON.stringify(preview))
-	const instructions = `Synthesize the ordered chapter previews in ${options.language}. Adaptation requirements: ${options.requirements ?? ''}.
+	const prefix = `Synthesize the ordered chapter previews in ${options.language}. Adaptation requirements: ${options.requirements ?? ''}.`
+	const instructions = `${prefix}
 Return JSON. Use stable IDs, real chapter IDs, and character IDs for relations. Mark main characters major and new entries candidate. Preserve confirmed facts; ${incremental ? 'never delete.' : 'delete only this volume’s mistaken candidates.'}
 ${inclusionCriteria}
 Existing entries:
@@ -354,9 +413,25 @@ ${nextEvent.instructions}`
 			)
 		: packetOutputReserve
 	const budget = model.contextWindow - outputReserve
-	const packetBudget = Math.floor(
-		(budget - bytes(eventPrompt) - historyBudget - 384) / 3,
-	)
+	const packetBudget = !useEvents
+		? 0
+		: legacyFormat === undefined
+			? eventPacketBudget(
+					model.contextWindow,
+					historyBudget,
+					packetOutputReserve,
+					bytes(eventPrompt),
+				)
+			: legacyEventPacketBudget(
+					legacyFormat,
+					model.contextWindow,
+					historyBudget,
+					packetOutputReserve,
+					incremental,
+					prefix,
+					instructions,
+					bible,
+				)
 	const packets =
 		useEvents && packetBudget > 0
 			? previewPackets(packetText, chapterIds, packetBudget)
@@ -495,6 +570,8 @@ ${packets[packet]}`,
 	}
 	if (legacyReady && !quarantineReason) {
 		try {
+			if (useEvents && packets.length !== legacyReady.packet)
+				throw new Error('Saved synthesis packet layout does not match')
 			for (const [i, part] of parts.entries()) check(part, parts.slice(0, i))
 		} catch {
 			quarantineReason = 'Saved synthesis failed current validation'
@@ -509,9 +586,12 @@ ${packets[packet]}`,
 	const located = new Map<string, Proposal>()
 	let packetIndex = 0
 	for (const part of parts) {
-		const packetIds =
-			state.whole || legacyReady
-				? chapterIds
+		const packetIds = state.whole
+			? chapterIds
+			: legacyReady && quarantineReason
+				? part.chapters
+						.map(({ chapterId }) => chapterId)
+						.filter((id) => chapterSet.has(id))
 				: [
 						...(packets[packetIndex] ?? '').matchAll(/^Chapter ([\w-]+):$/gm),
 					].map(([, id]) => id)

@@ -177,7 +177,7 @@ export function synthesisOutput<T>(schema: Schema<T>) {
 			fillCollections(shape, value)
 			return validator.validate(value)
 		},
-		instructions: `JSON shape (s=string, b=boolean, ?=optional, |=or, ...=extra keys allowed, [T]=array; numeric suffix=min length, <=max length): ${describeShape(shape)}`,
+		instructions: synthesisInstructions(shape),
 		repair(value: unknown, errors: ValidationError[]) {
 			const contexts = new Map<string, string[]>()
 			for (const { path } of errors) {
@@ -206,4 +206,8 @@ export function synthesisOutput<T>(schema: Schema<T>) {
 			].join('\n')
 		},
 	}
+}
+
+export function synthesisInstructions(schema: Schema<unknown> | Shape) {
+	return `JSON shape (s=string, b=boolean, ?=optional, |=or, ...=extra keys allowed, [T]=array; numeric suffix=min length, <=max length): ${describeShape(schema as Shape)}`
 }
