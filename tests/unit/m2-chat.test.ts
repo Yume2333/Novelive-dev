@@ -188,6 +188,8 @@ test('only applies human-approved current proposals and returns rejection feedba
 	}
 	const rejected = await propose()
 	expect(chat.work.writes).toBe(0)
+	const sibling = await chat.send(rejected.sessionId, prompts.plan)
+	await chat.done(sibling)
 	await chat.reopen()
 	expect(
 		await chat.call('proposal.get', {
@@ -220,6 +222,10 @@ test('only applies human-approved current proposals and returns rejection feedba
 	expect(
 		(await chat.done(rejected.head, fromRejection)).message.parts,
 	).toContainEqual({ type: 'text', text: 'I will keep the original tense.' })
+	expect(
+		(await chat.call('chat.get', { workId, sessionId: rejected.sessionId }))
+			.headId,
+	).toBe(sibling)
 	expect(chat.work.writes).toBe(0)
 	const approved = await propose()
 	const fromApproval = chat.events.length

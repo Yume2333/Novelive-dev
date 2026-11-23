@@ -10,6 +10,7 @@ NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
 ```
 
 The authorized coordinator can use `record.ts` for provider evidence, with the
-relay credentials and a private `NL_CASSETTE_DIR` outside the repository. Run
+relay credentials and private `NL_CASSETTE_DIR` and `NL_USAGE_CSV` paths outside
+the repository. Run
 via `NL_REPLAY=record pnpm --filter @novelive/desktop exec tsx ../../tests/fixtures/cassettes/m2-chat/record.ts`.
 Do not replace the deterministic regression fixture with a private recording.

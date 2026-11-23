@@ -1,6 +1,4 @@
 import { appendFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import {
 	createChatFixture,
 	image,
@@ -13,13 +11,19 @@ import {
 const directory = process.env.NL_CASSETTE_DIR
 const baseUrl = process.env.NL_IMAGE_BASE_URL
 const apiKey = process.env.NL_IMAGE_API_KEY
-if (process.env.NL_REPLAY !== 'record' || !directory || !baseUrl || !apiKey)
+const usage = process.env.NL_USAGE_CSV
+if (
+	process.env.NL_REPLAY !== 'record' ||
+	!directory ||
+	!baseUrl ||
+	!apiKey ||
+	!usage
+)
 	throw new Error(
-		'Coordinator recording requires a private NL_CASSETTE_DIR, NL_REPLAY=record, and the provisioned relay',
+		'Coordinator recording requires private NL_CASSETTE_DIR and NL_USAGE_CSV paths, NL_REPLAY=record, and the provisioned relay',
 	)
 const endpoint = new URL(baseUrl)
 if (endpoint.pathname === '/') endpoint.pathname = '/v1'
-const usage = join(homedir(), 'memory/poke_5b9601/files/novelive/usage.csv')
 let calls = 0
 const fetch: typeof globalThis.fetch = async (input, init) => {
 	if (calls >= 8) throw new Error('M2 chat recording limit reached')

@@ -308,10 +308,17 @@ export class ChatService {
 	private resume(sessionId: string, proposalId: string) {
 		if (this.closing || this.active.has(sessionId)) return
 		const rows = this.store.entries(sessionId)
-		const last = rows.findLast((row) => row.kind === 'message')
+		const last = rows.find(
+			(row) =>
+				row.kind === 'message' &&
+				row.data.parts.some(
+					(part) => part.type === 'proposal' && part.proposal.id === proposalId,
+				),
+		)
 		if (
-			!last?.data.turn?.length ||
-			last.data.turn.at(-1)?.role !== 'toolResult'
+			last?.kind !== 'message' ||
+			last.data.turn?.at(-1)?.role !== 'toolResult' ||
+			rows.some((row) => row.kind === 'message' && row.parentId === last.id)
 		)
 			return
 		const message = this.store.project(last)
@@ -319,11 +326,7 @@ export class ChatService {
 		const cards = message.parts.flatMap((part) =>
 			part.type === 'proposal' ? [part.proposal] : [],
 		)
-		if (
-			!cards.some((card) => card.id === proposalId) ||
-			cards.some((card) => card.status === 'pending')
-		)
-			return
+		if (cards.some((card) => card.status === 'pending')) return
 		const user = rows.find(
 			(row) => row.kind === 'message' && row.id === last.parentId,
 		)
