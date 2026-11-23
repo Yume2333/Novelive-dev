@@ -5,7 +5,6 @@ import {
 	type AssetRegistry,
 	formatVersion,
 	projectFiles,
-	type WorkSettings,
 } from '@novelive/format/model'
 import {
 	applyScriptLinePatch,
@@ -349,12 +348,7 @@ export class ProjectEditor {
 		return {
 			...snapshot,
 			scenes,
-			revision: this.revision(
-				model.chapter,
-				{ ...snapshot, scenes },
-				model.settings.customMarks,
-				id,
-			),
+			revision: this.revision(model.chapter, { ...snapshot, scenes }, id),
 		}
 	}
 
@@ -369,7 +363,6 @@ export class ProjectEditor {
 			scenes,
 			markSuggestions,
 		}: Pick<Snapshot, 'paragraphs' | 'scenes' | 'markSuggestions'>,
-		customMarks: WorkSettings['customMarks'],
 		head: unknown,
 	) {
 		return contentRevision([
@@ -378,7 +371,6 @@ export class ProjectEditor {
 			paragraphs,
 			scenes,
 			markSuggestions,
-			customMarks,
 			head,
 		])
 	}
@@ -440,7 +432,6 @@ export class ProjectEditor {
 			revision: this.revision(
 				chapter,
 				content,
-				work.settings.customMarks,
 				chapterHistoryHead(project, workId, chapterId),
 			),
 		}

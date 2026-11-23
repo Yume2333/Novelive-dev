@@ -133,6 +133,35 @@ test('a replacement draft supplants the pending marks only for its own chapter',
 	expect(pendingMarks(project, otherChapter)).toEqual(unaffected)
 })
 
+test('accepting an unrelated work mark does not invalidate another chapter revision', async () => {
+	using project = await fixture()
+	const other = { workId, chapterId: 'ch0002' }
+	await project.write(projectFiles.chapter({ ...other, volumeId }), {
+		formatVersion,
+		chapterId: other.chapterId,
+		title: '第二章',
+		paragraphIds: ['p0001'],
+		sceneIds: [],
+		cg: [],
+	})
+	await project.writeFile(projectFiles.chapterText(other.chapterId), '走吧。')
+	const editor = new ProjectEditor(project, volumeId, workId)
+	await replaceMarkSuggestions(project, volumeId, target, [
+		{ name: 'glow', css: 'color: #ffa;', perChar: true },
+	])
+	const otherBefore = await editor.snapshot(other)
+	const { chapter, editorId } = await editor.open(target)
+	const accepted = await editor.resolveMark({
+		...target,
+		editorId,
+		expectedRevision: chapter.revision,
+		suggestionId: chapter.markSuggestions[0].id,
+		decision: 'accept',
+	})
+	expect(accepted.revision).not.toBe(chapter.revision)
+	expect((await editor.snapshot(other)).revision).toBe(otherBefore.revision)
+})
+
 async function fixture() {
 	directory = await mkdtemp(join(tmpdir(), 'novelive-m2-history-'))
 	const project = await Project.create(join(directory, 'project'), {
