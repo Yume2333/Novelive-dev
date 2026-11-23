@@ -8,8 +8,8 @@ import {
 	bibleEntryBases,
 	existing,
 	type readBible,
-	validatePatch,
 } from '../../synthesis/patch'
+import { prepareBiblePatch } from './patch'
 
 type Bible = Awaited<ReturnType<typeof readBible>>
 type Kind = keyof Bible
@@ -25,13 +25,6 @@ async function proposalRestriction(
 	payload: Payload,
 	bible: Bible,
 ): Promise<string | undefined> {
-	if (payload.kind === 'bible') {
-		const scoped = payload.changes.find(
-			(change) => change.op !== 'none' && change.observedChapter,
-		)
-		if (scoped)
-			return `此候选限定于章节 ${scoped.observedChapter}，暂不支持按章应用；仅可拒绝，不能覆盖全局设定。`
-	}
 	const chapters = new Set<string>()
 	const series = await project.read(projectFiles.series)
 	for (const volumeId of series.volumeIds) {
@@ -43,14 +36,7 @@ async function proposalRestriction(
 				chapters.add(chapterId)
 	}
 	try {
-		validatePatch(
-			bible,
-			payload.kind === 'bible' ? payload.changes : [],
-			payload.kind === 'glossary' ? payload.changes : [],
-			chapters,
-			chapters,
-			false,
-		)
+		prepareBiblePatch(bible, payload, chapters)
 	} catch (error) {
 		return error instanceof Error ? error.message : String(error)
 	}

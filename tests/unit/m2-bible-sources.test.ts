@@ -6,9 +6,11 @@ import {
 	bibleRevision,
 	getBible,
 } from '../../packages/creator/src/bible/editing'
+import { sourceRevision } from '../../packages/creator/src/bible/editing/sources'
 import { ChatService } from '../../packages/creator/src/chat'
 import { projectProposals } from '../../packages/creator/src/chat/project'
 import { ChatStore } from '../../packages/creator/src/chat/store'
+import type { Proposal } from '../../packages/creator/src/contract'
 import { Project } from '../../packages/creator/src/project'
 import {
 	synthesisFiles,
@@ -704,3 +706,132 @@ test('real patch preflight blocks missing speakers without writing confirmed con
 		await service.close()
 	}
 })
+
+test.each([true, false])(
+	'post-patch preflight and apply agree when deleting a referenced character (keep reference: %s)',
+	async (keepReference) => {
+		const removed = {
+			id: 'removed',
+			name: 'Removed character',
+			aliases: [],
+			status: 'confirmed' as const,
+		}
+		const relation = {
+			id: 'deletion-relation',
+			from: 'traveler',
+			to: removed.id,
+			type: 'friend',
+			status: 'confirmed' as const,
+		}
+		await project.write(projectFiles.character(scope, removed.id), {
+			formatVersion,
+			entries: [removed],
+		})
+		await project.write(projectFiles.relations(scope), {
+			formatVersion,
+			entries: [relation],
+		})
+		const result = await publish()
+		const before = await readBible(project)
+		const revision = bibleRevision(before)
+		const now = new Date().toISOString()
+		const proposal: Proposal = {
+			id: 'batch-delete',
+			workId: ref.workId,
+			createdAt: now,
+			updatedAt: now,
+			chapterIds: [],
+			status: 'pending',
+			payload: {
+				kind: 'bible',
+				volumeId: ref.volumeId,
+				expectedRevision: revision,
+				changes: [
+					{ kind: 'character', op: 'delete', entry: removed },
+					{
+						kind: 'relation',
+						op: 'update',
+						entry: {
+							...relation,
+							to: keepReference ? removed.id : 'traveler',
+							type: 'updated friend',
+						},
+					},
+				],
+			},
+		}
+		new ChatStore(project.database, ref.workId).recordStandaloneProposal(
+			proposal,
+			{
+				path: file.path,
+				revision: sourceRevision(result),
+				bases: bibleEntryBases(before).filter(
+					({ kind, id }) =>
+						(kind === 'character' && id === removed.id) ||
+						(kind === 'relation' && id === relation.id),
+				),
+				baseRevision: revision,
+			},
+			revision,
+		)
+		const view = await getBible(project, input)
+		expect(view.proposalActions[proposal.id]).toMatchObject(
+			keepReference
+				? {
+						canApprove: false,
+						status: 'restricted',
+						reason: 'Unknown character reference: removed',
+					}
+				: { canApprove: true },
+		)
+		const service = chat()
+		try {
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject(
+				keepReference
+					? {
+							status: 'restricted',
+							reason: 'Unknown character reference: removed',
+							proposal: { status: 'pending' },
+						}
+					: { status: 'resolved', proposal: { status: 'approved' } },
+			)
+			if (keepReference) {
+				expect(await readBible(project)).toEqual(before)
+				expect(
+					await service.resolve(
+						{
+							...input,
+							proposalId: proposal.id,
+							decision: {
+								kind: 'reject',
+								reason: 'Keep dependencies consistent',
+							},
+						},
+						new AbortController().signal,
+					),
+				).toMatchObject({
+					status: 'resolved',
+					proposal: { status: 'rejected' },
+				})
+			} else {
+				expect(
+					(await readBible(project)).character.some(
+						({ id }) => id === removed.id,
+					),
+				).toBe(false)
+				expect((await readBible(project)).relation).toContainEqual({
+					...relation,
+					to: 'traveler',
+					type: 'updated friend',
+				})
+			}
+		} finally {
+			await service.close()
+		}
+	},
+)

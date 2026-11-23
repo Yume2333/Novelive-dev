@@ -6,6 +6,7 @@ import { ChatStore, type ProposalSource } from '../../chat/store'
 import type { CommandInput, CommandOutput, Proposal } from '../../contract'
 import { Project } from '../../project'
 import { existing, readBible } from '../../synthesis/patch'
+import { prepareBiblePatch } from './patch'
 import {
 	bridgeBibleSources,
 	fileFor,
@@ -202,38 +203,17 @@ async function apply(
 			: { status: 'stale' }
 	const workId = proposal.workId
 	await workContext(project, workId, payload.volumeId)
-	const after = structuredClone(before)
-	const touched = new Set<Kind>()
-	const changes =
-		payload.kind === 'bible'
-			? payload.changes
-			: payload.changes.map((entry) => ({
-					kind: 'glossary' as const,
-					op: 'update' as const,
-					entry,
-				}))
-	for (const { kind, op, entry } of changes) {
-		if (op === 'none') continue
-		touched.add(kind)
-		const entries = after[kind] as Entry[]
-		const index = entries.findIndex(({ id }) => id === entry.id)
-		if (op === 'delete') {
-			if (index >= 0) entries.splice(index, 1)
-			continue
-		}
-		const { conflict: _, ...fields } = entry
-		const confirmed = { ...fields, status: 'confirmed' as const }
-		if (index >= 0) entries[index] = confirmed
-		else entries.push(confirmed)
+	const chapters = new Set<string>()
+	const series = await project.read(projectFiles.series)
+	for (const volumeId of series.volumeIds) {
+		const volume = await project.read(projectFiles.volume(volumeId))
+		for (const id of volume.workIds)
+			for (const chapterId of (
+				await project.read(projectFiles.work(volumeId, id))
+			).chapterIds)
+				chapters.add(chapterId)
 	}
-	const ids = new Set(after.character.map(({ id }) => id))
-	for (const relation of after.relation)
-		if (!ids.has(relation.from) || !ids.has(relation.to))
-			throw { code: 'invalid_config', message: '角色仍被关系引用，不能删除' }
-	for (const character of after.character)
-		for (const address of character.addresses ?? [])
-			if (!ids.has(address.speakerId))
-				throw { code: 'invalid_config', message: '角色仍被称呼引用，不能删除' }
+	const { after, touched } = prepareBiblePatch(before, payload, chapters)
 	const writes = new Map<string, Entry[]>()
 	for (const kind of touched) {
 		if (kind === 'character' || kind === 'location') {
