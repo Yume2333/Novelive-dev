@@ -15,7 +15,7 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 longform and queue'` → 4 passed；同一构建全量 Electron E2E（`--workers=1`）→ 59 passed；`pnpm check` → 51 files / 669 passed, 1 skipped。见 `.workflow/evidence/m4-longform/gate-resume.txt`（代码 `deafccc`）。
+- Check after: `NL_REPLAY=strict xvfb-run -a pnpm exec playwright test --grep 'M4 longform and queue'` → 4 passed；同一构建全量 Electron E2E（`--workers=1`）→ 59 passed；`pnpm check` → 51 files / 669 passed, 1 skipped。见 `.workflow/evidence/m4-longform/gate-resume.txt`（代码 `8db0406`）。
 - 本轮：关闭时取消并等待生产任务；首卷出图失败会解除后卷等待并允许重新打开；保存设置不等待主视觉确认；后卷画师实际发送已批准主视觉。真实 Electron 验证双向重排、外部参考图与 EPUB 内嵌图合计上限、所选 EPUB 图实际保存。
 - 证据：`gate-*.png`、上一轮 `gate.txt`。生产用量来自严格回放；29 条公开合成 cassette 位于 `tests/fixtures/cassettes/m4-gate/`，本轮无付费调用。
 - UUID 响应重绑定为显式回放选项；生产 cassette 目录沿用严格回放延迟/故障选项。已有回放默认响应不变。
@@ -24,3 +24,4 @@
 - Review: blocked (base ce09ca4bff51b1093dc37854ddda795e49348cb1, reviewer Devin Review)
 - [PR #66](https://github.com/Yume2333/Novelive-dev/pull/66)：`a7ce916` 修复退出中断导入的回滚、DOCX 扉页封面和暂停续卷的预处理，并验证原生退出后重开、续做并发布首章；`af1305c` 阻止后卷越过缺少摘要的暂停前卷，并验证第二条作品绑定失败时一并回滚工程和第一条绑定。不提前归档。
 - `deafccc`：全局队列显示须先继续的前卷标题，真实 Electron 验证被拒的后卷仍暂停。
+- `8db0406`：全局队列保留前卷标题提示；缺失模型名时，真实 Electron 验证显示中文设置指引。

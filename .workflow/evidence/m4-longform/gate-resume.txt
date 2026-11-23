@@ -2,20 +2,23 @@ M4/10 handoff verification — PR #66
 
 Node 24.22.3, pnpm 12.21.0, Electron 45.4.1, Xvfb, Mesa software Vulkan (lavapipe).
 Strict replay in Electron; model transport synthetic or replayed. No paid requests.
-Verified application code through deafccc.
+Verified application code through 8db0406.
 
 $ VK_ICD_FILENAMES=…/lvp_icd.json NL_REPLAY=strict pnpm check
-Checked 351 files in 175ms. No fixes applied.
+Checked 351 files in 161ms. No fixes applied.
  Test Files  51 passed (51)
       Tests  669 passed | 1 skipped (670)
 
-$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 longform and queue'
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e tests/e2e/m4-production-queue.spec.ts
+  1 passed (2.3s)
+
+$ NL_REPLAY=strict xvfb-run -a pnpm exec playwright test --grep 'M4 longform and queue'
   4 passed (1.6m)
 
 $ NL_REPLAY=strict xvfb-run -a pnpm exec playwright test --workers=1
   59 passed (4.2m)
 
-The full suite reused the same Electron build as the gate. The default parallel run timed out in the queue and import-join tests; the serial run completed all 59.
+Both suites reused the Electron build from the focused queue test. The previous head's default parallel run timed out in the queue and import-join tests; the serial run completed all 59.
 - W1: the wizard disables the other embedded illustration at two external plus one embedded; deselecting re-enables it. After confirmation the EPUB import report and saved bytes contain only the chosen illustration plus any external references. See gate-w1-epub-nav.png.
 - W2: two queued works reorder in both directions in the drawer and creator queue without replacing the active worker. See gate-w2-reordered.png.
 - Integration: the later volume's real painter submission carries the approved key visual bytes even with a same-ID unapproved volume style. The injected transport never reaches a provider.
@@ -25,5 +28,6 @@ The full suite reused the same Electron build as the gate. The default parallel 
 - Review follow-ups: cancellation at new-project registration rolls back the project and allows retry; an image-only DOCX title page retains its cover; resuming the first volume makes no sequel preparation requests until the sequel is explicitly resumed.
 - A crash-paused prerequisite without a digest blocks later-volume synthesis. Continuing the prerequisite supplies its digest to the later volume. A worker-command test verifies that failure of the second binding removes both the new project and the existing first binding.
 - The real Electron queue drawer names the prerequisite volume when the user tries to resume a blocked sequel and leaves both works paused.
+- The same Electron test resumes a first volume with an incomplete model configuration and verifies actionable Chinese settings guidance instead of the provider-side validation text.
 
 As before, the headless gate does not visually verify OS notification bubbles or a physical tray, or evaluate real model quality.
