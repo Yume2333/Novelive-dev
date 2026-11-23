@@ -49,6 +49,33 @@ function restoreExpressionCrown(raster: Pixels, base: Pixels) {
 		edited.right > reference.right + margin
 	)
 		return false
+	const seamTolerance = Math.ceil(width * 0.003)
+	const covers = (source: Pixels, row: number, x: number) =>
+		source.data[(row * width + x) * 4 + 3] >= 128
+	let joins = false
+	for (let x = 0; x < width; x++) {
+		const above = covers(base, rows - 1, x)
+		const below = covers(raster, rows, x)
+		if (above && below) joins = true
+		if (above === below) continue
+		let near = false
+		for (
+			let neighbor = Math.max(0, x - seamTolerance);
+			neighbor <= Math.min(width - 1, x + seamTolerance);
+			neighbor++
+		) {
+			if (
+				above
+					? covers(raster, rows, neighbor)
+					: covers(base, rows - 1, neighbor)
+			) {
+				near = true
+				break
+			}
+		}
+		if (!near) return false
+	}
+	if (!joins) return false
 	base.data.copy(raster.data, 0, 0, rows * width * 4)
 	return true
 }

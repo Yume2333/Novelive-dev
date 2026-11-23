@@ -432,10 +432,10 @@ test('rejects mismatched derivation sizes and RGB transparency, not legitimate R
 
 test('restores a narrow expression crown without accepting clipped bases or shifted edits', async () => {
 	const target = { width: 400, height: 600 }
-	const sprite = (crown: string) =>
+	const sprite = (crown: string, join = 'M199 3h2v4h-2Z') =>
 		sharp(
 			Buffer.from(
-				`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><path fill="#259" d="${crown} M201 3Q310 80 285 215L350 600H50l65-385Q90 80 199 3Z"/></svg>`,
+				`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><path fill="#259" d="${crown} ${join} M201 7Q310 80 285 215L350 600H50l65-385Q90 80 199 7Z"/></svg>`,
 			),
 		)
 			.png()
@@ -443,6 +443,7 @@ test('restores a narrow expression crown without accepting clipped bases or shif
 	const base = await sprite('M199 1h2v2h-2Z')
 	const drift = await sprite('M199 0h2v3h-2Z')
 	const clipped = await sprite('M175 0h50v3h-50Z')
+	const misalignedSeam = await sprite('M199 0h2v3h-2Z', 'M207 3h2v4h-2Z')
 	const checks = { transparent: true, variant: false }
 	const fixed = await checkImage(drift, target, { ...checks, base })
 	expect(fixed).toHaveProperty('png')
@@ -455,6 +456,7 @@ test('restores a narrow expression crown without accepting clipped bases or shif
 	for (const [input, reference] of [
 		[drift, undefined],
 		[clipped, base],
+		[misalignedSeam, base],
 	] as const) {
 		expect(
 			await checkImage(input, target, { ...checks, base: reference }),
