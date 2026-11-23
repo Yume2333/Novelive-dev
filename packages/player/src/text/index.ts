@@ -139,6 +139,7 @@ export function mountText(
 	}
 	function measure() {
 		if (disposed) return
+		const anchor = ends[page - 1] ?? 0
 		const lineHeight = Number.parseFloat(getComputedStyle(layout).lineHeight)
 		const top = layout.getBoundingClientRect().top
 		const lines: { start: number; top: number }[] = []
@@ -169,7 +170,8 @@ export function mountText(
 			offsets = [0]
 			heights = [lineHeight * 3]
 		}
-		page = Math.min(page, ends.length - 1)
+		page = ends.findIndex(end => end > anchor)
+		if (page === -1) page = ends.length - 1
 		host.style.height = `${lineHeight * 3}px`
 		schedule()
 	}
