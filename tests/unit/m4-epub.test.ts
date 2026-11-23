@@ -146,6 +146,21 @@ test('keeps image-only TOC pages next to the preceding chapter', async () => {
 	expect(book.volumes[0].chapters).toHaveLength(2)
 })
 
+test('does not send invented chapter context for unplaced images', async () => {
+	const extraction = await extractEpub(
+		await epub({ 'OPS/chapter.xhtml': xhtml('<p>Opening text.</p>') }),
+	)
+	vi.mocked(artJson).mockResolvedValueOnce({
+		label: 'irrelevant',
+		reason: 'Decoration',
+	})
+	await classifyIllustrations(extraction, 'Bible', connection, {})
+	const prompt = vi.mocked(artJson).mock.lastCall?.[1]
+	expect(prompt).not.toContain('Opening text.')
+	expect(prompt).toContain('"chapter":null')
+	expect(prompt).toContain('"nearby":""')
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)
