@@ -203,7 +203,7 @@ export async function directChapterArt(
 			).catch((error: unknown) => {
 				if (!(error instanceof ArtResponseSchemaError) || schemaRepair)
 					throw error
-				schemaRepair = `Repair the JSON manifest: ${error.message}. Use lowercase ASCII asset IDs with digits, underscores or hyphens. Required ID shapes by kind: ${manifestIdGuidance}. Do not use a bare place ID; make manifest IDs and patch references agree.`
+				schemaRepair = `Repair the JSON manifest: ${error.message}. Use lowercase ASCII asset IDs with digits, underscores or hyphens. Required ID shapes by kind: ${manifestIdGuidance}. Do not use a bare place ID; make manifest IDs and patch references agree. Edit the rejected response, preserving unchanged items and stage directions:\n${JSON.stringify(error.rejected)}`
 			})
 			if (!result) continue
 			try {
