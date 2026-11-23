@@ -7,6 +7,7 @@ import type {
 	Proposal,
 	RewriteProposal,
 } from '../contract'
+import { markProposalKind } from '../editor/marks'
 
 export type Snapshot = CommandOutput<'chat.get'>
 export type Entry = Snapshot['entries'][number]
@@ -294,9 +295,9 @@ export class ChatStore {
 	proposal(id: string) {
 		const row = this.db
 			.prepare(
-				`SELECT ${proposalFields} FROM proposal WHERE proposal_id = ? AND work_id = ?`,
+				`SELECT ${proposalFields} FROM proposal WHERE proposal_id = ? AND work_id = ? AND kind != ?`,
 			)
-			.get(id, this.workId) as ProposalRow | undefined
+			.get(id, this.workId, markProposalKind) as ProposalRow | undefined
 		if (!row) throw chatError('not_found', '提议不存在')
 		const { data, feedback, toolCallId, ...base } = row
 		const { payload, chapterIds, rewrite, source } = JSON.parse(

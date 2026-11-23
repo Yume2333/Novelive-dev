@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 import { formatVersion, projectFiles, type Work } from '@novelive/format/model'
 import { compileScript, formatScript } from '@novelive/format/script'
 import type { createConfigStore } from '../config'
+import { withProjectEdits } from '../editor/history/storage'
+import { replaceMarkSuggestions } from '../editor/marks'
 import { TextModelError } from '../models/text'
 import {
 	type ArtBible,
@@ -252,12 +254,23 @@ export function chapterWorker(
 		write: (ctx) =>
 			step(async () => {
 				const { chapter, options } = await input(ctx)
-				const result = await writeChapter(chapter, options)
-				ctx.signal.throwIfAborted()
-				await project.writeFile(
-					draft(ctx.chapterId),
-					formatScript(result.scenes.map(({ scene }) => scene)),
-				)
+				const result = await writeChapter(chapter, {
+					...options,
+					proposeMarks: true,
+				})
+				await withProjectEdits(project, async () => {
+					ctx.signal.throwIfAborted()
+					await project.writeFile(
+						draft(ctx.chapterId),
+						formatScript(result.scenes.map(({ scene }) => scene)),
+					)
+					await replaceMarkSuggestions(
+						project,
+						volumeId,
+						ctx,
+						result.markSuggestions,
+					)
+				})
 			}),
 		review: (ctx) =>
 			step(async () => {

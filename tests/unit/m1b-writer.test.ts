@@ -77,6 +77,37 @@ function responses(...replies: Reply[]) {
 
 const scene =
 	'scene Bridge\nsource p0001\n: A paper boat drifted under the bridge.'
+
+test('separates new mark proposals from NVS and skips unsafe or registered marks', async () => {
+	const { options, requests } = responses(
+		[
+			scene,
+			'@propose-mark {"name":"shiver","css":" color: #99f; ","perChar":true}',
+			'@propose-mark {"name":"shiver","css":"color: red;","perChar":false}',
+			'@propose-mark {"name":"em","css":"opacity: 0.5;","perChar":false}',
+			'@propose-mark {"name":"ruby","css":"opacity: 0.5;","perChar":false}',
+			'@propose-mark {"name":"ripple","css":"opacity: 0.5;","perChar":false}',
+			'@propose-mark {"name":"leak","css":"background: image-set(\\"https://invalid.test/x\\" 1x);","perChar":false}',
+			'@propose-mark {"name":"escape","css":"} body { opacity: 0;","perChar":false}',
+			'@propose-mark malformed',
+		].join('\n'),
+	)
+	const draft = await writeChapter(chapter, {
+		...options,
+		proposeMarks: true,
+		script: { ...options.script, customMarks: ['ripple'] },
+	})
+	expect(requests).toHaveLength(1)
+	expect(requests[0]).toContain(
+		'Registered custom marks you may use in NVS: ripple.',
+	)
+	expect(draft.scenes).toHaveLength(1)
+	expect(draft.scenes[0].scene.lines).toHaveLength(1)
+	expect(draft.markSuggestions).toEqual([
+		{ name: 'shiver', css: 'color: #99f;', perChar: true },
+	])
+})
+
 const issue = {
 	category: 'omission',
 	paragraphId: 'p0001',

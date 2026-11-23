@@ -518,6 +518,7 @@ export function EditorPage() {
 								<div className="editor-columns">
 									<ScriptEditor
 										readOnly={busy}
+										autoFocus={!chapter?.markSuggestions.length}
 										value={draft}
 										onChange={setDraft}
 										onLine={setLine}
