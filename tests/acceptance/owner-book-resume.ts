@@ -1,6 +1,6 @@
 export function checkOwnerBookResumePrompt(
 	prompt: unknown,
-	expected: { packet: number; events: number },
+	expected?: { packet: number; events: number },
 ) {
 	if (
 		typeof prompt === 'string' &&
@@ -12,6 +12,7 @@ export function checkOwnerBookResumePrompt(
 		if (packet) {
 			const events = /^Events already extracted: (\d+)$/m.exec(prompt)
 			if (
+				expected &&
 				Number(packet[1]) === expected.packet &&
 				Number(events?.[1]) === expected.events
 			)

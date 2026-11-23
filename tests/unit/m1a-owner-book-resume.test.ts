@@ -28,3 +28,11 @@ test('owner-book resume rejects non-selector prompts containing a candidates hea
 		),
 	).toThrow('Request did not resume the saved synthesis packet')
 })
+
+test('selection-only resume rejects even valid extraction and preview prompts', () => {
+	for (const prompt of [extraction(2, 3), 'Preview fiction in zh-TW.']) {
+		expect(() => checkOwnerBookResumePrompt(prompt)).toThrow(
+			'Request did not resume the saved synthesis packet',
+		)
+	}
+})

@@ -1,3 +1,14 @@
+export const ownerBookSelectionCap = 700_000
+
+export function reserveOwnerBookSelection(
+	used: number,
+	requestBody: string,
+	outputCap: number,
+) {
+	const reserve = Buffer.byteLength(requestBody) + outputCap + 1024
+	return used + reserve <= ownerBookSelectionCap ? reserve : undefined
+}
+
 async function readResponseUsage(response: Response) {
 	const body = await response.text()
 	const rows = response.headers

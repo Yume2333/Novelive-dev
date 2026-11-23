@@ -70,7 +70,7 @@ const selectionScope: Record<string, string> = {
 	location:
 		'Keep a recurring playable setting or the setting of a consequential scene that needs a distinct backdrop. Drop places only mentioned in passing, route waypoints, and incidental subdivisions or alternate names of the same setting.',
 	relation:
-		'Keep durable relationships that explain consequential choices or conflicts. Group both directions of the same pair, and keep one representative of the same standing relationship; descriptions in chapter-dated changes count as evidence. Drop co-presence, isolated interactions, and kinship or titles that do not affect the story.',
+		'Keep durable relationships that explain consequential choices or conflicts, or establish character or family roles that the adaptation must keep consistent even if introduced once. Group both directions of the same pair, and keep one representative of the same standing relationship; descriptions in chapter-dated changes count as evidence. Drop co-presence, isolated interactions, and incidental kinship or titles.',
 	timeline:
 		'Keep only turning points that change the direction or outcome of a plot thread. Keep one representative of the whole event; omit scene beats, logistics, and retellings under another ID.',
 	foreshadowing:
@@ -78,7 +78,7 @@ const selectionScope: Record<string, string> = {
 	style:
 		'Keep reusable visual direction or narrator voice that should apply beyond the scene. Drop commentary on plot, a chapter summary, and the mood of an individual scene.',
 	glossary:
-		'Keep a distinctive named organization, object, technique, title, or cultural expression whose consistent wording or pronunciation matters. Drop ordinary objects, generic offices and roles, and definitions with no continuity need. Character and place names belong in the Bible, not the glossary.',
+		'Keep a distinctive named organization, object, technique, title, or cultural expression whose consistent wording or pronunciation matters, or whose meaning is needed to understand a consequential event. Drop ordinary objects, generic offices and roles, and definitions with no continuity need. Character and place names belong in the Bible, not the glossary.',
 }
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
@@ -148,7 +148,7 @@ export interface SynthesisOptions {
 
 const minimumEventLimit = 128
 const packetFormat = 7
-const selectionVersion = 1
+const selectionVersion = 2
 const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')

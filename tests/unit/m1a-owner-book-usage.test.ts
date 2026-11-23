@@ -1,5 +1,18 @@
 import { expect, test, vi } from 'vitest'
-import { observeOwnerBookUsage } from '../acceptance/owner-book-usage'
+import {
+	observeOwnerBookUsage,
+	ownerBookSelectionCap,
+	reserveOwnerBookSelection,
+} from '../acceptance/owner-book-usage'
+
+test('selection reserves input bytes and maximum output before spending the last tokens', () => {
+	const text = '小說'
+	const output = 8_192
+	const reserve = Buffer.byteLength(text) + output + 1024
+	const used = ownerBookSelectionCap - reserve
+	expect(reserveOwnerBookSelection(used, text, output)).toBe(reserve)
+	expect(reserveOwnerBookSelection(used + 1, text, output)).toBeUndefined()
+})
 
 test('owner-book usage accounting leaves the first SSE frame available before the stream finishes', async () => {
 	const encoder = new TextEncoder()

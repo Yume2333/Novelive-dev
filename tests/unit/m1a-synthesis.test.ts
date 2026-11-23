@@ -912,9 +912,9 @@ const selectionFixture = async (
 	})
 }
 
-test.each([false, true])(
-	'resumes without repeating extraction and only reuses compatible saved picks (legacy: %s)',
-	async (legacy) => {
+test.each(['current', 'previous', 'unversioned'] as const)(
+	'resumes without repeating extraction and only reuses compatible saved picks (checkpoint: %s)',
+	async (version) => {
 		await seed(root)
 		const args = { ...options, strategy: 'events' as const }
 		{
@@ -936,11 +936,15 @@ test.each([false, true])(
 				packet: 1,
 				selections: [[1]],
 				ready: false,
-				selectionVersion: 1,
+				selectionVersion: 2,
 			})
-			if (legacy) {
+			if (version !== 'current') {
 				const { selectionVersion: _version, ...old } = checkpoint
-				await project.write(files.checkpoint, { ...old, selections: [[2]] })
+				await project.write(files.checkpoint, {
+					...old,
+					...(version === 'previous' ? { selectionVersion: 1 } : {}),
+					selections: [[2]],
+				})
 			}
 		}
 		using project = await Project.open(root)
@@ -970,13 +974,15 @@ test.each([false, true])(
 			...args,
 			fetch,
 		})
-		expect(selectors).toEqual(legacy ? ['character', 'glossary'] : ['glossary'])
+		expect(selectors).toEqual(
+			version === 'current' ? ['glossary'] : ['character', 'glossary'],
+		)
 		expect(result.biblePatch.map(({ entry }) => entry.id)).toEqual(['guide'])
 		expect(result.glossaryPatch.map(({ id }) => id)).toEqual(['seal'])
 		expect(
 			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
 		).toEqual(result)
-		expect(fetch).toHaveBeenCalledTimes(legacy ? 2 : 1)
+		expect(fetch).toHaveBeenCalledTimes(version === 'current' ? 1 : 2)
 	},
 )
 

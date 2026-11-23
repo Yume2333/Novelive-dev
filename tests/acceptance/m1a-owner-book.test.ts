@@ -2,13 +2,14 @@ import { createHash } from 'node:crypto'
 import {
 	access,
 	appendFile,
+	cp,
 	mkdir,
 	mkdtemp,
 	readFile,
 	writeFile,
 } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
 import { headingRules } from '../../packages/creator/src/import/txt'
@@ -31,13 +32,20 @@ import {
 import { projectFiles } from '../../packages/format/src/model'
 import { scoreAgainstConsensus } from './bible-patch-score'
 import { checkOwnerBookResumePrompt } from './owner-book-resume'
-import { observeOwnerBookUsage } from './owner-book-usage'
+import {
+	observeOwnerBookUsage,
+	ownerBookSelectionCap,
+	reserveOwnerBookSelection,
+} from './owner-book-usage'
 
 const home = homedir()
 const source = join(home, 'novelive-testbooks', 'yesou-puyan.txt')
 const root = join(home, '.local/novelive-tools/m1a-owner-book')
 const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
-const purpose = 'M1a/07 owner book with shared inclusion criteria'
+const fullPurpose = 'M1a/07 owner book with shared inclusion criteria'
+const selectionPurpose = 'M1a/07 W4 selection-only 700k'
+const savedEvents = 81
+const savedPackets = 7
 const previewModel = 'gemini-3.8-flash'
 const cap = 5_000_000
 const eventContextWindow = 16_384
@@ -93,9 +101,27 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		)
 			throw new Error('Unexpected synthesis model')
 		const mustResume = process.env.NL_OWNER_BOOK_EXPECT_RESUME === '1'
+		const checkpointSource = process.env.NL_OWNER_BOOK_SELECTION_SOURCE
+		const runDirectory = process.env.NL_OWNER_BOOK_RUN_DIR
+		const dryRun = process.env.NL_OWNER_BOOK_SELECTION_STUB
+		const purpose = checkpointSource ? selectionPurpose : fullPurpose
+		if (
+			(dryRun &&
+				(!checkpointSource || !['complete', 'cap'].includes(dryRun))) ||
+			(checkpointSource &&
+				(!runDirectory ||
+					resolve(checkpointSource) === resolve(runDirectory, 'events') ||
+					synthesisModel !== 'devin-swe-2' ||
+					mustResume))
+		)
+			throw new Error(
+				'Selection-only requires a separate run directory and the saved main model',
+			)
 		let expectedResume: { packet: number; events: number } | undefined
-		const baseUrl = process.env.NL_IMAGE_BASE_URL
-		const apiKey = process.env.NL_IMAGE_API_KEY
+		const baseUrl = dryRun
+			? 'https://relay.invalid'
+			: process.env.NL_IMAGE_BASE_URL
+		const apiKey = dryRun ? 'offline-stub' : process.env.NL_IMAGE_API_KEY
 		if (!baseUrl || !apiKey)
 			throw new Error('The provisioned relay environment is unavailable')
 		const endpoint = new URL(baseUrl)
@@ -135,13 +161,18 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			resumedEvents: 0,
 		}
 		let used = 0
+		let capReached = false
 		const pendingUsage = new Set<Promise<void>>()
 		let ledgerFailed = false
-		for (const line of (await readFile(ledger, 'utf8')).split('\n')) {
+		let reservationExceeded = false
+		for (const line of (dryRun ? '' : await readFile(ledger, 'utf8')).split(
+			'\n',
+		)) {
 			const [, , , tokens, , reason] = line.split(',')
 			if (reason?.startsWith(purpose)) used += Number(tokens)
 		}
 		const paid: typeof globalThis.fetch = async (input, init) => {
+			if (checkpointSource) await Promise.all(pendingUsage)
 			controller.signal.throwIfAborted()
 			const request = new Request(input, init)
 			if (
@@ -152,16 +183,14 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			const text = await request.clone().text()
 			const payload = JSON.parse(text)
 			const model: string = payload.model
-			if (model !== previewModel && model !== synthesisModel)
+			if (
+				model !== synthesisModel &&
+				(checkpointSource || model !== previewModel)
+			)
 				throw new Error('Unexpected real-book provider model')
 			const outputCap = payload.max_completion_tokens ?? payload.max_tokens
 			if (!Number.isSafeInteger(outputCap) || outputCap < 1)
 				throw new Error('Real-book request has no valid output cap')
-			const reserve = Buffer.byteLength(text) + outputCap + 1024
-			if (used + reserve > cap) {
-				controller.abort()
-				throw new Error('Real-book token cap reached')
-			}
 			const prompt = payload.messages[0]?.content
 			const isSynthesis =
 				typeof prompt === 'string' &&
@@ -169,6 +198,22 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			if (mustResume && !isSynthesis) {
 				controller.abort()
 				throw new Error('Resume attempted a paid preview request')
+			}
+			if (checkpointSource && dryRun === 'cap' && stats.calls === 0) {
+				const firstReserve = reserveOwnerBookSelection(0, text, outputCap)
+				if (firstReserve === undefined) throw new Error('Invalid stub request')
+				used = ownerBookSelectionCap - firstReserve
+			}
+			const reserve = checkpointSource
+				? reserveOwnerBookSelection(used, text, outputCap)
+				: Buffer.byteLength(text) + outputCap + 1024
+			if (
+				reserve === undefined ||
+				(!checkpointSource && used + reserve > cap)
+			) {
+				capReached = true
+				controller.abort()
+				throw new Error('Real-book token cap reached')
 			}
 			used += reserve
 			const call = ++stats.calls
@@ -194,6 +239,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				used += tokens - reserve
 				stats.tokens += tokens
 				stats.reserved += Number(measured === undefined)
+				if (dryRun) return
 				try {
 					await appendFile(
 						ledger,
@@ -203,9 +249,34 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					ledgerFailed = true
 					controller.abort()
 				}
+				if (checkpointSource && tokens > reserve) {
+					reservationExceeded = true
+					controller.abort()
+				}
 			}
 			try {
-				const response = await fetch(request, { signal })
+				const response = dryRun
+					? new Response(
+							`data: ${JSON.stringify({
+								id: 'selection-stub',
+								object: 'chat.completion.chunk',
+								model,
+								choices: [
+									{
+										index: 0,
+										delta: { content: '{"keep":[]}' },
+										finish_reason: 'stop',
+									},
+								],
+								usage: {
+									prompt_tokens: dryRun === 'cap' ? reserve - 1 : 1,
+									completion_tokens: 1,
+									total_tokens: dryRun === 'cap' ? reserve : 2,
+								},
+							})}\n\ndata: [DONE]\n\n`,
+							{ headers: { 'content-type': 'text/event-stream' } },
+						)
+					: await fetch(request, { signal })
 				if (!response.ok) {
 					console.log(`${model} HTTP ${response.status}`)
 					if ([401, 403, 404, 429, 503].includes(response.status))
@@ -233,8 +304,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			),
 		)
 		expect(sha256).toBe(manifest.sha256)
-		const run =
-			process.env.NL_OWNER_BOOK_RUN_DIR ?? (await mkdtemp(join(root, 'run-')))
+		const run = runDirectory ?? (await mkdtemp(join(root, 'run-')))
+		if (checkpointSource) await mkdir(run, { recursive: true, mode: 0o700 })
 		const directory = join(run, 'events')
 		const cassette = {
 			directory: join(root, 'cassette'),
@@ -253,6 +324,12 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		})
 		const fetchReplay: typeof globalThis.fetch = async (input, init) => {
 			const request = new Request(input, init)
+			if (checkpointSource) {
+				checkOwnerBookResumePrompt(
+					(await request.clone().json()).messages[0]?.content,
+				)
+				return dryRun ? paid(request) : upstream(request)
+			}
 			if (expectedResume) {
 				const prompt = (await request.clone().json()).messages[0]?.content
 				if (
@@ -294,6 +371,47 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					throw error
 				}
 			}
+			if (checkpointSource) {
+				using archived = await Project.open(checkpointSource)
+				expect(
+					digest(await archived.readFile(projectFiles.original('txt'))),
+				).toBe(sha256)
+				const { volumeIds } = await archived.read(projectFiles.series)
+				expect(volumeIds).toHaveLength(20)
+				const files = synthesisFiles(volumeIds[0])
+				const saved = await archived.read(files.checkpoint)
+				expect(saved).toMatchObject({
+					ready: true,
+					applied: true,
+					packet: savedPackets,
+					whole: null,
+				})
+				expect(saved.events).toHaveLength(savedEvents)
+				const exclusions = [
+					'bible',
+					projectFiles.glossary({ level: 'series' }).path,
+					files.result.path,
+					files.checkpoint.path,
+				].map((name) => resolve(checkpointSource, name))
+				await cp(checkpointSource, path, {
+					recursive: true,
+					filter: (name) => !exclusions.includes(resolve(name)),
+				})
+				const project = await Project.open(path)
+				try {
+					await project.write(confirmed, initialCharacters)
+					const { selectedPatch: _frozen, ...extraction } = saved
+					await project.write(files.checkpoint, {
+						...extraction,
+						applied: false,
+						selections: [],
+					})
+					return project
+				} catch (error) {
+					project.close()
+					throw error
+				}
+			}
 			const project = await Project.create(path, { ...series, volumeIds: [] })
 			try {
 				const imported = await importTxt(project, book, {
@@ -329,6 +447,22 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					await first.read(projectFiles.work(volumeId, volume.workIds[0]))
 				).chapterIds
 				expect(chapterIds).toHaveLength(7)
+				const files = synthesisFiles(volumeId)
+				const selectionStart = checkpointSource
+					? await first.read(files.checkpoint)
+					: undefined
+				if (selectionStart) {
+					expect(selectionStart.packet).toBe(savedPackets)
+					expect(selectionStart.events).toHaveLength(savedEvents)
+					expect(selectionStart.whole).toBe(null)
+					if (!selectionStart.applied) {
+						expect(selectionStart.ready).toBe(true)
+						expect(selectionStart.selections).toBeDefined()
+						expect(selectionStart.selectedPatch).toBeUndefined()
+					}
+					stats.resumedPacket = selectionStart.packet
+					stats.resumedEvents = selectionStart.events.length
+				}
 				if (mustResume) {
 					const saved = await first.read(synthesisFiles(volumeId).checkpoint)
 					expect(saved.applied).toBe(false)
@@ -339,13 +473,49 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					}
 				}
 				phase = 'preview and chunked synthesis'
-				const result = await prepareVolume(first, volumeId, options)
+				const result = await prepareVolume(first, volumeId, options).catch(
+					async (error) => {
+						if (!capReached || !selectionStart) throw error
+						const paused = await first.read(files.checkpoint)
+						expect(paused).toMatchObject({
+							events: selectionStart.events,
+							packet: selectionStart.packet,
+							basis: selectionStart.basis,
+							applied: false,
+						})
+						expect(paused.selections?.length).toBeGreaterThanOrEqual(
+							selectionStart.selections?.length ?? 0,
+						)
+						if (dryRun === 'cap') expect(paused.selections).toEqual([[]])
+						await Promise.all(pendingUsage)
+						if (ledgerFailed)
+							throw new Error('Could not write the private usage ledger')
+						const report = {
+							status: 'paused at token cap',
+							used,
+							cap: ownerBookSelectionCap,
+							selections: paused.selections?.length,
+							stats,
+						}
+						await writeFile(
+							join(run, 'selection-result.json'),
+							JSON.stringify(report, null, 2),
+						)
+						console.log(JSON.stringify(report))
+					},
+				)
+				if (!result) return
 				chunked = result.synthesis
 				previewBytes = result.previews.reduce(
 					(sum, preview) => sum + Buffer.byteLength(JSON.stringify(preview)),
 					0,
 				)
-				const checkpoint = await first.read(synthesisFiles(volumeId).checkpoint)
+				const checkpoint = await first.read(files.checkpoint)
+				if (selectionStart) {
+					expect(checkpoint.events).toEqual(selectionStart.events)
+					expect(checkpoint.packet).toBe(selectionStart.packet)
+					expect(stats.previewCalls).toBe(0)
+				}
 				expect(checkpoint.packet).toBeGreaterThan(1)
 				expect(checkpoint.applied).toBe(true)
 				phase = 'consensus comparison'
@@ -384,6 +554,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				await Promise.all(pendingUsage)
 				if (ledgerFailed)
 					throw new Error('Could not write the private usage ledger')
+				if (reservationExceeded) controller.signal.throwIfAborted()
 				const report = {
 					sha256,
 					chapters: 154,
@@ -398,24 +569,38 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					restartIntact,
 					stats,
 				}
-				await writeFile(
-					join(root, 'redacted-result.json'),
-					JSON.stringify(report, null, 2),
-				)
-				await writeFile(
-					join(fixtures, 'chunked-run.json'),
-					`${JSON.stringify(
-						{
-							formatVersion: 1,
-							volumeId,
-							model: synthesisModel,
-							biblePatch: chunked.biblePatch,
-							glossaryPatch: chunked.glossaryPatch,
-						},
-						null,
-						'\t',
-					)}\n`,
-				)
+				const fixture = `${JSON.stringify(
+					{
+						formatVersion: 1,
+						volumeId,
+						model: synthesisModel,
+						biblePatch: chunked.biblePatch,
+						glossaryPatch: chunked.glossaryPatch,
+					},
+					null,
+					'\t',
+				)}\n`
+				if (checkpointSource) {
+					await writeFile(
+						join(run, 'selection-result.json'),
+						JSON.stringify(report, null, 2),
+					)
+					await writeFile(join(run, 'chunked-run.json'), fixture)
+					expect(confirmedIntact && restartIntact).toBe(true)
+					if (dryRun) {
+						console.log(JSON.stringify(report))
+						return
+					}
+					phase = 'consensus-normalized BiblePatch F1'
+					if (score.normalized < 0.9) console.log(JSON.stringify(report))
+					expect(score.normalized).toBeGreaterThanOrEqual(0.9)
+				} else {
+					await writeFile(
+						join(root, 'redacted-result.json'),
+						JSON.stringify(report, null, 2),
+					)
+				}
+				await writeFile(join(fixtures, 'chunked-run.json'), fixture)
 				await writeFile(
 					join(evidence, 'w4-consensus.json'),
 					`${JSON.stringify(report, null, '\t')}\n`,
@@ -428,9 +613,14 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				if (!closed) first.close()
 			}
 		} catch (error) {
+			if (reservationExceeded)
+				throw new Error(
+					'Selection usage exceeded the request reservation; check the private ledger',
+				)
 			const code = error instanceof TextModelError ? ` [${error.code}]` : ''
 			throw new Error(
 				`M1a/07 did not pass during ${phase}${code}; see the redacted result and usage`,
+				dryRun ? { cause: error } : undefined,
 			)
 		} finally {
 			controller.abort()
