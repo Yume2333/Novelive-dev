@@ -2,6 +2,8 @@ import sharp from 'sharp'
 import { hasTransparency } from '../../models/image'
 
 export type Dimensions = { width: number; height: number }
+export const spriteFrameIssue = '立绘主体缺失，或头部、侧面超出画布。'
+export const derivedFrameIssue = '差分图主体外框偏离基准图。'
 type Pixels = Dimensions & { data: Buffer }
 
 async function pixels(input: Buffer): Promise<Pixels> {
@@ -28,6 +30,27 @@ function bounds({ data, width, height }: Pixels) {
 		}
 	}
 	return { left, right, top, bottom }
+}
+
+function restoreExpressionCrown(raster: Pixels, base: Pixels) {
+	const { width, height } = raster
+	const rows = Math.ceil(height * 0.005)
+	const reference = bounds({ ...base, height: rows })
+	const margin = Math.ceil(width * 0.01)
+	if (
+		reference.top === 0 ||
+		reference.top >= rows ||
+		reference.right - reference.left > width * 0.05
+	)
+		return false
+	const edited = bounds({ ...raster, height: rows })
+	if (
+		edited.left < reference.left - margin ||
+		edited.right > reference.right + margin
+	)
+		return false
+	base.data.copy(raster.data, 0, 0, rows * width * 4)
+	return true
 }
 
 function checkerboard({ data, width, height }: Pixels) {
@@ -110,7 +133,7 @@ export async function checkImage(
 			Math.abs(width / height / (target.width / target.height) - 1) <= 0.01
 				? 'fill'
 				: 'cover'
-		const png = await sharp(input)
+		let png = await sharp(input)
 			.resize({ ...target, fit, kernel: 'lanczos3' })
 			.png()
 			.toBuffer()
@@ -118,16 +141,33 @@ export async function checkImage(
 			if (!(await hasTransparency(png))) return { issue: '全透明像素不足。' }
 			const raster = await pixels(png)
 			if (checkerboard(raster)) return { issue: '立绘绘制了棋盘格背景。' }
-			const frame = bounds(raster)
+			let frame = bounds(raster)
+			const base = options.base ? await pixels(options.base) : undefined
+			if (
+				base &&
+				!options.variant &&
+				frame.top === 0 &&
+				base.width === raster.width &&
+				base.height === raster.height &&
+				restoreExpressionCrown(raster, base)
+			) {
+				png = await sharp(raster.data, {
+					raw: { width: raster.width, height: raster.height, channels: 4 },
+				})
+					.png()
+					.toBuffer()
+				if (!(await hasTransparency(png))) return { issue: '全透明像素不足。' }
+				frame = bounds(raster)
+			}
 			if (
 				frame.right < 0 ||
 				frame.top === 0 ||
 				frame.left === 0 ||
 				frame.right === target.width - 1
 			)
-				return { issue: '立绘主体缺失，或头部、侧面超出画布。' }
-			if (options.base) {
-				const original = bounds(await pixels(options.base))
+				return { issue: spriteFrameIssue }
+			if (base) {
+				const original = bounds(base)
 				if (
 					(['left', 'right', 'top', 'bottom'] as const).some(
 						(key) =>
@@ -138,7 +178,7 @@ export async function checkImage(
 								0.02,
 					)
 				)
-					return { issue: '差分图主体外框偏离基准图。' }
+					return { issue: derivedFrameIssue }
 			}
 		} else if (!options.variant && !(await safeArea(png))) {
 			return { issue: '主体未达到中央 4:3 安全区的 70% 阈值。' }

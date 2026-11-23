@@ -430,14 +430,108 @@ test('rejects mismatched derivation sizes and RGB transparency, not legitimate R
 	).toEqual({ issue: '差分图尺寸与基准图不一致。' })
 })
 
+test('restores a narrow expression crown without accepting clipped bases or shifted edits', async () => {
+	const target = { width: 400, height: 600 }
+	const sprite = (crown: string) =>
+		sharp(
+			Buffer.from(
+				`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><path fill="#259" d="${crown} M201 3Q310 80 285 215L350 600H50l65-385Q90 80 199 3Z"/></svg>`,
+			),
+		)
+			.png()
+			.toBuffer()
+	const base = await sprite('M199 1h2v2h-2Z')
+	const drift = await sprite('M199 0h2v3h-2Z')
+	const clipped = await sprite('M175 0h50v3h-50Z')
+	const checks = { transparent: true, variant: false }
+	const fixed = await checkImage(drift, target, { ...checks, base })
+	expect(fixed).toHaveProperty('png')
+	if ('png' in fixed) {
+		const raw = (input: Buffer) => sharp(input).raw().toBuffer()
+		expect((await raw(fixed.png)).subarray(0, 400 * 4 * 3)).toEqual(
+			(await raw(base)).subarray(0, 400 * 4 * 3),
+		)
+	}
+	for (const [input, reference] of [
+		[drift, undefined],
+		[clipped, base],
+	] as const) {
+		expect(
+			await checkImage(input, target, { ...checks, base: reference }),
+		).toEqual({
+			issue: '立绘主体缺失，或头部、侧面超出画布。',
+		})
+	}
+})
+
+test('retries an expression with only the base after a composition failure', async () => {
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(async (_prompt, _refs, { width, height }) => ({
+			bytes:
+				render.mock.calls.length === 2
+					? await sharp(
+							Buffer.from(
+								`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width / 2}" height="${height}" fill="#456def"/></svg>`,
+							),
+						)
+							.png()
+							.toBuffer()
+					: await picture(width, height, true),
+		}))
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: 'Ada raises her eyebrows.' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay)
+			const path = 'assets/style.png'
+			await project.writeFile(path, await picture(320, 180, false))
+			const styled = {
+				...bible,
+				style: { ...bible.style, references: [{ path, description: 'Style' }] },
+			}
+			const [base, expression] = await art.register(
+				[
+					{ id: 'ada/uniform/neutral', kind: 'character', description: 'Ada' },
+					{
+						id: 'ada/uniform/curious',
+						kind: 'expression',
+						description: 'Curious',
+					},
+				],
+				styled,
+			)
+			expect(await art.draw(base, styled)).toEqual({ status: 'drawn' })
+			expect(await art.draw(expression, styled)).toEqual({ status: 'drawn' })
+			expect(render.mock.calls[1][1]).toHaveLength(2)
+			expect(render.mock.calls[2][1]).toEqual([render.mock.calls[1][1][0]])
+			expect(render.mock.calls[2][0]).toContain(
+				'pixel-aligned outside the face',
+			)
+		})
+	} finally {
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('removes an opaque sprite background before validating and auditing the result', async () => {
 	const svg = Buffer.from(
 		'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><path fill="#e8dfd7" d="M0 0h300v450H0z"/><ellipse fill="#3d2536" cx="150" cy="122" rx="49" ry="63"/><ellipse fill="#e1a07f" cx="150" cy="126" rx="36" ry="48"/><path fill="#5230a0" d="M112 175q-44 12-51 81l18 92 22-14 2 116h94l2-116 22 14 18-92q-7-69-51-81z"/></svg>',
 	)
 	const opaque = await sharp(svg).removeAlpha().png().toBuffer()
+	const landscape = await picture(320, 180, false)
 	const renderer = vi
 		.spyOn(artModels, 'imageRenderer')
-		.mockReturnValue(async () => ({ bytes: opaque }))
+		.mockReturnValue(async (_prompt, _refs, _size, transparent) => ({
+			bytes: transparent ? opaque : landscape,
+		}))
 	const model = vi
 		.spyOn(artModels, 'artJson')
 		.mockImplementation(
@@ -446,27 +540,47 @@ test('removes an opaque sprite background before validating and auditing the res
 				const { data, info } = await sharp(images?.[0])
 					.raw()
 					.toBuffer({ resolveWithObject: true })
-				expect(info.channels).toBe(4)
-				expect(data[3]).toBe(0)
-				const center =
-					Math.floor(info.height / 2) * info.width + Math.floor(info.width / 2)
-				expect(data[center * 4 + 3]).toBe(255)
+				if (info.height > info.width) {
+					expect(info.channels).toBe(4)
+					expect(data[3]).toBe(0)
+					const center =
+						Math.floor(info.height / 2) * info.width +
+						Math.floor(info.width / 2)
+					expect(data[center * 4 + 3]).toBe(255)
+				}
 				return { pass: true, failedChecks: [], feedback: '' }
 			},
 		)
 	try {
 		await projectTest(async (project) => {
 			const art = service(project, replay)
+			vi.stubEnv('NL_MATTING_DIR', join(project.root, 'missing-matting'))
+			const pool = await art.candidates(bible, ['c1'], 'assets/main.webp', [])
+			expect(pool).toMatchObject({ mattingUnavailable: true, characters: [] })
+			const [fallback] = await art.register(
+				[{ id: 'ada/coat/neutral', kind: 'character', description: 'Ada' }],
+				bible,
+			)
+			await expect(art.draw(fallback, bible)).resolves.toEqual({
+				status: 'placeholder',
+				reason: 'matting_unavailable',
+				issue: '本地去背景不可用；请使用可返回透明底的图片模型。',
+			})
+			const registry = await art.registry()
+			const saved = registry.entries.find(({ id }) => id === fallback.assetId)
+			if (!saved) throw new Error('Missing registered sprite')
+			expect(saved?.status).toBe('placeholder')
+			expect(
+				await sharp(await project.readFile(saved.path)).metadata(),
+			).toMatchObject({
+				format: 'webp',
+				hasAlpha: true,
+			})
+			vi.unstubAllEnvs()
 			const [sprite] = await art.register(
 				[{ id: 'ada/uniform/neutral', kind: 'character', description: 'Ada' }],
 				bible,
 			)
-			vi.stubEnv('NL_MATTING_DIR', join(project.root, 'missing-matting'))
-			await expect(art.draw(sprite, bible)).resolves.toEqual({
-				status: 'unsupported',
-				issue: '本地去背景不可用；请使用可返回透明底的图片模型。',
-			})
-			vi.unstubAllEnvs()
 			expect(await art.draw(sprite, bible)).toEqual({ status: 'drawn' })
 		})
 	} finally {

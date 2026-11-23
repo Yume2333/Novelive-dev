@@ -561,6 +561,7 @@ export function createProduction(
 						cachePath: await cache(project, cachePath),
 					})
 					visual = {
+						...(pool.mattingUnavailable ? { mattingUnavailable: true } : {}),
 						mainVisuals: await Promise.all(pool.mainVisuals.map(candidate)),
 						supplemental: await Promise.all(pool.supplemental.map(candidate)),
 						characters: await Promise.all(

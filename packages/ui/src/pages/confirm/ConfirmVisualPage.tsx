@@ -102,6 +102,11 @@ function VisualChoices({ visual }: { visual: Visual }) {
 			<p className={styles.lead}>
 				确认点 1 / 2 · 选择首卷主要角色的设定和全作统一的主视觉。
 			</p>
+			{visual.mattingUnavailable && (
+				<p role="status" className={styles.lead}>
+					本地去背景不可用；无法生成透明底的角色可以使用占位图继续制作。
+				</p>
+			)}
 			<fieldset className={styles.card} disabled={busy}>
 				<legend>主视觉</legend>
 				<div className={styles.gallery}>

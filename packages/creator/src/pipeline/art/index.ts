@@ -21,7 +21,13 @@ import {
 	recordProfile,
 } from '../postprocess'
 import { MattingUnavailableError, removeBackground } from './background'
-import { checkImage, type Dimensions, placeholder } from './check'
+import {
+	checkImage,
+	type Dimensions,
+	derivedFrameIssue,
+	placeholder,
+	spriteFrameIssue,
+} from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
 import { type ArtBible, type ArtJob, type ManifestItem, planArt } from './plan'
@@ -34,6 +40,7 @@ type RegistryEntry = AssetRegistry['entries'][number]
 type Candidate = { id: string; cachePath: string }
 type VisualCandidates = {
 	mainVisuals: Candidate[]
+	mattingUnavailable?: true
 	characters: {
 		characterId: string
 		costumeId: string
@@ -175,7 +182,10 @@ export class ArtProduction {
 		return task
 	}
 
-	async savePlaceholder(id: string, issue: string): Promise<ImageJobResult> {
+	async savePlaceholder(
+		id: string,
+		issue: string,
+	): Promise<Extract<ImageJobResult, { status: 'placeholder' }>> {
 		const entry = (await this.registry()).entries.find((item) => item.id === id)
 		if (!entry) throw new Error(`Unregistered asset: ${id}`)
 		const family =
@@ -344,8 +354,22 @@ export class ArtProduction {
 		const output = base
 			? await sharp(base).metadata()
 			: this.outputSize(portrait)
-		const result = await this.paint(drawing, target, portrait, Boolean(base))
+		const result = await this.paint(
+			drawing,
+			target,
+			portrait,
+			Boolean(base),
+		).catch((error: unknown) => {
+			if (!(error instanceof MattingUnavailableError)) throw error
+			return { issue: error.message, reason: 'matting_unavailable' } as const
+		})
 		if ('issue' in result) {
+			if ('reason' in result) {
+				const fallback = redraw
+					? ({ status: 'placeholder', issue: result.issue } as const)
+					: await this.savePlaceholder(entry.id, result.issue)
+				return { ...fallback, reason: result.reason }
+			}
 			return result.unsupported || redraw
 				? {
 						status: result.unsupported ? 'unsupported' : 'placeholder',
@@ -472,6 +496,7 @@ export class ArtProduction {
 		let reviewed: Buffer | undefined
 		let moderated = false
 		let attempt = 0
+		let baseOnly = false
 		while (attempt <= this.options.image.retries) {
 			const content = await artJson(
 				painter,
@@ -485,9 +510,14 @@ export class ArtProduction {
 				contentSchema,
 				this.options,
 			)
+			const editReferences = baseOnly ? refs.slice(0, 1) : refs
+			const describe = (firstReference: number, issue = '') =>
+				baseOnly
+					? `Edit only the brows, eyes and mouth of Image ${firstReference}: ${content.content} ${issue} Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face.`
+					: drawingPrompt(promptDrawing, content.content, issue, firstReference)
 			const result = await this.render(
-				drawingPrompt(promptDrawing, content.content, feedback),
-				refs,
+				describe(1, feedback),
+				editReferences,
 				target,
 				transparent,
 			)
@@ -519,14 +549,19 @@ export class ArtProduction {
 					recovered = await removeBackground(result.bytes, this.options.signal)
 				} catch (error) {
 					this.options.signal?.throwIfAborted()
-					if (error instanceof MattingUnavailableError)
-						return { issue: error.message, unsupported: true } as const
+					if (error instanceof MattingUnavailableError) throw error
 					return checked
 				}
 				checked = await checkImage(recovered, target, checks)
 			}
 			if ('issue' in checked) {
 				if (checked.unsupported) return checked
+				if (
+					drawing.kind === 'expression' &&
+					(checked.issue === spriteFrameIssue ||
+						checked.issue === derivedFrameIssue)
+				)
+					baseOnly = true
 				issue = feedback = checked.issue
 				continue
 			}
@@ -536,11 +571,11 @@ export class ArtProduction {
 					'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
 					`Original image brief (verify independently of the painter's rewrite): ${drawing.description}`,
-					drawingPrompt(promptDrawing, content.content, '', 2),
+					describe(2),
 				].join('\n'),
 				auditSchema,
 				this.options,
-				[checked.png, ...refs],
+				[checked.png, ...editReferences],
 			)
 			if (judge.pass && judge.failedChecks.length === 0) return checked
 			reviewed = checked.png
@@ -620,6 +655,7 @@ export class ArtProduction {
 			)
 		}
 		const characters: VisualCandidates['characters'] = []
+		let mattingUnavailable: true | undefined
 		for (const character of bible.characters) {
 			if (
 				!character.major ||
@@ -634,32 +670,44 @@ export class ArtProduction {
 				if (designReference) references.push(designReference)
 				for (const i of [1, 2, 3]) {
 					const id = `costume-${i}`
-					candidates.push(
-						await candidate(
-							id,
-							{
-								kind: 'character',
-								description: `造型候选 ${i}：${costume.description}`,
-								style,
-								references,
-								characters: [character],
-								keep: [],
-							},
-							cachePath(
-								`candidates/characters/${character.id}/${costume.id}/${id}.webp`,
+					try {
+						candidates.push(
+							await candidate(
+								id,
+								{
+									kind: 'character',
+									description: `造型候选 ${i}：${costume.description}`,
+									style,
+									references,
+									characters: [character],
+									keep: [],
+								},
+								cachePath(
+									`candidates/characters/${character.id}/${costume.id}/${id}.webp`,
+								),
+								true,
 							),
-							true,
-						),
-					)
+						)
+					} catch (error) {
+						if (!(error instanceof MattingUnavailableError)) throw error
+						mattingUnavailable = true
+						break
+					}
 				}
-				characters.push({
-					characterId: character.id,
-					costumeId: costume.id,
-					candidates,
-				})
+				if (candidates.length)
+					characters.push({
+						characterId: character.id,
+						costumeId: costume.id,
+						candidates,
+					})
 			}
 		}
-		return { mainVisuals, characters, supplemental }
+		return {
+			mainVisuals,
+			characters,
+			supplemental,
+			...(mattingUnavailable ? { mattingUnavailable } : {}),
+		}
 	}
 
 	async confirmVisual(
