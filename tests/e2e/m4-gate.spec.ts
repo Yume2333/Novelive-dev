@@ -40,6 +40,7 @@ import {
 	joined,
 	other,
 	screeningDirectory,
+	screeningReason,
 } from '../fixtures/cassettes/m4-gate/fixture'
 
 const require = createRequire(
@@ -131,25 +132,69 @@ async function launch(
 }
 
 test.describe('M4 longform and queue', () => {
-	test('EPUB screening confirms and saves a manually overridden illustration', async () => {
-		test.setTimeout(45_000)
+	test('EPUB screening survives reopening and saves a manually overridden illustration', async () => {
+		test.setTimeout(65_000)
 		const root = await mkdtemp(join(homedir(), '.m4-epub-screening-'))
 		try {
 			const folder = join(root, 'projects')
 			await mkdir(folder)
 			const source = await writeScreeningEpub(root)
-			const { app, page } = await launch(root, true, screeningDirectory)
+			const firstRun = await launch(root, true, screeningDirectory)
+			let pendingRoute: string
 			try {
+				const { app, page } = firstRun
 				await call(page, 'config.update', configuration)
 				await importBook(app, page, source, folder)
 				await page.getByRole('button', { name: '跳过核对' }).click()
 				await page
 					.getByRole('link', { name: '选择主视觉' })
 					.click({ timeout: 30_000 })
+				await expect(
+					page.getByRole('radio', { name: 'EPUB 参考方案' }),
+				).toBeVisible()
+				pendingRoute = new URL(page.url()).hash
+			} finally {
+				await firstRun.app.close()
+			}
+
+			const rows = (
+				await readFile(join(screeningDirectory, 'cassette.jsonl'), 'utf8')
+			)
+				.trim()
+				.split('\n')
+			const withoutScreening = rows.filter((line) => {
+				const { body } = JSON.parse(line)
+				return (
+					!body.b64 ||
+					!Buffer.from(body.b64, 'base64').includes(screeningReason)
+				)
+			})
+			expect(rows.length - withoutScreening.length).toBe(2)
+			const reopenedCassette = join(root, 'without-screening')
+			await mkdir(reopenedCassette)
+			await writeFile(
+				join(reopenedCassette, 'cassette.jsonl'),
+				withoutScreening.join('\n'),
+			)
+
+			const { app, page } = await launch(root, true, reopenedCassette)
+			try {
+				await page.evaluate((hash) => {
+					location.hash = hash
+				}, pendingRoute)
+				const character = page.getByRole('group', { name: /Ada/ })
+				const epubCostume = character.getByRole('radio', {
+					name: 'EPUB 参考方案',
+				})
+				await character.getByRole('radio').nth(1).check()
+				await epubCostume.check()
+				await expect(epubCostume).toBeChecked()
 				const visuals = page.getByRole('group', { name: '主视觉', exact: true })
 				await expect(
 					visuals.getByRole('radio', { name: '推荐 · EPUB 插图 1' }),
 				).toBeChecked()
+				const missing = await readdir(root)
+				expect(missing).not.toContain('missing.log')
 				const override = visuals.getByRole('radio', {
 					name: 'EPUB 插图 2',
 					exact: true,

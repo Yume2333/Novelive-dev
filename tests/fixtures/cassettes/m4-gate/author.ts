@@ -6,7 +6,7 @@ import { createConfigStore } from '../../../../packages/creator/src/config'
 import { importFileProject } from '../../../../packages/creator/src/import/wizard'
 import { createProduction } from '../../../../packages/creator/src/project/production'
 import { createReplayFetch } from '../../../../packages/creator/src/replay'
-import { picture } from '../m1b-art/fixture'
+import { bible, picture } from '../m1b-art/fixture'
 import { writeScreeningEpub } from './books'
 import {
 	completion,
@@ -16,6 +16,7 @@ import {
 	joined,
 	other,
 	screeningDirectory,
+	screeningReason,
 } from './fixture'
 
 process.env.NL_REPLAY = ''
@@ -46,10 +47,11 @@ const synthetic: typeof globalThis.fetch = async (input, init) => {
 	const last = body.messages.at(-1).content
 	const prompt: string = typeof last === 'string' ? last : last[0].text
 	if (prompt.startsWith('Classify this EPUB illustration'))
-		return completion({
-			label: classified++ === 0 ? 'scene' : 'irrelevant',
-			reason: 'Synthetic screening result.',
-		})
+		return completion(
+			classified++ === 0
+				? { label: 'character', characterId: 'ada', reason: screeningReason }
+				: { label: 'irrelevant', reason: screeningReason },
+		)
 	if (
 		body.tools?.some(
 			(tool: { function: { name: string } }) =>
@@ -126,6 +128,19 @@ const synthetic: typeof globalThis.fetch = async (input, init) => {
 					description: '安静的河岸',
 				},
 			},
+			...(screening
+				? [
+						{
+							op: 'add',
+							kind: 'character',
+							entry: {
+								...bible.characters[0],
+								status: 'candidate',
+								firstSeenChapter: ids[0],
+							},
+						},
+					]
+				: []),
 		],
 		glossaryPatch: [],
 	})
@@ -168,11 +183,19 @@ try {
 			const visual = session.snapshot().visual?.importedIllustrations
 			assert.deepEqual(visual?.recommended, ['illustration-1'])
 			assert.equal(visual?.candidates.length, 2)
+			const group = session.snapshot().visual?.characters[0]
+			assert.equal(group?.candidates[0].id, 'costume-epub')
 			await session.confirm({
 				workId: imported.workId,
 				mainVisualId: 'illustration-2',
 				supplementalIds: [],
-				characters: [],
+				characters: [
+					{
+						characterId: group.characterId,
+						costumeId: group.costumeId,
+						candidateId: 'costume-epub',
+					},
+				],
 			})
 			await session.queue.idle()
 			assert.notEqual(session.snapshot().phase, 'confirm-visual')
