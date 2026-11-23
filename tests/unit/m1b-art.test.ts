@@ -72,6 +72,43 @@ test.each([
 	expect(result).toEqual({ pass: true })
 })
 
+function artReplies(...replies: string[]) {
+	return vi.fn<typeof globalThis.fetch>(async () => {
+		const content = replies.shift()
+		if (content === undefined) throw new Error('Unexpected art request')
+		const chunk = {
+			choices: [{ index: 0, delta: { content }, finish_reason: 'stop' }],
+			usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+		}
+		return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+			headers: { 'content-type': 'text/event-stream' },
+		})
+	})
+}
+
+test.each([true, false])(
+	'bounds art JSON repair (valid repair: %s)',
+	async (valid) => {
+		const malformed = '{"pass":true "unused":false}'
+		const fetch = artReplies(malformed, valid ? '{"pass":true}' : malformed)
+		const result = artModels.artJson(
+			main,
+			'Review the image.',
+			obj({ pass: bool() }),
+			{
+				replay: { ...replay, mode: 'replay', fetch },
+			},
+		)
+		if (valid) await expect(result).resolves.toEqual({ pass: true })
+		else await expect(result).rejects.toThrow('Art model returned invalid JSON')
+		expect(fetch).toHaveBeenCalledTimes(2)
+		const [input, init] = fetch.mock.calls[1]
+		expect(
+			JSON.stringify((await new Request(input, init).json()).messages),
+		).toContain('Return only corrected JSON')
+	},
+)
+
 async function projectTest(run: (project: Project) => Promise<void>) {
 	const dir = await mkdtemp(join(tmpdir(), 'novelive-m1b-art-'))
 	try {
@@ -1614,6 +1651,28 @@ test('staging patches cannot replace writer dialogue', () => {
 		'Invalid staging patch',
 	)
 })
+
+test.each([true, false])(
+	'uses the staging manifest repair once for invalid JSON (valid repair: %s)',
+	async (valid) => {
+		const malformed = '{"patch":"" "items":[],"merges":{}}'
+		const fetch = artReplies(
+			malformed,
+			valid ? '{"patch":"","items":[],"merges":{}}' : malformed,
+		)
+		const result = directChapterArt(script, bible, empty, {
+			main,
+			replay: { ...replay, mode: 'replay', fetch },
+		})
+		if (valid) await expect(result).resolves.toMatchObject({ items: [] })
+		else await expect(result).rejects.toThrow('Art model returned invalid JSON')
+		expect(fetch).toHaveBeenCalledTimes(2)
+		const [input, init] = fetch.mock.calls[1]
+		expect(
+			JSON.stringify((await new Request(input, init).json()).messages),
+		).toContain('Repair the JSON manifest: Art model returned invalid JSON')
+	},
+)
 
 test('requests repair when a staging patch adds an image absent from the manifest', async () => {
 	const patch = 'PUT <4:\n@cg cg-window'

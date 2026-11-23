@@ -14,7 +14,10 @@ import {
 } from '../../packages/creator/src/pipeline/writing'
 import { promptFits } from '../../packages/creator/src/pipeline/writing/budget'
 import { writingModel } from '../../packages/creator/src/pipeline/writing/request'
-import { reviewFidelity } from '../../packages/creator/src/pipeline/writing/review'
+import {
+	reviewFidelity,
+	reviewStyle,
+} from '../../packages/creator/src/pipeline/writing/review'
 import { scopeScene } from '../../packages/creator/src/pipeline/writing/scope'
 import { createReplayFetch } from '../../packages/creator/src/replay'
 import { projectSpend } from '../../packages/creator/src/usage/spend'
@@ -86,6 +89,40 @@ function responses(...replies: Reply[]) {
 
 const scene =
 	'scene Bridge\nsource p0001\n: A paper boat drifted under the bridge.'
+
+test.each([true, false])(
+	'bounds style review JSON repair (valid repair: %s)',
+	async (valid) => {
+		const malformed = '{"issues":["tone" "rhythm"]}'
+		const { options, requests } = responses(
+			malformed,
+			valid ? '{"issues":[]}' : malformed,
+		)
+		const result = reviewStyle(writingModel(options.writer, options), scene)
+		if (valid) await expect(result).resolves.toEqual([])
+		else
+			await expect(result).rejects.toThrow('Style review returned invalid JSON')
+		expect(requests).toHaveLength(2)
+		expect(requests[1]).toContain('Return only corrected JSON')
+	},
+)
+
+test('repairs source alignment JSON before validating ranges', async () => {
+	const { options, requests } = responses(
+		'[{"paragraphCount":1 "lineCount":1,"targets":[]}]',
+		'[{"paragraphCount":2,"lineCount":1,"targets":[]}]',
+	)
+	const model = writingModel(options.writer, options)
+	const paragraphs = [
+		{ id: 'p0001', text: 'A boat drifted.' },
+		{ id: 'p0002', text: 'A bell rang.' },
+	]
+	await expect(
+		scopeScene(() => model, scene.replace('\n:', '\n\n:'), paragraphs),
+	).resolves.toMatchObject([{ paragraphs }])
+	expect(requests).toHaveLength(2)
+	expect(requests[1]).toContain('Scene source alignment returned invalid JSON')
+})
 
 test('separates new mark proposals from NVS and skips unsafe or registered marks', async () => {
 	const { options, requests } = responses(

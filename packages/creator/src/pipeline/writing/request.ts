@@ -4,11 +4,12 @@ import {
 	buildTextModel,
 	createTextStream,
 	outputTokenBudget,
+	parseModelJson,
 	type TextConnection,
 	TextModelError,
 	textResultError,
 } from '../../models/text'
-import { fitPrompt } from './budget'
+import { fitPrompt, promptFits } from './budget'
 
 export type WritingTransport = {
 	signal?: AbortSignal
@@ -85,3 +86,39 @@ export const userMessage = (content: string) => ({
 	content,
 	timestamp: 0,
 })
+
+export async function requestWritingJson<T>(
+	model: ReturnType<typeof writingModel>,
+	prompt: string,
+	phase: string,
+	validate: (value: unknown) => T | undefined,
+	invalidShape: string,
+): Promise<T> {
+	const request = async (
+		context: Context,
+	): Promise<{ issue: string } | { value: T }> => {
+		const result = await model.request(context, phase)
+		let value: unknown
+		try {
+			value = parseModelJson(textOf(result))
+		} catch (error) {
+			if (!(error instanceof SyntaxError)) throw error
+			return { issue: `${phase} returned invalid JSON` }
+		}
+		const checked = validate(value)
+		return checked === undefined ? { issue: invalidShape } : { value: checked }
+	}
+	const first = await request({ messages: [userMessage(prompt)] })
+	if ('value' in first) return first.value
+	const repair = {
+		messages: [
+			userMessage(
+				`${prompt}\n${first.issue}. Return only corrected JSON matching the requested format.`,
+			),
+		],
+	}
+	if (!promptFits(model, repair)) throw new Error(first.issue)
+	const second = await request(repair)
+	if ('value' in second) return second.value
+	throw new Error(second.issue)
+}

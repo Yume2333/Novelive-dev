@@ -149,7 +149,7 @@ test('staging and portrait painting dispatch to their configured role models', a
 	expect(requests).toEqual(['fixture-art-fast', 'fixture-art-visual'])
 })
 
-test('a painter exception materializes both base and variant placeholders before publication', async () => {
+test('a painter format error after one repair materializes both base and variant placeholders before publication', async () => {
 	const { projectDir, workId } = await fixture()
 	using project = await Project.open(projectDir)
 	const work = await project.read(projectFiles.work('v0001', workId))
@@ -204,7 +204,7 @@ test('a painter exception materializes both base and variant placeholders before
 			expect(
 				(await sharp(await project.readFile(path)).metadata()).format,
 			).toBe('webp')
-		expect(requests).toBe(1)
+		expect(requests).toBe(2)
 	} finally {
 		queue.dispose()
 	}
