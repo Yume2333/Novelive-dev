@@ -55,6 +55,15 @@ function scalar(raw: string, rest: string[]) {
 	return raw.replace(/\s+#.*$/, '')
 }
 
+function flowDepth(line: string) {
+	const bare = line
+		.replace(/"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'/g, '')
+		.replace(/(?:^|\s)#.*$/, '')
+	return (
+		(bare.match(/[[{]/g)?.length ?? 0) - (bare.match(/[\]}]/g)?.length ?? 0)
+	)
+}
+
 // A leading `---` block is YAML front matter only when every line reads as
 // YAML; otherwise it is a thematic break and the text stays in the body.
 function frontMatter(text: string) {
@@ -67,11 +76,14 @@ function frontMatter(text: string) {
 	let keys = 0
 	for (const line of lines) {
 		if (!line.trim()) continue
-		if (open && /^[\]}][ \t]*(?:#.*)?$/.test(line)) open--
-		else if (yamlLine.test(line)) {
-			if (yamlKey.test(line)) keys++
-			if (/[[{][ \t]*$/.test(line)) open++
-		} else return { body: text, metadata }
+		if (
+			!(open && /^[\]}][\]},\s]*(?:#.*)?$/.test(line)) &&
+			!yamlLine.test(line)
+		)
+			return { body: text, metadata }
+		if (yamlKey.test(line)) keys++
+		open += flowDepth(line)
+		if (open < 0) return { body: text, metadata }
 	}
 	if (!block || !keys) return { body: text, metadata }
 	for (const [i, line] of lines.entries()) {
