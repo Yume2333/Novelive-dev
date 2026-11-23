@@ -355,6 +355,25 @@ test('excludes cover and notes-only files from heading coverage', async () => {
 	expect(book.volumes[0].chapters[0].notes).toContain('Copyright note.')
 })
 
+test.each([false, true])(
+	'preserves the first prose preface with cover=%s',
+	async (cover) => {
+		const { book } = await extractEpub(
+			await epub({
+				'OPS/book.opf': `<package><manifest><item id="cover" href="cover.xhtml"/><item id="body" href="chapter.xhtml"/><item id="image" href="images/picture.svg" media-type="image/svg+xml"/></manifest><spine>${cover ? '<itemref idref="cover"/>' : ''}<itemref idref="body"/></spine></package>`,
+				'OPS/cover.xhtml': xhtml('<img src="images/picture.svg"/>'),
+				'OPS/chapter.xhtml': xhtml(
+					'<p>Preface.</p><h1>Chapter One</h1><p>First.</p>',
+				),
+			}),
+		)
+		expect(book.navigation).toBe('heading')
+		expect(
+			book.volumes[0].chapters.map((chapter) => chapter.paragraphs),
+		).toEqual([['Preface.'], ['Chapter One', 'First.']])
+	},
+)
+
 test('keeps a later spine file epigraph with that file chapter', async () => {
 	const { book } = await extractEpub(
 		await epub({

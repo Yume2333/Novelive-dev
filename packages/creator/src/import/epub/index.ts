@@ -323,7 +323,11 @@ export async function extractEpub(
 						? [{ doc: index, block: offset, title: block.text }]
 						: [],
 				)
-				if (index > 0 && headings.length) headings[0].block = 0
+				if (headings.length) {
+					if (doc !== proseDocs[0]) headings[0].block = 0
+					else if (headings[0].block > 0)
+						headings.unshift({ doc: index, block: 0, title: '前言' })
+				}
 				return headings.length
 					? headings
 					: [
