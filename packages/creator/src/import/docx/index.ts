@@ -289,6 +289,7 @@ export async function extractDocx(
 		}[] = []
 		let archived: string[] = []
 		let pendingNotes: string[] = []
+		const covers: string[] = []
 		const flush = () => {
 			const chunks: string[][] = [[]]
 			const images: {
@@ -344,7 +345,15 @@ export async function extractDocx(
 			}
 			pendingNotes.push(...notes, ...archived)
 			for (const [index, paragraphs] of chunks.entries()) {
-				if (!paragraphs.length) continue
+				if (!paragraphs.length) {
+					if (!volumes.length && !volume.chapters.length)
+						covers.push(
+							...images
+								.filter((image) => image.chunk === index)
+								.map((image) => image.archivePath),
+						)
+					continue
+				}
 				const chapter = {
 					title: title + (chunks.length > 1 ? `（${index + 1}）` : ''),
 					paragraphs,
@@ -392,12 +401,19 @@ export async function extractDocx(
 				format: 'docx',
 				metadata: {},
 				volumes,
-				illustrations: located.map((image) => ({
-					archivePath: image.archivePath,
-					volume: volumes.indexOf(image.volume),
-					chapter: image.volume.chapters.indexOf(image.chapter),
-					paragraph: image.paragraph,
-				})),
+				illustrations: [
+					...covers.map((archivePath) => ({
+						archivePath,
+						volume: 0,
+						chapter: 0,
+					})),
+					...located.map((image) => ({
+						archivePath: image.archivePath,
+						volume: volumes.indexOf(image.volume),
+						chapter: image.volume.chapters.indexOf(image.chapter),
+						paragraph: image.paragraph,
+					})),
+				],
 			},
 		}
 	} catch (cause) {

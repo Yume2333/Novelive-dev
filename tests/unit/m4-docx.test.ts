@@ -30,6 +30,37 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 }
 
 describe('DOCX extraction', () => {
+	test('offers an inline cover before the first heading at the first chapter without a paragraph', async () => {
+		const parts = {
+			'word/_rels/document.xml.rels': imageRelationships({
+				cover: 'media/cover.png',
+				inline: 'media/inline.png',
+			}),
+			'word/media/cover.png': 'cover image',
+			'word/media/inline.png': 'inline image',
+		}
+		const book = await extract(
+			drawing('cover') +
+				heading('第一卷', 1) +
+				heading('第一章', 2) +
+				p('正文。') +
+				drawing('inline'),
+			parts,
+		)
+		expect(book.illustrations).toEqual([
+			{ archivePath: 'word/media/cover.png', volume: 0, chapter: 0 },
+			{
+				archivePath: 'word/media/inline.png',
+				volume: 0,
+				chapter: 0,
+				paragraph: 0,
+			},
+		])
+		await expect(extract(drawing('cover'), parts)).rejects.toMatchObject({
+			code: 'no_extractable_text',
+		})
+	})
+
 	test('locates embedded inline drawings across volumes and chapters without leaking drawing text', async () => {
 		const book = await extract(
 			heading('第一卷', 1) +
