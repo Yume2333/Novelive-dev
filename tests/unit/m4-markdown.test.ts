@@ -209,6 +209,11 @@ test('a leading thematic break is not front matter; YAML comments, escapes and b
 		extract('---\ntitle: 港\ntags: [\n  a,\n  b\n]\n---\n正文。\n').metadata,
 	).toEqual({ title: '港' })
 	expect(
+		extract(
+			'---\n\nRead: [the log\n](log.md) first.\n\n---\n\nThe ship left.\n',
+		).volumes[0].chapters[0].paragraphs,
+	).toEqual(['Read: the log first.', 'The ship left.'])
+	expect(
 		extract('---\ntitle: >-\n  The Long\n  Road\nauthor: x\n---\n正文。\n')
 			.metadata,
 	).toEqual({ title: 'The Long Road' })
@@ -232,16 +237,17 @@ test('a top heading other than the front matter title is a volume', () => {
 
 test('annotation lines stay apart from adjacent prose; heading footnotes and inline comments are handled', () => {
 	const book = extract(
-		'# 第一章[^t]\n\n注：旧版作小门\n她走进了院子。<!-- a > b -->\n译者注：原版里这里用的是旧地名，\n新版将它改成了海港\n他没回头。\n\n# 第二章\n\n完。\n\n[^t]: 标题注。\n',
+		'# 第一章[^t]\n\n注：旧版作小门\n她走进了院子。<!-- a > b -->\n译者注：原版里这里用的是旧地名，\n新版将它改成了海港\n他没回头。\n译者注：旧译章名为《归航》；\n她把信收了起来。\n\n# 第二章\n\n完。\n\n[^t]: 标题注。\n',
 	)
 	expect(book.volumes[0].chapters).toEqual([
 		{
 			title: '第一章',
-			paragraphs: ['她走进了院子。', '他没回头。'],
+			paragraphs: ['她走进了院子。', '他没回头。', '她把信收了起来。'],
 			notes: [
 				'标题注。',
 				'注：旧版作小门',
 				'译者注：原版里这里用的是旧地名，新版将它改成了海港',
+				'译者注：旧译章名为《归航》；',
 			],
 		},
 		{ title: '第二章', paragraphs: ['完。'], notes: [] },

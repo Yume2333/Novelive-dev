@@ -24,13 +24,13 @@ const matterHeading =
 const annotation =
 	/^(?:[【[]?(?:注释|注釋|脚注|腳註|附注|附註|译者注|譯者註|作者注|编者注|編者註|版权|版權|著作权|著作權)|[【[]?[注註]\s*[:：】\]])/
 const sentenceEnd = /[。！？…」』”）]$/
-const midSentence = /[，、；：,;:]$/
+const midSentence = /[，、,]$/
 const wide =
 	/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\u3000-\u303f\uff00-\uffef“”‘’…—]/u
 // Marks a hard line break inside extracted text.
 const hard = '\u0000'
 
-const yamlLine = /^(?:#|\s|[\]}]|-(?:\s|$)|[^\s#:-][^:]*:(?:\s|$))/
+const yamlLine = /^(?:#|\s|-(?:\s|$)|[^\s#:-][^:]*:(?:\s|$))/
 const yamlKey = /^[^\s#:-][^:]*:(?:\s|$)/
 
 function scalar(raw: string, rest: string[]) {
@@ -63,13 +63,17 @@ function frontMatter(text: string) {
 		/^---[ \t]*\n([\s\S]*?)\n(?:---|\.\.\.)[ \t]*(?:\n|$)/,
 	)
 	const lines = block?.[1].split('\n') ?? []
-	const filled = lines.filter((line) => line.trim())
-	if (
-		!block ||
-		!filled.some((line) => yamlKey.test(line)) ||
-		!filled.every((line) => yamlLine.test(line))
-	)
-		return { body: text, metadata }
+	let open = 0
+	let keys = 0
+	for (const line of lines) {
+		if (!line.trim()) continue
+		if (open && /^[\]}][ \t]*(?:#.*)?$/.test(line)) open--
+		else if (yamlLine.test(line)) {
+			if (yamlKey.test(line)) keys++
+			if (/[[{][ \t]*$/.test(line)) open++
+		} else return { body: text, metadata }
+	}
+	if (!block || !keys) return { body: text, metadata }
 	for (const [i, line] of lines.entries()) {
 		const field = line.match(/^(title|lang|language):[ \t]*(.+?)[ \t]*$/)
 		if (!field) continue
@@ -111,7 +115,7 @@ function phrasing(nodes: PhrasingContent[], refs: string[] = []): string {
 // Soft breaks join wrapped lines. A hard break, or a soft break after a CJK
 // sentence end, starts a new paragraph, as in line-per-paragraph novel text.
 // An annotation starts a paragraph of its own and runs on only while its
-// line ends mid-sentence.
+// line ends on a comma.
 function paragraphs(text: string) {
 	const out: string[] = []
 	for (const part of text.split(hard)) {
