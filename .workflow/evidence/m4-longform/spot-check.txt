@@ -1,0 +1,65 @@
+M4 follow-up: main comparison and authorized provider spot checks
+Date: 2026-11-23
+
+M1b comparison
+--------------
+Fetched origin/main: 3ffefd68c5121bf9d4d9c7090ac3f92696b87c75.
+Built and ran in the separate detached worktree .workflow/worktrees/m4-main-compare.
+Command in both checkouts:
+  NL_REPLAY=strict xvfb-run -a pnpm test:e2e tests/e2e/m1b-gate.spec.ts
+
+origin/main:
+  ✓ M1b make and play publishes through both confirmation points in real Electron (22.0s)
+  1 passed (22.4s)
+
+Branch after test-only locator fix:
+  ✓ M1b make and play publishes through both confirmation points in real Electron (19.7s)
+  1 passed (20.3s)
+
+Current main already scopes this assertion to .nl-text-display. The branch's
+older unscoped locator matched hidden layout and visible text; its earlier
+failure is in gate.txt. Applied the same visible-layer scoping, with no product
+change. These two runs use different revisions of the test, so main's pass is
+not evidence of an application regression caused by A-C.
+
+Full branch regression:
+  NL_REPLAY=strict xvfb-run -a pnpm test:e2e
+  57 passed (1.6m)
+No failed tests or worker teardown timeout in this final run.
+
+Authorized paid spot checks
+--------------------------
+Real relay; private request budget enforced at one HTTP request per operation.
+No synthetic responses, no paid reviewer/repair calls, no image generation.
+
+model              calls  input tokens  output tokens  total tokens  input images  generated images
+devin-swe-2             1           702            118           820             0                 0
+gemini-3.8-flash        1          1228            218          1446             1                 0
+TOTAL                  2          1930            336          2266             1                 0
+
+Writer: real writeChapter path, gate English-source chapter ch0001, target zh-CN.
+HTTP 200, finish=stop, visible text returned; fallback was not needed or called.
+Outcome: Simplified Chinese narration and valid locally compiled NVS, covering
+the source paragraph. The paper boat passing beneath the bridge is retained.
+Judgement: language and script-format spot check pass; the model adds river,
+light and wave atmosphere beyond the one source sentence. Not a fidelity signoff
+or a general translation-quality evaluation; no paid fidelity review was run.
+
+EPUB classification: real classifyIllustrations -> artJson path on one image.
+Fixture: public-domain NASA astronaut portrait, scikit-image v0.22.0
+skimage/data/astronaut.png (photographic, not a generated image or color swatch).
+SHA-256: 88431cd9653ccd539741b555fb0a46b61558b301d4110412b5bc28b5e3ea6cb5
+The image stayed outside the repository. Fictional reference context describes
+a brown-haired woman astronaut in an orange flight suit.
+HTTP 200, finish=stop. Result: character; selected=false.
+Judgement: sensible visual match to the descriptive character context. This is
+a reference suggestion only; human selection remains necessary.
+
+Accounting/privacy
+------------------
+Private cassettes, raw model output and run harness: ~/novelive-private/m4-spot/.
+Two actual-call rows appended to ~/memory/poke_5b9601/files/novelive/usage.csv;
+tokens column records provider total, with input/output and input-image counts
+in purpose. Generated-image counts are zero. Neither file set is committed.
+This receipt contains no relay address, key, full prompt or raw provider output.
+OS notification bubbles and broad model/art quality remain outside this check.

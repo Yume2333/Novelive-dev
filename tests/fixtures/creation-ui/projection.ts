@@ -137,6 +137,9 @@ export async function installProjection(app: ElectronApplication) {
 					case 'library.list':
 						respond({ works: [], unreadableCount: 0 })
 						break
+					case 'production.getQueue':
+						respond({ active: null, queued: [], inactive: [] })
+						break
 					case 'production.get':
 						respond(snapshot)
 						break

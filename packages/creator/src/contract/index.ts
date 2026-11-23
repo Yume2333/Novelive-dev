@@ -39,6 +39,7 @@ export * from './chat'
 export * from './editor'
 export * from './import'
 export * from './production'
+export * from './queue'
 
 const generation = int({ minimum: 1 })
 const scope = oneOf(['app', 'work'])
@@ -195,7 +196,7 @@ export interface Novelive {
 	): () => void
 	resourceUrl(path: string): string
 	pickFolder(): Promise<string | null>
-	pickFiles(kind: 'txt' | 'image'): Promise<string[]>
+	pickFiles(kind: 'source' | 'txt' | 'image'): Promise<string[]>
 	host: {
 		progress?: DesktopProgressApi
 		appState(): Promise<HostState>

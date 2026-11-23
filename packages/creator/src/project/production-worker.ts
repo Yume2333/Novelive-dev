@@ -86,12 +86,28 @@ export async function productionBible(
 		volumeId && workId
 			? await resolveBible(project, { level: 'work', volumeId, workId })
 			: await readBible(project)
+	const approved = bible.style.find(
+		({ status, references }) => status === 'confirmed' && references?.length,
+	)
+	const seriesStyle =
+		!approved && volumeId && workId
+			? (
+					await existing(() =>
+						project.read(projectFiles.style({ level: 'series' })),
+					)
+				)?.entries.find(
+					({ status, references }) =>
+						status === 'confirmed' && references?.length,
+				)
+			: undefined
 	return {
 		bible,
 		art: {
 			characters: bible.character,
 			locations: bible.location,
-			style: bible.style.find(({ status }) => status === 'confirmed') ??
+			style: approved ??
+				seriesStyle ??
+				bible.style.find(({ status }) => status === 'confirmed') ??
 				bible.style[0] ?? {
 					id: 'style',
 					status: 'candidate' as const,

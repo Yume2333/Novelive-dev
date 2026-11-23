@@ -97,7 +97,12 @@ function bodyText(node: Element): string {
 		.join('')
 }
 
-function relationshipTarget(source: string, kind: string, part: string) {
+function relationshipTarget(
+	source: string,
+	kind: string,
+	part: string,
+	id?: string,
+) {
 	const root = xml(source)
 	const relationships = root.children.flatMap((node) =>
 		typeof node === 'string' ? [] : node.children,
@@ -111,6 +116,7 @@ function relationshipTarget(source: string, kind: string, part: string) {
 				'http://purl.oclc.org/ooxml/package/relationships',
 			].includes(rel.uri) ||
 			!rel.attrs.Type?.endsWith(`/${kind}`) ||
+			(id !== undefined && rel.attrs.Id !== id) ||
 			rel.attrs.TargetMode === 'External'
 		)
 			continue
@@ -120,7 +126,7 @@ function relationshipTarget(source: string, kind: string, part: string) {
 		if (
 			target.startsWith('../') ||
 			target.includes('\\') ||
-			/^[a-z]+:/i.test(target)
+			/^[a-z]+:/i.test(rel.attrs.Target)
 		)
 			throw new DocxImportError(
 				'invalid_docx',
@@ -128,6 +134,33 @@ function relationshipTarget(source: string, kind: string, part: string) {
 			)
 		return rel.attrs.Target.startsWith('/') ? rel.attrs.Target.slice(1) : target
 	}
+}
+
+function* embeddedImages(node: Element, inline = false): Generator<string> {
+	if (
+		wordNamespaces.has(node.uri) &&
+		['del', 'pict', 'txbxContent'].includes(node.name)
+	)
+		return
+	const inside =
+		inline ||
+		(node.name === 'inline' &&
+			[
+				'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing',
+				'http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing',
+			].includes(node.uri))
+	if (
+		inside &&
+		[
+			'http://schemas.openxmlformats.org/drawingml/2006/main',
+			'http://purl.oclc.org/ooxml/drawingml/main',
+		].includes(node.uri) &&
+		node.name === 'blip' &&
+		node.attrs.embed
+	)
+		yield node.attrs.embed
+	for (const child of node.children)
+		if (typeof child !== 'string') yield* embeddedImages(child, inside)
 }
 
 /** Extracts DOCX bytes without writing archive entries to disk. */
@@ -213,6 +246,18 @@ export async function extractDocx(
 		const paragraphs = [...elements(body, 'p')].map((p) => {
 			const id = [...elements(p, 'pStyle')][0]?.attrs.val
 			return {
+				images: [...embeddedImages(p)].flatMap((id) => {
+					const target =
+						partRels && relationshipTarget(partRels, 'image', mainPart, id)
+					const entry =
+						target &&
+						entries.find(
+							(entry) =>
+								!entry.directory &&
+								entry.filename.toLowerCase() === target.toLowerCase(),
+						)
+					return entry ? [entry.filename] : []
+				}),
 				text: bodyText(p).trim(),
 				level: outline(p) ?? (id ? styleLevel(id) : undefined),
 				notes: ['footnote', 'endnote'].flatMap((kind) =>
@@ -235,16 +280,40 @@ export async function extractDocx(
 			chapters: [],
 		}
 		let title = levels.length ? '前言' : '正文'
-		let lines: string[] = []
+		let lines: { text: string; images: string[] }[] = []
+		const located: {
+			archivePath: string
+			volume: typeof volume
+			chapter: (typeof volume.chapters)[number]
+			paragraph: number
+		}[] = []
 		let archived: string[] = []
 		let pendingNotes: string[] = []
+		const covers: {
+			archivePath: string
+			volume: typeof volume
+			beforeBody: boolean
+		}[] = []
 		const flush = () => {
 			const chunks: string[][] = [[]]
+			const images: {
+				archivePath: string
+				chunk: number
+				paragraph: number
+			}[] = []
 			const notes: string[] = []
 			let size = 0
 			for (const raw of lines) {
-				const line = raw.trim()
-				if (!line) continue
+				const line = raw.text.trim()
+				if (!line) {
+					for (const archivePath of raw.images)
+						images.push({
+							archivePath,
+							chunk: chunks.length - 1,
+							paragraph: chunks[chunks.length - 1].length,
+						})
+					continue
+				}
 				const classificationText = /^(?:https?:\/\/|www\.)\S+$/i.test(line)
 					? line
 					: line.replace(/(?:https?:\/\/|www\.)\S+/gi, '链接')
@@ -257,6 +326,7 @@ export async function extractDocx(
 					notes.push(line)
 					continue
 				}
+				let first = true
 				for (const bodyLine of line
 					.split('\n')
 					.map((text) => text.trim())
@@ -265,18 +335,46 @@ export async function extractDocx(
 						chunks.push([])
 						size = 0
 					}
+					if (first)
+						for (const archivePath of raw.images)
+							images.push({
+								archivePath,
+								chunk: chunks.length - 1,
+								paragraph: chunks[chunks.length - 1].length,
+							})
+					first = false
 					chunks[chunks.length - 1].push(bodyLine)
 					size += bodyLine.length + (size ? 2 : 0)
 				}
 			}
 			pendingNotes.push(...notes, ...archived)
 			for (const [index, paragraphs] of chunks.entries()) {
-				if (!paragraphs.length) continue
-				volume.chapters.push({
+				if (!paragraphs.length) {
+					if (!volume.chapters.length)
+						covers.push(
+							...images
+								.filter((image) => image.chunk === index)
+								.map(({ archivePath }) => ({
+									archivePath,
+									volume,
+									beforeBody: volumes.length === 0,
+								})),
+						)
+					continue
+				}
+				const chapter = {
 					title: title + (chunks.length > 1 ? `（${index + 1}）` : ''),
 					paragraphs,
 					notes: [...pendingNotes],
-				})
+				}
+				volume.chapters.push(chapter)
+				for (const image of images.filter((image) => image.chunk === index))
+					located.push({
+						archivePath: image.archivePath,
+						volume,
+						chapter,
+						paragraph: Math.min(image.paragraph, paragraphs.length - 1),
+					})
 				pendingNotes = []
 			}
 			lines = []
@@ -290,7 +388,8 @@ export async function extractDocx(
 					volume = { title: p.text, chapters: [] }
 					title = '前言'
 				} else title = p.text
-			} else if (p.text) lines.push(p.text)
+				if (p.images.length) lines.push({ text: '', images: p.images })
+			} else if (p.text || p.images.length) lines.push(p)
 			archived.push(...p.notes)
 		}
 		flush()
@@ -304,7 +403,30 @@ export async function extractDocx(
 			.at(-1)
 			?.chapters.at(-1)
 			?.notes.push(...pendingNotes)
-		return { status: 'ready', book: { format: 'docx', metadata: {}, volumes } }
+		return {
+			status: 'ready',
+			book: {
+				format: 'docx',
+				metadata: {},
+				volumes,
+				illustrations: [
+					...covers.flatMap(({ archivePath, volume, beforeBody }) => {
+						const index = volumes.indexOf(volume)
+						if (index === -1 && beforeBody)
+							return [{ archivePath, volume: 0, chapter: 0 }]
+						return index === -1
+							? []
+							: [{ archivePath, volume: index, chapter: 0 }]
+					}),
+					...located.map((image) => ({
+						archivePath: image.archivePath,
+						volume: volumes.indexOf(image.volume),
+						chapter: image.volume.chapters.indexOf(image.chapter),
+						paragraph: image.paragraph,
+					})),
+				],
+			},
+		}
 	} catch (cause) {
 		if (cause instanceof DocxImportError) throw cause
 		throw new DocxImportError(

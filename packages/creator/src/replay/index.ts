@@ -20,6 +20,7 @@ export interface ReplayOptions {
 	fault?: ReplayFault
 	delayMs?: number
 	normalizeIds?: boolean
+	rebindIds?: boolean
 	fallbackDirectory?: string
 	reuseRecorded?: boolean
 	reportMissing?: boolean
@@ -74,7 +75,12 @@ function encodedOrigin(origin: string) {
 	return new RegExp(pattern, 'gi')
 }
 
-async function requestIdentity(request: Request, normalizeIds = false) {
+async function requestIdentity(
+	request: Request,
+	normalizeIds = false,
+	rebindIds = false,
+) {
+	const ids: string[] = []
 	const url = new URL(request.url)
 	const secrets = [
 		request.headers.get('authorization')?.replace(/^\S+\s+/, ''),
@@ -96,9 +102,12 @@ async function requestIdentity(request: Request, normalizeIds = false) {
 		for (const secret of secrets) {
 			if (secret) text = text.replaceAll(secret, '[redacted]')
 		}
-		return relayOrigin
+		text = relayOrigin
 			? text.replace(relayOrigin, 'https://relay.invalid')
 			: text
+		for (const [index, id] of ids.entries())
+			text = text.replaceAll(id, `[replay-uuid-${index}]`)
+		return text
 	}
 	const path = scrub(url.pathname + url.search)
 	const method = request.method
@@ -133,20 +142,34 @@ async function requestIdentity(request: Request, normalizeIds = false) {
 			// Non-text request bodies are hashed as bytes.
 		}
 	}
-	if (normalizeIds && typeof canonical === 'string')
+	if (normalizeIds && typeof canonical === 'string') {
+		if (rebindIds)
+			ids.push(
+				...new Set(
+					canonical.match(
+						/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+					) ?? [],
+				),
+			)
 		canonical = canonical
 			.replace(
 				/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
 				'[uuid]',
 			)
 			.replace(/ #[0-9a-f]{4}\b/g, ' #[line]')
+	}
 	const key = createHash('sha256')
 		.update(method)
 		.update(path)
 		.update(canonical)
 		.digest('hex')
 		.slice(0, 16)
-	return { key, method, path, reqHash: hash(canonical), scrub }
+	const restore = (text: string) =>
+		text.replace(
+			/\[replay-uuid-(\d+)\]/g,
+			(token, index) => ids[Number(index)] ?? token,
+		)
+	return { key, method, path, reqHash: hash(canonical), scrub, restore }
 }
 
 function modeFromEnvironment() {
@@ -268,7 +291,7 @@ export function createReplayFetch(
 		response: Response,
 		bytes: Buffer,
 	) {
-		const { scrub, ...request } = identity
+		const { scrub, restore: _restore, ...request } = identity
 		const headers: Record<string, string> = {}
 		for (const name of allowedHeaders) {
 			const value = response.headers.get(name)
@@ -326,7 +349,13 @@ export function createReplayFetch(
 
 	return async (input, init) => {
 		const request = new Request(input, init)
-		const identity = await requestIdentity(request, options.normalizeIds)
+		const rebindIds =
+			options.rebindIds ?? process.env.NL_REPLAY_REBIND_IDS === '1'
+		const identity = await requestIdentity(
+			request,
+			options.normalizeIds,
+			rebindIds,
+		)
 		request.signal.throwIfAborted()
 		if (fallback) {
 			try {
@@ -465,6 +494,13 @@ export function createReplayFetch(
 		} else {
 			bytes = Buffer.from(row.body.b64 ?? '', 'base64')
 		}
+		if (
+			rebindIds &&
+			/^(?:text\/|application\/(?:[\w.+-]*json|xml))/i.test(
+				row.headers['content-type'] ?? '',
+			)
+		)
+			bytes = Buffer.from(identity.restore(Buffer.from(bytes).toString('utf8')))
 		if (options.fault === 'bad-image') bytes = corruptImage(bytes)
 		const stream =
 			request.method === 'HEAD' || [204, 205, 304].includes(row.status)

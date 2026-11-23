@@ -1,4 +1,9 @@
-import { TextReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js'
+import {
+	TextReader,
+	Uint8ArrayReader,
+	Uint8ArrayWriter,
+	ZipWriter,
+} from '@zip.js/zip.js'
 
 export const namespace =
 	'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
@@ -7,10 +12,17 @@ export const paragraph = (text: string, properties = '') =>
 export const documentXml = (body: string) =>
 	`<w:document xmlns:w="${namespace}"><w:body>${body}</w:body></w:document>`
 
-export async function syntheticDocx(parts: Record<string, string>) {
+export async function syntheticDocx(
+	parts: Record<string, string | Uint8Array>,
+) {
 	const zip = new ZipWriter(new Uint8ArrayWriter())
 	for (const [name, text] of Object.entries(parts))
-		await zip.add(name, new TextReader(text))
+		await zip.add(
+			name,
+			typeof text === 'string'
+				? new TextReader(text)
+				: new Uint8ArrayReader(text),
+		)
 	return zip.close()
 }
 

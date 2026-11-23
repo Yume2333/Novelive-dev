@@ -5,7 +5,16 @@ import {
 	type ImportReport,
 	projectFiles,
 } from '@novelive/format/model'
+import type {
+	ExtractedBook,
+	ImportExtraction,
+	ImportJoinTarget,
+} from '../../contract/import'
 import { Project } from '../../project'
+import { extractDocx } from '../docx'
+import { extractEpub } from '../epub'
+import { extractMarkdown } from '../markdown'
+import { extractPdf } from '../pdf'
 import {
 	detectTxtEncoding,
 	importTxt,
@@ -14,6 +23,12 @@ import {
 	type TxtVolume,
 	writeTxtLayout,
 } from '../txt'
+import {
+	importIllustrations,
+	type StoredIllustration,
+	type WizardIllustration,
+} from './illustrations'
+import { joinImportedVolumes, type RegisterImported } from './join'
 
 export interface ImportLayout {
 	title: string
@@ -27,20 +42,28 @@ export interface ImportLayout {
 
 export interface ImportWizardView {
 	status: 'ready'
+	format: 'txt' | ExtractedBook['format']
+	workIds: string[]
 	projectDir: string
 	workId: string
-	encoding: TxtEncoding
+	encoding?: TxtEncoding
 	paragraphs: number
 	layout: ImportLayout
 	suggested: ImportLayout
 	findings: { paragraph: number; note: string }[]
 	references: string[]
+	illustrations: WizardIllustration[]
+	selectedIllustrations: string[]
 }
 
 type WizardReport = ImportReport & {
-	encoding: TxtEncoding
+	format?: ImportWizardView['format']
+	encoding?: TxtEncoding
 	structure: TxtStructure
 	references?: string[]
+	externalReferences?: string[]
+	illustrations?: StoredIllustration[]
+	selectedIllustrations?: string[]
 	layout?: ImportLayout
 }
 
@@ -199,6 +222,7 @@ export async function readImportWizard(
 	const title = report.check?.title ?? ''
 	const language = report.check?.language ?? 'zh-CN'
 	const { confirmWithReferences } = await firstSettings(project)
+	const ids = await workIds(project)
 	const suggested = suggestedLayout(
 		report.structure,
 		title,
@@ -207,8 +231,10 @@ export async function readImportWizard(
 	)
 	return {
 		status: 'ready',
+		format: report.format ?? 'txt',
+		workIds: ids,
 		projectDir: project.root,
-		workId: (await workIds(project))[0],
+		workId: ids[0],
 		encoding: report.encoding,
 		paragraphs: originals(report.structure).reduce(
 			(sum, { chapter }) => sum + chapter.paragraphs.length,
@@ -223,6 +249,10 @@ export async function readImportWizard(
 			}),
 		),
 		references: report.references ?? [],
+		illustrations: (report.illustrations ?? []).map(
+			({ cachePath: _cachePath, ...candidate }) => candidate,
+		),
+		selectedIllustrations: report.selectedIllustrations ?? [],
 	}
 }
 
@@ -235,18 +265,45 @@ function folderName(title: string) {
 	)
 }
 
-export async function importTxtProject(options: {
-	sourcePath: string
-	folder: string
-	title: string
-	encoding?: TxtEncoding
-	references: string[]
-}) {
+export async function importTxtProject(
+	options: {
+		sourcePath: string
+		folder: string
+		title: string
+		encoding?: TxtEncoding
+		references: string[]
+		join?: ImportJoinTarget
+	},
+	register?: RegisterImported,
+) {
+	return importProject(options, 'txt', register)
+}
+
+export async function importFileProject(
+	options: Parameters<typeof importTxtProject>[0],
+	register?: RegisterImported,
+) {
+	const extension = extname(options.sourcePath).toLowerCase()
+	const format =
+		extension === '.md' || extension === '.markdown'
+			? 'markdown'
+			: extension.slice(1)
+	if (!['txt', 'epub', 'markdown', 'docx', 'pdf'].includes(format))
+		throw invalid('不支持的原文格式')
+	return importProject(options, format as ImportWizardView['format'], register)
+}
+
+async function importProject(
+	options: Parameters<typeof importTxtProject>[0],
+	format: ImportWizardView['format'],
+	register?: RegisterImported,
+) {
 	for (const path of options.references)
 		if (!referenceTypes.has(extname(path).toLowerCase()))
 			throw invalid(`不支持的参考图格式：${basename(path)}`)
+	if (options.references.length > 3) throw invalid('最多选择 3 张参考图')
 	const bytes = await readFile(options.sourcePath)
-	if (!options.encoding) {
+	if (format === 'txt' && !options.encoding) {
 		const candidates = detectTxtEncoding(bytes)
 		if (!candidates.length)
 			throw { code: 'unsupported', message: '无法识别原文编码' }
@@ -259,6 +316,19 @@ export async function importTxtProject(options: {
 				})),
 			}
 	}
+	let book: ExtractedBook | undefined
+	if (format !== 'txt') {
+		const extraction: ImportExtraction = await {
+			epub: extractEpub,
+			markdown: extractMarkdown,
+			docx: extractDocx,
+			pdf: extractPdf,
+		}[format](bytes)
+		if (extraction.status === 'unsupported') return extraction
+		book = extraction.book
+	}
+	if (options.join)
+		return joinImportedVolumes(options, bytes, format, book, register)
 	const root = join(options.folder, folderName(options.title))
 	let project: Project
 	try {
@@ -273,12 +343,57 @@ export async function importTxtProject(options: {
 			throw invalid(`该位置已有同名文件夹：${root}`)
 		throw error
 	}
-	using opened = project
 	try {
-		await importTxt(opened, bytes, {
-			title: options.title.trim(),
-			encoding: options.encoding,
-		})
+		using opened = project
+		if (book) {
+			let chapterIndex = 0
+			const structure: TxtStructure = {
+				findings: [],
+				volumes: book.volumes.map((volume, v) => ({
+					volumeId: `v${String(v + 1).padStart(4, '0')}`,
+					title: volume.title,
+					chapters: volume.chapters.map((chapter) => ({
+						chapterId: `ch${String(++chapterIndex).padStart(4, '0')}`,
+						title: chapter.title,
+						line: chapterIndex,
+						paragraphs: chapter.paragraphs.map((text, p) => ({
+							id: `p${String(p + 1).padStart(4, '0')}`,
+							text,
+						})),
+						notes: chapter.notes,
+					})),
+				})),
+			}
+			const title = options.title.trim()
+			const language = book.metadata.language ?? 'zh-CN'
+			await writeTxtLayout(opened, structure.volumes, { title, language })
+			await opened.writeFile(
+				projectFiles.original(format === 'markdown' ? 'md' : format),
+				bytes,
+			)
+			const report: WizardReport = {
+				formatVersion,
+				format,
+				structure,
+				volumeSuggestions: structure.volumes.map((volume) => ({
+					title: volume.title,
+					firstChapterId: volume.chapters[0].chapterId,
+					lastChapterId: volume.chapters[volume.chapters.length - 1].chapterId,
+				})),
+				check: { title, language, chapterFindings: [] },
+			}
+			await opened.write(projectFiles.importReport, report)
+			const series = await opened.read(projectFiles.series)
+			await opened.write(projectFiles.series, {
+				...series,
+				volumeIds: structure.volumes.map((volume) => volume.volumeId),
+			})
+		} else {
+			await importTxt(opened, bytes, {
+				title: options.title.trim(),
+				encoding: options.encoding,
+			})
+		}
 		const references: string[] = []
 		await mkdir(join(opened.root, 'source/references'), { recursive: true })
 		for (const [i, path] of options.references.entries()) {
@@ -289,9 +404,20 @@ export async function importTxtProject(options: {
 		const report = (await opened.read(
 			projectFiles.importReport,
 		)) as WizardReport
-		const next: WizardReport = { ...report, references }
+		const illustrations = book
+			? await importIllustrations(opened, bytes, book)
+			: []
+		const next: WizardReport = {
+			...report,
+			references,
+			externalReferences: references,
+			illustrations,
+			selectedIllustrations: [],
+		}
 		await opened.write(projectFiles.importReport, next)
-		return await readImportWizard(opened)
+		const result = await readImportWizard(opened)
+		await register?.(result.workIds, result.projectDir)
+		return result
 	} catch (error) {
 		await rm(root, { recursive: true, force: true })
 		throw error
@@ -301,11 +427,35 @@ export async function importTxtProject(options: {
 export async function reviseTxtProject(
 	projectDir: string,
 	layout: ImportLayout,
+	selectedIllustrations?: string[],
 ) {
 	using project = await Project.open(projectDir)
 	const report = (await project.read(projectFiles.importReport)) as WizardReport
+	const selected = selectedIllustrations ?? report.selectedIllustrations ?? []
+	const externalReferences =
+		report.externalReferences ?? report.references ?? []
+	const illustrations = report.illustrations ?? []
+	if (new Set(selected).size !== selected.length) throw invalid('插图选择无效')
+	const selectedCandidates = selected.map((id) => {
+		const candidate = illustrations.find((candidate) => candidate.id === id)
+		if (!candidate) throw invalid('插图选择无效')
+		return candidate
+	})
+	if (externalReferences.length + selected.length > 3)
+		throw invalid('最多选择 3 张参考图')
 	const volumes = applyLayout(report.structure, layout)
 	const ids = await workIds(project)
+	if (
+		ids.length !==
+		(report.layout?.volumes.length ?? report.structure.volumes.length)
+	)
+		throw invalid('系列已添加新卷，不能重新划分原文')
+	const references = [...externalReferences]
+	for (const candidate of selectedCandidates) {
+		const path = `source/references/${candidate.id}.png`
+		await project.writeFile(path, await project.readFile(candidate.cachePath))
+		references.push(path)
+	}
 	const settings = {
 		...(await firstSettings(project)),
 		confirmWithReferences: layout.confirmWithReferences,
@@ -339,6 +489,9 @@ export async function reviseTxtProject(
 	const starts = layout.chapters.map((chapter) => chapter.start)
 	const next: WizardReport = {
 		...report,
+		externalReferences,
+		selectedIllustrations: selected,
+		references,
 		check: {
 			title,
 			language: layout.language,

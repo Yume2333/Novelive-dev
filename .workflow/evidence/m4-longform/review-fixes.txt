@@ -1,0 +1,88 @@
+PR 66 review follow-up, based on merged main at 3612fae
+
+Verified cases and separate product fixes
+----------------------------------------
+1. 9ff8e29: changing the bible during later-volume synthesis rejected the shared
+   preparation. A typed stale-bible error now retries that volume serially up to
+   three attempts; previews and completed earlier volumes are reused. Tests
+   exercise one successful retry and continuously changing input exhausting the
+   bound, without duplicate readiness callbacks or earlier-volume synthesis.
+2. e962e3c: a sequel could confirm new visuals into the owning series style.
+   An effective confirmed style with references now skips repeat visual approval.
+   Integration coverage checks production starts without candidates; the real
+   Electron gate additionally checks approved main-visual bytes are unchanged.
+3. 7a806c6: overlapping joins read the same series volume list. Joins now serialize
+   per project root across Project handles; tests cover concurrent valid joins
+   with a failed join between them, preserving both sources and registry entries.
+4. 137b71f: declared EPUB source language overrode the established output language.
+   Joined work language now comes from the existing series work first. Tests use
+   declared English/Japanese sources and assert Chinese output plus intact source.
+5. c441e64: preparing from the first work supplied its language to every volume.
+   Each volume now reads its own work language. The production-service test checks
+   Chinese first-volume and Japanese second-volume preview/synthesis prompts.
+6. 3d39987: an image-only DOCX prelude was dropped at the first heading. Its inline
+   covers now attach to volume 0/chapter 0, without a paragraph. Covers-only DOCX
+   still rejects as no_extractable_text; ordinary inline image positions persist.
+7. ee923e3: chapter eviction tracking retained every dropped sequence forever.
+   Its global sequence history is now bounded by maxEntries, iterated without a
+   per-query copy. Forgotten history advances a conservative scope gap watermark.
+   Tests cover exact recent backfill and truthful gaps beyond the tracking bound.
+8. a075915: join mode showed an ignored work title. The field is hidden; the
+   focused real Electron join test asserts there is no work-title textbox.
+9. b0daf88: Workflow already used strokeWidth=1.8; the drawer close X did not.
+   The X now uses 1.8 too. No unrelated icon changes.
+
+Post-merge fixture maintenance
+------------------------------
+The initial requested gate at 3612fae reported 1 failed / 2 passed: missing strict
+writer replay after main's prose-style review change. The no-network synthetic
+responder now authors that review; cassettes were regenerated in-process, with
+zero provider calls. The gate queues the inherited-style sequel after the second
+project obtains the production slot, without requiring another visual approval.
+Tiny typed fixture corrections retain the import schema's discriminants/fields.
+
+Final local verification
+------------------------
+pnpm typecheck
+  $ tsc --noEmit
+  Exit code: 0
+
+pnpm lint
+  Checked 350 files. No fixes applied.
+  Found 1 info.
+  Exit code: 0
+  Existing tests/fixtures/text-models/build-synthetic.ts useTemplate suggestion.
+
+NL_REPLAY=strict pnpm test tests/integration/m4-series-production.test.ts tests/integration/m4-series.test.ts
+  Test Files  2 passed (2)
+       Tests  15 passed (15)
+
+NL_REPLAY=strict pnpm test tests/unit/m4-docx.test.ts tests/unit/m4-import-wizard.test.ts
+  Test Files  2 passed (2)
+       Tests  38 passed (38)
+
+NL_REPLAY=strict pnpm test tests/unit/m2-chat-events.test.ts
+  Test Files  1 passed (1)
+       Tests  10 passed (10)
+
+NL_REPLAY=strict pnpm test tests/unit/m1a-synthesis.test.ts tests/unit/m4-docx.test.ts tests/unit/m4-import-join.test.ts tests/integration/m4-queue.test.ts
+  Test Files  4 passed (4)
+       Tests  103 passed (103)
+  This later run includes the typed DOCX/EPUB fixture corrections.
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 longform and queue'
+  W1 five formats, EPUB fallback, notes, manual illustrations and scanned PDF (5.5s)
+  W2-W3 continuous series, scheduling, crash recovery, waiting notifications and actual usage (1.1m)
+  W3 real host no-tray, tray reopen and same-profile second instance (3.2s)
+  3 passed (1.3m)
+
+NL_REPLAY=strict xvfb-run -a pnpm exec playwright test tests/e2e/m4-import-join.spec.ts
+  M4 wizard joins a second book to an existing series in real Electron (1.6s)
+  1 passed (2.0s)
+
+git diff --check: no output, exit 0.
+UI behavior exercised; appearance was not separately visually reviewed.
+
+Environment: the retained main-comparison worktree caused Biome's nested-root
+configuration error. Moved that archival worktree with git worktree move to
+~/novelive-private/m4-main-compare; no lint/build/shared configuration edits.

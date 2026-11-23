@@ -1132,6 +1132,7 @@ export class ChapterScheduler {
 		if (work.reason === 'confirm_visual') return ['confirm-visual', 'confirm']
 		if (work.reason === 'confirm_first') return ['confirm-first', 'confirm']
 		if (work.status === 'done') return ['done', 'idle']
+		if (work.reason === 'crashed') return ['producing', 'stopped']
 		if (
 			!this.get(
 				"SELECT 1 FROM task WHERE work_id = ? AND kind = 'chapter'",

@@ -1,0 +1,295 @@
+M4 longform and queue — Slice C verification
+
+Synthetic fixtures only; no paid model calls. Native notification show() and tray-watcher availability are controlled for headless Electron; actual renderer/preload/creator IPC, native tray handlers, windows, SIGKILL recovery and production run normally.
+
+Environment: Node 24.22.3, pnpm 12.21.0; installed mesa-vulkan-drivers (lavapipe) for the existing real upscaler tests. No test bypass or repository build/CI configuration change.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 longform and queue'
+$ pnpm build && playwright test --grep 'M4 longform and queue'
+$ pnpm --filter @novelive/desktop build
+$ electron-vite build
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 1506 modules transformed.
+rendering chunks...
+[plugin vite:reporter]
+(!) /home/ubuntu/repos/Novelive-dev/packages/creator/src/project/index.ts is dynamically imported by /home/ubuntu/repos/Novelive-dev/packages/creator/src/entry.ts but also statically imported by /home/ubuntu/repos/Novelive-dev/packages/creator/src/bible/editing/index.ts, /home/ubuntu/repos/Novelive-dev/packages/creator/src/import/wizard/index.ts, /home/ubuntu/repos/Novelive-dev/packages/creator/src/import/wizard/join.ts, /home/ubuntu/repos/Novelive-dev/packages/creator/src/project/player.ts, /home/ubuntu/repos/Novelive-dev/packages/creator/src/project/production.ts, /home/ubuntu/repos/Novelive-dev/packages/creator/src/usage/index.ts, dynamic import will not move module into another chunk.
+
+out/main/chunks/sanitize-unicode-BvtkLirb.js                      0.18 kB
+out/main/chunks/openai-prompt-cache-COP8flKD.js                   0.35 kB
+out/main/chunks/node-CuXhTfv0.js                                  0.39 kB
+out/main/chunks/hash-RwksDas4.js                                  0.50 kB
+out/main/chunks/session-resources-DM9jSTKE.js                     0.62 kB
+out/main/chunks/headers-dI3nc1Mq.js                               0.67 kB
+out/main/chunks/github-copilot-headers-eBo5GwLf.js                0.85 kB
+out/main/chunks/abort-signals-DeiSNi7A.js                         0.97 kB
+out/main/chunks/openrouter-cost-2NkAUD0d.js                       1.15 kB
+out/main/chunks/typesafe-system-one-L6ACgjIm.js                   1.39 kB
+out/main/chunks/cloudflare-workers-ai-system-one-DdgRr4Go.js      2.11 kB
+out/main/chunks/project-pipeline-9s8y8QEG.js                      2.45 kB
+out/main/chunks/storage-C8xc7uQx.js                               3.00 kB
+out/main/chunks/rules-CLU_Iw_q.js                                 3.04 kB
+out/main/chunks/provider-retry-WJkqjyes.js                        3.20 kB
+out/main/chunks/classifier-shared-Cc6aPt2q.js                     3.49 kB
+out/main/chunks/schema-Cwm4b2Ot.js                                3.55 kB
+out/main/chunks/error-body-CdWUqgQr.js                            3.68 kB
+out/main/chunks/grammar-BZZA6Eqg.js                               3.86 kB
+out/main/chunks/openrouter-images-4PaQTxyf.js                     5.08 kB
+out/main/chunks/system-one-shared-BCq95rop.js                     5.52 kB
+out/main/chunks/openai-decisions-BORmEQRc.js                      5.81 kB
+out/main/chunks/compile-De90LASc.js                              10.17 kB
+out/main/chunks/multipart-parser-BRdUHHBf.js                     10.96 kB
+out/main/chunks/revisions-ouoVRHRS.js                            11.03 kB
+out/main/chunks/pi-messages-Csy8WGg3.js                          11.17 kB
+out/main/chunks/parse-Js0u_a_-.js                                11.34 kB
+out/main/chunks/openai-responses-BEFr5BfJ.js                     14.22 kB
+out/main/chunks/google-generative-ai-CW9QA0Bb.js                 14.40 kB
+out/main/chunks/azure-openai-responses-CQiVS2GR.js               14.67 kB
+out/main/chunks/transform-messages-JiM6Vhid.js                   15.75 kB
+out/main/chunks/google-vertex-w1Y4pTer.js                        16.62 kB
+out/main/chunks/join-DnlkwsFB.js                                 17.64 kB
+out/main/chunks/history-D9l6tgnC.js                              17.96 kB
+out/main/index.js                                                23.22 kB
+out/main/chunks/streaming-json-6gNt-JGQ.js                       25.65 kB
+out/main/chunks/mistral-conversations--J8sw4mA.js                26.20 kB
+out/main/chunks/openai-responses-shared-BGAjmIMj.js              28.17 kB
+out/main/chunks/index-Cit94trg.js                                36.19 kB
+out/main/chunks/index-a6qmKpy0.js                                39.47 kB
+out/main/chunks/openai-completions-DJoBJA3e.js                   49.92 kB
+out/main/chunks/openai-codex-responses-Dqml_83H.js               52.73 kB
+out/main/chunks/node-txibFRnY.js                                 89.79 kB
+out/main/chunks/project-BKWU-OCf.js                              93.71 kB
+out/main/creator.js                                             113.72 kB
+out/main/chunks/index-Bu_lctqp.js                               130.22 kB
+out/main/chunks/production-CahRiagk.js                          156.83 kB
+out/main/chunks/src-j6dD3ueG.js                                 241.36 kB
+out/main/chunks/anthropic-messages-Kc-KKY1E.js                  570.57 kB
+out/main/chunks/client-B_wyAP3K.js                              954.72 kB
+out/main/chunks/index-DVArnHKT.js                             1,240.29 kB
+out/main/chunks/google-shared-DIx9vRs5.js                     1,527.42 kB
+out/main/chunks/index-BlhB2OZr.js                             1,598.12 kB
+out/main/chunks/index-v6jqN50r.js                             2,002.54 kB
+✓ built in 5.38s
+vite v7.2.7 building ssr environment for production...
+transforming...
+✓ 27 modules transformed.
+rendering chunks...
+out/preload/index.cjs  123.59 kB
+✓ built in 123ms
+vite v7.2.7 building client environment for production...
+transforming...
+✓ 3310 modules transformed.
+rendering chunks...
+../../apps/desktop/out/renderer/index.html                                                            0.40 kB
+../../apps/desktop/out/renderer/assets/manrope-vietnamese-700-normal-CUqMx5-1.woff2                   4.55 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-vietnamese-400-normal-BLrFBAHj.woff2            4.65 kB
+../../apps/desktop/out/renderer/assets/manrope-greek-700-normal-CHUG9PD8.woff2                        5.24 kB
+../../apps/desktop/out/renderer/assets/manrope-vietnamese-700-normal-pt65Fn2Z.woff                    6.36 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-vietnamese-400-normal-C-iWyKLC.woff             6.50 kB
+../../apps/desktop/out/renderer/assets/manrope-greek-700-normal-DyfsrCpP.woff                         6.74 kB
+../../apps/desktop/out/renderer/assets/manrope-cyrillic-700-normal-Dw_fZAg2.woff2                     7.85 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-ext-700-normal-DYOwVNan.woff2                    8.28 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-ext-400-normal-DR7lHpW4.woff2             9.05 kB
+../../apps/desktop/out/renderer/assets/manrope-cyrillic-700-normal-7JNVKxyl.woff                     10.00 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-ext-700-normal-eVCcYqtJ.woff                    11.35 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-ext-400-normal-DI-aIsWt.woff             12.55 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-400-normal-BG6hkEXj.woff2                13.46 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-700-normal-BZp_XxE4.woff2                       14.21 kB
+../../apps/desktop/out/renderer/assets/hanken-grotesk-latin-400-normal-CjyVwvJV.woff                 17.24 kB
+../../apps/desktop/out/renderer/assets/manrope-latin-700-normal-DGRFkw-m.woff                        18.41 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-Ba7eOkfT.woff2  1,142.55 kB
+../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-CN8EQoOj.woff   1,564.08 kB
+../../apps/desktop/out/renderer/assets/index-CDfXug_7.css                                            72.73 kB
+../../apps/desktop/out/renderer/assets/highlighted-body-PUFBAJJF-DNAmthxp.js                          0.80 kB
+../../apps/desktop/out/renderer/assets/getTextureBatchBindGroup-DOzHjhnn.js                           0.94 kB
+../../apps/desktop/out/renderer/assets/canvasUtils-mWrWvEuR.js                                       13.47 kB
+../../apps/desktop/out/renderer/assets/getTexelRangeRects-B1XIBYrK.js                                19.18 kB
+../../apps/desktop/out/renderer/assets/webworkerAll-xWYa-RMv.js                                      34.97 kB
+../../apps/desktop/out/renderer/assets/CanvasPool-B7e8SHiy.js                                        64.92 kB
+../../apps/desktop/out/renderer/assets/browserAll-BsYuUp43.js                                       102.79 kB
+../../apps/desktop/out/renderer/assets/WebGPURenderer-oGWVrajI.js                                   123.79 kB
+../../apps/desktop/out/renderer/assets/WebGLRenderer-rxB2jgOR.js                                    152.19 kB
+../../apps/desktop/out/renderer/assets/RenderTargetSystem-T5NCLZ3y.js                               167.68 kB
+../../apps/desktop/out/renderer/assets/CanvasRenderer-CmN1oQVh.js                                   281.00 kB
+../../apps/desktop/out/renderer/assets/index-B9PvXkXw.js                                          3,100.09 kB
+✓ built in 4.69s
+
+Running 3 tests using 1 worker
+
+  ✓  1 tests/e2e/m4-gate.spec.ts:116:2 › M4 longform and queue › W1 five formats, EPUB fallback, notes, manual illustrations and scanned PDF (5.1s)
+  ✓  2 tests/e2e/m4-gate.spec.ts:194:2 › M4 longform and queue › W2–W3 continuous series, scheduling, crash recovery, waiting notifications and actual usage (1.1m)
+  ✓  3 tests/e2e/m4-gate.spec.ts:559:2 › M4 longform and queue › W3 real host no-tray, tray reopen and same-profile second instance (1.3s)
+
+  3 passed (1.2m)
+
+$ NL_REPLAY=strict pnpm test
+$ vitest run
+
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev
+
+
+ Test Files  49 passed (49)
+      Tests  625 passed | 1 skipped (626)
+   Start at  05:23:11
+   Duration  24.10s (tests 90%, import 9%, transform 1%)
+
+
+Other e2e specs: strict replay, real Electron under Xvfb, all 54 non-M4-gate tests. Full-run output follows. The projection fixture's missing production.getQueue response is corrected below; the unrelated M1b gate locator still matches both .nl-text-layout and .nl-text-display. Neither the player text implementation nor m1b-gate.spec.ts changed in A–C (checked against the branch base). The broad run also reported a worker teardown timeout. This is not a clean broad-e2e result.
+
+Running 54 tests using 4 workers
+
+  ✓   3 tests/e2e/m0-shell.spec.ts:36:1 › M0 desktop shell renders the empty library and connects to a real creator (1.0s)
+  ✓   1 tests/e2e/m0-lifecycle.spec.ts:11:1 › M0 creator lifecycle and protocol recovers an interrupted generation and confines cache images (1.2s)
+  ✓   5 tests/e2e/m0-shell.spec.ts:70:1 › M0 desktop shell does not register debug commands without NL_E2E (761ms)
+  ✓   2 tests/e2e/m0-ui-shell.spec.ts:11:1 › M0 library and usage navigate between real empty pages and switch theme without native scrollbars (2.0s)
+  ✓   6 tests/e2e/m0-lifecycle.spec.ts:107:1 › M0 creator lifecycle and protocol stops after three failed handshakes until manually restarted (1.6s)
+  ✓   8 tests/e2e/m0-ui-shell.spec.ts:70:1 › M0 library and usage scroll overflowing content using the overlay track and thumb (883ms)
+  ✓   4 tests/e2e/m0-settings.spec.ts:75:1 › M0 settings saves five slots and runs recorded text and vision requests (3.0s)
+  ✓  11 tests/e2e/m0-settings.spec.ts:159:1 › M0 settings preserves a manual context limit when inheritance keeps the catalog provider (2.1s)
+  ✓  10 tests/e2e/m1b-player.spec.ts:21:2 › M1b minimal player renders local compiled beats and advances all four text kinds (2.8s)
+  ✓  12 tests/e2e/m0-settings.spec.ts:201:1 › M0 settings shows recorded image capabilities and loads their protocol thumbnails (4.2s)
+  ✓  13 tests/e2e/m1b-player.spec.ts:21:2 › M1b minimal player renders local compiled beats and advances all four text kinds and reports a missing referenced asset (4.5s)
+  ✓  15 tests/e2e/m1b-production-contract.spec.ts:14:1 › M1b fixed scene renders two host resources from the built Electron renderer (3.8s)
+  ✓  14 tests/e2e/m0-settings.spec.ts:253:1 › M0 settings cancels a slow test, reports creator interruption and retests after restart (5.2s)
+  ✓  16 tests/e2e/m1b-wizard.spec.ts:93:1 › M1b TXT wizard reviews findings, revises chapter divisions and keeps a reference image (1.4s)
+  ✓  17 tests/e2e/m0-settings.spec.ts:327:1 › M0 settings reports exhausted disconnection in the UI (1.3s)
+  ✓  18 tests/e2e/m1b-wizard.spec.ts:202:1 › M1b TXT wizard asks for an ambiguous encoding and can skip review (955ms)
+  ✓  19 tests/e2e/m0-settings.spec.ts:352:1 › M0 settings keeps other image results when the edit endpoint is unsupported (1.3s)
+  ✓  21 tests/e2e/m0-settings.spec.ts:389:1 › M0 settings backs up a damaged config before resetting it (896ms)
+  ✓  20 tests/e2e/m2-bible.spec.ts:37:1 › M2 bible and glossary views, accepts, rejects and preserves confirmed content against stale proposals (3.0s)
+  ✓  22 tests/e2e/m2-chat.spec.ts:305:1 › M2 chat panel pastes images, shows tools, stops, switches sessions and branches (1.5s)
+  ✓  24 tests/e2e/m2-chat.spec.ts:468:1 › M2 chat panel hides actions only for a truly stale proposal (779ms)
+  ✓  25 tests/e2e/m2-contract-routes.spec.ts:11:1 › M2 contract routes mount the editor and Bible without loading production (548ms)
+  ✓  23 tests/e2e/m2-bible.spec.ts:483:1 › M2 bible and glossary bridges a synthesized conflict into persistent approval and rejection controls (2.3s)
+  ✓  26 tests/e2e/m2-editor.spec.ts:85:1 › M2 editor preview locates source and current line, edits, undoes and previews a fixed project (2.2s)
+  ✘   9 tests/e2e/m1b-gate.spec.ts:49:1 › M1b make and play publishes through both confirmation points in real Electron (20.9s)
+  ✓  29 tests/e2e/m3-controls.spec.ts:26:2 › M3 player controls › skip-read completes read cont and captions with pauses but leaves unread auto text alone (1.5s)
+  ✘   7 tests/e2e/m1b-creation-ui.spec.ts:43:1 › M1b creation surfaces show the two gates, blocked chapters and live records (30.0s)
+  ✓  28 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture normal (3.4s)
+  ✓  30 tests/e2e/m3-controls.spec.ts:88:2 › M3 player controls › live text speed, page dwell, first-page saves and read-only page skipping (7.4s)
+  ✓  31 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture empty (1.6s)
+  ✓  27 tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (12.9s)
+  ✓  34 tests/e2e/m3-text.spec.ts:20:1 › M3 text typography timing units: empty, instant, nested speed and pauses (4ms)
+  ✓  33 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture failure (1.5s)
+  ✓  36 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture stale (2.1s)
+  ✓  37 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture crlf (2.5s)
+  ✓  32 tests/e2e/m3-controls.spec.ts:211:2 › M3 player controls › persistent slots, thumbnails, history and reread survive restart (7.8s)
+  ✓  39 tests/e2e/m3-controls.spec.ts:507:2 › M3 player controls › controller uses contract dwell and never skips unread or a wait (1.2s)
+  ✓  38 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture leading (2.1s)
+  ✓  40 tests/e2e/m3-controls.spec.ts:591:3 › M3 player controls › settings and reread in the real Electron player (2.7s)
+  ✓  41 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture effects (2.5s)
+  ✓  43 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture long (2.6s)
+  ✓  44 tests/e2e/m4-import-illustrations.spec.ts:20:2 › M4 illustration selection persists only the chosen epub candidate in real Electron (1.7s)
+  ✓  45 tests/e2e/m4-import-illustrations.spec.ts:20:2 › M4 illustration selection persists only the chosen docx candidate in real Electron (1.6s)
+  ✓  35 tests/e2e/m3-text.spec.ts:44:1 › M3 text typography: stable CJK, ruby, pauses, speed segments, tags and three-line pages (16.2s)
+  ✓  46 tests/e2e/m4-import-join.spec.ts:18:1 › M4 wizard joins a second book to an existing series in real Electron (1.4s)
+  ✓  47 tests/e2e/m4-production-queue.spec.ts:14:1 › M4 global production drawer shows paused rows, refetches and reorders a seeded two-work queue (1.5s)
+  ✓  48 tests/e2e/m4-single-instance.spec.ts:12:1 › M4 same-profile second instance exits and focuses the hidden original; distinct profiles remain independent (1.3s)
+  ✓  49 tests/e2e/m4-tray.spec.ts:12:1 › M4 desktop lifecycle keeps the real creator alive without a tray and reopens on activation (620ms)
+  ✓  42 tests/e2e/m3-controls.spec.ts:591:3 › M3 player controls › chapter wait in the real Electron player (9.2s)
+  ✓  51 tests/e2e/m4-tray.spec.ts:76:1 › M4 desktop lifecycle confirms active quit, cancels safely and cleans up only on acceptance (369ms)
+  ✓  53 tests/e2e/m4-tray.spec.ts:161:1 › M4 desktop lifecycle validates notifications, strips tags, limits text and locates all four destinations (518ms)
+  ✓  52 tests/e2e/m3-controls.spec.ts:591:3 › M3 player controls › reread successor in the real Electron player (2.4s)
+Worker teardown timeout of 30000ms exceeded.
+
+Failed worker ran 3 tests:
+tests/e2e/m0-shell.spec.ts:36:1 › M0 desktop shell renders the empty library and connects to a real creator
+tests/e2e/m0-shell.spec.ts:70:1 › M0 desktop shell does not register debug commands without NL_E2E
+tests/e2e/m1b-creation-ui.spec.ts:43:1 › M1b creation surfaces show the two gates, blocked chapters and live records
+  ✓  50 tests/e2e/m4-usage.spec.ts:36:1 › M4 usage and stale assets (10.2s)
+  ✓  54 tests/e2e/m1b-creation-ui.spec.ts:186:1 › M1b creation surfaces persist role models and writer presets through the creator (1.9s)
+
+
+  1) tests/e2e/m1b-creation-ui.spec.ts:43:1 › M1b creation surfaces show the two gates, blocked chapters and live records
+
+    Test timeout of 30000ms exceeded.
+
+    Error Context: test-results/m1b-creation-ui-M1b-creati-abfd5-d-chapters-and-live-records/error-context.md
+
+  2) tests/e2e/m1b-gate.spec.ts:49:1 › M1b make and play publishes through both confirmation points in real Electron
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('暮色中，一只纸船从桥下漂过。')
+    Expected: visible
+    Error: strict mode violation: getByText('暮色中，一只纸船从桥下漂过。') resolved to 2 elements:
+        1) <div aria-hidden="true" class="nl-text-layout">…</div> aka getByText('暮色中，一只纸船从桥下漂过。').first()
+        2) <div class="nl-text-display">…</div> aka getByText('暮色中，一只纸船从桥下漂过。').nth(1)
+
+    Call log:
+      - Expect "toBeVisible" getByText('暮色中，一只纸船从桥下漂过。') with timeout 5000ms
+      - waiting for getByText('暮色中，一只纸船从桥下漂过。')
+
+
+      156 | 			await capture(page, '03-confirm-first')
+      157 | 			await page.getByRole('link', { name: '试玩第一章' }).click()
+    > 158 | 			await expect(page.getByText('暮色中，一只纸船从桥下漂过。')).toBeVisible()
+          | 			                                               ^
+      159 | 			await expect(page.locator('canvas')).toBeVisible()
+      160 | 			await capture(page, '04-play-chapter-one')
+      161 | 			await page.goBack()
+        at /home/ubuntu/repos/Novelive-dev/tests/e2e/m1b-gate.spec.ts:158:51
+
+    Error Context: test-results/m1b-gate-M1b-make-and-play-10e70-ion-points-in-real-Electron/error-context.md
+
+  2 failed
+    tests/e2e/m1b-creation-ui.spec.ts:43:1 › M1b creation surfaces show the two gates, blocked chapters and live records
+    tests/e2e/m1b-gate.spec.ts:49:1 › M1b make and play publishes through both confirmation points in real Electron
+  52 passed (1.1m)
+  1 error was not a part of any test, see above for details
+
+$ NL_REPLAY=strict xvfb-run -a pnpm exec playwright test tests/e2e/m1b-creation-ui.spec.ts
+
+Running 2 tests using 1 worker
+
+  ✓  1 tests/e2e/m1b-creation-ui.spec.ts:43:1 › M1b creation surfaces show the two gates, blocked chapters and live records (1.4s)
+  ✓  2 tests/e2e/m1b-creation-ui.spec.ts:186:1 › M1b creation surfaces persist role models and writer presets through the creator (1.6s)
+
+  2 passed (3.6s)
+
+$ pnpm typecheck
+$ tsc --noEmit
+
+$ pnpm lint
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+tests/fixtures/text-models/build-synthetic.ts:63:3 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━
+
+  i Template literals are preferred over string concatenation.
+
+    61 │ function completions(content: string, finishReason = 'stop') {
+    62 │ 	return (
+  > 63 │ 		[
+       │ 		^
+  > 64 │ 			{
+        ...
+  > 82 │ 			)
+  > 83 │ 			.join('') + 'data: [DONE]\n\n'
+       │ 			^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    84 │ 	)
+    85 │ }
+
+  i Template literals are easier to read than a chain of + operators and quotes, and they avoid mistakes with spaces and escaped quotes.
+
+  i Unsafe fix: Use a template literal.
+
+     61  61 │   function completions(content: string, finishReason = 'stop') {
+     62  62 │     return (
+     63     │ - → → [
+         63 │ + → → `${[
+     64  64 │         {
+     65  65 │           choices: [
+    ······· │
+     81  81 │             `data: ${JSON.stringify({ id: 'chat_fixture', ...chunk })}\n\n`,
+     82  82 │         )
+     83     │ - → → → .join('')·+·'data:·[DONE]\n\n'
+         83 │ + → → → .join('')}data:·[DONE]\n\n`
+     84  84 │     )
+     85  85 │   }
+
+
+Checked 345 files in 445ms. No fixes applied.
+Found 1 info.
+
+Screenshots: gate-w1-{txt,md,docx,pdf,epub-nav,epub-fallback,scanned-pdf}.png; gate-w2-{reordered,crashed-paused,stale-image-reminder}.png; gate-w3-{real-player-waiting,actual-usage,host-reopened}.png.
+
+Verification boundary: functional English-source → Chinese-script output is checked under authored responses, not translation/model/art quality. The stale-asset proposal is seeded; its acceptance, staleness propagation and reminder use real UI/IPC against production-created assets. OS notification bubbles and a physical desktop tray were not visually verified.

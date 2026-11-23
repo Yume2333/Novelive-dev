@@ -9,6 +9,7 @@ import { EventReplay } from './chat/events'
 import { registerChat } from './chat/register'
 import { createConfigStore } from './config'
 import {
+	type CommandInput,
 	type CreatorFrame,
 	clientFrame,
 	creatorCommandError,
@@ -187,8 +188,11 @@ registry.register('editor.saveRules', async (input) => {
 })
 const chats = new Map<string, ReturnType<typeof openChat>>()
 const events = new EventReplay()
+// Sequences belong to this creator generation. Reopened sessions republish their
+// persisted chapter records with new seqs; clients must reset afterSeq when the
+// creator generation changes.
 let eventSeq = 0
-let closingChat = false
+let closing = false
 
 function publish(envelope: EventEnvelope) {
 	envelope.seq = ++eventSeq
@@ -232,7 +236,7 @@ async function openChat(workId: string) {
 }
 
 async function getChat(workId: string) {
-	if (closingChat) throw { code: 'cancelled', message: '创作端正在关闭' }
+	if (closing) throw { code: 'cancelled', message: '创作端正在关闭' }
 	let opening = chats.get(workId)
 	if (!opening) {
 		opening = openChat(workId)
@@ -259,6 +263,7 @@ function loadProduction() {
 			config,
 			process.env.NL_PRODUCTION_CASSETTE_DIR
 				? {
+						...strictReplayOptions(),
 						directory: process.env.NL_PRODUCTION_CASSETTE_DIR,
 						fallbackDirectory: process.env.NL_PRODUCTION_FALLBACK_DIR,
 						normalizeIds: true,
@@ -273,6 +278,7 @@ function loadProduction() {
 }
 
 function getProduction() {
+	if (closing) throw { code: 'cancelled', message: '创作端正在关闭' }
 	production ??= loadProduction()
 	return production
 }
@@ -321,6 +327,12 @@ registry.register('production.confirmVisual', async (input) =>
 registry.register('production.continue', async ({ workId }) =>
 	(await productionSession(workId)).continue(),
 )
+registry.register('production.getQueue', async () =>
+	(await getProduction()).getQueue(),
+)
+registry.register('production.moveQueueWork', async ({ workId, direction }) =>
+	(await getProduction()).moveQueueWork(workId, direction),
+)
 registry.register('production.stop', async ({ workId }) =>
 	(await productionSession(workId)).queue.stop(workId),
 )
@@ -366,26 +378,68 @@ registry.register('model.testImage', async (_payload, signal) => {
 	})
 })
 
-registry.register('import.txt', async (payload) => {
-	const { importTxtProject } = await import('./project-pipeline')
-	const result = await importTxtProject(payload)
-	if (result.status === 'ready')
-		await (await getProduction()).remember(result.workId, result.projectDir)
-	return result
+async function importSource(
+	payload: CommandInput<'import.file'>,
+	txtOnly: boolean,
+) {
+	const { importFileProject, importTxtProject } = await import(
+		'./import/wizard'
+	)
+	const staged: string[] = []
+	async function register(workIds: string[], projectDir: string) {
+		const service = await getProduction()
+		for (const workId of workIds) {
+			staged.push(workId)
+			await service.remember(workId, projectDir)
+		}
+	}
+	try {
+		return await (txtOnly ? importTxtProject : importFileProject)(
+			payload,
+			register,
+		)
+	} catch (error) {
+		await Promise.allSettled(
+			staged.map((id) => rm(join(dataDir, 'projects', id), { force: true })),
+		)
+		throw error
+	}
+}
+registry.register('import.file', (payload) => importSource(payload, false))
+registry.register('import.txt', (payload) => importSource(payload, true))
+registry.register('import.target', async ({ projectDir }) => {
+	const { readImportTarget } = await import('./import/wizard/join')
+	return readImportTarget(projectDir)
 })
-registry.register('import.revise', async ({ projectDir, layout }) => {
-	const { reviseTxtProject } = await import('./project-pipeline')
-	const result = await reviseTxtProject(projectDir, layout)
-	await (await getProduction()).remember(result.workId, result.projectDir)
-	return result
-})
+registry.register(
+	'import.revise',
+	async ({ projectDir, layout, selectedIllustrations }) => {
+		const { reviseTxtProject } = await import('./project-pipeline')
+		const result = await reviseTxtProject(
+			projectDir,
+			layout,
+			selectedIllustrations,
+		)
+		const service = await getProduction()
+		for (const workId of result.workIds)
+			await service.remember(workId, result.projectDir)
+		return result
+	},
+)
 
-registry.register('events.list', async ({ scope, scopeId, afterSeq }) => ({
-	...(scope === 'work'
-		? events.list(scopeId, afterSeq)
-		: { events: [], gap: false }),
-	snapshot: scope === 'app' ? { ready: true, generation } : null,
-}))
+registry.register('events.list', async ({ scope, scopeId, afterSeq }) => {
+	const service = scope === 'work' && production ? await production : undefined
+	return {
+		...events.list(
+			scopeId,
+			afterSeq,
+			scope,
+			service?.records(scopeId) ?? [],
+			service?.hasRecords(scopeId) ?? false,
+		),
+		snapshot: scope === 'app' ? { ready: true, generation } : null,
+	}
+})
 
 if (process.env.NL_E2E === '1') {
 	registry.register('debug.sqliteSmoke', async () => {
@@ -424,8 +478,10 @@ parent.once('message', ({ ports }) => {
 	const [port] = ports
 	sendEvent = (frame) => port.postMessage(frame)
 	const pending = new Map<number, AbortController>()
+	const requests = new Set<Promise<void>>()
+	let draining: Promise<void> | undefined
 
-	port.on('message', async ({ data }) => {
+	async function handle(data: unknown) {
 		if (!clientFrame.check(data)) {
 			console.error('Invalid creator command frame')
 			return
@@ -460,29 +516,44 @@ parent.once('message', ({ ports }) => {
 			pending.delete(requestId)
 			port.postMessage(response)
 		}
+	}
+
+	port.on('message', ({ data }) => {
+		if (draining) return
+		const request = handle(data).finally(() => requests.delete(request))
+		requests.add(request)
 	})
-	port.once('close', () => {
+	function drain() {
+		draining ??= shutdown()
+		return draining
+	}
+	async function shutdown() {
 		sendEvent = undefined
-		closingChat = true
-		for (const opening of chats.values())
-			void opening
-				.then(async ({ chat, project }) => {
-					await chat.close()
-					project.close()
-				})
-				.catch(() => {})
+		closing = true
 		for (const controller of pending.values()) controller.abort()
 		pending.clear()
-		void production?.then((session) => session.close())
-		for (const session of editorWorks.values()) {
-			void session
-				.then(async ({ project }) => {
-					const { withProjectEdits } = await import('./editor/history')
-					await withProjectEdits(project, async () => project.close())
-				})
-				.catch(() => {})
-		}
+		await Promise.allSettled([
+			...requests,
+			production?.then((session) => session.close()),
+			...[...chats.values()].map(async (opening) => {
+				const { chat, project } = await opening
+				await chat.close()
+				project.close()
+			}),
+		])
+		await Promise.allSettled(
+			[...editorWorks.values()].map(async (session) => {
+				const { project } = await session
+				const { withProjectEdits } = await import('./editor/history')
+				await withProjectEdits(project, async () => project.close())
+			}),
+		)
 		editorWorks.clear()
+	}
+	port.once('close', () => void drain())
+	parent.once('message', ({ data }) => {
+		if (data?.type !== 'shutdown' || data.generation !== generation) return
+		void drain().then(() => process.exit(0))
 	})
 	port.start()
 	parent.postMessage({ type: 'ready', generation })

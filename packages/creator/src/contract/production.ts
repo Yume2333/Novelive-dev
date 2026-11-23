@@ -11,6 +11,7 @@ import {
 	opt,
 	type Static,
 	str,
+	union,
 } from '@earendil-works/pi-schema'
 import {
 	assetId,
@@ -24,6 +25,7 @@ import {
 	workId,
 	workPhaseSchema,
 } from '@novelive/format/model'
+import { productionQueueSchema } from './queue'
 
 const work = { workId }
 const chapter = { ...work, chapterId: entityId }
@@ -79,6 +81,11 @@ const playerChaptersSchema = arr(
 )
 
 export const productionCommands = {
+	'production.getQueue': { input: obj({}), output: productionQueueSchema },
+	'production.moveQueueWork': {
+		input: obj({ workId, direction: union([lit(-1), lit(1)]) }),
+		output: productionQueueSchema,
+	},
 	'production.playerStatus': {
 		input: obj({ ...work, directory: opt(str({ minLength: 1 })) }),
 		output: obj({ chapters: playerChaptersSchema }),
@@ -135,6 +142,9 @@ export const productionSnapshotEventSchema = obj({
 })
 
 export const productionSnapshotEvent = compile(productionSnapshotEventSchema)
+export const productionQueueEvent = compile(
+	obj({ type: lit('production.queue'), payload: productionQueueSchema }),
+)
 export const productionChapterRecordEvent = compile(
 	obj({
 		type: lit('production.chapterRecord'),

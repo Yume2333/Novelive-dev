@@ -18,6 +18,7 @@ import { installNotifications } from './notifications'
 import { installLifecycle } from './tray'
 
 let creator: Electron.UtilityProcess | undefined
+let creatorDraining = false
 let generation = 0
 let state: HostState['creator'] = 'down'
 let library: BrowserWindow | undefined
@@ -27,6 +28,9 @@ let lifecycle: ReturnType<typeof installLifecycle>
 let closeNotifications: (() => void) | undefined
 const failureLimit = 3
 const handshakeTimeoutMs = 10_000
+const primaryInstance = app.requestSingleInstanceLock()
+if (!primaryInstance) app.quit()
+else app.on('second-instance', () => lifecycle?.show())
 
 protocol.registerSchemesAsPrivileged([
 	{
@@ -68,8 +72,21 @@ function stopCreator() {
 	worker?.kill()
 }
 
+async function drainCreator() {
+	creatorDraining = true
+	const worker = creator
+	creator = undefined
+	if (!worker) return
+	await new Promise<void>((resolve) => {
+		worker.once('exit', () => resolve())
+		worker.postMessage({ type: 'shutdown', generation })
+	})
+	keepAwake(false)
+}
+
 function startCreator(window: BrowserWindow) {
-	if (failures >= failureLimit || window.isDestroyed()) return
+	if (creatorDraining || failures >= failureLimit || window.isDestroyed())
+		return
 	stopCreator()
 	generation += 1
 	state = 'starting'
@@ -163,13 +180,14 @@ function openLibrary() {
 }
 
 app.whenReady().then(async () => {
+	if (!primaryInstance) return
 	await installProgressIpc(() => library)
 	lifecycle = installLifecycle({
 		window: () => library,
 		active: () => blocker !== undefined,
-		cleanup: () => {
+		cleanup: async () => {
 			closeNotifications?.()
-			stopCreator()
+			await drainCreator()
 		},
 	})
 	closeNotifications = installNotifications(() => library, lifecycle.show)
@@ -192,14 +210,19 @@ app.whenReady().then(async () => {
 		return result.filePaths[0] ?? null
 	})
 	ipcMain.handle('novelive:pick-files', async (_event, kind: unknown) => {
-		if (kind !== 'txt' && kind !== 'image') return []
+		if (kind !== 'source' && kind !== 'txt' && kind !== 'image') return []
 		const result = await dialog.showOpenDialog({
 			properties:
 				kind === 'image' ? ['openFile', 'multiSelections'] : ['openFile'],
 			filters:
 				kind === 'image'
 					? [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
-					: [{ name: 'TXT', extensions: ['txt'] }],
+					: [
+							{
+								name: '原文',
+								extensions: ['txt', 'epub', 'md', 'markdown', 'docx', 'pdf'],
+							},
+						],
 		})
 		return result.filePaths
 	})

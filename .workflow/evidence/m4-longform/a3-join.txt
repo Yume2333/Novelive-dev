@@ -1,0 +1,63 @@
+Slice A3: append an imported book to an existing series
+
+The import UI offers New Project / Join Existing Series, uses the existing
+folder picker, and queries import.target to validate the selected Novelive
+project and show its series. Projects currently contain one series.
+
+import.file accepts join: { projectDir, seriesId }. All five formats share
+the extraction path, then joinSeries appends each extracted volume in order.
+Each joined volume saves its original under source/imports/<volumeId>/.
+All new work IDs are registered. Existing settings are inherited by new
+works, while existing bible/settings/source files remain byte-identical.
+Joined imports do not use the empty-project layout writer. A stale original
+wizard cannot revise away volumes appended by a later join.
+
+Illustration selection and adding external references remain new-project-only.
+Joins retain existing project references; their import report is not replaced.
+The UI shows the added volume titles/chapter counts and links to the new work.
+
+pnpm typecheck
+$ tsc --noEmit
+Exit code: 0
+
+pnpm lint
+Checked 335 files in 189ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+Existing informational useTemplate suggestion: tests/fixtures/text-models/build-synthetic.ts:63.
+
+NL_REPLAY=strict pnpm test tests/unit/m4-import-join.test.ts tests/unit/m4-import-wizard.test.ts tests/unit/m4-import-contract.test.ts tests/unit/m1b-import-wizard.test.ts tests/integration/m4-series.test.ts
+ Test Files  5 passed (5)
+      Tests  48 passed (48)
+   Duration  1.16s (tests 57%, import 31%, transform 11%)
+Exit code: 0
+
+The join tests cover Markdown, DOCX, TXT, EPUB and PDF; multi-volume order;
+original preservation; byte-identical existing series/volume/work bible and
+settings files; invalid projects/series; empty input; unsupported added
+references; and preventing destructive layout revision after a join.
+
+Build from pnpm test:e2e:
+✓ built in 5.69s
+✓ built in 113ms
+✓ built in 4.38s
+Existing nonblocking Vite warning: Project is statically and dynamically imported.
+
+A2 regression tests on the same build:
+  ✓  1 tests/e2e/m4-import-illustrations.spec.ts:20:2 › M4 illustration selection persists only the chosen epub candidate in real Electron (1.7s)
+  ✓  2 tests/e2e/m4-import-illustrations.spec.ts:20:2 › M4 illustration selection persists only the chosen docx candidate in real Electron (1.6s)
+
+NL_REPLAY=strict xvfb-run -a pnpm exec playwright test tests/e2e/m4-import-join.spec.ts --workers=1
+  ✓  1 tests/e2e/m4-import-join.spec.ts:18:1 › M4 wizard joins a second book to an existing series in real Electron (1.7s)
+  1 passed (2.1s)
+Exit code: 0
+
+Real Electron check: creates the first project through the UI, rejects an
+invalid target folder, joins a second two-volume book through the UI, checks
+visible new volume titles/counts, original files, every new work's persisted
+binding, and onward routing. Screenshot: a3-joined-volumes.png.
+
+Scope: work-overview synthesis is not verified here. production.get starts
+prepareVolume for unstarted works; completing that requires the gate's model
+configuration/cassettes. This test verifies the join summary and navigation,
+not synthesis or production completion. Appearance is visually unreviewed.

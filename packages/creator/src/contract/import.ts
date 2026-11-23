@@ -49,26 +49,29 @@ const extractedBook = {
 	),
 }
 
+const illustrationSchema = obj({
+	archivePath: str({
+		pattern:
+			'^(?:(?!\\.{1,2}(?:/|$))[^/:\\\\\\x00-\\x1f]+/)*(?!\\.{1,2}$)[^/:\\\\\\x00-\\x1f]+$',
+	}),
+	volume: start,
+	chapter: start,
+	paragraph: opt(start),
+})
+
 export const extractedBookSchema = union([
 	obj({
 		...extractedBook,
 		format: lit('epub'),
 		navigation: oneOf(['nav', 'ncx', 'heading', 'spine']),
-		illustrations: arr(
-			obj({
-				// ZIP entry key, not a URL or a destination on disk.
-				archivePath: str({
-					pattern:
-						'^(?:(?!\\.{1,2}(?:/|$))[^/:\\\\\\x00-\\x1f]+/)*(?!\\.{1,2}$)[^/:\\\\\\x00-\\x1f]+$',
-				}),
-				// Zero-based volume/chapter indexes; if present, paragraph is the nearby body text.
-				volume: start,
-				chapter: start,
-				paragraph: opt(start),
-			}),
-		),
+		illustrations: arr(illustrationSchema),
 	}),
-	obj({ ...extractedBook, format: oneOf(['markdown', 'docx', 'pdf']) }),
+	obj({
+		...extractedBook,
+		format: lit('docx'),
+		illustrations: arr(illustrationSchema),
+	}),
+	obj({ ...extractedBook, format: oneOf(['markdown', 'pdf']) }),
 ])
 export type ExtractedBook = Static<typeof extractedBookSchema>
 
@@ -92,35 +95,85 @@ export const importLayoutSchema = obj({
 
 export const importWizardSchema = obj({
 	status: lit('ready'),
+	format: oneOf(['txt', 'epub', 'markdown', 'docx', 'pdf']),
+	workIds: arr(workId, { minItems: 1 }),
 	projectDir: text,
 	workId,
-	encoding,
+	encoding: opt(encoding),
 	paragraphs: start,
 	layout: importLayoutSchema,
 	suggested: importLayoutSchema,
 	findings: arr(obj({ paragraph: start, note: str() })),
 	references: arr(text),
+	illustrations: arr(
+		obj({
+			id: text,
+			volume: start,
+			chapter: start,
+			paragraph: opt(start),
+			preview: str({ pattern: '^data:image/png;base64,', maxLength: 350000 }),
+		}),
+		{ maxItems: 40 },
+	),
+	selectedIllustrations: arr(text, { maxItems: 3, uniqueItems: true }),
 })
 
-export const importCommands = {
-	'import.txt': {
-		input: obj({
-			sourcePath: text,
-			folder: text,
+const importJoinedSchema = obj({
+	status: lit('joined'),
+	format: oneOf(['txt', 'epub', 'markdown', 'docx', 'pdf']),
+	projectDir: text,
+	seriesId: entityId,
+	workId,
+	workIds: arr(workId, { minItems: 1 }),
+	volumes: arr(
+		obj({
+			volumeId: entityId,
+			workId,
 			title: text,
-			encoding: opt(encoding),
-			references: arr(text, { maxItems: 3 }),
+			chapters: int({ minimum: 1 }),
 		}),
-		output: union([
-			obj({
-				status: lit('encoding'),
-				candidates: arr(obj({ encoding, preview: str() }), { minItems: 2 }),
-			}),
-			importWizardSchema,
-		]),
+		{ minItems: 1 },
+	),
+})
+export type ImportJoined = Static<typeof importJoinedSchema>
+
+const fileImport = {
+	input: obj({
+		sourcePath: text,
+		folder: text,
+		title: text,
+		encoding: opt(encoding),
+		references: arr(text, { maxItems: 3 }),
+		join: opt(importJoinTargetSchema),
+	}),
+	output: union([
+		obj({
+			status: lit('encoding'),
+			candidates: arr(obj({ encoding, preview: str() }), { minItems: 2 }),
+		}),
+		importWizardSchema,
+		importJoinedSchema,
+		obj({
+			status: lit('unsupported'),
+			format: lit('pdf'),
+			reason: lit('no_extractable_text'),
+		}),
+	]),
+}
+
+export const importCommands = {
+	'import.target': {
+		input: obj({ projectDir: text }),
+		output: obj({ projectDir: text, seriesId: entityId, title: str() }),
 	},
+	'import.file': fileImport,
+	'import.txt': fileImport,
 	'import.revise': {
-		input: obj({ projectDir: text, layout: importLayoutSchema }),
+		input: obj({
+			projectDir: text,
+			layout: importLayoutSchema,
+			selectedIllustrations: opt(arr(text, { maxItems: 3, uniqueItems: true })),
+		}),
 		output: importWizardSchema,
 	},
 }
