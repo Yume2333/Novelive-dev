@@ -8,6 +8,7 @@ import type { EventEnvelope } from '../../packages/creator/src/contract'
 import { importFileProject } from '../../packages/creator/src/import/wizard'
 import { Project } from '../../packages/creator/src/project'
 import { createProduction } from '../../packages/creator/src/project/production'
+import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
 import { projectFiles, type Work } from '../../packages/format/src/model'
 import { connection } from '../fixtures/cassettes/m1a-synthesis/fixture'
 import { picture } from '../fixtures/cassettes/m1b-art/fixture'
@@ -36,7 +37,8 @@ const approvedStyle = {
 	],
 }
 const approveVisual = vi.fn(
-	async (_project: Project, _volumeId: string) => approvedStyle,
+	async (_project: Project, _volumeId: string, ..._choices: unknown[]) =>
+		approvedStyle,
 )
 vi.mock('../../packages/creator/src/project/production-worker', () => ({
 	productionModels: async () => ({
@@ -67,7 +69,8 @@ vi.mock('../../packages/creator/src/project/production-worker', () => ({
 					supplemental: [],
 				}
 			},
-			confirmVisual: async () => approveVisual(project, _volumeId),
+			confirmVisual: async (...choices: unknown[]) =>
+				approveVisual(project, _volumeId, ...choices),
 		}),
 		worker: workers.get(work.workId),
 		setModels: () => setModels(work.workId),
@@ -349,6 +352,95 @@ test.each([true, false])(
 		)
 	},
 )
+
+test('reconnecting to the first volume does not admit an unstarted sequel after a crash', async () => {
+	const book = await seed()
+	const [a, b] = book.workIds
+	const worker = workers.get(a)
+	if (!worker) throw new Error('Missing fixture worker')
+	worker.hold('write:ch0001')
+	{
+		using project = await Project.open(book.projectDir)
+		for (const workId of book.workIds)
+			project.database
+				.prepare(
+					'INSERT OR IGNORE INTO work (work_id, title, queue_pos, created_at) VALUES (?, ?, 0, 0)',
+				)
+				.run(workId, workId)
+		await project.write(projectFiles.style({ level: 'series' }), {
+			formatVersion: 1,
+			entries: [approvedStyle],
+		})
+		const scheduler = new ChapterScheduler(project.database, worker)
+		scheduler.start(a, ['ch0001'])
+		scheduler.confirmVisual(a)
+		await vi.waitFor(() => expect(worker.count('write:ch0001')).toBe(1))
+		scheduler.dispose()
+		await scheduler.idle()
+	}
+	const host = production()
+	for (const id of book.workIds) await host.remember(id, book.projectDir)
+	expect((await host.get(a)).snapshot().status).toBe('stopped')
+	const sequel = await host.get(b)
+	expect(sequel.snapshot()).toMatchObject({ status: 'stopped', chapters: [] })
+	expect((await host.getQueue()).inactive).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				link: expect.objectContaining({ workId: b }),
+				reason: 'crashed',
+			}),
+		]),
+	)
+	expect(requests).toEqual([])
+	expect(workers.get(b)?.count('write:ch0003')).toBe(0)
+	await sequel.continue()
+	await vi.waitFor(() => expect(workers.get(b)?.count('write:ch0003')).toBe(1))
+})
+
+test('skipping visual confirmation selects all imported references in order', async () => {
+	const book = await seed()
+	using project = await Project.open(book.projectDir)
+	const [workId] = book.workIds
+	const {
+		volumeIds: [volumeId],
+	} = await project.read(projectFiles.series)
+	const file = projectFiles.work(volumeId, workId)
+	const work = await project.read(file)
+	await project.write(file, {
+		...work,
+		settings: { ...work.settings, confirmWithReferences: false },
+	})
+	const references = [
+		'source/first.png',
+		'source/second.png',
+		'source/third.png',
+	]
+	await project.write(projectFiles.importReport, {
+		...(await project.read(projectFiles.importReport)),
+		references,
+	})
+	const host = production()
+	await host.remember(workId, book.projectDir)
+	await host.get(workId)
+	expect(approveVisual).toHaveBeenCalledWith(
+		expect.any(Project),
+		volumeId,
+		expect.anything(),
+		{
+			mainVisuals: [{ id: 'reference-1', cachePath: references[0] }],
+			supplemental: references.slice(1).map((cachePath, index) => ({
+				id: `reference-${index + 2}`,
+				cachePath,
+			})),
+			characters: [],
+		},
+		{
+			mainVisualId: 'reference-1',
+			supplementalIds: ['reference-2', 'reference-3'],
+			characters: [],
+		},
+	)
+})
 
 test('a sequel cannot open a visual gate before the first volume and inherits the approved style after restart', async () => {
 	const book = await seed()

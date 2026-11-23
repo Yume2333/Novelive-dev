@@ -174,6 +174,16 @@ export function createProduction(
 	function recoverProject(project: Project) {
 		if (recoveredProjects.has(project.root)) return
 		recoverChapterWork(project.database)
+		project.database
+			.prepare(
+				`UPDATE work AS pending SET status = 'paused', pause_reason = 'crashed'
+				WHERE status = 'queued'
+				AND NOT EXISTS (SELECT 1 FROM chapter WHERE work_id = pending.work_id)
+				AND EXISTS (SELECT 1 FROM work AS interrupted
+					WHERE status = 'paused' AND pause_reason = 'crashed'
+					AND EXISTS (SELECT 1 FROM chapter WHERE work_id = interrupted.work_id))`,
+			)
+			.run()
 		recoveredProjects.add(project.root)
 	}
 
@@ -264,7 +274,8 @@ export function createProduction(
 					const volume = await project.read(projectFiles.volume(volumeId))
 					for (const id of volume.workIds) {
 						await remember(id, root)
-						if (!shutdown.signal.aborted) void get(id).catch(() => {})
+						if (!shutdown.signal.aborted && !crashPaused(project, id))
+							void get(id).catch(() => {})
 					}
 				},
 			})
@@ -292,6 +303,14 @@ export function createProduction(
 				await volumes.get(volumeId)?.promise
 			},
 		}
+	}
+
+	function crashPaused(project: Project, workId: string) {
+		return !!project.database
+			.prepare(
+				"SELECT 1 FROM work WHERE work_id = ? AND status = 'paused' AND pause_reason = 'crashed'",
+			)
+			.get(workId)
 	}
 
 	async function cache(project: Project, path: string) {
@@ -338,18 +357,29 @@ export function createProduction(
 			const started = data
 				.prepare('SELECT 1 FROM chapter WHERE work_id = ? LIMIT 1')
 				.get(workId)
-			let preparation = preparations.get(project.root)
-			if (preparation && !(await preparation.has(volumeId))) {
-				await preparation.running
-				if (preparations.get(project.root) === preparation)
-					preparations.delete(project.root)
-				preparation = preparations.get(project.root)
+			async function prepare() {
+				const currentModels = await settings()
+				let preparation = preparations.get(project.root)
+				if (preparation && !(await preparation.has(volumeId))) {
+					await preparation.running
+					if (preparations.get(project.root) === preparation)
+						preparations.delete(project.root)
+					preparation = preparations.get(project.root)
+				}
+				checkOpen()
+				if (!preparation) {
+					preparation = startPreparation(
+						project.root,
+						work.language,
+						currentModels,
+					)
+					preparations.set(project.root, preparation)
+				}
+				return preparation
 			}
-			checkOpen()
-			if (!preparation) {
-				preparation = startPreparation(project.root, work.language, models)
-				preparations.set(project.root, preparation)
-			}
+			const pausedAfterCrash = crashPaused(project, workId)
+			const preparation = pausedAfterCrash ? undefined : await prepare()
+			let continuing: Promise<ProductionSnapshot> | undefined
 			let pool: Awaited<ReturnType<typeof service.candidates>> | undefined
 			let visual: ProductionSnapshot['visual'] = null
 			let confirmingVisual = false
@@ -457,7 +487,9 @@ export function createProduction(
 				}
 				visualChanged(project.root)
 			}
-			if (!started || queue.snapshot(workId).phase === 'confirm-visual') {
+			async function prepareVisual(
+				preparation: Awaited<ReturnType<typeof prepare>>,
+			) {
 				if (!started) {
 					await preparation.volume(volumeId)
 					summary = (await project.read(projectFiles.skeleton(volumeId)))
@@ -476,10 +508,14 @@ export function createProduction(
 				} else if (references.length && !work.settings.confirmWithReferences) {
 					await confirmSeriesVisual(
 						bible.style,
-						{ mainVisuals: references, supplemental: [], characters: [] },
+						{
+							mainVisuals: references.slice(0, 1),
+							supplemental: references.slice(1),
+							characters: [],
+						},
 						{
 							mainVisualId: references[0].id,
-							supplementalIds: [],
+							supplementalIds: references.slice(1).map(({ id }) => id),
 							characters: [],
 						},
 					)
@@ -522,6 +558,11 @@ export function createProduction(
 					if (!started) queue.start(workId, work.chapterIds)
 				}
 			}
+			if (
+				preparation &&
+				(!started || queue.snapshot(workId).phase === 'confirm-visual')
+			)
+				await prepareVisual(preparation)
 			checkOpen()
 			admitted = true
 			emit()
@@ -565,12 +606,23 @@ export function createProduction(
 							confirmingVisual = false
 						}
 					}),
-				continue: () =>
-					runJob(async () => {
+				continue() {
+					continuing ??= runJob(async () => {
+						if (pausedAfterCrash) {
+							const preparation = await prepare()
+							if (!started && crashPaused(project, workId)) {
+								await prepareVisual(preparation)
+								return snapshot()
+							}
+						}
 						await refresh()
 						queue.continue(workId)
 						return snapshot()
-					}),
+					}).finally(() => {
+						continuing = undefined
+					})
+					return continuing
+				},
 				retry: (chapterId: string) =>
 					runJob(async () => {
 						await refresh()
