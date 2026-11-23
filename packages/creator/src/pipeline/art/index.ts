@@ -40,6 +40,7 @@ type Options = ModelOptions & {
 	fast: TextConnection
 	visual: TextConnection
 	scope?: ProjectScope
+	readScope?: ProjectScope
 	resolution?: '2K' | '4K'
 	lossless?: boolean
 }
@@ -78,7 +79,7 @@ export class ArtProduction {
 	}
 
 	async registry(): Promise<AssetRegistry> {
-		return resolveRegistry(this.project, this.scope)
+		return resolveRegistry(this.project, this.options.readScope ?? this.scope)
 	}
 
 	async register(
@@ -91,13 +92,6 @@ export class ArtProduction {
 		return this.writeRegistry(async () => {
 			const previous = await this.registry()
 			const plan = planArt(items, bible, previous, merges)
-			if (this.scope.level !== 'series')
-				plan.jobs = plan.jobs.filter(
-					(job) =>
-						!previous.entries.some(
-							(entry) => entry.id === job.assetId && entry.status === 'drawn',
-						),
-				)
 			const existing = new Set(previous.entries.map((entry) => entry.id))
 			for (const entry of plan.registry.entries)
 				if (!existing.has(entry.id)) entry.path = this.scoped(entry.path)

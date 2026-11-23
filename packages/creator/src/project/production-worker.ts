@@ -116,7 +116,7 @@ export function chapterWorker(
 			replay,
 			signal,
 			resolution: work.settings.outputResolution,
-			scope: { level: 'work', volumeId, workId: work.workId },
+			readScope: { level: 'work', volumeId, workId: work.workId },
 		})
 	const ref = (chapterId: string) => ({
 		volumeId,

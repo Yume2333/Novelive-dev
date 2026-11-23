@@ -191,7 +191,7 @@ test('join appends collision-free sources without modifying shared entries or or
 
 test('volume two art reuses a drawn series character and writer uses target language and canonical names', async () => {
 	using p = await project()
-	await joinSeries(p, book)
+	const first = await joinSeries(p, book)
 	const second = await joinSeries(p, book)
 	await p.write(projectFiles.character(series, 'lin'), {
 		formatVersion: 1,
@@ -208,11 +208,6 @@ test('volume two art reuses a drawn series character and writer uses target lang
 		status: 'drawn' as const,
 		aliases: [],
 	}
-	await p.write(projectFiles.assetRegistry(series), {
-		formatVersion: 1,
-		entries: [asset],
-	})
-	await p.writeFile(asset.path, Buffer.from('existing character pixels'))
 	const { bible, art } = await productionBible(
 		p,
 		second.volumeId,
@@ -221,8 +216,7 @@ test('volume two art reuses a drawn series character and writer uses target lang
 	const imageFetch = vi.fn<typeof fetch>(async () => {
 		throw new Error('Unexpected image request')
 	})
-	const service = new ArtProduction(p, {
-		scope: { level: 'work', volumeId: second.volumeId, workId: second.workId },
+	const artOptions = {
 		main: connection,
 		fast: connection,
 		visual: connection,
@@ -232,24 +226,33 @@ test('volume two art reuses a drawn series character and writer uses target lang
 			model: 'fixture-image',
 			concurrency: 1,
 			retries: 0,
-			quality: 'low',
-			nativeMaxEdge: 1536,
-			postProcess: 'off',
-			upscaleTier: 'anime',
+			quality: 'low' as const,
+			nativeMaxEdge: 1536 as const,
+			postProcess: 'off' as const,
+			upscaleTier: 'anime' as const,
 		},
-		replay: { mode: 'strict', fetch: imageFetch },
+		replay: { mode: 'strict' as const, fetch: imageFetch },
+	}
+	const firstService = new ArtProduction(p, {
+		...artOptions,
+		readScope: { level: 'work', volumeId: first.volumeId, workId: first.workId },
+	})
+	await firstService.register([{ id: asset.id, kind: 'character', description: 'Lin' }], art)
+	await p.writeFile('source/portrait.webp', Buffer.from('existing character pixels'))
+	await firstService.adopt(asset.id, 'source/portrait.webp')
+	const service = new ArtProduction(p, {
+		...artOptions,
+		readScope: { level: 'work', volumeId: second.volumeId, workId: second.workId },
 	})
 	const jobs = await service.register(
 		[{ id: asset.id, kind: 'character', description: 'Lin' }],
 		art,
 		undefined,
 		undefined,
-		async ({ jobs }) => {
-			expect(jobs).toEqual([])
-		},
+		async ({ jobs }) => { expect(jobs.map((job) => job.assetId)).toEqual([asset.id]) },
 	)
-	expect(jobs).toEqual([])
-	expect((await service.registry()).entries[0]).toEqual(asset)
+	for (const job of jobs) expect(await service.draw(job, art)).toEqual({ status: 'drawn' })
+	expect((await service.registry()).entries[0].status).toBe('drawn')
 	expect(imageFetch).not.toHaveBeenCalled()
 	const requests: string[] = []
 	const synthetic: typeof fetch = async (input, init) => {
