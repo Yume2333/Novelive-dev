@@ -55,7 +55,7 @@ export async function mountMinimalPlayer(
 		text.className = 'nl-player-text'
 		box.append(text)
 		overlay.replaceChildren(box)
-		textRenderer = mountText(text, line.content, { auto })
+		textRenderer = mountText(text, line.content, { auto, continueImmediately: auto && line.kind !== 'caption' })
 	}
 	async function render(current: Beat | undefined) {
 		textRenderer?.dispose()

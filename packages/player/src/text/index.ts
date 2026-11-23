@@ -5,6 +5,7 @@ import './text.css'
 export interface TextOptions {
 	millisecondsPerCharacter?: number
 	auto?: boolean
+	continueImmediately?: boolean
 	autoSpeedMultiplier?: number
 	skip?: boolean
 }
@@ -122,6 +123,8 @@ export function mountText(
 				trailingPending = false
 				schedule()
 			}, delay)
+		} else if (page === ends.length - 1 && options.continueImmediately) {
+			resolveDone()
 		} else if (options.auto || options.skip) {
 			const count = ends[page] - (ends[page - 1] ?? 0)
 			timer = setTimeout(
