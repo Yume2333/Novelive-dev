@@ -27,7 +27,10 @@ const script = readFileSync(
 
 function chapterBeats() {
 	const compiled = compileScript(
-		script.replace('@caption 夜幕', '@caption 夜幕 #a3f8'),
+		script
+			.replace('@caption 夜幕', '@caption 夜幕 #a3f8')
+			.replace('@wait\n', '@wait #a3f7\n')
+			.replace('@wait 0.2\n', '@wait 0.2 #a3f6\n'),
 		{ ...context, sceneIds },
 	)
 	if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics))
@@ -87,7 +90,9 @@ test('projects the compiled chapter without losing direction order, resolved ass
 		text: { kind: 'caption' },
 	})
 	expect(beats[3]).toMatchObject({
-		cue: { kind: 'wait' },
+		sceneId: sceneIds[0],
+		actions: expect.arrayContaining([{ name: 'cg' }]),
+		cue: { kind: 'wait', lineId: 'a3f7' },
 		advance: { kind: 'click' },
 	})
 	expect(beats[4]).toMatchObject({
@@ -106,7 +111,8 @@ test('projects the compiled chapter without losing direction order, resolved ass
 		},
 	})
 	expect(beats[5]).toMatchObject({
-		cue: { kind: 'wait' },
+		sceneId: sceneIds[1],
+		cue: { kind: 'wait', lineId: 'a3f6' },
 		advance: { kind: 'delay', seconds: 0.2 },
 	})
 	expect(beats[6].cue).toMatchObject({

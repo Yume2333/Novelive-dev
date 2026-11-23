@@ -32,7 +32,7 @@ export interface PlayerSettings {
 
 type BeatCue =
 	| { kind: 'text'; position: SentenceRef; text: PlayerText }
-	| { kind: 'wait' }
+	| { kind: 'wait'; lineId: string }
 	| { kind: 'stage' }
 
 export interface PlaybackBeat {
@@ -49,8 +49,8 @@ function playbackCue(
 	speakerNames: Readonly<Record<string, string>>,
 ): BeatCue {
 	if (!line) return { kind: 'stage' }
-	if (line.type === 'wait') return { kind: 'wait' }
-	if (line.id === undefined) throw new Error('编译后的句子缺少 ID')
+	if (line.id === undefined) throw new Error('编译后的台词或等待缺少 ID')
+	if (line.type === 'wait') return { kind: 'wait', lineId: line.id }
 	const { kind, speaker, alias, content } = line
 	const displayName = alias ?? (speaker && (speakerNames[speaker] ?? speaker))
 	return {
