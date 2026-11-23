@@ -142,7 +142,13 @@ export const foreshadowingFileSchema = obj(
 	open,
 )
 export const styleFileSchema = obj(
-	{ ...version, entries: arr(styleSchema) },
+	{
+		...version,
+		entries: arr(styleSchema),
+		visualApprovals: opt(
+			arr(obj({ styleId: entityId, volumeId: opt(entityId) })),
+		),
+	},
 	open,
 )
 export const glossarySchema = obj(

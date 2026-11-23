@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
-import { projectFiles } from '@novelive/format/model'
+import { projectFiles, type Style } from '@novelive/format/model'
 import type { createConfigStore } from '../config'
 import type {
 	CommandInput,
@@ -26,6 +26,7 @@ import {
 	productionBible,
 	productionModels,
 } from './production-worker'
+import { entryOwner } from './series/ownership'
 
 const fail = (code: 'not_found' | 'invalid_config', message: string): never => {
 	throw { code, message }
@@ -355,6 +356,30 @@ export function createProduction(
 				setModels(next)
 				queue.setImageConcurrency(next.image.concurrency)
 			}
+			async function inheritsVisual(style: Style) {
+				if (style.status !== 'confirmed' || !style.references?.length)
+					return false
+				const owner = await entryOwner(
+					project,
+					{ level: 'work', volumeId, workId },
+					{ level: 'series' },
+					projectFiles.style,
+					style.id,
+				)
+				const document = await existing(() =>
+					project.read(projectFiles.style(owner)),
+				)
+				const approval = document?.visualApprovals?.find(
+					({ styleId }) => styleId === style.id,
+				)
+				if (!approval) return false
+				if (!approval.volumeId) return true
+				const series = await project.read(projectFiles.series)
+				const approvedAt = series.volumeIds.indexOf(approval.volumeId)
+				return (
+					approvedAt >= 0 && approvedAt < series.volumeIds.indexOf(volumeId)
+				)
+			}
 			if (!started || queue.snapshot(workId).phase === 'confirm-visual') {
 				if (!started) {
 					await preparation.volume(volumeId)
@@ -365,10 +390,7 @@ export function createProduction(
 				const references = (await readImportWizard(project)).references.map(
 					(cachePath, i) => ({ id: `reference-${i + 1}`, cachePath }),
 				)
-				if (
-					bible.style.status === 'confirmed' &&
-					bible.style.references?.length
-				) {
+				if (await inheritsVisual(bible.style)) {
 					if (!started) queue.start(workId, work.chapterIds)
 					queue.confirmVisual(workId)
 				} else if (references.length && !work.settings.confirmWithReferences) {
@@ -431,11 +453,10 @@ export function createProduction(
 				async confirm(input: CommandInput<'production.confirmVisual'>) {
 					if (snapshot().phase !== 'confirm-visual' || !pool) return snapshot()
 					await refresh()
-					await art().confirmVisual(
-						(await productionBible(project, volumeId, workId)).art.style,
-						pool,
-						input,
-					)
+					const style = (await productionBible(project, volumeId, workId)).art
+						.style
+					if (!(await inheritsVisual(style)))
+						await art().confirmVisual(style, pool, input)
 					queue.confirmVisual(workId)
 					return snapshot()
 				},

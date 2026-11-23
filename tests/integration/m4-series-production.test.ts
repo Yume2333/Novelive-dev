@@ -14,6 +14,7 @@ import { ScriptedWorker } from '../fixtures/scheduler/m1b/worker'
 const workers = new Map<string, ScriptedWorker>()
 const candidates = vi.fn()
 const approvedVolumes = new Set<string>()
+const approveVisual = vi.fn(async (_project: Project, _volumeId: string) => {})
 vi.mock('../../packages/creator/src/project/production-worker', () => ({
 	productionModels: async () => ({
 		organizer: connection,
@@ -24,6 +25,7 @@ vi.mock('../../packages/creator/src/project/production-worker', () => ({
 		art: {
 			style: approvedVolumes.has(volumeId)
 				? {
+						id: 'style',
 						status: 'confirmed',
 						references: [{ path: 'assets/style/main-visual.webp' }],
 					}
@@ -48,7 +50,7 @@ vi.mock('../../packages/creator/src/project/production-worker', () => ({
 					supplemental: [],
 				}
 			},
-			confirmVisual: async () => {},
+			confirmVisual: async () => approveVisual(project, _volumeId),
 		}),
 		worker: workers.get(work.workId),
 		setModels: () => {},
@@ -73,6 +75,7 @@ beforeEach(async () => {
 	laterRelease = undefined
 	candidates.mockClear()
 	approvedVolumes.clear()
+	approveVisual.mockReset()
 })
 afterEach(async () => {
 	laterRelease?.resolve()
@@ -276,26 +279,99 @@ test('opening the first work prepares each volume in its own work language', asy
 	])
 })
 
-test('later volumes inherit approved series artwork without another visual confirmation', async () => {
+test.each([true, false])(
+	'later volumes inherit explicitly approved artwork without another visual confirmation (series-wide: %s)',
+	async (seriesWide) => {
+		const book = await seed()
+		using project = await Project.open(book.projectDir)
+		const series = await project.read(projectFiles.series)
+		const laterVolume = series.volumeIds[1]
+		const id = book.workIds[1]
+		approvedVolumes.add(laterVolume)
+		await project.write(projectFiles.style({ level: 'series' }), {
+			formatVersion: 1,
+			entries: [
+				{
+					id: 'style',
+					status: 'confirmed',
+					description: 'Approved',
+					references: [
+						{
+							path: 'assets/style/main-visual.webp',
+							description: 'Main visual',
+						},
+					],
+				},
+			],
+			visualApprovals: [
+				{
+					styleId: 'style',
+					...(seriesWide ? {} : { volumeId: series.volumeIds[0] }),
+				},
+			],
+		})
+		const artwork = new Uint8Array([1, 2, 3])
+		await project.writeFile('assets/style/main-visual.webp', artwork)
+		const worker = workers.get(id)
+		if (!worker) throw new Error('Missing fixture worker')
+		worker.hold('write:ch0003')
+		const host = production()
+		await host.remember(id, book.projectDir)
+		const session = await host.get(id)
+		expect(session.snapshot().visual).toBeNull()
+		await vi.waitFor(() => expect(worker.count('write:ch0003')).toBe(1))
+		expect(candidates.mock.calls.some(([workId]) => workId === id)).toBe(false)
+		expect(await project.readFile('assets/style/main-visual.webp')).toEqual(
+			Buffer.from(artwork),
+		)
+	},
+)
+
+test('a sequel approving first does not clear the first volume visual gate after restart', async () => {
 	const book = await seed()
 	using project = await Project.open(book.projectDir)
 	const series = await project.read(projectFiles.series)
-	const laterVolume = series.volumeIds[1]
-	const id = book.workIds[1]
-	approvedVolumes.add(laterVolume)
-	const artwork = new Uint8Array([1, 2, 3])
-	await project.writeFile('assets/style/main-visual.webp', artwork)
-	const worker = workers.get(id)
-	if (!worker) throw new Error('Missing fixture worker')
-	worker.hold('write:ch0003')
+	approveVisual.mockImplementation(async (project, volumeId) => {
+		for (const id of series.volumeIds) approvedVolumes.add(id)
+		await project.write(projectFiles.style({ level: 'series' }), {
+			formatVersion: 1,
+			entries: [
+				{
+					id: 'style',
+					status: 'confirmed',
+					description: 'Sequel visual',
+					references: [
+						{
+							path: 'assets/style/main-visual.webp',
+							description: 'Main visual',
+						},
+					],
+				},
+			],
+			visualApprovals: [{ styleId: 'style', volumeId }],
+		})
+	})
 	const host = production()
-	await host.remember(id, book.projectDir)
-	const session = await host.get(id)
-	expect(session.snapshot().visual).toBeNull()
-	await vi.waitFor(() => expect(worker.count('write:ch0003')).toBe(1))
-	expect(candidates.mock.calls.some(([workId]) => workId === id)).toBe(false)
-	expect(await project.readFile('assets/style/main-visual.webp')).toEqual(
-		Buffer.from(artwork),
+	for (const id of book.workIds) await host.remember(id, book.projectDir)
+	const first = await host.get(book.workIds[0])
+	const later = await host.get(book.workIds[1])
+	expect(first.snapshot().phase).toBe('confirm-visual')
+	await later.confirm({
+		workId: book.workIds[1],
+		mainVisualId: 'one',
+		supplementalIds: [],
+		characters: [],
+	})
+	await later.queue.idle()
+	await host.close()
+	hosts.splice(hosts.indexOf(host), 1)
+	const restarted = production()
+	expect((await restarted.get(book.workIds[0])).snapshot().phase).toBe(
+		'confirm-visual',
+	)
+	expect(workers.get(book.workIds[0])?.count('write:ch0001')).toBe(0)
+	expect((await restarted.get(book.workIds[1])).snapshot().phase).toBe(
+		'confirm-first',
 	)
 })
 

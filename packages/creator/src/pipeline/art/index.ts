@@ -663,15 +663,32 @@ export class ArtProduction {
 			await this.persistRegistry(registry)
 		})
 		const chosen: Style = { ...style, status: 'confirmed', references }
-		await this.writeRegistry(() =>
-			persistOwnedEntries(
+		await this.writeRegistry(async () => {
+			await persistOwnedEntries(
 				this.project,
 				this.options.readScope ?? this.scope,
 				this.scope,
 				projectFiles.style,
 				[chosen],
-			),
-		)
+			)
+			const file = projectFiles.style(styleScope)
+			const document = await this.project.read(file)
+			const approvedScope = this.options.readScope ?? this.scope
+			await this.project.write(file, {
+				...document,
+				visualApprovals: [
+					...(document.visualApprovals ?? []).filter(
+						({ styleId }) => styleId !== style.id,
+					),
+					{
+						styleId: style.id,
+						...(approvedScope.level === 'series'
+							? {}
+							: { volumeId: approvedScope.volumeId }),
+					},
+				],
+			})
+		})
 		return chosen
 	}
 }
