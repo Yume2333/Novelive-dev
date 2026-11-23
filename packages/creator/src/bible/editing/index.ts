@@ -180,7 +180,7 @@ async function apply(
 	bases?: { kind: string; id: string; revision: string }[],
 ) {
 	const before = await readBible(project)
-	if (proposalRestriction(payload)) return false
+	if (proposalRestriction(payload, before)) return false
 	if (
 		bases
 			? !basesAreCurrent(before, bases)

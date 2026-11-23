@@ -445,3 +445,63 @@ test('chapter-scoped synthesis conflicts cannot replace global facts but can be 
 		await service.close()
 	}
 })
+
+test('relation conflicts with unpublished character dependencies cannot be approved', async () => {
+	const result = await publish()
+	result.conflicts = [
+		{
+			kind: 'relation',
+			op: 'add',
+			entry: {
+				id: 'unpublished-relation',
+				from: 'traveler',
+				to: 'missing',
+				description: 'Unpublished friend',
+				status: 'candidate',
+			},
+		},
+	]
+	result.glossaryConflicts = []
+	await project.write(file, result)
+	const first = await getBible(project, input)
+	const proposal = first.proposalIds
+		.map(
+			(id) => new ChatStore(project.database, ref.workId).proposal(id).proposal,
+		)
+		.find(
+			({ payload }) =>
+				payload.kind === 'bible' &&
+				payload.changes.some(({ kind }) => kind === 'relation'),
+		)
+	if (!proposal) throw new Error('Missing relation conflict')
+	const before = await readBible(project)
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'stale' })
+		expect(await readBible(project)).toEqual(before)
+		await project.write(projectFiles.character(scope, 'missing'), {
+			formatVersion,
+			entries: [
+				{
+					id: 'missing',
+					name: 'Published friend',
+					aliases: [],
+					status: 'confirmed',
+				},
+			],
+		})
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'resolved', proposal: { status: 'approved' } })
+	} finally {
+		await service.close()
+	}
+})

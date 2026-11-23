@@ -19,13 +19,35 @@ export function sourceRevision(value: unknown) {
 	return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
-export function proposalRestriction(payload: Payload): string | undefined {
+export function proposalRestriction(
+	payload: Payload,
+	bible: Bible,
+): string | undefined {
 	if (payload.kind === 'bible') {
 		const scoped = payload.changes.find(
 			(change) => change.op !== 'none' && change.observedChapter,
 		)
 		if (scoped)
 			return `此候选限定于章节 ${scoped.observedChapter}，暂不支持按章应用；仅可拒绝，不能覆盖全局设定。`
+		const characters = new Set(bible.character.map(({ id }) => id))
+		for (const change of payload.changes)
+			if (change.kind === 'character') {
+				if (change.op === 'add') characters.add(change.entry.id)
+				if (change.op === 'delete') characters.delete(change.entry.id)
+			}
+		for (const change of payload.changes) {
+			if (
+				change.kind !== 'relation' ||
+				change.op === 'none' ||
+				change.op === 'delete'
+			)
+				continue
+			const missing = [change.entry.from, change.entry.to].filter(
+				(id) => !characters.has(id),
+			)
+			if (missing.length)
+				return `依赖角色尚未登记：${missing.join('、')}；请先确认角色候选，再接受此关系。`
+		}
 	}
 }
 
