@@ -7,6 +7,20 @@ $ tsc --noEmit
 Exit code: 0
 
 PR #35 review follow-up (baseline d1ea43a verified as HEAD ancestor)
+Latest review fixes after integration 9b21dce:
+- Finding 5: 4aab74f bounds shared event replay at 256 envelopes / 1 MiB serialized bytes, drops oversized snapshots, and returns gap=true when history was discarded so consumers reload chat.get. Live delivery is unchanged. 928e963 removes the new non-null assertion. No session deletion callback exists in ChatOptions; bounded replay avoids coupling chat persistence to host retention. Tests exercise 1000 streamed snapshots, count/byte limits, empty/filter cases and oversized events.
+- Finding 6: ce46d80 makes projectChat locate imported work metadata and perform the same INSERT OR IGNORE as production (not exported there), preserving existing work/scheduler state. A concrete regression test deletes fixture task/work DB rows while keeping imported project files, verifies unadapted ChatService.create throws FOREIGN KEY constraint failed, then verifies projectChat can create the session and reopening preserves settings_rev=7/status=paused. Foreign works reject. Host closes its opened Project if adapter initialization fails.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (2.9s)
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+$ NL_REPLAY=strict pnpm check
+ Test Files  27 passed (27)
+      Tests  357 passed (357)
+All exit codes: 0. Existing fixture info unchanged; no paid calls/missing cassettes.
+
 Rebased onto origin/main 5ea3d49 after M2/02 and M2/03 merged, with no conflicts.
 Rebased finding commits: 91647a4 (finding 1), 43fd56a (finding 2).
 Desktop integration now uses registerChat(registry, getChat), one retained ChatService/Project per work, and waits for chat shutdown before closing its DB. The project adapter prepares versioned Bible/glossary proposals without writing and calls applyBibleProposal at approval. ChatStore owns all resolution persistence; the temporary resolver was deleted. Bible readers and fixtures now use ChatStore's {chapterIds,payload,rewrite?} DB envelope. Shared host event sequencing/replay now includes chat events without initializing production just to list chat events. No editor.* registration changed.
