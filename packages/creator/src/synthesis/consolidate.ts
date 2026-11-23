@@ -1,4 +1,4 @@
-import type { BiblePatch } from '@novelive/format/model'
+import type { BiblePatch, GlossaryPatch } from '@novelive/format/model'
 import type { readBible } from './patch'
 
 const nameKey = (name: string) =>
@@ -124,4 +124,90 @@ export function reconcileNamedAdditions(
 				return item
 		}
 	})
+}
+
+const selectionKinds = [
+	'character',
+	'location',
+	'relation',
+	'timeline',
+	'foreshadowing',
+	'style',
+] as const
+
+/**
+ * Lets `choose` keep a subset of each kind's additions, then removes changes
+ * and references that only pointed at a dropped addition.
+ */
+export async function selectAdditions(
+	patch: BiblePatch,
+	glossary: GlossaryPatch,
+	bible: Awaited<ReturnType<typeof readBible>>,
+	choose: (
+		kind: string,
+		candidates: readonly unknown[],
+	) => Promise<Set<number>>,
+) {
+	let selected = patch
+	for (const kind of selectionKinds) {
+		const additions = selected.filter(
+			(item) => item.kind === kind && item.op === 'add',
+		)
+		if (additions.length < 2) continue
+		const kept = await choose(
+			kind,
+			additions.map(({ entry, observedChapter }) =>
+				observedChapter ? { ...entry, observedChapter } : entry,
+			),
+		)
+		const dropped = new Set(additions.filter((_, i) => !kept.has(i)))
+		const survivors = new Set(
+			[
+				...bible[kind].map(({ id }) => id),
+				...selected.flatMap((item) =>
+					item.kind === kind && item.op === 'add' && !dropped.has(item)
+						? [item.entry.id]
+						: [],
+				),
+			].filter(Boolean),
+		)
+		const gone = new Set(
+			[...dropped]
+				.map(({ entry }) => entry.id)
+				.filter((id) => !survivors.has(id)),
+		)
+		selected = selected.flatMap((item): BiblePatch => {
+			if (dropped.has(item)) return []
+			if (item.kind === kind && gone.has(item.entry.id)) return []
+			if (kind !== 'character') return [item]
+			if (item.kind === 'relation')
+				return gone.has(item.entry.from) || gone.has(item.entry.to)
+					? []
+					: [item]
+			if (item.kind === 'character' && item.entry.addresses)
+				return [
+					{
+						...item,
+						entry: {
+							...item.entry,
+							addresses: item.entry.addresses.filter(
+								({ speakerId }) => !gone.has(speakerId),
+							),
+						},
+					} as typeof item,
+				]
+			return [item]
+		})
+	}
+	const terms = glossary.filter(
+		({ id }) => !bible.glossary.some((term) => term.id === id),
+	)
+	if (terms.length < 2) return { biblePatch: selected, glossaryPatch: glossary }
+	const kept = await choose('glossary', terms)
+	return {
+		biblePatch: selected,
+		glossaryPatch: glossary.filter(
+			(term) => !terms.includes(term) || kept.has(terms.indexOf(term)),
+		),
+	}
 }

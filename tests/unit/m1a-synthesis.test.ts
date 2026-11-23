@@ -16,6 +16,7 @@ import {
 	validatePatch,
 } from '../../packages/creator/src/synthesis/patch'
 import { type BiblePatch, projectFiles } from '../../packages/format/src/model'
+import { checkOwnerBookResumePrompt } from '../acceptance/owner-book-resume'
 import {
 	candidateTower,
 	chapters,
@@ -30,9 +31,17 @@ import {
 
 let directory: string
 let root: string
+const stream = (result: unknown) =>
+	new Response(
+		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+		{ headers: { 'content-type': 'text/event-stream' } },
+	)
 const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 	const body = await new Request(input, init).json()
 	const prompt: string = body.messages[0].content
+	const candidates = prompt.split('Candidates:\n')[1]
+	if (candidates !== undefined)
+		return stream({ keep: candidates.split('\n').map((_, i) => i + 1) })
 	const packet = /Extract only the next event in packet (\d+)\/(\d+)/.exec(
 		prompt,
 	)
@@ -322,13 +331,28 @@ test('consolidates repeated candidate additions across events and remaps referen
 		status: 'candidate',
 	} as const
 	let calls = 0
+	let selections = 0
+	const sse = (result: unknown) =>
+		new Response(
+			`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+			{ headers: { 'content-type': 'text/event-stream' } },
+		)
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const request = new Request(input, init)
 		const body = await request.json()
-		expect(body.messages[0].content).toContain(
-			'qualifying new facts, not repeated background',
-		)
+		if (body.messages[0].content.includes('Candidates:\n')) {
+			selections++
+			expect(body.messages[0].content).toMatch(
+				/character candidates[\s\S]*\n1 \{"id":"guide"[\s\S]*\n2 \{"id":"guide"/,
+			)
+			return sse({ keep: [1, 2] })
+		}
+		expect(body.messages[0].content).toContain('Never restate a proposed entry')
 		const first = calls++ === 0
+		if (!first)
+			expect(body.messages[0].content).toContain(
+				'Already proposed entries:\ncharacter guide Lin/Guide\n',
+			)
 		const candidate = first
 			? guide
 			: {
@@ -376,6 +400,7 @@ test('consolidates repeated candidate additions across events and remaps referen
 		fetch,
 	})
 	expect(calls).toBe(2)
+	expect(selections).toBe(1)
 	expect(result.conflicts).toEqual([])
 	expect(result.biblePatch).toMatchObject([
 		{
@@ -655,6 +680,144 @@ test('a hard stop persists exactly one event and resumes after reopening without
 	}
 })
 
+const selectionFixture = async (
+	input: RequestInfo | URL,
+	init?: RequestInit,
+) => {
+	const prompt: string = (await new Request(input, init).json()).messages[0]
+		.content
+	if (prompt.includes('These character candidates'))
+		return stream({ keep: [1] })
+	if (prompt.includes('These glossary candidates')) return stream({ keep: [2] })
+	return stream({
+		overview: 'Ada meets a guide.',
+		chapters: chapters.map((chapterId) => ({
+			chapterId,
+			progress: 'They travel.',
+		})),
+		event: 'The guide joins Ada.',
+		is_last: true,
+		biblePatch: ['guide', 'lin'].map((id) => ({
+			kind: 'character',
+			op: 'add',
+			entry: { id, name: 'Lin', aliases: ['Guide'], status: 'candidate' },
+		})),
+		glossaryPatch: ['key', 'seal'].map((id) => ({
+			...term,
+			id,
+			original: id,
+			written: id,
+			status: 'candidate',
+		})),
+	})
+}
+
+test('resumes the first unfinished selector without repeating extraction or saved picks', async () => {
+	await seed(root)
+	const args = { ...options, strategy: 'events' as const }
+	{
+		using project = await Project.open(root)
+		await expect(
+			synthesizeVolume(project, 'v1', chapters, {
+				...args,
+				fetch: async (input, init) => {
+					const prompt = (await new Request(input, init).clone().json())
+						.messages[0].content
+					if (prompt.includes('These glossary candidates'))
+						throw new Error('Selection interrupted')
+					return selectionFixture(input, init)
+				},
+			}),
+		).rejects.toMatchObject({ code: 'network' })
+		expect(await project.read(files.checkpoint)).toMatchObject({
+			packet: 1,
+			selections: [[1]],
+			ready: false,
+		})
+	}
+	using project = await Project.open(root)
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const prompt = (await new Request(input, init).clone().json()).messages[0]
+			.content
+		expect(checkOwnerBookResumePrompt(prompt, { packet: 2, events: 1 })).toBe(
+			'selection',
+		)
+		expect(prompt).toContain('These glossary candidates')
+		return selectionFixture(input, init)
+	})
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...args,
+		fetch,
+	})
+	expect(fetch).toHaveBeenCalledTimes(1)
+	expect(result.biblePatch.map(({ entry }) => entry.id)).toEqual(['guide'])
+	expect(result.glossaryPatch.map(({ id }) => id)).toEqual(['seal'])
+	expect(
+		await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
+	).toEqual(result)
+	expect(fetch).toHaveBeenCalledTimes(1)
+})
+
+test.each([false, true])(
+	'partial publication never reinterprets saved selection picks (legacy: %s)',
+	async (legacy) => {
+		await seed(root)
+		const args = { ...options, strategy: 'events' as const }
+		const guide = projectFiles.character(scope, 'guide')
+		const glossary = projectFiles.glossary(scope)
+		const frozen = await (async () => {
+			using project = await Project.open(root)
+			const write = project.write.bind(project)
+			vi.spyOn(project, 'write').mockImplementation(async (file, value) => {
+				if (file.path === glossary.path)
+					throw new Error('Publication interrupted')
+				return write(file, value)
+			})
+			await expect(
+				synthesizeVolume(project, 'v1', chapters, {
+					...args,
+					fetch: selectionFixture,
+				}),
+			).rejects.toThrow('Publication interrupted')
+			const { selectedPatch, ...checkpoint } = await project.read(
+				files.checkpoint,
+			)
+			expect(checkpoint).toMatchObject({
+				ready: true,
+				applied: false,
+				selections: [[1], [2]],
+			})
+			expect(selectedPatch?.biblePatch.map(({ entry }) => entry.id)).toEqual([
+				'guide',
+			])
+			expect(selectedPatch?.glossaryPatch.map(({ id }) => id)).toEqual(['seal'])
+			expect(await project.read(guide)).toMatchObject({
+				entries: [{ id: 'guide' }],
+			})
+			if (legacy) await project.write(files.checkpoint, checkpoint)
+			return selectedPatch
+		})()
+		using project = await Project.open(root)
+		const fetch = vi.fn<typeof globalThis.fetch>(strict)
+		const resume = synthesizeVolume(project, 'v1', chapters, { ...args, fetch })
+		if (legacy) {
+			await expect(resume).rejects.toThrow(
+				'Cannot recover saved synthesis picks against a changed Bible',
+			)
+			expect(await project.read(files.checkpoint)).toMatchObject({
+				applied: false,
+			})
+		} else {
+			const result = await resume
+			expect(result).toMatchObject({ ...frozen, quarantined: true })
+			expect(result.conflicts.map(({ entry }) => entry.id)).toEqual(['guide'])
+			expect(result.glossaryConflicts.map(({ id }) => id)).toEqual(['seal'])
+		}
+		expect(fetch).not.toHaveBeenCalled()
+		expect(await project.read(glossary)).toMatchObject({ entries: [term] })
+	},
+)
+
 test('resumes the same synthesis packet after changing the model output cap', async () => {
 	await seed(root)
 	const prompts: string[] = []
@@ -852,9 +1015,9 @@ test('deduplication retains the first addition and the first competing identity 
 	expect(result.biblePatch.map(({ entry, op }) => [entry.id, op])).toEqual([
 		['guide', 'add'],
 		['ada', 'update'],
-		['guide', 'update'],
 		['ada', 'update'],
 	])
+	expect(result.biblePatch[0].entry).toMatchObject({ aliases: ['Navigator'] })
 	expect(result.conflicts).toMatchObject([
 		{ entry: { id: 'ada', identity: 'Admiral' } },
 	])
@@ -2160,7 +2323,7 @@ test.each(['shifted', 'missing'])(
 		const expanded = ids.map((chapterId, index) => ({
 			...previews[0],
 			chapterId,
-			summary: 'A'.repeat(index < 2 ? 650 : 2120),
+			summary: 'A'.repeat(index < 2 ? 650 : 1700),
 		}))
 		await Promise.all(
 			expanded.map((preview) =>
@@ -2217,13 +2380,19 @@ test.each(['shifted', 'missing'])(
 			strategy: 'events',
 			fetch: packetFetch,
 		})
-		expect(packetFetch).toHaveBeenCalledTimes(2)
-		const prompts = await Promise.all(
+		const contents = await Promise.all(
 			packetFetch.mock.calls.map(async ([input, init]) => {
 				const { messages } = await new Request(input, init).json()
-				const packet = String(messages[0].content).split(
-					'Chapter previews:\n',
-				)[1]
+				return String(messages[0].content)
+			}),
+		)
+		const extractions = contents.filter((content) =>
+			content.includes('Chapter previews:\n'),
+		)
+		expect(extractions).toHaveLength(2)
+		const prompts = await Promise.all(
+			extractions.map(async (content) => {
+				const packet = content.split('Chapter previews:\n')[1]
 				return Array.from(
 					new Set(
 						Array.from(

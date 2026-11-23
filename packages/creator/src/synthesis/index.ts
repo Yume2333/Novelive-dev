@@ -35,7 +35,7 @@ import {
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
-import { reconcileNamedAdditions } from './consolidate'
+import { reconcileNamedAdditions, selectAdditions } from './consolidate'
 import { scopedOnlyBrief } from './incremental/context'
 import { synthesisInstructions, synthesisOutput } from './output'
 import {
@@ -62,6 +62,15 @@ const eventFields = {
 }
 const eventSchema = obj(eventFields)
 const nextEvent = synthesisOutput(eventSchema)
+const selection = synthesisOutput(obj({ keep: arr(int({ minimum: 1 })) }))
+const selectionScope: Record<string, string> = {
+	relation:
+		"Keep only relationships that shape the volume's plot across chapters, one per pair of characters; drop single-scene interactions and restatements.",
+	timeline:
+		"Keep one entry per turning point of the volume's main plot; drop steps inside the same turning point.",
+	foreshadowing:
+		'Keep only the major threads the volume sets up for later chapters or volumes; drop scene-level suspense, hints resolved by the next chapter, and restatements.',
+}
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
 const checkpointSchema = obj({
@@ -71,6 +80,10 @@ const checkpointSchema = obj({
 	basis: str(),
 	packet: int({ minimum: 0 }),
 	events: arr(eventSchema),
+	selections: opt(arr(arr(int({ minimum: 1 })))),
+	selectedPatch: opt(
+		obj({ biblePatch: biblePatchSchema, glossaryPatch: glossaryPatchSchema }),
+	),
 	whole: nullable(outputSchema),
 	ready: bool(),
 	applied: bool(),
@@ -124,8 +137,8 @@ export interface SynthesisOptions {
 }
 
 const minimumEventLimit = 128
-const packetFormat = 6
-const legacyPacketFormats = [1, 2, 3, 4, 5]
+const packetFormat = 7
+const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const bytes = (text: string) => Buffer.byteLength(text)
@@ -155,6 +168,44 @@ function recentEvents(events: Event[], historyBudget: number) {
 		remaining -= size
 	}
 	return JSON.stringify(summaries)
+}
+function proposedEntries(events: Event[], budget: number) {
+	const lines = new Map<string, string>()
+	const items = events.flatMap((event) => event.biblePatch)
+	for (const kind of [
+		'character',
+		'location',
+		'relation',
+		'timeline',
+		'foreshadowing',
+		'style',
+	])
+		for (const item of items) {
+			if (item.kind !== kind || item.op === 'delete') continue
+			const label =
+				item.kind === 'character'
+					? [item.entry.name, ...(item.entry.aliases ?? [])].join('/')
+					: item.kind === 'location'
+						? item.entry.name
+						: item.kind === 'relation'
+							? `${item.entry.from}>${item.entry.to}`
+							: item.kind === 'timeline'
+								? item.entry.chapterId
+								: item.kind === 'foreshadowing'
+									? item.entry.plantedChapter
+									: ''
+			lines.set(`${kind}:${item.entry.id}`, `${kind} ${item.entry.id} ${label}`)
+		}
+	for (const entry of events.flatMap((event) => event.glossaryPatch))
+		lines.set(`glossary:${entry.original}`, `glossary ${entry.original}`)
+	const kept: string[] = []
+	let remaining = budget
+	for (const line of lines.values()) {
+		remaining -= bytes(line) + 1
+		if (remaining < 0) break
+		kept.push(line)
+	}
+	return kept.join('\n')
 }
 function previewPackets(
 	previews: readonly string[],
@@ -392,6 +443,10 @@ export async function synthesizeVolume(
 		: bible
 	const outputLimit = outputTokenBudget(model)
 	const historyBudget = Math.min(1024, Math.floor(model.contextWindow / 16))
+	const registryBudget = Math.max(
+		0,
+		Math.min(2048, Math.floor(model.contextWindow / 8) - 512),
+	)
 	const packetOutputReserve = Math.min(
 		4096,
 		Math.floor(model.contextWindow / 4),
@@ -447,6 +502,10 @@ ${packetText.join('\n')}`
 			? 'Bible changed before synthesis publication'
 			: undefined
 	const resumable = matching?.basis === basis ? matching : undefined
+	if (quarantineReason && matching?.selections && !matching.selectedPatch)
+		throw new Error(
+			'Cannot recover saved synthesis picks against a changed Bible',
+		)
 	const eventPrompt = `${instructions}
 ${nextEvent.instructions}`
 	const outputReserve = useEvents
@@ -454,14 +513,18 @@ ${nextEvent.instructions}`
 				packetOutputReserve,
 				Math.max(
 					512,
-					model.contextWindow - bytes(eventPrompt) - historyBudget - 768,
+					model.contextWindow -
+						bytes(eventPrompt) -
+						historyBudget -
+						registryBudget -
+						768,
 				),
 			)
 		: packetOutputReserve
 	const budget = model.contextWindow - outputReserve
 	const packetBudget = eventPacketBudget(
 		model.contextWindow,
-		historyBudget,
+		historyBudget + registryBudget,
 		packetOutputReserve,
 		bytes(eventPrompt),
 	)
@@ -488,7 +551,7 @@ ${nextEvent.instructions}`
 		throw new Error('Existing Bible is too large for synthesis context')
 
 	const chapterSet = new Set(chapterIds)
-	async function request<T extends Output>(
+	async function request<T>(
 		prompt: string,
 		contract: ReturnType<typeof synthesisOutput<T>>,
 		check: (output: T) => void,
@@ -568,8 +631,10 @@ ${nextEvent.instructions}`
 		const packet = state.packet
 		const event = await request(
 			`${eventPrompt}
-Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and qualifying new facts, not repeated background. Set is_last when done.
+Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Describe a relation as the standing relationship between the pair, naming its kind first, not the scene that shows it. Set is_last when done.
 Events already extracted: ${state.events.length}
+Already proposed entries:
+${proposedEntries(state.events, registryBudget)}
 Recent event summaries: ${recentEvents(state.events, historyBudget)}
 Chapter previews:
 ${packets[packet]}`,
@@ -654,13 +719,86 @@ ${packets[packet]}`,
 			proposal.chapter ? proposal : (located.get(proposal.content) ?? proposal),
 		)
 	}
-	const biblePatch = reconcileNamedAdditions(
-		[...ordered].map(({ item, chapter }) =>
-			chapter ? { ...item, observedChapter: chapter } : item,
-		),
-		bible,
+	async function selectPatch() {
+		const reconciled = reconcileNamedAdditions(
+			[...ordered].map(({ item, chapter }) =>
+				chapter ? { ...item, observedChapter: chapter } : item,
+			),
+			bible,
+		)
+		const terms = unique(parts.flatMap((part) => part.glossaryPatch))
+		return state.whole || (state.ready && !state.selections)
+			? { biblePatch: reconciled, glossaryPatch: terms }
+			: selectAdditions(reconciled, terms, bible, choose)
+	}
+	const progress = fitBytes(
+		skeleton.chapters
+			.map(({ chapterId, progress }) => `${chapterId}: ${progress}`)
+			.join('\n'),
+		historyBudget * 2,
 	)
-	const glossaryPatch = unique(parts.flatMap((part) => part.glossaryPatch))
+	let selectionIndex = 0
+	async function choose(kind: string, candidates: readonly unknown[]) {
+		const prompt = `${instructions}
+${selection.instructions}
+These ${kind} candidates were extracted packet by packet from this volume, so many restate, narrow or split one another. Choose the set a single whole-volume pass would return. ${selectionScope[kind] ?? `Keep every distinct ${kind} that meets the inclusion rules; drop a candidate only when it restates, narrows or splits another one for the same ${kind}, keeping the most complete under the name the text usually uses.`} Return keep as the numbers of the kept candidates.
+Chapter progress:
+${progress}
+`
+		const available = Math.max(384, budget - bytes(prompt) - 1024)
+		const keptRoom = Math.floor(available / 3)
+		const room = available - keptRoom
+		const lines = candidates.map((candidate) =>
+			fitBytes(
+				JSON.stringify(candidate, (_, value) =>
+					typeof value === 'string'
+						? Array.from(value).slice(0, 120).join('')
+						: value,
+				),
+				room - 8,
+			),
+		)
+		const chunks: string[][] = []
+		let size = 0
+		for (const line of lines) {
+			if (!chunks.length || size + bytes(line) + 8 > room) {
+				chunks.push([])
+				size = 0
+			}
+			chunks[chunks.length - 1].push(line)
+			size += bytes(line) + 8
+		}
+		const kept = new Set<number>()
+		let offset = 0
+		for (const chunk of chunks) {
+			let keep = state.selections?.[selectionIndex]
+			if (!keep) {
+				const earlier = [...kept].map((i) => lines[i]).join('\n')
+				const answer = await request(
+					`${prompt}${earlier ? `Kept from earlier candidates; drop any candidate that restates one of these:\n${fitBytes(earlier, keptRoom)}\n` : ''}Candidates:\n${chunk.map((line, i) => `${i + 1} ${line}`).join('\n')}`,
+					selection,
+					(value) => {
+						if (
+							new Set(value.keep).size !== value.keep.length ||
+							value.keep.some((n) => n > chunk.length)
+						)
+							throw new Error(
+								`keep must list distinct candidate numbers from 1 to ${chunk.length}`,
+							)
+					},
+				)
+				keep = answer.keep
+				state.selections = [...(state.selections ?? []), keep]
+				await project.write(files.checkpoint, state)
+			}
+			selectionIndex++
+			for (const n of keep) kept.add(offset + n - 1)
+			offset += chunk.length
+		}
+		return kept
+	}
+	const selectedPatch = state.selectedPatch ?? (await selectPatch())
+	const { biblePatch, glossaryPatch } = selectedPatch
 	options.signal?.throwIfAborted()
 	if (
 		hash(
@@ -671,9 +809,17 @@ ${packets[packet]}`,
 	)
 		throw new Error('Chapter previews changed during synthesis')
 	let latest = await readBible(project)
-	if (!state.ready) {
-		if (hash(latest) !== state.basis)
-			throw new Error('Bible changed during synthesis')
+	const basisUnchanged = hash(latest) === state.basis
+	if (!state.ready && !basisUnchanged)
+		throw new Error('Bible changed during synthesis')
+	if (
+		!state.ready ||
+		(!state.whole &&
+			!state.selectedPatch &&
+			!quarantineReason &&
+			basisUnchanged)
+	) {
+		if (!state.whole) state.selectedPatch = selectedPatch
 		state.ready = true
 		await project.write(files.checkpoint, state)
 		latest = await readBible(project)

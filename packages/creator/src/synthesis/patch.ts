@@ -619,7 +619,11 @@ export async function applyPatches(
 				!entry ||
 				group.length < 2 ||
 				originalIds.has(id) ||
-				group.some((item) => item.op !== 'add' || !accepted.has(item))
+				group[0].op !== 'add' ||
+				group.some(
+					(item) =>
+						(item.op !== 'add' && item.op !== 'update') || !accepted.has(item),
+				)
 			)
 				continue
 			const fields =
