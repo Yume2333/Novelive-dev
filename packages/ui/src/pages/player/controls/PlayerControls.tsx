@@ -11,10 +11,25 @@ import {
 	schedulePlayback,
 } from './controller'
 import './controls.css'
-import { scoped } from '../../../i18n'
+import { msg, scoped } from '../../../i18n'
 import { type ProgressControlsProps, ProgressPanel } from './ProgressPanel'
 
 const t = scoped('player')
+const progressWords = new Set<string>([
+	msg('制作中'),
+	msg('写作'),
+	msg('审稿'),
+	msg('演出'),
+	msg('出图'),
+	msg('等待'),
+	msg('完成'),
+	msg('已发布'),
+])
+const progressText = (progress?: string) =>
+	progress
+		?.split(' · ')
+		.map((part) => (progressWords.has(part) ? t(part) : part))
+		.join(' · ')
 
 let rememberedSettings = { ...defaultPlayerSettings }
 
@@ -234,7 +249,7 @@ export function PlayerControls({
 					) : (
 						<>
 							{t('下一章 · {{title}}', { title: waiting?.title })}
-							<p>{waiting?.progress}</p>
+							<p>{progressText(waiting?.progress)}</p>
 						</>
 					)}
 				</div>
@@ -436,7 +451,9 @@ export function PlayerControls({
 										}}
 									>
 										{chapter.title} ·{' '}
-										{chapter.published ? t('已发布') : chapter.progress}
+										{chapter.published
+											? t('已发布')
+											: progressText(chapter.progress)}
 										{chapter.read ? t(' · 已读') : ''}
 									</button>
 								))
