@@ -304,6 +304,57 @@ test('requests repair when a staging patch adds an image absent from the manifes
 	}
 })
 
+test('requests a schema repair for bare model-generated place IDs after a staging repair', async () => {
+	const patch = 'PUT <4:\n@cg cg-window'
+	const cg = { id: 'cg-window', kind: 'cg', description: '窗边' }
+	const location = { kind: 'location', description: '庭院' }
+	const answers = [
+		{ patch, items: [], merges: {} },
+		{
+			patch,
+			items: [
+				{ ...location, id: 'loc_courtyard' },
+				cg,
+				{ ...location, id: 'loc_gate' },
+			],
+			merges: {},
+		},
+		{ patch, items: [cg], merges: {} },
+	]
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		const answer = answers.shift()
+		if (!answer) throw new Error('Unexpected art-director request')
+		const chunk = {
+			choices: [
+				{
+					index: 0,
+					delta: { content: JSON.stringify(answer) },
+					finish_reason: 'stop',
+				},
+			],
+		}
+		const prompt = JSON.stringify(messages)
+		if (answers.length === 1)
+			expect(prompt).toContain('Repair the staging patch and manifest')
+		if (answers.length === 0) {
+			expect(prompt).toContain('Repair the staging patch and manifest')
+			expect(prompt).toContain('/items/0/id')
+			expect(prompt).toContain('/items/2/id')
+			expect(prompt).toContain('place/variant')
+		}
+		return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+			headers: { 'content-type': 'text/event-stream' },
+		})
+	})
+	const staged = await directChapterArt(script, bible, empty, {
+		main,
+		replay: { ...replay, mode: 'replay', fetch },
+	})
+	expect(fetch).toHaveBeenCalledTimes(3)
+	expect(staged.items).toEqual([cg])
+})
+
 test('preserves configured custom marks through staging and rejects unconfigured marks', async () => {
 	const marked = script.replace('窗外下雨了。', '{wave}窗外下雨了。{/wave}')
 	const model = vi.spyOn(artModels, 'artJson').mockResolvedValueOnce({
