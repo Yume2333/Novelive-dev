@@ -123,9 +123,8 @@ listener (inner): 演出已经清除。 #0002
 					console.log(
 						`AppImage creator ready: ${Math.round(performance.now() - start)} ms`,
 					)
-				await page.evaluate((id) => {
-					window.location.hash = `/work/${id}/play`
-				}, playerWorkId)
+				await page.getByRole('link', { name: '黄昏', exact: true }).click()
+				await page.getByRole('link', { name: '游玩', exact: true }).click()
 				return { app, page }
 			} catch (error) {
 				await app.close()

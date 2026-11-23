@@ -14,6 +14,7 @@ import {
 	creatorCommandError,
 	type EventEnvelope,
 } from './contract'
+import { listLibrary } from './project/library'
 import { createRegistry } from './registry'
 import { createReplayFetch, type ReplayOptions } from './replay'
 import { listUsage } from './usage'
@@ -282,6 +283,7 @@ async function productionSession(workId: string) {
 }
 
 registry.register('config.get', () => config.get())
+registry.register('library.list', () => listLibrary(dataDir))
 registry.register('usage.list', () => listUsage(dataDir))
 registry.register('bible.get', async (input) => {
 	using project = await openBibleProject(dataDir, input.workId)

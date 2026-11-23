@@ -80,6 +80,10 @@ export const commands = {
 	...editorCommands,
 	...productionCommands,
 	...importCommands,
+	'library.list': {
+		input: empty,
+		output: obj({ works: arr(obj({ workId: str(), title: str() })) }),
+	},
 	'config.get': {
 		input: empty,
 		output: union([maskedConfigSchema, configErrorSchema]),
