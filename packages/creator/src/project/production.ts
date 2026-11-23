@@ -365,7 +365,13 @@ export function createProduction(
 				const references = (await readImportWizard(project)).references.map(
 					(cachePath, i) => ({ id: `reference-${i + 1}`, cachePath }),
 				)
-				if (references.length && !work.settings.confirmWithReferences) {
+				if (
+					bible.style.status === 'confirmed' &&
+					bible.style.references?.length
+				) {
+					if (!started) queue.start(workId, work.chapterIds)
+					queue.confirmVisual(workId)
+				} else if (references.length && !work.settings.confirmWithReferences) {
 					await service.confirmVisual(
 						bible.style,
 						{ mainVisuals: references, supplemental: [], characters: [] },

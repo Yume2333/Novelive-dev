@@ -13,13 +13,24 @@ import { ScriptedWorker } from '../fixtures/scheduler/m1b/worker'
 
 const workers = new Map<string, ScriptedWorker>()
 const candidates = vi.fn()
+const approvedVolumes = new Set<string>()
 vi.mock('../../packages/creator/src/project/production-worker', () => ({
 	productionModels: async () => ({
 		organizer: connection,
 		director: connection,
 		image: { concurrency: 1 },
 	}),
-	productionBible: async () => ({ art: { style: {}, characters: [] } }),
+	productionBible: async (_project: Project, volumeId: string) => ({
+		art: {
+			style: approvedVolumes.has(volumeId)
+				? {
+						status: 'confirmed',
+						references: [{ path: 'assets/style/main-visual.webp' }],
+					}
+				: {},
+			characters: [],
+		},
+	}),
 	chapterWorker: (project: Project, _volumeId: string, work: Work) => ({
 		art: () => ({
 			candidates: async () => {
@@ -61,6 +72,7 @@ beforeEach(async () => {
 	laterEntered = Promise.withResolvers<void>()
 	laterRelease = undefined
 	candidates.mockClear()
+	approvedVolumes.clear()
 })
 afterEach(async () => {
 	laterRelease?.resolve()
@@ -233,6 +245,29 @@ test('onReady offers works before later synthesis, shares concurrent preparation
 	await vi.waitFor(() => expect(hostBusy.get(restarted)).toBe(false))
 	expect((await restarted.getQueue()).inactive).toHaveLength(2)
 	expect(requests).toHaveLength(count)
+})
+
+test('later volumes inherit approved series artwork without another visual confirmation', async () => {
+	const book = await seed()
+	using project = await Project.open(book.projectDir)
+	const series = await project.read(projectFiles.series)
+	const laterVolume = series.volumeIds[1]
+	const id = book.workIds[1]
+	approvedVolumes.add(laterVolume)
+	const artwork = new Uint8Array([1, 2, 3])
+	await project.writeFile('assets/style/main-visual.webp', artwork)
+	const worker = workers.get(id)
+	if (!worker) throw new Error('Missing fixture worker')
+	worker.hold('write:ch0003')
+	const host = production()
+	await host.remember(id, book.projectDir)
+	const session = await host.get(id)
+	expect(session.snapshot().visual).toBeNull()
+	await vi.waitFor(() => expect(worker.count('write:ch0003')).toBe(1))
+	expect(candidates.mock.calls.some(([workId]) => workId === id)).toBe(false)
+	expect(await project.readFile('assets/style/main-visual.webp')).toEqual(
+		Buffer.from(artwork),
+	)
 })
 
 test('empty queue and failed preparation reject cleanly and can retry without duplicate sessions', async () => {
