@@ -25,8 +25,15 @@ const internals = (stage: PixiStage) =>
 		tick(seconds: number): void
 	}
 
-it('composites incoming dissolves above the opaque outgoing background', async () => {
+function createStage() {
 	const stage = new PixiStage()
+	const { world, pictures } = internals(stage)
+	world.addChild(pictures)
+	return stage
+}
+
+it('composites incoming dissolves above the opaque outgoing background', async () => {
+	const stage = createStage()
 	const first = direct(
 		emptyStage(),
 		action('bg', { transition: 'none' }, 'first'),
@@ -46,7 +53,7 @@ it('composites incoming dissolves above the opaque outgoing background', async (
 })
 
 it('crossfades only the changed portrait while leaving background and other portraits opaque', async () => {
-	const stage = new PixiStage()
+	const stage = createStage()
 	const first = direct(
 		direct(emptyStage(), action('bg', { transition: 'none' }, 'room')),
 		action('show', { slot: 'center' }, 'hero/coat/calm'),
@@ -66,7 +73,7 @@ it('crossfades only the changed portrait while leaving background and other port
 })
 
 it('finishes concurrent shake and zoom at the focused camera position', async () => {
-	const stage = new PixiStage()
+	const stage = createStage()
 	await stage.commit(emptyStage(), assets, [], true)
 	const zoom = action('zoom', { scale: 1.5, target: 'left', duration: 0.2 })
 	const shake = action('shake', { strength: 1, duration: 0.4 })

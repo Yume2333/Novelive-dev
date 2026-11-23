@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import type { StageSnapshot } from '../contract'
+import { AssetWindow } from './assets'
 import { mountStage } from './index'
 import { PixiStage } from './renderer'
 import { emptyStage } from './state'
@@ -36,6 +37,27 @@ const saved = (): StageSnapshot => ({
 		text: { kind: 'narration', content: [{ type: 'text', text: 'First' }] },
 	},
 	active: [],
+})
+
+it('publishes logical state and text only after assets are ready, without waiting for animation completion', async () => {
+	const stage = await mountStage({} as HTMLElement, {
+		resolveAsset: (id) => id,
+	})
+	const loading = Promise.withResolvers<void>()
+	const animation = Promise.withResolvers<void>()
+	vi.spyOn(AssetWindow.prototype, 'sync').mockReturnValueOnce(loading.promise)
+	vi.spyOn(PixiStage.prototype, 'commit').mockReturnValueOnce(animation.promise)
+	const ready = vi.fn()
+	const incoming = saved().stage
+	const commit = stage.commit(incoming, [], [], false, ready)
+	expect(stage.state).toEqual(emptyStage())
+	expect(ready).not.toHaveBeenCalled()
+	loading.resolve()
+	await vi.waitFor(() => expect(ready).toHaveBeenCalledOnce())
+	expect(stage.state).toEqual(incoming)
+	animation.resolve()
+	await commit
+	await stage.destroy()
 })
 
 it('restores empty snapshots, replays only state directions and restarts text at page zero', async () => {
@@ -78,9 +100,9 @@ it('propagates restore rendering errors without restarting text or mutating save
 		{ resolveAsset: (id) => id },
 		restart,
 	)
-	vi.spyOn(PixiStage.prototype, 'commit').mockRejectedValueOnce(
-		new Error('renderer failed'),
-	)
+	vi.spyOn(PixiStage.prototype, 'commit').mockImplementationOnce(() => {
+		throw new Error('renderer failed')
+	})
 	await expect(player.restore(saved())).rejects.toThrow('renderer failed')
 	expect(restart).not.toHaveBeenCalled()
 	expect(player.state).toEqual(emptyStage())

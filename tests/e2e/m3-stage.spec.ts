@@ -49,10 +49,13 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 		},
 	})
 	const compiled = compileScript(
-		'scene 夜\nsource p0001\n@bg room/dusk transition none\n@show traveler/coat/calm center\n: First #0001\n@move center left duration 0.01\n: Second #0002\n@camera reset duration 0.4\n@filter brightness value 0.5\n: Dim #0003',
+		'scene 夜\nsource p0001\n@bg room/dusk transition none\n@show traveler/coat/calm center\n: First #0001\n@camera sway duration 0.4\n@wait 0.01 #0005\n@move center left duration 0.01\n: Second #0002\n@camera reset duration 0.4\n@filter brightness value 0.5\n: Dim #0003\n: Auto #0004',
 		{ ...context, paragraphIds: ['p0001'], sceneIds: ['aaaabbbb'] },
 	)
 	if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics))
+	const last = compiled.scenes[0].beats.at(-1)
+	if (!last) throw new Error('Missing automatic sentence fixture')
+	last.advance = { kind: 'auto' }
 	const background = (
 		await sharp({
 			create: { width: 960, height: 540, channels: 3, background: '#203060' },
@@ -97,7 +100,19 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 						throw error
 					},
 					{},
-					{ chapterId: 'chapter' },
+					{
+						chapterId: 'chapter',
+						initialActions: [
+							{
+								type: 'action',
+								name: 'shake',
+								args: { strength: 1, duration: 999 },
+								assets: [],
+								line: 1,
+								col: 1,
+							},
+						],
+					},
 				)
 				if (!player?.snapshot) throw new Error('Missing stage snapshot')
 				runtime.player = player
@@ -110,7 +125,9 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			'Default renderer:',
 			await page
 				.locator('canvas')
-				.evaluate((canvas) => (canvas.getContext('2d') ? 'canvas' : 'webgl')),
+				.evaluate((canvas) =>
+					(canvas as HTMLCanvasElement).getContext('2d') ? 'canvas' : 'webgl',
+				),
 		)
 		const capture = async () =>
 			Buffer.from(
@@ -134,6 +151,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 		for (const [channel, expected] of [224, 96, 48].entries())
 			expect(Math.abs(portraitPixel[channel] - expected)).toBeLessThanOrEqual(4)
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
+		await expect(page.locator('.nl-player-text')).toHaveCount(0)
 		await expect(page.locator('.nl-player-text')).toHaveText('Second')
 		expect(
 			await page.evaluate(
@@ -164,6 +182,10 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 					.toBuffer()),
 			])
 			.toEqual([16, 24, 48])
+		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+			'aria-busy',
+			'false',
+		)
 		await page.evaluate(async () => {
 			const { player, saved } = globalThis as unknown as StageHarness
 			await player.restore(saved)
@@ -207,6 +229,36 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			),
 		).toEqual({ effect: 'brightness', value: 0.5 })
 		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		await page.evaluate(() =>
+			(globalThis as unknown as StageHarness).player.restore(
+				(globalThis as unknown as StageHarness).saved,
+			),
+		)
+		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
+		await expect(page.locator('.nl-player-text')).toHaveText('Second')
+		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+			'aria-busy',
+			'false',
+		)
+		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
+		await expect(page.locator('.nl-player-text')).toHaveText('Dim')
+		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+			'aria-busy',
+			'false',
+		)
+		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
+		await expect(page.locator('.nl-player-text')).toHaveText('Auto')
+		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+			'aria-busy',
+			'false',
+		)
+		await page.evaluate(async () => {
+			const { player } = globalThis as unknown as StageHarness
+			if (!player.snapshot)
+				throw new Error('Missing automatic sentence snapshot')
+			await player.restore(player.snapshot)
+		})
+		await expect(page.locator('.nl-player-overlay')).toHaveText('本章结束')
 		await page.evaluate(() =>
 			(globalThis as unknown as StageHarness).abort.abort(),
 		)
@@ -402,6 +454,10 @@ test('M3 stage directions render the direction set and four landscape fill crops
 			for (const [, label] of cues.slice(1)) {
 				await canvas.click({ position: { x: 30, y: 100 } })
 				await expect(text).toHaveText(`${label}。`)
+				await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+					'aria-busy',
+					'false',
+				)
 				if (label === '移动')
 					await expect.poll(() => pixel(0.25, 0.4)).toEqual([224, 96, 48])
 				if (label === '表情')

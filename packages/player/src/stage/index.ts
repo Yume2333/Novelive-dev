@@ -158,6 +158,10 @@ export async function mountMinimalPlayer(
 	let snapshot: StageSnapshot | null = null
 	let index = -1
 	let busy = false
+	function setBusy(value: boolean) {
+		busy = value
+		element.ariaBusy = String(value)
+	}
 	let timer: ReturnType<typeof setTimeout> | undefined
 	function schedule(beat: (typeof beats)[number]) {
 		clearTimeout(timer)
@@ -196,7 +200,7 @@ export async function mountMinimalPlayer(
 	}
 	async function advance() {
 		if (busy || signal.aborted) return
-		busy = true
+		setBusy(true)
 		try {
 			const beat = beats[++index]
 			if (!beat) {
@@ -243,7 +247,7 @@ export async function mountMinimalPlayer(
 		} catch (error) {
 			onError(error)
 		} finally {
-			busy = false
+			setBusy(false)
 		}
 	}
 	const click = () => {
@@ -297,7 +301,7 @@ export async function mountMinimalPlayer(
 			)
 			if (restoredIndex < 0) throw new Error('存档句子不在当前章节')
 			if (busy) throw new Error('舞台正在切换')
-			busy = true
+			setBusy(true)
 			clearTimeout(timer)
 			try {
 				await stage.restore(saved, lookahead(beats, restoredIndex + 1))
@@ -309,7 +313,7 @@ export async function mountMinimalPlayer(
 					[{ restore: 'restart-text' }],
 				)
 			} finally {
-				busy = false
+				setBusy(false)
 			}
 		},
 	}

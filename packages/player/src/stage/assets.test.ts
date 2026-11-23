@@ -7,13 +7,10 @@ afterEach(() => vi.restoreAllMocks())
 
 describe('asset reference window', () => {
 	it('does not block a ready stage on unresolved lookahead decoding', async () => {
-		let resolve!: (value: unknown) => void
-		const future = new Promise((value) => {
-			resolve = value
-		})
+		const { promise: future, resolve } = Promise.withResolvers<unknown>()
 		vi.spyOn(Assets, 'load').mockImplementation(
-			({ src }: { src: string }) =>
-				(src === 'future'
+			(request: unknown) =>
+				((request as { src: string }).src === 'future'
 					? future
 					: Promise.resolve({ destroyed: true })) as never,
 		)
