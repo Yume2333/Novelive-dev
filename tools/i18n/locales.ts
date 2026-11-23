@@ -187,6 +187,8 @@ async function translateBatch(
 	const base = process.env.NL_IMAGE_BASE_URL
 	const key = process.env.NL_IMAGE_API_KEY
 	const model = process.env.NL_TRANSLATE_MODEL ?? 'devin-swe-2'
+	if (process.env.NL_REPLAY === 'strict')
+		throw new Error('Translation makes paid calls; unset NL_REPLAY=strict')
 	if (!base || !key)
 		throw new Error(
 			'Translation requires NL_IMAGE_BASE_URL and NL_IMAGE_API_KEY',
@@ -217,15 +219,10 @@ Reply with one JSON object mapping every input string to its translation, and no
 			}),
 		},
 	)
-	if (!response.ok) throw new Error(`${locale}/${ns}: HTTP ${response.status}`)
-	const body = (await response.json()) as {
-		choices: { message: { content: string } }[]
+	const body = (await response.json().catch(() => ({}))) as {
+		choices?: { message: { content: string } }[]
 		usage?: { total_tokens?: number }
 	}
-	const text = body.choices[0]?.message.content ?? ''
-	const parsed = JSON.parse(
-		text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1),
-	) as Record<string, unknown>
 	const usage = process.env.NL_USAGE_CSV
 	if (usage)
 		writeFileSync(
@@ -233,6 +230,11 @@ Reply with one JSON object mapping every input string to its translation, and no
 			`${new Date().toISOString().slice(0, 10)},${model},1,${body.usage?.total_tokens ?? ''},0,M5 locales ${locale}/${ns}\n`,
 			{ flag: 'a' },
 		)
+	if (!response.ok) throw new Error(`${locale}/${ns}: HTTP ${response.status}`)
+	const text = body.choices?.[0]?.message.content ?? ''
+	const parsed = JSON.parse(
+		text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1),
+	) as Record<string, unknown>
 	return Object.fromEntries(
 		keys.flatMap((source) => {
 			const value = parsed[source]
