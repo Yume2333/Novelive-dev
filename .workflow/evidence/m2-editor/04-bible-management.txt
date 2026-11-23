@@ -7,6 +7,22 @@ $ tsc --noEmit
 Exit code: 0
 
 PR #35 review follow-up (baseline d1ea43a verified as HEAD ancestor)
+Final integration rebase: origin/main 66e9dbe (M2/05 editor host retained). Resolved entry.ts import and adjacent host-block conflicts by retaining both editor and chat/Bible code, including both close handlers. Editor registrations are unchanged relative to main. Rebased SHAs: finding 1 9485210; finding 2 70151e4; desktop adapter a80a901; finding 5 5c08cf1 (style 6379572); finding 6 7d4e01b; scoped-watermark rework 43fdc98; navigation CI assertion b1ae048.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (3.1s)
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+$ NL_REPLAY=strict pnpm check
+Checked 230 files in 97ms. No fixes applied.
+Found 1 info.
+ Test Files  27 passed (27)
+      Tests  359 passed (359)
+Exit codes: 0. Chat panel e2e is now available from merged M2/06 and is additionally run on the same freshly built Electron app.
+$ NL_REPLAY=strict xvfb-run -a pnpm exec playwright test --grep 'M2 chat panel'
+  1 passed (1.8s)
+Exit code: 0. This chat UI test uses its existing projection driver; the Bible Electron test separately covers live chat host CRUD and real proposal approvals.
+
 Replay watermark follow-up: directly replaced the scalar droppedThrough with per-(scope,scopeId) watermarks. Trimming work A or dropping its oversized event does not signal a gap for work B or unopened works; app/work scopes with identical IDs remain separate. New regression tests cover all cases.
 $ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
   1 passed (2.6s)
