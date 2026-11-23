@@ -56,6 +56,7 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 		await page.getByRole('link', { name: '导入原文' }).click()
 		await page.getByRole('button', { name: '选择原文', exact: true }).click()
 		await page.getByRole('radio', { name: '加入已有系列' }).check()
+		await expect(page.getByRole('textbox', { name: '作品名' })).toHaveCount(0)
 		await page.getByRole('button', { name: '选择已有工程' }).click()
 		await expect(page.getByRole('alert')).toHaveText(
 			'请选择有效的 Novelive 工程文件夹',

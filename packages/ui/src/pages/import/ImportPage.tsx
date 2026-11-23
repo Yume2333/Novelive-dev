@@ -260,13 +260,15 @@ export function ImportPage() {
 						选择原文
 					</button>
 				</div>
-				<label className={styles.row}>
-					<span className={styles.label}>作品名</span>
-					<input
-						value={title}
-						onChange={(event) => setTitle(event.target.value)}
-					/>
-				</label>
+				{!joining && (
+					<label className={styles.row}>
+						<span className={styles.label}>作品名</span>
+						<input
+							value={title}
+							onChange={(event) => setTitle(event.target.value)}
+						/>
+					</label>
+				)}
 				{joining ? (
 					<>
 						<div className={styles.row}>
