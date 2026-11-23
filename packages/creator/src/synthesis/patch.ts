@@ -630,16 +630,18 @@ export async function applyPatches(
 					return Array.isArray(value) ? [value as unknown[]] : []
 				})
 				if (!arrays.length) continue
-				const keyed = new Map(
-					arrays
-						.flat()
-						.map((value) => [
-							value && typeof value === 'object' && 'id' in value
-								? value.id
-								: value,
-							value,
-						]),
-				)
+				const keyed = new Map<unknown, unknown>()
+				for (const value of arrays.flat()) {
+					const object = value && typeof value === 'object' ? value : undefined
+					const key =
+						kind === 'style' && object && 'path' in object
+							? object.path
+							: object && 'id' in object
+								? object.id
+								: value
+					if (kind === 'style') keyed.delete(key)
+					keyed.set(key, value)
+				}
 				const merged = unique([...keyed.values()])
 				Object.assign(entry, {
 					[field]: kind === 'style' ? merged.slice(-3) : merged,

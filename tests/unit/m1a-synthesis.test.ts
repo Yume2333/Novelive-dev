@@ -772,6 +772,43 @@ test('deduplication retains the first addition and the first competing identity 
 	)
 })
 
+test('consolidated style references prioritize the latest repeat before applying the image cap', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const reference = (image: string) => ({
+		path: `art/${image}.png`,
+		description: image,
+	})
+	const patch: BiblePatch = [
+		['a', 'b', 'c'],
+		['d', 'a'],
+	].map((images) => ({
+		kind: 'style',
+		op: 'add',
+		entry: {
+			id: 'layout',
+			status: 'candidate',
+			description: 'Layout',
+			references: images.map(reference),
+		},
+	}))
+	const { conflicts, consolidatedAdds } = await applyPatches(
+		project,
+		await readBible(project),
+		patch,
+		[],
+		new Set(chapters),
+	)
+	expect(conflicts).toEqual([])
+	const references = ['c', 'd', 'a'].map(reference)
+	expect((await readBible(project)).style).toContainEqual(
+		expect.objectContaining({ id: 'layout', references }),
+	)
+	expect(consolidatedAdds.get(patch[0])).toMatchObject({
+		entry: { references },
+	})
+})
+
 test('an undated update follows the dated addition it depends on', async () => {
 	await seed(root)
 	using project = await Project.open(root)
