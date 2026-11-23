@@ -322,6 +322,12 @@ registry.register('production.confirmVisual', async (input) =>
 registry.register('production.continue', async ({ workId }) =>
 	(await productionSession(workId)).continue(),
 )
+registry.register('production.getQueue', async () =>
+	(await getProduction()).getQueue(),
+)
+registry.register('production.moveQueueWork', async ({ workId, direction }) =>
+	(await getProduction()).moveQueueWork(workId, direction),
+)
 registry.register('production.stop', async ({ workId }) =>
 	(await productionSession(workId)).queue.stop(workId),
 )

@@ -23,6 +23,7 @@ import { ScrollArea } from '../components/ScrollArea'
 import { AgentPanel } from '../panels/agent/AgentPanel'
 import { workRoute } from '../routes/production'
 import styles from './AppShell.module.css'
+import { GlobalProductionQueue } from './GlobalProductionQueue'
 
 const navigation = [
 	{ to: '/', icon: LibraryBig, name: '书库' },
@@ -201,6 +202,7 @@ export function AppShell() {
 								</button>
 							</nav>
 						)}
+						<GlobalProductionQueue />
 						<fieldset className={styles.themes} aria-label="主题">
 							{themes.map(({ value, icon: Icon, name }) => (
 								<button

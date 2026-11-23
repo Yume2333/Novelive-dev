@@ -10,7 +10,6 @@ import type {
 } from '../contract'
 import type { ProductionQueue } from '../contract/queue'
 import { readImportWizard } from '../import/wizard'
-import { prepareVolume } from '../project-pipeline'
 import { createReplayFetch, type ReplayOptions } from '../replay'
 import { ChapterScheduler, recoverChapterWork } from '../scheduler/chapter'
 import {
@@ -18,8 +17,8 @@ import {
 	readQueueWork,
 	WorkQueue,
 } from '../scheduler/work-queue'
+import { prepareSeries } from '../synthesis/incremental'
 import { existing } from '../synthesis/patch'
-import { withUsage } from '../usage'
 import { Project } from './index'
 import { loadPlayerChapter, loadPlayerStatus } from './player'
 import {
@@ -44,6 +43,7 @@ export function createProduction(
 	const binding = (workId: string) => join(bindingsDir, workId)
 	const sessions = new Map<string, ReturnType<typeof open>>()
 	const recoveredProjects = new Set<string>()
+	const preparations = new Map<string, ReturnType<typeof startPreparation>>()
 	let loading = 0
 	let closing = false
 	let seq = 0
@@ -132,6 +132,90 @@ export function createProduction(
 		return restored
 	}
 
+	function startPreparation(
+		root: string,
+		language: string,
+		models: Awaited<ReturnType<typeof productionModels>>,
+	) {
+		const controller = new AbortController()
+		const initialized = Promise.withResolvers<void>()
+		void initialized.promise.catch(() => {})
+		const volumes = new Map<
+			string,
+			ReturnType<typeof Promise.withResolvers<void>>
+		>()
+		loading++
+		publishBusy()
+		const running = (async () => {
+			using project = await Project.open(root)
+			const series = await project.read(projectFiles.series)
+			for (const volumeId of series.volumeIds) {
+				const volume = await project.read(projectFiles.volume(volumeId))
+				for (const workId of volume.workIds) {
+					const work = await project.read(projectFiles.work(volumeId, workId))
+					if (
+						!project.database
+							.prepare('SELECT 1 FROM work WHERE work_id = ?')
+							.get(workId)
+					)
+						project.tasks.registerWork({ workId, title: work.title })
+				}
+				const gate = Promise.withResolvers<void>()
+				void gate.promise.catch(() => {})
+				volumes.set(volumeId, gate)
+			}
+			initialized.resolve()
+			await prepareSeries(project, {
+				previewConnection: models.organizer,
+				synthesisConnection: models.director,
+				language,
+				fetch: createReplayFetch(replay),
+				signal: controller.signal,
+				skipVolume: async (volumeId) => {
+					const volume = await project.read(projectFiles.volume(volumeId))
+					const started = volume.workIds.every((id) =>
+						project.database
+							.prepare('SELECT 1 FROM chapter WHERE work_id = ? LIMIT 1')
+							.get(id),
+					)
+					if (started) volumes.get(volumeId)?.resolve()
+					return started
+				},
+				onReady: async (volumeId) => {
+					volumes.get(volumeId)?.resolve()
+					const volume = await project.read(projectFiles.volume(volumeId))
+					for (const id of volume.workIds) {
+						await remember(id, root)
+						if (!closing) void get(id).catch(() => {})
+					}
+				},
+			})
+		})()
+			.catch((error) => {
+				preparations.delete(root)
+				initialized.reject(error)
+				for (const gate of volumes.values()) gate.reject(error)
+				throw error
+			})
+			.finally(() => {
+				loading--
+				publishBusy()
+			})
+		void running.catch(() => {})
+		return {
+			controller,
+			running,
+			async has(volumeId: string) {
+				await initialized.promise
+				return volumes.has(volumeId)
+			},
+			async volume(volumeId: string) {
+				await initialized.promise
+				await volumes.get(volumeId)?.promise
+			},
+		}
+	}
+
 	async function cache(project: Project, path: string) {
 		const bytes = await project.readFile(path)
 		const file = `production/${createHash('sha256').update(bytes).digest('hex')}${extname(path)}`
@@ -176,6 +260,17 @@ export function createProduction(
 			const started = data
 				.prepare('SELECT 1 FROM chapter WHERE work_id = ? LIMIT 1')
 				.get(workId)
+			let preparation = preparations.get(project.root)
+			if (preparation && !(await preparation.has(volumeId))) {
+				await preparation.running
+				if (preparations.get(project.root) === preparation)
+					preparations.delete(project.root)
+				preparation = preparations.get(project.root)
+			}
+			if (!preparation) {
+				preparation = startPreparation(project.root, work.language, models)
+				preparations.set(project.root, preparation)
+			}
 			let pool: Awaited<ReturnType<typeof service.candidates>> | undefined
 			let visual: ProductionSnapshot['visual'] = null
 			let summary = (
@@ -261,19 +356,9 @@ export function createProduction(
 			}
 			if (!started || queue.snapshot(workId).phase === 'confirm-visual') {
 				if (!started) {
-					const { synthesis } = await withUsage(
-						project,
-						workId,
-						'synthesize',
-						() =>
-							prepareVolume(project, volumeId, {
-								previewConnection: models.organizer,
-								synthesisConnection: models.director,
-								language: work.language,
-								fetch: createReplayFetch(replay),
-							}),
-					)
-					summary = synthesis.overview
+					await preparation.volume(volumeId)
+					summary = (await project.read(projectFiles.skeleton(volumeId)))
+						.overview
 				}
 				const bible = (await productionBible(project, volumeId, workId)).art
 				const references = (await readImportWizard(project)).references.map(
@@ -440,6 +525,11 @@ export function createProduction(
 		async close() {
 			closing = true
 			workQueue.close()
+			for (const preparation of preparations.values())
+				preparation.controller.abort()
+			await Promise.allSettled(
+				[...preparations.values()].map((preparation) => preparation.running),
+			)
 			const results = await Promise.allSettled(sessions.values())
 			await Promise.all(
 				results.map(async (result) => {

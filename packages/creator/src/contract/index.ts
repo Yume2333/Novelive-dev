@@ -39,6 +39,7 @@ export * from './chat'
 export * from './editor'
 export * from './import'
 export * from './production'
+export * from './queue'
 
 const generation = int({ minimum: 1 })
 const scope = oneOf(['app', 'work'])
