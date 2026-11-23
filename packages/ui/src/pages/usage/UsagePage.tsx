@@ -1,10 +1,12 @@
 import type { CommandOutput } from '@novelive/creator/contract'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, ChevronDown } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Collapse } from '../../components/Collapse'
 import { EmptyState, Page } from '../../components/Page'
 import styles from './UsagePage.module.css'
 
 export function UsagePage() {
+	const [showExplanation, setShowExplanation] = useState(false)
 	const [data, setData] = useState<CommandOutput<'usage.list'>>()
 	const [error, setError] = useState('')
 	useEffect(() => {
@@ -46,10 +48,20 @@ export function UsagePage() {
 	return (
 		<Page title="用量">
 			<div className={styles.content}>
-				<details>
-					<summary>用量说明</summary>
-					仅供参考，统计已发生的调用；不估算费用，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。
-				</details>
+				<div>
+					<button
+						type="button"
+						className={styles.disclosure}
+						aria-expanded={showExplanation}
+						onClick={() => setShowExplanation((open) => !open)}
+					>
+						<ChevronDown size={16} aria-hidden="true" />
+						用量说明
+					</button>
+					<Collapse open={showExplanation}>
+						仅供参考，统计已发生的调用；不估算费用，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。
+					</Collapse>
+				</div>
 				{error && <p role="alert">{error}</p>}
 				{!data && !error && <p role="status">正在读取用量</p>}
 				{data && (
