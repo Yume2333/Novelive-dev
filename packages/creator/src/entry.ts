@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, extname, join } from 'node:path'
+import { projectFiles } from '@novelive/format/model'
 import { createConfigStore } from './config'
 import { type CreatorFrame, clientFrame, creatorCommandError } from './contract'
 import { createRegistry } from './registry'
@@ -17,6 +19,109 @@ const config = createConfigStore(dataDir)
 const cacheDir = join(dataDir, 'cache')
 let sendEvent: ((frame: CreatorFrame) => void) | undefined
 let production: ReturnType<typeof loadProduction> | undefined
+const editorWorks = new Map<string, ReturnType<typeof openEditorWork>>()
+
+async function openEditorWork(workId: string) {
+	const [{ Project }, { ProjectEditor }] = await Promise.all([
+		import('./project'),
+		import('./editor/history'),
+	])
+	let directory: string
+	try {
+		directory = await readFile(join(dataDir, 'projects', workId), 'utf8')
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+		throw { code: 'not_found', message: '工程中找不到这部作品' }
+	}
+	const project = await Project.open(directory)
+	try {
+		const series = await project.read(projectFiles.series)
+		for (const volumeId of series.volumeIds) {
+			const volume = await project.read(projectFiles.volume(volumeId))
+			if (!volume.workIds.includes(workId)) continue
+			const work = await project.read(projectFiles.work(volumeId, workId))
+			if (
+				!project.database
+					.prepare('SELECT 1 FROM work WHERE work_id = ?')
+					.get(workId)
+			)
+				project.tasks.registerWork({ workId, title: work.title })
+			return {
+				project,
+				volumeId,
+				editor: new ProjectEditor(project, volumeId, workId),
+			}
+		}
+		throw { code: 'not_found', message: '工程中找不到这部作品' }
+	} catch (error) {
+		project.close()
+		throw error
+	}
+}
+
+function editorWork(workId: string) {
+	let session = editorWorks.get(workId)
+	if (!session) {
+		session = openEditorWork(workId).catch((error) => {
+			editorWorks.delete(workId)
+			throw error
+		})
+		editorWorks.set(workId, session)
+	}
+	return session
+}
+
+registry.register('editor.open', async (input) => {
+	const { project, editor } = await editorWork(input.workId)
+	const result = await editor.open(input)
+	try {
+		const entries = await Promise.all(
+			result.registry.entries.map(async (entry) => {
+				const unavailable = () => ({
+					...entry,
+					path: `editor/unavailable/${createHash('sha256').update(`${project.root}/${entry.id}`).digest('hex')}${extname(entry.path)}`,
+				})
+				if (entry.status === 'pending') return unavailable()
+				let bytes: Buffer
+				try {
+					bytes = await project.readFile(entry.path)
+				} catch (error) {
+					if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+						return unavailable()
+					throw error
+				}
+				const path = `editor/${createHash('sha256').update(bytes).digest('hex')}${extname(entry.path)}`
+				const destination = join(cacheDir, path)
+				await mkdir(dirname(destination), { recursive: true })
+				await writeFile(destination, bytes)
+				return { ...entry, path }
+			}),
+		)
+		return { ...result, registry: { ...result.registry, entries } }
+	} catch (error) {
+		await editor.close({ ...input, editorId: result.editorId })
+		throw error
+	}
+})
+registry.register('editor.close', async (input) =>
+	(await editorWork(input.workId)).editor.close(input),
+)
+registry.register('editor.editLine', async (input) =>
+	(await editorWork(input.workId)).editor.editLine(input),
+)
+registry.register('editor.undo', async (input) =>
+	(await editorWork(input.workId)).editor.undo(input),
+)
+registry.register('editor.history', async (input) => {
+	const { project } = await editorWork(input.workId)
+	const { listHistory, withProjectEdits } = await import('./editor/history')
+	return withProjectEdits(project, async () => listHistory(project, input))
+})
+registry.register('editor.saveRules', async (input) => {
+	const { project, volumeId } = await editorWork(input.workId)
+	const { saveRules } = await import('./editor/rules')
+	return saveRules(project, volumeId, input)
+})
 
 function strictReplayOptions(): ReplayOptions | undefined {
 	if (process.env.NL_REPLAY !== 'strict') return undefined
@@ -225,6 +330,15 @@ parent.once('message', ({ ports }) => {
 		for (const controller of pending.values()) controller.abort()
 		pending.clear()
 		void production?.then((session) => session.close())
+		for (const session of editorWorks.values()) {
+			void session
+				.then(async ({ project }) => {
+					const { withProjectEdits } = await import('./editor/history')
+					await withProjectEdits(project, async () => project.close())
+				})
+				.catch(() => {})
+		}
+		editorWorks.clear()
 	})
 	port.start()
 	parent.postMessage({ type: 'ready', generation })

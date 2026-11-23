@@ -1,0 +1,77 @@
+M2/05 editor UI and task-02 integration
+Branch: devin/1795394948-m2-editor-05
+Original base: 0bf76ad
+Merged origin/main 5ea3d49 in merge commit 355af98 (parents 566ca0c, 5ea3d49).
+
+Required real-project Check:
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 editor preview'
+  ✓  1 tests/e2e/m2-editor.spec.ts:76:1 › M2 editor preview locates source and current line, edits, undoes and previews a fixed project (1.3s)
+  1 passed (2.1s)
+Exit code: 0
+
+This launches the real Electron app and creator process with a fixed on-disk project, not mock IPC.
+Assertions cover source-to-scene and scene-to-source location, current-line jump, versioned save,
+session undo, preview at the selected line, reopening with an empty undo stack, history and rules IPC,
+content-addressed cache paths, background pixel [32, 48, 96], and pending-asset error presentation.
+Screenshot inspected: 05-editor-preview.png (real project, selected second sentence and cached background).
+
+pnpm typecheck
+$ tsc --noEmit
+Exit code: 0
+
+pnpm lint
+Checked 216 files in 120ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+The info is the existing useTemplate suggestion at tests/fixtures/text-models/build-synthetic.ts:63.
+
+NL_REPLAY=strict pnpm test
+ Test Files  25 passed (25)
+      Tests  351 passed (351)
+   Start at  01:08:46
+   Duration  12.35s (tests 87%, transform 7%, import 6%)
+Exit code: 0
+Includes task-02 history/rules and task-03 session unit tests.
+
+NL_REPLAY=strict xvfb-run -a pnpm exec playwright test --grep 'M2 editor contract fixture|M2 contract routes'
+  ✓  1 tests/e2e/m2-contract-routes.spec.ts:11:1 › M2 contract routes mount the editor and Bible without loading production (431ms)
+  ✓  2 tests/e2e/m2-editor.spec.ts:322:3 › contract-render › M2 editor contract fixture normal (2.8s)
+  ✓  3 tests/e2e/m2-editor.spec.ts:322:3 › contract-render › M2 editor contract fixture empty (1.6s)
+  ✓  4 tests/e2e/m2-editor.spec.ts:322:3 › contract-render › M2 editor contract fixture failure (1.4s)
+  ✓  5 tests/e2e/m2-editor.spec.ts:322:3 › contract-render › M2 editor contract fixture stale (1.2s)
+  5 passed (12.2s)
+Exit code: 0
+Uses the desktop build produced by the passing required Check, without rebuilding unchanged inputs.
+The route spec is the existing M2 e2e spec on merged main. The component fixtures use schema-validated
+contract substitutes and cover text effects, marks, selected rewrite hunks, empty/open failure/stale cases.
+05-editor-contract-fixture.png is component evidence, not backend rewrite/mark acceptance.
+
+Integration and choices:
+- Register editor.open/close/editLine/undo through one ProjectEditor per work; use task-02 listHistory/saveRules.
+- Open the project from the persisted work binding, identify its volume and register its existing work metadata
+  with ProjectTasks when needed. Do not start production queues or require configured model credentials.
+- Reuse task-02 persistence/revisions/session undo, not a renderer persistence layer or new backend tables.
+- Close project databases through the existing project-edit queue when the creator port closes.
+- ProjectEditor.open returns project-relative registry paths. The resource protocol serves only the host cache
+  (host-runtime/cache.ts realpath containment). entry.ts therefore copies readable assets to editor/<sha256>.<ext>
+  and maps pending/missing assets to editor/unavailable/<hash>.<ext>. No resource-protocol widening was needed.
+- One stable-ID text-line mutation per save matches editor.editLine, not an unversioned full-script write.
+- Source location uses scene-to-paragraph-range granularity, the mapping exposed by scene.sourceIds.
+- Existing mountMinimalPlayer renders compiled beats, preceding stage actions and following scenes.
+- ScrollArea/OverlayScrollbar hide native CodeMirror scrollbars; no shared config or dependency edits.
+
+Unimplemented on merged main and intentionally NOT registered:
+editor.resolveMark, editor.rewriteScene, editor.applyRewrite, editor.regenerateImage, editor.selectImage.
+None is required by the real-project 05 Check. Mark/rewrite UI has component-contract coverage only;
+real successful proposal acceptance/generation awaits those backend implementations. No fake success handlers.
+All model-capable checks use NL_REPLAY=strict. No paid model calls or new cassettes were needed.
+
+Review: skipped — no independent reviewer/subagent tool is exposed in this session.
+
+.workflow/bin/workflow task archive m2-editor/05-editor-ui
+Archived task m2-editor/05 to .workflow/done/m2-editor/05-editor-ui.md
+Exit code: 0
+
+.workflow/bin/workflow validate
+Workflow is valid (66 task files).
+Exit code: 0
