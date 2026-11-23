@@ -1,0 +1,957 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { _electron as electron, expect, test } from '@playwright/test'
+import sharp from 'sharp'
+import { Project } from '../../packages/creator/src/project'
+import { projectFiles } from '../../packages/format/src/model'
+import {
+	defaultPlayerSettings,
+	dwellMilliseconds,
+	schedulePlayback,
+} from '../../packages/ui/src/pages/player/controls/controller'
+import {
+	playerRef,
+	playerScript,
+	playerWorkId,
+	seedPlayerProject,
+} from '../fixtures/minimal-player'
+
+const require = createRequire(
+	new URL('../../apps/desktop/package.json', import.meta.url),
+)
+
+test.describe('M3 player controls', () => {
+	test('skip-read completes read cont and captions with pauses but leaves unread auto text alone', async () => {
+		const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-auto-skip-'))
+		const root = join(directory, 'project')
+		const png = await sharp({
+			create: { width: 32, height: 32, channels: 3, background: '#203060' },
+		})
+			.png()
+			.toBuffer()
+		await seedPlayerProject(root, png, png)
+		{
+			using project = await Project.open(root)
+			await project.writeFile(
+				projectFiles.scene(playerRef, 'aaaabbbb'),
+				'scene 空屋\nsource p0001\n: 开始 #0001\n: {wait 60}已读自动{wait 60} cont #0002\n@caption {wait 60}已读字幕{wait 60} #0003\n: {wait 60}未读自动 cont #0004\n: 结束 #0005\n',
+			)
+		}
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${join(directory, 'profile')}`],
+			env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
+		})
+		try {
+			const page = await app.firstWindow()
+			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await app.evaluate(({ dialog }, path) => {
+				dialog.showOpenDialog = async () => ({
+					canceled: false,
+					filePaths: [path],
+				})
+			}, root)
+			await page.evaluate(async (workId) => {
+				const api = window.novelive.host.progress
+				if (!api) throw new Error('Missing progress API')
+				await api.save(workId, {
+					mainline: null,
+					saves: [],
+					read: ['0001', '0002', '0003'].map((sentenceId) => ({
+						chapterId: 'ch1',
+						sceneId: 'aaaabbbb',
+						sentenceId,
+					})),
+				})
+				window.location.hash = `/work/${workId}/play`
+			}, playerWorkId)
+			await page.getByRole('button', { name: '打开本地工程' }).click()
+			const viewport = page.locator('.nl-player-text')
+			const display = viewport.locator('.nl-text-display')
+			await expect(display).toHaveText('开始')
+			await page.keyboard.press('Escape')
+			await page.getByLabel('跳过已读').check()
+			await page.keyboard.press('Escape')
+			await expect(display).toHaveText('未读自动', { timeout: 3000 })
+			await expect(viewport).toHaveAttribute('data-revealed', '0')
+			await page.waitForTimeout(350)
+			await expect(display).toHaveText('未读自动')
+			await expect(viewport).toHaveAttribute('data-revealed', '0')
+		} finally {
+			await app.close()
+			await rm(directory, { recursive: true, force: true })
+		}
+	})
+
+	test('live text speed, page dwell, first-page saves and read-only page skipping', async () => {
+		test.setTimeout(60000)
+		const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-pages-'))
+		const root = join(directory, 'project')
+		const read = '山川河流正在等待旅人。'.repeat(24)
+		const unread = '下一句仍未读，不能跳过。'.repeat(24)
+		const png = await sharp({
+			create: { width: 32, height: 32, channels: 3, background: '#203060' },
+		})
+			.png()
+			.toBuffer()
+		await seedPlayerProject(root, png, png)
+		{
+			using project = await Project.open(root)
+			await project.writeFile(
+				projectFiles.scene(playerRef, 'aaaabbbb'),
+				playerScript
+					.replace('你好，世界。', read)
+					.replace('我在想什么？', unread),
+			)
+		}
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${join(directory, 'profile')}`],
+			env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
+		})
+		try {
+			const page = await app.firstWindow()
+			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await app.evaluate(({ dialog }, path) => {
+				dialog.showOpenDialog = async () => ({
+					canceled: false,
+					filePaths: [path],
+				})
+			}, root)
+			await page.evaluate((id) => {
+				window.location.hash = `/work/${id}/play`
+			}, playerWorkId)
+			await page.getByRole('button', { name: '打开本地工程' }).click()
+			const viewport = page.locator('.nl-player-text')
+			const display = viewport.locator('.nl-text-display')
+			await expect(display).toHaveText(read)
+			await page.keyboard.press('Escape')
+			await page.getByRole('button', { name: '设置', exact: true }).click()
+			await page
+				.getByRole('slider', { name: '文字速度（毫秒 / 字）', exact: true })
+				.press('End')
+			await page
+				.getByRole('slider', { name: '自动播放倍率', exact: true })
+				.press('Home')
+			await page.getByRole('button', { name: '返回菜单' }).click()
+			await page.getByLabel('自动播放', { exact: true }).check()
+			await page.keyboard.press('Escape')
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await page.waitForTimeout(3000)
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await expect(display.locator('[data-glyph="50"]')).toHaveCSS(
+				'visibility',
+				'hidden',
+			)
+			await page.keyboard.press('Escape')
+			await page.getByRole('button', { name: '设置', exact: true }).click()
+			await page.getByLabel('瞬间显示').check()
+			const firstEnd = Number(await viewport.getAttribute('data-revealed'))
+			const pages = Number(await viewport.getAttribute('data-pages'))
+			expect(firstEnd).toBeGreaterThan(50)
+			expect(pages).toBeGreaterThan(2)
+			await expect(display.locator(`[data-glyph="${firstEnd - 1}"]`)).toHaveCSS(
+				'visibility',
+				'visible',
+			)
+			await expect(display.locator(`[data-glyph="${firstEnd}"]`)).toHaveCSS(
+				'visibility',
+				'hidden',
+			)
+			await page.keyboard.press('Escape')
+			await page.waitForTimeout(200)
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await expect(viewport).toHaveAttribute('data-page', '2', {
+				timeout: dwellMilliseconds(firstEnd, 0.25) + 2000,
+			})
+			await page.keyboard.press('Escape')
+			await page.getByRole('button', { name: '快速存档', exact: true }).click()
+			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await page.keyboard.press('Escape')
+			await page.getByRole('button', { name: '快速读档', exact: true }).click()
+			await expect(display).toHaveText(read)
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await page.evaluate((content) => {
+				const overlay = document.querySelector('.nl-player-overlay')
+				if (!overlay) throw new Error('Missing overlay')
+				const seen = new Set([1])
+				new MutationObserver(() => {
+					const text = overlay.querySelector<HTMLElement>('.nl-player-text')
+					if (text?.querySelector('.nl-text-display')?.textContent === content)
+						seen.add(Number(text.dataset.page))
+					document.body.dataset.skippedPages = JSON.stringify([...seen])
+				}).observe(overlay, {
+					subtree: true,
+					attributes: true,
+					attributeFilter: ['data-page'],
+				})
+			}, read)
+			await page.keyboard.press('Escape')
+			await page.getByLabel('跳过已读').check()
+			await page.keyboard.press('Escape')
+			await expect(display).toHaveText(unread)
+			await expect(page.locator('body')).toHaveAttribute(
+				'data-skipped-pages',
+				JSON.stringify(Array.from({ length: pages }, (_, index) => index + 1)),
+			)
+			await page.waitForTimeout(350)
+			await expect(display).toHaveText(unread)
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await page.screenshot({
+				path: '.workflow/evidence/m3-playback/05-controls-pages.png',
+			})
+		} finally {
+			await app.close()
+			await rm(directory, { recursive: true, force: true })
+		}
+	})
+
+	test('persistent slots, thumbnails, history and reread survive restart', async () => {
+		const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-persistent-'))
+		const root = join(directory, 'project')
+		const profile = join(directory, 'profile')
+		const png = await sharp({
+			create: { width: 32, height: 128, channels: 3, background: '#203060' },
+		})
+			.png()
+			.toBuffer()
+		await seedPlayerProject(root, png, png)
+		{
+			using project = await Project.open(root)
+			const file = projectFiles.work('v1', playerWorkId)
+			await project.write(file, {
+				...(await project.read(file)),
+				chapterIds: ['ch1', 'ch2'],
+			})
+			await project.write(
+				projectFiles.chapter({ ...playerRef, chapterId: 'ch2' }),
+				{
+					...(await project.read(projectFiles.chapter(playerRef))),
+					chapterId: 'ch2',
+					title: '晨光',
+				},
+			)
+			await project.writeFile(
+				projectFiles.scene({ ...playerRef, chapterId: 'ch2' }, 'aaaabbbb'),
+				playerScript.replace('你好，世界。', '第二章开始。'),
+			)
+		}
+		await mkdir(join(profile, 'projects'), { recursive: true })
+		await writeFile(join(profile, 'projects', playerWorkId), root)
+		async function open() {
+			const app = await electron.launch({
+				executablePath: require('electron'),
+				args: ['apps/desktop', `--user-data-dir=${profile}`],
+				env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
+			})
+			const page = await app.firstWindow()
+			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await page.evaluate((id) => {
+				window.location.hash = `/work/${id}/play`
+			}, playerWorkId)
+			return { app, page }
+		}
+		let { app, page } = await open()
+		try {
+			const text = () => page.locator('.nl-player-text .nl-text-display')
+			const advance = async () => {
+				await expect(page.locator('.nl-player-text')).toHaveAttribute(
+					'data-text-finished',
+					'true',
+				)
+				await page
+					.locator('.nl-player canvas')
+					.click({ position: { x: 20, y: 20 } })
+			}
+			const menu = () => page.keyboard.press('Escape')
+			await expect(text()).toHaveText('你好，世界。')
+			await menu()
+			await expect(
+				page.getByRole('button', { name: '快速读档', exact: true }),
+			).toBeDisabled()
+			await page.getByRole('button', { name: '快速存档', exact: true }).click()
+			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await advance()
+			await expect(text()).toHaveText('我在想什么？')
+			await menu()
+			await page.getByLabel('自动播放', { exact: true }).check()
+			await page.getByLabel('跳过已读').check()
+			await page.getByRole('button', { name: '快速读档', exact: true }).click()
+			await expect(text()).toHaveText('你好，世界。')
+			await menu()
+			await expect(
+				page.getByLabel('自动播放', { exact: true }),
+			).not.toBeChecked()
+			await expect(page.getByLabel('跳过已读')).not.toBeChecked()
+			await page.getByRole('button', { name: '读档', exact: true }).click()
+			await expect(
+				page.getByRole('button', { name: '返回菜单', exact: true }),
+			).toBeFocused()
+			await menu()
+			await menu()
+			await page.getByRole('button', { name: '存档', exact: true }).click()
+			await expect(page.locator('.nl-save-grid button')).toHaveCount(60)
+			await page
+				.getByRole('button', { name: '存档槽位 1', exact: true })
+				.click()
+			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await menu()
+			await page.getByRole('button', { name: '读档', exact: true }).click()
+			await expect(
+				page.getByRole('button', { name: '读档槽位 2', exact: true }),
+			).toBeDisabled()
+			await expect(page.getByAltText('槽位 1 缩略图')).toHaveJSProperty(
+				'naturalWidth',
+				480,
+			)
+			await expect(page.getByAltText('槽位 1 缩略图')).toHaveJSProperty(
+				'naturalHeight',
+				270,
+			)
+			await expect(page.locator('time')).toBeVisible()
+			await mkdir('.workflow/evidence/m3-playback', { recursive: true })
+			await page.screenshot({
+				path: '.workflow/evidence/m3-playback/05-controls-saves.png',
+			})
+			await menu()
+			await advance()
+			await expect(text()).toHaveText('我在想什么？')
+			await menu()
+			await page.getByRole('button', { name: '章节', exact: true }).click()
+			await page.getByRole('button', { name: /晨光/ }).click()
+			await expect(text()).toHaveText('第二章开始。')
+			await menu()
+			await page.getByRole('button', { name: '历史记录', exact: true }).click()
+			await page
+				.getByRole('button', { name: '1. 你好，世界。', exact: true })
+				.click()
+			await expect(text()).toHaveText('你好，世界。')
+			for (const line of ['我在想什么？', '第二章开始。']) {
+				await menu()
+				await page
+					.getByRole('button', { name: '历史记录', exact: true })
+					.click()
+				await page
+					.getByRole('button', { name: '前进一句', exact: true })
+					.click()
+				await expect(text()).toHaveText(line)
+			}
+			await menu()
+			await page.getByRole('button', { name: '章节', exact: true }).click()
+			await page.getByRole('button', { name: /空屋/ }).click()
+			await expect(page.getByRole('main')).toHaveAttribute(
+				'data-mode',
+				'reread',
+			)
+			await menu()
+			await page.getByRole('button', { name: '历史记录', exact: true }).click()
+			await page
+				.getByRole('button', { name: '3. 第二章开始。', exact: true })
+				.click()
+			await expect(page.getByRole('main')).toHaveAttribute('data-mode', 'main')
+			const previousMainline = await page
+				.getByRole('main')
+				.getAttribute('data-mainline')
+			await advance()
+			await expect(text()).toHaveText('我在想什么？')
+			await expect(page.getByRole('main')).not.toHaveAttribute(
+				'data-mainline',
+				previousMainline ?? '',
+			)
+			await menu()
+			await page.getByRole('button', { name: '历史记录', exact: true }).click()
+			await page.getByRole('button', { name: '后退一句', exact: true }).click()
+			await expect(text()).toHaveText('第二章开始。')
+			const mainline = await page
+				.getByRole('main')
+				.getAttribute('data-mainline')
+			await expect
+				.poll(() =>
+					page.evaluate(
+						async (id) =>
+							JSON.stringify(
+								(await window.novelive.host.progress?.load(id))?.mainline,
+							),
+						playerWorkId,
+					),
+				)
+				.toBe(mainline)
+			await app.close()
+			;({ app, page } = await open())
+			await expect(text()).toHaveText('我在想什么？')
+			await menu()
+			await page.getByRole('button', { name: '读档', exact: true }).click()
+			await expect(page.getByAltText('槽位 1 缩略图')).toHaveJSProperty(
+				'naturalWidth',
+				480,
+			)
+			await page
+				.getByRole('button', { name: '读档槽位 1', exact: true })
+				.click()
+			await expect(text()).toHaveText('你好，世界。')
+			await expect(page.getByRole('main')).toHaveAttribute('data-mode', 'main')
+			await expect(page.getByRole('main')).toHaveAttribute(
+				'data-mainline',
+				mainline ?? '',
+			)
+			await menu()
+			await page.getByRole('button', { name: '章节', exact: true }).click()
+			await page.getByRole('button', { name: /空屋/ }).click()
+			await expect(text()).toHaveText('你好，世界。')
+			await expect(page.getByRole('main')).toHaveAttribute(
+				'data-mode',
+				'reread',
+			)
+			await advance()
+			await expect(text()).toHaveText('我在想什么？')
+			await expect(page.getByRole('main')).toHaveAttribute(
+				'data-mainline',
+				mainline ?? '',
+			)
+			await expect
+				.poll(() =>
+					page.evaluate(
+						async (id) =>
+							JSON.stringify(
+								(await window.novelive.host.progress?.load(id))?.mainline,
+							),
+						playerWorkId,
+					),
+				)
+				.toBe(mainline)
+			await page.evaluate(async (id) => {
+				const api = window.novelive.host.progress
+				const saved = await api?.load(id)
+				if (!api || !saved?.mainline) throw new Error('missing progress')
+				await api.save(id, {
+					...saved,
+					mainline: { ...saved.mainline, sentenceId: 'removed' },
+				})
+			}, playerWorkId)
+			await app.close()
+			;({ app, page } = await open())
+			await expect(text()).toHaveText('第二章开始。')
+			await page.evaluate(async (id) => {
+				const api = window.novelive.host.progress
+				const saved = await api?.load(id)
+				if (!api || !saved) throw new Error('missing progress')
+				await api.save(id, {
+					...saved,
+					saves: saved.saves.map((entry) =>
+						entry.slot.kind === 'quick'
+							? {
+									...entry,
+									snapshot: {
+										...entry.snapshot,
+										position: {
+											...entry.snapshot.position,
+											sentenceId: 'removed',
+										},
+									},
+								}
+							: entry,
+					),
+				})
+			}, playerWorkId)
+			await app.close()
+			;({ app, page } = await open())
+			await expect(text()).toHaveText('第二章开始。')
+			await advance()
+			await expect(text()).toHaveText('我在想什么？')
+			await menu()
+			await page.getByRole('button', { name: '快速读档', exact: true }).click()
+			await expect(
+				page.getByText('存档中的句子已不存在', { exact: true }),
+			).toBeVisible()
+			await expect(text()).toHaveText('我在想什么？')
+			await menu()
+			await page.getByRole('button', { name: '历史记录', exact: true }).click()
+			await expect(
+				page.getByRole('button', { name: '1. 第二章开始。', exact: true }),
+			).toBeVisible()
+			await expect(
+				page.getByRole('button', { name: '2. 我在想什么？', exact: true }),
+			).toBeVisible()
+			{
+				using project = await Project.open(root)
+				await project.writeFile(
+					projectFiles.scene(playerRef, 'aaaabbbb'),
+					playerScript.replace('你好，世界。', '改写后的句子。'),
+				)
+			}
+			await menu()
+			await menu()
+			await page.getByRole('button', { name: '读档', exact: true }).click()
+			await page
+				.getByRole('button', { name: '读档槽位 1', exact: true })
+				.click()
+			await expect(text()).toHaveText('你好，世界。')
+			await menu()
+			await page.getByRole('button', { name: '快速存档', exact: true }).click()
+			await expect(page.getByRole('status')).toHaveText('存档成功')
+			const savedText = await page.evaluate(
+				async (id) =>
+					(await window.novelive.host.progress?.load(id))?.saves.find(
+						(entry) => entry.slot.kind === 'quick',
+					)?.snapshot.stage.text.content,
+				playerWorkId,
+			)
+			expect(savedText).toEqual([{ type: 'text', text: '你好，世界。' }])
+		} finally {
+			await app.close()
+			await rm(directory, { recursive: true, force: true })
+		}
+	})
+	test('controller uses contract dwell and never skips unread or a wait', async () => {
+		expect(dwellMilliseconds(10, 2)).toBe(4000)
+		let advances = 0
+		let frame = {
+			position: null,
+			characters: 10,
+			read: false,
+			ready: true,
+			pageReady: true,
+			ended: false,
+		}
+		const controller = {
+			mode: 'main' as const,
+			frame: () => frame,
+			subscribe: () => () => {},
+			advance: () => {
+				advances++
+			},
+			applySettings: () => {},
+		}
+		schedulePlayback(
+			controller,
+			{ ...defaultPlayerSettings, skipRead: true },
+			false,
+			false,
+		)()
+		expect(advances).toBe(0)
+		frame = { ...frame, read: true }
+		const cancel = schedulePlayback(
+			controller,
+			{ ...defaultPlayerSettings, skipRead: true },
+			false,
+			false,
+		)
+		await expect.poll(() => advances).toBe(1)
+		cancel()
+		frame = { ...frame, ready: false }
+		schedulePlayback(controller, defaultPlayerSettings, true, false)()
+		expect(advances).toBe(1)
+		frame = { ...frame, read: false, ready: true, characters: 0 }
+		const cancelUnread = schedulePlayback(
+			controller,
+			{
+				...defaultPlayerSettings,
+				skipRead: true,
+				autoPlaySpeedMultiplier: 0.25,
+			},
+			true,
+			false,
+		)
+		await new Promise((resolve) => setTimeout(resolve, 350))
+		expect(advances).toBe(1)
+		cancelUnread()
+		frame = { ...frame, pageReady: false }
+		const cancelUnrevealed = schedulePlayback(
+			controller,
+			{ ...defaultPlayerSettings, autoPlaySpeedMultiplier: 0.25 },
+			true,
+			false,
+		)
+		await new Promise((resolve) =>
+			setTimeout(resolve, dwellMilliseconds(0, 0.25) + 50),
+		)
+		expect(advances).toBe(1)
+		cancelUnrevealed()
+		frame = { ...frame, pageReady: true }
+		const cancelAuto = schedulePlayback(
+			controller,
+			{ ...defaultPlayerSettings, autoPlaySpeedMultiplier: 0.25 },
+			true,
+			false,
+		)
+		await expect.poll(() => advances).toBe(2)
+		cancelAuto()
+		expect(dwellMilliseconds(0, 1)).toBe(1200)
+		schedulePlayback(controller, defaultPlayerSettings, true, true)()
+		expect(advances).toBe(2)
+	})
+
+	for (const scenario of [
+		'settings and reread',
+		'chapter wait',
+		'reread successor',
+	] as const) {
+		test(`${scenario} in the real Electron player`, async () => {
+			const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-controls-'))
+			const root = join(directory, 'project')
+			const png = await sharp({
+				create: { width: 32, height: 128, channels: 3, background: '#203060' },
+			})
+				.png()
+				.toBuffer()
+			await seedPlayerProject(root, png, png)
+			if (scenario === 'chapter wait') {
+				using project = await Project.open(root)
+				await project.writeFile(
+					projectFiles.scene(playerRef, 'aaaabbbb'),
+					playerScript.replace('source p0001', 'source p0001\n@wait 0.01'),
+				)
+			}
+			{
+				using project = await Project.open(root)
+				const file = projectFiles.work('v1', playerWorkId)
+				await project.write(file, {
+					...(await project.read(file)),
+					chapterIds:
+						scenario === 'chapter wait'
+							? ['ch1', 'ch2', 'ch3']
+							: ['ch1', 'ch2'],
+				})
+				await project.write(
+					projectFiles.chapter({ ...playerRef, chapterId: 'ch2' }),
+					{
+						...(await project.read(projectFiles.chapter(playerRef))),
+						chapterId: 'ch2',
+						title: '晨光',
+					},
+				)
+				await project.writeFile(
+					projectFiles.scene({ ...playerRef, chapterId: 'ch2' }, 'aaaabbbb'),
+					playerScript
+						.replace('你好，世界。', '第二章开始。')
+						.replace('source p0001', 'source p0001\n@caption 自动开场'),
+				)
+				project.database
+					.prepare(
+						'INSERT INTO work (work_id, title, queue_pos, created_at) VALUES (?, ?, 0, 0)',
+					)
+					.run(playerWorkId, '测试')
+				project.database
+					.prepare(
+						"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, 'ch1', 1, 'published'), (?, 'ch2', 2, 'producing')",
+					)
+					.run(playerWorkId, playerWorkId)
+				if (scenario === 'chapter wait') {
+					await project.write(
+						projectFiles.chapter({ ...playerRef, chapterId: 'ch3' }),
+						{
+							...(await project.read(projectFiles.chapter(playerRef))),
+							chapterId: 'ch3',
+							title: '后续章节',
+						},
+					)
+					project.database
+						.prepare(
+							"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, 'ch3', 3, 'producing')",
+						)
+						.run(playerWorkId)
+				}
+				if (scenario === 'reread successor')
+					project.database
+						.prepare(
+							"UPDATE chapter SET user_state = 'published' WHERE chapter_id = 'ch2'",
+						)
+						.run()
+			}
+			const app = await electron.launch({
+				executablePath: require('electron'),
+				args: ['apps/desktop', `--user-data-dir=${join(directory, 'profile')}`],
+				env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
+			})
+			try {
+				const page = await app.firstWindow()
+				await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+				await page.evaluate(() => {
+					document.body.dataset.playerWaitEntries = '0'
+					window.addEventListener('novelive:player-waiting', (event) => {
+						const detail = (event as CustomEvent<string | null>).detail
+						document.body.dataset.playerWaiting = JSON.stringify(detail)
+						if (detail)
+							document.body.dataset.playerWaitEntries = String(
+								Number(document.body.dataset.playerWaitEntries) + 1,
+							)
+					})
+				})
+				await app.evaluate(({ dialog }, path) => {
+					dialog.showOpenDialog = async () => ({
+						canceled: false,
+						filePaths: [path],
+					})
+				}, root)
+				await page.evaluate((id) => {
+					window.location.hash = `/work/${id}/play`
+				}, playerWorkId)
+				await page.getByRole('button', { name: '打开本地工程' }).click()
+				const canvas = page.locator('.nl-player canvas')
+				const text = page.locator('.nl-player-text .nl-text-display')
+				await expect(text).toHaveText('你好，世界。')
+				const advance = async () => {
+					const viewport = page.locator('.nl-player-text')
+					if (await viewport.count())
+						await expect(viewport).toHaveAttribute('data-text-finished', 'true')
+					await canvas.click({ position: { x: 20, y: 20 } })
+				}
+				async function range(label: string, value: number) {
+					const input = page.getByRole('slider', { name: label, exact: true })
+					const min = Number(await input.getAttribute('min'))
+					const step = Number(await input.getAttribute('step'))
+					await input.press('Home')
+					for (let index = 0; index < Math.round((value - min) / step); index++)
+						await input.press('ArrowRight')
+				}
+				if (scenario === 'settings and reread') {
+					await page.keyboard.press('Escape')
+					await expect(
+						page.getByRole('dialog', { name: '系统菜单' }),
+					).toBeVisible()
+					await page.getByLabel('自动播放', { exact: true }).check()
+					await expect(
+						page.getByLabel('自动播放', { exact: true }),
+					).toBeChecked()
+					await page.getByLabel('自动播放', { exact: true }).uncheck()
+					await page.keyboard.press('Escape')
+					await expect(page.getByRole('dialog')).toHaveCount(0)
+					await canvas.click({ button: 'right', position: { x: 20, y: 20 } })
+					await page.getByRole('button', { name: '设置', exact: true }).click()
+					await range('字号', 36)
+					await range('对话框不透明度', 0.5)
+					await page
+						.getByRole('slider', { name: '文字速度（毫秒 / 字）', exact: true })
+						.press('End')
+					await page.getByLabel('瞬间显示').check()
+					await range('自动播放倍率', 2)
+					await page.getByLabel('对话框样式').selectOption('paper')
+					await expect(page.locator('.nl-player-textbox')).toHaveCSS(
+						'font-size',
+						'36px',
+					)
+					await expect(page.locator('.nl-text-viewport')).toHaveCSS(
+						'font-size',
+						'36px',
+					)
+					await expect(page.locator('.nl-player-surface')).toHaveAttribute(
+						'data-dialogue-style',
+						'paper',
+					)
+					await expect(page.locator('.nl-player-surface')).toHaveCSS(
+						'--player-dialogue-opacity',
+						'0.5',
+					)
+					await expect(page.locator('.nl-player-surface')).toHaveCSS(
+						'--player-text-delay',
+						'0ms',
+					)
+					await page.getByLabel('全屏', { exact: true }).click()
+					await expect
+						.poll(() => page.evaluate(() => !!document.fullscreenElement))
+						.toBe(true)
+					await expect(page.getByLabel('全屏', { exact: true })).toBeChecked()
+					await page.getByLabel('全屏', { exact: true }).click()
+					await expect
+						.poll(() => page.evaluate(() => !!document.fullscreenElement))
+						.toBe(false)
+					await page.getByRole('button', { name: '返回菜单' }).click()
+					await page.getByRole('button', { name: '隐藏界面' }).click()
+					await expect(page.locator('.nl-player-overlay')).toBeHidden()
+					await expect(page.locator('.nl-player-overlay')).toHaveCSS(
+						'opacity',
+						'0',
+					)
+					await page.screenshot({
+						path: '.workflow/evidence/m3-playback/05-controls-hidden.png',
+					})
+					await advance()
+					await expect(text).toHaveText('你好，世界。')
+					await page.keyboard.press('Escape')
+					await page.getByRole('button', { name: '隐藏界面' }).click()
+					await page.keyboard.press('a')
+					await expect(page.locator('.nl-player-overlay')).toBeVisible()
+					await advance()
+					await expect(text).toHaveText('我在想什么？')
+					const mainline = await page
+						.getByRole('main')
+						.getAttribute('data-mainline')
+					await page.keyboard.press('Escape')
+					await page.getByRole('button', { name: '章节', exact: true }).click()
+					await expect(
+						page.getByRole('button', { name: /晨光/ }),
+					).toBeDisabled()
+					await page.getByRole('button', { name: /空屋/ }).click()
+					await expect(text).toHaveText('你好，世界。')
+					await expect(page.getByRole('main')).toHaveAttribute(
+						'data-mode',
+						'reread',
+					)
+					await expect(page.getByRole('main')).toHaveAttribute(
+						'data-mainline',
+						mainline ?? '',
+					)
+					await page.keyboard.press('Escape')
+					await page.getByLabel('跳过已读').check()
+					await page.keyboard.press('Escape')
+					await expect(text).toHaveText('风从窗边吹过。')
+					await page.keyboard.press('Escape')
+					await expect(page.getByLabel('跳过已读')).toBeChecked()
+					await mkdir('.workflow/evidence/m3-playback', { recursive: true })
+					await page.screenshot({
+						path: '.workflow/evidence/m3-playback/05-controls-menu.png',
+					})
+					await page
+						.locator('.nl-controls-backdrop')
+						.click({ position: { x: 5, y: 5 } })
+					await expect(page.getByRole('dialog')).toHaveCount(0)
+					await page.keyboard.press('Escape')
+					await expect(
+						page.getByRole('button', { name: '在编辑器中打开这里' }),
+					).toBeDisabled()
+					await page.getByLabel('跳过已读').uncheck()
+					await page.getByRole('button', { name: '返回游戏' }).focus()
+					await page.keyboard.press('Shift+Tab')
+					await expect(
+						page.getByRole('button', { name: '设置', exact: true }),
+					).toBeFocused()
+					await page.keyboard.press('Tab')
+					await expect(
+						page.getByRole('button', { name: '返回游戏' }),
+					).toBeFocused()
+					await expect(
+						page.getByRole('button', { name: '在编辑器中打开这里' }),
+					).toHaveAttribute('title', '请先将本地工程关联到作品')
+					await mkdir(join(directory, 'profile', 'projects'), {
+						recursive: true,
+					})
+					await writeFile(
+						join(directory, 'profile', 'projects', playerWorkId),
+						root,
+					)
+					await page.evaluate(() => {
+						window.location.hash = '/'
+					})
+					await expect(page.getByRole('main', { name: '播放器' })).toHaveCount(
+						0,
+					)
+					await page.evaluate((id) => {
+						window.location.hash = `/work/${id}/play`
+					}, playerWorkId)
+					await expect(text).toHaveText('我在想什么？')
+					await page.keyboard.press('Escape')
+					await page.getByRole('button', { name: '在编辑器中打开这里' }).click()
+					await expect(page).toHaveURL(
+						/\/edit\?chapterId=ch1&sceneId=.+&lineId=.+/,
+					)
+				} else if (scenario === 'reread successor') {
+					await page.keyboard.press('Escape')
+					await page.getByRole('button', { name: '章节', exact: true }).click()
+					await page.getByRole('button', { name: /空屋/ }).click()
+					await expect(page.getByRole('main')).toHaveAttribute(
+						'data-mode',
+						'reread',
+					)
+					await expect(text).toHaveText('你好，世界。')
+					for (const line of [
+						'我在想什么？',
+						'风从窗边吹过。',
+						'黄昏时分',
+						'屋子静了。',
+					]) {
+						await advance()
+						await expect(text).toHaveText(line)
+					}
+					await advance()
+					await page
+						.getByRole('button', { name: '下一章已就绪，点击开始' })
+						.click()
+					await expect(text).toHaveText('自动开场')
+					await expect(page.getByRole('main')).toHaveAttribute(
+						'data-mode',
+						'main',
+					)
+					await expect(page.getByRole('main')).toHaveAttribute(
+						'data-mainline',
+						/"chapterId":"ch2"/,
+					)
+					await expect(page.locator('body')).toHaveAttribute(
+						'data-player-wait-entries',
+						'0',
+					)
+				} else {
+					for (let index = 0; index < 6; index++) await advance()
+					await expect(page.getByRole('status')).toContainText('下一章 · 晨光')
+					await expect(page.getByRole('status')).toContainText('制作中')
+					{
+						using project = await Project.open(root)
+						project.database
+							.prepare(
+								"UPDATE chapter SET user_state = 'published' WHERE chapter_id = 'ch3'",
+							)
+							.run()
+					}
+					await page.waitForTimeout(2200)
+					await expect(page.locator('body')).toHaveAttribute(
+						'data-player-waiting',
+						JSON.stringify(playerWorkId),
+					)
+					await page.evaluate(() => {
+						window.location.hash = '/'
+					})
+					await expect(page.locator('body')).toHaveAttribute(
+						'data-player-waiting',
+						'null',
+					)
+					await page.evaluate((id) => {
+						window.location.hash = `/work/${id}/play`
+					}, playerWorkId)
+					await page.getByRole('button', { name: '打开本地工程' }).click()
+					await expect(text).toHaveText('屋子静了。')
+					await advance()
+					await expect(page.locator('body')).toHaveAttribute(
+						'data-player-waiting',
+						JSON.stringify(playerWorkId),
+					)
+					await app.evaluate(({ BrowserWindow }) => {
+						BrowserWindow.getAllWindows()[0].hide()
+					})
+					{
+						using project = await Project.open(root)
+						project.database
+							.prepare(
+								"UPDATE chapter SET user_state = 'published' WHERE chapter_id = 'ch2'",
+							)
+							.run()
+					}
+					await expect(
+						page.getByRole('button', { name: '下一章已就绪，点击开始' }),
+					).toBeVisible({ timeout: 15000 })
+					await expect(canvas).toHaveCount(0)
+					await expect(page.locator('body')).toHaveAttribute(
+						'data-player-waiting',
+						'null',
+					)
+					await app.evaluate(({ BrowserWindow }) =>
+						BrowserWindow.getAllWindows()[0].show(),
+					)
+					await expect(
+						page.getByRole('button', { name: '下一章已就绪，点击开始' }),
+					).toBeVisible()
+					await page
+						.getByRole('button', { name: '下一章已就绪，点击开始' })
+						.click()
+					await expect(text).toHaveText('自动开场')
+					await expect(text).toHaveText('第二章开始。')
+					await advance()
+					await expect(text).toHaveText('我在想什么？')
+				}
+			} finally {
+				await app.close()
+				await rm(directory, { recursive: true, force: true })
+			}
+		})
+	}
+})

@@ -301,8 +301,13 @@ registry.register('config.reset', async () => {
 	await (await production)?.refreshSettings()
 	return value
 })
-registry.register('production.playerChapter', async ({ directory, workId }) =>
-	(await getProduction()).player(workId, directory),
+registry.register(
+	'production.playerChapter',
+	async ({ directory, workId, chapterId }) =>
+		(await getProduction()).player(workId, directory, chapterId),
+)
+registry.register('production.playerStatus', async ({ directory, workId }) =>
+	(await getProduction()).playerStatus(workId, directory),
 )
 registry.register('production.get', async ({ workId }) =>
 	(await productionSession(workId)).snapshot(),

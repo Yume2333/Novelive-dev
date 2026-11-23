@@ -13,6 +13,7 @@ import {
 	utilityProcess,
 } from 'electron'
 import { cacheResponse } from '../../../../packages/creator/src/host-runtime/cache'
+import { installProgressIpc } from '../progress-ipc'
 import { installNotifications } from './notifications'
 import { installLifecycle } from './tray'
 
@@ -158,7 +159,8 @@ function openLibrary() {
 	}
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+	await installProgressIpc(() => library)
 	lifecycle = installLifecycle({
 		window: () => library,
 		active: () => blocker !== undefined,

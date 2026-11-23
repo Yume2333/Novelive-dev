@@ -21,7 +21,7 @@ import {
 import { existing } from '../synthesis/patch'
 import { withUsage } from '../usage'
 import { Project } from './index'
-import { loadPlayerChapter } from './player'
+import { loadPlayerChapter, loadPlayerStatus } from './player'
 import {
 	chapterWorker,
 	productionBible,
@@ -418,24 +418,24 @@ export function createProduction(
 				),
 			)
 		},
-		async player(workId: string, selected?: string) {
+		async playerStatus(workId: string, selected?: string) {
 			const linked = await existing(() => readFile(binding(workId), 'utf8'))
-			if (linked) {
-				using project = await Project.open(linked)
-				if (
-					!project.database
-						.prepare(
-							"SELECT 1 FROM chapter WHERE work_id = ? AND ord = 1 AND user_state = 'published'",
-						)
-						.get(workId)
-				)
-					fail('not_found', '第一章尚未发布')
-			}
-			return loadPlayerChapter(
+			return loadPlayerStatus(
 				linked ?? selected ?? fail('not_found', '请选择本地工程'),
 				workId,
-				cacheDir,
 			)
+		},
+		async player(workId: string, selected?: string, chapterId?: string) {
+			const linked = await existing(() => readFile(binding(workId), 'utf8'))
+			return {
+				...(await loadPlayerChapter(
+					linked ?? selected ?? fail('not_found', '请选择本地工程'),
+					workId,
+					cacheDir,
+					chapterId,
+				)),
+				linked: !!linked,
+			}
 		},
 		async close() {
 			closing = true

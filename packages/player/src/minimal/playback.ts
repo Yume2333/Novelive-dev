@@ -6,9 +6,10 @@ export function createPlayback(
 	signal: AbortSignal,
 	onError: (error: unknown) => void,
 	textFinished?: () => Promise<void>,
+	options: { startIndex?: number } = {},
 ) {
 	const beats = scenes.flatMap((scene) => scene.beats)
-	let index = -1
+	let index = (options.startIndex ?? 0) - 1
 	let busy = false
 	let stopped = false
 	let timer: ReturnType<typeof setTimeout> | undefined

@@ -8,6 +8,7 @@
 }
 
 .nl-player-stage,
+.nl-player-surface,
 .nl-player-overlay {
 	position: absolute;
 	inset: 0;

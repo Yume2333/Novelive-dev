@@ -130,6 +130,30 @@ const api: Novelive = {
 	pickFolder: () => ipcRenderer.invoke('novelive:pick-folder'),
 	pickFiles: (kind) => ipcRenderer.invoke('novelive:pick-files', kind),
 	host: {
+		progress: {
+			load: (workId) =>
+				ipcRenderer.invoke('novelive:progress', { operation: 'load', workId }),
+			save: (workId, progress) =>
+				ipcRenderer.invoke('novelive:progress', {
+					operation: 'save',
+					workId,
+					progress,
+				}),
+			saveSlot: (workId, slot, snapshot, rect) =>
+				ipcRenderer.invoke('novelive:progress', {
+					operation: 'saveSlot',
+					workId,
+					slot,
+					snapshot,
+					rect,
+				}),
+			thumbnail: (workId, slot) =>
+				ipcRenderer.invoke('novelive:progress', {
+					operation: 'thumbnail',
+					workId,
+					slot,
+				}),
+		},
 		appState: (): Promise<HostState> => ipcRenderer.invoke('novelive:state'),
 		openLogDir: () => ipcRenderer.invoke('novelive:open-log-dir'),
 		restartCreator: () => ipcRenderer.invoke('novelive:restart'),
