@@ -934,7 +934,7 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Decided:** 分块对照三个整卷输出形成的共识；名称或别名和变更动作归一匹配，F1 门槛保持 0.90。每批先参考已提出条目，按全卷尺度选取并保存 checkpoint。
 - **Instead of:** 单次整卷输出作唯一真值、字面完全相等、为达标降低门槛或调整 scorer。
 - **Because:** 整卷输出自身有波动（37 条共识，留一基线 0.650）；实际分块 0.80–0.85 仍未通过。
-- **Decided by:** agent
+- **Decided by:** agent (m1a-project/07)
 
 ## 2026-11-23 - 真书制作暂沿用整卷综合
 
@@ -948,21 +948,21 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Decided:** 允许未输出的可选集合保持空；已有约束继续校验。自动策略指纹包含实际策略/输入，避免错误复用已有综合。
 - **Instead of:** 强制模型补空字段，或把自动策略和其他策略共用不可区分的缓存键。
 - **Because:** 减少无实质变化的结构修复，同时不把不匹配的 checkpoint 当有效结果。
-- **Decided by:** agent
+- **Decided by:** agent (m1a-project/05)
 
 ## 2026-11-23 - 推理耗尽走专用错误
 
 - **Decided:** 按 catalog 用每模型输出上限，允许槽覆盖；仅有推理文本时判 reasoning_limit，允许一次更高上限重试；JSON 角色可回退 Gemini。
 - **Instead of:** 所有模型固定 4096，或默认低推理强度。
 - **Because:** 中继可能忽略推理强度，HTTP 200 仍无可解析内容。
-- **Decided by:** agent
+- **Decided by:** agent (m1a-project/07)
 
 ## 2026-11-23 - 主视觉审核耗尽保留最后可用候选
 
 - **Decided:** 主视觉确认保留最后通过技术检查的候选，即使后续审核未通过或重绘不可解码；仍由创作者确认，不放宽章节图。
 - **Instead of:** 无候选可确认，或保留未过技术检查的最终结果。
 - **Because:** 保持透明度、可解码等技术约束，又不让视觉判断替代创作者确认。
-- **Decided by:** agent
+- **Decided by:** agent (m1b-production/11)
 
 ## 2026-11-23 - 忠实度引用限定原文窗口
 
@@ -976,7 +976,7 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Decided:** 格式失败单独修一次，指导由 planArt 同一规则生成，提供拒绝回包；之后 staging 重试编辑最近失败的回包。
 - **Instead of:** 放宽 ID 规则或重写原始旧回包。
 - **Because:** 裸地点 ID 来自模型，不是产品的中文转换；修复后两个地点都可供 @bg 引用。
-- **Decided by:** agent
+- **Decided by:** agent (m1b-production/11)
 
 ## 2026-11-23 - 响应头限时随输出量调整
 
@@ -997,4 +997,4 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Decided:** 确定性场景用合成 cassette；联合卷 UUID 只显式重绑定，不放松 hash；join 按项目串行；视觉确认按系列顺序，仅最早未确认卷主持。
 - **Instead of:** 付费重录确定性场景、乐观重试、给批准记录加来源元数据。
 - **Because:** 固定回放输入；来源元数据方案不断出现漏洞且不兼容已批准的旧工程，按序兼容既有记录。
-- **Decided by:** agent
+- **Decided by:** agent (m4-longform/10)
