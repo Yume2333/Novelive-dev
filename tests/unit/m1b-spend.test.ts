@@ -109,3 +109,43 @@ test('image reservations settle the returned image count and any measured token 
 		{ actual_tokens: 30, actual_images: 1 },
 	])
 })
+
+test.each(['response.completed', 'response.incomplete'])(
+	'quotes Responses requests and settles from terminal %s usage without a DONE marker',
+	async (type) => {
+		vi.stubEnv('NL_REPLAY', '')
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		using database = new DatabaseSync(':memory:')
+		const send = vi
+			.fn<typeof globalThis.fetch>()
+			.mockImplementation(
+				async () =>
+					new Response(
+						`data: ${JSON.stringify({ type, response: { usage: { input_tokens: 11, output_tokens: 19 } } })}\n\n`,
+						{ headers: { 'content-type': 'text/event-stream' } },
+					),
+			)
+		const dispatch = createReplayFetch({
+			fetch: send,
+			spend: projectSpend(database),
+		})
+		const request = (max_output_tokens: number) =>
+			dispatch('https://example.invalid/v1/responses', {
+				method: 'POST',
+				body: JSON.stringify({
+					max_output_tokens,
+					input: [
+						{ role: 'user', content: [{ type: 'input_text', text: 'Hello' }] },
+					],
+				}),
+			})
+		await expect(request(2000)).rejects.toThrow('超出工程预算')
+		expect(send).not.toHaveBeenCalled()
+		for (let i = 0; i < 2; i++) await (await request(500)).text()
+		expect(send).toHaveBeenCalledTimes(2)
+		expect(
+			database.prepare('SELECT actual_tokens FROM spend_reservation').all(),
+		).toEqual([{ actual_tokens: 30 }, { actual_tokens: 30 }])
+	},
+)

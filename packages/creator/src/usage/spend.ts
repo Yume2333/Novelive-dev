@@ -53,10 +53,19 @@ async function quote(request: Request) {
 			if (!perImage || !valid(tokens)) throw new Error()
 			return { tokens, images: count }
 		}
-		if (!/\/(?:chat\/completions|messages)$/.test(path)) throw new Error()
+		const responses = path.endsWith('/responses')
+		if (!responses && !/\/(?:chat\/completions|messages)$/.test(path))
+			throw new Error()
 		const body = object(await request.clone().json())
-		const output = body.max_completion_tokens ?? body.max_tokens
-		if (!valid(output) || output < 1 || !Array.isArray(body.messages))
+		const output = responses
+			? body.max_output_tokens
+			: (body.max_completion_tokens ?? body.max_tokens)
+		const input = responses ? body.input : body.messages
+		if (
+			!valid(output) ||
+			output < 1 ||
+			(!Array.isArray(input) && !(responses && typeof input === 'string'))
+		)
 			throw new Error()
 		const fields: string[] = []
 		let largeFieldBytes = 0
@@ -105,6 +114,13 @@ function observeUsage(response: Response, settle: (tokens: number) => void) {
 			return
 		}
 		tokens = totalUsage(row.usage) ?? tokens
+		if (
+			row.type === 'response.completed' ||
+			row.type === 'response.incomplete'
+		) {
+			const total = totalUsage(object(row.response).usage)
+			if (total !== undefined) settle(total)
+		}
 		if (row.type === 'message_start') {
 			const usage = object(object(row.message).usage)
 			const parts = [
