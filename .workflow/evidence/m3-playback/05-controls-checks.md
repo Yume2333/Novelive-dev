@@ -126,3 +126,30 @@ Workflow is valid (66 task files).
 `git diff --check` and `git diff origin/main --check` exit 0. The extra cached-diff check against the pre-merge branch reports whitespace in incoming PDF fixture xref rows; those files match main and were not edited (stripping PDF whitespace would invalidate offsets).
 
 Real-window `05-controls-pages.png` was inspected: the multi-page read sentence has been skipped page-by-page, and the next unread sentence remains at page one. The same test verifies visible 153 ms/grapheme typing, instant speed, autoplay waiting for page reveal, page dwell and page-two quick save restoring at page one. Existing menu/save-grid evidence and the M1b screenshot were refreshed by their regression tests.
+
+## Review on merge `edadb6bf612533028930037d0ba618815c336d0a`
+
+- `3d7452c`: hide the overlay with opacity, retaining visibility and layout. Explicit glyph visibility cannot override ancestor opacity. The real-window hidden state was inspected in `05-controls-hidden.png`; clicking and keyboard restoration remain covered.
+- `79f838e` and `396ad2a`: read scripted-auto text is eligible for skip, using M3/03's unchanged `mountText(..., { skip: true })`. This completes read `cont`/caption sentences without typing, pauses or dwell. The controller rechecks the live read state when executing a queued skip, so a timer from a previous read sentence cannot skip the newly displayed unread sentence. Native auto timing remains authoritative when not skipping. Click-driven read sentences still traverse their pages.
+- `496908a`: the unrevealed-page regression waits past the 300 ms contracted dwell while the scheduled timer remains live, asserts no advance, then invokes cleanup.
+
+Checks after the last code edit (exit 0):
+
+```text
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M3 player controls'
+Running 7 tests using 1 worker
+7 passed (35.0s)
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M3 text typography'
+Running 2 tests using 1 worker
+2 passed (16.9s)
+
+pnpm typecheck
+$ tsc --noEmit
+
+pnpm lint
+Checked 316 files in 216ms. No fixes applied.
+Found 1 info.
+```
+
+Lint's only informational diagnostic remains the unrelated `useTemplate` suggestion in `tests/fixtures/text-models/build-synthetic.ts`. `git diff --check` and `git diff origin/main --check` exit 0. The new read-auto Electron case seeds three read sentence IDs, skips both `cont` and caption text containing 60-second initial/trailing pauses, and verifies the first unread auto sentence stays at zero revealed glyphs. No text-layer source or API changes.
