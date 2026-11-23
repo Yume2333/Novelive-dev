@@ -11,7 +11,12 @@ import type {
 	StageSnapshot,
 	WorkProgress,
 } from '../../packages/player/src/contract'
-import { emptyStage } from '../../packages/player/src/stage/state'
+import { restoreSnapshot } from '../../packages/player/src/progress'
+import {
+	direct,
+	emptyStage,
+	stageAssets,
+} from '../../packages/player/src/stage/state'
 
 const directories: string[] = []
 afterEach(async () => {
@@ -60,6 +65,52 @@ function capture(background: string) {
 		.png()
 		.toBuffer()
 }
+
+test('restores a kept sentence after the new release removes its saved background', async () => {
+	const { store } = await createStore()
+	const saved = snapshot(first)
+	saved.stage.background = { assetId: 'old/room', transition: null }
+	saved.stage.cg = 'kept/cg'
+	saved.active = [
+		{
+			restore: 'replay-state',
+			action: {
+				type: 'action',
+				line: 1,
+				col: 1,
+				name: 'bg',
+				args: {},
+				assets: [{ id: 'old/room' }],
+			},
+		},
+	]
+	await store.saveSlot(workId, quick, saved, await capture('#123456'))
+	const update = {
+		workId,
+		fromVersion: 1,
+		toVersion: 2,
+		positions: [first],
+		assetIds: ['kept/cg'],
+	}
+	const { progress, legacySaves } = await store.migrate(update)
+	const [retained] = progress.saves
+	expect(retained.snapshot.position).toEqual(first)
+	expect(legacySaves).toEqual([])
+
+	let state = emptyStage()
+	const setState = (next: typeof state) => {
+		for (const asset of stageAssets(next))
+			if (!update.assetIds.includes(asset))
+				throw new Error(`Missing asset: ${asset}`)
+		state = next
+	}
+	await restoreSnapshot(retained.snapshot, {
+		setState,
+		replayState: (action) => setState(direct(state, action)),
+		restartText: () => {},
+	})
+	expect(state).toEqual({ ...saved.stage, background: null })
+})
 
 test('updates an existing progress file by full ID and persists archived slots with their thumbnails', async () => {
 	const { userData, directory, store } = await createStore()
@@ -118,6 +169,7 @@ test('updates an existing progress file by full ID and persists archived slots w
 		fromVersion: 1,
 		toVersion: 2,
 		positions: [otherChapter, otherScene, first],
+		assetIds: ['room'],
 	}
 	const expected: WorkProgress = {
 		mainline: otherScene,
@@ -208,6 +260,7 @@ test('keeps identical slot numbers independent across releases and bounds the ma
 		fromVersion: 1,
 		toVersion: 2,
 		positions: [first, otherChapter],
+		assetIds: [],
 	}
 	expect(
 		(await store.migrate({ ...update, toVersion: 1 })).progress.mainline,

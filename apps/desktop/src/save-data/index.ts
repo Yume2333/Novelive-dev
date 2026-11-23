@@ -11,6 +11,7 @@ import {
 import { join } from 'node:path'
 import sharp from 'sharp'
 import {
+	type AssetId,
 	type LegacySaveGroup,
 	type ProgressMigrationInput,
 	type ProgressMigrationResult,
@@ -88,9 +89,11 @@ export class FileProgressStore implements ProgressStore {
 	}
 
 	migrate(
-		input: Omit<ProgressMigrationInput, 'progress' | 'legacySaves'>,
+		input: Omit<ProgressMigrationInput, 'progress' | 'legacySaves'> & {
+			assetIds: readonly AssetId[]
+		},
 	): Promise<ProgressMigrationResult> {
-		const update = structuredClone(input)
+		const { assetIds, ...update } = structuredClone(input)
 		return this.enqueue(async () => {
 			const stored = await this.read(update.workId)
 			if (!stored)
@@ -98,7 +101,7 @@ export class FileProgressStore implements ProgressStore {
 					progress: { mainline: null, read: [], saves: [] },
 					legacySaves: [],
 				}
-			const migrated = migrateProgress({ ...update, ...stored })
+			const migrated = migrateProgress({ ...update, ...stored }, assetIds)
 			await this.write(update.workId, migrated)
 			return migrated
 		})
