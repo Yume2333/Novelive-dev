@@ -544,14 +544,15 @@ test.each([
 	{ scenario: 'changed setting', redraw: true },
 	{ scenario: 'review rejected', reject: true },
 	{ scenario: 'first image blocked', firstImage: true },
+	{ scenario: 'local image check failed', localRejection: true },
 ])(
 	'recording resumes an image budget pause: $scenario',
-	async ({ redraw, reject, firstImage }) => {
+	async ({ redraw, reject, firstImage, localRejection }) => {
 		const { projectDir, workId } = await fixture()
 		const config = createConfigStore(directory)
 		await config.update(configuration)
 		const models = await productionModels(config)
-		if (reject) models.image = { ...models.image, retries: 1 }
+		if (reject || localRejection) models.image = { ...models.image, retries: 1 }
 		const assetId = 'room/day'
 		const requests: string[] = []
 		const painterPrompts: string[] = []
@@ -559,6 +560,7 @@ test.each([
 		let allowReview = firstImage === true
 		let rejectReview = reject
 		let blockImage = firstImage === true
+		let blockRewrite = false
 		const open = async () => {
 			const project = await Project.open(projectDir)
 			const work = await project.read(projectFiles.work('v0001', workId))
@@ -568,12 +570,14 @@ test.each([
 				async spend(request, send) {
 					if (blockImage && request.url.endsWith('/images/generations'))
 						throw new SpendBudgetError('超出工程预算')
-					if (
-						request.url.endsWith('/chat/completions') &&
-						(await request.clone().json()).model === models.visual.model &&
-						!allowReview
-					)
-						throw new SpendBudgetError('超出工程预算')
+					if (request.url.endsWith('/chat/completions')) {
+						const { model } = await request.clone().json()
+						if (
+							(model === models.visual.model && !allowReview) ||
+							(model === models.main.model && blockRewrite)
+						)
+							throw new SpendBudgetError('超出工程预算')
+					}
 					return send(request, await quoteSpend(request))
 				},
 				async fetch(input, init) {
@@ -584,6 +588,14 @@ test.each([
 						painterPrompts.push(JSON.stringify(body.messages))
 					if (request.url.endsWith('/images/generations')) {
 						imagePrompts.push(body.prompt)
+						if (localRejection && imagePrompts.length === 1) {
+							blockRewrite = true
+							return Response.json({
+								data: [
+									{ b64_json: Buffer.from('not a PNG').toString('base64') },
+								],
+							})
+						}
 						const png = await sharp({
 							create: { width: 64, height: 36, channels: 3, background: 'red' },
 						})
@@ -604,7 +616,12 @@ test.each([
 					}
 					return body.model === models.visual.model
 						? completion({ pass: true, failedChecks: [], feedback: '' })
-						: completion({ content: 'A sunny room.' })
+						: completion({
+								content:
+									localRejection && painterPrompts.length > 1
+										? 'A bright room with clear edges.'
+										: 'A sunny room.',
+							})
 				},
 			})
 			const queue = new ChapterScheduler(project.database, {
@@ -654,6 +671,7 @@ test.each([
 		}
 		allowReview = true
 		blockImage = false
+		blockRewrite = false
 		if (reject) {
 			const { project, queue } = await open()
 			try {
@@ -682,7 +700,9 @@ test.each([
 			expect(requests).toEqual([
 				models.main.model,
 				models.image.model,
-				...(redraw ? [models.main.model, models.image.model] : []),
+				...(redraw || localRejection
+					? [models.main.model, models.image.model]
+					: []),
 				...(reject
 					? [models.visual.model, models.main.model, models.image.model]
 					: []),
@@ -690,6 +710,10 @@ test.each([
 			])
 			if (redraw)
 				expect(painterPrompts.at(-1)).toContain('A moonlit observatory')
+			if (localRejection) {
+				expect(painterPrompts.at(-1)).toContain('图片无法解码。')
+				expect(imagePrompts.at(-1)).toContain('A bright room with clear edges.')
+			}
 			if (reject)
 				expect(imagePrompts.at(-1)).toContain('Move the window to the center.')
 			expect(queue.snapshot(workId).chapters[0].status).toBe('published')

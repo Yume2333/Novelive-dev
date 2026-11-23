@@ -746,9 +746,10 @@ export class ArtProduction {
 			await clearReview()
 		}
 		while (attempt <= this.options.image.retries) {
-			const content =
-				rewritten ??
-				(await artJson(
+			let content = rewritten
+			if (content === undefined) {
+				await savePaint({ feedback, png: reviewed?.toString('base64') })
+				const rewrite = await artJson(
 					painter,
 					[
 						'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
@@ -760,12 +761,13 @@ export class ArtProduction {
 					contentSchema,
 					this.options,
 				)
-					.then(({ content }) => content)
-					.catch(async (error: unknown) => {
-						if (error instanceof SpendBudgetError && reviewed)
-							await savePaint({ feedback, png: reviewed.toString('base64') })
-						throw error
-					}))
+				content = rewrite.content
+				await savePaint({
+					feedback,
+					rewritten: content,
+					png: reviewed?.toString('base64'),
+				})
+			}
 			const editReferences = baseOnly ? refs.slice(0, 1) : refs
 			const describe = (
 				firstReference: number,
@@ -775,11 +777,6 @@ export class ArtProduction {
 				baseOnly
 					? `Edit only the brows, eyes and mouth of Image ${firstReference}: ${content} ${issue} Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face.`
 					: drawingPrompt(input, content, issue, firstReference)
-			await savePaint({
-				feedback,
-				rewritten: content,
-				png: reviewed?.toString('base64'),
-			})
 			const result = await render(
 				describe(1, feedback),
 				editReferences,
