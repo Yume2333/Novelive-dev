@@ -3,10 +3,13 @@ import { Check } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Page } from '../../components/Page'
+import { scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import styles from '../production/Production.module.css'
 import { ProductionNotice } from '../production/ProductionNotice'
 import { useWorkProduction } from '../work/WorkProduction'
+
+const t = scoped('confirm')
 
 type Visual = NonNullable<ProductionSnapshot['visual']>
 type Candidate = Visual['mainVisuals'][number]
@@ -41,7 +44,7 @@ function CandidateCard({
 			/>
 			<img src={window.novelive.resourceUrl(candidate.cachePath)} alt="" />
 			<span>
-				{label ?? `方案 ${index + 1}`}
+				{label ?? t('方案 {{value}}', { value: index + 1 })}
 				{checked && <Check size={16} aria-hidden="true" />}
 			</span>
 		</label>
@@ -52,13 +55,13 @@ export function ConfirmVisualPage() {
 	const { snapshot } = useWorkProduction()
 	const visual = snapshot.phase === 'confirm-visual' ? snapshot.visual : null
 	return (
-		<Page title="确认角色与主视觉">
+		<Page title={t('确认角色与主视觉')}>
 			{visual ? (
 				<VisualChoices visual={visual} />
 			) : (
 				<div className={styles.stack}>
-					<p>目前没有待确认的主视觉。</p>
-					<Link to={workRoute('work', snapshot.workId)}>返回概览</Link>
+					<p>{t('目前没有待确认的主视觉。')}</p>
+					<Link to={workRoute('work', snapshot.workId)}>{t('返回概览')}</Link>
 				</div>
 			)}
 		</Page>
@@ -91,7 +94,9 @@ function VisualChoices({ visual }: { visual: Visual }) {
 		)
 		return index === -1
 			? undefined
-			: `${recommended.includes(id) ? '推荐 · ' : ''}EPUB 插图 ${index + 1}`
+			: recommended.includes(id)
+				? t('推荐 · EPUB 插图 {{value}}', { value: index + 1 })
+				: t('EPUB 插图 {{value}}', { value: index + 1 })
 	}
 	const mainVisuals = [...visual.mainVisuals, ...visibleImported]
 	const supplementalVisuals = [
@@ -130,18 +135,20 @@ function VisualChoices({ visual }: { visual: Visual }) {
 			}}
 		>
 			<p className={styles.lead}>
-				确认点 1 / 2 · 选择首卷主要角色的设定和全作统一的主视觉。
+				{t('确认点 1 / 2 · 选择首卷主要角色的设定和全作统一的主视觉。')}
 			</p>
 			{visual.mattingUnavailable && (
 				<ProductionNotice>
 					<span role="status">
-						本地去背景不可用；无法生成透明底的角色可以使用占位图继续制作。
+						{t(
+							'本地去背景不可用；无法生成透明底的角色可以使用占位图继续制作。',
+						)}
 					</span>
 				</ProductionNotice>
 			)}
 			{imported?.fallback ? (
 				<p className={styles.notice} role="status">
-					未能筛选 EPUB 插图，已显示全部插图，可手动选择。
+					{t('未能筛选 EPUB 插图，已显示全部插图，可手动选择。')}
 				</p>
 			) : importedCandidates.some(
 					({ id }) =>
@@ -154,12 +161,12 @@ function VisualChoices({ visual }: { visual: Visual }) {
 						aria-pressed={showAll}
 						onClick={() => setShowAll(!showAll)}
 					>
-						{showAll ? '收起未推荐的 EPUB 插图' : '显示全部 EPUB 插图'}
+						{showAll ? t('收起未推荐的 EPUB 插图') : t('显示全部 EPUB 插图')}
 					</button>
 				</div>
 			) : null}
 			<fieldset className={styles.card} disabled={busy}>
-				<legend>主视觉</legend>
+				<legend>{t('主视觉')}</legend>
 				<div className={styles.gallery}>
 					{mainVisuals.map((candidate, index) => (
 						<CandidateCard
@@ -181,7 +188,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 			</fieldset>
 			{visual.characters.length > 0 && (
 				<section aria-labelledby="major-characters" className={styles.stack}>
-					<h2 id="major-characters">第一卷主要角色</h2>
+					<h2 id="major-characters">{t('第一卷主要角色')}</h2>
 					{visual.characters.map(
 						({
 							characterId,
@@ -209,7 +216,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 												name={key}
 												label={
 													candidate.id === 'costume-epub'
-														? 'EPUB 参考方案'
+														? t('EPUB 参考方案')
 														: undefined
 												}
 												checked={characterIds[key] === candidate.id}
@@ -230,7 +237,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 			)}
 			{supplementalVisuals.length > 0 && (
 				<fieldset className={styles.card} disabled={busy}>
-					<legend>补充画风参考（最多两张）</legend>
+					<legend>{t('补充画风参考（最多两张）')}</legend>
 					<div className={styles.gallery}>
 						{supplementalVisuals.map((candidate, index) => {
 							const checked = supplementalIds.includes(candidate.id)
@@ -259,7 +266,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 			)}
 			<div className={styles.actions}>
 				<Link className={styles.button} to={workRoute('work', workId)}>
-					返回概览
+					{t('返回概览')}
 				</Link>
 				<button
 					className={styles.primary}
@@ -268,7 +275,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 					}
 					type="submit"
 				>
-					确认并制作第一章
+					{t('确认并制作第一章')}
 				</button>
 			</div>
 		</form>

@@ -15,6 +15,9 @@ import { ScriptEditor } from './ScriptEditor'
 import { sceneAssets } from './scene-assets'
 import '../player/player.css'
 import './editor.css'
+import { scoped } from '../../i18n'
+
+const t = scoped('editor')
 
 type Opening = CommandOutput<'editor.open'>
 type Chapter = Opening['chapter']
@@ -58,7 +61,7 @@ export function EditorPage() {
 			if (workId === id && changedChapter === chapterId) {
 				if (dirty) {
 					setPendingRefresh(true)
-					setError('章节已更新，当前修改已保留；放弃修改后加载新版本')
+					setError(t('章节已更新，当前修改已保留；放弃修改后加载新版本'))
 				} else setRefresh((value) => value + 1)
 			}
 		}
@@ -112,7 +115,7 @@ export function EditorPage() {
 				setDraft(value.chapter.scenes[0]?.nvs ?? '')
 			})
 			.catch((cause) => {
-				if (!disposed) setError(cause.message ?? '无法打开编辑器')
+				if (!disposed) setError(cause.message ?? t('无法打开编辑器'))
 			})
 		return () => {
 			disposed = true
@@ -134,7 +137,7 @@ export function EditorPage() {
 			setError(
 				cause instanceof Error
 					? cause.message
-					: ((cause as { message?: string }).message ?? '操作失败'),
+					: ((cause as { message?: string }).message ?? t('操作失败')),
 			)
 		} finally {
 			setBusy(false)
@@ -152,7 +155,7 @@ export function EditorPage() {
 	function chooseScene(index: number) {
 		if (busy) return
 		if (dirty) {
-			setError('请先保存或放弃当前修改')
+			setError(t('请先保存或放弃当前修改'))
 			return
 		}
 		setSceneIndex(index)
@@ -178,14 +181,14 @@ export function EditorPage() {
 			changed.length !== 1 ||
 			index === undefined
 		)
-			throw new Error('每次保存请只修改一句，不能增加或删除行')
+			throw new Error(t('每次保存请只修改一句，不能增加或删除行'))
 		const lineId = previous[index]?.match(/ #([0-9a-f]{4})\s*$/)?.[1]
 		if (
 			!lineId ||
 			!next[index]?.trim() ||
 			next[index]?.match(/ #([0-9a-f]{4})\s*$/)?.[1] !== lineId
 		)
-			throw new Error('请选择带句子 ID 的文本行，保留末尾 ID')
+			throw new Error(t('请选择带句子 ID 的文本行，保留末尾 ID'))
 		const saved = await window.novelive.call('editor.editLine', {
 			...target,
 			sceneId: scene.sceneId,
@@ -243,7 +246,7 @@ export function EditorPage() {
 			(beat) => beat.line && beat.line.line >= line + offset,
 		)
 		if (index < 0) {
-			setError('当前位置之后没有可预览的句子')
+			setError(t('当前位置之后没有可预览的句子'))
 			return
 		}
 		const beats = current.beats.slice(index)
@@ -257,7 +260,7 @@ export function EditorPage() {
 			opening.registry.entries.map((entry) => [entry.id, entry.path]),
 		)
 		const fail = () => {
-			if (!abort.signal.aborted) setError('无法加载舞台素材')
+			if (!abort.signal.aborted) setError(t('无法加载舞台素材'))
 		}
 		void mountMinimalPlayer(
 			stage.current,
@@ -265,7 +268,7 @@ export function EditorPage() {
 			{
 				resolveAsset: (asset) => {
 					const path = paths.get(asset)
-					if (!path) throw new Error('找不到素材')
+					if (!path) throw new Error(t('找不到素材'))
 					return window.novelive.resourceUrl(path)
 				},
 			},
@@ -273,13 +276,17 @@ export function EditorPage() {
 			fail,
 			opening.speakerNames,
 			undefined,
-			{ customMarks: opening.settings.customMarks, initialActions },
+			{
+				customMarks: opening.settings.customMarks,
+				initialActions,
+				endText: t('本章结束'),
+			},
 		).catch(fail)
 		return () => abort.abort()
 	}, [preview, opening, scene, sceneIndex, draft, line])
 	return (
 		<Page
-			title="编辑器"
+			title={t('编辑器')}
 			action={
 				<button
 					type="button"
@@ -287,13 +294,13 @@ export function EditorPage() {
 					disabled={!scene || busy}
 					onClick={() => setPreview((value) => value + 1)}
 				>
-					从当前句预览
+					{t('从当前句预览')}
 				</button>
 			}
 		>
 			<div className="editor-workbench" aria-busy={busy}>
 				{error && <div role="alert">{error}</div>}
-				{!opening && !error && <p role="status">正在打开编辑器</p>}
+				{!opening && !error && <p role="status">{t('正在打开编辑器')}</p>}
 				{opening && (
 					<>
 						<h2>{chapter?.title}</h2>
@@ -301,13 +308,13 @@ export function EditorPage() {
 							<section
 								className="editor-banner"
 								key={mark.id}
-								aria-label="新标记提议"
+								aria-label={t('新标记提议')}
 							>
-								<strong>新标记：{mark.name}</strong>
-								<code title="播放生效的 CSS">
-									{effectiveMarkCss(mark.name, mark.css) || '无可渲染样式'}
+								<strong>{t('新标记：{{name}}', { name: mark.name })}</strong>
+								<code title={t('播放生效的 CSS')}>
+									{effectiveMarkCss(mark.name, mark.css) || t('无可渲染样式')}
 								</code>
-								<span>{mark.perChar ? '逐字' : '整段'}</span>
+								<span>{mark.perChar ? t('逐字') : t('整段')}</span>
 								{(['accept', 'reject'] as const).map((decision) => (
 									<button
 										type="button"
@@ -345,20 +352,20 @@ export function EditorPage() {
 											})
 										}
 									>
-										{decision === 'accept' ? '接受标记' : '拒绝标记'}
+										{decision === 'accept' ? t('接受标记') : t('拒绝标记')}
 									</button>
 								))}
 							</section>
 						))}
 						{!scene ? (
-							<p>本章还没有剧本</p>
+							<p>{t('本章还没有剧本')}</p>
 						) : (
 							<>
 								<div className="editor-toolbar">
 									<label>
-										场景
+										{t('场景')}
 										<select
-											aria-label="场景"
+											aria-label={t('场景')}
 											value={sceneIndex}
 											disabled={busy}
 											onChange={(event) =>
@@ -377,35 +384,35 @@ export function EditorPage() {
 										onClick={() => setSource((value) => !value)}
 										aria-expanded={source}
 									>
-										原文对照
+										{t('原文对照')}
 									</button>
 									<button
 										type="button"
 										disabled={!dirty || busy}
 										onClick={() => void run(save)}
 									>
-										保存当前句
+										{t('保存当前句')}
 									</button>
 									<button
 										type="button"
 										disabled={(!dirty && !pendingRefresh) || busy}
 										onClick={discard}
 									>
-										放弃修改
+										{t('放弃修改')}
 									</button>
 									<button
 										type="button"
 										disabled={(!undoCount && !dirty) || busy}
 										onClick={undo}
 									>
-										撤销
+										{t('撤销')}
 									</button>
-									<span>当前行 {line}</span>
+									<span>{t('当前行 {{line}}', { line })}</span>
 								</div>
 								<section
 									className="editor-stage"
 									ref={stage}
-									aria-label="舞台预览"
+									aria-label={t('舞台预览')}
 								/>
 								<SceneImages
 									key={scene.sceneId}
@@ -428,7 +435,7 @@ export function EditorPage() {
 											'production.resolveAsset',
 											{ workId: id, assetId },
 										).promise
-										if (!asset) throw new Error('找不到素材')
+										if (!asset) throw new Error(t('找不到素材'))
 										setOpening((value) =>
 											value
 												? {
@@ -449,14 +456,14 @@ export function EditorPage() {
 								<div
 									className="editor-toolbar"
 									role="toolbar"
-									aria-label="文本效果"
+									aria-label={t('文本效果')}
 								>
 									{[
-										['强调', '{em}', '{/em}'],
-										['加粗', '{b}', '{/b}'],
-										['注音', '{ruby よみ}', '{/ruby}'],
-										['停顿', '{wait 0.5}', ''],
-										['变速', '{speed 0.5}', '{/speed}'],
+										[t('强调'), '{em}', '{/em}'],
+										[t('加粗'), '{b}', '{/b}'],
+										[t('注音'), t('{ruby よみ}'), '{/ruby}'],
+										[t('停顿'), '{wait 0.5}', ''],
+										[t('变速'), '{speed 0.5}', '{/speed}'],
 									].map(([label, before, after]) => (
 										<button
 											type="button"
@@ -474,9 +481,9 @@ export function EditorPage() {
 										</button>
 									))}
 									<label>
-										文本标记
+										{t('文本标记')}
 										<select
-											aria-label="文本标记"
+											aria-label={t('文本标记')}
 											value=""
 											disabled={busy}
 											onChange={(event) => {
@@ -489,7 +496,7 @@ export function EditorPage() {
 													})
 											}}
 										>
-											<option value="">选择标记</option>
+											<option value="">{t('选择标记')}</option>
 											{[
 												'em',
 												'b',
@@ -530,7 +537,7 @@ export function EditorPage() {
 											className="editor-source"
 											viewportRef={sourceViewport}
 										>
-											<h3>原文</h3>
+											<h3>{t('原文')}</h3>
 											{chapter?.paragraphs.map((paragraph) => (
 												<button
 													type="button"
@@ -573,21 +580,21 @@ export function EditorPage() {
 									}}
 								>
 									<input
-										aria-label="重写要求"
+										aria-label={t('重写要求')}
 										value={instruction}
 										onChange={(event) => setInstruction(event.target.value)}
-										placeholder="重写要求"
+										placeholder={t('重写要求')}
 									/>
 									<button
 										type="submit"
 										disabled={!instruction.trim() || dirty || busy}
 									>
-										重写场景
+										{t('重写场景')}
 									</button>
 								</form>
 								{proposal && (
-									<section aria-label="重写差异">
-										<h3>差异列表</h3>
+									<section aria-label={t('重写差异')}>
+										<h3>{t('差异列表')}</h3>
 										<ScrollArea className="editor-diff">
 											{proposal.hunks.map((hunk) => (
 												<label key={hunk.id}>
@@ -626,13 +633,13 @@ export function EditorPage() {
 												})
 											}
 										>
-											应用勾选差异
+											{t('应用勾选差异')}
 										</button>
 										<button
 											type="button"
 											onClick={() => setProposal(undefined)}
 										>
-											取消重写
+											{t('取消重写')}
 										</button>
 									</section>
 								)}

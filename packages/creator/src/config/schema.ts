@@ -2,7 +2,6 @@ import {
 	arr,
 	bool,
 	int,
-	lit,
 	nullable,
 	num,
 	Optional,
@@ -60,7 +59,7 @@ const imageFields = {
 }
 const appFields = {
 	theme: oneOf(['light', 'dark', 'system']),
-	language: lit('zh-CN'),
+	language: oneOf(['zh-CN', 'zh-TW', 'en', 'ja']),
 	projectDir: str(),
 }
 

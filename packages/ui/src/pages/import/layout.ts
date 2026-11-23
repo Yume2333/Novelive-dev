@@ -1,4 +1,7 @@
 import type { CommandOutput } from '@novelive/creator/contract'
+import { scoped } from '../../i18n'
+
+const t = scoped('import')
 
 export type ImportLayout = Extract<
 	CommandOutput<'import.txt'>,
@@ -57,7 +60,7 @@ export function splitChapter(
 	if (length < 2) return layout
 	const chapter = layout.chapters[index]
 	const next = {
-		title: `${chapter.title}（续）`,
+		title: t('{{title}}（续）', { title: chapter.title }),
 		start: chapter.start + Math.floor(length / 2),
 	}
 	return {
@@ -71,7 +74,10 @@ export function startVolume(layout: ImportLayout, index: number): ImportLayout {
 	if (index === 0 || isVolumeStart(layout, index)) return layout
 	const volumes = [
 		...layout.volumes,
-		{ title: `第${layout.volumes.length + 1}卷`, start: index },
+		{
+			title: t('第{{value}}卷', { value: layout.volumes.length + 1 }),
+			start: index,
+		},
 	].sort((a, b) => a.start - b.start)
 	return { ...layout, volumes }
 }

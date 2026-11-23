@@ -1,6 +1,9 @@
 import type { CommandOutput } from '@novelive/creator/contract'
 import { LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
+import { scoped } from '../../i18n'
+
+const t = scoped('editor')
 
 type Choices = Extract<
 	CommandOutput<'editor.regenerateImage'>,
@@ -31,7 +34,7 @@ export function SceneImages({
 	const generate = (count: number) =>
 		void run(async () => {
 			setGenerating(true)
-			setGenerationStatus('正在生成图片')
+			setGenerationStatus(t('正在生成图片'))
 			try {
 				setChoices(undefined)
 				const { revision } = await window.novelive.call(
@@ -50,21 +53,21 @@ export function SceneImages({
 				}).promise
 				if (result.status === 'applied') {
 					await onApplied(assetId)
-					setGenerationStatus('图片已替换')
+					setGenerationStatus(t('图片已替换'))
 				} else {
 					setRevision(revision)
 					setChoices(result)
-					setGenerationStatus('候选图片已生成')
+					setGenerationStatus(t('候选图片已生成'))
 				}
 			} catch (error) {
-				setGenerationStatus('图片生成失败')
+				setGenerationStatus(t('图片生成失败'))
 				throw error
 			} finally {
 				setGenerating(false)
 			}
 		})
 	return (
-		<section aria-label="场景图片">
+		<section aria-label={t('场景图片')}>
 			{generationStatus && (
 				<div
 					className="editor-image-loading"
@@ -79,9 +82,9 @@ export function SceneImages({
 			)}
 			<div className="editor-toolbar">
 				<label>
-					图片
+					{t('图片')}
 					<select
-						aria-label="图片"
+						aria-label={t('图片')}
 						value={assetId}
 						disabled={disabled}
 						onChange={(event) => {
@@ -98,31 +101,31 @@ export function SceneImages({
 					</select>
 				</label>
 				<label>
-					重绘要求
+					{t('重绘要求')}
 					<input
-						aria-label="重绘要求"
+						aria-label={t('重绘要求')}
 						value={instruction}
 						disabled={disabled}
 						onChange={(event) => setInstruction(event.target.value)}
 					/>
 				</label>
 				<button type="button" disabled={disabled} onClick={() => generate(1)}>
-					出一张，直接替换
+					{t('出一张，直接替换')}
 				</button>
 				<button type="button" disabled={disabled} onClick={() => generate(2)}>
-					多出几张再挑
+					{t('多出几张再挑')}
 				</button>
 			</div>
 			{choices && (
 				<section
 					className="editor-toolbar editor-image-candidates"
-					aria-label="候选图片"
+					aria-label={t('候选图片')}
 				>
 					{choices.candidates.map((candidate, index) => (
 						<button
 							type="button"
 							key={candidate.id}
-							aria-label={`选择版本 ${index + 1}`}
+							aria-label={t('选择版本 {{value}}', { value: index + 1 })}
 							disabled={disabled}
 							onClick={() =>
 								void run(async () => {
@@ -140,9 +143,9 @@ export function SceneImages({
 						>
 							<img
 								src={window.novelive.resourceUrl(candidate.cachePath)}
-								alt={`候选版本 ${index + 1}`}
+								alt={t('候选版本 {{value}}', { value: index + 1 })}
 							/>
-							选择版本 {index + 1}
+							{t('选择版本 {{value}}', { value: index + 1 })}
 						</button>
 					))}
 				</section>

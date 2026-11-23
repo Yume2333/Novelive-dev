@@ -8,27 +8,30 @@ import {
 import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { Collapse } from '../../../components/Collapse'
+import { msg, scoped } from '../../../i18n'
 import { Select } from '../ModelFields'
 import styles from '../SettingsPage.module.css'
 import { WriterPresetEditor } from './WriterPresetEditor'
 
+const t = scoped('settings')
+
 const roles = [
-	['organizer', '整理'],
-	['director', '主控'],
-	['writer', '写手'],
-	['reviewer-script', '审稿'],
-	['artist', '美术导演'],
-	['painter-portrait', '立绘画师'],
-	['painter-scene', '场景画师'],
-	['painter-variant', '差分画师'],
-	['reviewer-visual', '视觉审核'],
-	['illustration-screening', 'EPUB 插图筛选'],
+	['organizer', msg('整理')],
+	['director', msg('主控')],
+	['writer', msg('写手')],
+	['reviewer-script', msg('审稿')],
+	['artist', msg('美术导演')],
+	['painter-portrait', msg('立绘画师')],
+	['painter-scene', msg('场景画师')],
+	['painter-variant', msg('差分画师')],
+	['reviewer-visual', msg('视觉审核')],
+	['illustration-screening', msg('EPUB 插图筛选')],
 ] as const
 const slots = [
-	['fast', '快速模型'],
-	['main', '主模型'],
-	['writing', '写作模型'],
-	['visual', '视觉模型'],
+	['fast', msg('快速模型')],
+	['main', msg('主模型')],
+	['writing', msg('写作模型')],
+	['visual', msg('视觉模型')],
 ] as const
 
 export function ProductionSettings({
@@ -73,23 +76,23 @@ export function ProductionSettings({
 					aria-controls="production-settings-panel"
 					onClick={() => setOpen((value) => !value)}
 				>
-					高级设置 <ChevronDown size={16} aria-hidden="true" />
+					{t('高级设置')} <ChevronDown size={16} aria-hidden="true" />
 				</button>
 			</h2>
 			<Collapse open={open}>
 				<div className={styles.cards} id="production-settings-panel">
-					<section className={styles.card} aria-label="角色模型配置">
+					<section className={styles.card} aria-label={t('角色模型配置')}>
 						{roles.map(([role, name]) => (
 							<div className={styles.row} key={role}>
-								<strong>{name}</strong>
+								<strong>{t(name)}</strong>
 								<Select
-									label={`${name}模型`}
+									label={t('{{name}}模型', { name: t(name) })}
 									value={roleModels[role] ?? roleModelDefaults[role]}
 									options={slots.map(([slot, title]) => [
 										slot,
 										slot === roleModelDefaults[role]
-											? `${title}（默认）`
-											: title,
+											? t('{{title}}（默认）', { title: t(title) })
+											: t(title),
 									])}
 									disabled={busy}
 									onChange={(slot) =>
@@ -99,9 +102,9 @@ export function ProductionSettings({
 							</div>
 						))}
 					</section>
-					<section className={styles.card} aria-label="写手预设">
+					<section className={styles.card} aria-label={t('写手预设')}>
 						<div className={styles.row}>
-							<strong>写手预设</strong>
+							<strong>{t('写手预设')}</strong>
 							<button
 								type="button"
 								disabled={busy || Boolean(editing)}
@@ -115,14 +118,14 @@ export function ProductionSettings({
 									})
 								}
 							>
-								新建预设
+								{t('新建预设')}
 							</button>
 						</div>
 						{writer.presets.map((preset) => (
 							<div className={styles.row} key={preset.id}>
 								<strong>{preset.name}</strong>
 								{writer.defaultPresetId === preset.id ? (
-									<span className={styles.muted}>全局默认</span>
+									<span className={styles.muted}>{t('全局默认')}</span>
 								) : (
 									<button
 										type="button"
@@ -131,7 +134,7 @@ export function ProductionSettings({
 											void saveWriter({ defaultPresetId: preset.id })
 										}
 									>
-										设为默认
+										{t('设为默认')}
 									</button>
 								)}
 								<button
@@ -139,7 +142,7 @@ export function ProductionSettings({
 									disabled={busy || Boolean(editing)}
 									onClick={() => setEditing(preset)}
 								>
-									编辑
+									{t('编辑')}
 								</button>
 							</div>
 						))}
@@ -163,12 +166,12 @@ export function ProductionSettings({
 					</section>
 					{notice === 'saved' && (
 						<p role="status" className={styles.success}>
-							高级设置已保存
+							{t('高级设置已保存')}
 						</p>
 					)}
 					{notice === 'failed' && (
 						<p role="alert" className={styles.error}>
-							无法保存高级设置，请检查输入后重试。
+							{t('无法保存高级设置，请检查输入后重试。')}
 						</p>
 					)}
 				</div>

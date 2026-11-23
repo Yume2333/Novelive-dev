@@ -3,6 +3,9 @@ import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { parseScript } from '@novelive/format/script'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { OverlayScrollbar } from '../../components/ScrollArea'
+import { scoped } from '../../i18n'
+
+const t = scoped('editor')
 
 export function ScriptEditor({
 	value,
@@ -41,7 +44,7 @@ export function ScriptEditor({
 					editable.current.of(EditorView.editable.of(true)),
 					lineNumbers(),
 					EditorView.lineWrapping,
-					EditorView.contentAttributes.of({ 'aria-label': 'NVS 剧本' }),
+					EditorView.contentAttributes.of({ 'aria-label': t('NVS 剧本') }),
 					keymap.of([
 						{
 							key: 'Mod-z',

@@ -1,6 +1,9 @@
 import { useEffect } from 'react'
 import type { PlaybackMode } from '../../../../../player/src/contract/progress'
+import { scoped } from '../../../i18n'
 import type { ControlChapter } from './PlayerControls'
+
+const t = scoped('player')
 
 export function useChapterWait({
 	workId,
@@ -78,7 +81,7 @@ export function useChapterWait({
 						})),
 					)
 			} catch {
-				if (!cancelled) onError('无法更新章节制作进度')
+				if (!cancelled) onError(t('无法更新章节制作进度'))
 			} finally {
 				busy = false
 			}

@@ -109,6 +109,7 @@ export async function mountMinimalPlayer(
 		restore?: StageSnapshot
 		start?: StageSnapshot['position']
 		onSnapshot?(snapshot: StageSnapshot): void
+		endText?: string
 		progress?: PlaybackProgress
 		initialActions?: readonly CompiledAction[]
 	} = {},
@@ -300,7 +301,7 @@ export async function mountMinimalPlayer(
 			const beat = beats[++index]
 			if (!beat) {
 				renderText(null)
-				overlay.textContent = '本章结束'
+				overlay.textContent = options.endText ?? '本章结束'
 				observeOverlay()
 				onBeat?.(undefined)
 				return

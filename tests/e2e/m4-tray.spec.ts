@@ -111,7 +111,13 @@ test('M4 desktop lifecycle confirms active quit, cancels safely and cleans up on
 				const load = process
 					.getBuiltinModule('module')
 					.createRequire(`${process.cwd()}/package.json`)
-				new Function('require', 'exports', code)(load, exported)
+				new Function('require', 'exports', code)(
+					(id: string) =>
+						id === '../i18n'
+							? { t: (key: string) => key, onLanguage() {} }
+							: load(id),
+					exported,
+				)
 				let cleaned = 0
 				let prompts = 0
 				let response = 0

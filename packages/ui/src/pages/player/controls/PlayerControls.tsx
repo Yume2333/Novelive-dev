@@ -11,7 +11,25 @@ import {
 	schedulePlayback,
 } from './controller'
 import './controls.css'
+import { msg, scoped } from '../../../i18n'
 import { type ProgressControlsProps, ProgressPanel } from './ProgressPanel'
+
+const t = scoped('player')
+const progressWords = new Set<string>([
+	msg('制作中'),
+	msg('写作'),
+	msg('审稿'),
+	msg('演出'),
+	msg('出图'),
+	msg('等待'),
+	msg('完成'),
+	msg('已发布'),
+])
+const progressText = (progress?: string) =>
+	progress
+		?.split(' · ')
+		.map((part) => (progressWords.has(part) ? t(part) : part))
+		.join(' · ')
 
 let rememberedSettings = { ...defaultPlayerSettings }
 
@@ -144,7 +162,7 @@ export function PlayerControls({
 			if (document.fullscreenElement) await document.exitFullscreen()
 			else await document.documentElement.requestFullscreen()
 		} catch {
-			setFailure('无法切换全屏')
+			setFailure(t('无法切换全屏'))
 		}
 	}
 	function stopPlayback() {
@@ -162,23 +180,23 @@ export function PlayerControls({
 			)
 			if (save) await onSave(slot)
 			else await onLoad(slot)
-			setNotice(save ? '存档成功' : '读档完成')
+			setNotice(save ? t('存档成功') : t('读档完成'))
 		} catch (error) {
-			setFailure(error instanceof Error ? error.message : '存读档失败')
+			setFailure(error instanceof Error ? error.message : t('存读档失败'))
 		}
 	}
 	const title =
 		screen === 'menu'
-			? '系统菜单'
+			? t('系统菜单')
 			: screen === 'settings'
-				? '设置'
+				? t('设置')
 				: screen === 'save'
-					? '存档'
+					? t('存档')
 					: screen === 'load'
-						? '读档'
+						? t('读档')
 						: screen === 'history'
-							? '历史记录'
-							: '章节'
+							? t('历史记录')
+							: t('章节')
 	const toggle = (label: string, checked: boolean, change: () => void) => (
 		<label className="nl-control-row">
 			<span>{label}</span>
@@ -227,12 +245,12 @@ export function PlayerControls({
 				<div className="nl-chapter-wait" role="status">
 					{awaitingClick ? (
 						<button type="button" onClick={onResume}>
-							下一章已就绪，点击开始
+							{t('下一章已就绪，点击开始')}
 						</button>
 					) : (
 						<>
-							下一章 · {waiting?.title}
-							<p>{waiting?.progress}</p>
+							{t('下一章 · {{title}}', { title: waiting?.title })}
+							<p>{progressText(waiting?.progress)}</p>
 						</>
 					)}
 				</div>
@@ -242,7 +260,7 @@ export function PlayerControls({
 					<button
 						className="nl-controls-dismiss"
 						type="button"
-						aria-label="关闭菜单"
+						aria-label={t('关闭菜单')}
 						onClick={() => setScreen(null)}
 					/>
 					<section
@@ -275,7 +293,7 @@ export function PlayerControls({
 								<>
 									<button type="button" onClick={() => setScreen(null)}>
 										<Play size={18} strokeWidth={1.8} aria-hidden="true" />
-										返回游戏
+										{t('返回游戏')}
 									</button>
 									<button
 										type="button"
@@ -285,7 +303,7 @@ export function PlayerControls({
 										}
 										onClick={() => void slotAction({ kind: 'quick' }, true)}
 									>
-										快速存档
+										{t('快速存档')}
 									</button>
 									<button
 										type="button"
@@ -296,7 +314,7 @@ export function PlayerControls({
 										}
 										onClick={() => void slotAction({ kind: 'quick' }, false)}
 									>
-										快速读档
+										{t('快速读档')}
 									</button>
 									<button
 										type="button"
@@ -306,16 +324,16 @@ export function PlayerControls({
 										}
 										onClick={() => setScreen('save')}
 									>
-										存档
+										{t('存档')}
 									</button>
 									<button type="button" onClick={() => setScreen('load')}>
-										读档
+										{t('读档')}
 									</button>
 									<button type="button" onClick={() => setScreen('history')}>
-										历史记录
+										{t('历史记录')}
 									</button>
-									{toggle('自动播放', auto, () => setAuto(!auto))}
-									{toggle('跳过已读', settings.skipRead, () =>
+									{toggle(t('自动播放'), auto, () => setAuto(!auto))}
+									{toggle(t('跳过已读'), settings.skipRead, () =>
 										update('skipRead', !settings.skipRead),
 									)}
 									<button
@@ -326,21 +344,21 @@ export function PlayerControls({
 										}}
 									>
 										<EyeOff size={18} strokeWidth={1.8} aria-hidden="true" />
-										隐藏界面
+										{t('隐藏界面')}
 									</button>
 									<button type="button" onClick={() => setScreen('chapters')}>
 										<BookOpen size={18} strokeWidth={1.8} aria-hidden="true" />
-										章节
+										{t('章节')}
 									</button>
 									<button type="button" onClick={() => setScreen('settings')}>
 										<Settings size={18} strokeWidth={1.8} aria-hidden="true" />
-										设置
+										{t('设置')}
 									</button>
 									<button
 										type="button"
 										disabled={!editorLinked || !controller?.frame().position}
 										title={
-											editorLinked ? undefined : '请先将本地工程关联到作品'
+											editorLinked ? undefined : t('请先将本地工程关联到作品')
 										}
 										onClick={() => {
 											const position = controller?.frame().position
@@ -352,27 +370,27 @@ export function PlayerControls({
 											strokeWidth={1.8}
 											aria-hidden="true"
 										/>
-										在编辑器中打开这里
+										{t('在编辑器中打开这里')}
 									</button>
 								</>
 							) : screen === 'settings' ? (
 								<>
 									{slider(
-										'自动播放倍率',
+										t('自动播放倍率'),
 										'autoPlaySpeedMultiplier',
 										0.25,
 										3,
 										0.25,
 									)}
 									{slider(
-										'文字速度（毫秒 / 字）',
+										t('文字速度（毫秒 / 字）'),
 										'textMillisecondsPerCharacter',
 										3,
 										153,
 										1,
 									)}
 									{toggle(
-										'瞬间显示',
+										t('瞬间显示'),
 										settings.textMillisecondsPerCharacter === 0,
 										() =>
 											update(
@@ -380,19 +398,23 @@ export function PlayerControls({
 												settings.textMillisecondsPerCharacter === 0 ? 30 : 0,
 											),
 									)}
-									{slider('字号', 'fontSize', 15, 48, 1)}
-									{slider('对话框不透明度', 'dialogueOpacity', 0.1, 1, 0.05)}
-									{toggle('全屏', settings.fullscreen, () => void fullscreen())}
+									{slider(t('字号'), 'fontSize', 15, 48, 1)}
+									{slider(t('对话框不透明度'), 'dialogueOpacity', 0.1, 1, 0.05)}
+									{toggle(
+										t('全屏'),
+										settings.fullscreen,
+										() => void fullscreen(),
+									)}
 									<label className="nl-control-row">
-										对话框样式
+										{t('对话框样式')}
 										<select
 											value={settings.dialogueStyle}
 											onChange={(event) =>
 												update('dialogueStyle', event.target.value)
 											}
 										>
-											<option value="soft">柔边通栏</option>
-											<option value="paper">浅色纸笺</option>
+											<option value="soft">{t('柔边通栏')}</option>
+											<option value="paper">{t('浅色纸笺')}</option>
 										</select>
 									</label>
 								</>
@@ -431,18 +453,20 @@ export function PlayerControls({
 										}}
 									>
 										{chapter.title} ·{' '}
-										{chapter.published ? '已发布' : chapter.progress}
-										{chapter.read ? ' · 已读' : ''}
+										{chapter.published
+											? t('已发布')
+											: progressText(chapter.progress)}
+										{chapter.read ? t(' · 已读') : ''}
 									</button>
 								))
 							) : (
-								<p>暂无章节</p>
+								<p>{t('暂无章节')}</p>
 							)}
 						</ScrollArea>
 						{failure && <p role="alert">{failure}</p>}
 						{screen !== 'menu' && (
 							<button type="button" onClick={() => setScreen('menu')}>
-								返回菜单
+								{t('返回菜单')}
 							</button>
 						)}
 					</section>

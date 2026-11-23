@@ -6,6 +6,9 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, useOutletContext, useParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
+import { scoped } from '../../i18n'
+
+const t = scoped('work')
 
 type Action =
 	| 'production.confirmVisual'
@@ -26,7 +29,12 @@ export function useWorkProduction() {
 
 export const chapterTitle = (snapshot: ProductionSnapshot, chapterId: string) =>
 	snapshot.chapterTitles?.[chapterId] ??
-	`第 ${snapshot.chapters.findIndex((chapter) => chapter.chapterId === chapterId) + 1} 章`
+	t('第 {{value}} 章', {
+		value:
+			snapshot.chapters.findIndex(
+				(chapter) => chapter.chapterId === chapterId,
+			) + 1,
+	})
 
 function errorMessage(error: unknown) {
 	return error &&
@@ -34,7 +42,7 @@ function errorMessage(error: unknown) {
 		'message' in error &&
 		typeof error.message === 'string'
 		? error.message
-		: '无法读取制作状态，请重试。'
+		: t('无法读取制作状态，请重试。')
 }
 
 export function WorkProduction() {
@@ -109,13 +117,13 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 			loadVersion++
 			eventVersion.current++
 			setSnapshot(undefined)
-			setError('创作端已断开，等待重新连接。')
+			setError(t('创作端已断开，等待重新连接。'))
 		})
 		void window.novelive.host.appState().then(
 			(state) => {
 				if (!active || loadVersion !== 0) return
 				if (state.creator === 'ready') load()
-				else if (state.creator !== 'starting') setError('创作端未连接。')
+				else if (state.creator !== 'starting') setError(t('创作端未连接。'))
 			},
 			(failure) => {
 				if (active) setError(errorMessage(failure))
@@ -158,11 +166,11 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 	return (
 		<>
 			{error && (
-				<Page title="制作提示">
+				<Page title={t('制作提示')}>
 					<p role="alert">{error}</p>
 					{!snapshot && (
 						<button type="button" onClick={retry}>
-							重新读取
+							{t('重新读取')}
 						</button>
 					)}
 				</Page>
@@ -173,8 +181,8 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 				/>
 			) : (
 				!error && (
-					<Page title="作品">
-						<p role="status">正在读取制作状态…</p>
+					<Page title={t('作品')}>
+						<p role="status">{t('正在读取制作状态…')}</p>
 					</Page>
 				)
 			)}

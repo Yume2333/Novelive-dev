@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import type { SettingsHost } from '../../shell/AppShell'
 import styles from './ImportPage.module.css'
@@ -29,23 +30,25 @@ import {
 	startVolume,
 } from './layout'
 
+const t = scoped('import')
+
 type Result = CommandOutput<'import.file'>
 type Wizard = Extract<Result, { status: 'ready' }>
 type Candidates = Extract<Result, { status: 'encoding' }>['candidates']
 type Encoding = NonNullable<CommandInput<'import.file'>['encoding']>
 
 const languages = [
-	['zh-CN', '简体中文'],
-	['zh-TW', '繁体中文'],
-	['ja', '日语'],
-	['en', '英语'],
-	['ko', '韩语'],
+	['zh-CN', msg('简体中文')],
+	['zh-TW', msg('繁体中文')],
+	['ja', msg('日语')],
+	['en', msg('英语')],
+	['ko', msg('韩语')],
 ] as const
 const encodingNames: Record<Encoding, string> = {
 	'utf-8': 'UTF-8',
-	gb18030: 'GB18030（简体）',
-	big5: 'Big5（繁体）',
-	shift_jis: 'Shift_JIS（日文）',
+	gb18030: msg('GB18030（简体）'),
+	big5: msg('Big5（繁体）'),
+	shift_jis: msg('Shift_JIS（日文）'),
 	'utf-16le': 'UTF-16 LE',
 	'utf-16be': 'UTF-16 BE',
 }
@@ -54,7 +57,7 @@ const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path
 const message = (error: unknown) =>
 	error && typeof error === 'object' && 'message' in error
 		? String((error as CommandError).message)
-		: '导入失败，请重试。'
+		: t('导入失败，请重试。')
 
 export function ImportPage() {
 	const { config } = useOutletContext<SettingsHost>()
@@ -130,7 +133,7 @@ export function ImportPage() {
 						: undefined,
 			}).promise
 			if (result.status === 'unsupported') {
-				setError('扫描版 PDF 无可提取文字，暂不支持 OCR')
+				setError(t('扫描版 PDF 无可提取文字，暂不支持 OCR'))
 				return
 			}
 			if (result.status === 'encoding') {
@@ -164,20 +167,20 @@ export function ImportPage() {
 		return (
 			<section className={styles.page}>
 				<header className={styles.header}>
-					<h1>已加入系列</h1>
+					<h1>{t('已加入系列')}</h1>
 					<button
 						type="button"
 						className={styles.primary}
 						onClick={() => navigate(workRoute('work', joined.workId))}
 					>
-						进入作品
+						{t('进入作品')}
 					</button>
 				</header>
-				<section className={styles.card} aria-label="新增卷">
+				<section className={styles.card} aria-label={t('新增卷')}>
 					{joined.volumes.map((volume) => (
 						<div className={styles.row} key={volume.volumeId}>
 							<span className={styles.value}>{volume.title}</span>
-							<span>{volume.chapters} 章</span>
+							<span>{t('{{chapters}} 章', { chapters: volume.chapters })}</span>
 						</div>
 					))}
 				</section>
@@ -207,14 +210,14 @@ export function ImportPage() {
 	return (
 		<section className={styles.page}>
 			<header className={styles.header}>
-				<h1>导入原文</h1>
+				<h1>{t('导入原文')}</h1>
 				<button
 					type="button"
 					className={styles.primary}
 					disabled={!ready}
 					onClick={() => void start()}
 				>
-					导入
+					{t('导入')}
 				</button>
 			</header>
 			{error && (
@@ -224,7 +227,7 @@ export function ImportPage() {
 			)}
 			<div className={styles.card}>
 				<fieldset className={styles.card}>
-					<legend className={styles.cardTitle}>导入方式</legend>
+					<legend className={styles.cardTitle}>{t('导入方式')}</legend>
 					<label className={styles.row}>
 						<input
 							type="radio"
@@ -233,7 +236,7 @@ export function ImportPage() {
 							disabled={busy}
 							onChange={() => setJoining(false)}
 						/>
-						<span>新建工程</span>
+						<span>{t('新建工程')}</span>
 					</label>
 					<label className={styles.row}>
 						<input
@@ -243,26 +246,26 @@ export function ImportPage() {
 							disabled={busy}
 							onChange={() => setJoining(true)}
 						/>
-						<span>加入已有系列</span>
+						<span>{t('加入已有系列')}</span>
 					</label>
 				</fieldset>
 				<div className={styles.row}>
 					<FileText aria-hidden="true" size={18} />
-					<span className={styles.label}>原文</span>
+					<span className={styles.label}>{t('原文')}</span>
 					<span className={styles.value}>
-						{source ? fileName(source) : '未选择'}
+						{source ? fileName(source) : t('未选择')}
 					</span>
 					<button
 						type="button"
 						disabled={busy}
 						onClick={() => void pickSource()}
 					>
-						选择原文
+						{t('选择原文')}
 					</button>
 				</div>
 				{!joining && (
 					<label className={styles.row}>
-						<span className={styles.label}>作品名</span>
+						<span className={styles.label}>{t('作品名')}</span>
 						<input
 							value={title}
 							onChange={(event) => setTitle(event.target.value)}
@@ -273,9 +276,9 @@ export function ImportPage() {
 					<>
 						<div className={styles.row}>
 							<FolderOpen aria-hidden="true" size={18} />
-							<span className={styles.label}>已有工程</span>
+							<span className={styles.label}>{t('已有工程')}</span>
 							<span className={styles.value}>
-								{joinTarget?.projectDir ?? '未选择'}
+								{joinTarget?.projectDir ?? t('未选择')}
 							</span>
 							<button
 								type="button"
@@ -293,12 +296,12 @@ export function ImportPage() {
 									})
 								}
 							>
-								选择已有工程
+								{t('选择已有工程')}
 							</button>
 						</div>
 						{joinTarget && (
 							<label className={styles.row}>
-								<span className={styles.label}>系列</span>
+								<span className={styles.label}>{t('系列')}</span>
 								<select value={joinTarget.seriesId} disabled={busy}>
 									<option value={joinTarget.seriesId}>
 										{joinTarget.title || joinTarget.seriesId}
@@ -307,36 +310,38 @@ export function ImportPage() {
 							</label>
 						)}
 						<div className={styles.row}>
-							<span className={styles.label}>参考图</span>
-							<span className={styles.value}>沿用已有工程</span>
+							<span className={styles.label}>{t('参考图')}</span>
+							<span className={styles.value}>{t('沿用已有工程')}</span>
 						</div>
 					</>
 				) : (
 					<>
 						<div className={styles.row}>
 							<FolderOpen aria-hidden="true" size={18} />
-							<span className={styles.label}>保存位置</span>
-							<span className={styles.value}>{location || '未设置'}</span>
+							<span className={styles.label}>{t('保存位置')}</span>
+							<span className={styles.value}>{location || t('未设置')}</span>
 							<button
 								type="button"
 								disabled={busy}
 								onClick={() => void pickLocation()}
 							>
-								选择文件夹
+								{t('选择文件夹')}
 							</button>
 						</div>
 						<div className={styles.row}>
 							<ImagePlus aria-hidden="true" size={18} />
-							<span className={styles.label}>参考图</span>
+							<span className={styles.label}>{t('参考图')}</span>
 							<span className={styles.value}>
-								{references.length ? `${references.length} 张` : '无'}
+								{references.length
+									? t('{{length}} 张', { length: references.length })
+									: t('无')}
 							</span>
 							<button
 								type="button"
 								disabled={busy || references.length >= 3}
 								onClick={() => void pickReferences()}
 							>
-								添加图片
+								{t('添加图片')}
 							</button>
 						</div>
 						{references.map((path) => (
@@ -345,7 +350,7 @@ export function ImportPage() {
 								<button
 									type="button"
 									className={styles.icon}
-									aria-label={`移除 ${fileName(path)}`}
+									aria-label={t('移除 {{value}}', { value: fileName(path) })}
 									onClick={() =>
 										setReferences((current) =>
 											current.filter((item) => item !== path),
@@ -360,8 +365,8 @@ export function ImportPage() {
 				)}
 			</div>
 			{candidates && (
-				<fieldset className={styles.card} aria-label="原文编码">
-					<legend className={styles.cardTitle}>原文编码</legend>
+				<fieldset className={styles.card} aria-label={t('原文编码')}>
+					<legend className={styles.cardTitle}>{t('原文编码')}</legend>
 					{candidates.map((candidate) => (
 						<label key={candidate.encoding} className={styles.row}>
 							<input
@@ -371,7 +376,7 @@ export function ImportPage() {
 								onChange={() => setEncoding(candidate.encoding)}
 							/>
 							<span className={styles.label}>
-								{encodingNames[candidate.encoding]}
+								{t(encodingNames[candidate.encoding])}
 							</span>
 							<span className={styles.value}>{candidate.preview}</span>
 						</label>
@@ -411,9 +416,9 @@ function Review({
 	return (
 		<section className={styles.page}>
 			<header className={styles.header}>
-				<h1>核对导入</h1>
+				<h1>{t('核对导入')}</h1>
 				<button type="button" disabled={busy} onClick={() => onFinish(false)}>
-					跳过核对
+					{t('跳过核对')}
 				</button>
 				<button
 					type="button"
@@ -421,7 +426,7 @@ function Review({
 					disabled={busy || !valid}
 					onClick={() => onFinish(true)}
 				>
-					确认
+					{t('确认')}
 				</button>
 			</header>
 			{error && (
@@ -431,7 +436,7 @@ function Review({
 			)}
 			<div className={styles.card}>
 				<label className={styles.row}>
-					<span className={styles.label}>作品名</span>
+					<span className={styles.label}>{t('作品名')}</span>
 					<input
 						value={layout.title}
 						onChange={(event) =>
@@ -440,7 +445,7 @@ function Review({
 					/>
 				</label>
 				<label className={styles.row}>
-					<span className={styles.label}>原文语言</span>
+					<span className={styles.label}>{t('原文语言')}</span>
 					<select
 						value={layout.language}
 						onChange={(event) =>
@@ -449,7 +454,7 @@ function Review({
 					>
 						{languages.map(([value, name]) => (
 							<option key={value} value={value}>
-								{name}
+								{t(name)}
 							</option>
 						))}
 						{!languages.some(([value]) => value === layout.language) && (
@@ -461,7 +466,7 @@ function Review({
 							? 'Markdown'
 							: wizard.format.toUpperCase()}
 						{wizard.format === 'txt' && wizard.encoding
-							? ` · ${encodingNames[wizard.encoding]}`
+							? ` · ${t(encodingNames[wizard.encoding])}`
 							: ''}
 					</span>
 				</label>
@@ -478,15 +483,18 @@ function Review({
 							}
 						/>
 						<span className={styles.value}>
-							已有 {wizard.references.length + selectedIllustrations.length}{' '}
-							张参考图时也停在角色设定
+							{t('已有 {{value}} 张参考图时也停在角色设定', {
+								value: wizard.references.length + selectedIllustrations.length,
+							})}
 						</span>
 					</label>
 				)}
 			</div>
 			{wizard.illustrations.length > 0 && (
 				<fieldset className={styles.card}>
-					<legend className={styles.cardTitle}>插图参考（最多 3 张）</legend>
+					<legend className={styles.cardTitle}>
+						{t('插图参考（最多 3 张）')}
+					</legend>
 					{wizard.illustrations.map((candidate, index) => (
 						<label key={candidate.id} className={styles.row}>
 							<input
@@ -511,23 +519,26 @@ function Review({
 							<img
 								className={styles.illustration}
 								src={candidate.preview}
-								alt={`插图 ${index + 1}`}
+								alt={t('插图 {{value}}', { value: index + 1 })}
 							/>
 							<span className={styles.value}>
-								使用插图 {index + 1} · 第 {candidate.volume + 1} 卷 · 第{' '}
-								{candidate.chapter + 1} 章
+								{t('使用插图 {{value}} · 第 {{value2}} 卷 · 第 {{value3}} 章', {
+									value: index + 1,
+									value2: candidate.volume + 1,
+									value3: candidate.chapter + 1,
+								})}
 								{candidate.paragraph === undefined
 									? ''
-									: ` · 第 ${candidate.paragraph + 1} 段`}
+									: t(' · 第 {{value}} 段', { value: candidate.paragraph + 1 })}
 							</span>
 						</label>
 					))}
 				</fieldset>
 			)}
 			{wizard.findings.length > 0 && (
-				<section className={styles.card} aria-label="整理建议">
+				<section className={styles.card} aria-label={t('整理建议')}>
 					<div className={styles.cardHeader}>
-						<h2 className={styles.cardTitle}>整理建议</h2>
+						<h2 className={styles.cardTitle}>{t('整理建议')}</h2>
 						<button
 							type="button"
 							onClick={() =>
@@ -539,7 +550,7 @@ function Review({
 								})
 							}
 						>
-							恢复建议划分
+							{t('恢复建议划分')}
 						</button>
 					</div>
 					{wizard.findings.map((finding, i) => (
@@ -559,12 +570,12 @@ function Review({
 					<section
 						key={volume.start}
 						className={styles.card}
-						aria-label={`第 ${v + 1} 卷`}
+						aria-label={t('第 {{value}} 卷', { value: v + 1 })}
 					>
 						<div className={styles.cardHeader}>
 							<input
 								className={styles.volumeTitle}
-								aria-label={`第 ${v + 1} 卷标题`}
+								aria-label={t('第 {{value}} 卷标题', { value: v + 1 })}
 								value={volume.title}
 								onChange={(event) =>
 									onChange(renameVolume(layout, v, event.target.value))
@@ -576,7 +587,7 @@ function Review({
 									onClick={() => onChange(mergeVolume(layout, v))}
 								>
 									<Merge aria-hidden="true" size={14} />
-									并入上一卷
+									{t('并入上一卷')}
 								</button>
 							)}
 						</div>
@@ -587,17 +598,19 @@ function Review({
 								<fieldset
 									key={`${i}-${chapter.start}`}
 									className={styles.row}
-									aria-label={`第 ${i + 1} 章`}
+									aria-label={t('第 {{value}} 章', { value: i + 1 })}
 								>
 									<span className={styles.index}>{i + 1}</span>
 									<input
-										aria-label={`第 ${i + 1} 章标题`}
+										aria-label={t('第 {{value}} 章标题', { value: i + 1 })}
 										value={chapter.title}
 										onChange={(event) =>
 											onChange(renameChapter(layout, i, event.target.value))
 										}
 									/>
-									<span className={styles.count}>{length} 段</span>
+									<span className={styles.count}>
+										{t('{{length}} 段', { length })}
+									</span>
 									<span className={styles.actions}>
 										<button
 											type="button"
@@ -605,7 +618,7 @@ function Review({
 											onClick={() => onChange(splitChapter(layout, i, total))}
 										>
 											<Scissors aria-hidden="true" size={14} />
-											拆分
+											{t('拆分')}
 										</button>
 										<button
 											type="button"
@@ -613,7 +626,7 @@ function Review({
 											onClick={() => onChange(mergeChapter(layout, i))}
 										>
 											<Merge aria-hidden="true" size={14} />
-											并入上一章
+											{t('并入上一章')}
 										</button>
 										<button
 											type="button"
@@ -621,7 +634,7 @@ function Review({
 											onClick={() => onChange(startVolume(layout, i))}
 										>
 											<SplitSquareVertical aria-hidden="true" size={14} />
-											从此分卷
+											{t('从此分卷')}
 										</button>
 									</span>
 								</fieldset>

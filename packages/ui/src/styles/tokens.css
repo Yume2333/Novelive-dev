@@ -220,3 +220,21 @@
 	--dur-slow: 260ms;
 	--dur-breath: 2200ms;
 }
+
+:root:lang(zh-TW) {
+	--font-display:
+		"Manrope", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
+		"Noto Sans CJK TC", "Source Han Sans TC", sans-serif;
+	--font-body:
+		"Hanken Grotesk", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei",
+		"Noto Sans CJK TC", "Source Han Sans TC", sans-serif;
+}
+
+:root:lang(ja) {
+	--font-display:
+		"Manrope", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo",
+		"Noto Sans CJK JP", "Source Han Sans JP", sans-serif;
+	--font-body:
+		"Hanken Grotesk", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo",
+		"Noto Sans CJK JP", "Source Han Sans JP", sans-serif;
+}

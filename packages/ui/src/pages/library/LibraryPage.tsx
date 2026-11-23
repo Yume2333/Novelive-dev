@@ -3,9 +3,12 @@ import { FileUp, LibraryBig } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { EmptyState, Page, PageAction } from '../../components/Page'
+import { scoped } from '../../i18n'
 import { productionRoutes, workRoute } from '../../routes/production'
 import styles from './LibraryPage.module.css'
 import { ImportPackage } from './share/ImportPackage'
+
+const t = scoped('library')
 
 export function LibraryPage() {
 	const [library, setLibrary] = useState<CommandOutput<'library.list'>>()
@@ -51,7 +54,7 @@ export function LibraryPage() {
 
 	return (
 		<Page
-			title="书库"
+			title={t('书库')}
 			action={
 				<div className={styles.actions}>
 					{share && (
@@ -65,27 +68,31 @@ export function LibraryPage() {
 						/>
 					)}
 					<PageAction icon={FileUp} to={productionRoutes.import}>
-						导入原文
+						{t('导入原文')}
 					</PageAction>
 				</div>
 			}
 		>
 			{error ? (
-				<p role="alert">无法读取书库</p>
+				<p role="alert">{t('无法读取书库')}</p>
 			) : !library ? (
-				<p>正在读取书库</p>
+				<p>{t('正在读取书库')}</p>
 			) : library.works.length === 0 && library.unreadableCount === 0 ? (
 				<EmptyState
 					icon={LibraryBig}
-					title="书库还是空的"
-					text="还没有作品"
+					title={t('书库还是空的')}
+					text={t('还没有作品')}
 					card
 				/>
 			) : (
 				<section aria-labelledby="library-projects" className={styles.projects}>
-					<h2 id="library-projects">我的工程</h2>
+					<h2 id="library-projects">{t('我的工程')}</h2>
 					{library.unreadableCount > 0 && (
-						<p role="alert">有 {library.unreadableCount} 部作品无法读取</p>
+						<p role="alert">
+							{t('有 {{unreadableCount}} 部作品无法读取', {
+								unreadableCount: library.unreadableCount,
+							})}
+						</p>
 					)}
 					<ul className={styles.grid}>
 						{library.works.map(({ workId, title, published, chapters }) => (
@@ -105,7 +112,10 @@ export function LibraryPage() {
 											className={styles.progress}
 											id={`work-progress-${workId}`}
 										>
-											已发布 {published} / {chapters} 章
+											{t('已发布 {{published}} / {{chapters}} 章', {
+												published,
+												chapters,
+											})}
 										</span>
 									</span>
 								</Link>

@@ -6,6 +6,9 @@ import type {
 import { useState } from 'react'
 import { ShareDialog } from '../../../components/ShareDialog'
 import styles from '../../../components/ShareDialog.module.css'
+import { msg, scoped } from '../../../i18n'
+
+const t = scoped('work')
 
 type Selection = Omit<
 	Extract<ShareRequest, { operation: 'previewExport' }>,
@@ -18,9 +21,9 @@ type Warnings = Extract<
 >['warnings']
 
 const scopes = [
-	['work', '单部作品'],
-	['volume', '整卷'],
-	['series', '整个系列'],
+	['work', msg('单部作品')],
+	['volume', msg('整卷')],
+	['series', msg('整个系列')],
 ] as const
 
 export function ExportPackage({
@@ -80,7 +83,7 @@ export function ExportPackage({
 				else setError(response.error.message)
 			}
 		} catch {
-			setError('无法导出作品包，请重试。')
+			setError(t('无法导出作品包，请重试。'))
 		} finally {
 			setBusy(false)
 		}
@@ -99,11 +102,11 @@ export function ExportPackage({
 					setOpen(true)
 				}}
 			>
-				导出作品包
+				{t('导出作品包')}
 			</button>
 			{open && (
 				<ShareDialog
-					title="导出作品包"
+					title={t('导出作品包')}
 					busy={busy}
 					onClose={() => setOpen(false)}
 					actions={
@@ -114,20 +117,24 @@ export function ExportPackage({
 								disabled={busy}
 								onClick={() => void advance()}
 							>
-								{warnings ? '导出 .novelive' : '检查导出内容'}
+								{warnings ? t('导出 .novelive') : t('检查导出内容')}
 							</button>
 						)
 					}
 				>
 					{versions ? (
 						<p role="status">
-							已导出 {versions.length} 部作品（
-							{versions.map((version) => `v${version}`).join('、')}）。
+							{t('已导出 {{count}} 部作品（{{versions}}）。', {
+								count: versions.length,
+								versions: versions
+									.map((version) => `v${version}`)
+									.join(t('、')),
+							})}
 						</p>
 					) : (
 						<>
 							<fieldset className={styles.options} disabled={busy}>
-								<legend>导出范围</legend>
+								<legend>{t('导出范围')}</legend>
 								{scopes.map(([value, label]) => (
 									<label key={value}>
 										<input
@@ -139,7 +146,7 @@ export function ExportPackage({
 												resetReview()
 											}}
 										/>
-										{label}
+										{t(label)}
 									</label>
 								))}
 							</fieldset>
@@ -153,13 +160,15 @@ export function ExportPackage({
 										resetReview()
 									}}
 								/>
-								包含原文
+								{t('包含原文')}
 							</label>
 							{warnings &&
 								(warnings.length ? (
 									<div className={styles.notice}>
 										<p>
-											以下章节使用了占位图。导出后仍会显示占位图，可以继续导出。
+											{t(
+												'以下章节使用了占位图。导出后仍会显示占位图，可以继续导出。',
+											)}
 										</p>
 										<ul>
 											{warnings.map(({ workId, chapterId, title }) => (
@@ -168,11 +177,13 @@ export function ExportPackage({
 										</ul>
 									</div>
 								) : !busy ? (
-									<p role="status">检查完成，没有使用占位图的章节。</p>
+									<p role="status">{t('检查完成，没有使用占位图的章节。')}</p>
 								) : null)}
 						</>
 					)}
-					{busy && <p role="status">{warnings ? '正在导出…' : '正在检查…'}</p>}
+					{busy && (
+						<p role="status">{warnings ? t('正在导出…') : t('正在检查…')}</p>
+					)}
 					{error && <p role="alert">{error}</p>}
 				</ShareDialog>
 			)}

@@ -4,7 +4,10 @@ import type {
 	SaveSlot,
 } from '../../../../../../player/src/contract'
 import { slotKey } from '../../../../../../player/src/progress'
+import { scoped } from '../../../../i18n'
 import styles from './LegacySavePanel.module.css'
+
+const t = scoped('player')
 
 export interface LegacySaveActions {
 	list(workId: string): Promise<readonly LegacySaveGroup[]>
@@ -30,7 +33,7 @@ export function LegacySavePanel({
 				if (active) setGroups(groups)
 			},
 			() => {
-				if (active) setError('无法读取旧版本存档。')
+				if (active) setError(t('无法读取旧版本存档。'))
 			},
 		)
 		return () => {
@@ -59,7 +62,7 @@ export function LegacySavePanel({
 			)
 			setConfirmation('')
 		} catch {
-			setError('无法删除旧版本存档，请重试。')
+			setError(t('无法删除旧版本存档，请重试。'))
 		} finally {
 			setBusy(false)
 		}
@@ -67,18 +70,20 @@ export function LegacySavePanel({
 
 	if (!groups.length && !error) return null
 	return (
-		<section className={styles.panel} aria-label="旧版本存档">
-			<h3>旧版本存档</h3>
-			<p>这些存档无法在当前版本读取，可以保留或删除。</p>
+		<section className={styles.panel} aria-label={t('旧版本存档')}>
+			<h3>{t('旧版本存档')}</h3>
+			<p>{t('这些存档无法在当前版本读取，可以保留或删除。')}</p>
 			{error && <p role="alert">{error}</p>}
 			{groups.map(({ version, saves }) => (
-				<section key={version} aria-label={`版本 v${version}`}>
-					<h4>版本 v{version}</h4>
+				<section key={version} aria-label={t('版本 v{{version}}', { version })}>
+					<h4>{t('版本 v{{version}}', { version })}</h4>
 					<ul>
 						{saves.map(({ slot, savedAt }) => {
 							const key = `${version}/${slotKey(slot)}`
 							const name =
-								slot.kind === 'quick' ? '快速存档' : `槽位 ${slot.slot}`
+								slot.kind === 'quick'
+									? t('快速存档')
+									: t('槽位 {{slot}}', { slot: slot.slot })
 							return (
 								<li className={styles.row} key={key}>
 									<span>{name}</span>
@@ -92,25 +97,28 @@ export function LegacySavePanel({
 												disabled={busy}
 												onClick={() => setConfirmation('')}
 											>
-												取消
+												{t('取消')}
 											</button>
 											<button
 												type="button"
 												disabled={busy}
 												onClick={() => void remove(version, slot)}
 											>
-												确认删除
+												{t('确认删除')}
 											</button>
 										</>
 									) : (
 										<button
 											type="button"
 											className={styles.delete}
-											aria-label={`删除 v${version} ${name}`}
+											aria-label={t('删除 v{{version}} {{name}}', {
+												version,
+												name,
+											})}
 											disabled={busy}
 											onClick={() => setConfirmation(key)}
 										>
-											删除
+											{t('删除')}
 										</button>
 									)}
 								</li>

@@ -2,7 +2,10 @@ import type { DesktopShareApi, ShareResponse } from '@novelive/creator/contract'
 import { useState } from 'react'
 import { ShareDialog } from '../../../components/ShareDialog'
 import styles from '../../../components/ShareDialog.module.css'
+import { scoped } from '../../../i18n'
 import libraryStyles from '../LibraryPage.module.css'
+
+const t = scoped('library')
 
 type Inspection = Extract<ShareResponse, { ok: true }>['result']
 type InspectedWork = Extract<
@@ -65,7 +68,7 @@ export function ImportPackage({
 			else setError(response.error.message)
 		} catch {
 			setOpen(true)
-			setError('无法检查作品包，请重新选择。')
+			setError(t('无法检查作品包，请重新选择。'))
 		} finally {
 			setBusy(false)
 		}
@@ -105,7 +108,9 @@ export function ImportPackage({
 			onImported()
 		} catch {
 			setError(
-				asProject ? '无法导入为工程，请重试。' : '无法导入作品包，请重试。',
+				asProject
+					? t('无法导入为工程，请重试。')
+					: t('无法导入作品包，请重试。'),
 			)
 		} finally {
 			setBusy(false)
@@ -120,11 +125,11 @@ export function ImportPackage({
 				disabled={busy}
 				onClick={() => void inspect()}
 			>
-				导入作品包
+				{t('导入作品包')}
 			</button>
 			{open && (
 				<ShareDialog
-					title="导入作品包"
+					title={t('导入作品包')}
 					busy={busy}
 					onClose={() => setOpen(false)}
 					actions={
@@ -137,7 +142,7 @@ export function ImportPackage({
 								disabled={busy}
 								onClick={() => void importPackage(false)}
 							>
-								{updates.length ? '确认导入与更新' : '导入'}
+								{updates.length ? t('确认导入与更新') : t('导入')}
 							</button>
 						) : (
 							canImportAsProject && (
@@ -147,25 +152,31 @@ export function ImportPackage({
 									disabled={busy}
 									onClick={() => void importPackage(true)}
 								>
-									导入为工程
+									{t('导入为工程')}
 								</button>
 							)
 						))
 					}
 				>
 					{busy ? (
-						<p role="status">{review ? '正在导入…' : '正在检查作品包…'}</p>
+						<p role="status">
+							{review ? t('正在导入…') : t('正在检查作品包…')}
+						</p>
 					) : projectImported ? (
-						<p role="status">已导入为新工程，可以在书库中编辑。</p>
+						<p role="status">{t('已导入为新工程，可以在书库中编辑。')}</p>
 					) : imported !== undefined ? (
-						<p role="status">已导入或更新 {imported} 部作品。</p>
+						<p role="status">
+							{t('已导入或更新 {{count}} 部作品。', { count: imported })}
+						</p>
 					) : (
 						review && (
 							<>
 								<ul>
 									{works.map((entry) => (
 										<li key={entry.work.workId}>
-											<strong>《{entry.title}》</strong>{' '}
+											<strong>
+												{t('《{{title}}》', { title: entry.title })}
+											</strong>{' '}
 											{describeVersion(entry)}
 										</li>
 									))}
@@ -173,7 +184,9 @@ export function ImportPackage({
 								{updates.length > 0 && (
 									<div className={styles.notice}>
 										<p>
-											确认后将替换上述旧版本。存档和已读记录会迁移；无法迁移的存档会保留在「旧版本存档」中。
+											{t(
+												'确认后将替换上述旧版本。存档和已读记录会迁移；无法迁移的存档会保留在「旧版本存档」中。',
+											)}
 										</p>
 									</div>
 								)}
@@ -181,7 +194,9 @@ export function ImportPackage({
 						)
 					)}
 					{review && canImportAsProject && !projectImported && (
-						<p>导入为工程会创建可编辑的副本，再次导出时将使用新的作品 ID。</p>
+						<p>
+							{t('导入为工程会创建可编辑的副本，再次导出时将使用新的作品 ID。')}
+						</p>
 					)}
 					{error && <p role="alert">{error}</p>}
 				</ShareDialog>
@@ -193,12 +208,18 @@ export function ImportPackage({
 function describeVersion(entry: InspectedWork) {
 	switch (entry.relation) {
 		case 'new':
-			return `v${entry.work.version} · 新作品`
+			return t('v{{version}} · 新作品', { version: entry.work.version })
 		case 'update':
-			return `v${entry.installedVersion} → v${entry.work.version} · 可更新`
+			return t('v{{installed}} → v{{version}} · 可更新', {
+				installed: entry.installedVersion,
+				version: entry.work.version,
+			})
 		case 'current':
-			return `v${entry.work.version} · 已导入`
+			return t('v{{version}} · 已导入', { version: entry.work.version })
 		case 'older':
-			return `v${entry.work.version} · 已安装较新的 v${entry.installedVersion}，不会替换`
+			return t('v{{version}} · 已安装较新的 v{{installed}}，不会替换', {
+				version: entry.work.version,
+				installed: entry.installedVersion,
+			})
 	}
 }

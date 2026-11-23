@@ -13,8 +13,11 @@ import { type ComponentProps, useRef, useState } from 'react'
 import { Streamdown } from 'streamdown'
 import { Collapse } from '../../components/Collapse'
 import { OverlayScrollbar } from '../../components/ScrollArea'
+import { msg, scoped } from '../../i18n'
 import styles from './AgentPanel.module.css'
 import type { Attachment, Part } from './session'
+
+const t = scoped('agent')
 
 type ProposalPart = Extract<Part, { type: 'proposal' }>
 type Proposal = ProposalPart['proposal']
@@ -30,13 +33,13 @@ export interface ProposalActions {
 }
 
 const proposalKinds: Record<Proposal['payload']['kind'], string> = {
-	bible: '修改设定集',
-	glossary: '修改术语表',
-	requirements: '修改改编要求',
-	rewriteScene: '重写场景',
-	redrawImage: '重画图片',
-	redoChapter: '重做章节',
-	resynthesizeVolume: '重新综合',
+	bible: msg('修改设定集'),
+	glossary: msg('修改术语表'),
+	requirements: msg('修改改编要求'),
+	rewriteScene: msg('重写场景'),
+	redrawImage: msg('重画图片'),
+	redoChapter: msg('重做章节'),
+	resynthesizeVolume: msg('重新综合'),
 }
 
 function pretty(value: string) {
@@ -95,12 +98,12 @@ function ToolCard({
 }) {
 	const done = part.result !== undefined
 	const status = done
-		? '完成'
+		? t('完成')
 		: activity === 'streaming'
-			? '运行中'
+			? t('运行中')
 			: activity === 'stopped'
-				? '已停止'
-				: '未完成'
+				? t('已停止')
+				: t('未完成')
 	return (
 		<Disclosure
 			label={part.name}
@@ -113,11 +116,11 @@ function ToolCard({
 				)
 			}
 		>
-			<span className={styles.caption}>参数</span>
+			<span className={styles.caption}>{t('参数')}</span>
 			<pre className={styles.code}>{pretty(part.input)}</pre>
 			{done && (
 				<>
-					<span className={styles.caption}>结果</span>
+					<span className={styles.caption}>{t('结果')}</span>
 					<pre className={styles.code}>{pretty(part.result ?? '')}</pre>
 				</>
 			)}
@@ -134,10 +137,10 @@ const subtaskIcons = {
 	cancelled: <CircleDashed aria-hidden="true" size={15} />,
 }
 const subtaskLabels = {
-	running: '进行中',
-	done: '完成',
-	failed: '失败',
-	cancelled: '已取消',
+	running: msg('进行中'),
+	done: msg('完成'),
+	failed: msg('失败'),
+	cancelled: msg('已取消'),
 }
 
 export function ScrollField(props: ComponentProps<'textarea'>) {
@@ -189,16 +192,16 @@ function ProposalCard({
 			setRestriction(result.status === 'restricted' ? result.reason : '')
 			setRejecting(false)
 		} catch {
-			setError('没能提交，请重试')
+			setError(t('没能提交，请重试'))
 		} finally {
 			setBusy(false)
 		}
 	}
 	const { payload } = current
 	return (
-		<section className={styles.proposal} aria-label="确认卡">
+		<section className={styles.proposal} aria-label={t('确认卡')}>
 			{rewrite && (
-				<section className={styles.rewrite} aria-label="重写差异">
+				<section className={styles.rewrite} aria-label={t('重写差异')}>
 					{rewrite.hunks.map((hunk) => (
 						<label key={hunk.id} className={styles.rewriteHunk}>
 							<input
@@ -242,28 +245,29 @@ function ProposalCard({
 									}),
 								)
 							} catch {
-								setError('没能应用，请刷新后重试')
+								setError(t('没能应用，请刷新后重试'))
 							} finally {
 								setBusy(false)
 							}
 						}}
 					>
-						应用勾选差异
+						{t('应用勾选差异')}
 					</button>
 				</section>
 			)}
-			<span className={styles.caption}>{proposalKinds[payload.kind]}</span>
+			<span className={styles.caption}>{t(proposalKinds[payload.kind])}</span>
 			<p className={styles.proposalPrompt}>{current.prompt}</p>
 			{payload.kind === 'requirements' && (
 				<dl className={styles.diff}>
-					<dt>改前</dt>
+					<dt>{t('改前')}</dt>
 					<dd>{payload.previous}</dd>
-					<dt>改后</dt>
+					<dt>{t('改后')}</dt>
 					<dd>{payload.next}</dd>
 				</dl>
 			)}
 			<p className={styles.impact}>
-				影响：{chapters.length ? chapters.join('、') : '不改动已生成的章节'}
+				{t('影响：')}
+				{chapters.length ? chapters.join(t('、')) : t('不改动已生成的章节')}
 			</p>
 			{restriction && (
 				<p className={styles.resolution} role="status">
@@ -272,22 +276,24 @@ function ProposalCard({
 			)}
 			{stale ? (
 				<p className={styles.resolution} role="status">
-					内容已经变了，这张卡已过期
+					{t('内容已经变了，这张卡已过期')}
 				</p>
 			) : current.status === 'approved' ? (
 				<p className={styles.resolution} role="status">
-					<Check aria-hidden="true" size={14} /> 已确认
+					<Check aria-hidden="true" size={14} /> {t('已确认')}
 				</p>
 			) : current.status === 'rejected' ? (
 				<p className={styles.resolution} role="status">
-					<Ban aria-hidden="true" size={14} /> 已拒绝
-					{current.feedback ? `：${current.feedback}` : ''}
+					<Ban aria-hidden="true" size={14} /> {t('已拒绝')}
+					{current.feedback
+						? t('：{{feedback}}', { feedback: current.feedback })
+						: ''}
 				</p>
 			) : rejecting ? (
 				<div className={styles.rejectBox}>
 					<ScrollField
-						aria-label="拒绝理由"
-						placeholder="理由（可不填），Agent 会据此调整"
+						aria-label={t('拒绝理由')}
+						placeholder={t('理由（可不填），Agent 会据此调整')}
 						rows={2}
 						value={reason}
 						onChange={(event) => setReason(event.target.value)}
@@ -298,7 +304,7 @@ function ProposalCard({
 							className={styles.button}
 							onClick={() => setRejecting(false)}
 						>
-							取消
+							{t('取消')}
 						</button>
 						<button
 							type="button"
@@ -311,7 +317,7 @@ function ProposalCard({
 								})
 							}
 						>
-							确认拒绝
+							{t('确认拒绝')}
 						</button>
 					</div>
 				</div>
@@ -323,7 +329,7 @@ function ProposalCard({
 						disabled={busy}
 						onClick={() => setRejecting(true)}
 					>
-						拒绝
+						{t('拒绝')}
 					</button>
 					<button
 						type="button"
@@ -331,7 +337,7 @@ function ProposalCard({
 						disabled={busy || Boolean(restriction)}
 						onClick={() => void decide({ kind: 'approve' })}
 					>
-						确认
+						{t('确认')}
 					</button>
 				</div>
 			)}
@@ -373,7 +379,7 @@ export function MessageParts({
 				return (
 					<Disclosure
 						key={key}
-						label="思考过程"
+						label={t('思考过程')}
 						icon={<CircleDashed aria-hidden="true" size={15} />}
 						defaultOpen={activity === 'streaming'}
 					>
@@ -386,7 +392,7 @@ export function MessageParts({
 						key={key}
 						type="button"
 						className={styles.thumb}
-						aria-label={`查看图片 ${part.attachment.name}`}
+						aria-label={t('查看图片 {{name}}', { name: part.attachment.name })}
 						onClick={() => onPreview(part.attachment)}
 					>
 						<img
@@ -406,8 +412,8 @@ export function MessageParts({
 						<span className={styles.cardTitle}>{part.label}</span>
 						<span className={styles.caption}>
 							{part.status === 'running' && activity === 'stopped'
-								? '已停止'
-								: subtaskLabels[part.status]}
+								? t('已停止')
+								: t(subtaskLabels[part.status])}
 						</span>
 					</div>
 				)

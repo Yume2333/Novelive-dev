@@ -2,6 +2,7 @@ import { access, constants } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { app, type BrowserWindow, dialog, shell } from 'electron'
 import updaters from 'electron-updater'
+import { languageReady, t } from '../i18n'
 import { checkUpdate, updatePolicy } from './policy'
 
 export function installUpdates(options: {
@@ -32,9 +33,9 @@ export function installUpdates(options: {
 
 	let checking: Promise<void> | undefined
 	async function prompt(message: string, action?: string) {
-		const buttons = action ? ['稍后', action] : ['确定']
+		const buttons = action ? [t('稍后'), action] : [t('确定')]
 		const dialogOptions = {
-			title: 'Novelive 更新',
+			title: t('Novelive 更新'),
 			message,
 			buttons,
 			defaultId: 0,
@@ -55,39 +56,44 @@ export function installUpdates(options: {
 			return true
 		} catch (error) {
 			console.error('Novelive AppImage directory is not writable', error)
-			await prompt('无法替换 AppImage。请将其移至可写目录后再重试更新。')
+			await prompt(t('无法替换 AppImage。请将其移至可写目录后再重试更新。'))
 			return false
 		}
 	}
 
 	async function check(manual: boolean) {
 		if (!policy || !engine) {
-			if (manual) await prompt('未配置应用更新源。')
+			if (manual) await prompt(t('未配置应用更新源。'))
 			return
 		}
 		try {
 			const result = await checkUpdate(engine, policy)
+			if (!manual && result.kind !== 'current') await languageReady(15_000)
 			if (result.kind === 'current') {
-				if (manual) await prompt('已是最新版本。')
+				if (manual) await prompt(t('已是最新版本。'))
 			} else if (result.kind === 'manual') {
 				if (
 					await prompt(
-						`版本 ${result.version} 已可用，请手动下载。`,
-						'打开下载',
+						t('版本 {{version}} 已可用，请手动下载。', {
+							version: result.version,
+						}),
+						t('打开下载'),
 					)
 				)
 					await shell.openExternal(result.url)
 			} else if (
 				await prompt(
-					`版本 ${result.version} 已下载，可以重启安装。`,
-					'重启安装',
+					t('版本 {{version}} 已下载，可以重启安装。', {
+						version: result.version,
+					}),
+					t('重启安装'),
 				)
 			) {
 				await options.quit(() => engine.quitAndInstall(false, true), canInstall)
 			}
 		} catch (error) {
 			console.error('Novelive update check failed', error)
-			if (manual) await prompt('检查或下载应用更新失败，请稍后重试。')
+			if (manual) await prompt(t('检查或下载应用更新失败，请稍后重试。'))
 		}
 	}
 

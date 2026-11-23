@@ -3,8 +3,11 @@ import {
 	productionChapterRecordEvent,
 } from '@novelive/creator/contract'
 import { useEffect, useState } from 'react'
+import { scoped } from '../../i18n'
 import { stepName } from './ChapterState'
 import styles from './Production.module.css'
+
+const t = scoped('production')
 
 function chapterRecord(
 	envelope: EventEnvelope,
@@ -75,24 +78,26 @@ export function ChapterRecords({
 	}, [workId, chapterId])
 
 	return (
-		<section className={styles.records} aria-label="章节运行记录">
-			{state === 'loading' && <p role="status">正在读取运行记录…</p>}
+		<section className={styles.records} aria-label={t('章节运行记录')}>
+			{state === 'loading' && <p role="status">{t('正在读取运行记录…')}</p>}
 			{state === 'failed' && (
-				<p role="alert">无法读取历史记录，请关闭后重试。</p>
+				<p role="alert">{t('无法读取历史记录，请关闭后重试。')}</p>
 			)}
-			{state === 'gap' && <p role="status">部分较早的运行记录已不可用。</p>}
-			{state === 'ready' && !records.length && <p>暂无运行记录</p>}
+			{state === 'gap' && (
+				<p role="status">{t('部分较早的运行记录已不可用。')}</p>
+			)}
+			{state === 'ready' && !records.length && <p>{t('暂无运行记录')}</p>}
 			<ol className={styles.list}>
 				{records.map(({ seq, at, step, status, message, detail }) => (
 					<li key={seq}>
 						<strong>
-							{stepName[step]} ·{' '}
+							{t(stepName[step])} ·{' '}
 							{
 								{
-									running: '进行中',
-									done: '完成',
-									failed: '失败',
-									cancelled: '已取消',
+									running: t('进行中'),
+									done: t('完成'),
+									failed: t('失败'),
+									cancelled: t('已取消'),
 								}[status]
 							}
 						</strong>
@@ -100,7 +105,7 @@ export function ChapterRecords({
 						<p>{message}</p>
 						{detail && (
 							<details>
-								<summary>详情</summary>
+								<summary>{t('详情')}</summary>
 								<p>{detail}</p>
 							</details>
 						)}

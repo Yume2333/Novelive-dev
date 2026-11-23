@@ -6,10 +6,13 @@ import type {
 } from '../../../../../player/src/contract'
 import { manualSaveSlots } from '../../../../../player/src/contract'
 import { slotKey } from '../../../../../player/src/progress'
+import { scoped } from '../../../i18n'
 import {
 	type LegacySaveActions,
 	LegacySavePanel,
 } from './legacy-saves/LegacySavePanel'
+
+const t = scoped('player')
 
 export interface ProgressControlsProps {
 	workId: string
@@ -63,7 +66,7 @@ export function ProgressPanel({
 				if (!cancelled) setThumbnails(Object.fromEntries(images))
 			})
 			.catch(() => {
-				if (!cancelled) setFailure('无法加载存档缩略图')
+				if (!cancelled) setFailure(t('无法加载存档缩略图'))
 			})
 		return () => {
 			cancelled = true
@@ -78,7 +81,7 @@ export function ProgressPanel({
 						disabled={!history.cursor}
 						onClick={() => onHistoryStep('back')}
 					>
-						后退一句
+						{t('后退一句')}
 					</button>
 					<button
 						type="button"
@@ -88,7 +91,7 @@ export function ProgressPanel({
 						}
 						onClick={() => onHistoryStep('forward')}
 					>
-						前进一句
+						{t('前进一句')}
 					</button>
 				</div>
 				{history.entries.length ? (
@@ -106,7 +109,7 @@ export function ProgressPanel({
 						</button>
 					))
 				) : (
-					<p>暂无历史记录</p>
+					<p>{t('暂无历史记录')}</p>
 				)}
 			</>
 		)
@@ -127,7 +130,11 @@ export function ProgressPanel({
 						<button
 							type="button"
 							key={name}
-							aria-label={`${view === 'save' ? '存档' : '读档'}槽位 ${index + 1}`}
+							aria-label={
+								view === 'save'
+									? t('存档槽位 {{index}}', { index: index + 1 })
+									: t('读档槽位 {{index}}', { index: index + 1 })
+							}
 							disabled={view === 'load' && !entry}
 							onClick={() => onSlot(slot)}
 						>
@@ -136,12 +143,12 @@ export function ProgressPanel({
 									src={thumbnails[name]}
 									width={480}
 									height={270}
-									alt={`槽位 ${index + 1} 缩略图`}
+									alt={t('槽位 {{value}} 缩略图', { value: index + 1 })}
 								/>
 							) : (
-								<span className="nl-save-empty">空槽位</span>
+								<span className="nl-save-empty">{t('空槽位')}</span>
 							)}
-							<span>槽位 {index + 1}</span>
+							<span>{t('槽位 {{value}}', { value: index + 1 })}</span>
 							{entry && (
 								<time dateTime={entry.savedAt}>
 									{new Date(entry.savedAt).toLocaleString()}

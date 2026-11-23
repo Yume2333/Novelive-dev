@@ -14,6 +14,7 @@ import {
 } from 'electron'
 import { cacheResponse } from '../../../../packages/creator/src/host-runtime/cache'
 import { installProgressIpc } from '../progress-ipc'
+import { t } from './i18n'
 import { installNotifications } from './notifications'
 import { installLifecycle } from './tray'
 import { installUpdates } from './update'
@@ -241,7 +242,7 @@ app.whenReady().then(async () => {
 		if (kind === 'package') {
 			const result = await dialog.showOpenDialog({
 				properties: ['openFile'],
-				filters: [{ name: 'Novelive 作品包', extensions: ['novelive'] }],
+				filters: [{ name: t('Novelive 作品包'), extensions: ['novelive'] }],
 			})
 			return result.filePaths
 		}
@@ -251,10 +252,10 @@ app.whenReady().then(async () => {
 				kind === 'image' ? ['openFile', 'multiSelections'] : ['openFile'],
 			filters:
 				kind === 'image'
-					? [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+					? [{ name: t('图片'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
 					: [
 							{
-								name: '原文',
+								name: t('原文'),
 								extensions: ['txt', 'epub', 'md', 'markdown', 'docx', 'pdf'],
 							},
 						],
@@ -263,8 +264,8 @@ app.whenReady().then(async () => {
 	})
 	ipcMain.handle('novelive:pick-package-destination', async () => {
 		const result = await dialog.showSaveDialog({
-			defaultPath: '作品.novelive',
-			filters: [{ name: 'Novelive 作品包', extensions: ['novelive'] }],
+			defaultPath: t('作品.novelive'),
+			filters: [{ name: t('Novelive 作品包'), extensions: ['novelive'] }],
 		})
 		if (result.canceled || !result.filePath) return null
 		if (/\.novelive$/i.test(result.filePath)) return result.filePath
@@ -278,9 +279,11 @@ app.whenReady().then(async () => {
 		}
 		const { response } = await dialog.showMessageBox({
 			type: 'warning',
-			title: '替换作品包',
-			message: `「${basename(destination)}」已存在，是否替换？`,
-			buttons: ['取消', '替换'],
+			title: t('替换作品包'),
+			message: t('「{{name}}」已存在，是否替换？', {
+				name: basename(destination),
+			}),
+			buttons: [t('取消'), t('替换')],
 			defaultId: 0,
 			cancelId: 0,
 			noLink: true,

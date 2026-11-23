@@ -1,6 +1,9 @@
 import { type ReactNode, useEffect, useId, useRef } from 'react'
+import { scoped } from '../i18n'
 import { ScrollArea } from './ScrollArea'
 import styles from './ShareDialog.module.css'
+
+const t = scoped('components')
 
 export function ShareDialog({
 	title,
@@ -43,7 +46,7 @@ export function ShareDialog({
 					disabled={busy}
 					onClick={onClose}
 				>
-					关闭
+					{t('关闭')}
 				</button>
 				{actions}
 			</footer>

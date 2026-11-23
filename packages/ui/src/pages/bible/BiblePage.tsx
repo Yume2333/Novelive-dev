@@ -4,7 +4,10 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { Collapse } from '../../components/Collapse'
 import { Page } from '../../components/Page'
 import { ScrollArea } from '../../components/ScrollArea'
+import { msg, scoped } from '../../i18n'
 import styles from './BiblePage.module.css'
+
+const t = scoped('bible')
 
 type Bible = CommandOutput<'bible.get'>
 type Entry =
@@ -20,73 +23,78 @@ type ProposalEntry = Extract<
 	{ kind: 'bible' }
 >['changes'][number]['entry']
 const categories = [
-	['characters', '角色'],
-	['locations', '地点'],
-	['glossary', '术语'],
-	['relations', '关系'],
-	['timeline', '时间线'],
-	['foreshadowing', '伏笔'],
-	['styles', '风格'],
+	['characters', msg('角色')],
+	['locations', msg('地点')],
+	['glossary', msg('术语')],
+	['relations', msg('关系')],
+	['timeline', msg('时间线')],
+	['foreshadowing', msg('伏笔')],
+	['styles', msg('风格')],
 ] as const
 const message = (error: unknown) =>
 	error && typeof error === 'object' && 'message' in error
 		? String(error.message)
-		: '读取失败，请重试。'
+		: t('读取失败，请重试。')
 const labels: Record<string, string> = {
-	name: '名字',
-	originalName: '原文名字',
-	aliases: '别名',
-	major: '主要角色',
-	addresses: '称呼',
-	speakerId: '说话人',
-	identity: '身份',
-	personality: '性格',
-	speech: '说话方式',
-	appearance: '外貌',
-	description: '描述',
-	anchorFeatures: '锚点特征',
-	keyColors: '关键颜色',
-	hair: '发色',
-	eyes: '瞳色',
-	clothing: '服装',
-	costumes: '造型',
-	fromChapter: '起始章',
-	expressions: '表情',
-	references: '参考图',
-	reuse: '复用方式',
-	knows: '已知事实',
-	fact: '事实',
-	changes: '剧情变化',
-	chapterId: '章节',
-	field: '字段',
-	value: '内容',
-	firstSeenChapter: '首次出场',
-	revealedChapter: '揭示章节',
-	from: '角色',
-	to: '关联角色',
-	variants: '变体',
-	event: '事件',
-	storyTime: '故事时间',
-	plantedChapter: '埋设章节',
-	resolvedChapter: '回收章节',
-	narration: '旁白语气',
-	original: '原文写法',
-	written: '作品写法',
-	pronunciation: '注音',
-	category: '类别',
-	note: '备注',
-	path: '路径',
+	name: msg('名字'),
+	originalName: msg('原文名字'),
+	aliases: msg('别名'),
+	major: msg('主要角色'),
+	addresses: msg('称呼'),
+	speakerId: msg('说话人'),
+	identity: msg('身份'),
+	personality: msg('性格'),
+	speech: msg('说话方式'),
+	appearance: msg('外貌'),
+	description: msg('描述'),
+	anchorFeatures: msg('锚点特征'),
+	keyColors: msg('关键颜色'),
+	hair: msg('发色'),
+	eyes: msg('瞳色'),
+	clothing: msg('服装'),
+	costumes: msg('造型'),
+	fromChapter: msg('起始章'),
+	expressions: msg('表情'),
+	references: msg('参考图'),
+	reuse: msg('复用方式'),
+	knows: msg('已知事实'),
+	fact: msg('事实'),
+	changes: msg('剧情变化'),
+	chapterId: msg('章节'),
+	field: msg('字段'),
+	value: msg('内容'),
+	firstSeenChapter: msg('首次出场'),
+	revealedChapter: msg('揭示章节'),
+	from: msg('角色'),
+	to: msg('关联角色'),
+	variants: msg('变体'),
+	event: msg('事件'),
+	storyTime: msg('故事时间'),
+	plantedChapter: msg('埋设章节'),
+	resolvedChapter: msg('回收章节'),
+	narration: msg('旁白语气'),
+	original: msg('原文写法'),
+	written: msg('作品写法'),
+	pronunciation: msg('注音'),
+	category: msg('类别'),
+	note: msg('备注'),
+	path: msg('路径'),
 	id: 'ID',
 }
 function print(value: unknown): string {
 	if (Array.isArray(value))
-		return value.length ? value.map(print).join('；') : '无'
+		return value.length ? value.map(print).join(t('；')) : t('无')
 	if (value && typeof value === 'object')
 		return Object.entries(value)
-			.map(([key, item]) => `${labels[key] ?? key}：${print(item)}`)
-			.join('，')
-	if (typeof value === 'boolean') return value ? '是' : '否'
-	return value === undefined || value === null ? '未设置' : String(value)
+			.map(([key, item]) =>
+				t('{{value}}：{{value2}}', {
+					value: labels[key] ? t(labels[key]) : key,
+					value2: print(item),
+				}),
+			)
+			.join(t('，'))
+	if (typeof value === 'boolean') return value ? t('是') : t('否')
+	return value === undefined || value === null ? t('未设置') : String(value)
 }
 const title = (entry: Entry | ProposalEntry) =>
 	'name' in entry
@@ -140,7 +148,11 @@ function approvalNotice(proposal: Proposal, bible: Bible) {
 			}
 		}
 	}
-	return `已接受候选${images ? '；受影响的已有图片已标记过期。' : '。'}${style ? '风格变更仅提示，不自动过期。' : ''}`
+	return (
+		t('已接受候选') +
+		(images ? t('；受影响的已有图片已标记过期。') : t('。')) +
+		(style ? t('风格变更仅提示，不自动过期。') : '')
+	)
 }
 
 function Fields({ entry }: { entry: Entry | ProposalEntry }) {
@@ -152,7 +164,7 @@ function Fields({ entry }: { entry: Entry | ProposalEntry }) {
 				)
 				.map(([key, value]) => (
 					<div key={key}>
-						<dt>{labels[key] ?? key}</dt>
+						<dt>{labels[key] ? t(labels[key]) : key}</dt>
 						<dd>{print(value)}</dd>
 					</div>
 				))}
@@ -182,7 +194,7 @@ function Occurrences({ entry }: { entry: Entry }) {
 				aria-controls={id}
 				onClick={() => setOpen((value) => !value)}
 			>
-				跨章节定位（{occurrences.length}）
+				{t('跨章节定位（{{length}}）', { length: occurrences.length })}
 			</button>
 			<Collapse open={open}>
 				<div id={id}>
@@ -198,7 +210,7 @@ function Occurrences({ entry }: { entry: Entry }) {
 							))}
 						</ul>
 					) : (
-						<p>暂无原文匹配</p>
+						<p>{t('暂无原文匹配')}</p>
 					)}
 				</div>
 			</Collapse>
@@ -233,7 +245,7 @@ function Candidate({
 	return (
 		<article className={styles.card} aria-label={proposal.prompt}>
 			<h3>{proposal.prompt}</h3>
-			<p>{action.reason ?? '待确认'}</p>
+			<p>{action.reason ?? t('待确认')}</p>
 			{changes.map(({ kind, op, entry }) => {
 				const confirmed = (bible[collection[kind]] as Entry[]).find(
 					({ id }) => id === entry.id,
@@ -267,21 +279,26 @@ function Candidate({
 						<h4>
 							{title(entry)} ·{' '}
 							{
-								{ add: '新增', update: '更新', delete: '删除', none: '不变' }[
-									op
-								]
+								{
+									add: t('新增'),
+									update: t('更新'),
+									delete: t('删除'),
+									none: t('不变'),
+								}[op]
 							}
 						</h4>
 						{conflicts.length > 0 && (
 							<div className={styles.conflict}>
-								<strong>与已确认内容冲突</strong>
+								<strong>{t('与已确认内容冲突')}</strong>
 								{conflicts.map(([key, value]) => (
 									<p key={key}>
-										{labels[key] ?? key}：
-										{print(
-											(confirmed as unknown as Record<string, unknown>)[key],
-										) ?? '未设置'}{' '}
-										→ {value === undefined ? '移除' : print(value)}
+										{t('{{label}}：{{before}} → {{after}}', {
+											label: labels[key] ? t(labels[key]) : key,
+											before: print(
+												(confirmed as unknown as Record<string, unknown>)[key],
+											),
+											after: value === undefined ? t('移除') : print(value),
+										})}
 									</p>
 								))}
 							</div>
@@ -290,7 +307,7 @@ function Candidate({
 						<Fields entry={entry} />
 						{confirmed && <Occurrences entry={confirmed} />}
 						{kind === 'style' && (
-							<p>风格变更不会自动标记图片过期，请自行检查已有图片。</p>
+							<p>{t('风格变更不会自动标记图片过期，请自行检查已有图片。')}</p>
 						)}
 					</section>
 				)
@@ -301,10 +318,10 @@ function Candidate({
 					disabled={busy || stale}
 					onClick={() => resolve(proposal.id)}
 				>
-					接受候选
+					{t('接受候选')}
 				</button>
 				<label>
-					拒绝理由
+					{t('拒绝理由')}
 					<input
 						value={reason}
 						onChange={(event) => setReason(event.target.value)}
@@ -315,7 +332,7 @@ function Candidate({
 					disabled={busy}
 					onClick={() => resolve(proposal.id, reason)}
 				>
-					拒绝候选
+					{t('拒绝候选')}
 				</button>
 			</div>
 		</article>
@@ -406,14 +423,14 @@ function BibleProjection({
 			}).promise
 			setNotice(
 				result.status === 'stale'
-					? '候选已过期，未修改已确认内容。'
+					? t('候选已过期，未修改已确认内容。')
 					: result.status === 'restricted'
 						? result.reason
 						: reason === undefined
 							? bible
 								? approvalNotice(result.proposal, bible)
-								: '已接受候选。'
-							: '已拒绝候选，理由已保存。',
+								: t('已接受候选。')
+							: t('已拒绝候选，理由已保存。'),
 			)
 			const next = await window.novelive.call('bible.get', { workId, volumeId })
 				.promise
@@ -433,7 +450,7 @@ function BibleProjection({
 		}
 	}
 	return (
-		<Page title="设定集">
+		<Page title={t('设定集')}>
 			<div className={styles.layout}>
 				<form
 					className={styles.actions}
@@ -443,26 +460,26 @@ function BibleProjection({
 					}}
 				>
 					<label>
-						卷 ID
+						{t('卷 ID')}
 						<input
-							aria-label="卷 ID"
+							aria-label={t('卷 ID')}
 							value={volumeDraft}
 							onChange={(event) => setVolumeDraft(event.target.value)}
 						/>
 					</label>
 					<button type="submit" disabled={busy}>
-						切换卷
+						{t('切换卷')}
 					</button>
 					<button type="button" disabled={busy} onClick={refresh}>
-						刷新
+						{t('刷新')}
 					</button>
 				</form>
 				{error && <p role="alert">{error}</p>}
 				{notice && <p role="status">{notice}</p>}
-				{!bible && !error && <p role="status">正在读取设定集…</p>}
+				{!bible && !error && <p role="status">{t('正在读取设定集…')}</p>}
 				{bible && (
 					<>
-						<nav className={styles.actions} aria-label="设定分类">
+						<nav className={styles.actions} aria-label={t('设定分类')}>
 							{categories.map(([key, label]) => (
 								<button
 									type="button"
@@ -470,27 +487,38 @@ function BibleProjection({
 									aria-pressed={category === key}
 									onClick={() => setCategory(key)}
 								>
-									{label}（{bible[key].length}）
+									{t('{{label}}（{{length}}）', {
+										label: t(label),
+										length: bible[key].length,
+									})}
 								</button>
 							))}
 						</nav>
 						<ScrollArea className={styles.scroll}>
 							<div className={styles.columns}>
-								<section aria-label="已登记内容">
-									<h2>{categories.find(([key]) => key === category)?.[1]}</h2>
-									{bible[category].length === 0 && <p>暂无条目</p>}
+								<section aria-label={t('已登记内容')}>
+									<h2>
+										{t(categories.find(([key]) => key === category)?.[1] ?? '')}
+									</h2>
+									{bible[category].length === 0 && <p>{t('暂无条目')}</p>}
 									{bible[category].map((entry) => (
 										<article className={styles.card} key={entry.id}>
 											<h3>{title(entry)}</h3>
-											<p>{entry.status === 'confirmed' ? '已确认' : '候选'}</p>
+											<p>
+												{entry.status === 'confirmed' ? t('已确认') : t('候选')}
+											</p>
 											<Fields entry={entry} />
 											<Occurrences entry={entry} />
 										</article>
 									))}
 								</section>
-								<section aria-label="待确认候选">
-									<h2>待确认候选（{proposals.length}）</h2>
-									{!proposals.length && <p>暂无待确认候选</p>}
+								<section aria-label={t('待确认候选')}>
+									<h2>
+										{t('待确认候选（{{length}}）', {
+											length: proposals.length,
+										})}
+									</h2>
+									{!proposals.length && <p>{t('暂无待确认候选')}</p>}
 									{proposals.map((proposal) => (
 										<Candidate
 											key={proposal.id}
