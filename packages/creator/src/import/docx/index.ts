@@ -67,6 +67,11 @@ function xml(source: string): Element {
 function* elements(node: Element, name: string): Generator<Element> {
 	for (const child of node.children) {
 		if (typeof child === 'string') continue
+		if (
+			wordNamespaces.has(child.uri) &&
+			['drawing', 'pict', 'txbxContent'].includes(child.name)
+		)
+			continue
 		if (wordNamespaces.has(child.uri) && child.name.endsWith('PrChange'))
 			continue
 		if (wordNamespaces.has(child.uri) && child.name === name) yield child

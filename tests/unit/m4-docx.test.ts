@@ -29,6 +29,21 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 }
 
 describe('DOCX extraction', () => {
+	test('does not collect text box paragraphs within images or drawings', async () => {
+		const book = await extract(
+			p('正文。') +
+				['drawing', 'pict', 'txbxContent']
+					.map(
+						(tag) =>
+							`<w:${tag}><w:txbxContent>${heading('不应作为标题')}${p('不应作为正文')}</w:txbxContent></w:${tag}>`,
+					)
+					.join('') +
+				p('继续。'),
+		)
+		expect(book.volumes[0].chapters).toEqual([
+			{ title: '正文', paragraphs: ['正文。', '继续。'], notes: [] },
+		])
+	})
 	test('resolves relocated document, styles, footnotes and endnotes relationships', async () => {
 		const rels = (targets: Record<string, string>) =>
 			`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${Object.entries(
