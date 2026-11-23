@@ -116,7 +116,7 @@ export class PixiStage {
 		this.state = structuredClone(state)
 		const old = this.pictures
 		const pictures = new Container()
-		this.world.addChildAt(pictures, 0)
+		this.world.addChildAt(pictures, this.world.getChildIndex(old) + 1)
 		this.pictures = pictures
 		const image = (id: string, layer: Container, portrait = false) => {
 			const sprite = new Sprite(assets.get(id))
