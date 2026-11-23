@@ -6,11 +6,20 @@ import { existing, type readBible } from '../../synthesis/patch'
 type Bible = Awaited<ReturnType<typeof readBible>>
 type Family = 'character' | 'location' | 'cg'
 
+function characterDescription(character: Bible['character'][number]) {
+	if ('description' in character && typeof character.description === 'string')
+		return character.description
+}
+
 export function stalePrefixes(before: Bible, after: Bible) {
 	const prefixes: { prefix: string; family: Family }[] = []
 	for (const character of before.character) {
 		const next = after.character.find(({ id }) => id === character.id)
-		if (!next || !isDeepStrictEqual(character.appearance, next.appearance))
+		if (
+			!next ||
+			!isDeepStrictEqual(character.appearance, next.appearance) ||
+			characterDescription(character) !== characterDescription(next)
+		)
 			prefixes.push({ prefix: `${character.id}/`, family: 'character' })
 		else
 			for (const costume of character.costumes ?? []) {
