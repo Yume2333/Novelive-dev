@@ -54,6 +54,19 @@ export function UsagePage() {
 				{!data && !error && <p role="status">正在读取用量</p>}
 				{data && (
 					<>
+						{data.unreadableProjects.length > 0 && (
+							<section role="alert" aria-label="部分项目无法读取">
+								<h2>部分项目无法读取</h2>
+								<p>以下项目未计入统计，其他项目的记录仍然显示。</p>
+								<ul>
+									{data.unreadableProjects.map((project) => (
+										<li key={project.projectId}>
+											{project.projectId}：{project.reason}
+										</li>
+									))}
+								</ul>
+							</section>
+						)}
 						<dl className={styles.totals}>
 							<div>
 								<dt>文本输入 tokens</dt>

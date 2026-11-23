@@ -7,6 +7,7 @@ export const usageCommands = {
 		output: obj({
 			records: arr(obj({ id: str(), usage: productionUsageSchema })),
 			staleAssets: arr(obj({ workId: str(), assetKey: str() })),
+			unreadableProjects: arr(obj({ projectId: str(), reason: str() })),
 		}),
 	},
 }

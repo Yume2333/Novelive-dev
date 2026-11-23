@@ -255,3 +255,37 @@ test('chapterWorker and its ArtProduction attribute asynchronous model usage wit
 		vi.unstubAllEnvs()
 	}
 })
+
+test('usage keeps readable history and distinguishes broken bindings from empty projects', async () => {
+	await fixture(async (project, profile) => {
+		expect(await listUsage(join(profile, 'empty'))).toEqual({
+			records: [],
+			staleAssets: [],
+			unreadableProjects: [],
+		})
+		expect(await listUsage(profile)).toEqual({
+			records: [],
+			staleAssets: [],
+			unreadableProjects: [],
+		})
+		project.database
+			.prepare(
+				"INSERT INTO usage(usage_id,work_id,at,slot,purpose,model,usage_input,usage_output,usage_cache_read,usage_cache_write) VALUES ('usage', ?, 1, 'main', 'write', 'fixture', 11, 7, 0, 0)",
+			)
+			.run(workId)
+		const history = await listUsage(profile)
+		await writeFile(join(profile, 'projects', 'duplicate'), project.root)
+		await writeFile(
+			join(profile, 'projects', 'moved'),
+			join(profile, 'missing'),
+		)
+		await mkdir(join(profile, 'projects', 'invalid-binding'))
+		const partial = await listUsage(profile)
+		expect(partial.records).toEqual(history.records)
+		expect(partial.records).toHaveLength(1)
+		expect(partial.unreadableProjects).toEqual([
+			{ projectId: 'invalid-binding', reason: '项目无法读取' },
+			{ projectId: 'moved', reason: '项目已移动或不存在' },
+		])
+	})
+})

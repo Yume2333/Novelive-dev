@@ -38,7 +38,11 @@ test('M4 usage and stale assets', async () => {
 	const directory = join(root, 'project')
 	const profile = join(root, 'profile')
 	try {
-		expect(await listUsage(profile)).toEqual({ records: [], staleAssets: [] })
+		expect(await listUsage(profile)).toEqual({
+			records: [],
+			staleAssets: [],
+			unreadableProjects: [],
+		})
 		using project = await Project.create(directory, {
 			formatVersion,
 			seriesId: 'usage',
@@ -297,11 +301,25 @@ test('M4 usage and stale assets', async () => {
 				page.getByRole('region', { name: '已发生用量' }),
 			).toContainText('fixture-art-image')
 			expect((await listUsage(profile)).records).toEqual(usage.records)
+			await writeFile(
+				join(profile, 'projects', 'broken'),
+				join(root, 'missing'),
+			)
+			const partial = await listUsage(profile)
+			expect(partial.records).toEqual(usage.records)
+			expect(partial.unreadableProjects).toEqual([
+				{ projectId: 'broken', reason: '项目已移动或不存在' },
+			])
+			await page.reload()
+			await expect(
+				page.getByRole('alert', { name: '部分项目无法读取' }),
+			).toContainText('broken：项目已移动或不存在')
+			await expect(
+				page.getByRole('region', { name: '已发生用量' }),
+			).toContainText('fixture-art-image')
 		} finally {
 			await app.close()
 		}
-		await writeFile(join(profile, 'projects', 'broken'), join(root, 'missing'))
-		await expect(listUsage(profile)).rejects.toBeDefined()
 	} finally {
 		await rm(root, { recursive: true, force: true })
 	}
