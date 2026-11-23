@@ -49,6 +49,14 @@ function pdf(pages, image = false, cjk = false) {
 
 for (const [name, pages, image, cjk] of [
 	[
+		'wrapped-notes',
+		[
+			['Chapter 1', 'Body sentence.', '[1] A note begins', 'and continues'],
+			['New page prose', 'continues here.'],
+		],
+		false,
+	],
+	[
 		'zone-chapters',
 		['1', '5', '9'].map((text) => [
 			{ text, y: 380 },
@@ -189,6 +197,10 @@ for (const [name, pages, image, cjk] of [
 					{ text: 'A local novel', y: 40 },
 				])
 			: pages
+	if (name === 'notes')
+		layout = pages.map((lines) =>
+			lines.map((text, i) => ({ text, x: i === 3 ? 44 : 20 })),
+		)
 	if (name === 'bare-page-numbers')
 		layout = [0, 1, 2].map((i) => [
 			{ text: String(10 + i), x: 5, y: 380 },

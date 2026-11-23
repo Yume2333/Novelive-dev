@@ -55,20 +55,33 @@ function mergeLines(lines: Line[]) {
 			volume.chapters.some((chapter) => chapter.notes.length > 0),
 		),
 	)
+	const noteBlocks = lines.map(
+		(line, i) =>
+			notes[i] &&
+			parseTxt(`${line.text}\nPDF continuation probe`).volumes.some((volume) =>
+				volume.chapters.some((chapter) =>
+					chapter.notes.includes('PDF continuation probe'),
+				),
+			),
+	)
+	let noteParagraph = false
 	for (const [i, line] of lines.entries()) {
 		const previous = lines[i - 1]
 		const boundary =
 			!previous ||
 			notes[i] ||
-			notes[i - 1] ||
+			(notes[i - 1] && !noteBlocks[i - 1]) ||
+			(noteParagraph && previous.page !== line.page) ||
 			heading(line.text) ||
 			heading(previous.text) ||
 			/[。！？…」』”".!?][\s）)\]’']*$/u.test(previous.text) ||
 			line.x - line.left > line.height * 0.8 ||
 			(previous.page === line.page &&
 				Math.abs(previous.y - line.y) > line.spacing * 1.5)
-		if (boundary) paragraphs.push(line.text)
-		else {
+		if (boundary) {
+			paragraphs.push(line.text)
+			noteParagraph = notes[i]
+		} else {
 			const last = paragraphs.length - 1
 			if (/[A-Za-z]-$/u.test(paragraphs[last]) && /^[a-z]/u.test(line.text))
 				paragraphs[last] = paragraphs[last].slice(0, -1) + line.text

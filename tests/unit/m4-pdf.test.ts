@@ -8,6 +8,15 @@ import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
 
+test('keeps soft-wrapped note text together but closes the note at a page change', async () => {
+	const result = await extractPdf(await fixture('wrapped-notes'))
+	if (result.status !== 'ready') throw new Error('Expected text PDF')
+	expect(result.book.volumes[0].chapters[0]).toMatchObject({
+		paragraphs: ['Body sentence.', 'New page prose continues here.'],
+		notes: ['[1] A note begins and continues'],
+	})
+})
+
 test('retains nonsequenced number headings in zones and bare folios with only two pages of evidence', async () => {
 	const chapters = await extractPdf(await fixture('zone-chapters'))
 	if (chapters.status !== 'ready') throw new Error('Expected text PDF')
