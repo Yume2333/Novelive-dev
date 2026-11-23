@@ -1,7 +1,7 @@
 import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { parseScript } from '@novelive/format/script'
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { OverlayScrollbar } from '../../components/ScrollArea'
 
 export function ScriptEditor({
@@ -28,7 +28,7 @@ export function ScriptEditor({
 	const initial = useRef(value)
 	const editable = useRef(new Compartment())
 	callbacks.current = { onChange, onLine, onUndo }
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (!host.current) return
 		const editor = new EditorView({
 			parent: host.current,

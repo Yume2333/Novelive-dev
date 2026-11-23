@@ -409,6 +409,17 @@ test.describe('contract-render', () => {
 					await expect(
 						page.getByText('当前行 36', { exact: true }),
 					).toBeVisible()
+					const scroller = page.locator('.editor-code .cm-scroller')
+					expect(
+						await scroller.evaluate((el) => el.scrollHeight > el.clientHeight),
+					).toBe(true)
+					const track = page.locator('.editor-code > [data-active]')
+					await expect(track).toHaveCount(1)
+					await scroller.evaluate((el) => {
+						el.scrollTop = 0
+					})
+					await expect(track).toHaveAttribute('data-active', 'true')
+					await page.screenshot({ path: `${evidence}/05-editor-scrollbar.png` })
 					return
 				}
 				if (mode === 'effects') {
