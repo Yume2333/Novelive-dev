@@ -155,7 +155,11 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			expect(published()).toEqual(['ch0001'])
 			await capture(page, '03-confirm-first')
 			await page.getByRole('link', { name: '试玩第一章' }).click()
-			await expect(page.getByText('暮色中，一只纸船从桥下漂过。')).toBeVisible()
+			await expect(
+				page.locator('.nl-text-display').filter({
+					hasText: '暮色中，一只纸船从桥下漂过。',
+				}),
+			).toBeVisible()
 			await expect(page.locator('canvas')).toBeVisible()
 			await capture(page, '04-play-chapter-one')
 			await page.goBack()
