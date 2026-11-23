@@ -83,6 +83,13 @@ const auditSchema = obj({
 })
 const contentSchema = obj({ content: str({ minLength: 1 }) })
 
+function omitStyleFromGeneration(drawing: Drawing) {
+	return (
+		drawing.kind === 'character' &&
+		!drawing.references.some(({ role }) => role === 'identity')
+	)
+}
+
 async function auditPreview(png: Buffer) {
 	const { hasAlpha, width, height } = await sharp(png).metadata()
 	if (!hasAlpha) return { png }
@@ -525,13 +532,8 @@ export class ArtProduction {
 	) {
 		this.render ??= imageRenderer(this.options.image, this.options)
 		const render = this.render
-		const references = (
-			drawing.kind === 'character' &&
-			!drawing.references.some(({ role }) => role === 'identity')
-				? drawing.references.filter(({ role }) => role !== 'style')
-				: drawing.references
-		).slice(0, 16)
-		const refs = await Promise.all(
+		const references = drawing.references.slice(0, 16)
+		const auditRefs = await Promise.all(
 			references.map(async (ref, i) => {
 				const image = sharp(await this.project.readFile(ref.path))
 				return (
@@ -541,7 +543,17 @@ export class ArtProduction {
 					.toBuffer()
 			}),
 		)
-		const promptDrawing = { ...drawing, references }
+		const auditDrawing = { ...drawing, references }
+		const omitStyle = omitStyleFromGeneration(auditDrawing)
+		const refs = omitStyle
+			? auditRefs.filter((_, index) => references[index].role !== 'style')
+			: auditRefs
+		const promptDrawing = omitStyle
+			? {
+					...drawing,
+					references: references.filter(({ role }) => role !== 'style'),
+				}
+			: auditDrawing
 		const painter = derived
 			? this.options.fast
 			: transparent
@@ -576,10 +588,14 @@ export class ArtProduction {
 				this.options,
 			)
 			const editReferences = baseOnly ? refs.slice(0, 1) : refs
-			const describe = (firstReference: number, issue = '') =>
+			const describe = (
+				firstReference: number,
+				issue = '',
+				input = promptDrawing,
+			) =>
 				baseOnly
 					? `Edit only the brows, eyes and mouth of Image ${firstReference}: ${content.content} ${issue} Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face.`
-					: drawingPrompt(promptDrawing, content.content, issue, firstReference)
+					: drawingPrompt(input, content.content, issue, firstReference)
 			const result = await render(
 				describe(1, feedback),
 				editReferences,
@@ -681,13 +697,13 @@ export class ArtProduction {
 					preview.transparencyHint,
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
 					`Original image brief (verify independently of the painter's rewrite): ${drawing.description}`,
-					describe(2),
+					describe(2, '', auditDrawing),
 				]
 					.filter(Boolean)
 					.join('\n'),
 				auditSchema,
 				this.options,
-				[preview.png, ...editReferences],
+				[preview.png, ...(baseOnly ? editReferences : auditRefs)],
 			)
 			if (judge.pass && judge.failedChecks.length === 0) return checked
 			issue = feedback =

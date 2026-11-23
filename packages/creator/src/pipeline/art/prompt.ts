@@ -43,7 +43,7 @@ export function drawingPrompt(
 			? `Image ${styleIndices[0]}`
 			: `Images ${styleIndices[0]}–${styleIndices.at(-1)}`
 	const subject =
-		kind === 'character'
+		kind === 'character' && references.some(({ role }) => role === 'identity')
 			? 'Use the character description and identity reference for the subject, never the style reference. Compose a pose from the brief, not the style reference’s pose or silhouette.'
 			: `Do not copy the people in ${styleIndices.length === 1 ? 'it' : 'them'}: face, hairstyle, hair and eye color, outfit and accessories come only from the description below.`
 	const declaration = styleIndices.length

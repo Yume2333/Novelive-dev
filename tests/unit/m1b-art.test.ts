@@ -521,6 +521,11 @@ test('retries an expression with only the base after a composition failure', asy
 			expect(await art.draw(base, styled)).toEqual({ status: 'drawn' })
 			expect(render.mock.calls[0][1]).toEqual([])
 			expect(render.mock.calls[0][0]).toContain(styled.style.description)
+			const audit = model.mock.calls.find(([, prompt]) =>
+				prompt.startsWith('Visually audit'),
+			)
+			expect(audit?.[1]).toContain('Image 2 is a style reference only.')
+			expect(audit?.[4]?.slice(1)).toEqual([await project.readFile(path)])
 			expect(await art.draw(expression, styled)).toEqual({ status: 'drawn' })
 			expect(render.mock.calls[1][1]).toHaveLength(2)
 			expect(render.mock.calls[2][1]).toEqual([render.mock.calls[1][1][0]])
