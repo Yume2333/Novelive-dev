@@ -261,16 +261,16 @@ export class PixiStage {
 		})
 		const shake = actions.find((action) => action.name === 'shake')
 		if (shake && !instant) {
-			const baseX = this.world.x
+			const cameraX = () => focus * (1 - this.world.scale.x)
 			this.animate(
 				Number(shake.args.duration),
 				(p) => {
 					this.world.x =
-						baseX +
+						cameraX() +
 						Math.sin(p * 90) * Number(shake.args.strength) * 24 * (1 - p)
 				},
 				() => {
-					this.world.x = baseX
+					this.world.x = cameraX()
 				},
 			)
 		}
