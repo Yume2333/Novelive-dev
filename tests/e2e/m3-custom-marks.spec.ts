@@ -89,7 +89,7 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			await replaceMarkSuggestions(project, playerRef.volumeId, playerRef, [
 				{
 					name: 'glow',
-					css: 'color: #fc6 !important; color: red; text-shadow: 0 0 5px #f75',
+					css: 'color: #fc6 !important; color: red; text-shadow: 0 0 5px #f75; animation: spin 1s',
 					perChar: true,
 				},
 			])
@@ -120,6 +120,11 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			}, playerRef)
 			const accept = page.getByRole('button', { name: '接受标记' })
 			await expect(accept).toBeEnabled()
+			const proposedStyle = page
+				.getByRole('region', { name: '新标记提议' })
+				.locator('code')
+			await expect(proposedStyle).toContainText('text-shadow')
+			await expect(proposedStyle).not.toContainText('animation')
 			await accept.click()
 			await expect(accept).toHaveCount(0)
 			await page.getByRole('button', { name: '快捷位置', exact: true }).click()

@@ -4,7 +4,7 @@ import type {
 	RewriteProposal,
 } from '@novelive/creator/contract'
 import { compileScript } from '@novelive/format/script'
-import { mountMinimalPlayer } from '@novelive/player'
+import { effectiveMarkCss, mountMinimalPlayer } from '@novelive/player'
 import { useEffect, useRef, useState } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
@@ -309,7 +309,9 @@ export function EditorPage() {
 								aria-label="新标记提议"
 							>
 								<strong>新标记：{mark.name}</strong>
-								<code>{mark.css}</code>
+								<code title="播放生效的 CSS">
+									{effectiveMarkCss(mark.name, mark.css) || '无可渲染样式'}
+								</code>
 								<span>{mark.perChar ? '逐字' : '整段'}</span>
 								{(['accept', 'reject'] as const).map((decision) => (
 									<button

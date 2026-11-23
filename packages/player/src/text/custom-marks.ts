@@ -60,3 +60,12 @@ export function markDeclarations(name: string, css: string): Declaration[] {
 	}
 	return declarations
 }
+
+export function effectiveMarkCss(name: string, css: string): string {
+	return markDeclarations(name, css)
+		.filter(([property, value]) => CSS.supports(property, value))
+		.map(([property, value, priority]) =>
+			priority ? `${property}: ${value} !important;` : `${property}: ${value};`,
+		)
+		.join(' ')
+}
