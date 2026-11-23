@@ -2151,6 +2151,95 @@ test.each([2, 5])(
 	},
 )
 
+test.each(['shifted', 'missing'])(
+	'extracts again when legacy packet chapter IDs are %s despite matching packet counts',
+	async (kind) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const ids = [...chapters, 'c3']
+		const expanded = ids.map((chapterId, index) => ({
+			...previews[0],
+			chapterId,
+			summary: 'A'.repeat(index < 2 ? 650 : 2120),
+		}))
+		await Promise.all(
+			expanded.map((preview) =>
+				project.write(projectFiles.preview(preview.chapterId), preview),
+			),
+		)
+		const volume = { level: 'volume', volumeId: 'v1' } as const
+		const fingerprint = (value: unknown) =>
+			createHash('sha256').update(JSON.stringify(value)).digest('hex')
+		await project.write(files.checkpoint, {
+			formatVersion: 1,
+			fingerprint: fingerprint({
+				packetFormat: 2,
+				previews: expanded,
+				language: options.language,
+				strategy: 'events',
+				incremental: false,
+				scope: volume,
+				model: connection.model,
+				context: connection.contextWindow,
+			}),
+			basis: fingerprint(await readBible(project)),
+			packet: 2,
+			events: [
+				{
+					event: 'Saved first packet',
+					overview: 'Stale extraction.',
+					chapters:
+						kind === 'shifted'
+							? [{ chapterId: ids[0], progress: 'First chapter.' }]
+							: [],
+					biblePatch: [{ kind: 'location', op: 'add', entry: candidateTower }],
+					glossaryPatch: [],
+					is_last: true,
+				},
+				{
+					event: 'Saved second packet',
+					overview: '',
+					chapters: ids
+						.slice(1)
+						.map((chapterId) => ({ chapterId, progress: 'Later chapter.' })),
+					biblePatch: [],
+					glossaryPatch: [],
+					is_last: true,
+				},
+			],
+			whole: null,
+			ready: true,
+			applied: false,
+		})
+		const result = await synthesizeVolume(project, 'v1', ids, {
+			...options,
+			scope: volume,
+			strategy: 'events',
+			fetch: packetFetch,
+		})
+		expect(packetFetch).toHaveBeenCalledTimes(2)
+		const prompts = await Promise.all(
+			packetFetch.mock.calls.map(async ([input, init]) => {
+				const { messages } = await new Request(input, init).json()
+				const packet = String(messages[0].content).split(
+					'Chapter previews:\n',
+				)[1]
+				return Array.from(
+					new Set(
+						Array.from(
+							packet.matchAll(/^Chapter ([\w-]+):$/gm),
+							([, id]) => id,
+						),
+					),
+				)
+			}),
+		)
+		expect(prompts).toEqual([[ids[0], ids[1]], [ids[2]]])
+		expect(result.biblePatch).toEqual([])
+		expect(result.overview).not.toContain('Stale extraction')
+	},
+)
+
 test('a checkpoint quarantined on resume stays quarantined even if the original Bible is restored', async () => {
 	await seed(root)
 	const tower = projectFiles.location(scope, 'tower')

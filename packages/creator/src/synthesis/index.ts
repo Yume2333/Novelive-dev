@@ -176,6 +176,29 @@ function previewPackets(
 	return packets
 }
 
+const packetChapters = (packet = '') =>
+	new Set(Array.from(packet.matchAll(/^Chapter ([\w-]+):$/gm), ([, id]) => id))
+
+function matchesRecordedPackets(checkpoint: Checkpoint, packets: string[]) {
+	if (!packets.length || packets.length !== checkpoint.packet) return false
+	const recorded = new Set<string>()
+	let index = 0
+	for (const event of checkpoint.events) {
+		if (index === packets.length) return false
+		for (const { chapterId } of event.chapters) recorded.add(chapterId)
+		if (!event.is_last) continue
+		const rebuilt = packetChapters(packets[index++])
+		if (
+			!recorded.size ||
+			recorded.size !== rebuilt.size ||
+			[...recorded].some((chapter) => !rebuilt.has(chapter))
+		)
+			return false
+		recorded.clear()
+	}
+	return index === packets.length
+}
+
 function eventPacketBudget(
 	context: number,
 	history: number,
@@ -363,7 +386,6 @@ export async function synthesizeVolume(
 		saved?.ready && !saved.applied
 			? legacyPacketFormats.find((format) => matchesPacket(saved, [format]))
 			: undefined
-	const legacyReady = legacyFormat === undefined ? undefined : saved
 	const bible = await readBible(project)
 	const contextBible = options.scope
 		? await readBible(project, options.scope)
@@ -386,6 +408,30 @@ ${whole.instructions}
 For each chapter, include progress and exhaustively extract every distinct Bible and glossary entry that meets the inclusion rules. Return their union across all chapters. Summarize only the overview; do not abridge the patch to a volume-level shortlist.
 Chapter previews:
 ${packetText.join('\n')}`
+	const legacyPackets =
+		legacyFormat !== undefined && savedMode === 'events'
+			? previewPackets(
+					packetText,
+					chapterIds,
+					legacyEventPacketBudget(
+						legacyFormat,
+						model.contextWindow,
+						historyBudget,
+						packetOutputReserve,
+						incremental,
+						prefix,
+						instructions,
+						bible,
+					),
+				)
+			: undefined
+	const legacyReady =
+		legacyFormat !== undefined &&
+		saved &&
+		(saved.whole ||
+			(legacyPackets && matchesRecordedPackets(saved, legacyPackets)))
+			? saved
+			: undefined
 	const useEvents = legacyReady
 		? savedMode === 'events'
 		: strategy === 'events' ||
@@ -413,29 +459,18 @@ ${nextEvent.instructions}`
 			)
 		: packetOutputReserve
 	const budget = model.contextWindow - outputReserve
-	const packetBudget = !useEvents
-		? 0
-		: legacyFormat === undefined
-			? eventPacketBudget(
-					model.contextWindow,
-					historyBudget,
-					packetOutputReserve,
-					bytes(eventPrompt),
-				)
-			: legacyEventPacketBudget(
-					legacyFormat,
-					model.contextWindow,
-					historyBudget,
-					packetOutputReserve,
-					incremental,
-					prefix,
-					instructions,
-					bible,
-				)
+	const packetBudget = eventPacketBudget(
+		model.contextWindow,
+		historyBudget,
+		packetOutputReserve,
+		bytes(eventPrompt),
+	)
 	const packets =
-		useEvents && packetBudget > 0
-			? previewPackets(packetText, chapterIds, packetBudget)
-			: []
+		legacyReady && legacyPackets
+			? legacyPackets
+			: useEvents && packetBudget > 0
+				? previewPackets(packetText, chapterIds, packetBudget)
+				: []
 	const limit =
 		options.maxEvents ?? Math.max(minimumEventLimit, packets.length * 4)
 	const state: Checkpoint = (quarantineReason ? matching : undefined) ??
@@ -570,8 +605,6 @@ ${packets[packet]}`,
 	}
 	if (legacyReady && !quarantineReason) {
 		try {
-			if (useEvents && packets.length !== legacyReady.packet)
-				throw new Error('Saved synthesis packet layout does not match')
 			for (const [i, part] of parts.entries()) check(part, parts.slice(0, i))
 		} catch {
 			quarantineReason = 'Saved synthesis failed current validation'
@@ -587,24 +620,18 @@ ${packets[packet]}`,
 	let packetIndex = 0
 	for (const part of parts) {
 		const packetIds = state.whole
-			? chapterIds
-			: legacyReady && quarantineReason
-				? part.chapters
-						.map(({ chapterId }) => chapterId)
-						.filter((id) => chapterSet.has(id))
-				: [
-						...(packets[packetIndex] ?? '').matchAll(/^Chapter ([\w-]+):$/gm),
-					].map(([, id]) => id)
+			? new Set(chapterIds)
+			: packetChapters(packets[packetIndex])
 		const affected = unique(
 			part.chapters
 				.map(({ chapterId }) => chapterId)
-				.filter((id) => packetIds.includes(id)),
+				.filter((id) => packetIds.has(id)),
 		)
 		const observed =
 			affected.length === 1
 				? affected[0]
-				: new Set(packetIds).size === 1
-					? packetIds[0]
+				: packetIds.size === 1
+					? packetIds.values().next().value
 					: undefined
 		for (const { observedChapter: _claimed, ...item } of part.biblePatch) {
 			const { content, observation } = proposalKeys(item, observed)
