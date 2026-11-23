@@ -160,6 +160,7 @@ export function PlayerPage() {
 			controller.signal,
 			fail,
 			loaded.speakerNames,
+			controls.rendered,
 		).catch(fail)
 		return () => {
 			unsubscribe()

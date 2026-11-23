@@ -1,4 +1,4 @@
-import type { CompiledScene } from '@novelive/format/script'
+import type { Beat, CompiledScene } from '@novelive/format/script'
 import type {
 	PlayerSettings,
 	SentenceRef,
@@ -50,11 +50,10 @@ export function minimalControlsController(
 	mode: PlaybackMode,
 	progress: ControlsProgress,
 	signal: AbortSignal,
-): PlayerControlsController {
+): PlayerControlsController & { rendered(beat: Beat | undefined): void } {
 	const beats = scenes.flatMap(({ scene, beats }) =>
 		beats.map((beat) => ({ sceneId: scene.id, beat })),
 	)
-	let index = -1
 	let current: ControlFrame = {
 		position: null,
 		characters: 0,
@@ -63,16 +62,10 @@ export function minimalControlsController(
 		ended: false,
 	}
 	const listeners = new Set<() => void>()
-	const observer = new MutationObserver((records) => {
-		if (
-			!records.some(
-				(record) =>
-					record.target instanceof HTMLElement &&
-					record.target.classList.contains('nl-player-overlay'),
-			)
-		)
-			return
-		const item = beats[++index]
+	function rendered(beat: Beat | undefined) {
+		if (signal.aborted) return
+		const index = beats.findIndex((item) => item.beat === beat)
+		const item = beats[index]
 		const line = item?.beat.line
 		const position =
 			line?.type === 'text' && line.id && item.sceneId
@@ -92,10 +85,10 @@ export function minimalControlsController(
 			recordReachedSentence(progress, position, mode, index)
 		}
 		for (const listener of listeners) listener()
-	})
-	observer.observe(host, { childList: true, subtree: true })
-	signal.addEventListener('abort', () => observer.disconnect(), { once: true })
+	}
+	signal.addEventListener('abort', () => listeners.clear(), { once: true })
 	return {
+		rendered,
 		mode,
 		frame: () => current,
 		subscribe(listener) {

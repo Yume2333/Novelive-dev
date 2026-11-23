@@ -10,6 +10,7 @@ export async function mountMinimalPlayer(
 	signal: AbortSignal,
 	onError: (error: unknown) => void,
 	speakerNames: Readonly<Record<string, string>> = {},
+	onBeat?: (beat: Beat | undefined) => void,
 ): Promise<void> {
 	const app = new Application()
 	await app.init({ width: 960, height: 540, preference: 'webgl' })
@@ -102,7 +103,15 @@ export async function mountMinimalPlayer(
 		if (current.line?.type === 'text') showText(current.line)
 		else overlay.replaceChildren()
 	}
-	const playback = createPlayback(scenes, render, signal, onError)
+	const playback = createPlayback(
+		scenes,
+		async (beat) => {
+			await render(beat)
+			if (!signal.aborted) onBeat?.(beat)
+		},
+		signal,
+		onError,
+	)
 	const click = playback.click
 	host.addEventListener('click', click)
 	signal.addEventListener(

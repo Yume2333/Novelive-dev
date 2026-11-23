@@ -113,6 +113,13 @@ test.describe('M3 player controls', () => {
 				.png()
 				.toBuffer()
 			await seedPlayerProject(root, png, png)
+			if (scenario === 'chapter wait') {
+				using project = await Project.open(root)
+				await project.writeFile(
+					projectFiles.scene(playerRef, 'aaaabbbb'),
+					playerScript.replace('source p0001', 'source p0001\n@wait 0.01'),
+				)
+			}
 			{
 				using project = await Project.open(root)
 				const file = projectFiles.work('v1', playerWorkId)
