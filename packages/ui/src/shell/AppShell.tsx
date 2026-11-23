@@ -8,6 +8,7 @@ import {
 	BarChart3,
 	Contrast,
 	LibraryBig,
+	MessageSquareText,
 	Moon,
 	Play,
 	Settings,
@@ -17,6 +18,7 @@ import {
 import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useMatch } from 'react-router-dom'
 import { ScrollArea } from '../components/ScrollArea'
+import { AgentPanel } from '../panels/agent/AgentPanel'
 import { workRoute } from '../routes/production'
 import styles from './AppShell.module.css'
 
@@ -50,6 +52,8 @@ export function AppShell() {
 	const [hostError, setHostError] = useState('')
 	const { pathname } = useLocation()
 	const workId = useMatch('/work/:id/*')?.params.id
+	const [agentOpen, setAgentOpen] = useState(false)
+	const [agentFull, setAgentFull] = useState(false)
 	const theme = config && 'theme' in config ? config.theme : 'system'
 	const updateConfig = useCallback(async (patch: ConfigUpdate) => {
 		const saved = await window.novelive.call('config.update', patch).promise
@@ -126,6 +130,23 @@ export function AppShell() {
 		}
 	}
 
+	useEffect(() => {
+		if (!workId) return
+		const toggle = (event: KeyboardEvent) => {
+			if (
+				event.key.toLowerCase() !== 'j' ||
+				!(event.ctrlKey || event.metaKey) ||
+				event.altKey ||
+				event.shiftKey
+			)
+				return
+			event.preventDefault()
+			setAgentOpen((open) => !open)
+		}
+		window.addEventListener('keydown', toggle)
+		return () => window.removeEventListener('keydown', toggle)
+	}, [workId])
+
 	return (
 		<div className={styles.shell}>
 			<aside className={styles.sidebar}>
@@ -158,6 +179,20 @@ export function AppShell() {
 										{name}
 									</NavLink>
 								))}
+								<button
+									type="button"
+									className={styles.navLink}
+									aria-pressed={agentOpen}
+									title="Agent（Ctrl/⌘+J）"
+									onClick={() => setAgentOpen(!agentOpen)}
+								>
+									<MessageSquareText
+										aria-hidden="true"
+										size={19}
+										strokeWidth={1.8}
+									/>
+									Agent
+								</button>
 							</nav>
 						)}
 						<fieldset className={styles.themes} aria-label="主题">
@@ -222,6 +257,15 @@ export function AppShell() {
 						}
 					/>
 				</ScrollArea>
+				{workId && agentOpen && (
+					<AgentPanel
+						key={workId}
+						workId={workId}
+						full={agentFull}
+						onToggleFull={() => setAgentFull(!agentFull)}
+						onClose={() => setAgentOpen(false)}
+					/>
+				)}
 			</main>
 		</div>
 	)
