@@ -34,3 +34,31 @@ Coverage limitations:
 原生宿主验收（主会话提供，补充上述自动化覆盖范围）：
 真实 KDE Plasma（:0，pnpm dev，NL_REPLAY=strict，无付费调用）：制作中关窗隐藏到托盘、creator 存活；托盘菜单重开；退出确认「继续制作」取消且 creator 存活，「停止并退出」后 Electron 与 creator 进程均消失（ps 确认）；标题含 <b> 的作品通知正文去标签，点击通知前台打开「确认角色与主视觉」页。主机需用户级 libnotify 运行时才能显示原生通知。
 未覆盖：无托盘最小化仅 e2e；完成通知（strict replay 第二章模型连接错误未到完成）；新章通知由 M3/05 提供事件、M4/10 验收。
+
+本轮补验（devin/m4-02-04-08；Xvfb、独立 D-Bus、KWin X11）：
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 desktop lifecycle'
+  3 passed (3.0s)
+
+$ NL_REPLAY=strict NL_M4_NATIVE_HOST=tray pnpm exec playwright test tests/e2e/m4-tray.spec.ts --grep 'M4 native desktop lifecycle'
+  2 passed (2.4s)
+LXQt Panel 注册真实 StatusNotifier host。Electron 窗口隐藏，D-Bus 中可查到 Electron 注册的 item；调用 item 的 Activate 后窗口恢复，creator 的 generation 不变。截图：08-native-tray.png。
+
+$ NL_REPLAY=strict NL_M4_NATIVE_HOST=no-tray pnpm exec playwright test tests/e2e/m4-tray.spec.ts --grep 'minimizes without a tray'
+  1 passed (1.6s)
+在不启动 LXQt Panel 的独立 D-Bus 会话里，ListNames 无 StatusNotifier watcher，真实窗口最小化而不是隐藏，creator 的 generation 不变。截图：08-native-no-tray.png；窗口状态以 Electron isMinimized() 为准。
+
+$ NL_REPLAY=strict NL_M4_NATIVE_HOST=tray pnpm exec playwright test tests/e2e/m4-tray.spec.ts --grep 'delivers and activates'
+  1 passed (1.4s)
+Dunst 1.5.0，Noto Sans CJK SC。D-Bus 记录原生发送与动作：
+  member=Notify
+  string "新章已就绪"
+  string "纸船 · 灯火"
+  member=ActionInvoked
+  member=Notify
+  string "制作完成"
+  string "纸船 · 全部章节"
+  member=ActionInvoked
+两次动作均将窗口带回前台，分别定位到作品播放页和概览。截图：08-native-new-chapter.png、08-native-completion.png。
+
+原生用例从主进程 IPC 注入合成制作快照，不替换 Electron Notification、D-Bus 或托盘；不宣称跑了真实模型制作或验证了 Windows/macOS。

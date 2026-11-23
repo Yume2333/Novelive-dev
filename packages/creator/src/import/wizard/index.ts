@@ -10,9 +10,12 @@ import type {
 	ImportExtraction,
 	ImportJoinTarget,
 } from '../../contract/import'
+import type { TextConnection } from '../../models/text'
+import type { ModelOptions } from '../../pipeline/art/models'
 import { Project } from '../../project'
 import { extractDocx } from '../docx'
 import { extractEpub } from '../epub'
+import { classifyIllustrations } from '../epub/illustrations'
 import { extractMarkdown } from '../markdown'
 import { extractPdf } from '../pdf'
 import {
@@ -253,6 +256,49 @@ export async function readImportWizard(
 			({ cachePath: _cachePath, ...candidate }) => candidate,
 		),
 		selectedIllustrations: report.selectedIllustrations ?? [],
+	}
+}
+
+export async function screenImportedIllustrations(
+	project: Project,
+	bible: string,
+	connection: () => Promise<TextConnection>,
+	options: ModelOptions,
+) {
+	const report = (await project.read(projectFiles.importReport)) as WizardReport
+	const candidates =
+		report.format === 'epub' ? (report.illustrations ?? []) : []
+	if (!candidates.length) return undefined
+	const choices = candidates.map(({ id, cachePath }) => ({ id, cachePath }))
+	try {
+		const extraction = await extractEpub(
+			await project.readFile(projectFiles.original('epub')),
+		)
+		const ids = new Set(candidates.map(({ id }) => id))
+		const illustrations = extraction.book.illustrations.filter((_, index) =>
+			ids.has(`illustration-${index + 1}`),
+		)
+		if (illustrations.length !== candidates.length)
+			throw new Error('EPUB illustration list does not match import')
+		const results = await classifyIllustrations(
+			{ ...extraction, book: { ...extraction.book, illustrations } },
+			bible,
+			await connection(),
+			options,
+		)
+		return {
+			fallback: false,
+			candidates: choices.map((choice, index) => ({
+				...choice,
+				recommended: results[index].label !== 'irrelevant',
+			})),
+		}
+	} catch {
+		options.signal?.throwIfAborted()
+		return {
+			fallback: true,
+			candidates: choices.map((choice) => ({ ...choice, recommended: false })),
+		}
 	}
 }
 

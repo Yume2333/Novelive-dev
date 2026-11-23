@@ -1,8 +1,13 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compile } from '@earendil-works/pi-schema'
-import { TextReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js'
+import {
+	TextReader,
+	Uint8ArrayReader,
+	Uint8ArrayWriter,
+	ZipWriter,
+} from '@zip.js/zip.js'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { extractedBookSchema } from '../../packages/creator/src/contract/import'
 import { extractEpub } from '../../packages/creator/src/import/epub'
@@ -10,8 +15,14 @@ import {
 	classifyIllustrations,
 	illustrationCandidates,
 } from '../../packages/creator/src/import/epub/illustrations'
+import {
+	importFileProject,
+	reviseTxtProject,
+	screenImportedIllustrations,
+} from '../../packages/creator/src/import/wizard'
 import type { TextConnection } from '../../packages/creator/src/models/text'
 import { artJson } from '../../packages/creator/src/pipeline/art/models'
+import { Project } from '../../packages/creator/src/project'
 import { createReplayFetch } from '../../packages/creator/src/replay'
 import {
 	classificationCases,
@@ -54,8 +65,9 @@ const ncx =
 const body =
 	'<h1 id="one">Chapter One</h1><p>First &amp; bright.<a epub:type="noteref">1</a></p><p><img src="images/picture.svg"/></p><aside epub:type="footnote"><p>Not body</p></aside><h2 id="two">Chapter Two</h2><p>Second paragraph.</p>'
 
-async function epub(overrides: Record<string, string | undefined> = {}) {
-	const files: Record<string, string | undefined> = {
+type Entry = string | Uint8Array | undefined
+async function epub(overrides: Record<string, Entry> = {}) {
+	const files: Record<string, Entry> = {
 		mimetype: 'application/epub+zip',
 		'META-INF/container.xml':
 			'<container><rootfiles><rootfile full-path="OPS/book.opf"/></rootfiles></container>',
@@ -69,7 +81,13 @@ async function epub(overrides: Record<string, string | undefined> = {}) {
 	}
 	const zip = new ZipWriter(new Uint8ArrayWriter())
 	for (const [path, source] of Object.entries(files))
-		if (source !== undefined) await zip.add(path, new TextReader(source))
+		if (source !== undefined)
+			await zip.add(
+				path,
+				typeof source === 'string'
+					? new TextReader(source)
+					: new Uint8ArrayReader(source),
+			)
 	return zip.close()
 }
 
@@ -653,3 +671,65 @@ test('classification errors propagate and never silently discard manual candidat
 	).rejects.toThrow('invalid classification')
 	expect(illustrationCandidates(extraction)).toHaveLength(1)
 })
+
+test.each(classificationCases)(
+	'imported EPUB illustration screening replays $label and falls back when its cassette is missing',
+	async (sample) => {
+		const folder = await mkdtemp(join(tmpdir(), 'novelive-epub-wizard-'))
+		try {
+			const sourcePath = join(folder, 'fixture.epub')
+			const picture = await readFile(
+				`${syntheticDirectory}/${sample.label}.png`,
+			)
+			await writeFile(
+				sourcePath,
+				await epub({
+					'OPS/chapter.xhtml': xhtml(
+						`<p id="one">${sample.nearby}</p><img src="images/picture.svg"/>`,
+					),
+					'OPS/nav.xhtml': xhtml(
+						'<nav epub:type="toc"><ol><li><a href="chapter.xhtml#one">Chapter One</a></li></ol></nav>',
+					),
+					'OPS/toc.ncx': undefined,
+					'OPS/images/picture.svg': picture,
+				}),
+			)
+			const view = await importFileProject({
+				folder,
+				sourcePath,
+				title: 'Fixture',
+				references: [],
+			})
+			if (view.status !== 'ready') throw new Error('Expected EPUB import')
+			await reviseTxtProject(view.projectDir, view.layout, ['illustration-1'])
+			using project = await Project.open(view.projectDir)
+			const fetch = vi.fn(() => {
+				throw new Error('Network must not run')
+			})
+			const screen = (directory: string) =>
+				screenImportedIllustrations(
+					project,
+					sample.bible,
+					async () => visualConnection,
+					{ replay: { mode: 'strict', directory, fetch } },
+				)
+			const candidate = {
+				id: 'illustration-1',
+				cachePath: 'source/imports/illustrations/illustration-1.png',
+			}
+			await expect(screen(syntheticDirectory)).resolves.toEqual({
+				fallback: false,
+				candidates: [
+					{ ...candidate, recommended: sample.label !== 'irrelevant' },
+				],
+			})
+			await expect(screen(folder)).resolves.toEqual({
+				fallback: true,
+				candidates: [{ ...candidate, recommended: false }],
+			})
+			expect(fetch).not.toHaveBeenCalled()
+		} finally {
+			await rm(folder, { recursive: true, force: true })
+		}
+	},
+)

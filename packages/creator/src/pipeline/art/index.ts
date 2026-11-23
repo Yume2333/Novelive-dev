@@ -684,6 +684,7 @@ export class ArtProduction {
 			selection.supplementalIds.length > 2 ||
 			new Set(selection.supplementalIds).size !==
 				selection.supplementalIds.length ||
+			selection.supplementalIds.includes(selection.mainVisualId) ||
 			selection.characters.length !== pool.characters.length
 		)
 			throw new Error('Invalid visual selection')

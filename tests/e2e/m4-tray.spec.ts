@@ -1,3 +1,4 @@
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -253,6 +254,200 @@ test('M4 desktop lifecycle validates notifications, strips tags, limits text and
 		await expect
 			.poll(() => page.evaluate(() => location.hash))
 			.toBe('#/work/11111111-1111-4111-8111-111111111111')
+	} finally {
+		await desktop.close()
+		rmSync(profile, { recursive: true, force: true })
+	}
+})
+
+const nativeMode = process.env.NL_M4_NATIVE_HOST
+
+function trayProperty(property: string) {
+	return execFileSync(
+		'gdbus',
+		[
+			'call',
+			'--session',
+			'--dest',
+			'org.kde.StatusNotifierWatcher',
+			'--object-path',
+			'/StatusNotifierWatcher',
+			'--method',
+			'org.freedesktop.DBus.Properties.Get',
+			'org.kde.StatusNotifierWatcher',
+			property,
+		],
+		{ encoding: 'utf8' },
+	)
+}
+
+function desktopScreenshot(name: string) {
+	const directory = process.env.NL_M4_NATIVE_EVIDENCE
+	if (directory)
+		execFileSync('import', ['-window', 'root', join(directory, `${name}.png`)])
+}
+
+test('M4 native desktop lifecycle minimizes without a tray or reopens through the real tray', async () => {
+	test.skip(!nativeMode, 'Requires an isolated Linux desktop and session bus')
+	const profile = mkdtempSync(join(tmpdir(), 'novelive-native-tray-'))
+	const desktop = await electron.launch({
+		executablePath: require('electron'),
+		args: ['apps/desktop', `--user-data-dir=${profile}`],
+		env: { ...process.env, NL_E2E: '1', NL_REPLAY: 'strict' },
+	})
+	try {
+		const page = await desktop.firstWindow()
+		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		const before = await page.evaluate(() => window.novelive.host.appState())
+		await desktop.evaluate(({ BrowserWindow }) =>
+			BrowserWindow.getAllWindows()[0].close(),
+		)
+		if (nativeMode === 'no-tray') {
+			const names = execFileSync(
+				'gdbus',
+				[
+					'call',
+					'--session',
+					'--dest',
+					'org.freedesktop.DBus',
+					'--object-path',
+					'/org/freedesktop/DBus',
+					'--method',
+					'org.freedesktop.DBus.ListNames',
+				],
+				{ encoding: 'utf8' },
+			)
+			expect(names).not.toContain('org.kde.StatusNotifierWatcher')
+			await expect
+				.poll(() =>
+					desktop.evaluate(({ BrowserWindow }) =>
+						BrowserWindow.getAllWindows()[0].isMinimized(),
+					),
+				)
+				.toBe(true)
+			desktopScreenshot('08-native-no-tray')
+		} else {
+			expect(trayProperty('IsStatusNotifierHostRegistered')).toContain('true')
+			await expect
+				.poll(() =>
+					desktop.evaluate(({ BrowserWindow }) =>
+						BrowserWindow.getAllWindows()[0].isVisible(),
+					),
+				)
+				.toBe(false)
+			const itemPattern = /'([^/']+)(\/[^']+)?'/
+			await expect
+				.poll(() => trayProperty('RegisteredStatusNotifierItems'))
+				.toMatch(itemPattern)
+			const item = itemPattern.exec(
+				trayProperty('RegisteredStatusNotifierItems'),
+			)
+			if (!item) throw new Error('Electron did not register a tray item')
+			desktopScreenshot('08-native-tray')
+			execFileSync('gdbus', [
+				'call',
+				'--session',
+				'--dest',
+				item[1],
+				'--object-path',
+				item[2] ?? '/StatusNotifierItem',
+				'--method',
+				'org.kde.StatusNotifierItem.Activate',
+				'0',
+				'0',
+			])
+			await expect
+				.poll(() =>
+					desktop.evaluate(({ BrowserWindow }) =>
+						BrowserWindow.getAllWindows()[0].isVisible(),
+					),
+				)
+				.toBe(true)
+		}
+		expect(
+			(await page.evaluate(() => window.novelive.host.appState())).generation,
+		).toBe(before.generation)
+	} finally {
+		await desktop.close()
+		rmSync(profile, { recursive: true, force: true })
+	}
+})
+
+test('M4 native desktop lifecycle delivers and activates new-chapter and completion notifications', async () => {
+	test.skip(nativeMode !== 'tray', 'Requires Dunst on an isolated desktop bus')
+	const profile = mkdtempSync(join(tmpdir(), 'novelive-native-notify-'))
+	const desktop = await electron.launch({
+		executablePath: require('electron'),
+		args: ['apps/desktop', `--user-data-dir=${profile}`],
+		env: { ...process.env, NL_REPLAY: 'strict' },
+	})
+	const workId = '11111111-1111-4111-8111-111111111111'
+	try {
+		const page = await desktop.firstWindow()
+		await page.getByRole('heading', { name: '书库', exact: true }).waitFor()
+		for (const phase of ['producing', 'done'] as const) {
+			execFileSync('dunstctl', ['close-all'])
+			await desktop.evaluate(
+				({ BrowserWindow, ipcMain, Notification }, { phase, workId }) => {
+					if (!Notification.isSupported())
+						throw new Error('Native notifications are not available')
+					const window = BrowserWindow.getAllWindows()[0]
+					const event = { sender: window.webContents }
+					const publish = (status: 'waiting' | 'published') =>
+						ipcMain.emit('novelive:production-event', event, {
+							type: 'production.snapshot',
+							payload: {
+								workId,
+								title: '<b>纸船</b>',
+								phase: status === 'waiting' ? 'producing' : phase,
+								status:
+									status === 'waiting' || phase === 'producing'
+										? 'producing'
+										: 'idle',
+								chapters: [{ chapterId: 'chapter', priority: false, status }],
+								chapterTitles: { chapter: '灯火' },
+								visual: null,
+							},
+						})
+					publish('waiting')
+					if (phase === 'producing')
+						ipcMain.emit('novelive:player-waiting', event, workId)
+					window.hide()
+					publish('published')
+				},
+				{ phase, workId },
+			)
+			try {
+				await expect
+					.poll(
+						() =>
+							spawnSync(
+								'xdotool',
+								['search', '--onlyvisible', '--class', 'Dunst'],
+								{
+									encoding: 'utf8',
+								},
+							).status,
+						{ timeout: 3000 },
+					)
+					.toBe(0)
+			} finally {
+				desktopScreenshot(
+					phase === 'producing'
+						? '08-native-new-chapter'
+						: '08-native-completion',
+				)
+			}
+			execFileSync('dunstctl', ['action'])
+			await expect
+				.poll(() => page.evaluate(() => location.hash))
+				.toBe(`#/work/${workId}${phase === 'producing' ? '/play' : ''}`)
+			expect(
+				await desktop.evaluate(({ BrowserWindow }) =>
+					BrowserWindow.getAllWindows()[0].isVisible(),
+				),
+			).toBe(true)
+		}
 	} finally {
 		await desktop.close()
 		rmSync(profile, { recursive: true, force: true })
