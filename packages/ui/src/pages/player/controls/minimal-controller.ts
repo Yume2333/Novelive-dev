@@ -49,7 +49,8 @@ export function minimalControlsController(
 			position,
 			read,
 			...textPage(host),
-			ready: line?.type === 'text' && item?.beat.advance.kind === 'click',
+			ready: line?.type === 'text',
+			scripted: item?.beat.advance.kind !== 'click',
 			ended: !item,
 		}
 		for (const listener of listeners) listener()
@@ -87,8 +88,10 @@ export function minimalControlsController(
 				listeners.delete(listener)
 			}
 		},
-		advance() {
-			host.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+		advance(skip) {
+			if (skip && current.scripted)
+				host.dispatchEvent(new Event('novelive:player-skip'))
+			else host.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 		},
 		applySettings(settings: PlayerSettings) {
 			host.style.setProperty('--player-font-size', `${settings.fontSize}px`)

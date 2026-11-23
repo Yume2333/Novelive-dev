@@ -59,15 +59,17 @@ export async function mountMinimalPlayer(
 	}
 	let displayedLine: TextLine | undefined
 	let displayedAuto = false
+	let displayedSkip = false
 	let textSpeed = 30
 	function setting(name: string, fallback: number) {
 		const value = Number.parseFloat(host.style.getPropertyValue(name))
 		return Number.isFinite(value) ? value : fallback
 	}
-	function showText(line: TextLine, auto: boolean) {
+	function showText(line: TextLine, auto: boolean, skip = false) {
 		textRenderer?.dispose()
 		displayedLine = line
 		displayedAuto = auto
+		displayedSkip = skip
 		textSpeed = setting('--player-text-delay', 30)
 		displayedText = {
 			kind: line.kind,
@@ -96,6 +98,7 @@ export async function mountMinimalPlayer(
 			millisecondsPerCharacter: textSpeed,
 			auto,
 			continueImmediately: auto && line.kind !== 'caption',
+			skip,
 			get autoSpeedMultiplier() {
 				return 1 / setting('--player-auto-multiplier', 1)
 			},
@@ -159,15 +162,21 @@ export async function mountMinimalPlayer(
 	let click = () => {}
 	const settingsChanged = () => {
 		if (displayedLine && textSpeed !== setting('--player-text-delay', 30))
-			showText(displayedLine, displayedAuto)
+			showText(displayedLine, displayedAuto, displayedSkip)
+	}
+	const skip = () => {
+		if (displayedLine && displayedAuto && !displayedSkip)
+			showText(displayedLine, true, true)
 	}
 	host.addEventListener('novelive:player-settings', settingsChanged)
+	host.addEventListener('novelive:player-skip', skip)
 	signal.addEventListener(
 		'abort',
 		() => {
 			textRenderer?.dispose()
 			host.removeEventListener('click', click)
 			host.removeEventListener('novelive:player-settings', settingsChanged)
+			host.removeEventListener('novelive:player-skip', skip)
 			stage.remove()
 			app.destroy(false, { children: true })
 			for (const item of textures.values()) item.destroy(true)

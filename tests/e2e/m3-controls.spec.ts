@@ -23,6 +23,68 @@ const require = createRequire(
 )
 
 test.describe('M3 player controls', () => {
+	test('skip-read completes read cont and captions with pauses but leaves unread auto text alone', async () => {
+		const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-auto-skip-'))
+		const root = join(directory, 'project')
+		const png = await sharp({
+			create: { width: 32, height: 32, channels: 3, background: '#203060' },
+		})
+			.png()
+			.toBuffer()
+		await seedPlayerProject(root, png, png)
+		{
+			using project = await Project.open(root)
+			await project.writeFile(
+				projectFiles.scene(playerRef, 'aaaabbbb'),
+				'scene 空屋\nsource p0001\n: 开始 #0001\n: {wait 60}已读自动{wait 60} cont #0002\n@caption {wait 60}已读字幕{wait 60} #0003\n: {wait 60}未读自动 cont #0004\n: 结束 #0005\n',
+			)
+		}
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${join(directory, 'profile')}`],
+			env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
+		})
+		try {
+			const page = await app.firstWindow()
+			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await app.evaluate(({ dialog }, path) => {
+				dialog.showOpenDialog = async () => ({
+					canceled: false,
+					filePaths: [path],
+				})
+			}, root)
+			await page.evaluate(async (workId) => {
+				const api = window.novelive.host.progress
+				if (!api) throw new Error('Missing progress API')
+				await api.save(workId, {
+					mainline: null,
+					saves: [],
+					read: ['0001', '0002', '0003'].map((sentenceId) => ({
+						chapterId: 'ch1',
+						sceneId: 'aaaabbbb',
+						sentenceId,
+					})),
+				})
+				window.location.hash = `/work/${workId}/play`
+			}, playerWorkId)
+			await page.getByRole('button', { name: '打开本地工程' }).click()
+			const viewport = page.locator('.nl-player-text')
+			const display = viewport.locator('.nl-text-display')
+			await expect(display).toHaveText('开始')
+			await page.keyboard.press('Escape')
+			await page.getByLabel('跳过已读').check()
+			await page.keyboard.press('Escape')
+			await expect(display).toHaveText('未读自动', { timeout: 3000 })
+			await expect(viewport).toHaveAttribute('data-revealed', '0')
+			await page.waitForTimeout(350)
+			await expect(display).toHaveText('未读自动')
+			await expect(viewport).toHaveAttribute('data-revealed', '0')
+		} finally {
+			await app.close()
+			await rm(directory, { recursive: true, force: true })
+		}
+	})
+
 	test('live text speed, page dwell, first-page saves and read-only page skipping', async () => {
 		test.setTimeout(60000)
 		const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-pages-'))
