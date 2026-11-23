@@ -391,13 +391,10 @@ async function importSource(
 		}
 	}
 	try {
-		const result = await (txtOnly ? importTxtProject : importFileProject)(
+		return await (txtOnly ? importTxtProject : importFileProject)(
 			payload,
 			register,
 		)
-		if (result.status === 'ready')
-			await register(result.workIds, result.projectDir)
-		return result
 	} catch (error) {
 		await Promise.allSettled(
 			staged.map((id) => rm(join(dataDir, 'projects', id), { force: true })),

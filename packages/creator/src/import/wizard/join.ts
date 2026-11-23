@@ -6,7 +6,7 @@ import { decodeTxt, parseTxt } from '../txt'
 import type { ImportWizardView, importTxtProject } from './index'
 
 const invalid = (message: string) => ({ code: 'invalid_config', message })
-export type RegisterJoined = (
+export type RegisterImported = (
 	workIds: string[],
 	projectDir: string,
 ) => Promise<void>
@@ -50,7 +50,7 @@ export async function joinImportedVolumes(
 	bytes: Uint8Array,
 	format: ImportWizardView['format'],
 	book?: ExtractedBook,
-	register?: RegisterJoined,
+	register?: RegisterImported,
 ): Promise<ImportJoined> {
 	if (!options.join) throw invalid('请选择要加入的系列')
 	using project = await openTarget(

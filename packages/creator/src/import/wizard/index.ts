@@ -28,7 +28,7 @@ import {
 	type StoredIllustration,
 	type WizardIllustration,
 } from './illustrations'
-import { joinImportedVolumes, type RegisterJoined } from './join'
+import { joinImportedVolumes, type RegisterImported } from './join'
 
 export interface ImportLayout {
 	title: string
@@ -274,14 +274,14 @@ export async function importTxtProject(
 		references: string[]
 		join?: ImportJoinTarget
 	},
-	register?: RegisterJoined,
+	register?: RegisterImported,
 ) {
 	return importProject(options, 'txt', register)
 }
 
 export async function importFileProject(
 	options: Parameters<typeof importTxtProject>[0],
-	register?: RegisterJoined,
+	register?: RegisterImported,
 ) {
 	const extension = extname(options.sourcePath).toLowerCase()
 	const format =
@@ -296,7 +296,7 @@ export async function importFileProject(
 async function importProject(
 	options: Parameters<typeof importTxtProject>[0],
 	format: ImportWizardView['format'],
-	register?: RegisterJoined,
+	register?: RegisterImported,
 ) {
 	for (const path of options.references)
 		if (!referenceTypes.has(extname(path).toLowerCase()))
@@ -343,8 +343,8 @@ async function importProject(
 			throw invalid(`该位置已有同名文件夹：${root}`)
 		throw error
 	}
-	using opened = project
 	try {
+		using opened = project
 		if (book) {
 			let chapterIndex = 0
 			const structure: TxtStructure = {
@@ -415,7 +415,9 @@ async function importProject(
 			selectedIllustrations: [],
 		}
 		await opened.write(projectFiles.importReport, next)
-		return await readImportWizard(opened)
+		const result = await readImportWizard(opened)
+		await register?.(result.workIds, result.projectDir)
+		return result
 	} catch (error) {
 		await rm(root, { recursive: true, force: true })
 		throw error

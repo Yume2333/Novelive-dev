@@ -62,6 +62,26 @@ describe('DOCX extraction', () => {
 		})
 	})
 
+	test('offers a standalone title-page cover at the first retained chapter', async () => {
+		const book = await extract(
+			heading('扉页') +
+				drawing('cover') +
+				heading('第一卷') +
+				heading('第一章', 2) +
+				p('正文。'),
+			{
+				'word/_rels/document.xml.rels': imageRelationships({
+					cover: 'media/cover.png',
+				}),
+				'word/media/cover.png': 'cover image',
+			},
+		)
+		expect(book.volumes.map(({ title }) => title)).toEqual(['第一卷'])
+		expect(book.illustrations).toEqual([
+			{ archivePath: 'word/media/cover.png', volume: 0, chapter: 0 },
+		])
+	})
+
 	test('locates embedded inline drawings across volumes and chapters without leaking drawing text', async () => {
 		const book = await extract(
 			heading('第一卷', 1) +

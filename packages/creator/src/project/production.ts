@@ -224,6 +224,7 @@ export function createProduction(
 		root: string,
 		language: string,
 		models: Awaited<ReturnType<typeof productionModels>>,
+		resumingVolume?: string,
 	) {
 		const controller = new AbortController()
 		const initialized = Promise.withResolvers<void>()
@@ -248,6 +249,11 @@ export function createProduction(
 					)
 						project.tasks.registerWork({ workId, title: work.title })
 				}
+				if (
+					volumeId !== resumingVolume &&
+					volume.workIds.some((id) => crashPaused(project, id))
+				)
+					continue
 				const gate = Promise.withResolvers<void>()
 				void gate.promise.catch(() => {})
 				volumes.set(volumeId, gate)
@@ -260,6 +266,7 @@ export function createProduction(
 				fetch: createReplayFetch(replay),
 				signal: controller.signal,
 				skipVolume: async (volumeId) => {
+					if (!volumes.has(volumeId)) return true
 					const volume = await project.read(projectFiles.volume(volumeId))
 					const started = volume.workIds.every((id) =>
 						project.database
@@ -357,7 +364,7 @@ export function createProduction(
 			const started = data
 				.prepare('SELECT 1 FROM chapter WHERE work_id = ? LIMIT 1')
 				.get(workId)
-			async function prepare() {
+			async function prepare(resuming = false) {
 				const currentModels = await settings()
 				let preparation = preparations.get(project.root)
 				if (preparation && !(await preparation.has(volumeId))) {
@@ -372,6 +379,7 @@ export function createProduction(
 						project.root,
 						work.language,
 						currentModels,
+						resuming ? volumeId : undefined,
 					)
 					preparations.set(project.root, preparation)
 				}
@@ -609,7 +617,7 @@ export function createProduction(
 				continue() {
 					continuing ??= runJob(async () => {
 						if (pausedAfterCrash) {
-							const preparation = await prepare()
+							const preparation = await prepare(true)
 							if (!started && crashPaused(project, workId)) {
 								await prepareVisual(preparation)
 								return snapshot()

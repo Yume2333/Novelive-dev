@@ -353,7 +353,7 @@ test.each([true, false])(
 	},
 )
 
-test('reconnecting to the first volume does not admit an unstarted sequel after a crash', async () => {
+test('reconnecting and resuming the first volume leaves an unstarted sequel unprepared after a crash', async () => {
 	const book = await seed()
 	const [a, b] = book.workIds
 	const worker = workers.get(a)
@@ -380,7 +380,8 @@ test('reconnecting to the first volume does not admit an unstarted sequel after 
 	}
 	const host = production()
 	for (const id of book.workIds) await host.remember(id, book.projectDir)
-	expect((await host.get(a)).snapshot().status).toBe('stopped')
+	const first = await host.get(a)
+	expect(first.snapshot().status).toBe('stopped')
 	const sequel = await host.get(b)
 	expect(sequel.snapshot()).toMatchObject({ status: 'stopped', chapters: [] })
 	expect((await host.getQueue()).inactive).toEqual(
@@ -393,7 +394,14 @@ test('reconnecting to the first volume does not admit an unstarted sequel after 
 	)
 	expect(requests).toEqual([])
 	expect(workers.get(b)?.count('write:ch0003')).toBe(0)
+	await first.continue()
+	await vi.waitFor(() => expect(worker.count('write:ch0001')).toBe(2))
+	worker.release('write:ch0001')
+	await vi.waitFor(() => expect(hostBusy.get(host)).toBe(false))
+	expect(sequel.snapshot()).toMatchObject({ status: 'stopped', chapters: [] })
+	expect(requests).toEqual([])
 	await sequel.continue()
+	await laterEntered.promise
 	await vi.waitFor(() => expect(workers.get(b)?.count('write:ch0003')).toBe(1))
 })
 

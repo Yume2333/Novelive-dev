@@ -122,8 +122,8 @@ async function launch(root: string, production = false) {
 }
 
 test.describe('M4 longform and queue', () => {
-	test('W3 native quit drains the real creator with an active production job', async () => {
-		test.setTimeout(60_000)
+	test('W3 native quit drains the real creator and the same project resumes after reopening', async () => {
+		test.setTimeout(90_000)
 		const root = await mkdtemp(join(homedir(), '.m4-gate-quit-'))
 		const receipt = join(root, 'shutdown.log')
 		const projects = join(root, 'projects')
@@ -218,6 +218,29 @@ test.describe('M4 longform and queue', () => {
 			expect(await readFile(receipt, 'utf8')).toBe(
 				'停止并退出\nshutdown\nworker-exit:0\napp-quit\n',
 			)
+			const reopened = await launch(root, true)
+			try {
+				const snapshot = () => call(reopened.page, 'production.get', { workId })
+				expect((await snapshot()).status).toBe('stopped')
+				expect(
+					db
+						.prepare("SELECT count(*) AS n FROM task WHERE status = 'running'")
+						.get()?.n,
+				).toBe(0)
+				await call(reopened.page, 'production.continue', { workId })
+				await expect
+					.poll(async () => (await snapshot()).phase, { timeout: 40_000 })
+					.toBe('confirm-first')
+				expect(
+					db
+						.prepare(
+							"SELECT user_state FROM chapter WHERE work_id = ? AND chapter_id = 'ch0001'",
+						)
+						.get(workId)?.user_state,
+				).toBe('published')
+			} finally {
+				await reopened.app.close()
+			}
 		} finally {
 			if (
 				desktopProcess.exitCode === null &&

@@ -46,6 +46,28 @@ async function epub() {
 	return zip.close()
 }
 
+test('removes a new project when shutdown prevents registration and allows retry', async () => {
+	const root = await workspace()
+	const sourcePath = join(root, 'source.md')
+	await writeFile(sourcePath, '# 第一章\n\n她推开门。\n')
+	const options = { sourcePath, folder: root, title: '门', references: [] }
+	const cancelled = { code: 'cancelled', message: '创作端正在关闭' }
+	await expect(
+		importFileProject(options, async (workIds, projectDir) => {
+			expect(workIds).toHaveLength(1)
+			expect(await readFile(join(projectDir, 'series.json'), 'utf8')).toContain(
+				'门',
+			)
+			throw cancelled
+		}),
+	).rejects.toEqual(cancelled)
+	expect(await readdir(root)).toEqual(['source.md'])
+	await expect(importFileProject(options)).resolves.toMatchObject({
+		status: 'ready',
+		projectDir: join(root, '门'),
+	})
+})
+
 test.each(['epub', 'docx'] as const)(
 	'%s only persists explicitly selected illustrations as references',
 	async (format) => {
