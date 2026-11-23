@@ -6,6 +6,7 @@ import {
 	prepareVolume,
 } from '../../project-pipeline'
 import { withUsage } from '../../usage'
+import { BibleChangedDuringSynthesisError } from '../index'
 
 export async function prepareSeries(
 	project: Project,
@@ -23,12 +24,24 @@ export async function prepareSeries(
 		options.signal?.throwIfAborted()
 		const skip = await options.skipVolume?.(volumeId)
 		const volume = await project.read(projectFiles.volume(volumeId))
-		const prepare = () =>
-			prepareVolume(project, volumeId, {
-				...options,
-				previousDigests: [...previousDigests],
-				incremental: series.volumeIds.indexOf(volumeId) > 0,
-			})
+		const prepare = async () => {
+			for (let attempt = 0; ; attempt++) {
+				try {
+					return await prepareVolume(project, volumeId, {
+						...options,
+						previousDigests: [...previousDigests],
+						incremental: series.volumeIds.indexOf(volumeId) > 0,
+					})
+				} catch (error) {
+					if (
+						!(error instanceof BibleChangedDuringSynthesisError) ||
+						attempt >= 2
+					)
+						throw error
+					options.signal?.throwIfAborted()
+				}
+			}
+		}
 		const result = skip
 			? undefined
 			: volume.workIds.length

@@ -368,6 +368,75 @@ test('incremental preparation reports volume one before later work, passes diges
 	expect(requests).toHaveLength(count)
 })
 
+test.each([false, true])(
+	'series preparation retries a changed bible serially and is bounded (keeps changing: %s)',
+	async (keepsChanging) => {
+		using p = await project()
+		const first = await joinSeries(p, book)
+		const second = await joinSeries(p, book)
+		const ready: string[] = []
+		let firstCalls = 0
+		let secondCalls = 0
+		let previews = 0
+		const synthetic: typeof fetch = async (input, init) => {
+			const body = await new Request(input, init).json()
+			const prompt = body.messages[0].content as string
+			if (prompt.startsWith('Preview fiction')) {
+				previews++
+				return sse({
+					summary: 'Arrival',
+					characters: [],
+					locations: [],
+					timelineNotes: [],
+					foreshadowingHints: [],
+				})
+			}
+			if (prompt.startsWith('Summarize volume'))
+				return sse({ summary: 'Earlier digest' })
+			const later = prompt.includes(second.chapterIds[0])
+			if (later) {
+				secondCalls++
+				if (keepsChanging || secondCalls === 1)
+					await p.write(projectFiles.character(series, 'lin'), {
+						formatVersion: 1,
+						entries: [{ ...character, name: `Approved ${secondCalls}` }],
+					})
+			} else firstCalls++
+			return sse({
+				overview: 'Arrival',
+				chapters: [
+					{
+						chapterId: (later ? second : first).chapterIds[0],
+						progress: 'Arrived',
+					},
+				],
+				biblePatch: [],
+				glossaryPatch: [],
+			})
+		}
+		const running = prepareSeries(p, {
+			previewConnection: connection,
+			synthesisConnection: connection,
+			language: 'en',
+			fetch: synthetic,
+			onReady: (id) => {
+				ready.push(id)
+			},
+		})
+		if (keepsChanging) {
+			await expect(running).rejects.toThrow('Bible changed during synthesis')
+			expect(ready).toEqual([first.volumeId])
+			expect(secondCalls).toBe(3)
+		} else {
+			await running
+			expect(ready).toEqual([first.volumeId, second.volumeId])
+			expect(secondCalls).toBe(2)
+		}
+		expect(firstCalls).toBe(1)
+		expect(previews).toBe(2)
+	},
+)
+
 test('art registration persists local entries without freezing inherited rows', async () => {
 	using p = await project()
 	const joined = await joinSeries(p, book)
