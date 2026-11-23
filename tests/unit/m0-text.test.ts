@@ -362,9 +362,17 @@ describe('M0 text model adapter', () => {
 		{ maxTokens: 32, delayMs: 120_000, stops: false },
 		{ maxTokens: 16_000, delayMs: 120_000, stops: true },
 		{ maxTokens: 32_000, delayMs: 601_000, stops: false },
+		{
+			maxTokens: 16_000,
+			delayMs: 136_001,
+			stops: false,
+			content: 'A'.repeat(196_000),
+			effectiveCap: 5_440,
+			abortMs: 136_000,
+		},
 	])(
 		'waits for delayed headers within the deadline for $maxTokens output tokens',
-		async ({ maxTokens, delayMs, stops }) => {
+		async ({ maxTokens, delayMs, stops, content, effectiveCap, abortMs }) => {
 			vi.useFakeTimers()
 			try {
 				const { promise: started, resolve: start } =
@@ -372,29 +380,35 @@ describe('M0 text model adapter', () => {
 				const chunk = {
 					choices: [{ delta: { content: 'OK' }, finish_reason: 'stop' }],
 				}
-				const fetch = vi.fn<typeof globalThis.fetch>(
-					(input, init) =>
-						new Promise((resolve, reject) => {
-							const { signal } = new Request(input, init)
-							const timer = setTimeout(() => {
-								resolve(
-									new Response(
-										`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
-										{ headers: { 'content-type': 'text/event-stream' } },
-									),
-								)
-							}, delayMs)
-							signal.addEventListener(
-								'abort',
-								() => {
-									clearTimeout(timer)
-									reject(signal.reason)
-								},
-								{ once: true },
+				let sentCap: number | undefined
+				let abortedAfter: number | undefined
+				const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+					const request = new Request(input, init)
+					const { signal } = request
+					const now = Date.now()
+					const body = await request.json()
+					sentCap = body.max_completion_tokens ?? body.max_tokens
+					return new Promise((resolve, reject) => {
+						const timer = setTimeout(() => {
+							resolve(
+								new Response(
+									`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
+									{ headers: { 'content-type': 'text/event-stream' } },
+								),
 							)
-							start()
-						}),
-				)
+						}, delayMs)
+						signal.addEventListener(
+							'abort',
+							() => {
+								abortedAfter = Date.now() - now
+								clearTimeout(timer)
+								reject(signal.reason)
+							},
+							{ once: true },
+						)
+						start()
+					})
+				})
 				const model = buildTextModel({
 					...configured,
 					model: 'fixture-header-deadline',
@@ -405,7 +419,11 @@ describe('M0 text model adapter', () => {
 					model,
 					normalizeContext({
 						messages: [
-							{ role: 'user', content: 'Reply with OK.', timestamp: 0 },
+							{
+								role: 'user',
+								content: content ?? 'Reply with OK.',
+								timestamp: 0,
+							},
 						],
 					}),
 					{ apiKey: configured.apiKey, maxTokens },
@@ -423,6 +441,10 @@ describe('M0 text model adapter', () => {
 						errorMessage: expect.stringMatching(/^\[network\]/),
 					})
 				expect(fetch).toHaveBeenCalledOnce()
+				if (effectiveCap !== undefined) {
+					expect(sentCap).toBe(effectiveCap)
+					expect(abortedAfter).toBe(abortMs)
+				}
 			} finally {
 				vi.useRealTimers()
 			}
