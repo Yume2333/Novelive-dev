@@ -334,7 +334,7 @@ test('requests a schema repair for bare model-generated place IDs after a stagin
 				},
 			],
 		}
-		const prompt = JSON.stringify(messages)
+		const prompt = messages[0].content[0].text
 		if (answers.length === 1)
 			expect(prompt).toContain('Repair the staging patch and manifest')
 		if (answers.length === 0) {
@@ -343,6 +343,8 @@ test('requests a schema repair for bare model-generated place IDs after a stagin
 			expect(prompt).toContain('/items/2/id')
 			expect(prompt).toContain('location: place/variant')
 			expect(prompt).toContain('character: character/costume/expression')
+			expect(prompt).toContain('"id":"loc_courtyard"')
+			expect(prompt).toContain('"id":"loc_gate"')
 		}
 		return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
 			headers: { 'content-type': 'text/event-stream' },
