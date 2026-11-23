@@ -7,9 +7,7 @@ import type {
 	StageSnapshot,
 } from '../../contract'
 import { emptyStage } from '../../stage/state'
-
-const positionKey = ({ chapterId, sceneId, sentenceId }: SentenceRef) =>
-	JSON.stringify([chapterId, sceneId, sentenceId])
+import { sentenceKey } from '..'
 
 function migrateSnapshot(
 	snapshot: StageSnapshot,
@@ -79,9 +77,9 @@ export function migrateProgress(
 	if (toVersion <= fromVersion)
 		return structuredClone({ progress, legacySaves })
 
-	const valid = new Set(positions.map(positionKey))
+	const valid = new Set(positions.map(sentenceKey))
 	const assets = new Set(assetIds)
-	const matches = (position: SentenceRef) => valid.has(positionKey(position))
+	const matches = (position: SentenceRef) => valid.has(sentenceKey(position))
 	const saves: SaveEntry[] = []
 	const archived: SaveEntry[] = []
 	for (const entry of progress.saves) {
