@@ -13,15 +13,26 @@ $ tsc --noEmit
 ```text
 $ biome check && stylelint 'packages/ui/src/**/*.css'
 tests/fixtures/text-models/build-synthetic.ts:63:3 lint/style/useTemplate  FIXABLE
-Checked 291 files in 145ms. No fixes applied.
+Checked 291 files in 164ms. No fixes applied.
 Found 1 info.
 ```
+
+Six-finding review round, before adding the explicit-load freshness regression:
 
 `NL_REPLAY=strict pnpm test tests/integration/m3-save.test.ts tests/unit/m1b-player.test.ts tests/unit/player-progress-ipc.test.ts` (exit 0)
 
 ```text
 Test Files  3 passed (3)
 Tests       20 passed (20)
+```
+
+Latest explicit-load/save-mode review round:
+
+`NL_REPLAY=strict pnpm test tests/integration/m3-save.test.ts tests/unit/player-progress-ipc.test.ts` (exit 0)
+
+```text
+Test Files  2 passed (2)
+Tests       13 passed (13)
 ```
 
 `NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M3 player controls'` (exit 0)
@@ -33,7 +44,7 @@ Running 5 tests using 1 worker
   ✓ settings and reread in the real Electron player
   ✓ chapter wait in the real Electron player
   ✓ reread successor in the real Electron player
-  5 passed (19.0s)
+  5 passed (19.7s)
 ```
 
 `NL_REPLAY=strict xvfb-run -a pnpm exec playwright test tests/e2e/m1b-player.spec.ts` (exit 0)
@@ -63,6 +74,8 @@ Devin Review findings on `91e7841` were addressed in separate commits:
 - `dd8bd24`: snapshots capture displayed restored text, including after the underlying script changes.
 - `b0863f7`: load-dialog initial focus skips disabled controls, including entirely empty grids.
 - `6b60c68`: history requests no thumbnails; grid requests share validated cached progress, refreshed on writes. Unit coverage checks 60 concurrent requests, empty slots, untrusted senders and corrupt persisted data.
+- `b8be259`: explicit progress loads always read the store, so another app instance's newer progress/saves are not replaced by cached data when reopening playback. No `requestSingleInstanceLock` exists in the desktop entry point or the app/packages/tools source; thumbnail requests still share cached metadata.
+- `4a7330b`: save restores keep the mode selected by `PlaybackProgress.loadSave`; only history jumps derive mode from the target chapter. Electron regression checks a read off-mainline save loads in main mode, while TOC reread still uses reread mode.
 
 Real Electron coverage includes stale resume IDs after restart, history reread → mainline with subsequent forward progress, invalid save rejection without losing stage/history, and re-saving an old-text snapshot after an actual scene rewrite.
 
