@@ -9,7 +9,7 @@ import {
 } from '@earendil-works/pi-schema'
 import {
 	assetId,
-	biblePatchSchema,
+	completeBiblePatchSchema,
 	entityId,
 	glossaryPatchSchema,
 	sceneId,
@@ -20,7 +20,7 @@ import type { TextConnection } from '../models/text'
 
 const reason = str()
 const schemas = {
-	bible: obj({ volumeId: entityId, changes: biblePatchSchema, reason }),
+	bible: obj({ volumeId: entityId, changes: completeBiblePatchSchema, reason }),
 	glossary: obj({ volumeId: entityId, changes: glossaryPatchSchema, reason }),
 	requirements: obj({ text: str(), reason }),
 	rewriteScene: obj({

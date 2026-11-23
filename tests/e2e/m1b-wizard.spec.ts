@@ -47,6 +47,16 @@ async function answerDialogs(app: ElectronApplication, answers: string[][]) {
 	}, answers)
 }
 
+async function closeWizard(app: ElectronApplication) {
+	await app.evaluate(({ dialog }) => {
+		dialog.showMessageBox = async () => ({
+			response: 1,
+			checkboxChecked: false,
+		})
+	})
+	await app.close()
+}
+
 const json = async (root: string, path: string) =>
 	JSON.parse(await readFile(join(root, path), 'utf8'))
 
@@ -185,7 +195,7 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 		)
 		expect(work.settings.confirmWithReferences).toBe(false)
 	} finally {
-		await app.close()
+		await closeWizard(app)
 	}
 })
 
@@ -218,6 +228,6 @@ test('M1b TXT wizard asks for an ambiguous encoding and can skip review', async 
 		expect(report.encoding).toBe('big5')
 		expect(report.layout).toBeUndefined()
 	} finally {
-		await app.close()
+		await closeWizard(app)
 	}
 })

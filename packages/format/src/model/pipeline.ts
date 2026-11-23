@@ -10,6 +10,7 @@ import {
 } from '@earendil-works/pi-schema'
 import {
 	characterSchema,
+	characterUpdateSchema,
 	foreshadowingEntrySchema,
 	glossaryEntrySchema,
 	locationSchema,
@@ -85,27 +86,53 @@ export const importReportSchema = obj(
 )
 const operation = oneOf(['add', 'update', 'delete', 'none'])
 const patchFields = { op: operation, observedChapter: opt(entityId) }
-export const biblePatchSchema = arr(
+const otherPatchEntries = [
+	obj({ kind: lit('relation'), ...patchFields, entry: relationSchema }, open),
+	obj({ kind: lit('location'), ...patchFields, entry: locationSchema }, open),
+	obj(
+		{ kind: lit('timeline'), ...patchFields, entry: timelineEntrySchema },
+		open,
+	),
+	obj(
+		{
+			kind: lit('foreshadowing'),
+			...patchFields,
+			entry: foreshadowingEntrySchema,
+		},
+		open,
+	),
+	obj({ kind: lit('style'), ...patchFields, entry: styleSchema }, open),
+] as const
+export const completeBiblePatchSchema = arr(
 	union([
 		obj(
 			{ kind: lit('character'), ...patchFields, entry: characterSchema },
 			open,
 		),
-		obj({ kind: lit('relation'), ...patchFields, entry: relationSchema }, open),
-		obj({ kind: lit('location'), ...patchFields, entry: locationSchema }, open),
+		...otherPatchEntries,
+	]),
+)
+export const biblePatchSchema = arr(
+	union([
 		obj(
-			{ kind: lit('timeline'), ...patchFields, entry: timelineEntrySchema },
+			{
+				...patchFields,
+				kind: lit('character'),
+				op: lit('add'),
+				entry: characterSchema,
+			},
 			open,
 		),
 		obj(
 			{
-				kind: lit('foreshadowing'),
 				...patchFields,
-				entry: foreshadowingEntrySchema,
+				kind: lit('character'),
+				op: oneOf(['update', 'delete', 'none']),
+				entry: characterUpdateSchema,
 			},
 			open,
 		),
-		obj({ kind: lit('style'), ...patchFields, entry: styleSchema }, open),
+		...otherPatchEntries,
 	]),
 )
 export const glossaryPatchSchema = arr(glossaryEntrySchema)

@@ -21,42 +21,44 @@ const shape = obj({ id: entityId, description: str() }, open)
 const reference = obj({ path: str(), description: str() }, open)
 const named = { name: str(), originalName: opt(str()) }
 
-export const characterSchema = obj(
-	{
-		...entry,
-		...named,
-		aliases: arr(str()),
-		major: opt(bool()),
-		addresses: opt(arr(obj({ speakerId: entityId, name: str() }, open))),
-		identity: opt(str()),
-		personality: opt(str()),
-		speech: opt(str()),
-		appearance: opt(
+const characterFields = {
+	...entry,
+	...named,
+	aliases: arr(str()),
+	major: opt(bool()),
+	addresses: opt(arr(obj({ speakerId: entityId, name: str() }, open))),
+	identity: opt(str()),
+	personality: opt(str()),
+	speech: opt(str()),
+	appearance: opt(
+		obj(
+			{
+				description: str(),
+				anchorFeatures: opt(arr(str(), { minItems: 2, maxItems: 3 })),
+				keyColors: opt(
+					obj({ hair: str(), eyes: str(), clothing: str() }, open),
+				),
+			},
+			open,
+		),
+	),
+	costumes: opt(
+		arr(
 			obj(
-				{
-					description: str(),
-					anchorFeatures: opt(arr(str(), { minItems: 2, maxItems: 3 })),
-					keyColors: opt(
-						obj({ hair: str(), eyes: str(), clothing: str() }, open),
-					),
-				},
+				{ id: entityId, description: str(), fromChapter: opt(entityId) },
 				open,
 			),
 		),
-		costumes: opt(
-			arr(
-				obj(
-					{ id: entityId, description: str(), fromChapter: opt(entityId) },
-					open,
-				),
-			),
-		),
-		expressions: opt(arr(shape)),
-		references: opt(arr(reference)),
-		reuse: opt(oneOf(['reusable', 'one-off'])),
-		knows: opt(arr(obj({ chapterId: entityId, fact: str() }, open))),
-		changes: opt(arr(change)),
-	},
+	),
+	expressions: opt(arr(shape)),
+	references: opt(arr(reference)),
+	reuse: opt(oneOf(['reusable', 'one-off'])),
+	knows: opt(arr(obj({ chapterId: entityId, fact: str() }, open))),
+	changes: opt(arr(change)),
+}
+export const characterSchema = obj(characterFields, open)
+export const characterUpdateSchema = obj(
+	{ ...characterFields, aliases: opt(characterFields.aliases) },
 	open,
 )
 export const relationSchema = obj(

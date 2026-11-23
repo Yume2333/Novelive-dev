@@ -260,7 +260,7 @@ function changesOf(entry: Entry | undefined): Change[] {
 
 function temporalPoint(
 	kind: keyof Bible,
-	entry: Entry,
+	entry: Entry | Patch['entry'],
 	chapterId?: string,
 ): Point | undefined {
 	const field = temporalField(kind)
@@ -704,7 +704,7 @@ export async function applyPatches(
 	)
 
 	const publishedIds = new Set(survivingCharacters.map(({ id }) => id))
-	const references = (entry: Character | Relation) =>
+	const references = (entry: Pick<Character, 'addresses'> | Relation) =>
 		'from' in entry
 			? [entry.from, entry.to]
 			: (entry.addresses?.map(({ speakerId }) => speakerId) ?? [])

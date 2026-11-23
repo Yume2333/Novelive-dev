@@ -15,6 +15,10 @@ type Entry =
 	| Bible['styles'][number]
 	| Bible['timeline'][number]
 	| Bible['foreshadowing'][number]
+type ProposalEntry = Extract<
+	Proposal['payload'],
+	{ kind: 'bible' }
+>['changes'][number]['entry']
 const categories = [
 	['characters', '角色'],
 	['locations', '地点'],
@@ -84,7 +88,7 @@ function print(value: unknown): string {
 	if (typeof value === 'boolean') return value ? '是' : '否'
 	return value === undefined || value === null ? '未设置' : String(value)
 }
-const title = (entry: Entry) =>
+const title = (entry: Entry | ProposalEntry) =>
 	'name' in entry
 		? String(entry.name)
 		: 'written' in entry
@@ -139,7 +143,7 @@ function approvalNotice(proposal: Proposal, bible: Bible) {
 	return `已接受候选${images ? '；受影响的已有图片已标记过期。' : '。'}${style ? '风格变更仅提示，不自动过期。' : ''}`
 }
 
-function Fields({ entry }: { entry: Entry }) {
+function Fields({ entry }: { entry: Entry | ProposalEntry }) {
 	return (
 		<dl className={styles.fields}>
 			{Object.entries(entry)
@@ -247,6 +251,12 @@ function Candidate({
 								.filter(
 									([key, value]) =>
 										!['status', 'conflict', 'occurrences'].includes(key) &&
+										!(
+											kind === 'character' &&
+											op === 'update' &&
+											key === 'aliases' &&
+											value === undefined
+										) &&
 										JSON.stringify(
 											(confirmed as unknown as Record<string, unknown>)[key],
 										) !== JSON.stringify(value),

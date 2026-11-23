@@ -189,9 +189,107 @@ test.each([false, true])(
 		expect(
 			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
 		).toEqual(result)
+		expect(
+			await synthesizeVolume(project, 'v1', chapters, {
+				...args,
+				strategy: 'auto',
+				fetch,
+			}),
+		).toEqual(result)
 		expect(fetch).not.toHaveBeenCalled()
 	},
 )
+
+test('published character updates do not clear omitted aliases or reject them on confirmed entries', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const confirmedFile = projectFiles.character(scope, confirmed.id)
+	const guide = { id: 'guide', name: 'Guide', status: 'candidate' } as const
+	const candidateFile = projectFiles.character(scope, guide.id)
+	await project.write(confirmedFile, {
+		formatVersion: 1,
+		entries: [{ ...confirmed, aliases: ['Captain'] }],
+	})
+	await project.write(candidateFile, {
+		formatVersion: 1,
+		entries: [{ ...guide, aliases: ['Navigator'] }],
+	})
+	const { aliases: _, ...withoutAliases } = confirmed
+	const patch: BiblePatch = [
+		{ kind: 'character', op: 'update', entry: withoutAliases },
+		{
+			kind: 'character',
+			op: 'update',
+			entry: { ...guide, personality: 'Curious' },
+		},
+	]
+	const result = await applyPatches(
+		project,
+		await readBible(project),
+		patch,
+		[],
+		new Set(chapters),
+	)
+	expect(result.conflicts).toEqual([])
+	expect(await project.read(confirmedFile)).toMatchObject({
+		entries: [{ aliases: ['Captain'] }],
+	})
+	expect(await project.read(candidateFile)).toMatchObject({
+		entries: [{ aliases: ['Navigator'], personality: 'Curious' }],
+	})
+})
+
+test('auto reopens a whole result even when the published Bible is too large for whole mode', async () => {
+	await seed(root)
+	const description = 'A tower overlooking the harbor. '.repeat(800)
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const body = await new Request(input, init).json()
+		expect(body.messages[0].content).toContain(
+			'Return their union across all chapters',
+		)
+		const output = {
+			overview: 'Ada reaches the tower.',
+			chapters: chapters.map((chapterId) => ({
+				chapterId,
+				progress: 'Journey continues.',
+			})),
+			biblePatch: [
+				{
+					kind: 'location',
+					op: 'add',
+					entry: { ...candidateTower, description },
+				},
+			],
+		}
+		return new Response(
+			`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(output) }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+			{ headers: { 'content-type': 'text/event-stream' } },
+		)
+	})
+	let result: Awaited<ReturnType<typeof synthesizeVolume>>
+	{
+		using project = await Project.open(root)
+		result = await synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			fetch,
+		})
+		expect((await readBible(project)).location).toContainEqual(
+			expect.objectContaining({ description }),
+		)
+	}
+	const offline = vi.fn<typeof globalThis.fetch>(async () => {
+		throw new Error('Reopening must not call the provider')
+	})
+	using project = await Project.open(root)
+	expect(
+		await synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			fetch: offline,
+		}),
+	).toEqual(result)
+	expect(fetch).toHaveBeenCalledOnce()
+	expect(offline).not.toHaveBeenCalled()
+})
 
 test('whole synthesis requests a complete chapter-by-chapter patch, not a shortlist', async () => {
 	await seed(root)
@@ -375,7 +473,7 @@ test.each([
 			const prompt = messages[0].content as string
 			expect(prompt).toContain('is_last:b')
 			expect(prompt).toMatch(
-				/glossaryPatch:\[\{id:[^,]+,status:(?:\$\d+|"candidate"\|"confirmed")/,
+				/glossaryPatch\?:\[\{id:[^,]+,status:(?:\$\d+|"candidate"\|"confirmed")/,
 			)
 			expect(prompt).toContain('"candidate"|"confirmed"')
 			let output: unknown = response
@@ -1877,6 +1975,268 @@ test.each([false, true])(
 			expect(result.quarantined).toBe(true)
 			expect(result.bibleBase).toBeUndefined()
 		}
+	},
+)
+
+test.each([true, false])(
+	'recovers a legacy ready checkpoint without extracting again (valid: %s)',
+	async (valid) => {
+		await seed(root)
+		{
+			using project = await Project.open(root)
+			const write = project.write.bind(project)
+			vi.spyOn(project, 'write').mockImplementation(async (file, value) => {
+				await write(file, value)
+				if (
+					file.path === files.checkpoint.path &&
+					(value as { ready: boolean }).ready
+				)
+					throw new Error('Stopped before publication')
+			})
+			await expect(
+				synthesizeVolume(project, 'v1', chapters, {
+					...options,
+					strategy: 'whole',
+				}),
+			).rejects.toThrow('Stopped before publication')
+		}
+		const offline = vi.fn<typeof globalThis.fetch>(async () => {
+			throw new Error('Ready synthesis must not call the provider')
+		})
+		using project = await Project.open(root)
+		const checkpoint = await project.read(files.checkpoint)
+		if (!checkpoint.whole) throw new Error('Missing whole output')
+		const before = await readBible(project)
+		await project.write(files.checkpoint, {
+			...checkpoint,
+			fingerprint: createHash('sha256')
+				.update(
+					JSON.stringify({
+						packetFormat: 5,
+						previews: await Promise.all(
+							chapters.map((id) => project.read(projectFiles.preview(id))),
+						),
+						language: options.language,
+						strategy: 'auto',
+						incremental: false,
+						model: connection.model,
+						context: connection.contextWindow,
+					}),
+				)
+				.digest('hex'),
+			whole: valid
+				? checkpoint.whole
+				: {
+						...checkpoint.whole,
+						biblePatch: [
+							...checkpoint.whole.biblePatch,
+							{
+								kind: 'location',
+								op: 'update',
+								entry: { ...candidateTower, id: 'missing-tower' },
+							},
+						],
+					},
+		})
+		const result = await synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			fetch: offline,
+		})
+		expect(offline).not.toHaveBeenCalled()
+		expect(result.quarantined).toBe(!valid)
+		expect(await project.read(files.checkpoint)).toMatchObject({
+			applied: true,
+		})
+		if (valid) {
+			expect(await readBible(project)).not.toEqual(before)
+			expect(result.bibleBase).toBeDefined()
+		} else {
+			expect(await readBible(project)).toEqual(before)
+			expect(result.conflicts).toContainEqual(
+				expect.objectContaining({
+					entry: expect.objectContaining({
+						id: 'missing-tower',
+						conflict: 'Saved synthesis failed current validation',
+					}),
+				}),
+			)
+		}
+	},
+)
+
+test.each([2, 5])(
+	'restores packet chapter scope when legacy events omit progress (format: %s)',
+	async (packetFormat) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const expanded = previews.map((preview) => ({
+			...preview,
+			summary: 'A'.repeat(1900),
+		}))
+		await Promise.all(
+			expanded.map((preview) =>
+				project.write(projectFiles.preview(preview.chapterId), preview),
+			),
+		)
+		const fingerprint = (value: unknown) =>
+			createHash('sha256').update(JSON.stringify(value)).digest('hex')
+		await project.write(files.checkpoint, {
+			formatVersion: 1,
+			fingerprint: fingerprint({
+				packetFormat,
+				previews: expanded,
+				language: options.language,
+				strategy: 'events',
+				incremental: false,
+				model: connection.model,
+				context: connection.contextWindow,
+			}),
+			basis: fingerprint(await readBible(project)),
+			packet: 2,
+			events: [
+				{
+					event: 'Discovery',
+					overview: 'The tower is found.',
+					chapters: [],
+					biblePatch: [{ kind: 'location', op: 'add', entry: candidateTower }],
+					glossaryPatch: [],
+					is_last: false,
+				},
+				...chapters.map((chapterId) => ({
+					event: chapterId,
+					overview: '',
+					chapters: [{ chapterId, progress: 'The journey continues.' }],
+					biblePatch: [],
+					glossaryPatch: [],
+					is_last: true,
+				})),
+			],
+			whole: null,
+			ready: true,
+			applied: false,
+		})
+		const offline = vi.fn<typeof globalThis.fetch>(async () => {
+			throw new Error('Ready events should not be extracted again')
+		})
+		const result = await synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			strategy: 'events',
+			fetch: offline,
+		})
+		expect(offline).not.toHaveBeenCalled()
+		expect(result.quarantined).toBe(false)
+		expect(result.biblePatch).toEqual([
+			{
+				kind: 'location',
+				op: 'add',
+				observedChapter: chapters[0],
+				entry: candidateTower,
+			},
+		])
+		const { entries } = await project.read(
+			projectFiles.location(scope, candidateTower.id),
+		)
+		expect(entries).toMatchObject([
+			{
+				description: '',
+				changes: [
+					{
+						chapterId: chapters[0],
+						field: 'description',
+						value: candidateTower.description,
+					},
+				],
+			},
+		])
+	},
+)
+
+test.each(['shifted', 'missing'])(
+	'extracts again when legacy packet chapter IDs are %s despite matching packet counts',
+	async (kind) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const ids = [...chapters, 'c3']
+		const expanded = ids.map((chapterId, index) => ({
+			...previews[0],
+			chapterId,
+			summary: 'A'.repeat(index < 2 ? 650 : 2120),
+		}))
+		await Promise.all(
+			expanded.map((preview) =>
+				project.write(projectFiles.preview(preview.chapterId), preview),
+			),
+		)
+		const volume = { level: 'volume', volumeId: 'v1' } as const
+		const fingerprint = (value: unknown) =>
+			createHash('sha256').update(JSON.stringify(value)).digest('hex')
+		await project.write(files.checkpoint, {
+			formatVersion: 1,
+			fingerprint: fingerprint({
+				packetFormat: 2,
+				previews: expanded,
+				language: options.language,
+				strategy: 'events',
+				incremental: false,
+				scope: volume,
+				model: connection.model,
+				context: connection.contextWindow,
+			}),
+			basis: fingerprint(await readBible(project)),
+			packet: 2,
+			events: [
+				{
+					event: 'Saved first packet',
+					overview: 'Stale extraction.',
+					chapters:
+						kind === 'shifted'
+							? [{ chapterId: ids[0], progress: 'First chapter.' }]
+							: [],
+					biblePatch: [{ kind: 'location', op: 'add', entry: candidateTower }],
+					glossaryPatch: [],
+					is_last: true,
+				},
+				{
+					event: 'Saved second packet',
+					overview: '',
+					chapters: ids
+						.slice(1)
+						.map((chapterId) => ({ chapterId, progress: 'Later chapter.' })),
+					biblePatch: [],
+					glossaryPatch: [],
+					is_last: true,
+				},
+			],
+			whole: null,
+			ready: true,
+			applied: false,
+		})
+		const result = await synthesizeVolume(project, 'v1', ids, {
+			...options,
+			scope: volume,
+			strategy: 'events',
+			fetch: packetFetch,
+		})
+		expect(packetFetch).toHaveBeenCalledTimes(2)
+		const prompts = await Promise.all(
+			packetFetch.mock.calls.map(async ([input, init]) => {
+				const { messages } = await new Request(input, init).json()
+				const packet = String(messages[0].content).split(
+					'Chapter previews:\n',
+				)[1]
+				return Array.from(
+					new Set(
+						Array.from(
+							packet.matchAll(/^Chapter ([\w-]+):$/gm),
+							([, id]) => id,
+						),
+					),
+				)
+			}),
+		)
+		expect(prompts).toEqual([[ids[0], ids[1]], [ids[2]]])
+		expect(result.biblePatch).toEqual([])
+		expect(result.overview).not.toContain('Stale extraction')
 	},
 )
 

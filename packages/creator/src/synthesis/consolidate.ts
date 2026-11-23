@@ -88,20 +88,21 @@ export function reconcileNamedAdditions(
 	return patch.map((item) => {
 		const { entry } = item
 		switch (item.kind) {
-			case 'character':
-				return {
-					...item,
-					entry: {
-						...item.entry,
-						id: character(entry.id),
-						...(item.entry.addresses && {
-							addresses: item.entry.addresses.map((address) => ({
-								...address,
-								speakerId: character(address.speakerId),
-							})),
-						}),
-					},
+			case 'character': {
+				const remapped = {
+					...item.entry,
+					id: character(entry.id),
+					...(item.entry.addresses && {
+						addresses: item.entry.addresses.map((address) => ({
+							...address,
+							speakerId: character(address.speakerId),
+						})),
+					}),
 				}
+				return item.op === 'add'
+					? { ...item, entry: { ...remapped, aliases: item.entry.aliases } }
+					: { ...item, entry: remapped }
+			}
 			case 'location':
 				return {
 					...item,
