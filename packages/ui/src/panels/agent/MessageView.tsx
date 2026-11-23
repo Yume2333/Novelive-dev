@@ -363,6 +363,7 @@ export function MessageParts({
 					<Streamdown
 						key={key}
 						className={styles.markdown}
+						codeBlockMaxHeight={0}
 						parseIncompleteMarkdown={activity === 'streaming'}
 					>
 						{part.text}

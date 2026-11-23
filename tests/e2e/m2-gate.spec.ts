@@ -211,6 +211,54 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			agent.locator('pre').filter({ hasText: '纸船与灯火' }),
 		).toBeVisible()
 		await expect(script).not.toContainText('笛声')
+		const codeBlock = agent.locator('[data-streamdown="code-block"]').filter({
+			hasText: '纸船与灯火',
+		})
+		await expect(codeBlock.getByRole('button')).toHaveCount(2)
+		expect(
+			await codeBlock.evaluate((block) => {
+				const header = block.querySelector(
+					'[data-streamdown="code-block-header"]',
+				) as HTMLElement
+				const actions = block.querySelector(
+					'[data-streamdown="code-block-actions"]',
+				) as HTMLElement
+				const body = block.querySelector(
+					'[data-streamdown="code-block-body"]',
+				) as HTMLElement
+				const pre = block.querySelector('pre') as HTMLElement
+				const headerBounds = header.getBoundingClientRect()
+				const actionsBounds = actions.getBoundingClientRect()
+				return {
+					surface:
+						getComputedStyle(block).backgroundColor !== 'rgba(0, 0, 0, 0)',
+					border: parseFloat(getComputedStyle(block).borderTopWidth) > 0,
+					padding: parseFloat(getComputedStyle(body).paddingTop) > 0,
+					headerAligned:
+						Math.abs(
+							headerBounds.y +
+								headerBounds.height / 2 -
+								actionsBounds.y -
+								actionsBounds.height / 2,
+						) < 2,
+					iconButtons: [...actions.querySelectorAll('button')].every(
+						(button) =>
+							getComputedStyle(button).borderTopWidth === '0px' &&
+							button.clientWidth === 32,
+					),
+					wrap: getComputedStyle(pre).whiteSpace === 'pre-wrap',
+					cjkFont: getComputedStyle(pre).fontFamily.includes('Noto Sans SC'),
+				}
+			}),
+		).toEqual({
+			surface: true,
+			border: true,
+			padding: true,
+			headerAligned: true,
+			iconButtons: true,
+			wrap: true,
+			cjkFont: true,
+		})
 		await capture(page, '04-agent-cjk-confirm')
 		await card.getByRole('button', { name: '确认', exact: true }).click()
 		const chatDiff = card.getByRole('region', { name: '重写差异' })
