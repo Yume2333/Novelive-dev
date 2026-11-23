@@ -24,6 +24,7 @@ import { editorCommands } from './editor'
 import { importCommands } from './import'
 import type { DesktopProgressApi } from './player-progress'
 import { productionCommands } from './production'
+import type { DesktopShareApi } from './share'
 
 export {
 	type ConfigUpdate,
@@ -40,6 +41,7 @@ export * from './editor'
 export * from './import'
 export * from './production'
 export * from './queue'
+export * from './share'
 
 const generation = int({ minimum: 1 })
 const scope = oneOf(['app', 'work'])
@@ -190,6 +192,7 @@ export interface Novelive {
 	pickFiles(kind: 'source' | 'txt' | 'image'): Promise<string[]>
 	host: {
 		progress?: DesktopProgressApi
+		share?: DesktopShareApi
 		appState(): Promise<HostState>
 		openLogDir(): Promise<void>
 		restartCreator(): Promise<void>
