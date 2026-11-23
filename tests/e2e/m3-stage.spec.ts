@@ -92,8 +92,11 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 					host,
 					scenes,
 					{
-						resolveAsset: (id) =>
-							`data:image/png;base64,${id === 'room/dusk' ? background : portrait}`,
+						resolveAsset: (id) => {
+							if (id === 'room/undrawn')
+								throw new Error('Undrawn earlier background')
+							return `data:image/png;base64,${id === 'room/dusk' ? background : portrait}`
+						},
 					},
 					runtime.abort.signal,
 					(error) => {
@@ -103,6 +106,14 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 					{
 						chapterId: 'chapter',
 						initialActions: [
+							{
+								type: 'action',
+								name: 'bg',
+								args: { transition: 'none' },
+								assets: [{ id: 'room/undrawn' }],
+								line: 1,
+								col: 1,
+							},
 							{
 								type: 'action',
 								name: 'shake',

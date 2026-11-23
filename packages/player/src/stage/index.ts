@@ -209,6 +209,9 @@ export async function mountMinimalPlayer(
 				return
 			}
 			let state = stage.state
+			if (index === 0)
+				for (const action of options.initialActions ?? [])
+					state = direct(state, action)
 			for (const action of beat.actions) state = direct(state, action)
 			state.text = beat.cue.kind === 'text' ? beat.cue.text : null
 			let incoming: StageSnapshot | null = null
@@ -266,12 +269,6 @@ export async function mountMinimalPlayer(
 		},
 		{ once: true },
 	)
-	if (options.initialActions) {
-		let initial = stage.state
-		for (const action of options.initialActions)
-			initial = direct(initial, action)
-		await stage.commit(initial, lookahead(beats, 0), [], true)
-	}
 	await advance()
 	return {
 		progress,
