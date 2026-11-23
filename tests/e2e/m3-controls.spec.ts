@@ -200,6 +200,18 @@ test.describe('M3 player controls', () => {
 					),
 				)
 				.toBe(mainline)
+			await page.evaluate(async (id) => {
+				const api = window.novelive.host.progress
+				const saved = await api?.load(id)
+				if (!api || !saved?.mainline) throw new Error('missing progress')
+				await api.save(id, {
+					...saved,
+					mainline: { ...saved.mainline, sentenceId: 'removed' },
+				})
+			}, playerWorkId)
+			await app.close()
+			;({ app, page } = await open())
+			await expect(text()).toHaveText('第二章开始。')
 		} finally {
 			await app.close()
 			await rm(directory, { recursive: true, force: true })

@@ -18,6 +18,7 @@ import {
 	sentenceKey,
 } from './controls/minimal-controller'
 import { type ControlChapter, PlayerControls } from './controls/PlayerControls'
+import { containsSentence } from './controls/position'
 import { useChapterWait } from './controls/useChapterWait'
 import './player.css'
 
@@ -152,7 +153,10 @@ export function PlayerPage() {
 				setLoaded({
 					workId: id,
 					restore,
-					start: resume ?? undefined,
+					start:
+						resume && containsSentence(result.scenes, resume)
+							? resume
+							: undefined,
 					linked,
 					chapterId: chapter.chapterId,
 					mode,

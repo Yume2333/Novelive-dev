@@ -11,6 +11,7 @@ import {
 import { projectFiles } from '../../packages/format/src/model'
 import { type Beat, compileScript } from '../../packages/format/src/script'
 import { createPlayback } from '../../packages/player/src/minimal/playback'
+import { containsSentence } from '../../packages/ui/src/pages/player/controls/position'
 import {
 	playerRef,
 	playerScript,
@@ -20,6 +21,28 @@ import {
 import { context } from '../fixtures/script/context'
 
 const directories: string[] = []
+
+test('persisted resume positions are checked against the current chapter', () => {
+	const result = compileScript('scene 空屋\n: 开始。', {
+		...context,
+		sceneIds: ['aaaabbbb'],
+	})
+	if (!result.ok) throw new Error('compile failed')
+	const scene = result.scenes[0]
+	const position = {
+		chapterId: 'ch1',
+		sceneId: scene.scene.id ?? '',
+		sentenceId: scene.beats[0].line?.id ?? '',
+	}
+	expect(containsSentence(result.scenes, position)).toBe(true)
+	expect(
+		containsSentence(result.scenes, { ...position, sentenceId: 'removed' }),
+	).toBe(false)
+	expect(
+		containsSentence(result.scenes, { ...position, sceneId: 'rewritten' }),
+	).toBe(false)
+	expect(containsSentence([], position)).toBe(false)
+})
 
 test('desktop progress IPC validates empty progress, slots, snapshots and capture bounds', () => {
 	const snapshot = {
