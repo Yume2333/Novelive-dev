@@ -74,6 +74,7 @@ export function mountText(
 	let page = 0
 	let revealed = 0
 	let disposed = false
+	let awaitingClick = false
 	let timer: ReturnType<typeof setTimeout> | undefined
 	let resolveDone: () => void = () => {}
 	const finished = new Promise<void>((resolve) => {
@@ -124,7 +125,7 @@ export function mountText(
 				schedule()
 			}, delay)
 		} else if (page === ends.length - 1 && options.continueImmediately) {
-			resolveDone()
+			if (!awaitingClick) resolveDone()
 		} else if (options.auto || options.skip) {
 			const count = ends[page] - (ends[page - 1] ?? 0)
 			timer = setTimeout(
@@ -185,11 +186,17 @@ export function mountText(
 	return {
 		finished,
 		click() {
+			if (awaitingClick) {
+				awaitingClick = false
+				resolveDone()
+				return true
+			}
 			if (
 				revealed < ends[page] ||
 				(page === ends.length - 1 && trailingPending)
 			) {
 				if (page === ends.length - 1) {
+					awaitingClick = options.continueImmediately ?? false
 					pause = 0
 					trailingPending = false
 				}
