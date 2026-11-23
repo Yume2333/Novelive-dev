@@ -6,7 +6,7 @@ import {
 	parseScript,
 } from '@novelive/format/script'
 import { buildTextModel, type TextConnection } from '../../models/text'
-import { ArtResponseSchemaError, artJson, type ModelOptions } from './models'
+import { ArtResponseFormatError, artJson, type ModelOptions } from './models'
 import {
 	type ArtBible,
 	type ManifestItem,
@@ -198,18 +198,24 @@ export async function directChapterArt(
 		].join('\n')
 		let repair: string | undefined
 		let triedStagingRepair = false
-		let triedSchemaRepair = false
+		let triedFormatRepair = false
 		for (;;) {
 			const result = await artJson(
 				options.main,
 				repair ? `${brief}\n${repair}` : brief,
 				responseSchema,
 				options,
+				[],
+				'caller',
 			).catch((error: unknown) => {
-				if (!(error instanceof ArtResponseSchemaError) || triedSchemaRepair)
+				if (!(error instanceof ArtResponseFormatError) || triedFormatRepair)
 					throw error
-				triedSchemaRepair = true
-				repair = `Repair the JSON manifest: ${error.message}. Use lowercase ASCII asset IDs with digits, underscores or hyphens. Required ID shapes by kind: ${manifestIdGuidance}. Do not use a bare place ID; make manifest IDs and patch references agree. ${rejectedReply(error.rejected)}`
+				triedFormatRepair = true
+				repair = `Repair the JSON manifest: ${error.message}. Use lowercase ASCII asset IDs with digits, underscores or hyphens. Required ID shapes by kind: ${manifestIdGuidance}. Do not use a bare place ID; make manifest IDs and patch references agree.${
+					error.rejected === undefined
+						? ''
+						: ` ${rejectedReply(error.rejected)}`
+				}`
 			})
 			if (!result) continue
 			try {

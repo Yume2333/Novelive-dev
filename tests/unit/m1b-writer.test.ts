@@ -14,7 +14,10 @@ import {
 } from '../../packages/creator/src/pipeline/writing'
 import { promptFits } from '../../packages/creator/src/pipeline/writing/budget'
 import { writingModel } from '../../packages/creator/src/pipeline/writing/request'
-import { reviewFidelity } from '../../packages/creator/src/pipeline/writing/review'
+import {
+	reviewFidelity,
+	reviewStyle,
+} from '../../packages/creator/src/pipeline/writing/review'
 import { scopeScene } from '../../packages/creator/src/pipeline/writing/scope'
 import { createReplayFetch } from '../../packages/creator/src/replay'
 import { projectSpend } from '../../packages/creator/src/usage/spend'
@@ -86,6 +89,95 @@ function responses(...replies: Reply[]) {
 
 const scene =
 	'scene Bridge\nsource p0001\n: A paper boat drifted under the bridge.'
+
+test.each([true, false])(
+	'bounds style review JSON repair (valid repair: %s)',
+	async (valid) => {
+		const malformed = '{"issues":["tone" "rhythm"]}'
+		const { options, requests } = responses(
+			malformed,
+			valid ? '{"issues":[]}' : malformed,
+		)
+		const result = reviewStyle(writingModel(options.writer, options), scene)
+		if (valid) await expect(result).resolves.toEqual([])
+		else
+			await expect(result).rejects.toThrow('Style review returned invalid JSON')
+		expect(requests).toHaveLength(2)
+		expect(requests[1]).toContain('Return only corrected JSON')
+	},
+)
+
+test('repairs source alignment JSON before validating ranges', async () => {
+	const { options, requests } = responses(
+		'[{"paragraphCount":1 "lineCount":1,"targets":[]}]',
+		'[{"paragraphCount":2,"lineCount":1,"targets":[]}]',
+	)
+	const model = writingModel(options.writer, options)
+	const paragraphs = [
+		{ id: 'p0001', text: 'A boat drifted.' },
+		{ id: 'p0002', text: 'A bell rang.' },
+	]
+	await expect(
+		scopeScene(() => model, scene.replace('\n:', '\n\n:'), paragraphs),
+	).resolves.toMatchObject([{ paragraphs }])
+	expect(requests).toHaveLength(2)
+	expect(requests[1]).toContain('Return only corrected JSON')
+})
+
+test('leaves room to repair a style review split near the model limit', async () => {
+	const { options, requests } = responses(
+		'{"issues":["tone" "rhythm"]}',
+		'{"issues":[]}',
+		'{"issues":[]}',
+	)
+	const model = writingModel(
+		{ ...options.writer, contextWindow: 4096 },
+		options,
+	)
+	const draft = [
+		'scene Bridge',
+		'source p0001-p0001',
+		'',
+		`: first ${'a'.repeat(1260)}`,
+		`: second ${'b'.repeat(1260)}`,
+	].join('\n')
+	await expect(reviewStyle(model, draft)).resolves.toEqual([])
+	expect(requests).toHaveLength(3)
+	expect(requests[0]).toContain(': first')
+	expect(requests[0]).not.toContain(': second')
+	expect(requests[1]).toContain(': first')
+	expect(requests[1]).toContain('Return only corrected JSON')
+	expect(requests[2]).toContain(': second')
+})
+
+test('stops without a style repair when the malformed reply did not settle', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-style-usage-'))
+	using db = new DatabaseSync(':memory:')
+	const provider = responses('{"issues":["tone" "rhythm"]}')
+	const fetch = createReplayFetch({
+		mode: 'record',
+		directory,
+		fetch: provider.fetch,
+		spend: projectSpend(db),
+	})
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+	vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '1')
+	try {
+		await expect(
+			reviewStyle(writingModel(provider.options.writer, { fetch }), scene),
+		).rejects.toThrow(
+			'Model request outcome unknown; not retried automatically',
+		)
+		expect(provider.requests).toHaveLength(1)
+		expect(
+			db.prepare('SELECT actual_tokens FROM spend_reservation').all(),
+		).toEqual([{ actual_tokens: null }])
+	} finally {
+		vi.unstubAllEnvs()
+		await rm(directory, { recursive: true, force: true })
+	}
+})
 
 test('separates new mark proposals from NVS and skips unsafe or registered marks', async () => {
 	const { options, requests } = responses(

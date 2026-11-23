@@ -1,9 +1,13 @@
 import type { Message, Tool } from '@earendil-works/pi-ai'
 import { arr, compile, obj, oneOf, str } from '@earendil-works/pi-schema'
 import { paragraphIdPattern } from '@novelive/format/model'
-import { parseModelJson } from '../../models/text'
 import { ContextLimitError, fitUnits, promptFits } from './budget'
-import { textOf, userMessage, type writingModel } from './request'
+import {
+	requestWritingJson,
+	userMessage,
+	writingJsonPromptFits,
+	type writingModel,
+} from './request'
 import {
 	type SourceParagraph,
 	sceneBody,
@@ -444,17 +448,21 @@ export async function reviewStyle(
 	model: ReturnType<typeof writingModel>,
 	script: string,
 ) {
-	const prompt = (draft: string) => ({
-		messages: [
-			userMessage(
-				`Review prose style only (voice, rhythm and wording). Do not evaluate fidelity or plot. Return JSON {"issues":["..."]}; use an empty array when no issues.\n${draft}`,
-			),
-		],
-	})
-	if (promptFits(model, prompt(script)))
-		return styleIssues(
-			textOf(await model.request(prompt(script), 'Style review')),
+	const prompt = (draft: string) =>
+		`Review prose style only (voice, rhythm and wording). Do not evaluate fidelity or plot. Return JSON {"issues":["..."]}; use an empty array when no issues.\n${draft}`
+	const fits = (draft: string) => writingJsonPromptFits(model, prompt(draft))
+	const request = (draft: string, phase: string) =>
+		requestWritingJson(
+			model,
+			prompt(draft),
+			phase,
+			(value) => {
+				const checked = style.validate(value)
+				return checked.ok ? checked.value.issues : undefined
+			},
+			'Style review returned invalid issues',
 		)
+	if (fits(script)) return request(script, 'Style review')
 	const [heading, range, , ...lines] = script.trimEnd().split('\n')
 	const excerpt = (body: readonly string[]) =>
 		[heading, range, '', ...body].join('\n')
@@ -462,24 +470,10 @@ export async function reviewStyle(
 	if (!lines.length) throw new ContextLimitError('Style review')
 	for (const body of fitUnits(
 		lines,
-		(batch) => promptFits(model, prompt(excerpt(batch))),
+		(batch) => fits(excerpt(batch)),
 		'Style review line',
 	))
-		for (const issue of styleIssues(
-			textOf(await model.request(prompt(excerpt(body)), 'Style review line')),
-		))
+		for (const issue of await request(excerpt(body), 'Style review line'))
 			issues.add(issue)
 	return [...issues]
-}
-
-function styleIssues(response: string) {
-	let value: unknown
-	try {
-		value = parseModelJson(response)
-	} catch {
-		throw new Error('Style review returned invalid JSON')
-	}
-	const checked = style.validate(value)
-	if (!checked.ok) throw new Error('Style review returned invalid issues')
-	return checked.value.issues
 }

@@ -1,7 +1,11 @@
 import { arr, bool, compile, int, obj } from '@earendil-works/pi-schema'
-import { parseModelJson } from '../../models/text'
 import { ContextLimitError, promptFits } from './budget'
-import { textOf, userMessage, type writingModel } from './request'
+import {
+	requestWritingJson,
+	userMessage,
+	writingJsonPromptFits,
+	type writingModel,
+} from './request'
 
 export type SourceParagraph = { id: string; text: string }
 export type ScopedFinding = {
@@ -30,7 +34,6 @@ const plan = compile(
 )
 const boundary = compile(obj({ lineCount: count, complete: bool() }))
 const phase = 'Scene source alignment'
-const messages = (prompt: string) => ({ messages: [userMessage(prompt)] })
 
 export function sceneBody(script: string) {
 	const [heading, , , ...lines] = script.trimEnd().split('\n')
@@ -63,7 +66,7 @@ export async function scopeScene(
 		]
 	const aligner = model()
 	const prompt = alignmentPrompt(paragraphs, lines, findings, false)
-	if (promptFits(aligner, messages(prompt)))
+	if (writingJsonPromptFits(aligner, prompt))
 		return align(aligner, prompt, paragraphs, lines, findings, false)
 	if (paragraphs.length < 2) throw new ContextLimitError(phase)
 
@@ -85,7 +88,7 @@ export async function scopeScene(
 		const local = relevant.map(({ finding }) => finding)
 		const localPrompt = alignmentPrompt([paragraph], body, local, true)
 		// Check the actual paragraph and body, not the candidate prefix used to find its boundary.
-		if (!promptFits(aligner, messages(localPrompt)))
+		if (!promptFits(aligner, { messages: [userMessage(localPrompt)] }))
 			throw new ContextLimitError(phase)
 		const scoped = local.some(({ paragraphId }) => !paragraphId)
 			? await align(aligner, localPrompt, [paragraph], body, local, true)
@@ -150,28 +153,23 @@ async function paragraphBoundary(
 	let to = 1
 	while (
 		to < lines.length &&
-		promptFits(model, messages(render(lines.slice(0, to + 1))))
+		writingJsonPromptFits(model, render(lines.slice(0, to + 1)))
 	)
 		to++
-	const result = await model.request(
-		messages(render(lines.slice(0, to))),
+	const checked = await requestWritingJson(
+		model,
+		render(lines.slice(0, to)),
 		phase,
+		(value) => {
+			const result = boundary.validate(value)
+			return result.ok && result.value.lineCount <= to
+				? result.value
+				: undefined
+		},
+		'Scene source alignment returned an invalid paragraph boundary',
 	)
-	const checked = boundary.validate(parsePlan(textOf(result)))
-	if (!checked.ok || checked.value.lineCount > to)
-		throw new Error(
-			'Scene source alignment returned an invalid paragraph boundary',
-		)
-	if (!checked.value.complete) throw new ContextLimitError(phase)
-	return checked.value.lineCount
-}
-
-function parsePlan(text: string): unknown {
-	try {
-		return parseModelJson(text)
-	} catch {
-		throw new Error('Scene source alignment returned invalid JSON')
-	}
+	if (!checked.complete) throw new ContextLimitError(phase)
+	return checked.lineCount
 }
 
 function addCitedTargets(
@@ -236,14 +234,20 @@ async function align(
 	findings: readonly ScopedFinding[],
 	partial: boolean,
 ) {
-	const result = await model.request(messages(prompt), phase)
-	const checked = plan.validate(parsePlan(textOf(result)))
-	if (!checked.ok)
-		throw new Error('Scene source alignment returned invalid ranges')
+	const ranges = await requestWritingJson(
+		model,
+		prompt,
+		phase,
+		(value) => {
+			const checked = plan.validate(value)
+			return checked.ok ? checked.value : undefined
+		},
+		'Scene source alignment returned invalid ranges',
+	)
 	let paragraphIndex = 0
 	let lineIndex = 0
 	const used = new Set<number>()
-	const groups = checked.value.map(({ paragraphCount, lineCount, targets }) => {
+	const groups = ranges.map(({ paragraphCount, lineCount, targets }) => {
 		const cited = paragraphs.slice(
 			paragraphIndex,
 			paragraphIndex + paragraphCount,

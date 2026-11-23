@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { bool, obj } from '@earendil-works/pi-schema'
 import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
@@ -17,7 +18,10 @@ import * as artModels from '../../packages/creator/src/pipeline/art/models'
 import { planArt } from '../../packages/creator/src/pipeline/art/plan'
 import * as upscale from '../../packages/creator/src/pipeline/postprocess'
 import { Project } from '../../packages/creator/src/project'
-import { quoteSpend } from '../../packages/creator/src/usage/spend'
+import {
+	projectSpend,
+	quoteSpend,
+} from '../../packages/creator/src/usage/spend'
 import {
 	bible,
 	directory,
@@ -72,6 +76,43 @@ test.each([
 	expect(result).toEqual({ pass: true })
 })
 
+function artReplies(...replies: string[]) {
+	return vi.fn<typeof globalThis.fetch>(async () => {
+		const content = replies.shift()
+		if (content === undefined) throw new Error('Unexpected art request')
+		const chunk = {
+			choices: [{ index: 0, delta: { content }, finish_reason: 'stop' }],
+			usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+		}
+		return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+			headers: { 'content-type': 'text/event-stream' },
+		})
+	})
+}
+
+test.each([true, false])(
+	'bounds art JSON repair (valid repair: %s)',
+	async (valid) => {
+		const malformed = '{"pass":true "unused":false}'
+		const fetch = artReplies(malformed, valid ? '{"pass":true}' : malformed)
+		const result = artModels.artJson(
+			main,
+			'Review the image.',
+			obj({ pass: bool() }),
+			{
+				replay: { ...replay, mode: 'replay', fetch },
+			},
+		)
+		if (valid) await expect(result).resolves.toEqual({ pass: true })
+		else await expect(result).rejects.toThrow('Art model returned invalid JSON')
+		expect(fetch).toHaveBeenCalledTimes(2)
+		const [input, init] = fetch.mock.calls[1]
+		expect(
+			JSON.stringify((await new Request(input, init).json()).messages),
+		).toContain('Return only corrected JSON')
+	},
+)
+
 async function projectTest(run: (project: Project) => Promise<void>) {
 	const dir = await mkdtemp(join(tmpdir(), 'novelive-m1b-art-'))
 	try {
@@ -84,6 +125,45 @@ async function projectTest(run: (project: Project) => Promise<void>) {
 		await rm(dir, { recursive: true, force: true })
 	}
 }
+
+test('stops without a staging repair when the malformed reply did not settle', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-staging-usage-'))
+	using db = new DatabaseSync(':memory:')
+	const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+		const frame = {
+			choices: [
+				{
+					index: 0,
+					delta: { content: '{"patch":"" "items":[]}' },
+					finish_reason: 'stop',
+				},
+			],
+		}
+		return new Response(`data: ${JSON.stringify(frame)}\n\ndata: [DONE]\n\n`, {
+			headers: { 'content-type': 'text/event-stream' },
+		})
+	})
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+	vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '1')
+	try {
+		await expect(
+			directChapterArt(script, bible, empty, {
+				main,
+				replay: { mode: 'record', directory, fetch, spend: projectSpend(db) },
+			}),
+		).rejects.toThrow(
+			'Model request outcome unknown; not retried automatically',
+		)
+		expect(fetch).toHaveBeenCalledTimes(1)
+		expect(
+			db.prepare('SELECT actual_tokens FROM spend_reservation').all(),
+		).toEqual([{ actual_tokens: null }])
+	} finally {
+		vi.unstubAllEnvs()
+		await rm(directory, { recursive: true, force: true })
+	}
+})
 
 test('parallel jobs serialize registry updates across art service instances', async () => {
 	await projectTest(async (project) => {
@@ -1614,6 +1694,28 @@ test('staging patches cannot replace writer dialogue', () => {
 		'Invalid staging patch',
 	)
 })
+
+test.each([true, false])(
+	'uses the staging manifest repair once for invalid JSON (valid repair: %s)',
+	async (valid) => {
+		const malformed = '{"patch":"" "items":[],"merges":{}}'
+		const fetch = artReplies(
+			malformed,
+			valid ? '{"patch":"","items":[],"merges":{}}' : malformed,
+		)
+		const result = directChapterArt(script, bible, empty, {
+			main,
+			replay: { ...replay, mode: 'replay', fetch },
+		})
+		if (valid) await expect(result).resolves.toMatchObject({ items: [] })
+		else await expect(result).rejects.toThrow('Art model returned invalid JSON')
+		expect(fetch).toHaveBeenCalledTimes(2)
+		const [input, init] = fetch.mock.calls[1]
+		expect(
+			JSON.stringify((await new Request(input, init).json()).messages),
+		).toContain('Repair the JSON manifest: Art model returned invalid JSON')
+	},
+)
 
 test('requests repair when a staging patch adds an image absent from the manifest', async () => {
 	const patch = 'PUT <4:\n@cg cg-window'

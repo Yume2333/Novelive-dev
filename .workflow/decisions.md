@@ -943,3 +943,11 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** 两次 Check 分别在综合与视觉审查停止，未到达首个确认点；离线核对证明修复路径，不证明整本制作和作品质量。
 - **Effort:** m1b-production
 - **Decided by:** agent (m1b-production/11)
+
+## 2026-11-23 - M1b/11 先离线验证演出回复修复
+
+- **Decided:** [M1b/11](tasks/m1b-production/11-m1b-owner-book.md) 继续阻塞。先用离线录制验证对已核销的演出 JSON 语法错误做有界修复，再由所有者决定是否授权下一次串行窗口。
+- **Instead of:** 在同一付费窗口重试失败的第一章，或以首个确认点通过替代完整验收。
+- **Because:** [合入 #96 后的真书 Check](evidence/m1b/owner/live-run-2fbd4d7.md) 已通过首个确认点，但第一章演出因非法 JSON 停止，未发布或试玩。预算正常，调整额度不能解决解析错误。
+- **Effort:** m1b-production
+- **Decided by:** agent (m1b-production/11)

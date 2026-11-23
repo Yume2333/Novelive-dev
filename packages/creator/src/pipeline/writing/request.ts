@@ -4,11 +4,12 @@ import {
 	buildTextModel,
 	createTextStream,
 	outputTokenBudget,
+	parseModelJson,
 	type TextConnection,
 	TextModelError,
 	textResultError,
 } from '../../models/text'
-import { fitPrompt } from './budget'
+import { ContextLimitError, fitPrompt, promptFits } from './budget'
 
 export type WritingTransport = {
 	signal?: AbortSignal
@@ -26,11 +27,16 @@ export function writingModel(
 	options: WritingTransport,
 ) {
 	const model = buildTextModel(connection)
-	const stream = createTextStream({
+	const policy = {
 		fetch: options.fetch,
 		...(process.env.NL_REPLAY === 'record'
 			? { requestRetries: 0, streamRetries: 0 }
 			: {}),
+	}
+	const stream = createTextStream(policy)
+	const guardedStream = createTextStream({
+		...policy,
+		stopOnUnknownOutcome: true,
 	})
 	const outputLimit = outputTokenBudget(model)
 	const outputTokens = Math.min(
@@ -48,10 +54,12 @@ export function writingModel(
 			context: Context,
 			phase = 'Writing prompt',
 			outputEstimate = 0,
+			reply: 'script' | 'json' = 'script',
 		) {
 			options.signal?.throwIfAborted()
 			const normalized = normalizeContext(context)
-			const result = await stream(
+			const dispatch = reply === 'json' ? guardedStream : stream
+			const result = await dispatch(
 				model,
 				fitPrompt(limits, normalized, phase, outputEstimate),
 				{
@@ -85,3 +93,50 @@ export const userMessage = (content: string) => ({
 	content,
 	timestamp: 0,
 })
+
+function jsonRepairContext(prompt: string) {
+	return {
+		messages: [
+			userMessage(
+				`${prompt}\nThe previous reply was invalid. Return only corrected JSON matching the requested format.`,
+			),
+		],
+	}
+}
+
+export function writingJsonPromptFits(
+	model: ReturnType<typeof writingModel>,
+	prompt: string,
+) {
+	return promptFits(model, jsonRepairContext(prompt))
+}
+
+export async function requestWritingJson<T>(
+	model: ReturnType<typeof writingModel>,
+	prompt: string,
+	phase: string,
+	validate: (value: unknown) => T | undefined,
+	invalidShape: string,
+): Promise<T> {
+	const repair = jsonRepairContext(prompt)
+	if (!promptFits(model, repair)) throw new ContextLimitError(phase)
+	const request = async (
+		context: Context,
+	): Promise<{ issue: string } | { value: T }> => {
+		const result = await model.request(context, phase, 0, 'json')
+		let value: unknown
+		try {
+			value = parseModelJson(textOf(result))
+		} catch (error) {
+			if (!(error instanceof SyntaxError)) throw error
+			return { issue: `${phase} returned invalid JSON` }
+		}
+		const checked = validate(value)
+		return checked === undefined ? { issue: invalidShape } : { value: checked }
+	}
+	const first = await request({ messages: [userMessage(prompt)] })
+	if ('value' in first) return first.value
+	const second = await request(repair)
+	if ('value' in second) return second.value
+	throw new Error(second.issue)
+}

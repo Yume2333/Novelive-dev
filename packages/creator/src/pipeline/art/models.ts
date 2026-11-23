@@ -16,19 +16,46 @@ import {
 	type TextConnection,
 	textResultError,
 } from '../../models/text'
-import { createReplayFetch, type ReplayOptions } from '../../replay'
+import {
+	createReplayFetch,
+	inheritSpendGuard,
+	type ReplayOptions,
+} from '../../replay'
 import { recordImageUsage } from '../../usage'
 import { SpendBudgetError } from '../../usage/spend'
 import type { Dimensions } from './check'
 
 export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
 
-export class ArtResponseSchemaError extends Error {
+export class ArtResponseFormatError extends Error {
 	constructor(
 		message: string,
 		readonly rejected: unknown,
 	) {
 		super(message)
+	}
+}
+
+export class ArtResponseSchemaError extends ArtResponseFormatError {}
+
+export async function artJson<T>(
+	connection: TextConnection,
+	prompt: string,
+	schema: Schema<T>,
+	options: ModelOptions,
+	images: readonly Buffer[] = [],
+	formatRepair: 'once' | 'caller' = 'once',
+): Promise<T> {
+	const request = (suffix: string) =>
+		requestArtJson(connection, prompt + suffix, schema, options, images)
+	try {
+		return await request('')
+	} catch (error) {
+		if (formatRepair === 'caller' || !(error instanceof ArtResponseFormatError))
+			throw error
+		return request(
+			`\nThe previous reply was invalid: ${error.message}. Return only corrected JSON matching the requested format.`,
+		)
 	}
 }
 
@@ -38,7 +65,7 @@ function checkedReplay(fetch: typeof globalThis.fetch) {
 		get failure() {
 			return failure
 		},
-		fetch: (async (input, init) => {
+		fetch: inheritSpendGuard(fetch, async (input, init) => {
 			try {
 				return await fetch(input, init)
 			} catch (error) {
@@ -50,7 +77,7 @@ function checkedReplay(fetch: typeof globalThis.fetch) {
 					failure = error
 				throw error
 			}
-		}) satisfies typeof globalThis.fetch,
+		}),
 	}
 }
 
@@ -190,12 +217,12 @@ export function imageRenderer(
 	}
 }
 
-export async function artJson<T>(
+async function requestArtJson<T>(
 	connection: TextConnection,
 	prompt: string,
 	schema: Schema<T>,
 	options: ModelOptions,
-	images: readonly Buffer[] = [],
+	images: readonly Buffer[],
 ): Promise<T> {
 	const model = buildTextModel(connection, images.length > 0)
 	const replay = checkedReplay(createReplayFetch(options.replay))
@@ -207,7 +234,10 @@ export async function artJson<T>(
 			data: png.toString('base64'),
 		})),
 	]
-	const response = await createTextStream({ fetch: replay.fetch })(
+	const response = await createTextStream({
+		fetch: replay.fetch,
+		stopOnUnknownOutcome: true,
+	})(
 		model,
 		normalizeContext({
 			messages: [{ role: 'user', content, timestamp: 0 }],
@@ -225,7 +255,16 @@ export async function artJson<T>(
 	const text = response.content
 		.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 		.join('')
-	const value = parseModelJson(text)
+	let value: unknown
+	try {
+		value = parseModelJson(text)
+	} catch (error) {
+		if (!(error instanceof SyntaxError)) throw error
+		throw new ArtResponseFormatError(
+			'Art model returned invalid JSON',
+			undefined,
+		)
+	}
 	const validated = compile(schema).validate(value)
 	if (!validated.ok)
 		throw new ArtResponseSchemaError(JSON.stringify(validated.errors), value)
