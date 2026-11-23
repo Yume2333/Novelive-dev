@@ -119,6 +119,13 @@ const minimumEventLimit = 128
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const bytes = (text: string) => Buffer.byteLength(text)
+const repairPrefix = 'Repair the JSON: '
+function fitBytes(text: string, limit: number) {
+	if (bytes(text) <= limit) return text
+	return new TextDecoder().decode(Buffer.from(text).subarray(0, limit), {
+		stream: true,
+	})
+}
 function recentEvents(events: Event[], historyBudget: number) {
 	const summaries: string[] = []
 	let remaining = historyBudget - 2
@@ -334,14 +341,12 @@ ${nextEvent.instructions}`
 		contract: ReturnType<typeof synthesisOutput<T>>,
 		check: (output: T) => void,
 	): Promise<T> {
+		const repairBudget = budget - bytes(prompt) - bytes(repairPrefix)
+		if (repairBudget <= 0)
+			throw new Error('Synthesis input exceeds the model context budget')
 		const messages = [{ role: 'user' as const, content: prompt, timestamp: 0 }]
 		for (let attempt = 0; ; attempt++) {
 			options.signal?.throwIfAborted()
-			if (
-				messages.reduce((total, message) => total + bytes(message.content), 0) >
-				budget
-			)
-				throw new Error('Synthesis input exceeds the model context budget')
 			const response = await stream(model, normalizeContext({ messages }), {
 				apiKey: options.connection.apiKey,
 				signal: options.signal,
@@ -368,7 +373,12 @@ ${nextEvent.instructions}`
 				if (attempt === 1) throw error
 				messages.push({
 					role: 'user',
-					content: `Repair the JSON: ${error instanceof Error ? error.message : String(error)}`,
+					content:
+						repairPrefix +
+						fitBytes(
+							error instanceof Error ? error.message : String(error),
+							repairBudget,
+						),
 					timestamp: 0,
 				})
 			}

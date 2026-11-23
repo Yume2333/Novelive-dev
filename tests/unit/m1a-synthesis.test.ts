@@ -319,6 +319,10 @@ test.each([
 			'required fields: id, status, original, written, category',
 		],
 	},
+	{
+		response: { ...repairedEvent, overview: false, ['章'.repeat(8192)]: true },
+		errors: ['/overview [type]: expected string, got boolean'],
+	},
 ] as const)(
 	'repairs a redacted invalid event against the same contract',
 	async ({ response, errors }) => {
@@ -336,9 +340,18 @@ test.each([
 			if (messages.length === 2) {
 				for (const expected of errors)
 					expect(messages[1].content).toContain(expected)
-				expect(messages[1].content).toContain(
-					'allowed keys: overview, chapters, biblePatch, glossaryPatch, event, is_last',
-				)
+				if (
+					Buffer.byteLength(JSON.stringify(response)) > connection.contextWindow
+				) {
+					expect(
+						Buffer.byteLength(prompt + messages[1].content),
+					).toBeLessThanOrEqual(connection.contextWindow - 4096)
+					expect(messages[1].content).not.toContain('\uFFFD')
+				} else {
+					expect(messages[1].content).toContain(
+						'allowed keys: overview, chapters, biblePatch, glossaryPatch, event, is_last',
+					)
+				}
 				output = repairedEvent
 			}
 			const data = [
