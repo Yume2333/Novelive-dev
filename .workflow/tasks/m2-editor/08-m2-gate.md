@@ -13,6 +13,8 @@
 
 ## Progress
 
+- PR #57 第四轮：确认起始 HEAD 29da1b4；J 复现采用候选后残留生成提示，切换图片/采用候选时清理旧状态；门禁覆盖两条清理路径，新增 `08-image-candidate-applied.png`。严格 check → 43 files / 563 passed / 1 skipped；严格门禁 → 1 passed (12.9s)。第三轮 Linux CI 已通过；本轮无付费调用、无重录。
+
 - PR #57 第三轮：确认起始 HEAD 5bbcdab；H 保留重绘完成/失败状态到 aria-busy 解除后，I 用 renderer 实际 decode 的图片 URL/hash 校验单张替换与候选采用，跳过 UI 缓存刷新会使测试失败。兼容 main 新文本渲染器的隐藏测量副本，精确断言可见 innerText。严格 check → 43 files / 563 passed / 1 skipped；严格门禁 → 1 passed (14.5s)，更新截图和 receipt。无新增录制或付费调用。
 
 - PR #57 第二轮：确认起始 HEAD 为 c905614；修复图片替换清空文本撤销、图片 ID 子串匹配、手动还原草稿后无法刷新、生产 Agent 位置 prompt；补齐重绘 spinner 与独立 replay filter 回归。用户授权后仅录制一次且成功：2 次 gemini-3.8-flash，3011 input / 631 output / 3642 total；复用 writer 与图片 cassette，不再付费。已更新两份私有账本并审查提交 cassette。严格 check → 43 files / 563 passed / 1 skipped；严格 M2 gate + editor → 10 passed (20.7s)，刷新 M2 截图。原生 select 是现有生产控件模式且已用 Tokens 样式，无现成自定义生产下拉，保留。详见 receipt 第二轮记录。

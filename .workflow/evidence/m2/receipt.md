@@ -2,6 +2,33 @@
 
 Branch: `devin/1795402319-m2-gate`.
 
+## PR #57 round 4
+
+Started from confirmed HEAD `29da1b423a43d9a313938fd12446dfece99fd97c`.
+J: candidate adoption previously left `候选图片已生成` visible (gate expected
+zero status elements but received one). Clear the old generation status on
+image selection changes and candidate adoption. Generation itself replaces the
+old status with its new loading state. The gate asserts status removal after
+both a picker change event and candidate adoption, and captures
+`08-image-candidate-applied.png`. No additional provider calls or recordings.
+
+Final checks:
+
+```text
+Checked 305 files in 170ms. No fixes applied.
+Found 1 info.
+Test Files 43 passed (43)
+Tests 563 passed | 1 skipped (564)
+```
+
+```text
+✓ tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (11.3s)
+1 passed (12.9s)
+```
+
+Round 3 Linux checks and Electron smoke passed before this final push. The
+mainline hidden-text compatibility fix also passed the PR merge build.
+
 ## PR #57 round 3
 
 Confirmed starting HEAD `5bbcdabb2164b347493ecaa3d43fb49e4725cc1a`.

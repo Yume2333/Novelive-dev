@@ -59,13 +59,13 @@ out/main/chunks/client-B_wyAP3K.js                              954.72 kB
 out/main/chunks/index-BgS5ybJj.js                             1,240.29 kB
 out/main/chunks/google-shared-DSHGrtMa.js                     1,527.42 kB
 out/main/chunks/index-v6jqN50r.js                             2,002.54 kB
-✓ built in 4.91s
+✓ built in 5.07s
 vite v7.2.7 building ssr environment for production...
 transforming...
 ✓ 27 modules transformed.
 rendering chunks...
 out/preload/index.cjs  120.62 kB
-✓ built in 148ms
+✓ built in 132ms
 vite v7.2.7 building client environment for production...
 transforming...
 ✓ 3288 modules transformed.
@@ -90,22 +90,22 @@ rendering chunks...
 ../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-Ba7eOkfT.woff2  1,142.55 kB
 ../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-CN8EQoOj.woff   1,564.08 kB
 ../../apps/desktop/out/renderer/assets/index-CbFRh3nb.css                                            66.63 kB
-../../apps/desktop/out/renderer/assets/highlighted-body-PUFBAJJF-_tWF960Y.js                          0.80 kB
-../../apps/desktop/out/renderer/assets/getTextureBatchBindGroup-7ZGHOA6l.js                           0.94 kB
-../../apps/desktop/out/renderer/assets/canvasUtils-CKcVeVm9.js                                       13.47 kB
-../../apps/desktop/out/renderer/assets/getTexelRangeRects-BlE4fIsj.js                                19.18 kB
-../../apps/desktop/out/renderer/assets/webworkerAll-C7DjZUvO.js                                      34.97 kB
-../../apps/desktop/out/renderer/assets/CanvasPool-Dy67vsCJ.js                                        64.92 kB
-../../apps/desktop/out/renderer/assets/browserAll-DQ2s74mC.js                                       102.79 kB
-../../apps/desktop/out/renderer/assets/WebGPURenderer-BnL6i040.js                                   123.79 kB
-../../apps/desktop/out/renderer/assets/WebGLRenderer-CnXg7K7H.js                                    152.19 kB
-../../apps/desktop/out/renderer/assets/RenderTargetSystem-q5UiBR28.js                               167.68 kB
-../../apps/desktop/out/renderer/assets/CanvasRenderer-Hve35bct.js                                   281.00 kB
-../../apps/desktop/out/renderer/assets/index-DseQ69fm.js                                          3,025.36 kB
-✓ built in 7.65s
+../../apps/desktop/out/renderer/assets/highlighted-body-PUFBAJJF-CUb3sLh4.js                          0.80 kB
+../../apps/desktop/out/renderer/assets/getTextureBatchBindGroup-hvDhdMOi.js                           0.94 kB
+../../apps/desktop/out/renderer/assets/canvasUtils-BCkQXmSx.js                                       13.47 kB
+../../apps/desktop/out/renderer/assets/getTexelRangeRects-Cn-qNCIO.js                                19.18 kB
+../../apps/desktop/out/renderer/assets/webworkerAll-BH4KWLtl.js                                      34.97 kB
+../../apps/desktop/out/renderer/assets/CanvasPool-BgU1WH4H.js                                        64.92 kB
+../../apps/desktop/out/renderer/assets/browserAll-DWbTyRfj.js                                       102.79 kB
+../../apps/desktop/out/renderer/assets/WebGPURenderer-BRE_e9s9.js                                   123.79 kB
+../../apps/desktop/out/renderer/assets/WebGLRenderer-CzamJ4Al.js                                    152.19 kB
+../../apps/desktop/out/renderer/assets/RenderTargetSystem-CdtrhjMG.js                               167.68 kB
+../../apps/desktop/out/renderer/assets/CanvasRenderer-ZZ781lBC.js                                   281.00 kB
+../../apps/desktop/out/renderer/assets/index-DQmddScd.js                                          3,025.44 kB
+✓ built in 7.53s
 
 Running 1 test using 1 worker
 
-  ✓  1 tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (12.3s)
+  ✓  1 tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (11.3s)
 
-  1 passed (14.5s)
+  1 passed (12.9s)
