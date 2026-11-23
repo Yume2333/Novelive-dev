@@ -901,18 +901,27 @@ test('retries after an unmattable image instead of immediately offering a reject
 	}
 })
 
-test('retains a transparent EPUB costume when both repair prompts are moderated', async () => {
+test.each([
+	{ terminal: 'both repair prompts are moderated', first: 'costume-epub' },
+	{ terminal: 'the repair reference is refused', first: 'costume-1' },
+])('offers $first after $terminal', async ({ first }) => {
 	const opaque = await picture(320, 480, false)
 	const landscape = await picture(320, 180, false)
 	const portrait = await picture(320, 480, true)
 	const moderated = {
 		error: { code: 'moderation', message: 'Content rejected' },
 	} as const
-	const responses = [
+	const keepEpub = first === 'costume-epub'
+	const responses: Awaited<
+		ReturnType<ReturnType<typeof artModels.imageRenderer>>
+	>[] = [
 		{ bytes: portrait },
-		{ bytes: opaque },
-		moderated,
-		moderated,
+		...(keepEpub
+			? [{ bytes: opaque }, moderated, moderated]
+			: [
+					{ ...moderated, referenceModerated: true } as const,
+					{ bytes: portrait },
+				]),
 		{ bytes: opaque },
 		{ bytes: opaque },
 	]
@@ -927,11 +936,12 @@ test('retains a transparent EPUB costume when both repair prompts are moderated'
 	const matte = vi
 		.spyOn(background, 'removeBackground')
 		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	let portraitReviews = 0
 	const model = vi
 		.spyOn(artModels, 'artJson')
 		.mockImplementation(async (_connection, prompt) => {
 			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
-			return prompt.includes('造型候选')
+			return prompt.includes('造型候选') && ++portraitReviews === 1
 				? {
 						pass: false,
 						failedChecks: ['style'],
@@ -953,15 +963,14 @@ test('retains a transparent EPUB costume when both repair prompts are moderated'
 			)
 			expect(pool).toMatchObject({
 				mattingUnavailable: true,
-				characters: [
-					{ characterId: 'ada', candidates: [{ id: 'costume-epub' }] },
-				],
+				characters: [{ characterId: 'ada', candidates: [{ id: first }] }],
 			})
 			expect(
 				render.mock.calls
 					.filter(([, , , transparent]) => transparent)
 					.map(([, refs]) => refs.length),
-			).toEqual([1, 1, 1, 1, 0, 0])
+			).toEqual(keepEpub ? [1, 1, 1, 1, 0, 0] : [1, 1, 0, 0, 0])
+			expect(portraitReviews).toBe(keepEpub ? 1 : 2)
 		})
 	} finally {
 		renderer.mockRestore()

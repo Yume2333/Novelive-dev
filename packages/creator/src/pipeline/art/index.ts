@@ -552,10 +552,11 @@ export class ArtProduction {
 				if (result.error.code === 'unsupported')
 					return { issue, unsupported: true } as const
 				if (result.error.code === 'moderation') {
-					if (optionalReference && (result.referenceModerated || moderated))
-						return reviewed
-							? { issue, reviewed }
-							: ({ issue, moderated: true } as const)
+					if (
+						(optionalReference && result.referenceModerated) ||
+						(candidateBudget && moderated)
+					)
+						return { issue, reviewed, moderated: true } as const
 					if (moderated) break
 					moderated = true
 					feedback = moderationHint
@@ -672,6 +673,20 @@ export class ArtProduction {
 		const cachePath = (path: string) =>
 			projectFiles.style(styleScope).path.replace('bible/style.json', path)
 		const matting: CostumeCandidateBudget['matting'] = {}
+		const persistCandidate = async (
+			path: string,
+			png: Buffer,
+			portrait: boolean,
+		) => {
+			const profile = await this.saveWebp(
+				path,
+				png,
+				this.outputSize(portrait),
+				this.configuredProfile(),
+				true,
+			)
+			await this.writeRegistry(() => recordProfile(this.project, path, profile))
+		}
 		const saveCandidate = async (
 			drawing: Drawing,
 			path: string,
@@ -680,6 +695,9 @@ export class ArtProduction {
 			candidateBudget?: CostumeCandidateBudget,
 		) => {
 			if (!(await this.file(path))) {
+				const fallbackPath = path.replace(/\.webp$/, '-fallback.webp')
+				if (candidateBudget && (await this.file(fallbackPath)))
+					return { cachePath: fallbackPath }
 				if (
 					candidateBudget?.matting.error &&
 					candidateBudget.opaqueStreak >= opaqueCandidateLimit
@@ -695,23 +713,19 @@ export class ArtProduction {
 				)
 				let png: Buffer
 				if ('issue' in result) {
-					if ('moderated' in result) return false
-					if (!('reviewed' in result) || !result.reviewed)
+					if ('reviewed' in result && result.reviewed) {
+						if (candidateBudget)
+							return { cachePath: fallbackPath, png: result.reviewed }
+						png = result.reviewed
+					} else if ('moderated' in result) {
+						return false
+					} else {
 						throw new Error(result.issue)
-					png = result.reviewed
+					}
 				} else {
 					png = result.png
 				}
-				const profile = await this.saveWebp(
-					path,
-					png,
-					this.outputSize(portrait),
-					this.configuredProfile(),
-					true,
-				)
-				await this.writeRegistry(() =>
-					recordProfile(this.project, path, profile),
-				)
+				await persistCandidate(path, png, portrait)
 			}
 			return true
 		}
@@ -783,6 +797,22 @@ export class ArtProduction {
 				: undefined
 			for (const costume of character.costumes ?? []) {
 				const candidates: Candidate[] = []
+				let fallback: (Candidate & { png?: Buffer }) | undefined
+				const collect = async (
+					id: string,
+					drawing: Drawing,
+					path: string,
+					optionalReference = false,
+				) => {
+					const saved = await saveCostumeCandidate(
+						drawing,
+						path,
+						optionalReference,
+					)
+					if (saved === true) candidates.push({ id, cachePath: path })
+					else if (saved) fallback ??= { id, ...saved }
+					return saved === true
+				}
 				const references = this.styleReferences(bible.style)
 				const designReference = characterDesignReference(character)
 				if (designReference) references.push(designReference)
@@ -800,7 +830,8 @@ export class ArtProduction {
 						const path = cachePath(
 							`${directory}/costume-epub-${illustrationKey}.webp`,
 						)
-						const saved = await saveCostumeCandidate(
+						const saved = await collect(
+							'costume-epub',
 							{
 								...drawing,
 								references: [
@@ -815,15 +846,16 @@ export class ArtProduction {
 							path,
 							true,
 						)
-						if (saved) {
-							candidates.push({ id: 'costume-epub', cachePath: path })
-							continue
-						}
+						if (saved) continue
 					}
 					const id = `costume-${i}`
 					const path = cachePath(`${directory}/${id}.webp`)
-					if (await saveCostumeCandidate(drawing, path))
-						candidates.push({ id, cachePath: path })
+					await collect(id, drawing, path)
+				}
+				if (!candidates.length && fallback) {
+					const { id, cachePath, png } = fallback
+					if (png) await persistCandidate(cachePath, png, true)
+					candidates.push({ id, cachePath })
 				}
 				if (candidates.length)
 					characters.push({
