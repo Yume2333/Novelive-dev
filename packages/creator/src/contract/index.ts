@@ -198,7 +198,8 @@ export interface Novelive {
 	): () => void
 	resourceUrl(path: string): string
 	pickFolder(): Promise<string | null>
-	pickFiles(kind: 'source' | 'txt' | 'image'): Promise<string[]>
+	pickFiles(kind: 'source' | 'txt' | 'image' | 'package'): Promise<string[]>
+	pickPackageDestination?(): Promise<string | null>
 	host: {
 		progress?: DesktopProgressApi
 		share?: DesktopShareApi

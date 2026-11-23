@@ -1,5 +1,5 @@
-import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { lstat, mkdir } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import type { HostState } from '@novelive/creator/contract'
 import {
 	app,
@@ -213,6 +213,13 @@ app.whenReady().then(async () => {
 		return result.filePaths[0] ?? null
 	})
 	ipcMain.handle('novelive:pick-files', async (_event, kind: unknown) => {
+		if (kind === 'package') {
+			const result = await dialog.showOpenDialog({
+				properties: ['openFile'],
+				filters: [{ name: 'Novelive 作品包', extensions: ['novelive'] }],
+			})
+			return result.filePaths
+		}
 		if (kind !== 'source' && kind !== 'txt' && kind !== 'image') return []
 		const result = await dialog.showOpenDialog({
 			properties:
@@ -228,6 +235,32 @@ app.whenReady().then(async () => {
 						],
 		})
 		return result.filePaths
+	})
+	ipcMain.handle('novelive:pick-package-destination', async () => {
+		const result = await dialog.showSaveDialog({
+			defaultPath: '作品.novelive',
+			filters: [{ name: 'Novelive 作品包', extensions: ['novelive'] }],
+		})
+		if (result.canceled || !result.filePath) return null
+		if (/\.novelive$/i.test(result.filePath)) return result.filePath
+		const destination = `${result.filePath}.novelive`
+		try {
+			await lstat(destination)
+		} catch (error) {
+			if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+				return destination
+			throw error
+		}
+		const { response } = await dialog.showMessageBox({
+			type: 'warning',
+			title: '替换作品包',
+			message: `「${basename(destination)}」已存在，是否替换？`,
+			buttons: ['取消', '替换'],
+			defaultId: 0,
+			cancelId: 0,
+			noLink: true,
+		})
+		return response === 1 ? destination : null
 	})
 	ipcMain.handle('novelive:open-log-dir', async () => {
 		await mkdir(logDir(), { recursive: true })

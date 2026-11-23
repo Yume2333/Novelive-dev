@@ -6,11 +6,16 @@ import type {
 } from '../../../../../player/src/contract'
 import { manualSaveSlots } from '../../../../../player/src/contract'
 import { slotKey } from '../../../../../player/src/progress'
+import {
+	type LegacySaveActions,
+	LegacySavePanel,
+} from './legacy-saves/LegacySavePanel'
 
 export interface ProgressControlsProps {
 	workId: string
 	progress: WorkProgress
 	history: PlaybackHistory
+	legacySaves?: LegacySaveActions
 	onSave(slot: SaveSlot): Promise<void>
 	onLoad(slot: SaveSlot): Promise<void>
 	onHistory(index: number): void
@@ -22,6 +27,7 @@ export function ProgressPanel({
 	workId,
 	progress,
 	history,
+	legacySaves,
 	onSlot,
 	onHistory,
 	onHistoryStep,
@@ -107,6 +113,9 @@ export function ProgressPanel({
 	return (
 		<>
 			{failure && <p role="alert">{failure}</p>}
+			{legacySaves && (
+				<LegacySavePanel key={workId} workId={workId} actions={legacySaves} />
+			)}
 			<div className="nl-save-grid">
 				{Array.from({ length: manualSaveSlots }, (_, index) => {
 					const slot: SaveSlot = { kind: 'manual', slot: index + 1 }

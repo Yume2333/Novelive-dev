@@ -1,0 +1,109 @@
+.dialog {
+	width: min(560px, 100% - var(--space-7));
+	max-height: calc(100dvh - var(--space-7));
+	padding: var(--space-5);
+	overflow: hidden;
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-xl);
+	background: var(--color-surface-container-low);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-surface);
+}
+
+.dialog[open] {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.dialog::backdrop {
+	background: var(--scrim);
+}
+
+.dialog h2 {
+	margin: 0;
+	font: 700 20px var(--font-display);
+}
+
+.scroll {
+	min-height: 0;
+}
+
+.content {
+	display: grid;
+	gap: var(--space-3);
+	padding: var(--space-1);
+}
+
+.content :is(p, ul) {
+	margin: 0;
+}
+
+.content ul {
+	padding-inline-start: var(--space-5);
+}
+
+.options {
+	display: grid;
+	gap: var(--space-2);
+	margin: 0;
+	padding: var(--space-3);
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-md);
+}
+
+.content label {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.content input {
+	accent-color: var(--color-primary);
+}
+
+.notice {
+	display: grid;
+	gap: var(--space-2);
+	padding: var(--space-3);
+	border-radius: var(--radius-md);
+	background: var(--color-tertiary-fixed);
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--space-2);
+}
+
+.button,
+.primary {
+	min-height: 36px;
+	padding: var(--space-1) var(--space-3);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-container);
+	color: var(--color-on-surface);
+	font: inherit;
+	cursor: pointer;
+}
+
+.primary {
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+}
+
+:is(.button, .primary):hover:not(:disabled) {
+	filter: brightness(1.08);
+}
+
+:is(.button, .primary):focus-visible {
+	outline: none;
+	box-shadow: var(--shadow-focus);
+}
+
+:is(.button, .primary):disabled {
+	opacity: 0.5;
+	cursor: default;
+}
