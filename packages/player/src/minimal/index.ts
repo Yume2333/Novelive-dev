@@ -1,3 +1,4 @@
+import type { WorkSettings } from '@novelive/format/model'
 import type { Beat, CompiledScene, TextLine } from '@novelive/format/script'
 import { Application, Sprite, Texture } from 'pixi.js'
 import type { SentenceRef, StageSlot, StageSnapshot } from '../contract'
@@ -19,6 +20,7 @@ export async function mountMinimalPlayer(
 	speakerNames: Readonly<Record<string, string>> = {},
 	onBeat?: (beat: Beat | undefined) => void,
 	options: {
+		customMarks?: WorkSettings['customMarks']
 		chapterId?: string
 		restore?: StageSnapshot
 		start?: SentenceRef
@@ -95,6 +97,21 @@ export async function mountMinimalPlayer(
 		box.append(text)
 		overlay.replaceChildren(box)
 		textRenderer = mountText(text, line.content, {
+			customMarks: options.customMarks,
+			viewport: {
+				element: overlay,
+				textHeight() {
+					const above =
+						text.getBoundingClientRect().top - box.getBoundingClientRect().top
+					const style = getComputedStyle(box)
+					return (
+						overlay.clientHeight -
+						above -
+						Number.parseFloat(style.paddingBottom) -
+						Number.parseFloat(style.borderBottomWidth)
+					)
+				},
+			},
 			millisecondsPerCharacter: textSpeed,
 			auto,
 			continueImmediately: auto && line.kind !== 'caption',
