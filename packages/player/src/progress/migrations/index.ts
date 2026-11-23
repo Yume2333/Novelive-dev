@@ -1,67 +1,39 @@
 import type {
-	AssetId,
+	PlaybackBeat,
 	ProgressMigrationInput,
 	ProgressMigrationResult,
 	SaveEntry,
 	SentenceRef,
 	StageSnapshot,
 } from '../../contract'
-import { emptyStage } from '../../stage/state'
-import { sentenceKey } from '..'
+import { direct, emptyStage } from '../../stage/state'
+import { captureSnapshot, sentenceKey } from '..'
 
-function migrateSnapshot(
-	snapshot: StageSnapshot,
-	assets: ReadonlySet<AssetId>,
-): StageSnapshot {
-	const defaults = emptyStage()
-	const stage = snapshot.stage
-	const { background, cg, foreground, sprites } = stage ?? defaults
-	const transition = background?.transition
-	return {
-		...snapshot,
-		active: (snapshot.active ?? []).filter(
-			(active) =>
-				active.restore !== 'replay-state' ||
-				active.action.assets.every(({ id }) => assets.has(id)),
-		),
-		stage: {
-			...defaults,
-			...stage,
-			background:
-				background && assets.has(background.assetId)
-					? {
-							...background,
-							transition: transition
-								? {
-										...transition,
-										fromAssetId:
-											transition.fromAssetId &&
-											assets.has(transition.fromAssetId)
-												? transition.fromAssetId
-												: null,
-									}
-								: null,
-						}
-					: null,
-			cg: cg && assets.has(cg) ? cg : null,
-			foreground: foreground && assets.has(foreground) ? foreground : null,
-			sprites: Object.fromEntries(
-				Object.entries(sprites ?? {}).filter(([, sprite]) =>
-					assets.has(sprite.assetId),
-				),
-			),
-			camera: {
-				...defaults.camera,
-				...stage?.camera,
-				zoom: { ...defaults.camera.zoom, ...stage?.camera?.zoom },
-			},
-			text: {
-				...stage?.text,
-				kind: stage?.text?.kind ?? 'narration',
-				content: stage?.text?.content ?? [],
-			},
-		},
+function rebuildSnapshots(
+	chapters: readonly (readonly PlaybackBeat[])[],
+	wanted: ReadonlySet<string>,
+): Map<string, StageSnapshot> {
+	const snapshots = new Map<string, StageSnapshot>()
+	for (const chapter of chapters) {
+		const lastSave = chapter.findLastIndex(
+			({ cue }) => cue.kind === 'text' && wanted.has(sentenceKey(cue.position)),
+		)
+		let stage = emptyStage()
+		for (const { actions, cue } of chapter.slice(0, lastSave + 1)) {
+			stage = actions.reduce(direct, stage)
+			if (cue.kind === 'text') {
+				const key = sentenceKey(cue.position)
+				if (wanted.has(key))
+					snapshots.set(
+						key,
+						captureSnapshot(cue.position, { ...stage, text: cue.text }, [
+							{ restore: 'restart-text' },
+						]),
+					)
+			}
+		}
 	}
+	return snapshots
 }
 
 export function migrateProgress(
@@ -72,22 +44,24 @@ export function migrateProgress(
 		progress,
 		legacySaves,
 	}: ProgressMigrationInput,
-	assetIds: readonly AssetId[],
+	chapters: readonly (readonly PlaybackBeat[])[],
 ): ProgressMigrationResult {
 	if (toVersion <= fromVersion)
 		return structuredClone({ progress, legacySaves })
 
 	const valid = new Set(positions.map(sentenceKey))
-	const assets = new Set(assetIds)
 	const matches = (position: SentenceRef) => valid.has(sentenceKey(position))
+	const snapshots = rebuildSnapshots(
+		chapters,
+		new Set(
+			progress.saves.map(({ snapshot }) => sentenceKey(snapshot.position)),
+		),
+	)
 	const saves: SaveEntry[] = []
 	const archived: SaveEntry[] = []
 	for (const entry of progress.saves) {
-		if (matches(entry.snapshot.position))
-			saves.push({
-				...entry,
-				snapshot: migrateSnapshot(entry.snapshot, assets),
-			})
+		const snapshot = snapshots.get(sentenceKey(entry.snapshot.position))
+		if (snapshot) saves.push({ ...entry, snapshot })
 		else archived.push(entry)
 	}
 	const { mainline } = progress

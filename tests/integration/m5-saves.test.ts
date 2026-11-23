@@ -7,6 +7,7 @@ import { afterEach, expect, test } from 'vitest'
 import { FileProgressStore } from '../../apps/desktop/src/save-data'
 import { workProgress } from '../../packages/creator/src/contract/player-progress'
 import type {
+	PlaybackBeat,
 	SentenceRef,
 	StageSnapshot,
 	WorkProgress,
@@ -66,6 +67,63 @@ function capture(background: string) {
 		.toBuffer()
 }
 
+function textBeat(
+	position: SentenceRef,
+	actions: PlaybackBeat['actions'] = [],
+	text = snapshot(position).stage.text,
+): PlaybackBeat {
+	return {
+		sceneId: position.sceneId,
+		cue: { kind: 'text', position, text },
+		actions,
+		advance: { kind: 'click' },
+	}
+}
+
+function spriteDirection(
+	name: 'show' | 'face',
+	id: string,
+): PlaybackBeat['actions'][number] {
+	return {
+		type: 'action',
+		line: 1,
+		col: 1,
+		name,
+		args: { slot: 'left' },
+		assets: [{ id, slot: 'left' }],
+	}
+}
+
+test('restores the new release sprite in time for its next expression change', async () => {
+	const { store } = await createStore()
+	const saved = snapshot(first)
+	saved.stage.sprites = direct(
+		saved.stage,
+		spriteDirection('show', 'hero/old/calm'),
+	).sprites
+	await store.saveSlot(workId, quick, saved, await capture('#123456'))
+
+	const next = spriteDirection('face', 'hero/new/smiling')
+	const update = {
+		workId,
+		fromVersion: 1,
+		toVersion: 2,
+		chapters: [
+			[
+				textBeat(removedSentence, [spriteDirection('show', 'hero/new/calm')]),
+				textBeat(first),
+				textBeat({ ...first, sentenceId: '0003' }, [next]),
+			],
+		],
+	}
+	const { progress } = await store.migrate(update)
+	const [retained] = progress.saves
+	expect(retained.snapshot.stage.sprites.left?.assetId).toBe('hero/new/calm')
+	expect(direct(retained.snapshot.stage, next).sprites.left?.assetId).toBe(
+		'hero/new/smiling',
+	)
+})
+
 test('restores a kept sentence after the new release removes its saved background', async () => {
 	const { store } = await createStore()
 	const saved = snapshot(first)
@@ -85,12 +143,23 @@ test('restores a kept sentence after the new release removes its saved backgroun
 		},
 	]
 	await store.saveSlot(workId, quick, saved, await capture('#123456'))
+	const updatedText = {
+		kind: 'narration',
+		content: [{ type: 'text', text: 'Revised' }],
+	} as const
+	const cg = {
+		type: 'action',
+		line: 1,
+		col: 1,
+		name: 'cg',
+		args: {},
+		assets: [{ id: 'kept/cg' }],
+	} as const satisfies PlaybackBeat['actions'][number]
 	const update = {
 		workId,
 		fromVersion: 1,
 		toVersion: 2,
-		positions: [first],
-		assetIds: ['kept/cg'],
+		chapters: [[textBeat(first, [cg], updatedText)]],
 	}
 	const { progress, legacySaves } = await store.migrate(update)
 	const [retained] = progress.saves
@@ -100,8 +169,7 @@ test('restores a kept sentence after the new release removes its saved backgroun
 	let state = emptyStage()
 	const setState = (next: typeof state) => {
 		for (const asset of stageAssets(next))
-			if (!update.assetIds.includes(asset))
-				throw new Error(`Missing asset: ${asset}`)
+			if (asset !== 'kept/cg') throw new Error(`Missing asset: ${asset}`)
 		state = next
 	}
 	await restoreSnapshot(retained.snapshot, {
@@ -109,7 +177,7 @@ test('restores a kept sentence after the new release removes its saved backgroun
 		replayState: (action) => setState(direct(state, action)),
 		restartText: () => {},
 	})
-	expect(state).toEqual({ ...saved.stage, background: null })
+	expect(state).toEqual({ ...saved.stage, background: null, text: updatedText })
 })
 
 test('updates an existing progress file by full ID and persists archived slots with their thumbnails', async () => {
@@ -168,8 +236,34 @@ test('updates an existing progress file by full ID and persists archived slots w
 		workId,
 		fromVersion: 1,
 		toVersion: 2,
-		positions: [otherChapter, otherScene, first],
-		assetIds: ['room'],
+		chapters: [
+			[textBeat(otherChapter)],
+			[
+				textBeat(otherScene),
+				textBeat(
+					first,
+					[
+						{
+							type: 'action',
+							line: 1,
+							col: 1,
+							name: 'bg',
+							args: { transition: 'none' },
+							assets: [{ id: 'room' }],
+						},
+						{
+							type: 'action',
+							line: 2,
+							col: 1,
+							name: 'zoom',
+							args: { scale: 1.5, target: 'stage' },
+							assets: [],
+						},
+					],
+					text,
+				),
+			],
+		] satisfies readonly (readonly PlaybackBeat[])[],
 	}
 	const expected: WorkProgress = {
 		mainline: otherScene,
@@ -179,6 +273,7 @@ test('updates an existing progress file by full ID and persists archived slots w
 				...retained,
 				snapshot: {
 					...snapshot(first),
+					active: [{ restore: 'restart-text' }],
 					stage: {
 						...emptyStage(),
 						background: { assetId: 'room', transition: null },
@@ -259,8 +354,7 @@ test('keeps identical slot numbers independent across releases and bounds the ma
 		workId,
 		fromVersion: 1,
 		toVersion: 2,
-		positions: [first, otherChapter],
-		assetIds: [],
+		chapters: [[textBeat(first)], [textBeat(otherChapter)]],
 	}
 	expect(
 		(await store.migrate({ ...update, toVersion: 1 })).progress.mainline,
@@ -272,7 +366,7 @@ test('keeps identical slot numbers independent across releases and bounds the ma
 		...update,
 		fromVersion: 2,
 		toVersion: 3,
-		positions: [],
+		chapters: [],
 	})
 	expect(release).toEqual({
 		progress: { mainline: null, read: [], saves: [] },

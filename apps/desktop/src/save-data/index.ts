@@ -11,8 +11,8 @@ import {
 import { join } from 'node:path'
 import sharp from 'sharp'
 import {
-	type AssetId,
 	type LegacySaveGroup,
+	type PlaybackBeat,
 	type ProgressMigrationInput,
 	type ProgressMigrationResult,
 	type ProgressStore,
@@ -89,11 +89,14 @@ export class FileProgressStore implements ProgressStore {
 	}
 
 	migrate(
-		input: Omit<ProgressMigrationInput, 'progress' | 'legacySaves'> & {
-			assetIds: readonly AssetId[]
+		input: Omit<
+			ProgressMigrationInput,
+			'positions' | 'progress' | 'legacySaves'
+		> & {
+			chapters: readonly (readonly PlaybackBeat[])[]
 		},
 	): Promise<ProgressMigrationResult> {
-		const { assetIds, ...update } = structuredClone(input)
+		const { chapters, ...update } = structuredClone(input)
 		return this.enqueue(async () => {
 			const stored = await this.read(update.workId)
 			if (!stored)
@@ -101,7 +104,15 @@ export class FileProgressStore implements ProgressStore {
 					progress: { mainline: null, read: [], saves: [] },
 					legacySaves: [],
 				}
-			const migrated = migrateProgress({ ...update, ...stored }, assetIds)
+			const positions = chapters.flatMap((chapter) =>
+				chapter.flatMap(({ cue }) =>
+					cue.kind === 'text' ? [cue.position] : [],
+				),
+			)
+			const migrated = migrateProgress(
+				{ ...update, ...stored, positions },
+				chapters,
+			)
 			await this.write(update.workId, migrated)
 			return migrated
 		})
