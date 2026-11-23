@@ -76,3 +76,23 @@ Checked 249 files in 103ms. No fixes applied.
 Found 1 info.
 Exit code: 0
 The same existing useTemplate informational diagnostic remains.
+
+Second review corrections (supersedes scoped-reference validation above):
+- Existing effective registry/style entries are updated at their winning scope; new production entries retain series ownership. Work style reference images also remain work-local.
+- Synthesis prompts retain scoped context, but validation uses the series publication bible plus patch additions. A work-only relation reference now triggers JSON repair.
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.test.ts tests/unit/m1a-synthesis.test.ts tests/unit/m1b-writer.test.ts tests/unit/m1b-art.test.ts tests/unit/m1b-production-worker.test.ts tests/unit/m1b-player.test.ts tests/unit/m2-revisions.test.ts
+ Test Files  7 passed (7)
+      Tests  111 passed (111)
+   Start at  03:17:45
+   Duration  10.85s (tests 89%, import 7%, transform 4%)
+Exit code: 0
+New coverage: pending work-owned asset adoption becomes drawn in loadPlayerChapter; work-owned style approval leaves the series style unchanged; work-only relation references request repair before publishing.
+
+$ pnpm typecheck && pnpm lint
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 250 files in 107ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+The existing useTemplate informational diagnostic remains.

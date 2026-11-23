@@ -2,7 +2,6 @@ import { arr, bool, obj, oneOf, str } from '@earendil-works/pi-schema'
 import {
 	type AssetRegistry,
 	type ChapterRef,
-	formatVersion,
 	type ImageJobResult,
 	type ProjectScope,
 	projectFiles,
@@ -12,8 +11,8 @@ import sharp from 'sharp'
 import { type ImageConfig, imageProvider, imageSize } from '../../models/image'
 import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
-import { resolveRegistry } from '../../project/series/resolve'
 import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
+import { resolveRegistry } from '../../project/series/resolve'
 import { checkImage, type Dimensions, placeholder } from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
@@ -84,7 +83,13 @@ export class ArtProduction {
 	}
 
 	private async persistRegistry(registry: AssetRegistry) {
-		await persistOwnedEntries(this.project, this.options.readScope ?? this.scope, this.scope, projectFiles.assetRegistry, registry.entries)
+		await persistOwnedEntries(
+			this.project,
+			this.options.readScope ?? this.scope,
+			this.scope,
+			projectFiles.assetRegistry,
+			registry.entries,
+		)
 	}
 
 	async register(
@@ -590,13 +595,22 @@ export class ArtProduction {
 			},
 		)
 		const references: NonNullable<Style['references']> = []
-		const styleScope = await entryOwner(this.project, this.options.readScope ?? this.scope, this.scope, projectFiles.style, style.id)
+		const styleScope = await entryOwner(
+			this.project,
+			this.options.readScope ?? this.scope,
+			this.scope,
+			projectFiles.style,
+			style.id,
+		)
 		for (const [i, source] of [main, ...supplemental].entries()) {
-			const path = projectFiles.style(styleScope).path.replace('bible/style.json',
-				i === 0
-					? 'assets/style/main-visual.webp'
-					: `assets/style/supplemental-${i}.webp`,
-			)
+			const path = projectFiles
+				.style(styleScope)
+				.path.replace(
+					'bible/style.json',
+					i === 0
+						? 'assets/style/main-visual.webp'
+						: `assets/style/supplemental-${i}.webp`,
+				)
 			await this.saveWebp(
 				path,
 				await this.project.readFile(source),
@@ -631,7 +645,15 @@ export class ArtProduction {
 			await this.persistRegistry(registry)
 		})
 		const chosen: Style = { ...style, status: 'confirmed', references }
-		await this.writeRegistry(() => persistOwnedEntries(this.project, this.options.readScope ?? this.scope, this.scope, projectFiles.style, [chosen]))
+		await this.writeRegistry(() =>
+			persistOwnedEntries(
+				this.project,
+				this.options.readScope ?? this.scope,
+				this.scope,
+				projectFiles.style,
+				[chosen],
+			),
+		)
 		return chosen
 	}
 }
