@@ -19,6 +19,14 @@ export type ArtBible = {
 	locations: readonly Location[]
 }
 
+export const manifestIdShapes = {
+	character: 'character/costume/expression',
+	expression: 'character/costume/expression',
+	location: 'place/variant',
+	variant: 'place/variant',
+	cg: 'cg-name',
+} satisfies Record<Kind, string>
+
 export function assetPath(id: string, kind: Kind) {
 	const folder =
 		kind === 'cg'
@@ -52,15 +60,9 @@ export function planArt(
 	const prefix = (id: string) => id.slice(0, id.lastIndexOf('/'))
 	const leaf = (id: string) => id.slice(id.lastIndexOf('/') + 1)
 	function check(id: string, kind: Kind) {
-		const parts = id.split('/').length
 		if (
 			!validId(id) ||
-			parts !==
-				(kind === 'cg'
-					? 1
-					: kind === 'character' || kind === 'expression'
-						? 3
-						: 2)
+			id.split('/').length !== manifestIdShapes[kind].split('/').length
 		)
 			throw new Error(`Invalid ${kind} asset: ${id}`)
 	}
