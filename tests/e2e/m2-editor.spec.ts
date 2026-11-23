@@ -27,7 +27,7 @@ const firstScene =
 	'scene 空屋\nsource p0001\n: 第一句。 #0001\n: 第二句。 #0002\n'
 const secondScene = 'scene 门外\nsource p0002\n: 门外的风。 #0003\n'
 
-async function editAndPreview(page: Page) {
+async function editAndPreview(page: Page, secondLine = 4) {
 	await expect(
 		page.getByRole('heading', { name: '编辑器', exact: true }),
 	).toBeVisible()
@@ -45,8 +45,12 @@ async function editAndPreview(page: Page) {
 	await expect(
 		page.getByRole('button', { name: 'p0001 · 空屋原文。' }),
 	).toHaveAttribute('aria-pressed', 'true')
-	await page.getByLabel('快捷位置', { exact: true }).selectOption('4')
-	await expect(page.getByText('当前行 4', { exact: true })).toBeVisible()
+	await page
+		.getByLabel('快捷位置', { exact: true })
+		.selectOption(String(secondLine))
+	await expect(
+		page.getByText(`当前行 ${secondLine}`, { exact: true }),
+	).toBeVisible()
 	const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
 	await editor.press('Home')
 	await editor.press('ArrowRight')
@@ -61,7 +65,9 @@ async function editAndPreview(page: Page) {
 	await expect(page.locator('.nl-player-text')).toHaveText('改过的第二句。')
 	await page.getByRole('button', { name: '撤销', exact: true }).click()
 	await expect(editor).not.toContainText('改过的')
-	await page.getByLabel('快捷位置', { exact: true }).selectOption('4')
+	await page
+		.getByLabel('快捷位置', { exact: true })
+		.selectOption(String(secondLine))
 	await page.getByRole('button', { name: '从当前句预览' }).click()
 	await expect(page.locator('.nl-player-text')).toHaveText('第二句。')
 	await mkdir(evidence, { recursive: true })
@@ -94,11 +100,11 @@ test('M2 editor preview locates source and current line, edits, undoes and previ
 			)
 			await project.writeFile(
 				projectFiles.scene(playerRef, 'aaaabbbb'),
-				firstScene,
+				firstScene.replace('source p0001\n', 'source p0001\n@bg room/dusk\n'),
 			)
 			await project.writeFile(
 				projectFiles.scene(playerRef, 'ccccdddd'),
-				secondScene,
+				secondScene.replace('source p0002\n', 'source p0002\n@bg future/day\n'),
 			)
 		}
 		await mkdir(join(profile, 'projects'), { recursive: true })
@@ -119,8 +125,66 @@ test('M2 editor preview locates source and current line, edits, undoes and previ
 			await page.evaluate(({ workId, chapterId }) => {
 				window.location.hash = `/work/${workId}/edit?chapterId=${chapterId}`
 			}, playerRef)
-			await editAndPreview(page)
+			await editAndPreview(page, 5)
+			await expect
+				.poll(async () => {
+					const { data, info } = await sharp(
+						await page.locator('canvas').screenshot(),
+					)
+						.raw()
+						.toBuffer({ resolveWithObject: true })
+					const offset =
+						(Math.floor(info.height * 0.1) * info.width +
+							Math.floor(info.width * 0.1)) *
+						info.channels
+					return Array.from(data.subarray(offset, offset + 3))
+				})
+				.toEqual([32, 48, 96])
 			await page.screenshot({ path: `${evidence}/05-editor-preview.png` })
+			const opened = await page.evaluate(
+				({ workId, chapterId }) =>
+					window.novelive.call('editor.open', { workId, chapterId }).promise,
+				playerRef,
+			)
+			expect(
+				opened.registry.entries.find((entry) => entry.id === 'room/dusk')?.path,
+			).toMatch(/^editor\/[a-f0-9]{64}\.png$/)
+			expect(
+				opened.registry.entries.find((entry) => entry.id === 'future/day')
+					?.path,
+			).toMatch(/^editor\/unavailable\/[a-f0-9]{64}\.png$/)
+			const saved = await page.evaluate(
+				({ opened, workId }) =>
+					window.novelive.call('editor.saveRules', {
+						workId,
+						target: { scope: 'work' },
+						expectedRevision: opened.settingsRevision,
+						previous: opened.settings.rules,
+						next: ['保留原文'],
+					}).promise,
+				{ opened, workId: playerWorkId },
+			)
+			expect(saved.rules).toEqual(['保留原文'])
+			await page.evaluate(
+				({ editorId, workId, chapterId }) =>
+					window.novelive.call('editor.close', { editorId, workId, chapterId })
+						.promise,
+				{ ...playerRef, editorId: opened.editorId },
+			)
+			const history = await page.evaluate(
+				(input) => window.novelive.call('editor.history', input).promise,
+				{ workId: playerWorkId },
+			)
+			expect(history.entries.map((entry) => entry.origin)).toEqual([
+				'creator',
+				'undo',
+				'creator',
+			])
+			expect(history.entries.map((entry) => entry.kind)).toEqual([
+				'rules',
+				'text',
+				'text',
+			])
 			await page.evaluate(() => {
 				window.location.hash = '/'
 			})
@@ -136,6 +200,9 @@ test('M2 editor preview locates source and current line, edits, undoes and previ
 			await expect(
 				page.getByRole('button', { name: '撤销', exact: true }),
 			).toBeDisabled()
+			await page.getByLabel('场景', { exact: true }).selectOption('1')
+			await page.getByRole('button', { name: '从当前句预览' }).click()
+			await expect(page.getByRole('alert')).toHaveText('无法加载舞台素材')
 		} finally {
 			await app.close()
 		}
