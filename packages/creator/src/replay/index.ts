@@ -45,6 +45,14 @@ export function isSpendGuardedFetch(fetch: typeof globalThis.fetch) {
 	return spendGuardedFetches.has(fetch)
 }
 
+export function inheritSpendGuard(
+	source: typeof globalThis.fetch,
+	wrapper: typeof globalThis.fetch,
+) {
+	if (isSpendGuardedFetch(source)) spendGuardedFetches.add(wrapper)
+	return wrapper
+}
+
 const bodyLimit = 256 * 1024
 const allowedHeaders = ['content-type', 'retry-after'] as const
 const sha = str({ pattern: '^[a-f0-9]{64}$' })

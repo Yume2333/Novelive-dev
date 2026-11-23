@@ -124,6 +124,31 @@ test('repairs source alignment JSON before validating ranges', async () => {
 	expect(requests[1]).toContain('Scene source alignment returned invalid JSON')
 })
 
+test('stops without a style repair when the malformed reply did not settle', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-style-usage-'))
+	using db = new DatabaseSync(':memory:')
+	const provider = responses('{"issues":["tone" "rhythm"]}')
+	const fetch = createReplayFetch({
+		mode: 'record',
+		directory,
+		fetch: provider.fetch,
+		spend: projectSpend(db),
+	})
+	try {
+		await expect(
+			reviewStyle(writingModel(provider.options.writer, { fetch }), scene),
+		).rejects.toThrow(
+			'Model request outcome unknown; not retried automatically',
+		)
+		expect(provider.requests).toHaveLength(1)
+		expect(
+			db.prepare('SELECT actual_tokens FROM spend_reservation').all(),
+		).toEqual([{ actual_tokens: null }])
+	} finally {
+		await rm(directory, { recursive: true, force: true })
+	}
+})
+
 test('separates new mark proposals from NVS and skips unsafe or registered marks', async () => {
 	const { options, requests } = responses(
 		[

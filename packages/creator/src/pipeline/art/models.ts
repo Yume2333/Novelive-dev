@@ -16,7 +16,11 @@ import {
 	type TextConnection,
 	textResultError,
 } from '../../models/text'
-import { createReplayFetch, type ReplayOptions } from '../../replay'
+import {
+	createReplayFetch,
+	inheritSpendGuard,
+	type ReplayOptions,
+} from '../../replay'
 import { recordImageUsage } from '../../usage'
 import { SpendBudgetError } from '../../usage/spend'
 import type { Dimensions } from './check'
@@ -61,7 +65,7 @@ function checkedReplay(fetch: typeof globalThis.fetch) {
 		get failure() {
 			return failure
 		},
-		fetch: (async (input, init) => {
+		fetch: inheritSpendGuard(fetch, async (input, init) => {
 			try {
 				return await fetch(input, init)
 			} catch (error) {
@@ -73,7 +77,7 @@ function checkedReplay(fetch: typeof globalThis.fetch) {
 					failure = error
 				throw error
 			}
-		}) satisfies typeof globalThis.fetch,
+		}),
 	}
 }
 
@@ -230,7 +234,10 @@ async function requestArtJson<T>(
 			data: png.toString('base64'),
 		})),
 	]
-	const response = await createTextStream({ fetch: replay.fetch })(
+	const response = await createTextStream({
+		fetch: replay.fetch,
+		stopOnUnknownOutcome: true,
+	})(
 		model,
 		normalizeContext({
 			messages: [{ role: 'user', content, timestamp: 0 }],

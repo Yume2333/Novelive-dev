@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { bool, obj } from '@earendil-works/pi-schema'
 import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
@@ -17,7 +18,10 @@ import * as artModels from '../../packages/creator/src/pipeline/art/models'
 import { planArt } from '../../packages/creator/src/pipeline/art/plan'
 import * as upscale from '../../packages/creator/src/pipeline/postprocess'
 import { Project } from '../../packages/creator/src/project'
-import { quoteSpend } from '../../packages/creator/src/usage/spend'
+import {
+	projectSpend,
+	quoteSpend,
+} from '../../packages/creator/src/usage/spend'
 import {
 	bible,
 	directory,
@@ -121,6 +125,41 @@ async function projectTest(run: (project: Project) => Promise<void>) {
 		await rm(dir, { recursive: true, force: true })
 	}
 }
+
+test('stops without a staging repair when the malformed reply did not settle', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-staging-usage-'))
+	using db = new DatabaseSync(':memory:')
+	const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+		const frame = {
+			choices: [
+				{
+					index: 0,
+					delta: { content: '{"patch":"" "items":[]}' },
+					finish_reason: 'stop',
+				},
+			],
+		}
+		return new Response(`data: ${JSON.stringify(frame)}\n\ndata: [DONE]\n\n`, {
+			headers: { 'content-type': 'text/event-stream' },
+		})
+	})
+	try {
+		await expect(
+			directChapterArt(script, bible, empty, {
+				main,
+				replay: { mode: 'record', directory, fetch, spend: projectSpend(db) },
+			}),
+		).rejects.toThrow(
+			'Model request outcome unknown; not retried automatically',
+		)
+		expect(fetch).toHaveBeenCalledTimes(1)
+		expect(
+			db.prepare('SELECT actual_tokens FROM spend_reservation').all(),
+		).toEqual([{ actual_tokens: null }])
+	} finally {
+		await rm(directory, { recursive: true, force: true })
+	}
+})
 
 test('parallel jobs serialize registry updates across art service instances', async () => {
 	await projectTest(async (project) => {

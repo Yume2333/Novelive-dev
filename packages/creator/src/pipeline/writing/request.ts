@@ -27,11 +27,16 @@ export function writingModel(
 	options: WritingTransport,
 ) {
 	const model = buildTextModel(connection)
-	const stream = createTextStream({
+	const policy = {
 		fetch: options.fetch,
 		...(process.env.NL_REPLAY === 'record'
 			? { requestRetries: 0, streamRetries: 0 }
 			: {}),
+	}
+	const stream = createTextStream(policy)
+	const guardedStream = createTextStream({
+		...policy,
+		stopOnUnknownOutcome: true,
 	})
 	const outputLimit = outputTokenBudget(model)
 	const outputTokens = Math.min(
@@ -49,10 +54,12 @@ export function writingModel(
 			context: Context,
 			phase = 'Writing prompt',
 			outputEstimate = 0,
+			reply: 'script' | 'json' = 'script',
 		) {
 			options.signal?.throwIfAborted()
 			const normalized = normalizeContext(context)
-			const result = await stream(
+			const dispatch = reply === 'json' ? guardedStream : stream
+			const result = await dispatch(
 				model,
 				fitPrompt(limits, normalized, phase, outputEstimate),
 				{
@@ -97,7 +104,7 @@ export async function requestWritingJson<T>(
 	const request = async (
 		context: Context,
 	): Promise<{ issue: string } | { value: T }> => {
-		const result = await model.request(context, phase)
+		const result = await model.request(context, phase, 0, 'json')
 		let value: unknown
 		try {
 			value = parseModelJson(textOf(result))
