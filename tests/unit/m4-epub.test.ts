@@ -308,6 +308,22 @@ test('retains notes before the first TOC chapter', async () => {
 	)
 })
 
+test('excludes cover and notes-only files from heading coverage', async () => {
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/book.opf':
+				'<package><manifest><item id="cover" href="cover.xhtml"/><item id="notes" href="notes.xhtml"/><item id="body" href="chapter.xhtml"/><item id="image" href="images/picture.svg" media-type="image/svg+xml"/></manifest><spine><itemref idref="cover"/><itemref idref="notes"/><itemref idref="body"/></spine></package>',
+			'OPS/cover.xhtml': xhtml('<img src="images/picture.svg"/>'),
+			'OPS/notes.xhtml': xhtml(
+				'<section epub:type="copyright-page"><p>Copyright note.</p></section>',
+			),
+		}),
+	)
+	expect(book.navigation).toBe('heading')
+	expect(book.volumes[0].chapters).toHaveLength(2)
+	expect(book.volumes[0].chapters[0].notes).toContain('Copyright note.')
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)

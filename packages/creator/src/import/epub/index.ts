@@ -310,9 +310,12 @@ export async function extractEpub(
 		method = 'heading'
 		const hasSignal = (block: Block) =>
 			block.heading && chapterKeyword.test(block.text)
+		const proseDocs = docs.filter((doc) =>
+			doc.blocks.some((block) => block.text && !block.note),
+		)
 		if (
 			docs.filter((doc) => doc.blocks.some(hasSignal)).length >=
-			Math.max(1, docs.length / 2)
+			Math.max(1, proseDocs.length / 2)
 		) {
 			markers = docs.flatMap((doc, index) => {
 				const headings = doc.blocks.flatMap((block, offset) =>
