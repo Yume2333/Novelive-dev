@@ -16,6 +16,7 @@ import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
 import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
 import { resolveRegistry } from '../../project/series/resolve'
+import type { ReplayOptions } from '../../replay'
 import { SpendBudgetError } from '../../usage/spend'
 import {
 	checkVariantProfile,
@@ -77,6 +78,7 @@ type VisualCandidates = {
 }
 type Options = ModelOptions & {
 	image: ImageConfig
+	imageGenerationReplay?: ReplayOptions
 	main: TextConnection
 	portrait?: TextConnection
 	fast: TextConnection
@@ -599,7 +601,11 @@ export class ArtProduction {
 		candidateBudget?: CostumeCandidateBudget,
 		checkpoint?: ReviewCheckpoint,
 	) {
-		this.render ??= imageRenderer(this.options.image, this.options)
+		this.render ??= imageRenderer(
+			this.options.image,
+			this.options,
+			this.options.imageGenerationReplay,
+		)
 		const render = this.render
 		const references = drawing.references.slice(0, 16)
 		const auditRefs = await Promise.all(

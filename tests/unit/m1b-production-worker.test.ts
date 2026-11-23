@@ -620,7 +620,7 @@ test.each([
 				const location = projectFiles.location({ level: 'series' }, 'room')
 				await project.write(location, {
 					formatVersion,
-					entries: bible.locations,
+					entries: [...bible.locations],
 				})
 				const [job] = await art().register(
 					[{ id: assetId, kind: 'location', description: 'Room in sunlight' }],
@@ -731,11 +731,13 @@ test('recording dispatches identical image requests for distinct editor candidat
 		}
 	}
 	const images: unknown[] = []
+	const textModels: string[] = []
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const request = new Request(input, init)
 		if (!request.url.endsWith('/images/generations')) {
-			return request.url.endsWith('/chat/completions') &&
-				(await request.json()).model === configuration.models.visual.model
+			const { model } = await request.json()
+			textModels.push(model)
+			return model === configuration.models.visual.model
 				? completion({ pass: true, failedChecks: [], feedback: '' })
 				: completion({ content: 'A sunny room.' })
 		}
@@ -745,7 +747,7 @@ test('recording dispatches identical image requests for distinct editor candidat
 				width: 64,
 				height: 36,
 				channels: 3,
-				background: ['red', 'blue', 'green', 'yellow'][images.length - 1],
+				background: ['red', 'blue', 'red', 'yellow'][images.length - 1],
 			},
 		})
 			.png()
@@ -796,11 +798,18 @@ test('recording dispatches identical image requests for distinct editor candidat
 	expect(images).toHaveLength(2)
 	expect(images[1]).toEqual(images[0])
 	expect(first.equals(second)).toBe(false)
+	expect(textModels).toEqual([
+		configuration.models.main.model,
+		configuration.models.visual.model,
+		configuration.models.main.model,
+		configuration.models.visual.model,
+	])
 	const [third, fourth] = await regenerate(join(directory, 'fresh'), recorded)
 	expect(images).toHaveLength(4)
 	expect(images.slice(2)).toEqual(images.slice(0, 2))
-	expect(third.equals(first)).toBe(false)
+	expect(third.equals(first)).toBe(true)
 	expect(third.equals(fourth)).toBe(false)
+	expect(textModels.slice(4)).toEqual([configuration.models.visual.model])
 })
 
 test('production records to NL_CASSETTE_DIR when no production directory is set', async () => {
