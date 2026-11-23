@@ -21,6 +21,8 @@ import type { Dimensions } from './check'
 
 export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
 
+export class ArtResponseSchemaError extends Error {}
+
 function checkedReplay(fetch: typeof globalThis.fetch) {
 	let failure: unknown
 	return {
@@ -198,6 +200,7 @@ export async function artJson<T>(
 	const json =
 		/^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(text.trim())?.[1] ?? text
 	const validated = compile(schema).validate(JSON.parse(json))
-	if (!validated.ok) throw new Error(JSON.stringify(validated.errors))
+	if (!validated.ok)
+		throw new ArtResponseSchemaError(JSON.stringify(validated.errors))
 	return validated.value
 }
