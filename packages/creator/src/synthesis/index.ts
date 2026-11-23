@@ -150,12 +150,18 @@ function fitBytes(text: string, limit: number) {
 		stream: true,
 	})
 }
-function recentEvents(events: Event[], historyBudget: number) {
+function recentEvents(
+	events: Event[],
+	historyBudget: number,
+	distinct = false,
+) {
 	const summaries: string[] = []
+	const seen = new Set<string>()
 	let remaining = historyBudget - 2
 	for (let i = events.length - 1; i >= 0 && remaining > 0; i--) {
 		const chars = Array.from(events[i].event).slice(0, 160)
 		let summary = chars.join('')
+		if (distinct && seen.has(summary)) continue
 		const separator = summaries.length ? 1 : 0
 		let size = bytes(JSON.stringify(summary)) + separator
 		if (!summaries.length)
@@ -165,6 +171,7 @@ function recentEvents(events: Event[], historyBudget: number) {
 				size = bytes(JSON.stringify(summary))
 			}
 		if (size > remaining) break
+		seen.add(summary)
 		summaries.unshift(summary)
 		remaining -= size
 	}
@@ -185,7 +192,11 @@ function repeatsPacketEvent(event: Event, packetEvents: Event[]) {
 		)
 	)
 }
-function proposedEntries(events: Event[], budget: number) {
+function proposedEntries(
+	events: Event[],
+	packetEvents: Event[],
+	budget: number,
+) {
 	const lines = new Map<string, string>()
 	const items = events.flatMap((event) => event.biblePatch)
 	for (const kind of [
@@ -214,14 +225,44 @@ function proposedEntries(events: Event[], budget: number) {
 		}
 	for (const entry of events.flatMap((event) => event.glossaryPatch))
 		lines.set(`glossary:${entry.original}`, `glossary ${entry.original}`)
-	const kept: string[] = []
-	let remaining = budget
-	for (const line of lines.values()) {
-		remaining -= bytes(line) + 1
-		if (remaining < 0) break
-		kept.push(line)
+	const full = [...lines.values()].join('\n')
+	if (bytes(full) <= budget) return { text: full, compact: false }
+
+	const ordered = new Set<string>()
+	for (const event of [...packetEvents].reverse()) {
+		for (const item of event.biblePatch)
+			if (item.op !== 'delete') ordered.add(`${item.kind}:${item.entry.id}`)
+		for (const entry of event.glossaryPatch)
+			ordered.add(`glossary:${entry.original}`)
 	}
-	return kept.join('\n')
+	for (const key of lines.keys()) ordered.add(key)
+	const groups = new Map<string, string[]>()
+	for (const key of ordered) {
+		const colon = key.indexOf(':')
+		const kind = key.slice(0, colon)
+		const id = key.slice(colon + 1)
+		if (!groups.has(kind)) groups.set(kind, [])
+		groups.get(kind)?.push(kind === 'glossary' ? JSON.stringify(id) : id)
+	}
+	const kept = new Map<string, string>()
+	let remaining = budget
+	const pending = [...groups].map(([kind, ids]) => ({ kind, ids, index: 0 }))
+	while (pending.length) {
+		for (let i = 0; i < pending.length; ) {
+			const group = pending[i]
+			const id = group.ids[group.index++]
+			const line = kept.get(group.kind)
+			const text = line === undefined ? `${group.kind}: ${id}` : ` ${id}`
+			const size = bytes(text) + Number(line === undefined && kept.size > 0)
+			if (size <= remaining) {
+				kept.set(group.kind, (line ?? '') + text)
+				remaining -= size
+			}
+			if (group.index === group.ids.length) pending.splice(i, 1)
+			else i++
+		}
+	}
+	return { text: [...kept.values()].join('\n'), compact: true }
 }
 function previewPackets(
 	previews: readonly string[],
@@ -571,6 +612,7 @@ ${nextEvent.instructions}`
 		prompt: string,
 		contract: ReturnType<typeof synthesisOutput<T>>,
 		check: (output: T) => void,
+		focusedPrompt?: string,
 	): Promise<T> {
 		const repairBudget = budget - bytes(prompt) - bytes(repairPrefix)
 		if (repairBudget <= 0)
@@ -585,11 +627,15 @@ ${nextEvent.instructions}`
 				outputLimit,
 				cacheRetention: 'none',
 			}).result()
-			if (response.stopReason !== 'stop')
-				throw textResultError(
+			if (response.stopReason !== 'stop') {
+				const error = textResultError(
 					response,
 					`Synthesis stopped: ${response.stopReason}`,
 				)
+				if (focusedPrompt && error.code === 'reasoning_limit')
+					return request(focusedPrompt, contract, check)
+				throw error
+			}
 			try {
 				const text = response.content
 					.flatMap((part) => (part.type === 'text' ? [part.text] : []))
@@ -648,15 +694,28 @@ ${nextEvent.instructions}`
 		const packetEvents = state.events.slice(
 			state.events.findLastIndex(({ is_last }) => is_last) + 1,
 		)
-		const event = await request(
-			`${eventPrompt}
-Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Describe a relation as the standing relationship between the pair, naming its kind first, not the scene that shows it. Set is_last when done.
+		const registry = proposedEntries(state.events, packetEvents, registryBudget)
+		const summaries = recentEvents(
+			registry.compact ? packetEvents : state.events,
+			historyBudget,
+			registry.compact,
+		)
+		const complete =
+			'When no distinct event or new fact remains in this packet, use is_last:true and empty arrays instead of restating it.'
+		const prompt = (instruction: string) => `${eventPrompt}
+Extract only the next event in packet ${packet + 1}/${packets.length}. ${instruction}
 Events already extracted: ${state.events.length}
 Already proposed entries:
-${proposedEntries(state.events, registryBudget)}
-Recent event summaries: ${recentEvents(state.events, historyBudget)}
+${registry.text}
+Recent event summaries: ${summaries}
 Chapter previews:
-${packets[packet]}`,
+${packets[packet]}`
+		const event = await request(
+			prompt(
+				registry.compact
+					? `Compare this packet with the saved events and proposed IDs below. Skip restatements, including rewordings; return progress and qualifying facts only for the next uncovered event. Describe relations as standing relationships, naming their kind first. ${complete}`
+					: 'Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Describe a relation as the standing relationship between the pair, naming its kind first, not the scene that shows it. Set is_last when done.',
+			),
 			nextEvent,
 			(value: Event) => {
 				if (!value.is_last && repeatsPacketEvent(value, packetEvents))
@@ -667,6 +726,9 @@ ${packets[packet]}`,
 				if (value.is_last && packet === packets.length - 1)
 					combine(volumeId, chapterIds, [...state.events, value])
 			},
+			prompt(
+				`Return one short JSON answer: the next uncovered plot event, its progress and only its new qualifying facts. Do not rescan for earlier events or restate proposed entries. Describe relations as standing relationships, naming their kind first. ${complete}`,
+			),
 		)
 		state.events.push(event)
 		if (event.is_last) state.packet++

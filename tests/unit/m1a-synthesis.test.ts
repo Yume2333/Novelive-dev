@@ -734,6 +734,151 @@ test('same event wording preserves new facts but a repeat needs progress or pack
 	})
 })
 
+test('a saturated packet shows recent unique IDs from each kind and can finish without restating facts', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const first = {
+		event: 'Ada investigates the harbor.',
+		overview: '',
+		chapters: chapters.map((chapterId) => ({
+			chapterId,
+			progress: 'Ada investigates the harbor.',
+		})),
+		biblePatch: Array.from({ length: 64 }, (_, i) => ({
+			kind: 'location' as const,
+			op: 'add' as const,
+			entry: {
+				...candidateTower,
+				id: `pier-${i}`,
+				name: `Named location in the harbor ${i}`,
+			},
+		})),
+		glossaryPatch: [],
+		is_last: false,
+	}
+	const second = {
+		...first,
+		biblePatch: [
+			first.biblePatch[0],
+			{
+				kind: 'timeline',
+				op: 'add',
+				entry: {
+					id: 'harbor-visit',
+					chapterId: 'c1',
+					event: 'Ada arrives.',
+					status: 'candidate',
+				},
+			},
+		],
+		glossaryPatch: [
+			{
+				...term,
+				id: 'signal',
+				original: 'harbor signal: blue',
+				written: 'blue signal',
+				status: 'candidate',
+			},
+		],
+	}
+	const finish = {
+		event: 'Packet complete',
+		overview: '',
+		chapters: [],
+		biblePatch: [],
+		glossaryPatch: [],
+		is_last: true,
+	}
+	let extractions = 0
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		const prompt: string = messages[0].content
+		if (prompt.includes('Candidates:\n')) return stream({ keep: [1] })
+		extractions++
+		if (extractions === 1) return stream(first)
+		if (extractions === 2) return stream(second)
+		expect(prompt).toContain('Extract only the next event in packet 1/1.')
+		expect(prompt).toContain('Events already extracted: 2')
+		expect(prompt).toContain('use is_last:true and empty arrays')
+		expect(prompt).toContain(
+			`Recent event summaries: ${JSON.stringify([first.event])}`,
+		)
+		const registry = prompt
+			.split('Already proposed entries:\n')[1]
+			.split('\nRecent event summaries:')[0]
+		expect(Buffer.byteLength(registry)).toBeLessThanOrEqual(1536)
+		expect(registry).toMatch(/^location: pier-0 pier-/m)
+		expect(registry.match(/\bpier-0\b/g)).toHaveLength(1)
+		expect(registry).toContain('timeline: harbor-visit')
+		expect(registry).toContain('glossary: "harbor signal: blue"')
+		return stream(finish)
+	}
+	const args = { ...options, strategy: 'events' as const, fetch }
+	await expect(
+		synthesizeVolume(project, 'v1', chapters, { ...args, maxEvents: 2 }),
+	).rejects.toThrow('Synthesis reached its event limit (2)')
+	await synthesizeVolume(project, 'v1', chapters, args)
+	expect(extractions).toBe(3)
+	expect(await project.read(files.checkpoint)).toMatchObject({
+		packet: 1,
+		events: [first, second, finish],
+		applied: true,
+	})
+})
+
+test.each([false, true])(
+	'packet reasoning-only responses get one focused retry (still reasoning only: %s)',
+	async (stillReasoning) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const prompts: string[] = []
+		const fetch: typeof globalThis.fetch = async (input, init) => {
+			const { messages } = await new Request(input, init).json()
+			const prompt: string = messages[0].content
+			prompts.push(prompt)
+			if (!stillReasoning && prompt.includes('Return one short JSON answer'))
+				return stream({
+					event: 'Ada opens the tower.',
+					overview: '',
+					chapters: chapters.map((chapterId) => ({
+						chapterId,
+						progress: 'Ada opens the tower.',
+					})),
+					biblePatch: [{ kind: 'location', op: 'add', entry: candidateTower }],
+					glossaryPatch: [],
+					is_last: true,
+				})
+			const chunks = [
+				{ choices: [{ index: 0, delta: { reasoning_content: 'Thinking' } }] },
+				{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+			]
+			return new Response(
+				`${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
+				{ headers: { 'content-type': 'text/event-stream' } },
+			)
+		}
+		const result = synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			connection: { ...connection, model: 'devin-swe-2' },
+			strategy: 'events',
+			fetch,
+		})
+		if (stillReasoning)
+			await expect(result).rejects.toMatchObject({ code: 'reasoning_limit' })
+		else expect((await result).biblePatch).toHaveLength(1)
+		expect(prompts[0]).not.toContain('Return one short JSON answer')
+		expect(new Set(prompts).size).toBe(2)
+		expect(prompts.at(-1)).toContain('Return one short JSON answer')
+		expect(prompts.at(-1)?.split('Chapter previews:\n')[1]).toEqual(
+			prompts[0].split('Chapter previews:\n')[1],
+		)
+		const checkpoint = project.read(files.checkpoint)
+		if (stillReasoning)
+			await expect(checkpoint).rejects.toMatchObject({ code: 'ENOENT' })
+		else expect((await checkpoint).events).toHaveLength(1)
+	},
+)
+
 const selectionFixture = async (
 	input: RequestInfo | URL,
 	init?: RequestInit,
