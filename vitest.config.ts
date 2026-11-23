@@ -5,6 +5,7 @@ export default defineConfig({
 		include: [
 			'tests/unit/**/*.test.ts',
 			'tests/integration/**/*.test.ts',
+			'packages/player/src/stage/*.test.ts',
 			...(process.env.NL_REPLAY === 'record' ||
 			process.env.NL_STYLE_REPLAY === '1'
 				? ['tests/acceptance/**/*.test.ts']
