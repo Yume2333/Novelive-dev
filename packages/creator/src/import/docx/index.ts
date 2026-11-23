@@ -138,7 +138,10 @@ export async function extractDocx(
 	try {
 		const entries = await zip.getEntries()
 		const read = async (path: string) => {
-			const entry = entries.find((entry) => entry.filename === path)
+			const normalized = posix.normalize(path).toLowerCase()
+			const entry = entries.find(
+				(entry) => posix.normalize(entry.filename).toLowerCase() === normalized,
+			)
 			return entry && !entry.directory
 				? entry.getData(new TextWriter(), { checkSignature: true })
 				: undefined

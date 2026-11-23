@@ -29,6 +29,15 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 }
 
 describe('DOCX extraction', () => {
+	test('matches normalized OPC part names case-insensitively', async () => {
+		const result = await extractDocx(
+			await syntheticDocx({ 'WORD/DOCUMENT.XML': documentXml(p('正文。')) }),
+		)
+		expect(result).toMatchObject({
+			status: 'ready',
+			book: { volumes: [{ chapters: [{ paragraphs: ['正文。'] }] }] },
+		})
+	})
 	test('retains nonbreaking hyphens and drops optional soft hyphens', async () => {
 		const book = await extract(
 			'<w:p><w:r><w:t>well</w:t><w:noBreakHyphen/><w:t>known</w:t><w:softHyphen/><w:t>word</w:t></w:r></w:p>',
