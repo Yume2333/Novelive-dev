@@ -6,11 +6,23 @@ import {
 	formatVersion,
 	projectFiles,
 } from '@novelive/format/model'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { propagateStaleness } from '../../packages/creator/src/bible/staleness'
+import { createConfigStore } from '../../packages/creator/src/config'
+import * as artModels from '../../packages/creator/src/pipeline/art/models'
 import { Project } from '../../packages/creator/src/project'
+import {
+	chapterWorker,
+	productionModels,
+} from '../../packages/creator/src/project/production-worker'
 import { readBible } from '../../packages/creator/src/synthesis/patch'
-import { listUsage } from '../../packages/creator/src/usage'
+import {
+	listUsage,
+	recordImageUsage,
+	recordTextUsage,
+} from '../../packages/creator/src/usage'
+import { bible } from '../fixtures/cassettes/m1b-art/fixture'
+import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
 
 const workId = '00000000-0000-0000-0000-000000000001'
 
@@ -146,4 +158,100 @@ test('characters and locations with the same Bible id invalidate only their own 
 			(await listUsage(profile)).staleAssets.map((row) => row.assetKey),
 		).toEqual(['shared/day'])
 	})
+})
+
+test('chapterWorker and its ArtProduction attribute asynchronous model usage without a caller usage scope', async () => {
+	vi.stubEnv('NL_REPLAY', 'strict')
+	const network = vi.fn(async () => {
+		throw new Error('Network forbidden')
+	})
+	vi.stubGlobal('fetch', network)
+	const usage = {
+		input: 11,
+		output: 7,
+		cacheRead: 0,
+		cacheWrite: 0,
+		totalTokens: 18,
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+	}
+	vi.spyOn(artModels, 'artJson').mockImplementation(
+		async (connection, prompt) => {
+			await Promise.resolve()
+			recordTextUsage(connection.model, usage)
+			return (
+				prompt.startsWith('Write only visible content')
+					? { content: 'A classroom' }
+					: { patch: '', items: [], merges: {} }
+			) as never
+		},
+	)
+	const painted = new Error('Stop after recording the returned image')
+	vi.spyOn(artModels, 'imageRenderer').mockImplementation(
+		(config) => async () => {
+			await Promise.resolve()
+			recordImageUsage(config.model, 1)
+			throw painted
+		},
+	)
+	try {
+		await fixture(async (project, profile) => {
+			const config = createConfigStore(profile)
+			await config.update(configuration)
+			const work = await project.read(projectFiles.work('v1', workId))
+			await project.write(
+				projectFiles.chapter({ volumeId: 'v1', workId, chapterId: 'c1' }),
+				{
+					formatVersion,
+					chapterId: 'c1',
+					title: 'Boat',
+					sceneIds: [],
+					paragraphIds: ['p0001'],
+					cg: [],
+				},
+			)
+			await project.writeFile(
+				projectFiles.chapterText('c1'),
+				'A paper boat drifts under the bridge.\n',
+			)
+			await project.writeFile(
+				'source/production/c1/draft.nvs',
+				'scene Boat\nsource p0001-p0001\n\n: A paper boat drifts under the bridge.\n',
+			)
+			const { worker, art } = chapterWorker(
+				project,
+				'v1',
+				work,
+				await productionModels(config),
+				{ mode: 'strict', fetch: network },
+			)
+			await worker.stage({
+				workId,
+				chapterId: 'c1',
+				link: 'none',
+				desensitized: false,
+				signal: new AbortController().signal,
+			})
+			await expect(art().candidates(bible, ['c1'])).rejects.toBe(painted)
+			const records = (await listUsage(profile)).records.map(
+				({ usage: row }) => ({
+					workId: row.link.workId,
+					phase: row.phase,
+					kind: row.kind,
+				}),
+			)
+			expect(records).toEqual(
+				expect.arrayContaining([
+					{ workId, phase: 'stage', kind: 'text' },
+					{ workId, phase: 'draw', kind: 'text' },
+					{ workId, phase: 'draw', kind: 'image' },
+				]),
+			)
+			expect(records).toHaveLength(3)
+			expect(network).not.toHaveBeenCalled()
+		})
+	} finally {
+		vi.restoreAllMocks()
+		vi.unstubAllGlobals()
+		vi.unstubAllEnvs()
+	}
 })
