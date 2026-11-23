@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { UpdateInfo } from 'electron-updater'
@@ -8,7 +8,10 @@ import {
 	updatePolicy,
 } from '../../apps/desktop/src/main/update/policy'
 // @ts-expect-error 开发工具的 ESM 入口
-import { generateNotices } from '../../tools/licenses/generate.mjs'
+import {
+	generateNotices,
+	readPackageLicenses,
+} from '../../tools/licenses/generate.mjs'
 
 const feed = 'http://127.0.0.1:8080/artifacts'
 const sha512 = Buffer.alloc(64, 1).toString('base64')
@@ -94,6 +97,20 @@ describe('M5 本地应用更新', () => {
 			expect(noInstaller.downloadUpdate).not.toHaveBeenCalled()
 		},
 	)
+})
+
+it('includes the component list shipped in the Windows sharp binary README', async () => {
+	const scratch = await mkdtemp(join(tmpdir(), 'novelive-sharp-notices-'))
+	const component = '| libvips | LGPLv3 |'
+	try {
+		await writeFile(join(scratch, 'LICENSE'), 'Apache-2.0')
+		await writeFile(join(scratch, 'README.md'), component)
+		await expect(
+			readPackageLicenses(scratch, '@img/sharp-win32-x64'),
+		).resolves.toEqual(['Apache-2.0', component])
+	} finally {
+		await rm(scratch, { recursive: true, force: true })
+	}
 })
 
 it('generates licensing from the production graph and local bundled models', async () => {

@@ -71,14 +71,6 @@ export async function generateNotices(output) {
 		await read(join(root, 'bin/matting/LICENSE')),
 	)
 	for (const [directory, pkg] of await productionPackages()) {
-		const names = (await readdir(directory))
-			.sort()
-			.filter((name) =>
-				/^(?:licen[cs]es?|copying|(?:third[-_ ]?party[-_ ]?)?notices?)(?:[._-]|$)/i.test(
-					name,
-				),
-			)
-		if (pkg.name.startsWith('@img/sharp-libvips-')) names.push('README.md')
 		parts.push(
 			[
 				`${pkg.name}@${pkg.version} — ${pkg.license ?? 'see upstream license'}`,
@@ -86,14 +78,29 @@ export async function generateNotices(output) {
 			]
 				.filter(Boolean)
 				.join('\n'),
+			...(await readPackageLicenses(directory, pkg.name)),
 		)
-		for (const name of names)
-			parts.push(...(await readLicenses(join(directory, name))))
 	}
 	await writeFile(
 		output,
 		`${parts.map((part) => part.trimEnd()).join('\n\n')}\n`,
 	)
+}
+
+export async function readPackageLicenses(directory, packageName) {
+	const names = (await readdir(directory))
+		.sort()
+		.filter((name) =>
+			/^(?:licen[cs]es?|copying|(?:third[-_ ]?party[-_ ]?)?notices?)(?:[._-]|$)/i.test(
+				name,
+			),
+		)
+	if (/^@img\/sharp-(?:libvips|win32)-/.test(packageName))
+		names.push('README.md')
+	const licenses = []
+	for (const name of names)
+		licenses.push(...(await readLicenses(join(directory, name))))
+	return licenses
 }
 
 async function readLicenses(path) {
