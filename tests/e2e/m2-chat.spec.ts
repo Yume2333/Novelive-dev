@@ -411,6 +411,10 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 			await expect(panel).toHaveAttribute('data-full', 'false')
 			await page.keyboard.press('Control+J')
 			await expect(panel).toHaveCount(0)
+			await page.keyboard.press('Control+J')
+			await expect(panel).toBeVisible()
+			await page.keyboard.press('Escape')
+			await expect(panel).toHaveCount(0)
 		} finally {
 			await app.close()
 		}

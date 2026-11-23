@@ -1,3 +1,7 @@
+.panel:focus {
+	outline: none;
+}
+
 .panel {
 	position: absolute;
 	inset-block: var(--space-3);
@@ -292,7 +296,7 @@
 .spin {
 	flex-shrink: 0;
 	color: var(--color-primary);
-	animation: spin 900ms linear infinite;
+	animation: spin calc(var(--dur-slow) * 4) linear infinite;
 }
 
 @keyframes spin {
@@ -406,6 +410,13 @@
 	cursor: default;
 }
 
+.fieldWrap {
+	position: relative;
+	display: flex;
+	flex: 1;
+	min-width: 0;
+}
+
 .field {
 	flex: 1;
 	min-width: 0;
@@ -498,6 +509,22 @@
 }
 
 .inputRow > .iconButton,
+.input[data-capped="true"] {
+	padding-inline-end: var(--space-6);
+}
+
+.input[data-expanded="true"] {
+	max-height: none;
+}
+
+.expand {
+	position: absolute;
+	top: var(--space-1);
+	inset-inline-end: var(--space-1);
+	width: 24px;
+	height: 24px;
+}
+
 .send {
 	width: 36px;
 	height: 36px;

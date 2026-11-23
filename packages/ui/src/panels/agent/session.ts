@@ -170,18 +170,26 @@ export function useAgentChat(workId: string) {
 		}
 	}, [workId, load, fail])
 
+	const latest = useRef(snapshot)
+	latest.current = snapshot
+	const creating = useRef<Promise<Snapshot> | null>(null)
+
 	const create = useCallback(async () => {
 		const created = await call('chat.create', { workId })
 		active.current = created.session.sessionId
+		latest.current = created
 		setSnapshot(created)
 		setSessions((list) => [created.session, ...(list ?? [])])
 		return created
 	}, [workId])
 
-	const ensure = useCallback(
-		async () => snapshot ?? (await create()),
-		[snapshot, create],
-	)
+	const ensure = useCallback(async () => {
+		if (latest.current) return latest.current
+		creating.current ??= create().finally(() => {
+			creating.current = null
+		})
+		return creating.current
+	}, [create])
 
 	return {
 		sessions: sessions ?? [],
@@ -241,7 +249,13 @@ export function useAgentChat(workId: string) {
 				...(position ? { position } : {}),
 			})
 			active.current = sessionId
-			const next = await call('chat.get', { workId, sessionId, headId })
+			let next: Snapshot
+			try {
+				next = await call('chat.get', { workId, sessionId, headId })
+			} catch {
+				setError('消息已发出，但没能刷新会话')
+				return
+			}
 			if (active.current === sessionId)
 				setSnapshot((latest) => settle(latest, next, headId))
 			setSessions((list) =>

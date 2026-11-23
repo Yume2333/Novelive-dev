@@ -9,9 +9,10 @@ import {
 	LoaderCircle,
 	Wrench,
 } from 'lucide-react'
-import { useState } from 'react'
+import { type ComponentProps, useRef, useState } from 'react'
 import { Streamdown } from 'streamdown'
 import { Collapse } from '../../components/Collapse'
+import { OverlayScrollbar } from '../../components/ScrollArea'
 import styles from './AgentPanel.module.css'
 import type { Attachment, Part } from './session'
 
@@ -139,6 +140,16 @@ const subtaskLabels = {
 	cancelled: '已取消',
 }
 
+export function ScrollField(props: ComponentProps<'textarea'>) {
+	const field = useRef<HTMLTextAreaElement>(null)
+	return (
+		<div className={styles.fieldWrap}>
+			<textarea ref={field} className={styles.field} {...props} />
+			<OverlayScrollbar targetRef={field} />
+		</div>
+	)
+}
+
 function ProposalCard({
 	proposal,
 	actions,
@@ -202,8 +213,7 @@ function ProposalCard({
 				</p>
 			) : rejecting ? (
 				<div className={styles.rejectBox}>
-					<textarea
-						className={styles.field}
+					<ScrollField
 						aria-label="拒绝理由"
 						placeholder="理由（可不填），Agent 会据此调整"
 						rows={2}

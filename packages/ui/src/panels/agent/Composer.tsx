@@ -1,5 +1,12 @@
-import { ArrowUp, ImagePlus, Square, X } from 'lucide-react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import {
+	ArrowUp,
+	ImagePlus,
+	Maximize2,
+	Minimize2,
+	Square,
+	X,
+} from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { OverlayScrollbar } from '../../components/ScrollArea'
 import styles from './AgentPanel.module.css'
 import type { Attachment } from './session'
@@ -9,6 +16,7 @@ type Pending = { attachment: Attachment; url: string }
 
 export function Composer({
 	streaming,
+	sessionId,
 	disabled,
 	onAttach,
 	onSend,
@@ -16,6 +24,7 @@ export function Composer({
 	onPreview,
 }: {
 	streaming: boolean
+	sessionId: string | null
 	disabled: boolean
 	onAttach(file: File): Promise<Attachment>
 	onSend(text: string, attachmentIds: string[]): Promise<void>
@@ -28,14 +37,46 @@ export function Composer({
 	const [error, setError] = useState('')
 	const input = useRef<HTMLTextAreaElement>(null)
 	const picker = useRef<HTMLInputElement>(null)
+	const [expanded, setExpanded] = useState(false)
+	const [capped, setCapped] = useState(false)
+	const [panelHeight, setPanelHeight] = useState(0)
+	const kept = useRef(pending)
+	kept.current = pending
+	const owner = useRef(sessionId)
 
+	useEffect(
+		() => () => {
+			for (const item of kept.current) URL.revokeObjectURL(item.url)
+		},
+		[],
+	)
+	useEffect(() => {
+		if (owner.current && owner.current !== sessionId)
+			setPending((list) => {
+				for (const item of list) URL.revokeObjectURL(item.url)
+				return []
+			})
+		owner.current = sessionId
+	}, [sessionId])
+	useEffect(() => {
+		const panel = input.current?.closest('aside')
+		if (!expanded || !panel) return
+		const observer = new ResizeObserver(() =>
+			setPanelHeight(panel.clientHeight),
+		)
+		observer.observe(panel)
+		return () => observer.disconnect()
+	}, [expanded])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: 文字变化时重新量高
 	useLayoutEffect(() => {
 		const element = input.current
 		if (!element) return
 		element.style.height = 'auto'
-		element.style.height = `${Math.min(element.scrollHeight, 168)}px`
-	}, [text])
+		setCapped(element.scrollHeight >= 168)
+		element.style.height = expanded
+			? `${Math.round(panelHeight / 2)}px`
+			: `${Math.min(element.scrollHeight, 168)}px`
+	}, [text, expanded, panelHeight])
 
 	const attach = async (files: File[]) => {
 		const images = files.filter((file) => imageTypes.includes(file.type))
@@ -72,6 +113,7 @@ export function Composer({
 			for (const item of pending) URL.revokeObjectURL(item.url)
 			setPending([])
 			setText('')
+			setExpanded(false)
 		} catch {
 			setError('没能发出，请重试')
 		} finally {
@@ -134,6 +176,8 @@ export function Composer({
 						aria-label="给 Agent 发消息"
 						placeholder="说说想改什么，可以直接贴图"
 						rows={1}
+						data-expanded={expanded}
+						data-capped={capped || expanded}
 						value={text}
 						disabled={disabled}
 						onChange={(event) => setText(event.target.value)}
@@ -156,6 +200,21 @@ export function Composer({
 						}}
 					/>
 					<OverlayScrollbar targetRef={input} />
+					{(capped || expanded) && (
+						<button
+							type="button"
+							className={`${styles.iconButton} ${styles.expand}`}
+							aria-label={expanded ? '收起输入框' : '放大输入框'}
+							title={expanded ? '收起' : '放大'}
+							onClick={() => setExpanded(!expanded)}
+						>
+							{expanded ? (
+								<Minimize2 aria-hidden="true" size={14} />
+							) : (
+								<Maximize2 aria-hidden="true" size={14} />
+							)}
+						</button>
+					)}
 				</div>
 				{streaming ? (
 					<button

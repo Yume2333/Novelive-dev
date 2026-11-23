@@ -17,6 +17,7 @@ import {
 	type Activity,
 	MessageParts,
 	type ProposalActions,
+	ScrollField,
 } from './MessageView'
 import {
 	branchPath,
@@ -142,20 +143,20 @@ function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
 
 function EditBox({
 	initial,
+	allowEmpty,
 	onCancel,
 	onSend,
 }: {
 	initial: string
+	allowEmpty: boolean
 	onCancel(): void
 	onSend(text: string): void
 }) {
 	const [text, setText] = useState(initial)
 	return (
 		<div className={styles.editBox}>
-			<textarea
-				// biome-ignore lint/a11y/noAutofocus: 编辑消息时直接进入输入
+			<ScrollField
 				autoFocus
-				className={styles.field}
 				aria-label="编辑消息"
 				rows={3}
 				value={text}
@@ -168,7 +169,7 @@ function EditBox({
 				<button
 					type="button"
 					className={styles.primary}
-					disabled={!text.trim()}
+					disabled={!allowEmpty && !text.trim()}
 					onClick={() => onSend(text.trim())}
 				>
 					重新发送
@@ -196,12 +197,14 @@ export function AgentPanel({
 	const [menu, setMenu] = useState(false)
 	const [editing, setEditing] = useState<string>()
 	const [preview, setPreview] = useState<{ src: string; name: string }>()
+	const panel = useRef<HTMLElement>(null)
 	const dialog = useRef<HTMLDialogElement>(null)
 	const end = useRef<HTMLDivElement>(null)
 	const path = snapshot ? branchPath(snapshot.entries, snapshot.headId) : []
 	const streaming = snapshot?.status === 'streaming'
 	const last = path.at(-1)
 
+	useEffect(() => panel.current?.focus(), [])
 	useEffect(() => {
 		if (preview) dialog.current?.showModal()
 	}, [preview])
@@ -228,6 +231,8 @@ export function AgentPanel({
 
 	return (
 		<aside
+			ref={panel}
+			tabIndex={-1}
 			className={styles.panel}
 			data-full={full}
 			aria-label="Agent"
@@ -302,6 +307,9 @@ export function AgentPanel({
 							const text = entry.parts
 								.map((part) => (part.type === 'text' ? part.text : ''))
 								.join('')
+							const images = entry.parts.flatMap((part) =>
+								part.type === 'image' ? [part.attachment.id] : [],
+							)
 							const go = (offset: number) => {
 								const target = siblings[index + offset]
 								if (target)
@@ -320,10 +328,11 @@ export function AgentPanel({
 									{editing === entry.id ? (
 										<EditBox
 											initial={text}
+											allowEmpty={images.length > 0}
 											onCancel={() => setEditing(undefined)}
 											onSend={(next) => {
 												setEditing(undefined)
-												void send(next, [], entry.parentId).catch(() =>
+												void send(next, images, entry.parentId).catch(() =>
 													chat.setError('没能重新发送'),
 												)
 											}}
@@ -397,6 +406,7 @@ export function AgentPanel({
 			)}
 			<Composer
 				streaming={streaming}
+				sessionId={snapshot?.session.sessionId ?? null}
 				disabled={!chat.loaded}
 				onAttach={chat.attach}
 				onSend={(text, ids) => send(text, ids, snapshot?.headId ?? null)}
