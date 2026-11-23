@@ -54,6 +54,7 @@ export function PlayerControls({
 	surface,
 	chapters,
 	onChapter,
+	onLibrary,
 	onEditor,
 	editorLinked,
 	waiting,
@@ -64,6 +65,7 @@ export function PlayerControls({
 	surface: HTMLElement | null
 	chapters: ControlChapter[]
 	onChapter(chapterId: string): void
+	onLibrary?: () => void
 	onEditor(position: SentenceRef): void
 	editorLinked: boolean
 	waiting?: ControlChapter
@@ -295,6 +297,11 @@ export function PlayerControls({
 										<Play size={18} strokeWidth={1.8} aria-hidden="true" />
 										{t('返回游戏')}
 									</button>
+									{onLibrary && (
+										<button type="button" onClick={onLibrary}>
+											{t('返回书库')}
+										</button>
+									)}
 									<button
 										type="button"
 										disabled={

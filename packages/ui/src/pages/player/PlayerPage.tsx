@@ -379,6 +379,7 @@ export function PlayerPage({
 					surface={host.current}
 					chapters={chapters}
 					editorLinked={loaded.linked}
+					onLibrary={version ? () => navigate('/') : undefined}
 					progress={progress.current.data}
 					history={progress.current.history}
 					legacySaves={legacySaves ?? packageLegacySaves}
