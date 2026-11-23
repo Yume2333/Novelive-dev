@@ -583,3 +583,66 @@ test('quarantined synthesis never authorizes snapshots of the newer confirmed Bi
 	}
 	expect(await readBible(project)).toEqual(before)
 })
+
+test('legacy pending proposal backfill cannot snapshot a newer targeted confirmed entry', async () => {
+	const first = await getBible(project, input)
+	const store = new ChatStore(project.database, ref.workId)
+	const proposal = first.proposalIds
+		.map((id) => store.proposal(id).proposal)
+		.find(({ payload }) => payload.kind === 'bible')
+	if (!proposal) throw new Error('Missing pending character')
+	project.database
+		.prepare(
+			"UPDATE proposal SET payload = json_remove(payload, '$.source.bases', '$.source.baseRevision') WHERE proposal_id = ?",
+		)
+		.run(proposal.id)
+	const character = await project.read(
+		projectFiles.character(scope, 'traveler'),
+	)
+	await project.write(projectFiles.character(scope, 'traveler'), {
+		...character,
+		entries: character.entries.map((entry) =>
+			entry.status === 'confirmed'
+				? { ...entry, name: 'Newer confirmed creator edit' }
+				: entry,
+		),
+	})
+	const next = await getBible(project, input)
+	expect(store.proposal(proposal.id).source?.bases).toBeUndefined()
+	expect(next.proposalActions[proposal.id]).toMatchObject({
+		canApprove: false,
+		reason: expect.stringContaining('已过期'),
+	})
+	const before = await readBible(project)
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'stale' })
+	} finally {
+		await service.close()
+	}
+	expect(await readBible(project)).toEqual(before)
+})
+
+test('backfill may enrich pending snapshots only while the saved whole-Bible revision matches', async () => {
+	const first = await getBible(project, input)
+	const store = new ChatStore(project.database, ref.workId)
+	for (const id of first.proposalIds)
+		project.database
+			.prepare(
+				"UPDATE proposal SET payload = json_remove(payload, '$.source.bases', '$.source.baseRevision') WHERE proposal_id = ?",
+			)
+			.run(id)
+	const next = await getBible(project, input)
+	for (const id of next.proposalIds) {
+		expect(next.proposalActions[id]).toMatchObject({ canApprove: true })
+		expect(store.proposal(id).source).toMatchObject({
+			baseRevision: first.revision,
+			bases: expect.any(Array),
+		})
+	}
+})

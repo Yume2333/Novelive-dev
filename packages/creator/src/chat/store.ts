@@ -38,6 +38,7 @@ export type ProposalSource = {
 	revision: string
 	entry?: { kind: string; id: string }
 	bases?: { kind: string; id: string; revision: string }[]
+	baseRevision?: string
 }
 type ProposalData = Pick<Proposal, 'chapterIds' | 'payload'> & {
 	rewrite?: RewriteProposal
@@ -250,7 +251,11 @@ export class ChatStore {
 		})
 	}
 
-	recordStandaloneProposal(proposal: Proposal, source: ProposalSource) {
+	recordStandaloneProposal(
+		proposal: Proposal,
+		source: ProposalSource,
+		currentRevision: string,
+	) {
 		const { id, prompt, payload, chapterIds } = proposal
 		this.db
 			.prepare(`INSERT OR IGNORE INTO proposal (proposal_id, work_id, kind, prompt, payload, created_at)
@@ -266,13 +271,17 @@ export class ChatStore {
 		const existing = this.proposal(id)
 		if (
 			existing.proposal.status === 'pending' &&
-			!existing.source?.bases &&
+			'expectedRevision' in existing.proposal.payload &&
+			existing.proposal.payload.expectedRevision === currentRevision &&
+			source.baseRevision === currentRevision &&
+			(!existing.source?.bases ||
+				existing.source.baseRevision !== currentRevision) &&
 			source.bases
 		)
 			this.db
-				.prepare(`UPDATE proposal SET payload = json_set(payload, '$.source.bases', json(?))
+				.prepare(`UPDATE proposal SET payload = json_set(payload, '$.source', json(?))
 			WHERE proposal_id = ? AND work_id = ? AND status = 'pending'`)
-				.run(JSON.stringify(source.bases), id, this.workId)
+				.run(JSON.stringify(source), id, this.workId)
 		return this.proposal(id)
 	}
 

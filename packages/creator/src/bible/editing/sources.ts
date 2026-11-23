@@ -112,7 +112,10 @@ export async function proposalActionability(
 			canApprove: false,
 			reason: '候选来源已被替换或移除，请查看新的综合候选；仍可拒绝此候选。',
 		}
-	if (source && !source.bases)
+	if (
+		source &&
+		(!source.bases || source.baseRevision !== payload.expectedRevision)
+	)
 		return {
 			canApprove: false,
 			reason: '候选已过期：缺少可信的原始条目快照，请重新提出。',
@@ -172,7 +175,12 @@ export async function bridgeBibleSources(
 				chapterIds,
 				payload,
 			},
-			{ ...source, bases },
+			{
+				...source,
+				bases,
+				...(bases ? { baseRevision: payload.expectedRevision } : {}),
+			},
+			sourceRevision(bible),
 		)
 	}
 	const conflicts = new Set<string>()
