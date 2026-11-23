@@ -405,7 +405,9 @@ export class ArtProduction {
 			const content = await artJson(
 				painter,
 				[
-					'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
+					drawing.kind === 'expression'
+						? 'Return JSON {"content":"..."}. Describe only the changes to the base sprite’s brows, eyes and mouth in positive factual prose. Leave the pose, clothing, lighting and transparent background unchanged. Do not describe a setting, background, floor, or props. If moderation declined, use neutral facial details.'
+						: 'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
 					`${drawing.kind}: ${drawing.description}`,
 					feedback,
 				]

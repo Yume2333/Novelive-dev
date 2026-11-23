@@ -219,6 +219,82 @@ test('missing strict cassettes fail closed, not as asset placeholders', async ()
 	})
 })
 
+test('an expression edit requests facial changes without repainting the transparent background', async () => {
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(async (_prompt, _refs, size, alpha) => ({
+			bytes: await picture(size.width, size.height, alpha),
+		}))
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: {
+						content: prompt.includes('Do not describe a setting')
+							? 'Drawn brows and pressed lips.'
+							: 'Drawn brows and pressed lips against a wooden hall.',
+					},
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay)
+			const stylePath = 'assets/style-reference.png'
+			const basePath = 'assets/base-sprite.png'
+			const style = await picture(320, 180, false)
+			await project.writeFile(stylePath, style)
+			await project.writeFile(basePath, await picture(1024, 1536, true))
+			const styledBible = {
+				...bible,
+				style: {
+					...bible.style,
+					references: [{ path: stylePath, description: 'Main visual' }],
+				},
+			}
+			const jobs = await art.register(
+				[
+					{
+						id: 'ada/uniform/angry',
+						kind: 'expression',
+						description: '紧咬牙关',
+					},
+				],
+				styledBible,
+			)
+			const expression = jobs.find((job) => job.kind === 'expression')
+			if (!expression || !('baseAssetId' in expression))
+				throw new Error('Missing expression job')
+			await art.adopt(expression.baseAssetId, basePath)
+			expect(await art.draw(expression, styledBible)).toEqual({
+				status: 'drawn',
+			})
+
+			expect(model.mock.calls[0][1]).toContain(
+				'only the changes to the base sprite',
+			)
+			expect(render).toHaveBeenCalledTimes(1)
+			const [[prompt, refs, , alpha]] = render.mock.calls
+			expect(alpha).toBe(true)
+			expect(refs).toHaveLength(2)
+			expect((await sharp(refs[0]).metadata()).hasAlpha).toBe(true)
+			expect((await sharp(refs[1]).metadata()).hasAlpha).toBe(false)
+			expect(prompt).toContain('Drawn brows and pressed lips.')
+			expect(prompt).not.toContain('wooden hall')
+			expect(prompt).toContain(
+				'Preserve the transparent background and alpha edges of Image 1',
+			)
+			expect(prompt).toContain('Image 2 is a style reference only')
+			expect(prompt).toContain(
+				'stroke texture of Image 2 stay exactly as in Image 2',
+			)
+		})
+	} finally {
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('a moderation rewrite does not consume the technical redraw budget', async () => {
 	const render = vi
 		.fn<ReturnType<typeof artModels.imageRenderer>>()

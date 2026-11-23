@@ -72,7 +72,7 @@ export function drawingPrompt(
 		kind === 'character'
 			? 'Center the character from the top of the head to above the knees, with a little headroom and the legs cut by the bottom edge above the knees. Use a transparent background without a floor or shadow. Match semitransparent edges to adjacent clothing or skin.'
 			: kind === 'expression' || kind === 'variant'
-				? `Keep everything else aligned to Image ${firstReference}: ${keep.join('；')}.`
+				? `Keep everything else aligned to Image ${firstReference}: ${keep.join('；')}.${kind === 'expression' ? ` Preserve the transparent background and alpha edges of Image ${firstReference}; apply the finishing guidance only to the character, not the background.` : ''}`
 				: `Keep the subject in the central 4:3 safe area of the 16:9 canvas; extend only the surroundings to the left and right.${kind === 'location' ? ' Show an empty scene without people.' : ''}`
 	const suffix = styleIndices.length
 		? finish.replaceAll('Image 1', numbered)
