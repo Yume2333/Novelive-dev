@@ -82,7 +82,12 @@ export const commands = {
 	...importCommands,
 	'library.list': {
 		input: empty,
-		output: obj({ works: arr(obj({ workId: str(), title: str() })) }),
+		output: obj({
+			works: arr(
+				obj({ workId: str(), title: str(), published: int(), chapters: int() }),
+			),
+			unreadableCount: int(),
+		}),
 	},
 	'config.get': {
 		input: empty,

@@ -21,15 +21,27 @@ export async function listLibrary(dataDir: string) {
 					const volume = await project.read(projectFiles.volume(volumeId))
 					if (!volume.workIds.includes(workId)) continue
 					const work = await project.read(projectFiles.work(volumeId, workId))
-					return { workId, title: work.title }
+					const published = project.database
+						.prepare(
+							"SELECT chapter_id FROM chapter WHERE work_id = ? AND user_state = 'published'",
+						)
+						.all(workId)
+						.filter((row) =>
+							work.chapterIds.includes(String(row.chapter_id)),
+						).length
+					return {
+						workId,
+						title: work.title,
+						published,
+						chapters: work.chapterIds.length,
+					}
 				}
 			}),
 	)
-	return {
-		works: works
-			.flatMap((work) =>
-				work.status === 'fulfilled' && work.value ? [work.value] : [],
-			)
-			.sort((a, b) => a.title.localeCompare(b.title, 'zh-CN')),
-	}
+	const readable = works
+		.flatMap((work) =>
+			work.status === 'fulfilled' && work.value ? [work.value] : [],
+		)
+		.sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'))
+	return { works: readable, unreadableCount: works.length - readable.length }
 }

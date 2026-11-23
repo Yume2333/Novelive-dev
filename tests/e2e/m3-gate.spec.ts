@@ -97,9 +97,13 @@ listener (inner): 演出已经清除。 #0002
 			.run(playerWorkId, playerWorkId)
 		await mkdir(join(profile, 'projects'), { recursive: true })
 		await writeFile(join(profile, 'projects', playerWorkId), root)
+		await writeFile(
+			join(profile, 'projects', 'missing'),
+			join(directory, 'missing'),
+		)
 		await mkdir(evidence, { recursive: true })
 
-		async function launch() {
+		async function launch(published: number) {
 			const start = performance.now()
 			const app = await electron.launch({
 				executablePath: packaged || require('electron'),
@@ -123,7 +127,12 @@ listener (inner): 演出已经清除。 #0002
 					console.log(
 						`AppImage creator ready: ${Math.round(performance.now() - start)} ms`,
 					)
-				await page.getByRole('link', { name: '黄昏', exact: true }).click()
+				await expect(page.getByRole('alert')).toHaveText('有 1 部作品无法读取')
+				const work = page.getByRole('link', { name: '黄昏', exact: true })
+				await expect(work).toHaveAccessibleDescription(
+					`已发布 ${published} / 2 章`,
+				)
+				await work.click()
 				await page.getByRole('link', { name: '游玩', exact: true }).click()
 				return { app, page }
 			} catch (error) {
@@ -131,7 +140,7 @@ listener (inner): 演出已经清除。 #0002
 				throw error
 			}
 		}
-		const { app, page } = await launch()
+		const { app, page } = await launch(1)
 		try {
 			const player = page.getByRole('main', { name: '播放器' })
 			const viewport = player.locator('.nl-player-text')
@@ -308,7 +317,7 @@ listener (inner): 演出已经清除。 #0002
 		} finally {
 			await app.close()
 		}
-		const restarted = await launch()
+		const restarted = await launch(2)
 		try {
 			await expect(restarted.page.locator('.nl-text-display')).toHaveText(
 				'晨光来了。',

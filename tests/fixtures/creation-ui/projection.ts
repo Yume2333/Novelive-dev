@@ -134,6 +134,9 @@ export async function installProjection(app: ElectronApplication) {
 					port1.postMessage({ ...base, type: 'result', result })
 				}
 				switch (data.command) {
+					case 'library.list':
+						respond({ works: [], unreadableCount: 0 })
+						break
 					case 'production.get':
 						respond(snapshot)
 						break
