@@ -90,6 +90,7 @@ export class ArtProduction {
 		bible: ArtBible,
 		merges?: Readonly<Record<string, string>>,
 		chapter?: ChapterRef,
+		beforeCommit?: (plan: ReturnType<typeof planArt>) => Promise<void>,
 	) {
 		return this.writeRegistry(async () => {
 			const previous = await this.registry()
@@ -97,6 +98,7 @@ export class ArtProduction {
 			const existing = new Set(previous.entries.map((entry) => entry.id))
 			for (const entry of plan.registry.entries)
 				if (!existing.has(entry.id)) entry.path = this.scoped(entry.path)
+			await beforeCommit?.(plan)
 			await this.project.write(this.registryFile, plan.registry)
 			if (chapter) {
 				const file = projectFiles.chapter(chapter)

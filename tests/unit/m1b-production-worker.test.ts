@@ -273,3 +273,69 @@ test('records a manually interrupted chapter as cancelled when production reopen
 		await production.close()
 	}
 })
+
+test('invalid staging does not advertise assets without drawing metadata on retry', async () => {
+	const { projectDir, workId } = await fixture()
+	using project = await Project.open(projectDir)
+	const work = await project.read(projectFiles.work('v0001', workId))
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	let attempt = 0
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		const prompt = JSON.stringify(messages)
+		const alreadyRegistered = prompt.includes('assets/locations/room/day.webp')
+		return completion({
+			patch:
+				++attempt === 1
+					? 'PUT <4:\n@bg room/day\n@costume ada/uniform'
+					: 'PUT <4:\n@bg room/day',
+			items: [
+				...(alreadyRegistered
+					? []
+					: [{ id: 'room/day', kind: 'location', description: 'Sunny' }]),
+				...(attempt === 1
+					? [
+							{
+								id: 'ada/uniform/neutral',
+								kind: 'character',
+								description: 'Blue uniform',
+							},
+						]
+					: []),
+			],
+			merges: {},
+		})
+	}
+	const { worker, art } = chapterWorker(
+		project,
+		'v0001',
+		work,
+		await productionModels(config),
+		{ fetch },
+	)
+	const chapterId = work.chapterIds[0]
+	await project.writeFile(
+		`source/production/${chapterId}/draft.nvs`,
+		'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n',
+	)
+	const ctx = {
+		workId,
+		chapterId,
+		link: 'none',
+		desensitized: false,
+		signal: new AbortController().signal,
+	} as const
+	await expect(worker.stage(ctx)).rejects.toThrow('舞台上找不到')
+	expect((await art().registry()).entries).toEqual([])
+	expect(await worker.stage(ctx)).toMatchObject([{ assetId: 'room/day' }])
+	expect(
+		JSON.parse(
+			(
+				await project.readFile('source/production/art/room/day.json')
+			).toString(),
+		),
+	).toMatchObject({
+		job: { assetId: 'room/day' },
+	})
+})

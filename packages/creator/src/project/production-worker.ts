@@ -258,46 +258,54 @@ export function chapterWorker(
 					},
 				)
 				ctx.signal.throwIfAborted()
-				const jobs = await service.register(
+				const dependencies = new Map<string, ArtJob>()
+				const sceneIds: string[] = []
+				await service.register(
 					staged.items,
 					bible,
 					staged.merges,
 					ref(ctx.chapterId),
-				)
-				const { entries } = await service.registry()
-				const output = compiled(staged.script, chapter, {
-					...options,
-					script: {
-						...options.script,
-						assets: entries,
+					async ({ jobs, registry: { entries } }) => {
+						const output = compiled(staged.script, chapter, {
+							...options,
+							script: { ...options.script, assets: entries },
+						})
+						for (const job of jobs) dependencies.set(job.assetId, job)
+						const byId = new Map(entries.map((entry) => [entry.id, entry]))
+						for (const { beats } of output.scenes)
+							for (const { actions } of beats)
+								for (const { assets } of actions)
+									for (const { id } of assets) {
+										if (
+											dependencies.has(id) ||
+											byId.get(id)?.status === 'drawn'
+										)
+											continue
+										const { job } = await drawingMetadata(id)
+										dependencies.set(id, job)
+									}
+						for (const job of jobs) {
+							ctx.signal.throwIfAborted()
+							await project.writeFile(
+								drawing(job.assetId),
+								JSON.stringify({
+									job,
+									cg: staged.cgReferences.get(job.assetId),
+								}),
+							)
+						}
+						for (const { scene } of output.scenes) {
+							if (!scene.id) throw new Error('Missing compiled scene ID')
+							sceneIds.push(scene.id)
+							ctx.signal.throwIfAborted()
+							await project.writeFile(
+								projectFiles.scene(ref(ctx.chapterId), scene.id),
+								formatScript([scene]),
+							)
+						}
+						ctx.signal.throwIfAborted()
 					},
-				})
-				for (const job of jobs)
-					await project.writeFile(
-						drawing(job.assetId),
-						JSON.stringify({ job, cg: staged.cgReferences.get(job.assetId) }),
-					)
-				const dependencies = new Map(jobs.map((job) => [job.assetId, job]))
-				const byId = new Map(entries.map((entry) => [entry.id, entry]))
-				for (const { beats } of output.scenes)
-					for (const { actions } of beats)
-						for (const { assets } of actions)
-							for (const { id } of assets) {
-								if (dependencies.has(id) || byId.get(id)?.status === 'drawn')
-									continue
-								const { job } = await drawingMetadata(id)
-								dependencies.set(id, job)
-							}
-				const sceneIds: string[] = []
-				for (const { scene } of output.scenes) {
-					if (!scene.id) throw new Error('Missing compiled scene ID')
-					sceneIds.push(scene.id)
-					ctx.signal.throwIfAborted()
-					await project.writeFile(
-						projectFiles.scene(ref(ctx.chapterId), scene.id),
-						formatScript([scene]),
-					)
-				}
+				)
 				const updated = await project.read(
 					projectFiles.chapter(ref(ctx.chapterId)),
 				)
