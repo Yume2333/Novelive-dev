@@ -145,6 +145,7 @@
 
 .nl-player-surface[data-ui-hidden="true"] .nl-player-overlay {
 	visibility: hidden;
+	opacity: 0;
 }
 
 .nl-player .nl-text-viewport {

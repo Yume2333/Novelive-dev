@@ -689,6 +689,13 @@ test.describe('M3 player controls', () => {
 					await page.getByRole('button', { name: '返回菜单' }).click()
 					await page.getByRole('button', { name: '隐藏界面' }).click()
 					await expect(page.locator('.nl-player-overlay')).toBeHidden()
+					await expect(page.locator('.nl-player-overlay')).toHaveCSS(
+						'opacity',
+						'0',
+					)
+					await page.screenshot({
+						path: '.workflow/evidence/m3-playback/05-controls-hidden.png',
+					})
 					await advance()
 					await expect(text).toHaveText('你好，世界。')
 					await page.keyboard.press('Escape')
