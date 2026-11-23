@@ -50,12 +50,15 @@ export async function mountStage(
 			upcoming: readonly string[] = [],
 			actions: Parameters<PixiStage['commit']>[2] = [],
 			instant = false,
+			onReady?: () => void,
 		) {
 			renderer.complete()
 			await assets.sync([...stageAssets(state), ...stageAssets(next)], upcoming)
 			if (disposed) return
-			await renderer.commit(next, assets, actions, instant)
+			const animation = renderer.commit(next, assets, actions, instant)
 			state = structuredClone(next)
+			onReady?.()
+			await animation
 			await assets.sync(stageAssets(state), upcoming)
 		},
 		async restore(
@@ -188,19 +191,30 @@ export async function mountMinimalPlayer(
 			let state = stage.state
 			for (const action of beat.actions) state = direct(state, action)
 			state.text = beat.cue.kind === 'text' ? beat.cue.text : null
+			let incoming: StageSnapshot | null = null
 			if (beat.cue.kind === 'text') {
 				const active: ActivePerformance[] = beat.actions.map((action) =>
 					['move', 'shake'].includes(action.name)
 						? { restore: 'skip-relative' }
 						: { restore: 'replay-state', action },
 				)
-				snapshot = captureSnapshot(
+				incoming = captureSnapshot(
 					beat.cue.position,
 					{ ...state, text: beat.cue.text },
 					[...active, { restore: 'restart-text' }],
 				)
 			}
-			await stage.commit(state, lookahead(beats, index + 1), beat.actions)
+			await stage.commit(
+				state,
+				lookahead(beats, index + 1),
+				beat.actions,
+				false,
+				() => {
+					snapshot = incoming
+					if (snapshot) progress.record(snapshot)
+					renderText(state.text)
+				},
+			)
 			if (signal.aborted) return
 			if (beat.cue.kind === 'text') {
 				snapshot = captureSnapshot(
@@ -208,9 +222,7 @@ export async function mountMinimalPlayer(
 					{ ...stage.state, text: beat.cue.text },
 					[{ restore: 'restart-text' }],
 				)
-				progress.record(snapshot)
 			}
-			renderText(state.text)
 			if (beat.advance.kind !== 'click')
 				timer = setTimeout(
 					() => void advance(),
