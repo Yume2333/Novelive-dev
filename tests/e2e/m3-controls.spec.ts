@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -272,6 +272,30 @@ test.describe('M3 player controls', () => {
 						.locator('.nl-controls-backdrop')
 						.click({ position: { x: 5, y: 5 } })
 					await expect(page.getByRole('dialog')).toHaveCount(0)
+					await page.keyboard.press('Escape')
+					await expect(
+						page.getByRole('button', { name: '在编辑器中打开这里' }),
+					).toBeDisabled()
+					await expect(
+						page.getByRole('button', { name: '在编辑器中打开这里' }),
+					).toHaveAttribute('title', '请先将本地工程关联到作品')
+					await mkdir(join(directory, 'profile', 'projects'), {
+						recursive: true,
+					})
+					await writeFile(
+						join(directory, 'profile', 'projects', playerWorkId),
+						root,
+					)
+					await page.evaluate(() => {
+						window.location.hash = '/'
+					})
+					await expect(page.getByRole('main', { name: '播放器' })).toHaveCount(
+						0,
+					)
+					await page.evaluate((id) => {
+						window.location.hash = `/work/${id}/play`
+					}, playerWorkId)
+					await expect(text).toHaveText('你好，世界。')
 					await page.keyboard.press('Escape')
 					await page.getByRole('button', { name: '在编辑器中打开这里' }).click()
 					await expect(page).toHaveURL(

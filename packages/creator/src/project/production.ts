@@ -420,12 +420,15 @@ export function createProduction(
 		},
 		async player(workId: string, selected?: string, chapterId?: string) {
 			const linked = await existing(() => readFile(binding(workId), 'utf8'))
-			return loadPlayerChapter(
-				linked ?? selected ?? fail('not_found', '请选择本地工程'),
-				workId,
-				cacheDir,
-				chapterId,
-			)
+			return {
+				...(await loadPlayerChapter(
+					linked ?? selected ?? fail('not_found', '请选择本地工程'),
+					workId,
+					cacheDir,
+					chapterId,
+				)),
+				linked: !!linked,
+			}
 		},
 		async close() {
 			closing = true

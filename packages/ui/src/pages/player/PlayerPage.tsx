@@ -30,6 +30,7 @@ export function PlayerPage() {
 	const [ended, setEnded] = useState(false)
 	const [awaitingClick, setAwaitingClick] = useState(false)
 	const [loaded, setLoaded] = useState<{
+		linked: boolean
 		chapterId: string
 		mode: PlaybackMode
 		scenes: CompiledScene[]
@@ -50,6 +51,7 @@ export function PlayerPage() {
 			setLoading(true)
 			try {
 				const {
+					linked,
 					script,
 					chapter,
 					registry,
@@ -94,6 +96,7 @@ export function PlayerPage() {
 				setEnded(false)
 				setAwaitingClick(waitForClick)
 				setLoaded({
+					linked,
 					chapterId: chapter.chapterId,
 					mode,
 					scenes: result.scenes,
@@ -207,6 +210,7 @@ export function PlayerPage() {
 					controller={control}
 					surface={host.current}
 					chapters={chapters}
+					editorLinked={loaded.linked}
 					onChapter={(chapterId) =>
 						void loadProject(
 							undefined,

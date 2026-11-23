@@ -76,6 +76,7 @@ export const productionCommands = {
 			chapterId: opt(entityId),
 		}),
 		output: obj({
+			linked: bool(),
 			chapters: arr(
 				obj({
 					chapterId: entityId,

@@ -28,6 +28,7 @@ export function PlayerControls({
 	chapters,
 	onChapter,
 	onEditor,
+	editorLinked,
 	waiting,
 	awaitingClick,
 	onResume,
@@ -37,6 +38,7 @@ export function PlayerControls({
 	chapters: ControlChapter[]
 	onChapter(chapterId: string): void
 	onEditor(position: SentenceRef): void
+	editorLinked: boolean
 	waiting?: ControlChapter
 	awaitingClick: boolean
 	onResume(): void
@@ -257,7 +259,10 @@ export function PlayerControls({
 									</button>
 									<button
 										type="button"
-										disabled={!controller?.frame().position}
+										disabled={!editorLinked || !controller?.frame().position}
+										title={
+											editorLinked ? undefined : '请先将本地工程关联到作品'
+										}
 										onClick={() => {
 											const position = controller?.frame().position
 											if (position) onEditor(position)
