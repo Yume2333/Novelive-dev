@@ -132,7 +132,7 @@ function characterBriefFallback(
 		return character.description
 }
 
-async function auditPreview(png: Buffer) {
+async function boundAuditImage(png: Buffer) {
 	const image = sharp(png)
 	const metadata = await image.metadata()
 	let { width, height } = metadata
@@ -146,7 +146,12 @@ async function auditPreview(png: Buffer) {
 		width = info.width
 		height = info.height
 	}
-	if (!metadata.hasAlpha) return { png }
+	return { png, width, height, hasAlpha: metadata.hasAlpha }
+}
+
+async function auditPreview(image: Buffer) {
+	const { png, width, height, hasAlpha } = await boundAuditImage(image)
+	if (!hasAlpha) return { png }
 	const tile = Math.max(1, Math.round(Math.min(width, height) / 24))
 	const checkerboard = Buffer.from(
 		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><pattern id="checker" width="${tile * 2}" height="${tile * 2}" patternUnits="userSpaceOnUse"><rect width="${tile * 2}" height="${tile * 2}" fill="#ddd"/><path d="M0 0h${tile}v${tile}H0z M${tile} ${tile}h${tile}v${tile}h-${tile}z" fill="#aaa"/></pattern></defs><rect width="100%" height="100%" fill="url(#checker)"/></svg>`,
@@ -695,18 +700,24 @@ export class ArtProduction {
 			}
 			await this.project.writeFile(checkpoint.path, JSON.stringify(pending))
 		}
+		let boundedRefs: Promise<Buffer[]> | undefined
 		const audit = async (
 			png: Buffer,
 			prompt: string,
 			preview: Awaited<ReturnType<typeof auditPreview>>,
 		) => {
 			try {
+				boundedRefs ??= Promise.all(
+					auditRefs.map(
+						async (reference) => (await boundAuditImage(reference)).png,
+					),
+				)
 				const judge = await artJson(
 					this.options.visual,
 					prompt,
 					auditSchema,
 					this.options,
-					[preview.png, ...auditRefs],
+					[preview.png, ...(await boundedRefs)],
 				)
 				if (judge.pass && judge.failedChecks.length === 0) {
 					await clearReview()

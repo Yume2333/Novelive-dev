@@ -17,6 +17,7 @@ import * as artModels from '../../packages/creator/src/pipeline/art/models'
 import { planArt } from '../../packages/creator/src/pipeline/art/plan'
 import * as upscale from '../../packages/creator/src/pipeline/postprocess'
 import { Project } from '../../packages/creator/src/project'
+import { quoteSpend } from '../../packages/creator/src/usage/spend'
 import {
 	bible,
 	directory,
@@ -190,13 +191,13 @@ test('confirms three main visuals and costumes, stages the chapter and draws can
 	})
 }, 45_000)
 
-test('bounds review images without shrinking generation references', async () => {
+test('bounds chapter review quotes without shrinking generation references or saved images', async () => {
 	const render = vi
 		.spyOn(artModels, 'imageRenderer')
 		.mockReturnValue(async (_prompt, refs, size) => {
 			expect(await sharp(refs[0]).metadata()).toMatchObject({
-				width: 2048,
-				height: 1024,
+				width: 3840,
+				height: 2160,
 			})
 			return { bytes: await picture(size.width, size.height, false) }
 		})
@@ -210,16 +211,41 @@ test('bounds review images without shrinking generation references', async () =>
 					height: 864,
 				})
 				expect(await sharp(images?.[1]).metadata()).toMatchObject({
-					width: 2048,
-					height: 1024,
+					width: 1536,
+					height: 864,
 				})
+				const quote = await quoteSpend(
+					new Request('https://example.invalid/v1/chat/completions', {
+						method: 'POST',
+						body: JSON.stringify({
+							max_tokens: 4096,
+							messages: [
+								{
+									role: 'user',
+									content: [
+										{ type: 'text', text: prompt },
+										...(images ?? []).map((image) => ({
+											type: 'image_url',
+											image_url: {
+												url: `data:image/png;base64,${image.toString('base64')}`,
+											},
+										})),
+									],
+								},
+							],
+						}),
+					}),
+				)
+				expect(quote.tokens).toBeGreaterThan(2 * 53_248)
+				expect(quote.tokens).toBeLessThan(120_000)
 				return { pass: true, failedChecks: [], feedback: '' }
 			},
 		)
 	try {
 		await projectTest(async (project) => {
 			const path = 'assets/style/reference.png'
-			await project.writeFile(path, await picture(2048, 1024, false))
+			const original = await picture(3840, 2160, false)
+			await project.writeFile(path, original)
 			const art = new ArtProduction(project, {
 				replay,
 				main,
@@ -237,23 +263,25 @@ test('bounds review images without shrinking generation references', async () =>
 					upscaleTier: 'anime',
 				},
 			})
-			const pool = await art.candidates(
-				{
-					...bible,
-					characters: [],
-					style: {
-						...bible.style,
-						references: [{ path, description: 'Style' }],
-					},
+			const confirmed = {
+				...bible,
+				style: {
+					...bible.style,
+					status: 'confirmed' as const,
+					references: [{ path, description: 'Style' }],
 				},
-				[],
+			}
+			const [job] = await art.register(
+				[{ id: 'cg-window', kind: 'cg', description: 'A window' }],
+				confirmed,
 			)
-			expect(pool.mainVisuals).toHaveLength(3)
+			expect(await art.draw(job, confirmed)).toEqual({ status: 'drawn' })
+			expect(await project.readFile(path)).toEqual(original)
 			expect(
 				model.mock.calls.filter(([, prompt]) =>
 					prompt.startsWith('Visually audit'),
 				),
-			).toHaveLength(3)
+			).toHaveLength(1)
 		})
 	} finally {
 		render.mockRestore()
