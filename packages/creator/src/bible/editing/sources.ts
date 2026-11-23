@@ -20,21 +20,11 @@ export function sourceRevision(value: unknown) {
 	return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
-async function proposalRestriction(
-	project: Project,
+function proposalRestriction(
 	payload: Payload,
 	bible: Bible,
-): Promise<string | undefined> {
-	const chapters = new Set<string>()
-	const series = await project.read(projectFiles.series)
-	for (const volumeId of series.volumeIds) {
-		const volume = await project.read(projectFiles.volume(volumeId))
-		for (const workId of volume.workIds)
-			for (const chapterId of (
-				await project.read(projectFiles.work(volumeId, workId))
-			).chapterIds)
-				chapters.add(chapterId)
-	}
+	chapters: ReadonlySet<string>,
+): string | undefined {
 	try {
 		prepareBiblePatch(bible, payload, chapters)
 	} catch (error) {
@@ -93,6 +83,7 @@ export async function proposalActionability(
 	project: Project,
 	proposal: Proposal,
 	bible: Bible,
+	chapters: ReadonlySet<string>,
 	source?: ProposalSource,
 ): Promise<
 	| { canApprove: true }
@@ -130,7 +121,7 @@ export async function proposalActionability(
 			status: 'stale',
 			reason: '候选已过期：目标条目已变更，请重新提出；已确认内容保持不变。',
 		}
-	const reason = await proposalRestriction(project, payload, bible)
+	const reason = proposalRestriction(payload, bible, chapters)
 	return reason
 		? { canApprove: false, status: 'restricted', reason }
 		: { canApprove: true }

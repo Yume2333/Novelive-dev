@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
-import { formatVersion, projectFiles } from '@novelive/format/model'
+import { formatVersion, projectFiles, type Work } from '@novelive/format/model'
 import { ChatStore, type ProposalSource } from '../../chat/store'
 import type { CommandInput, CommandOutput, Proposal } from '../../contract'
 import { Project } from '../../project'
@@ -53,12 +53,18 @@ async function workContext(
 	volumeId?: string,
 ) {
 	const series = await project.read(projectFiles.series)
+	const chapters = new Set<string>()
+	let selected: Work | undefined
 	for (const id of series.volumeIds) {
-		if (volumeId && id !== volumeId) continue
 		const volume = await project.read(projectFiles.volume(id))
-		if (volume.workIds.includes(workId))
-			return project.read(projectFiles.work(id, workId))
+		for (const candidateId of volume.workIds) {
+			const work = await project.read(projectFiles.work(id, candidateId))
+			for (const chapterId of work.chapterIds) chapters.add(chapterId)
+			if ((!volumeId || id === volumeId) && candidateId === workId)
+				selected = work
+		}
 	}
+	if (selected) return { work: selected, chapters }
 	throw { code: 'not_found', message: '工程中找不到这部作品或卷' }
 }
 
@@ -74,7 +80,11 @@ export async function getBible(
 	project: Project,
 	input: CommandInput<'bible.get'>,
 ): Promise<CommandOutput<'bible.get'>> {
-	const work = await workContext(project, input.workId, input.volumeId)
+	const { work, chapters } = await workContext(
+		project,
+		input.workId,
+		input.volumeId,
+	)
 	const bible = await readBible(project)
 	project.database
 		.prepare(
@@ -145,7 +155,13 @@ export async function getBible(
 				const { proposal, source } = store.proposal(id)
 				return [
 					id,
-					await proposalActionability(project, proposal, bible, source),
+					await proposalActionability(
+						project,
+						proposal,
+						bible,
+						chapters,
+						source,
+					),
 				]
 			}),
 		),
@@ -196,23 +212,22 @@ async function apply(
 	source?: ProposalSource,
 ): Promise<ApplicationResult> {
 	const before = await readBible(project)
-	const action = await proposalActionability(project, proposal, before, source)
+	const { chapters } = await workContext(
+		project,
+		proposal.workId,
+		payload.volumeId,
+	)
+	const action = await proposalActionability(
+		project,
+		proposal,
+		before,
+		chapters,
+		source,
+	)
 	if (!action.canApprove)
 		return action.status === 'restricted'
 			? { status: 'restricted', reason: action.reason }
 			: { status: 'stale' }
-	const workId = proposal.workId
-	await workContext(project, workId, payload.volumeId)
-	const chapters = new Set<string>()
-	const series = await project.read(projectFiles.series)
-	for (const volumeId of series.volumeIds) {
-		const volume = await project.read(projectFiles.volume(volumeId))
-		for (const id of volume.workIds)
-			for (const chapterId of (
-				await project.read(projectFiles.work(volumeId, id))
-			).chapterIds)
-				chapters.add(chapterId)
-	}
 	const { after, touched } = prepareBiblePatch(before, payload, chapters)
 	const writes = new Map<string, Entry[]>()
 	for (const kind of touched) {

@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import {
 	bibleRevision,
 	getBible,
@@ -85,6 +85,25 @@ function chat() {
 		proposals: projectProposals(project, ref.workId),
 	})
 }
+
+test('getBible reads the series, each volume and work once regardless of candidate count', async () => {
+	await publish()
+	const reads = vi.spyOn(project, 'read')
+	try {
+		const view = await getBible(project, input)
+		expect(view.proposalIds.length).toBeGreaterThan(1)
+		for (const path of [
+			projectFiles.series.path,
+			projectFiles.volume(ref.volumeId).path,
+			projectFiles.work(ref.volumeId, ref.workId).path,
+		])
+			expect(
+				reads.mock.calls.filter(([file]) => file.path === path),
+			).toHaveLength(1)
+	} finally {
+		reads.mockRestore()
+	}
+})
 
 test('synthesis proposals persist source revisions, resolve through chat and never resurrect on reopen', async () => {
 	const result = await publish()
@@ -786,7 +805,7 @@ test.each([true, false])(
 			id: 'deletion-relation',
 			from: 'traveler',
 			to: removed.id,
-			type: 'friend',
+			description: 'friend',
 			status: 'confirmed' as const,
 		}
 		await project.write(projectFiles.character(scope, removed.id), {
@@ -800,12 +819,11 @@ test.each([true, false])(
 		const result = await publish()
 		const before = await readBible(project)
 		const revision = bibleRevision(before)
-		const now = new Date().toISOString()
 		const proposal: Proposal = {
 			id: 'batch-delete',
 			workId: ref.workId,
-			createdAt: now,
-			updatedAt: now,
+			sessionId: null,
+			prompt: 'Batch character removal',
 			chapterIds: [],
 			status: 'pending',
 			payload: {
@@ -820,7 +838,7 @@ test.each([true, false])(
 						entry: {
 							...relation,
 							to: keepReference ? removed.id : 'traveler',
-							type: 'updated friend',
+							description: 'updated friend',
 						},
 					},
 				],
@@ -893,7 +911,7 @@ test.each([true, false])(
 				expect((await readBible(project)).relation).toContainEqual({
 					...relation,
 					to: 'traveler',
-					type: 'updated friend',
+					description: 'updated friend',
 				})
 			}
 		} finally {

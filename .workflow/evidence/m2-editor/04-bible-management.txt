@@ -7,6 +7,19 @@ $ tsc --noEmit
 Exit code: 0
 
 PR #35 review follow-up (baseline d1ea43a verified as HEAD ancestor)
+Post-patch review on 20cfefc:
+- 7172680: shared prepareBiblePatch applies the proposed replacement/deletion in memory, validates original operations, then invokes real validatePatch on every resulting entry/glossary term. Both projection and the writer invoke this same pure preparation; the writer's independent relation/address validator is removed. Batch tests delete a character and update a relation: keeping its reference returns restricted without writes and remains rejectable; removing its reference approves successfully.
+- 7be04da: all legacy fixtures strip baseVersion. Added marker-free versioned fixtures for a matching saved whole-Bible revision (sequential independent approvals work) and a newer edit (no bases, stale, no writes). The interrupted-checkpoint regression now starts with genuinely approvable legacy candidates rather than candidates already stale at creation.
+- Series context is collected once with work membership, then passed to every candidate preflight and the actual writer. A read-count regression asserts one series, volume and work read despite multiple proposals. No per-candidate metadata traversal or independent validator remains.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary|M2 chat panel'
+  4 passed (4.2s)
+$ NL_REPLAY=strict pnpm check
+Checked 234 files in 105ms. No fixes applied.
+Found 1 info.
+ Test Files  28 passed (28)
+      Tests  380 passed (380)
+Both exited 0; the final check includes the exact batch fixture schema and the context read-count assertion. The Electron pass remains applicable: only unit fixture data changed afterward. Logs: 04-pr35-postpatch-{e2e,check}.log. Scheduler untouched; no paid calls. PR remained open and mergeable; git_view_pr showed only the monitoring-control bot conversation comment, not inline review details. No PR comments were posted.
+
 Safety review on 0b44b9f (supersedes bridge-time legacy snapshots and hand-written reference restrictions below):
 - Quarantine overwrite: c5cf200. applyPatches now optionally exposes its in-memory merged result, derived solely from the validated read and its own merge. Normal synthesis hashes those entries without reading potentially newer on-disk entry snapshots. Quarantined output has no entry bases and an explicit quarantine marker; it cannot become approvable even if the old Bible later reappears. Legacy bases without the new provenance version are only reconstructed when their saved whole-Bible revision matches current contents exactly. Actual interrupted/ready checkpoint synthesis tests assert no quarantined bases; adapter regression asserts even a quarantined source containing newer hashes cannot overwrite the creator edit.
 - Backfill overwrite: c947782. Before fix, the concrete pending-character regression removed old bases, edited the confirmed duplicate while preserving the candidate, reopened, and incorrectly obtained a new targeted hash (expected undefined). Backfill now requires the existing saved expectedRevision, current whole-Bible revision and supplied provenance revision to match. Untrusted/missing metadata is never allowed to bypass a mismatching saved revision. Matching-revision enrichment and rejected-state preservation are tested.
