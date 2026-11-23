@@ -199,6 +199,10 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 		})
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
 		await expect(page.locator('.nl-player-text')).toHaveText('Second')
+		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+			'aria-busy',
+			'false',
+		)
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
 		await expect(page.locator('.nl-player-text')).toHaveText('Dim')
 		await expect
