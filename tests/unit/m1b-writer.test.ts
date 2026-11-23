@@ -24,9 +24,11 @@ type Reply =
 	| { truncated: string }
 function responses(...replies: Reply[]) {
 	const requests: string[] = []
+	const toolSchemas: unknown[] = []
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const body = await new Request(input, init).json()
 		requests.push(JSON.stringify(body.messages))
+		toolSchemas.push(body.tools)
 		const reply = replies.shift()
 		if (reply === undefined) throw new Error('Unexpected model request')
 		const tool = typeof reply !== 'string' && 'tool' in reply
@@ -72,7 +74,7 @@ function responses(...replies: Reply[]) {
 			{ headers: { 'content-type': 'text/event-stream' } },
 		)
 	}
-	return { requests, options: fixtureOptions(fetch), fetch }
+	return { requests, toolSchemas, options: fixtureOptions(fetch), fetch }
 }
 
 const scene =
@@ -124,6 +126,68 @@ describe('M1b writer', () => {
 		expect(result.scenes[0].beats[0].line).toMatchObject({
 			id: draft.scenes[0].beats[0].line?.id,
 		})
+	})
+
+	test('restricts fidelity citations to the scene source and corrects a draft-line citation', async () => {
+		const cited = { ...issue, paragraphId: 'p0020', quote: '窗外下着雨' }
+		const draftQuote = '屋里彻夜点着灯'
+		const input = {
+			paragraphs: [
+				{ id: 'p0019', text: '他推开窗。' },
+				{ id: 'p0020', text: '窗外下着雨。' },
+			],
+		}
+		const { options, requests, toolSchemas } = responses(
+			{
+				tool: 'submit_review',
+				arguments: {
+					issues: [{ ...cited, paragraphId: '#0002', quote: draftQuote }],
+				},
+			},
+			{
+				tool: 'submit_review',
+				arguments: {
+					issues: [{ ...cited, paragraphId: 'p0018', quote: '船靠在桥边' }],
+				},
+			},
+			{ tool: 'submit_review', arguments: { issues: [cited] } },
+		)
+		const model = writingModel(options.reviewer, options)
+		const result = await reviewFidelity(
+			model,
+			input,
+			`scene Window\nsource p0019-p0020\n: 他推开窗。 #0001\n: ${draftQuote}。 #0002`,
+			() => model,
+		)
+		expect(toolSchemas[0]).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					function: expect.objectContaining({
+						name: 'submit_review',
+						parameters: expect.objectContaining({
+							properties: expect.objectContaining({
+								issues: expect.objectContaining({
+									items: expect.objectContaining({
+										properties: expect.objectContaining({
+											paragraphId: expect.objectContaining({
+												enum: ['p0019', 'p0020'],
+											}),
+										}),
+									}),
+								}),
+							}),
+						}),
+					}),
+				}),
+			]),
+		)
+		expect(requests[0]).toContain('Source text (via read_source_range)')
+		expect(requests[0]).toContain('Draft script (comparison only)')
+		expect(requests[1]).toContain(
+			'You cited draft line #0002; cite source paragraph IDs (p0019, p0020) with text quoted verbatim from the source.',
+		)
+		expect(requests[2]).toContain('Quote not found in p0018')
+		expect(result).toEqual([cited])
 	})
 
 	test('separates style-only review and carries the priority preview and chapter constraints', async () => {
