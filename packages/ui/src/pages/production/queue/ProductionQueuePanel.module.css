@@ -1,0 +1,10 @@
+@media (hover: hover) {
+	.move {
+		opacity: 0;
+	}
+
+	li:hover > .move,
+	li:focus-within > .move {
+		opacity: 1;
+	}
+}
