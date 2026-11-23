@@ -355,9 +355,12 @@ function legacyEventPacketBudget(
 	bible: Awaited<ReturnType<typeof readBible>>,
 ) {
 	if (format >= 4) {
-		const contract = synthesisInstructions(
-			obj({ ...eventFields, biblePatch: completeBiblePatchSchema }),
-		)
+		const contract =
+			format === 6
+				? nextEvent.instructions
+				: synthesisInstructions(
+						obj({ ...eventFields, biblePatch: completeBiblePatchSchema }),
+					)
 		return eventPacketBudget(
 			context,
 			history,

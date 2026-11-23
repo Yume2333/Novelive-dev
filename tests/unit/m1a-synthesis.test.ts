@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { arr, bool, obj, str } from '@earendil-works/pi-schema'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { Project } from '../../packages/creator/src/project'
 import { createReplayFetch } from '../../packages/creator/src/replay'
@@ -9,13 +10,20 @@ import {
 	synthesisFiles,
 	synthesizeVolume,
 } from '../../packages/creator/src/synthesis'
+import { synthesisOutput } from '../../packages/creator/src/synthesis/output'
 import {
 	applyPatches,
 	bibleEntryBases,
 	readBible,
 	validatePatch,
 } from '../../packages/creator/src/synthesis/patch'
-import { type BiblePatch, projectFiles } from '../../packages/format/src/model'
+import {
+	type BiblePatch,
+	biblePatchSchema,
+	entityId,
+	glossaryPatchSchema,
+	projectFiles,
+} from '../../packages/format/src/model'
 import { checkOwnerBookResumePrompt } from '../acceptance/owner-book-resume'
 import {
 	candidateTower,
@@ -2683,6 +2691,105 @@ test.each([true, false])(
 		}
 	},
 )
+
+async function seedFormatSixSplit(
+	project: Project,
+	summary: string,
+	requirements = '',
+) {
+	const expanded = [{ ...previews[0], summary }]
+	await project.write(projectFiles.preview(chapters[0]), expanded[0])
+	const bible = await readBible(project)
+	const contract = synthesisOutput(
+		obj({
+			overview: str(),
+			chapters: arr(
+				obj({ chapterId: entityId, progress: str({ minLength: 1 }) }),
+			),
+			biblePatch: biblePatchSchema,
+			glossaryPatch: glossaryPatchSchema,
+			event: str({ minLength: 1 }),
+			is_last: bool(),
+		}),
+	).instructions
+	const prefix = `Synthesize the ordered chapter previews in en. Adaptation requirements: ${requirements}.
+Return JSON. Use stable IDs, real chapter IDs, and character IDs for relations. Mark main characters major and new entries candidate. Preserve confirmed facts; delete only this volume’s mistaken candidates.
+${inclusionCriteria}
+Existing entries:
+${JSON.stringify(bible)}
+${contract}`
+	const context = connection.contextWindow ?? 16384
+	const history = Math.min(1024, Math.floor(context / 16))
+	const output = Math.min(
+		4096,
+		Math.max(512, context - Buffer.byteLength(prefix) - history - 768),
+	)
+	const label = `Chapter ${chapters[0]}:\n`
+	const size =
+		Math.floor(
+			(context - output - Buffer.byteLength(prefix) - history - 384) / 3,
+		) - label.length
+	const fingerprint = (value: unknown) =>
+		createHash('sha256').update(JSON.stringify(value)).digest('hex')
+	const first = {
+		event: 'Saved first fragment',
+		overview: 'First fragment extracted.',
+		chapters: [{ chapterId: chapters[0], progress: 'First fragment.' }],
+		biblePatch: [],
+		glossaryPatch: [],
+		is_last: true,
+	}
+	await project.write(files.checkpoint, {
+		formatVersion: 1,
+		fingerprint: fingerprint({
+			packetFormat: 6,
+			previews: expanded,
+			language: options.language,
+			...(requirements && { requirements }),
+			strategy: 'events',
+			incremental: false,
+			model: connection.model,
+			context,
+		}),
+		basis: fingerprint(bible),
+		packet: 1,
+		events: [first],
+		whole: null,
+		ready: false,
+		applied: false,
+	})
+	return { label, size, text: JSON.stringify(expanded[0]), first }
+}
+
+test('format-6 resume starts at the exact next fragment of a split chapter', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const { label, size, text, first } = await seedFormatSixSplit(
+		project,
+		'First half then later evidence. '.repeat(145),
+	)
+	expect(text.length).toBeGreaterThan(size)
+	expect(text.length).toBeLessThan(size * 2)
+	const prompts: string[] = []
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		prompts.push(messages[0].content)
+		return stream({ ...first, event: 'Remaining fragment', overview: '' })
+	})
+	await synthesizeVolume(project, 'v1', [chapters[0]], {
+		...options,
+		strategy: 'events',
+		fetch,
+	})
+	expect(fetch).toHaveBeenCalledTimes(1)
+	expect(prompts[0]).toContain('Extract only the next event in packet 2/2.')
+	expect(prompts[0].split('Chapter previews:\n')[1]).toBe(
+		label + text.slice(size),
+	)
+	expect(
+		(await project.read(files.checkpoint)).events.map(({ event }) => event),
+	).toEqual([first.event, 'Remaining fragment'])
+})
 
 test.each([2, 5])(
 	'restores packet chapter scope when legacy events omit progress (format: %s)',
