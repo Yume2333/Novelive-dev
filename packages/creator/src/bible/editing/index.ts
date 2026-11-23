@@ -219,7 +219,7 @@ async function apply(
 			path,
 			`${JSON.stringify({ formatVersion, entries }, null, '\t')}\n`,
 		)
-	propagateStaleness(project, before, after)
+	await propagateStaleness(project, before, after)
 	return { status: 'applied' }
 }
 

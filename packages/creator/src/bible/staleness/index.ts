@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
+import { type ProjectScope, projectFiles } from '@novelive/format/model'
 import type { Project } from '../../project'
-import type { readBible } from '../../synthesis/patch'
+import { existing, type readBible } from '../../synthesis/patch'
 
 type Bible = Awaited<ReturnType<typeof readBible>>
 
@@ -29,12 +30,51 @@ export function stalePrefixes(before: Bible, after: Bible) {
 	return prefixes
 }
 
-export function propagateStaleness(
+export async function propagateStaleness(
 	project: Project,
 	before: Bible,
 	after: Bible,
 ) {
 	const prefixes = stalePrefixes(before, after)
+	const series = await project.read(projectFiles.series)
+	const scopes: { scope: ProjectScope; workIds: string[] }[] = []
+	const allWorks: string[] = []
+	for (const volumeId of series.volumeIds) {
+		const { workIds } = await project.read(projectFiles.volume(volumeId))
+		allWorks.push(...workIds)
+		scopes.push({ scope: { level: 'volume', volumeId }, workIds })
+		for (const workId of workIds)
+			scopes.push({
+				scope: { level: 'work', volumeId, workId },
+				workIds: [workId],
+			})
+	}
+	scopes.push({ scope: { level: 'series' }, workIds: allWorks })
+	for (const { scope, workIds } of scopes) {
+		const registry = await existing(() =>
+			project.read(projectFiles.assetRegistry(scope)),
+		)
+		for (const entry of registry?.entries ?? []) {
+			if (
+				entry.status !== 'drawn' ||
+				entry.type === 'cg' ||
+				!prefixes.some((prefix) => entry.id.startsWith(prefix))
+			)
+				continue
+			for (const workId of workIds)
+				project.database
+					.prepare(`INSERT OR IGNORE INTO asset (work_id, asset_key, kind, status)
+					SELECT ?, ?, ?, 'drawn' WHERE EXISTS (SELECT 1 FROM work WHERE work_id = ?)`)
+					.run(
+						workId,
+						entry.id,
+						entry.type === 'expression' || entry.type === 'variant'
+							? 'variant'
+							: 'base',
+						workId,
+					)
+		}
+	}
 	const assets = project.database
 		.prepare(
 			"SELECT work_id, asset_key FROM asset WHERE kind != 'cg' AND status IN ('drawn','stale')",
