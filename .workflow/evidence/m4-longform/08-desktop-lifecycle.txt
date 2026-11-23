@@ -30,3 +30,7 @@ Coverage limitations:
 - Notification instances and IPC validators are real; Notification.show/isSupported and click emission are substituted. Hash navigation reaches the real preload and renderer.
 - Native tray icon/popup rendering, native notification service delivery/clicks, Windows/macOS, active production cleanup and sleep blocking are not visually/end-to-end verified.
 - M3 must emit the player-waiting DOM event before the new-chapter path is reachable from the application UI.
+
+原生宿主验收（主会话提供，补充上述自动化覆盖范围）：
+真实 KDE Plasma（:0，pnpm dev，NL_REPLAY=strict，无付费调用）：制作中关窗隐藏到托盘、creator 存活；托盘菜单重开；退出确认「继续制作」取消且 creator 存活，「停止并退出」后 Electron 与 creator 进程均消失（ps 确认）；标题含 <b> 的作品通知正文去标签，点击通知前台打开「确认角色与主视觉」页。主机需用户级 libnotify 运行时才能显示原生通知。
+未覆盖：无托盘最小化仅 e2e；完成通知（strict replay 第二章模型连接错误未到完成）；新章通知由 M3/05 提供事件、M4/10 验收。
