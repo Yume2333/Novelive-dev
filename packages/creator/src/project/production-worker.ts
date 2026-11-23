@@ -24,6 +24,7 @@ import {
 	type StepContext,
 } from '../scheduler/chapter'
 import { existing, readBible } from '../synthesis/patch'
+import { usageMethods, withUsage } from '../usage'
 import type { Project } from './index'
 import { resolveBible } from './series/resolve'
 
@@ -107,17 +108,22 @@ export function chapterWorker(
 ) {
 	const fetch = createReplayFetch(replay)
 	const art = (signal?: AbortSignal) =>
-		new ArtProduction(project, {
-			main: models.main,
-			portrait: models.portrait,
-			fast: models.fast,
-			visual: models.visual,
-			image: models.image,
-			replay,
-			signal,
-			resolution: work.settings.outputResolution,
-			readScope: { level: 'work', volumeId, workId: work.workId },
-		})
+		usageMethods(
+			new ArtProduction(project, {
+				main: models.main,
+				portrait: models.portrait,
+				fast: models.fast,
+				visual: models.visual,
+				image: models.image,
+				replay,
+				signal,
+				resolution: work.settings.outputResolution,
+				readScope: { level: 'work', volumeId, workId: work.workId },
+			}),
+			project,
+			work.workId,
+			'draw',
+		)
 	const ref = (chapterId: string) => ({
 		volumeId,
 		workId: work.workId,
@@ -392,36 +398,38 @@ export function chapterWorker(
 		return JSON.parse((await project.readFile(drawing(id))).toString())
 	}
 	return {
-		worker,
+		worker: usageMethods(worker, project, work.workId, 'write'),
 		art,
 		rewriteScene: (
 			chapterId: string,
 			scene: { sourceIds: readonly string[]; nvs: string; instruction: string },
 			signal: AbortSignal,
 		) =>
-			step(async () => {
-				const { chapter, options } = await input({
-					workId: work.workId,
-					chapterId,
-					link: 'none',
-					desensitized: false,
-					signal,
-				})
-				const result = await writeChapter(
-					{
-						...chapter,
-						paragraphs: chapter.paragraphs.filter(({ id }) =>
-							scene.sourceIds.includes(id),
-						),
-						rewrite: { instruction: scene.instruction, current: scene.nvs },
-					},
-					options,
-				)
-				signal.throwIfAborted()
-				if (result.scenes.length !== 1)
-					throw new Error('A scene rewrite must return exactly one scene')
-				return result.scenes[0].scene
-			}),
+			withUsage(project, work.workId, 'write', () =>
+				step(async () => {
+					const { chapter, options } = await input({
+						workId: work.workId,
+						chapterId,
+						link: 'none',
+						desensitized: false,
+						signal,
+					})
+					const result = await writeChapter(
+						{
+							...chapter,
+							paragraphs: chapter.paragraphs.filter(({ id }) =>
+								scene.sourceIds.includes(id),
+							),
+							rewrite: { instruction: scene.instruction, current: scene.nvs },
+						},
+						options,
+					)
+					signal.throwIfAborted()
+					if (result.scenes.length !== 1)
+						throw new Error('A scene rewrite must return exactly one scene')
+					return result.scenes[0].scene
+				}),
+			),
 		async redraw(
 			assetId: string,
 			target: { path: string; instruction?: string },

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
 import type { createConfigStore } from '../config'
@@ -8,11 +8,18 @@ import type {
 	EventEnvelope,
 	ProductionSnapshot,
 } from '../contract'
+import type { ProductionQueue } from '../contract/queue'
 import { readImportWizard } from '../import/wizard'
 import { prepareVolume } from '../project-pipeline'
 import { createReplayFetch, type ReplayOptions } from '../replay'
-import { ChapterScheduler } from '../scheduler/chapter'
+import { ChapterScheduler, recoverChapterWork } from '../scheduler/chapter'
+import {
+	type QueueMove,
+	readQueueWork,
+	WorkQueue,
+} from '../scheduler/work-queue'
 import { existing } from '../synthesis/patch'
+import { withUsage } from '../usage'
 import { Project } from './index'
 import { loadPlayerChapter } from './player'
 import {
@@ -33,13 +40,34 @@ export function createProduction(
 	active: (busy: boolean) => void,
 ) {
 	const cacheDir = join(dataDir, 'cache')
-	const binding = (workId: string) => join(dataDir, 'projects', workId)
-	let state: Awaited<ReturnType<typeof open>> | undefined
-	let loading:
-		| { workId: string; result: Promise<Awaited<ReturnType<typeof open>>> }
-		| undefined
+	const bindingsDir = join(dataDir, 'projects')
+	const binding = (workId: string) => join(bindingsDir, workId)
+	const sessions = new Map<string, ReturnType<typeof open>>()
+	const recoveredProjects = new Set<string>()
+	let loading = 0
 	let closing = false
 	let seq = 0
+	let restored: Promise<void> | undefined
+	let lastQueue: string | undefined
+	const workQueue = new WorkQueue(publishQueue)
+
+	function publishBusy() {
+		active(!closing && (loading > 0 || workQueue.busy))
+	}
+
+	function publishQueue(queue: ProductionQueue) {
+		publishBusy()
+		const key = JSON.stringify(queue)
+		if (key === lastQueue) return
+		lastQueue = key
+		publish({
+			scope: 'app',
+			scopeId: 'app',
+			seq: ++seq,
+			at: new Date().toISOString(),
+			event: { type: 'production.queue', payload: queue },
+		})
+	}
 
 	async function remember(workId: string, directory: string) {
 		const file = binding(workId)
@@ -52,6 +80,56 @@ export function createProduction(
 			(await existing(() => readFile(binding(workId), 'utf8'))) ??
 			fail('not_found', '工程中找不到这部作品')
 		)
+	}
+
+	async function identity(project: Project, workId: string) {
+		const series = await project.read(projectFiles.series)
+		const volumes = await Promise.all(
+			series.volumeIds.map((id) => project.read(projectFiles.volume(id))),
+		)
+		const volume =
+			volumes.find(({ workIds }) => workIds.includes(workId)) ??
+			fail('not_found', '工程中找不到这部作品')
+		return { seriesId: series.seriesId, volumeId: volume.volumeId, workId }
+	}
+
+	function recoverProject(project: Project) {
+		if (recoveredProjects.has(project.root)) return
+		recoverChapterWork(project.database)
+		recoveredProjects.add(project.root)
+	}
+
+	async function restore() {
+		const bindings =
+			(await existing(() => readdir(bindingsDir, { withFileTypes: true }))) ??
+			[]
+		const entries = await Promise.allSettled(
+			bindings
+				.filter((file) => file.isFile())
+				.map(async ({ name: workId }) => {
+					using project = await Project.open(await directory(workId))
+					recoverProject(project)
+					const row = project.database
+						.prepare('SELECT title FROM work WHERE work_id = ?')
+						.get(workId) as { title: string } | undefined
+					if (!row) return null
+					return readQueueWork(project.database, {
+						link: await identity(project, workId),
+						projectDir: project.root,
+						title: row.title,
+					})
+				}),
+		)
+		for (const entry of entries) {
+			// Unavailable projects still report their open error when selected directly.
+			if (entry.status === 'fulfilled' && entry.value)
+				workQueue.restore(entry.value)
+		}
+	}
+
+	function ready() {
+		restored ??= restore()
+		return restored
 	}
 
 	async function cache(project: Project, path: string) {
@@ -67,14 +145,9 @@ export function createProduction(
 		const project = await Project.open(await directory(workId))
 		let scheduler: ChapterScheduler | undefined
 		try {
-			const series = await project.read(projectFiles.series)
-			const volumes = await Promise.all(
-				series.volumeIds.map((id) => project.read(projectFiles.volume(id))),
-			)
-			const volume =
-				volumes.find(({ workIds }) => workIds.includes(workId)) ??
-				fail('not_found', '工程中找不到这部作品')
-			const { volumeId } = volume
+			recoverProject(project)
+			const link = await identity(project, workId)
+			const { volumeId } = link
 			const work = await project.read(projectFiles.work(volumeId, workId))
 			const chapterTitles = Object.fromEntries(
 				await Promise.all(
@@ -133,7 +206,7 @@ export function createProduction(
 			function emit() {
 				if (closing) return
 				const status = snapshot()
-				active(status.status === 'producing' || !!loading)
+				workQueue.changed()
 				for (const run of queue.runLog(workId)) {
 					if (run.kind !== 'chapter') continue
 					run.steps.forEach((step, index) => {
@@ -164,8 +237,23 @@ export function createProduction(
 			const queue = new ChapterScheduler(data, worker, {
 				imageConcurrency: models.image.concurrency,
 				onChange: emit,
+				slot: {
+					workId,
+					granted: () => workQueue.granted(workId),
+					enqueueFirst: () => workQueue.enqueueFirst(workId),
+				},
 			})
 			scheduler = queue
+			workQueue.attach(workId, {
+				read: () =>
+					readQueueWork(data, {
+						link,
+						title: work.title,
+						projectDir: project.root,
+					}),
+				busy: () => queue.busy,
+				wake: () => queue.wake(),
+			})
 			async function refresh() {
 				const next = await settings()
 				setModels(next)
@@ -173,12 +261,18 @@ export function createProduction(
 			}
 			if (!started || queue.snapshot(workId).phase === 'confirm-visual') {
 				if (!started) {
-					const { synthesis } = await prepareVolume(project, volumeId, {
-						previewConnection: models.organizer,
-						synthesisConnection: models.director,
-						language: work.language,
-						fetch: createReplayFetch(replay),
-					})
+					const { synthesis } = await withUsage(
+						project,
+						workId,
+						'synthesize',
+						() =>
+							prepareVolume(project, volumeId, {
+								previewConnection: models.organizer,
+								synthesisConnection: models.director,
+								language: work.language,
+								fetch: createReplayFetch(replay),
+							}),
+					)
 					summary = synthesis.overview
 				}
 				const bible = (await productionBible(project, volumeId, workId)).art
@@ -280,42 +374,49 @@ export function createProduction(
 		} catch (error) {
 			scheduler?.dispose()
 			await scheduler?.idle()
+			workQueue.detach(workId)
 			project.close()
 			throw error
 		}
 	}
 
 	async function get(workId: string) {
-		if (state?.workId === workId) return state
-		if (loading?.workId === workId) return loading.result
-		if (loading || state?.snapshot().status === 'producing')
-			fail('invalid_config', '当前已有作品正在制作')
-		const start = async () => {
-			if (state) {
-				state.queue.dispose()
-				await state.queue.idle()
-				state.project.close()
-				state = undefined
-			}
-			return open(workId)
-		}
-		active(true)
-		const result = start()
-		loading = { workId, result }
-		try {
-			state = await result
-			return state
-		} finally {
-			loading = undefined
-			active(state?.snapshot().status === 'producing')
-		}
+		await ready()
+		if (closing) throw { code: 'cancelled', message: '创作端正在关闭' }
+		const session = sessions.get(workId)
+		if (session) return session
+		loading++
+		publishBusy()
+		const result = open(workId)
+			.catch((error) => {
+				sessions.delete(workId)
+				throw error
+			})
+			.finally(() => {
+				loading--
+				publishBusy()
+			})
+		sessions.set(workId, result)
+		return result
 	}
 
 	return {
 		remember,
 		get,
+		async getQueue() {
+			await ready()
+			return workQueue.snapshot()
+		},
+		async moveQueueWork(workId: string, direction: QueueMove) {
+			await ready()
+			return workQueue.move(workId, direction)
+		},
 		async refreshSettings() {
-			await state?.refreshSettings()
+			await Promise.all(
+				[...sessions.values()].map(async (session) =>
+					(await session).refreshSettings(),
+				),
+			)
 		},
 		async player(workId: string, selected?: string) {
 			const linked = await existing(() => readFile(binding(workId), 'utf8'))
@@ -338,11 +439,18 @@ export function createProduction(
 		},
 		async close() {
 			closing = true
-			const session = await (loading?.result.catch(() => undefined) ?? state)
-			session?.queue.dispose()
-			await session?.queue.idle()
-			session?.project.close()
-			active(false)
+			workQueue.close()
+			const results = await Promise.allSettled(sessions.values())
+			await Promise.all(
+				results.map(async (result) => {
+					if (result.status !== 'fulfilled') return
+					const { queue, project } = result.value
+					queue.dispose()
+					await queue.idle()
+					project.close()
+				}),
+			)
+			publishBusy()
 		},
 	}
 }

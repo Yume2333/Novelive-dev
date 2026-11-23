@@ -1,0 +1,45 @@
+M1a/07 — 公版真书分块综合验收
+Base: ea99733e566c72be5873d6507a07de37ef7b40ba
+Status: partial — W4 未通过
+
+书目：夏敬渠《野叟曝言》，维基文库一百五十四回本。
+来源：https://zh.wikisource.org/wiki/野叟曝言
+目录版本：2523154（https://zh.wikisource.org/w/index.php?oldid=2523154）
+版权：来源标注这是公有领域的清代作品，作者逝世超过 100 年，且出版早于 1931 年。
+UTF-8 TXT：3,911,342 bytes；SHA-256 dc14b620b537561c3e0bb6f51eb939b5758eeaadd9c864e050dc74b2e6e110f8。
+正文及每回原页的 URL／版本／HTML SHA-256 清单位于 ~/novelive-testbooks/，不入 Git。TXT 保留目录的二十个真实分卷及章回；卷标题增加供导入识别的卷序。第 127 回的源页面含一个 U+FFFD，以缺字框标示，不猜补原字。
+
+本书优先于仅以回目为主的候选：该来源直接提供真实分卷和连续章回，不需要人工分卷。首卷「奮字卷之一」7 回，61,192 字符；覆盖真卷比较而不必为整本做模型调用。
+默认章回规则把第 82 回的一条正文误识为标题；测试通过现有导入选项要求「第…回」后有分隔空白，恢复 20 卷／154 回，不修改正文或产品的默认规则。验收预览由 deepseek-v4.1-flash 回退到 gemini-3.8-flash，综合仍配置 devin-swe-2；不更改产品默认模型。成功时使用同一批预览对比整卷与受限上下文分块的规范化条目 ID 和操作，并检查重启能否复用已应用的检查点。
+
+NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts
+Error: M1a/07 did not pass during preview and chunked synthesis; see the redacted result and usage
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+
+原 DeepSeek 预览两次收到 HTTP 200，4,096 completion tokens 均耗在推理，无正文。单次 62-token 探针直接指定 `thinking: {type: "disabled"}`，仍返回 17 个 reasoning tokens；未另行请求其他参数。pi-ai 的 DeepSeek 兼容配置选自目录，但该目录模型的 off 值为 null，故兼容重试不能单独验证禁用参数。未假定中转支持禁用。
+
+文本适配器现在将推理耗尽且无答案的响应标为 `reasoning_limit`，不按网络错误重试。预览和综合为推理模型在模型上限和上下文上限之内增加输出容量。接受单个 JSON 代码块而不放宽现有 schema；此前 Gemini 的首轮输出有代码块，末章的修复响应缺少所需字段。
+
+最新付费运行导入全书，首卷 7 回预览和分卷摘要均写入；分块为 6 个包。第一包的 devin-swe-2 首次响应缺 `event`、`is_last`，含错误的字段类型和 `upsert` 操作；修复响应仍缺 glossary 条目的 `status` 且包含未声明的 `changes` 字段。私有响应离线用同一 checkpoint schema 验证确认这些问题。未完成第一包，未发起整卷控制；F1、已确认设定保全、重启零调用仍未验证，不记 W4 通过。
+
+累计账本：20 次、190,995 实测 tokens、0 张图、无未计量预留（DeepSeek 3 次 24,120 含探针；Gemini 15 次 157,383；综合 2 次 9,492）。最新 Check 新增 3 次、19,261 tokens；首卷预览重用先前的录制。预算 30,000,000 tokens／0 张。私有工程及录制存放于 ~/.local/novelive-tools/m1a-owner-book/，未提交。
+
+NL_REPLAY=strict pnpm check
+ Test Files  22 passed (22)
+      Tests  342 passed (342)
+
+Schema 契约修复：模型请求和修复提示从校验器使用的 pi-schema 派生，保留严格校验；
+修复提示列出完整字段路径、允许键和必填字段。两条脱敏失败响应纳入单元回归。
+单次 devin-swe-2 强制工具探针（608 tokens）返回 HTTP 200，但无工具调用，
+不启用该模式；未探测其他结构化输出方式。
+
+NL_REPLAY=strict pnpm check
+ Test Files  22 passed (22)
+      Tests  344 passed (344)
+
+单次付费重跑复用已保存的工程和预览（0 次预览调用）。首包修复通过并保存，
+第二包缺必填字段，修复只返回推理，报 `reasoning_limit`。
+付费 Check: Tests  1 failed (1)。重跑 4 次、36,358 tokens、0 张图；
+含探针累计 25 次、227,961 实测 tokens、0 张图。整卷对照、F1、已确认设定
+保全和重启未验收。

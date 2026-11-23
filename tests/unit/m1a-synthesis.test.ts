@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,6 +11,7 @@ import {
 } from '../../packages/creator/src/synthesis'
 import {
 	applyPatches,
+	bibleEntryBases,
 	readBible,
 	validatePatch,
 } from '../../packages/creator/src/synthesis/patch'
@@ -151,6 +153,158 @@ const strict = createReplayFetch({
 const options = { connection, language: 'en', fetch: strict }
 const files = synthesisFiles('v1')
 
+test.each([false, true])(
+	'reopens a completed synthesis across packet format changes (legacy: %s)',
+	async (legacy) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const args = { ...options, strategy: 'whole' as const }
+		const result = await synthesizeVolume(project, 'v1', chapters, args)
+		const checkpoint = await project.read(files.checkpoint)
+		const inputs = {
+			previews: await Promise.all(
+				chapters.map((id) => project.read(projectFiles.preview(id))),
+			),
+			language: args.language,
+			strategy: args.strategy,
+			incremental: false,
+			model: connection.model,
+			context: connection.contextWindow,
+		}
+		await project.write(
+			files.checkpoint,
+			legacy
+				? {
+						...checkpoint,
+						inputFingerprint: undefined,
+						fingerprint: createHash('sha256')
+							.update(JSON.stringify({ packetFormat: 2, ...inputs }))
+							.digest('hex'),
+					}
+				: { ...checkpoint, fingerprint: 'old-packet-format' },
+		)
+		const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+			throw new Error('Completed synthesis should be reused')
+		})
+		expect(
+			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
+		).toEqual(result)
+		expect(fetch).not.toHaveBeenCalled()
+	},
+)
+
+test('whole synthesis requests a complete chapter-by-chapter patch, not a shortlist', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const request = new Request(input, init)
+		const body = await request.clone().json()
+		expect(body.messages[0].content).toContain(
+			'Return their union across all chapters',
+		)
+		expect(body.messages[0].content).toContain('Summarize only the overview')
+		return strict(request)
+	})
+	await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		strategy: 'whole',
+		fetch,
+	})
+	expect(fetch).toHaveBeenCalledOnce()
+})
+
+test('consolidates repeated candidate additions across events and remaps references', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const guide = {
+		id: 'guide',
+		name: 'Lin',
+		aliases: ['Guide'],
+		costumes: [{ id: 'travel', description: 'Travel clothes' }],
+		status: 'candidate',
+	} as const
+	let calls = 0
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		const body = await request.json()
+		expect(body.messages[0].content).toContain(
+			'qualifying new facts, not repeated background',
+		)
+		const first = calls++ === 0
+		const candidate = first
+			? guide
+			: {
+					...guide,
+					id: 'lin',
+					name: 'Ｌｉｎ',
+					aliases: ['Guide', 'Navigator'],
+					costumes: [{ id: 'formal', description: 'Formal robes' }],
+				}
+		const result = {
+			overview: 'A journey',
+			chapters: [
+				{ chapterId: first ? 'c1' : 'c2', progress: 'The guide helps.' },
+			],
+			event: first ? 'Meeting Lin' : 'Following Lin',
+			is_last: !first,
+			biblePatch: [
+				{ op: 'add', kind: 'character', entry: candidate },
+				...(first
+					? []
+					: [
+							{
+								op: 'add',
+								kind: 'relation',
+								entry: {
+									id: 'guiding',
+									from: 'lin',
+									to: 'ada',
+									description: 'Guides Ada',
+									status: 'candidate',
+								},
+							},
+						]),
+			],
+			glossaryPatch: [],
+		}
+		return new Response(
+			`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+			{ headers: { 'content-type': 'text/event-stream' } },
+		)
+	}
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		strategy: 'events',
+		fetch,
+	})
+	expect(calls).toBe(2)
+	expect(result.conflicts).toEqual([])
+	expect(result.biblePatch).toMatchObject([
+		{
+			kind: 'character',
+			entry: {
+				id: 'guide',
+				aliases: ['Guide', 'Navigator'],
+				costumes: [{ id: 'travel' }, { id: 'formal' }],
+			},
+		},
+		{ kind: 'relation', entry: { from: 'guide', to: 'ada' } },
+	])
+	const bible = await readBible(project)
+	expect(bible.character.filter(({ id }) => id !== 'ada')).toMatchObject([
+		{
+			id: 'guide',
+			aliases: ['Guide', 'Navigator'],
+			costumes: [{ id: 'travel' }, { id: 'formal' }],
+		},
+	])
+	expect(bible.relation).toContainEqual(
+		expect.objectContaining({ from: 'guide', to: 'ada' }),
+	)
+	expect(result.bibleBase).toEqual(bibleEntryBases(bible))
+	expect(await project.read(files.result)).toEqual(result)
+})
+
 beforeEach(async () => {
 	directory = await mkdtemp(join(tmpdir(), 'novelive-synthesis-test-'))
 	root = join(directory, 'project')
@@ -162,6 +316,111 @@ afterEach(async () => {
 	expect(network).not.toHaveBeenCalled()
 	await rm(directory, { recursive: true, force: true })
 })
+
+const repairedEvent = {
+	overview: 'A key opens a tower.',
+	chapters: [
+		{ chapterId: 'c1', progress: 'Ada finds a key.' },
+		{ chapterId: 'c2', progress: 'Ada opens the tower.' },
+	],
+	event: 'Ada finds and uses a key.',
+	is_last: true,
+	biblePatch: [],
+	glossaryPatch: [],
+}
+
+test.each([
+	{
+		response: {
+			overview: { summary: 'A key opens a tower.' },
+			chapters: [{ chapterId: 'c1', progress: ['Ada finds a key.'] }],
+			biblePatch: [{ kind: 'location', op: 'upsert', entry: candidateTower }],
+			glossaryPatch: [],
+		},
+		errors: [
+			'/event [required]: missing',
+			'/is_last [required]: missing',
+			'/overview [type]: expected string, got object',
+			'/chapters/0/progress [type]: expected string, got array',
+			'/biblePatch/0/op [enum]:',
+		],
+	},
+	{
+		response: {
+			...repairedEvent,
+			glossaryPatch: [
+				{ id: 'key', original: 'Key', written: 'Key', category: 'object' },
+			],
+			changes: [],
+		},
+		errors: [
+			'/glossaryPatch/0/status [required]: missing',
+			'/changes [additionalProperties]: unknown field',
+			'declared keys: id, status,',
+			'required fields: id, status, original, written, category',
+		],
+	},
+	{
+		response: { ...repairedEvent, overview: false, ['章'.repeat(8192)]: true },
+		errors: ['/overview [type]: expected string, got boolean'],
+	},
+] as const)(
+	'repairs a redacted invalid event against the same contract',
+	async ({ response, errors }) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const contextWindow = 16_384
+		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+			const { messages } = await new Request(input, init).json()
+			const prompt = messages[0].content as string
+			expect(prompt).toContain('is_last:b')
+			expect(prompt).toMatch(
+				/glossaryPatch:\[\{id:[^,]+,status:(?:\$\d+|"candidate"\|"confirmed")/,
+			)
+			expect(prompt).toContain('"candidate"|"confirmed"')
+			let output: unknown = response
+			if (messages.length === 2) {
+				for (const expected of errors)
+					expect(messages[1].content).toContain(expected)
+				if (Buffer.byteLength(JSON.stringify(response)) > contextWindow) {
+					expect(
+						Buffer.byteLength(prompt + messages[1].content),
+					).toBeLessThanOrEqual(contextWindow - 4096)
+					expect(messages[1].content).not.toContain('\uFFFD')
+				} else {
+					expect(messages[1].content).toContain(
+						'allowed keys: overview, chapters, biblePatch, glossaryPatch, event, is_last',
+					)
+				}
+				output = repairedEvent
+			}
+			const data = [
+				{
+					choices: [
+						{
+							index: 0,
+							delta: { role: 'assistant', content: JSON.stringify(output) },
+						},
+					],
+				},
+				{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+			]
+			return new Response(
+				`${data.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
+				{ headers: { 'content-type': 'text/event-stream' } },
+			)
+		})
+		await expect(
+			synthesizeVolume(project, 'v1', chapters, {
+				...options,
+				connection: { ...connection, contextWindow },
+				strategy: 'events',
+				fetch,
+			}),
+		).resolves.toMatchObject({ chapters: repairedEvent.chapters })
+		expect(fetch).toHaveBeenCalledTimes(2)
+	},
+)
 
 test('whole-volume replay persists a skeleton, candidates and conflicts without replacing confirmed content', async () => {
 	await seed(root)
@@ -511,6 +770,43 @@ test('deduplication retains the first addition and the first competing identity 
 			}),
 		]),
 	)
+})
+
+test('consolidated style references prioritize the latest repeat before applying the image cap', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const reference = (image: string) => ({
+		path: `art/${image}.png`,
+		description: image,
+	})
+	const patch: BiblePatch = [
+		['a', 'b', 'c'],
+		['d', 'a'],
+	].map((images) => ({
+		kind: 'style',
+		op: 'add',
+		entry: {
+			id: 'layout',
+			status: 'candidate',
+			description: 'Layout',
+			references: images.map(reference),
+		},
+	}))
+	const { conflicts, consolidatedAdds } = await applyPatches(
+		project,
+		await readBible(project),
+		patch,
+		[],
+		new Set(chapters),
+	)
+	expect(conflicts).toEqual([])
+	const references = ['c', 'd', 'a'].map(reference)
+	expect((await readBible(project)).style).toContainEqual(
+		expect.objectContaining({ id: 'layout', references }),
+	)
+	expect(consolidatedAdds.get(patch[0])).toMatchObject({
+		entry: { references },
+	})
 })
 
 test('an undated update follows the dated addition it depends on', async () => {
