@@ -5,6 +5,7 @@ import type { StageSnapshot } from '../contract'
 import { mountText } from '../text'
 import { AssetWindow } from './assets'
 import { mountMinimalPlayer } from './index'
+import { PixiStage } from './renderer'
 
 vi.mock('./renderer', () => ({
 	PixiStage: class {
@@ -100,6 +101,36 @@ it('preserves main custom-mark styling and viewport metrics when mounting stage 
 			},
 		}),
 	)
+	abort.abort()
+})
+
+it('does not install a blank opening for empty preview history before the first background fade', async () => {
+	const scenes = fixture()
+	scenes[0].beats[0].actions[0].args = { transition: 'fade', duration: 0.5 }
+	const commit = vi.spyOn(PixiStage.prototype, 'commit')
+	const abort = new AbortController()
+	const ordinary = await mountMinimalPlayer(
+		new Element() as unknown as HTMLElement,
+		scenes,
+		resources,
+		abort.signal,
+		vi.fn(),
+	)
+	expect(commit).toHaveBeenCalledTimes(1)
+	commit.mockClear()
+	const preview = await mountMinimalPlayer(
+		new Element() as unknown as HTMLElement,
+		scenes,
+		resources,
+		abort.signal,
+		vi.fn(),
+		{},
+		undefined,
+		{ initialActions: [] },
+	)
+	expect(commit).toHaveBeenCalledTimes(1)
+	expect(commit.mock.calls[0][3]).toBe(false)
+	expect(preview?.state).toEqual(ordinary?.state)
 	abort.abort()
 })
 

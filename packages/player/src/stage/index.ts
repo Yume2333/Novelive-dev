@@ -304,7 +304,7 @@ export async function mountMinimalPlayer(
 				await stage.restore(saved, lookahead(beats, index + 1))
 			} else {
 				let state = stage.state
-				if (index === startIndex && initialActions) {
+				if (index === startIndex && initialActions?.length) {
 					for (const action of initialActions) state = direct(state, action)
 					state = previewOpening(state, beat.actions)
 					await stage.commit(state, lookahead(beats, index + 1), [], true)
