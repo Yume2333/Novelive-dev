@@ -20,7 +20,7 @@ async function openFixture(...options: Parameters<typeof createChatFixture>) {
 	return fixture
 }
 
-test('keeps streamed text and failure status after an interrupted reply reopens', async () => {
+test('preserves an interrupted reply in reopened history and follow-up context', async () => {
 	let body!: ReadableStreamDefaultController<Uint8Array>
 	const incoming = new ReadableStream<Uint8Array>({
 		start(controller) {
@@ -33,13 +33,34 @@ test('keeps streamed text and failure status after an interrupted reply reopens'
 			)
 		},
 	})
+	const requests: unknown[] = []
 	const chat = await openFixture({
 		replay: {
 			mode: 'replay',
-			fetch: async () =>
-				new Response(incoming, {
+			fetch: async (input, init) => {
+				const request = await new Request(input, init).json()
+				requests.push(request.messages)
+				if (requests.length > 1) {
+					const chunk = {
+						choices: [
+							{
+								index: 0,
+								delta: { content: 'Continued' },
+								finish_reason: 'stop',
+							},
+						],
+					}
+					return new Response(
+						`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
+						{
+							headers: { 'content-type': 'text/event-stream' },
+						},
+					)
+				}
+				return new Response(incoming, {
 					headers: { 'content-type': 'text/event-stream' },
-				}),
+				})
+			},
 		},
 	})
 	const { session } = await chat.call('chat.create', { workId })
@@ -70,6 +91,18 @@ test('keeps streamed text and failure status after an interrupted reply reopens'
 		status: 'failed',
 		parts,
 	})
+	await chat.done(
+		await chat.send(session.sessionId, 'Continue the reply', headId),
+	)
+	expect(requests).toHaveLength(2)
+	expect(requests[1]).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				role: 'assistant',
+				content: '[Interrupted response]\nVisible text',
+			}),
+		]),
+	)
 })
 
 test('streams an attached image reply, cancels a retry, and reopens both branches', async () => {

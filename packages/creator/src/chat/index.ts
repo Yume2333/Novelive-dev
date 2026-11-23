@@ -475,13 +475,20 @@ export class ChatService {
 						event.type === 'message_end' &&
 						event.message.role === 'assistant'
 					) {
-						if (event.message.content.length)
-							run.message.parts.push(...assistantParts(event.message))
-						else if (
+						const interrupted =
 							event.message.stopReason === 'aborted' ||
 							event.message.stopReason === 'error'
-						)
-							run.message.parts.push(...run.preview)
+						const parts =
+							interrupted && !event.message.content.length
+								? run.preview
+								: assistantParts(event.message)
+						run.message.parts.push(...parts)
+						if (interrupted) {
+							const content = parts.flatMap((part) =>
+								part.type === 'text' && part.text.trim() ? [part] : [],
+							)
+							if (content.length) run.turn.push({ ...event.message, content })
+						}
 						run.preview = []
 					} else if (
 						event.type === 'turn_end' &&
