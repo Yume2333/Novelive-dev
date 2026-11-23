@@ -91,6 +91,21 @@ test('keeps TOC chapter breaks at inline anchors', async () => {
 	expect(book.volumes[0].chapters[1].paragraphs).toEqual(['Second.'])
 })
 
+test('preserves direct prose around nested block paragraphs', async () => {
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/chapter.xhtml': xhtml(
+				'<blockquote>Before <em>nested</em>.<p>Inside.</p>After.</blockquote>',
+			),
+		}),
+	)
+	expect(book.volumes[0].chapters[0].paragraphs).toEqual([
+		'Before nested.',
+		'Inside.',
+		'After.',
+	])
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)

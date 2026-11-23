@@ -145,7 +145,35 @@ function document(path: string, root: Element): Document {
 				visit(image)
 			return
 		}
-		for (const child of children(node)) visit(child)
+		let inline: Element['children'] = []
+		const flush = () => {
+			if (inline.length) visit({ name: 'p', attrs: {}, children: inline })
+			inline = []
+		}
+		for (const child of node.children) {
+			if (
+				typeof child === 'string' ||
+				[
+					'a',
+					'span',
+					'em',
+					'strong',
+					'b',
+					'i',
+					'ruby',
+					'rt',
+					'br',
+					'img',
+					'image',
+				].includes(child.name)
+			) {
+				inline.push(child)
+			} else {
+				flush()
+				visit(child)
+			}
+		}
+		flush()
 	}
 	visit(all(root, 'body')[0] ?? root)
 	return { path, blocks, anchors }
