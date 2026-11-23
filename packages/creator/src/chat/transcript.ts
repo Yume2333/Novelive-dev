@@ -68,7 +68,7 @@ export async function conversation(
 		: { prefix: [], pendingProposalIds: [] }
 	const groups = await Promise.all(
 		path.slice(start).map(async (row) => {
-			const turn =
+			const turn: { messages: Message[]; pendingProposalIds: string[] } =
 				row.data.role === 'user'
 					? {
 							messages: [
