@@ -406,15 +406,19 @@ registry.register(
 	},
 )
 
-registry.register('events.list', async ({ scope, scopeId, afterSeq }) => ({
-	...events.list(
-		scopeId,
-		afterSeq,
-		scope,
-		scope === 'work' && production ? (await production).records(scopeId) : [],
-	),
-	snapshot: scope === 'app' ? { ready: true, generation } : null,
-}))
+registry.register('events.list', async ({ scope, scopeId, afterSeq }) => {
+	const service = scope === 'work' && production ? await production : undefined
+	return {
+		...events.list(
+			scopeId,
+			afterSeq,
+			scope,
+			service?.records(scopeId) ?? [],
+			service?.hasRecords(scopeId) ?? false,
+		),
+		snapshot: scope === 'app' ? { ready: true, generation } : null,
+	}
+})
 
 if (process.env.NL_E2E === '1') {
 	registry.register('debug.sqliteSmoke', async () => {

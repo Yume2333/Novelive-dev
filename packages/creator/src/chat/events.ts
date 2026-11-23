@@ -5,6 +5,7 @@ export class EventReplay {
 	private bytes = 0
 	private readonly droppedThrough = new Map<string, number>()
 	private readonly droppedChapters = new Map<number, string>()
+	private readonly forgottenChaptersThrough = new Map<string, number>()
 
 	constructor(
 		private readonly maxEntries = 256,
@@ -39,9 +40,9 @@ export class EventReplay {
 				if (oldest) {
 					const [seq, scope] = oldest
 					this.droppedChapters.delete(seq)
-					this.droppedThrough.set(
+					this.forgottenChaptersThrough.set(
 						scope,
-						Math.max(this.droppedThrough.get(scope) ?? 0, seq),
+						Math.max(this.forgottenChaptersThrough.get(scope) ?? 0, seq),
 					)
 				}
 			}
@@ -58,6 +59,7 @@ export class EventReplay {
 		afterSeq: number,
 		scope: EventEnvelope['scope'] = 'work',
 		records: readonly EventEnvelope[] = [],
+		completeChapterBackfill = false,
 	) {
 		const matches = (event: EventEnvelope) =>
 			event.scope === scope && event.scopeId === scopeId && event.seq > afterSeq
@@ -76,7 +78,11 @@ export class EventReplay {
 		}
 		return {
 			events: [...merged.values()].sort((a, b) => a.seq - b.seq),
-			gap: afterSeq < (this.droppedThrough.get(key) ?? 0) || chapterGap,
+			gap:
+				afterSeq < (this.droppedThrough.get(key) ?? 0) ||
+				(!completeChapterBackfill &&
+					afterSeq < (this.forgottenChaptersThrough.get(key) ?? 0)) ||
+				chapterGap,
 		}
 	}
 }

@@ -520,6 +520,9 @@ export function createProduction(
 		records(workId: string): readonly EventEnvelope[] {
 			return chapterRecords.get(workId) ?? []
 		},
+		hasRecords(workId: string) {
+			return chapterRecords.has(workId)
+		},
 		async getQueue() {
 			await ready()
 			return workQueue.snapshot()

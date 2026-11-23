@@ -100,12 +100,18 @@ test('chapter eviction history is bounded and older backfill conservatively reta
 	const records = Array.from({ length: 100 }, (_, index) => chapter(index + 1))
 	for (const record of records) replay.append(record)
 	expect(replay.list('work', 0, 'work', records).gap).toBe(true)
+	expect(replay.list('work', 0, 'work', records, true).gap).toBe(false)
 	expect(replay.list('work', 96, 'work', records)).toEqual({
 		events: records.slice(96),
 		gap: false,
 	})
 	expect(replay.list('work', 96, 'work', records.slice(97)).gap).toBe(true)
+	expect(replay.list('work', 96, 'work', records.slice(97), true).gap).toBe(
+		true,
+	)
 	expect(replay.list('other', 0)).toEqual({ events: [], gap: false })
+	for (let seq = 101; seq <= 103; seq++) replay.append(event(seq))
+	expect(replay.list('work', 0, 'work', records, true).gap).toBe(true)
 })
 
 test('app replay returns available queue events separately from work backfill', () => {

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compile } from '@earendil-works/pi-schema'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { EventReplay } from '../../packages/creator/src/chat/events'
 import { createConfigStore } from '../../packages/creator/src/config'
 import type { EventEnvelope } from '../../packages/creator/src/contract'
 import { productionQueueSchema } from '../../packages/creator/src/contract/queue'
@@ -371,7 +372,24 @@ test('real process death preserves checkpoints and pauses active and queued work
 		],
 	})
 	expect(host.records('unopened')).toEqual([])
+	expect(host.hasRecords('unopened')).toBe(false)
+	expect(host.hasRecords(a.workId)).toBe(true)
 	expect(host.records(a.workId)).toBe(first.records)
+	const replay = new EventReplay(1)
+	expect(first.records.length).toBeGreaterThan(2)
+	for (const record of first.records) replay.append(record)
+	expect(replay.list(a.workId, 0, 'work', host.records(a.workId)).gap).toBe(
+		true,
+	)
+	expect(
+		replay.list(
+			a.workId,
+			0,
+			'work',
+			host.records(a.workId),
+			host.hasRecords(a.workId),
+		).gap,
+	).toBe(false)
 	expect(host.records(a.workId).map(({ event }) => event.payload)).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
