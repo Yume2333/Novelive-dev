@@ -105,6 +105,7 @@ function document(path: string, root: Element): Document {
 						'li',
 						'blockquote',
 						'section',
+						'article',
 						'h1',
 						'h2',
 						'h3',

@@ -61,6 +61,21 @@ beforeEach(() => {
 	vi.mocked(artJson).mockClear()
 })
 
+test('keeps chapter blocks inside article wrappers', async () => {
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/chapter.xhtml': xhtml(
+				'<article><h1 id="one">Chapter One</h1><p>Alpha.</p><p>Beta.</p></article>',
+			),
+		}),
+	)
+	expect(book.volumes[0].chapters[0].paragraphs).toEqual([
+		'Chapter One',
+		'Alpha.',
+		'Beta.',
+	])
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)
