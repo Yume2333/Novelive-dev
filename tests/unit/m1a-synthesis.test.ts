@@ -2799,8 +2799,24 @@ test('format-6 resume fits a full Chinese packet without dropping preview text',
 		'沿江行船至渡口尋人'.repeat(1250),
 	)
 	const checkpoint = await project.read(files.checkpoint)
+	const character = {
+		kind: 'character',
+		op: 'add',
+		entry: { id: 'boatman', name: '船夫', aliases: [], status: 'candidate' },
+	} satisfies BiblePatch[number]
+	const relation = {
+		kind: 'relation',
+		op: 'add',
+		entry: {
+			id: 'boatman-guide',
+			from: 'boatman',
+			to: 'ada',
+			description: 'Guide: 船夫為乘客引路。',
+			status: 'candidate',
+		},
+	} satisfies BiblePatch[number]
 	const events = [
-		{ ...first, event: '往'.repeat(160) },
+		{ ...first, event: '往'.repeat(160), biblePatch: [character] },
 		{ ...first, event: '來'.repeat(18), is_last: false },
 		{ ...first, event: '回'.repeat(160), is_last: false },
 		{ ...first, event: '走'.repeat(160), is_last: false },
@@ -2812,8 +2828,19 @@ test('format-6 resume fits a full Chinese packet without dropping preview text',
 	const prompts: string[] = []
 	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 		const { messages } = await new Request(input, init).json()
-		prompts.push(messages[0].content)
-		return stream({ ...first, event: 'Resumed next fragment', overview: '' })
+		const prompt: string = messages[0].content
+		prompts.push(prompt)
+		expect(
+			prompt
+				.split('Already proposed entries:\n')[1]
+				.split('\nRecent event summaries:')[0],
+		).toMatch(/^character:? boatman(?:\s|$)/m)
+		return stream({
+			...first,
+			event: 'Resumed next fragment',
+			overview: '',
+			biblePatch: [relation],
+		})
 	})
 	await expect(
 		synthesizeVolume(project, 'v1', [chapters[0]], {
@@ -2835,7 +2862,10 @@ test('format-6 resume fits a full Chinese packet without dropping preview text',
 	).toBeLessThan(16384 - 4096)
 	expect(await project.read(files.checkpoint)).toMatchObject({
 		packet: 2,
-		events: [...events, { event: 'Resumed next fragment' }],
+		events: [
+			...events,
+			{ event: 'Resumed next fragment', biblePatch: [relation] },
+		],
 	})
 })
 

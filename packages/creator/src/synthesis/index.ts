@@ -787,20 +787,25 @@ ${packets[packet]}`
 				budget
 		) {
 			const extract =
-				'Return the next uncovered event, its progress and new facts. Set is_last when the packet is complete.'
+				'Return the next uncovered event, its progress and new facts. Reuse proposed IDs. Set is_last when the packet is complete.'
 			const focus =
-				'Return short JSON for the next uncovered event, or set is_last if done.'
+				'Return short JSON for the next uncovered event. Reuse proposed IDs. Set is_last if done.'
 			const messageRoom = budget - bytes(repairPrefix) - 1
-			const historyRoom =
+			const contextRoom =
 				messageRoom -
 				Math.max(bytes(prompt(extract, '', '')), bytes(prompt(focus, '', '')))
+			const { text: entries } = proposedEntries(
+				state.events,
+				packetEvents,
+				Math.max(0, Math.min(registryBudget, contextRoom - bytes('[]'))),
+			)
 			const history = recentEvents(
 				state.events,
-				Math.min(historyBudget, historyRoom),
+				Math.min(historyBudget, contextRoom - bytes(entries)),
 				true,
 			)
-			extractionPrompt = prompt(extract, '', history)
-			focusedPrompt = prompt(focus, '', history)
+			extractionPrompt = prompt(extract, entries, history)
+			focusedPrompt = prompt(focus, entries, history)
 		}
 		const event = await request(
 			extractionPrompt,
