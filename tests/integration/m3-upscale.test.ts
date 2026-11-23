@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
@@ -177,6 +177,43 @@ describe('M3 本地放大', () => {
 				.status,
 		).toBe('skipped')
 	}, 120_000)
+
+	it.skipIf(process.platform === 'win32')(
+		'第二次进程未写输出时拒绝复用第一次结果',
+		async () => {
+			const directory = await mkdtemp(join(tmpdir(), 'upscale-stale-'))
+			try {
+				const seed = join(directory, 'seed.png')
+				const marker = join(directory, 'finished')
+				const executable = join(directory, 'upscale.mjs')
+				await writeFile(
+					seed,
+					await sharp(opaque).resize(64, 96).png().toBuffer(),
+				)
+				await writeFile(
+					executable,
+					`#!/usr/bin/env node
+import { existsSync, copyFileSync, writeFileSync } from 'node:fs'
+if (!existsSync(${JSON.stringify(marker)})) {
+	copyFileSync(${JSON.stringify(seed)}, process.argv[process.argv.indexOf('-o') + 1])
+	writeFileSync(${JSON.stringify(marker)}, '')
+}
+`,
+				)
+				await chmod(executable, 0o755)
+				await expect(
+					postprocess(
+						opaque,
+						{ ...options, mode: 'double' },
+						{ binary: executable },
+					),
+				).rejects.toMatchObject({ code: 'ENOENT' })
+				expect(await readFile(marker, 'utf8')).toBe('')
+			} finally {
+				await rm(directory, { recursive: true, force: true })
+			}
+		},
+	)
 
 	it('空图、进程错误和取消会拒绝；目录可覆盖，下载幂等', async () => {
 		expect(resolveUpscale({ binary: 'custom', models: 'models' })).toEqual({

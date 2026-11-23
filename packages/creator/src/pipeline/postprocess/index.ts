@@ -69,6 +69,7 @@ export async function postprocess(
 				const input = join(directory, 'input.png')
 				const result = join(directory, 'output.png')
 				await writeFile(input, await sharp(output).png().toBuffer())
+				await rm(result, { force: true })
 				await new Promise<void>((resolve, reject) => {
 					const child = spawn(
 						paths.binary,
