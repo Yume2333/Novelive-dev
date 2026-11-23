@@ -13,6 +13,7 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-history.test.ts` → `Test Files  1 passed (1)`，`Tests  6 passed (6)`。
+- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-history.test.ts` → 1 个测试文件、7 个测试通过，见 `.workflow/evidence/m2-editor/02-edit-history.txt`。
+- 审查回归：`@move` 改变位置而非槽位身份；移动后换表情仍写原槽位。
 - 真实服务路径：用 `Project.create/open` 建立并重开磁盘工程，核对 .nvs、work.json、project.db 审计及会话级撤销；Electron 与调度接线留给后续任务。
 - 未调用模型，无需新增 cassette。
