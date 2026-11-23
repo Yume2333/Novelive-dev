@@ -12,6 +12,8 @@ import type {
 	CreatorFrame,
 } from '../../packages/creator/src/contract'
 import { productionChapterRecordEvent } from '../../packages/creator/src/contract/production'
+import { ProjectEditor } from '../../packages/creator/src/editor/history'
+import { CreativeRevisions } from '../../packages/creator/src/editor/revisions'
 import { importTxtProject } from '../../packages/creator/src/import/wizard'
 import { Project } from '../../packages/creator/src/project'
 import { createProduction } from '../../packages/creator/src/project/production'
@@ -529,6 +531,104 @@ test('a settings save changes the next step of an active production session', as
 		])
 	} finally {
 		releaseWriter.resolve()
+		await production.close()
+	}
+})
+
+test('recording dispatches identical image requests for distinct editor candidates', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	const { projectDir, workId } = await fixture()
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const assetId = 'room/day'
+	{
+		using project = await Project.open(projectDir)
+		const work = await project.read(projectFiles.work('v0001', workId))
+		const { art } = chapterWorker(
+			project,
+			'v0001',
+			work,
+			await productionModels(config),
+		)
+		const [job] = await art().register(
+			[{ id: assetId, kind: 'location', description: 'Room in sunlight' }],
+			bible,
+		)
+		await project.writeFile(
+			`source/production/art/${job.assetId}.json`,
+			JSON.stringify({ job }),
+		)
+		project.tasks.registerWork({ workId, title: 'Paper boat' })
+		const queue = new ChapterScheduler(project.database, new ScriptedWorker())
+		try {
+			queue.start(workId, ['ch0001'])
+			queue.confirmVisual(workId)
+			queue.stop(workId)
+			await queue.idle()
+		} finally {
+			queue.dispose()
+		}
+	}
+	const images: unknown[] = []
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		if (!request.url.endsWith('/images/generations')) {
+			return request.url.endsWith('/chat/completions') &&
+				(await request.json()).model === configuration.models.visual.model
+				? completion({ pass: true, failedChecks: [], feedback: '' })
+				: completion({ content: 'A sunny room.' })
+		}
+		images.push(await request.json())
+		const png = await sharp({
+			create: {
+				width: 64,
+				height: 36,
+				channels: 3,
+				background: images.length === 1 ? 'red' : 'blue',
+			},
+		})
+			.png()
+			.toBuffer()
+		return Response.json({ data: [{ b64_json: png.toString('base64') }] })
+	}
+	const production = createProduction(
+		directory,
+		config,
+		{
+			mode: 'record',
+			directory: join(directory, 'cassettes'),
+			reuseRecorded: true,
+			fetch,
+		},
+		() => {},
+		() => {},
+	)
+	try {
+		await production.remember(workId, projectDir)
+		const session = await production.get(workId)
+		const revisions = new CreativeRevisions(
+			session.project,
+			workId,
+			new ProjectEditor(session.project, 'v0001', workId),
+			session,
+		)
+		const result = await revisions.regenerateImage({
+			workId,
+			assetId,
+			expectedRevision: await revisions.imageRevision(assetId),
+			count: 2,
+		})
+		if (result.status !== 'candidates') throw new Error('Expected candidates')
+		expect(images).toHaveLength(2)
+		expect(images[1]).toEqual(images[0])
+		const [first, second] = await Promise.all(
+			result.candidates.map(({ cachePath }) =>
+				session.project.readFile(cachePath),
+			),
+		)
+		expect(first.equals(second)).toBe(false)
+	} finally {
 		await production.close()
 	}
 })
