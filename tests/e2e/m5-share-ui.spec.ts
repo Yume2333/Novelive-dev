@@ -174,6 +174,30 @@ test('M5 share surfaces review export, approve updates and import as a project i
 												},
 											}
 										}
+										if (request.operation === 'inspectImport' && picked === 4) {
+											return {
+												ok: true,
+												result: {
+													operation: 'inspectImport',
+													works: results.inspectImport.result.works.map(
+														(entry) =>
+															entry.relation === 'update'
+																? {
+																		...entry,
+																		relation: 'older',
+																		installedVersion: 3,
+																	}
+																: entry.relation === 'new'
+																	? {
+																			...entry,
+																			relation: 'current',
+																			installedVersion: entry.work.version,
+																		}
+																	: entry,
+													),
+												},
+											} satisfies ShareResponse
+										}
 										return results[request.operation]
 									},
 								},
@@ -221,6 +245,27 @@ test('M5 share surfaces review export, approve updates and import as a project i
 				approvedUpdates: [{ workId, installedVersion: 1, incomingVersion: 2 }],
 			})
 			await preview.getByRole('button', { name: '导入为工程' }).click()
+			await expect(preview.getByRole('status')).toHaveText(
+				'已导入为新工程，可以在书库中编辑。',
+			)
+			expect(requests.at(-1)).toEqual({
+				operation: 'importAsProject',
+				packagePath,
+				destination: copyPath,
+			})
+			await preview.getByRole('button', { name: '关闭' }).click()
+
+			await pick.click()
+			await expect(preview.getByText('v1 · 已导入')).toBeVisible()
+			await expect(
+				preview.getByText('v2 · 已安装较新的 v3，不会替换'),
+			).toBeVisible()
+			await expect(
+				preview.getByRole('button', { name: '确认导入与更新' }),
+			).toBeHidden()
+			await preview
+				.getByRole('button', { name: '导入为工程' })
+				.click({ timeout: 5000 })
 			await expect(preview.getByRole('status')).toHaveText(
 				'已导入为新工程，可以在书库中编辑。',
 			)

@@ -44,8 +44,7 @@ export function ImportPackage({
 	const canImport =
 		updates.length > 0 || works.some((entry) => entry.relation === 'new')
 	const canImportAsProject =
-		imported !== undefined ||
-		works.every((entry) => entry.relation === 'current')
+		imported !== undefined || (review !== undefined && !canImport)
 
 	async function inspect() {
 		setBusy(true)
