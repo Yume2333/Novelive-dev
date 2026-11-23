@@ -30,6 +30,9 @@ The saved artifacts and verifier are local to the smoke machine.
 
 Provider-measured smoke totals: 24 calls, 28,811 input tokens, 24,349 output
 tokens (53,160 total), 4 generated images, and no unmetered requests.
+These 24 calls are recorded in the owner's private ledger, not in Git.
+The earlier W4 request's 131,072-token reservation remains counted as open
+until it is reconciled.
 
 No book content, credentials, relay address, prompts, provider responses,
 or generated assets are included in this receipt.
