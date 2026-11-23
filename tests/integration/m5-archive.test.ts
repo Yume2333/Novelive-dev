@@ -9,7 +9,7 @@ import {
 	writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { text } from 'node:stream/consumers'
 import { pipeline } from 'node:stream/promises'
 import { projectFiles } from '@novelive/format/model'
@@ -191,10 +191,17 @@ describe('M5 .novelive archive', () => {
 			'bible/notes.json/detail.json',
 			JSON.stringify({ formatVersion: 1 }),
 		]
-		await rawArchive([marker, ...releasedEntries(), art, lore])
+		for (const [path, contents] of [art, lore]) {
+			const absolute = join(projectRoot, path)
+			await mkdir(dirname(absolute), { recursive: true })
+			await writeFile(absolute, contents)
+		}
+		await exportPackage({ projectRoot, destination, scope })
 		using archive = await openPackage(destination)
-		expect(await text(await archive.openEntry(art[0]))).toBe(art[1])
-		expect(await text(await archive.openEntry(lore[0]))).toBe(lore[1])
+		const extracted = join(directory, 'extracted')
+		await archive.extractTo(extracted)
+		for (const [path, contents] of [art, lore])
+			expect(await readFile(join(extracted, path), 'utf8')).toBe(contents)
 	})
 
 	it('does not overwrite an existing destination after an export error', async () => {
@@ -276,6 +283,30 @@ describe('M5 .novelive archive', () => {
 		},
 		{
 			entries: [marker, ['assets/ASSET-REGISTRY.JSON/tile.webp', 'art']],
+			message: 'file path used as a directory',
+		},
+		{
+			entries: [
+				marker,
+				[
+					`${projectFiles.character(scope, 'cat').path}/detail.json`,
+					'{"formatVersion":1}',
+				],
+			],
+			message: 'file path used as a directory',
+		},
+		{
+			entries: [
+				marker,
+				['bible/locations/station.json/detail.json', '{"formatVersion":1}'],
+			],
+			message: 'file path used as a directory',
+		},
+		{
+			entries: [
+				marker,
+				['volumes/vol-a/bible/digest.json/detail.json', '{"formatVersion":1}'],
+			],
 			message: 'file path used as a directory',
 		},
 	])(

@@ -67,19 +67,11 @@ export function isWorkDocument(path: string) {
 	return /^volumes\/[^/]+\/works\/[^/]+\/work\.json$/.test(path)
 }
 
-function relativeDocumentPath(path: string) {
-	return path
+export function packageDocumentCheck(path: string) {
+	const relative = path
 		.replace(/^volumes\/[^/]+\/(?:works\/[^/]+\/)?/, '')
 		.replace(/^chapters\/[^/]+\//, 'chapters/')
-}
-
-export function isFixedPackageDocument(path: string) {
-	return schemas.has(relativeDocumentPath(path))
-}
-
-export function checkPackageDocument(path: string, document: PackageJson) {
-	const relative = relativeDocumentPath(path)
-	const check =
+	return (
 		schemas.get(relative) ??
 		(/^source\/preview\/[^/]+\.json$/.test(relative)
 			? preview
@@ -88,5 +80,10 @@ export function checkPackageDocument(path: string, document: PackageJson) {
 				: /^bible\/locations\/[^/]+\.json$/.test(relative)
 					? location
 					: undefined)
+	)
+}
+
+export function checkPackageDocument(path: string, document: PackageJson) {
+	const check = packageDocumentCheck(path)
 	if (check && !check(document)) throw corrupt(path, 'invalid document')
 }
