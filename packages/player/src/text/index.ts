@@ -27,6 +27,7 @@ export function mountText(
 		options.millisecondsPerCharacter ?? 30,
 	)
 	const styles = new Map<string, ReturnType<typeof markDeclarations>>()
+	let styledMetrics = false
 	const stack: { element: HTMLElement; perChar?: string }[] = [
 		{ element: layout },
 	]
@@ -95,6 +96,7 @@ export function mountText(
 				if (priority || !element.style.getPropertyPriority(property))
 					element.style.setProperty(property, value, priority)
 			}
+			if (layer === layout && element.style.fontSize) styledMetrics = true
 			if (element.style.transform)
 				element.classList.add('nl-text-mark-transform')
 		}
@@ -186,15 +188,36 @@ export function mountText(
 		const anchor = ends[page - 1] ?? 0
 		const lineHeight = Number.parseFloat(getComputedStyle(layout).lineHeight)
 		const top = layout.getBoundingClientRect().top
-		const lines: { start: number; top: number }[] = []
+		const lines: { start: number; top: number; bottom: number }[] = []
+		const range = styledMetrics ? document.createRange() : undefined
 		glyphs.forEach((glyph, index) => {
-			const y = glyph.getBoundingClientRect().top - top
-			if (!lines.length || y - lines[lines.length - 1].top > lineHeight / 2)
-				lines.push({ start: index, top: y })
+			range?.selectNodeContents(glyph)
+			const rect =
+				range?.getBoundingClientRect() ?? glyph.getBoundingClientRect()
+			const y = rect.top - top
+			const bottom = rect.bottom - top
+			const previous = lines.at(-1)
+			if (
+				!previous ||
+				(styledMetrics
+					? y >= previous.bottom
+					: y - previous.top > lineHeight / 2)
+			)
+				lines.push({ start: index, top: y, bottom })
+			else if (styledMetrics) {
+				previous.top = Math.min(previous.top, y)
+				previous.bottom = Math.max(previous.bottom, bottom)
+			}
 		})
 		ends = []
 		offsets = []
 		heights = []
+		function edge(line: number) {
+			if (line === 0) return 0
+			if (line === lines.length)
+				return Math.max(layout.clientHeight, lines[line - 1].bottom)
+			return Math.max(lines[line - 1].bottom, lines[line].top - lines[0].top)
+		}
 		for (let line = 0; line < lines.length; ) {
 			let next = Math.min(line + 3, lines.length)
 			if (
@@ -204,9 +227,16 @@ export function mountText(
 				)
 			)
 				next--
-			offsets.push(line === 0 ? 0 : lines[line].top - lines[0].top)
+			const offset = styledMetrics
+				? edge(line)
+				: line === 0
+					? 0
+					: lines[line].top - lines[0].top
+			offsets.push(offset)
 			ends.push(lines[next]?.start ?? glyphs.length)
-			heights.push((next - line) * lineHeight)
+			heights.push(
+				styledMetrics ? edge(next) - offset : (next - line) * lineHeight,
+			)
 			line = next
 		}
 		if (!ends.length) {
@@ -216,7 +246,7 @@ export function mountText(
 		}
 		page = ends.findIndex((end) => end > anchor)
 		if (page === -1) page = ends.length - 1
-		host.style.height = `${lineHeight * 3}px`
+		host.style.height = `${Math.max(lineHeight * 3, ...heights)}px`
 		schedule()
 	}
 	const observer = new ResizeObserver(measure)
