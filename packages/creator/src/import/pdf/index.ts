@@ -112,8 +112,8 @@ function stripRunningEdges(lines: Line[]) {
 	const tops = new Map<number, Line>()
 	const bottoms = new Map<number, Line>()
 	for (const line of lines) {
-		if (!tops.has(line.page)) tops.set(line.page, line)
-		bottoms.set(line.page, line)
+		if (line.zone === 'top') tops.set(line.page, line)
+		if (line.zone === 'bottom') bottoms.set(line.page, line)
 	}
 	return lines.filter((line) => {
 		for (const edges of [tops, bottoms]) {

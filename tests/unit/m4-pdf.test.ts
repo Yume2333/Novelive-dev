@@ -8,6 +8,18 @@ import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
 
+test('keeps repeated prose at page edges without header or footer gaps', async () => {
+	const result = await extractPdf(await fixture('repeated-prose'))
+	if (result.status !== 'ready') throw new Error('Expected text PDF')
+	expect(result.book.volumes[0].chapters[0].paragraphs).toEqual([
+		'A first sentence.',
+		'The refrain.',
+		'Another sentence.',
+		'An answer.',
+		'The refrain.',
+	])
+})
+
 test('discarded left folios do not shift body margins or split soft wraps', async () => {
 	const result = await extractPdf(await fixture('left-folio'))
 	if (result.status !== 'ready') throw new Error('Expected text PDF')
@@ -22,7 +34,7 @@ test('removes consecutive running headers and footers, keeping the first chapter
 	expect(result.book.volumes[0].chapters).toEqual([
 		{
 			title: 'Chapter 2',
-			paragraphs: ['The story begins and continues to its ending.'],
+			paragraphs: ['The story begins and continues on and on to its ending.'],
 			notes: [],
 		},
 	])

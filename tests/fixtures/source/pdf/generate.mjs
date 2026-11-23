@@ -49,6 +49,14 @@ function pdf(pages, image = false, cjk = false) {
 
 for (const [name, pages, image, cjk] of [
 	[
+		'repeated-prose',
+		[
+			['Chapter 1', 'A first sentence.', 'The refrain.'],
+			['Another sentence.', 'An answer.', 'The refrain.'],
+		],
+		false,
+	],
+	[
 		'left-folio',
 		[
 			[
@@ -63,9 +71,9 @@ for (const [name, pages, image, cjk] of [
 	[
 		'running-edges',
 		[
-			['Chapter 2', 'The story begins', 'A local novel'],
-			['Chapter 2', 'and continues', 'A local novel'],
-			['Chapter 2', 'to its ending.', 'A local novel'],
+			['The story', 'begins', 'and'],
+			['continues', 'on', 'and'],
+			['on', 'to its', 'ending.'],
 		],
 		false,
 	],
@@ -153,5 +161,16 @@ for (const [name, pages, image, cjk] of [
 		false,
 	],
 ]) {
-	writeFileSync(new URL(`${name}.pdf`, import.meta.url), pdf(pages, image, cjk))
+	const layout =
+		name === 'running-edges'
+			? pages.map((lines) => [
+					{ text: 'Chapter 2', y: 380 },
+					...lines.map((text, i) => ({ text, y: 326 - i * 18 })),
+					{ text: 'A local novel', y: 40 },
+				])
+			: pages
+	writeFileSync(
+		new URL(`${name}.pdf`, import.meta.url),
+		pdf(layout, image, cjk),
+	)
 }
