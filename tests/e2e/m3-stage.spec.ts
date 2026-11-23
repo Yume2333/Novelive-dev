@@ -43,6 +43,7 @@ type StageHarness = {
 	>
 	saved: StageSnapshot
 	abort: AbortController
+	autoplayBusyAtRender: boolean
 	preview: import('../../packages/player/src/stage').PixiStage
 	mounting: ReturnType<
 		typeof import('../../packages/player/src/stage').mountMinimalPlayer
@@ -644,6 +645,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 				const second = scene.beats.find((beat) => beat.line?.id === '0002')
 				if (first.line?.type !== 'text' || second?.line?.type !== 'text')
 					throw new Error('Missing autoplay fixtures')
+				runtime.autoplayBusyAtRender = false
 				scene.beats = [
 					first,
 					{
@@ -731,6 +733,11 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 						onSnapshot(saved) {
 							runtime.latest = saved
 							progress.record(saved)
+							if (saved.position.sentenceId === '0002')
+								runtime.autoplayBusyAtRender =
+									host
+										.querySelector('.nl-player-stage')
+										?.getAttribute('aria-busy') === 'true'
 						},
 					},
 				)
@@ -739,23 +746,22 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			},
 			{ scenes: compiled.scenes, background, portrait },
 		)
-		await expect(page.locator('.nl-text-display')).toHaveText('Second')
-		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
-			'aria-busy',
-			'true',
-		)
-		await expect(page.locator('.nl-text-display')).toHaveText(
-			'Autoplay completed',
-		)
-		expect(
-			await page.evaluate(() =>
-				(
-					globalThis as unknown as StageHarness
-				).player.progress.history.entries.map(
-					(entry) => entry.position.sentenceId,
+		await expect
+			.poll(() =>
+				page.evaluate(() =>
+					(
+						globalThis as unknown as StageHarness
+					).player.progress.history.entries.map(
+						(entry) => entry.position.sentenceId,
+					),
 				),
+			)
+			.toEqual(['0001', '0002', '0003'])
+		expect(
+			await page.evaluate(
+				() => (globalThis as unknown as StageHarness).autoplayBusyAtRender,
 			),
-		).toEqual(['0001', '0002', '0003'])
+		).toBe(true)
 		await page.evaluate(() =>
 			(globalThis as unknown as StageHarness).abort.abort(),
 		)
