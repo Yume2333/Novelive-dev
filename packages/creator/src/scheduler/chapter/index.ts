@@ -274,7 +274,7 @@ export class ChapterScheduler {
 					workId,
 				)
 				this.exec(
-					`UPDATE task SET status = 'queued', attempts = 0, desensitized = 0, error_type = NULL
+					`UPDATE task SET status = 'queued', error_type = NULL
 					WHERE work_id = ? AND kind = 'chapter' AND status = 'needs_attention' AND error_type = 'budget_paused'`,
 					workId,
 				)

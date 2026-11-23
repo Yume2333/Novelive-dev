@@ -462,6 +462,32 @@ test('a refused writing request surfaces the budget pause and continues the same
 	})
 })
 
+test('continuing a budget pause preserves the moderation retry', async () => {
+	const worker = new ScriptedWorker()
+	const write = vi
+		.spyOn(worker, 'write')
+		.mockRejectedValueOnce(new ProductionTaskError('moderation', 'refused'))
+		.mockRejectedValueOnce(new SpendBudgetError('超出工程预算'))
+	const target = open(worker)
+	target.start(workId, ['ch1'])
+	target.confirmVisual(workId)
+	await target.idle()
+	expect(write.mock.calls.map(([ctx]) => ctx.desensitized)).toEqual([
+		false,
+		true,
+	])
+	expect(snapshot()).toMatchObject({ status: 'stopped' })
+
+	target.continue(workId)
+	await target.idle()
+	expect(write.mock.calls.map(([ctx]) => ctx.desensitized)).toEqual([
+		false,
+		true,
+		true,
+	])
+	expect(snapshot()).toMatchObject({ chapters: [{ status: 'published' }] })
+})
+
 test('crash recovery keeps confirmed work, skips saved images and leaves a replayable run log', async () => {
 	const manifests = { ch1: [cg('cg-a'), cg('cg-b')], ch2: [] }
 	const worker = new ScriptedWorker(manifests)
