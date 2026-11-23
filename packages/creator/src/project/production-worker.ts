@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { formatVersion, projectFiles, type Work } from '@novelive/format/model'
 import { compileScript, formatScript } from '@novelive/format/script'
 import type { createConfigStore } from '../config'
@@ -17,6 +19,7 @@ import {
 	reviewChapter,
 	type WriterOptions,
 	type WritingChapter,
+	type WritingProgress,
 	writeChapter,
 } from '../pipeline/writing'
 import { createReplayFetch, type ReplayOptions } from '../replay'
@@ -27,6 +30,7 @@ import {
 } from '../scheduler/chapter'
 import { existing, readBible } from '../synthesis/patch'
 import { usageMethods, withUsage } from '../usage'
+import { SpendBudgetError } from '../usage/spend'
 import type { Project } from './index'
 import { resolveBible } from './series/resolve'
 
@@ -125,7 +129,7 @@ export function chapterWorker(
 	replay?: ReplayOptions,
 ) {
 	const fetch = createReplayFetch(replay)
-	const art = (signal?: AbortSignal) =>
+	const art = (signal?: AbortSignal, imageGenerationReplay?: ReplayOptions) =>
 		usageMethods(
 			new ArtProduction(project, {
 				main: models.main,
@@ -134,6 +138,7 @@ export function chapterWorker(
 				visual: models.visual,
 				image: models.image,
 				replay,
+				imageGenerationReplay,
 				signal,
 				resolution: work.settings.outputResolution,
 				readScope: { level: 'work', volumeId, workId: work.workId },
@@ -270,9 +275,32 @@ export function chapterWorker(
 		write: (ctx) =>
 			step(async () => {
 				const { chapter, options } = await input(ctx)
-				const result = await writeChapter(chapter, {
-					...options,
-					proposeMarks: true,
+				const journal = `source/production/${ctx.workId}/${ctx.chapterId}/writing-resume.json`
+				const clear = () => rm(join(project.root, journal), { force: true })
+				if (!ctx.resumingBudget) await clear()
+				const progress: WritingProgress = ctx.resumingBudget
+					? ((await existing(async () =>
+							JSON.parse((await project.readFile(journal)).toString('utf8')),
+						)) ?? [])
+					: []
+				const result = await writeChapter(
+					chapter,
+					{ ...options, proposeMarks: true },
+					progress,
+				).catch(async (error: unknown) => {
+					if (
+						error instanceof SpendBudgetError ||
+						(error instanceof Error &&
+							error.cause instanceof SpendBudgetError) ||
+						(ctx.resumingBudget &&
+							error instanceof TextModelError &&
+							error.code === 'network')
+					) {
+						await project.writeFile(journal, JSON.stringify(progress))
+					} else {
+						await clear()
+					}
+					throw error
 				})
 				await withProjectEdits(project, async () => {
 					ctx.signal.throwIfAborted()
@@ -287,6 +315,7 @@ export function chapterWorker(
 						result.markSuggestions,
 					)
 				})
+				await clear()
 			}),
 		review: (ctx) =>
 			step(async () => {
@@ -402,6 +431,7 @@ export function chapterWorker(
 				metadata.job,
 				(await productionBible(project, volumeId, work.workId)).art,
 				metadata.cg,
+				ctx.resumingBudget,
 			)
 		},
 		placeholder(job, issue, signal) {
@@ -468,7 +498,16 @@ export function chapterWorker(
 			const metadata =
 				(await existing(() => drawingMetadata(assetId))) ??
 				(await confirmedPortrait(assetId, bible))
-			return art(signal).redraw(metadata.job, bible, metadata.cg, target)
+			const imageGenerationReplay =
+				(replay?.mode ?? process.env.NL_REPLAY) === 'record'
+					? { ...replay, fallbackDirectory: undefined, reuseRecorded: false }
+					: undefined
+			return art(signal, imageGenerationReplay).redraw(
+				metadata.job,
+				bible,
+				metadata.cg,
+				target,
+			)
 		},
 		adoptImage: (assetId: string, source: string) =>
 			art().adopt(assetId, source),

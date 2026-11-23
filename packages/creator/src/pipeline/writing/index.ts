@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import {
 	type Character,
 	defaultWorkSettings,
@@ -153,7 +154,10 @@ function clean(text: string) {
 		.replace(/^```(?:nvs|text|txt)?[^\S\n]*\n([\s\S]*?)\n```$/i, '$1')
 }
 
-type Writer = ReturnType<typeof writingModel>
+export type WritingProgress = { key: string; text: string | null }[]
+type Writer = ReturnType<typeof writingModel> & {
+	loadText?: (request: string, send: () => Promise<string>) => Promise<string>
+}
 const rawScenes = (script: string) =>
 	script.split(/\n(?=[^\S\n]*scene(?:\s|$))/)
 function sourceBounds(chunk: string, paragraphs: readonly SourceParagraph[]) {
@@ -165,9 +169,14 @@ function sourceBounds(chunk: string, paragraphs: readonly SourceParagraph[]) {
 }
 const userPrompt = (prompt: string) => ({ messages: [userMessage(prompt)] })
 function ask(model: Writer, prompt: string, phase: string, outputEstimate = 0) {
-	return model
-		.request(userPrompt(prompt), phase, outputEstimate)
-		.then((result) => clean(textOf(result)))
+	const send = () =>
+		model
+			.request(userPrompt(prompt), phase, outputEstimate)
+			.then((result) => clean(textOf(result)))
+	return (
+		model.loadText?.(JSON.stringify([phase, prompt, outputEstimate]), send) ??
+		send()
+	)
 }
 
 async function validate(
@@ -296,8 +305,38 @@ function estimateNvs(text: string) {
 export async function writeChapter(
 	chapter: WritingChapter,
 	options: WriterOptions,
+	progress?: WritingProgress,
 ) {
-	const model = writingModel(options.writer, options)
+	const model: Writer = writingModel(options.writer, options)
+	if (progress) {
+		let position = 0
+		const { apiKey: _, ...connection } = options.writer
+		model.loadText = async (request, send) => {
+			options.signal?.throwIfAborted()
+			const key = createHash('sha256')
+				.update(JSON.stringify([connection, request]))
+				.digest('hex')
+			const entry = progress[position]
+			if (entry?.key === key) {
+				position++
+				if (entry.text === null) throw new TruncatedWritingError(undefined)
+				return entry.text
+			}
+			progress.length = position
+			try {
+				const text = await send()
+				progress.push({ key, text })
+				position++
+				return text
+			} catch (error) {
+				if (error instanceof TruncatedWritingError) {
+					progress.push({ key, text: null })
+					position++
+				}
+				throw error
+			}
+		}
+	}
 	const speakers = [...options.script.speakers]
 	const instructions = brief(chapter, speakers)
 	const compileOptions = {

@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { arr, bool, obj, oneOf, opt, str } from '@earendil-works/pi-schema'
 import {
 	type AssetRegistry,
@@ -14,6 +16,8 @@ import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
 import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
 import { resolveRegistry } from '../../project/series/resolve'
+import type { ReplayOptions } from '../../replay'
+import { SpendBudgetError } from '../../usage/spend'
 import {
 	checkVariantProfile,
 	type Profile,
@@ -36,6 +40,18 @@ type CostumeCandidateBudget = {
 	opaqueStreak: number
 	matting: { error?: MattingUnavailableError }
 }
+type ReviewCheckpoint = {
+	path: string
+	resume: boolean
+}
+type PaintContinuation =
+	| { prompt: string; png: string }
+	| { feedback: string; rewritten?: string; png?: string }
+type PendingPaint = PaintContinuation & {
+	settingsVersion: string
+	attempt: number
+	moderated: boolean
+}
 const opaqueCandidateLimit = 2
 type PaintStop =
 	| 'retries'
@@ -57,6 +73,7 @@ type VisualCandidates = {
 }
 type Options = ModelOptions & {
 	image: ImageConfig
+	imageGenerationReplay?: ReplayOptions
 	main: TextConnection
 	portrait?: TextConnection
 	fast: TextConnection
@@ -226,12 +243,17 @@ export class ArtProduction {
 		job: ArtJob,
 		bible: ArtBible,
 		cg?: CgReferences,
+		resumingBudget = false,
 	): Promise<ImageJobResult> {
 		const pending = this.pendingDraws.get(job.assetId)
 		if (pending) return pending
-		const task = this.drawRegistered(job, bible, cg).finally(() =>
-			this.pendingDraws.delete(job.assetId),
-		)
+		const task = this.drawRegistered(
+			job,
+			bible,
+			cg,
+			undefined,
+			resumingBudget,
+		).finally(() => this.pendingDraws.delete(job.assetId))
 		this.pendingDraws.set(job.assetId, task)
 		return task
 	}
@@ -312,6 +334,7 @@ export class ArtProduction {
 		bible: ArtBible,
 		cg?: CgReferences,
 		redraw?: { path: string; instruction?: string },
+		resumingBudget = false,
 	): Promise<ImageJobResult> {
 		const signal = this.options.signal
 		signal?.throwIfAborted()
@@ -450,6 +473,16 @@ export class ArtProduction {
 			target,
 			portrait,
 			Boolean(base),
+			false,
+			undefined,
+			redraw
+				? undefined
+				: {
+						path: this.scoped(
+							`source/production/art/${createHash('sha256').update(entry.path).digest('hex')}.pending-review.json`,
+						),
+						resume: resumingBudget,
+					},
 		).catch((error: unknown) => {
 			if (!(error instanceof MattingUnavailableError)) throw error
 			return { issue: error.message, reason: 'matting_unavailable' } as const
@@ -565,8 +598,13 @@ export class ArtProduction {
 		derived = false,
 		optionalReference = false,
 		candidateBudget?: CostumeCandidateBudget,
+		checkpoint?: ReviewCheckpoint,
 	) {
-		this.render ??= imageRenderer(this.options.image, this.options)
+		this.render ??= imageRenderer(
+			this.options.image,
+			this.options,
+			this.options.imageGenerationReplay,
+		)
 		const render = this.render
 		const references = drawing.references.slice(0, 16)
 		const auditRefs = await Promise.all(
@@ -615,33 +653,134 @@ export class ArtProduction {
 		})
 		let moderated = false
 		let attempt = 0
+		let rewritten: string | undefined
+		const settingsVersion = checkpoint
+			? createHash('sha256')
+					.update(
+						JSON.stringify([
+							auditDrawing,
+							target,
+							transparent,
+							derived,
+							auditRefs.map((reference) =>
+								createHash('sha256').update(reference).digest('hex'),
+							),
+						]),
+					)
+					.digest('hex')
+			: ''
+		const clearReview = async () => {
+			if (checkpoint)
+				await rm(join(this.project.root, checkpoint.path), { force: true })
+		}
+		const savePaint = async (next: PaintContinuation) => {
+			if (!checkpoint) return
+			const pending: PendingPaint = {
+				settingsVersion,
+				attempt,
+				moderated,
+				...next,
+			}
+			await this.project.writeFile(checkpoint.path, JSON.stringify(pending))
+		}
+		const audit = async (
+			png: Buffer,
+			prompt: string,
+			preview: Awaited<ReturnType<typeof auditPreview>>,
+		) => {
+			try {
+				const judge = await artJson(
+					this.options.visual,
+					prompt,
+					auditSchema,
+					this.options,
+					[preview.png, ...auditRefs],
+				)
+				if (judge.pass && judge.failedChecks.length === 0) {
+					await clearReview()
+					return true
+				}
+				issue = feedback =
+					judge.feedback || `视觉审核未通过：${judge.failedChecks.join('、')}`
+				if (attempt <= this.options.image.retries)
+					await savePaint({ feedback, png: png.toString('base64') })
+				else await clearReview()
+				return false
+			} catch (error) {
+				if (error instanceof SpendBudgetError)
+					await savePaint({ prompt, png: png.toString('base64') })
+				throw error
+			}
+		}
+		if (checkpoint?.resume) {
+			const saved = await this.file(checkpoint.path)
+			if (saved) {
+				const pending: PendingPaint = JSON.parse(saved.toString())
+				if (pending.settingsVersion === settingsVersion) {
+					attempt = pending.attempt
+					moderated = pending.moderated
+					if ('feedback' in pending) {
+						issue = feedback = pending.feedback
+						rewritten = pending.rewritten
+						reviewed = pending.png
+							? Buffer.from(pending.png, 'base64')
+							: undefined
+					} else {
+						reviewed = Buffer.from(pending.png, 'base64')
+						if (
+							await audit(
+								reviewed,
+								pending.prompt,
+								await auditPreview(reviewed),
+							)
+						)
+							return { png: reviewed }
+					}
+				} else {
+					await clearReview()
+				}
+			}
+		} else {
+			await clearReview()
+		}
 		while (attempt <= this.options.image.retries) {
-			const content = await artJson(
-				painter,
-				[
-					'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
-					`${drawing.kind}: ${brief}`,
-					expression
-						? `Character preservation context (not part of the expression cue): ${expressionPreservation(drawing)}.`
-						: undefined,
+			let content = rewritten
+			if (content === undefined) {
+				await savePaint({ feedback, png: reviewed?.toString('base64') })
+				const rewrite = await artJson(
+					painter,
+					[
+						'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
+						`${drawing.kind}: ${brief}`,
+						expression
+							? `Character preservation context (not part of the expression cue): ${expressionPreservation(drawing)}.`
+							: undefined,
+						feedback,
+					]
+						.filter(Boolean)
+						.join('\n'),
+					contentSchema,
+					this.options,
+				)
+				content = rewrite.content
+				await savePaint({
 					feedback,
-				]
-					.filter(Boolean)
-					.join('\n'),
-				contentSchema,
-				this.options,
-			)
+					rewritten: content,
+					png: reviewed?.toString('base64'),
+				})
+			}
 			const describe = (
 				firstReference: number,
 				issue = '',
 				input = promptDrawing,
-			) => drawingPrompt(input, content.content, issue, firstReference)
+			) => drawingPrompt(input, content, issue, firstReference)
 			const result = await render(
 				describe(1, feedback),
 				refs,
 				target,
 				transparent,
 			)
+			rewritten = undefined
 			feedback = ''
 			if ('error' in result) {
 				this.options.signal?.throwIfAborted()
@@ -724,8 +863,8 @@ export class ArtProduction {
 			}
 			reviewed = checked.png
 			const preview = await auditPreview(checked.png)
-			const judge = await artJson(
-				this.options.visual,
+			const passed = await audit(
+				checked.png,
 				[
 					expression
 						? 'Visually audit the first image. Image 2 is the accepted base. Check the requested facial expression against the saved cue (description); verify identity, anchors and key colors against the base and preservation context. Reject unintended changes outside the face, including pose, silhouette, framing, transparency, colors, shading and linework. Judge style only by preservation of the accepted base, not by matching any other look. Check for artifacts independently.'
@@ -752,13 +891,9 @@ export class ArtProduction {
 				]
 					.filter(Boolean)
 					.join('\n'),
-				auditSchema,
-				this.options,
-				[preview.png, ...auditRefs],
+				preview,
 			)
-			if (judge.pass && judge.failedChecks.length === 0) return checked
-			issue = feedback =
-				judge.feedback || `视觉审核未通过：${judge.failedChecks.join('、')}`
+			if (passed) return checked
 		}
 		return stopped('retries')
 	}

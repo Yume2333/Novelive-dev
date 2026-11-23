@@ -257,19 +257,18 @@ function strictReplayOptions(): ReplayOptions | undefined {
 }
 
 function loadProduction() {
+	const directory = process.env.NL_PRODUCTION_CASSETTE_DIR
 	return import('./project/production').then(({ createProduction }) =>
 		createProduction(
 			dataDir,
 			config,
-			process.env.NL_PRODUCTION_CASSETTE_DIR
-				? {
-						...strictReplayOptions(),
-						directory: process.env.NL_PRODUCTION_CASSETTE_DIR,
-						fallbackDirectory: process.env.NL_PRODUCTION_FALLBACK_DIR,
-						normalizeIds: true,
-						reuseRecorded: true,
-					}
-				: strictReplayOptions(),
+			{
+				...strictReplayOptions(),
+				...(directory
+					? { directory, normalizeIds: true, reuseRecorded: true }
+					: {}),
+				fallbackDirectory: process.env.NL_PRODUCTION_FALLBACK_DIR,
+			},
 			publish,
 			(active) =>
 				parent.postMessage({ type: 'production.active', generation, active }),

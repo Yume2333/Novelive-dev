@@ -54,12 +54,16 @@ function checkedReplay(fetch: typeof globalThis.fetch) {
 	}
 }
 
-export function imageRenderer(config: ImageConfig, options: ModelOptions) {
+export function imageRenderer(
+	config: ImageConfig,
+	options: ModelOptions,
+	generationReplay = options.replay,
+) {
 	const provider = imageProvider(config.baseUrl, config.model)
-	const replay = checkedReplay(createReplayFetch(options.replay))
+	const replay = checkedReplay(createReplayFetch(generationReplay))
 	const download = createReplayFetch({
-		...options.replay,
-		fetch: imageDownloadUpstream(config.baseUrl, options.replay?.fetch),
+		...generationReplay,
+		fetch: imageDownloadUpstream(config.baseUrl, generationReplay?.fetch),
 		spend: undefined,
 	})
 	const client = new OpenAI({
