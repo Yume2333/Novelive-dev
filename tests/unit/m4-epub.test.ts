@@ -1,3 +1,6 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { compile } from '@earendil-works/pi-schema'
 import { TextReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js'
 import { beforeEach, expect, test, vi } from 'vitest'
@@ -9,6 +12,7 @@ import {
 } from '../../packages/creator/src/import/epub/illustrations'
 import type { TextConnection } from '../../packages/creator/src/models/text'
 import { artJson } from '../../packages/creator/src/pipeline/art/models'
+import { createReplayFetch } from '../../packages/creator/src/replay'
 import {
 	classificationCases,
 	classificationExtraction,
@@ -16,6 +20,7 @@ import {
 	visualConnection,
 } from '../fixtures/source/epub/classification'
 import {
+	providerReplay,
 	providerUsage,
 	runProviderCases,
 } from '../fixtures/source/epub/provider'
@@ -116,6 +121,39 @@ test('keeps usage reservation when provider token counts are incomplete', () => 
 	expect(
 		providerUsage({ prompt_tokens: -1, completion_tokens: 5 }),
 	).toBeUndefined()
+})
+
+test('reuses an existing provider request without paying or appending duplicate responses', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-epub-record-'))
+	const fetch = vi.fn(
+		async () =>
+			new Response('first response', {
+				headers: { 'content-type': 'text/plain' },
+			}),
+	)
+	try {
+		for (let index = 0; index < 2; index++) {
+			const replay = createReplayFetch(
+				providerReplay(directory, fetch, 'offline-regression'),
+			)
+			expect(
+				await (
+					await replay('https://relay.invalid/v1/chat/completions', {
+						method: 'POST',
+						body: '{"fixture":true}',
+					})
+				).text(),
+			).toBe('first response')
+		}
+		expect(fetch).toHaveBeenCalledTimes(1)
+		expect(
+			(await readFile(join(directory, 'cassette.jsonl'), 'utf8'))
+				.trim()
+				.split('\n'),
+		).toHaveLength(1)
+	} finally {
+		await rm(directory, { recursive: true, force: true })
+	}
 })
 
 test('keeps chapter blocks inside article wrappers', async () => {

@@ -5,6 +5,10 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 import { classifyIllustrations } from '../../../../packages/creator/src/import/epub/illustrations'
 import {
+	createReplayFetch,
+	type ReplayOptions,
+} from '../../../../packages/creator/src/replay'
+import {
 	classificationCases,
 	classificationExtraction,
 	syntheticDirectory,
@@ -12,6 +16,24 @@ import {
 } from './classification'
 
 export const privateRoot = join(homedir(), '.local/novelive-epub-provider')
+
+export function providerReplay(
+	directory: string,
+	fetch: typeof globalThis.fetch,
+	name: string,
+): ReplayOptions {
+	return {
+		mode: 'replay',
+		directory,
+		fetch: createReplayFetch({
+			mode: 'record',
+			directory,
+			fetch,
+			case: name,
+			tags: ['private-provider', 'm4-02'],
+		}),
+	}
+}
 
 export function providerUsage(
 	value:
@@ -133,18 +155,20 @@ export async function runProviderCases(
 			sample.bible,
 			{ ...visualConnection, baseUrl, apiKey },
 			{
-				replay: {
-					mode: mode === 'strict' ? 'strict' : 'record',
-					directory,
-					fetch,
-					case: `epub-${sample.label}`,
-					tags: [
-						mode === 'synthetic'
-							? 'synthetic-not-provider'
-							: 'private-provider',
-						'm4-02',
-					],
-				},
+				replay: record
+					? providerReplay(directory, fetch, `epub-${sample.label}`)
+					: {
+							mode: mode === 'strict' ? 'strict' : 'record',
+							directory,
+							fetch,
+							case: `epub-${sample.label}`,
+							tags: [
+								mode === 'synthetic'
+									? 'synthetic-not-provider'
+									: 'private-provider',
+								'm4-02',
+							],
+						},
 			},
 		)
 		assert.equal(candidates[0].label, sample.label)
