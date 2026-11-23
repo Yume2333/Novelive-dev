@@ -12,6 +12,8 @@ import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { headingRules } from '../../packages/creator/src/import/txt'
 import {
+	buildTextModel,
+	outputTokenBudget,
 	type TextConnection,
 	TextModelError,
 } from '../../packages/creator/src/models/text'
@@ -28,6 +30,7 @@ import {
 } from '../../packages/creator/src/synthesis'
 import { projectFiles } from '../../packages/format/src/model'
 import { scoreBiblePatches } from './bible-patch-score'
+import { observeOwnerBookUsage } from './owner-book-usage'
 
 const home = homedir()
 const source = join(home, 'novelive-testbooks', 'yesou-puyan.txt')
@@ -36,6 +39,8 @@ const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
 const purpose = 'M1a/07 owner book with shared inclusion criteria'
 const previewModel = 'gemini-3.8-flash'
 const cap = 5_000_000
+const eventContextWindow = 16_384
+const wholeContextWindow = 256_000
 const series = {
 	formatVersion: 1,
 	seriesId: 'yesou-puyan',
@@ -57,6 +62,23 @@ const bookHeadingRules = headingRules.map((rule) =>
 )
 const digest = (body: Uint8Array) =>
 	createHash('sha256').update(body).digest('hex')
+
+// Allow for the relay's startup and for output at one-third of the observed rate.
+const requestTimeout = (outputTokens: number) =>
+	90_000 + Math.ceil(outputTokens / 40) * 1000
+// Budget for the eight observed events and whole control, each with a repair.
+const volumeTimeout =
+	requestTimeout(0) +
+	2 *
+		(8 * requestTimeout(eventContextWindow / 2) +
+			requestTimeout(wholeContextWindow / 2))
+
+function requestFailure(signal: AbortSignal, error: unknown) {
+	if (signal.aborted)
+		return signal.reason?.name === 'TimeoutError' ? 'deadline' : 'aborted'
+	if (error instanceof SyntaxError) return 'invalid usage payload'
+	return 'transport or response read failed'
+}
 
 test.skipIf(process.env.NL_REPLAY !== 'record')(
 	'M1a/07 imports a complete public-domain book and compares one real volume on disk',
@@ -91,8 +113,14 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const synthesisConnection = {
 			...connection,
 			model: synthesisModel,
-			contextWindow: 256_000,
+			contextWindow: wholeContextWindow,
 		} satisfies TextConnection
+		const eventConnection = {
+			...synthesisConnection,
+			contextWindow: eventContextWindow,
+		}
+		const timeoutFor = (slot: TextConnection) =>
+			requestTimeout(outputTokenBudget(buildTextModel(slot)))
 		const stats = {
 			calls: 0,
 			tokens: 0,
@@ -105,6 +133,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			resumedEvents: 0,
 		}
 		let used = 0
+		const pendingUsage = new Set<Promise<void>>()
+		let ledgerFailed = false
 		for (const line of (await readFile(ledger, 'utf8')).split('\n')) {
 			const [, , , tokens, , reason] = line.split(',')
 			if (reason?.startsWith(purpose)) used += Number(tokens)
@@ -130,55 +160,65 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				controller.abort()
 				throw new Error('Real-book token cap reached')
 			}
-			used += reserve
-			stats.calls++
 			const prompt = payload.messages[0]?.content
 			const isSynthesis =
 				typeof prompt === 'string' &&
 				prompt.startsWith('Synthesize the ordered chapter previews')
+			if (mustResume && !isSynthesis) {
+				controller.abort()
+				throw new Error('Resume attempted a paid preview request')
+			}
+			used += reserve
+			const call = ++stats.calls
 			stats.previewCalls += Number(!isSynthesis)
 			stats.synthesisCalls += Number(isSynthesis)
 			const match = /Extract only the next event in packet \d+\/(\d+)/.exec(
 				text,
 			)
 			stats.packetCount = Math.max(stats.packetCount, Number(match?.[1] ?? 0))
-			let measured: number | undefined
-			try {
-				const response = await fetch(request)
-				if (response.ok) {
-					const body = await response.clone().text()
-					const rows = body.startsWith('data:')
-						? body
-								.split('\n')
-								.filter(
-									(line) =>
-										line.startsWith('data:') && !line.includes('[DONE]'),
-								)
-								.map((line) => JSON.parse(line.slice(5)))
-						: [JSON.parse(body)]
-					const usage = rows.findLast((row) => row.usage)?.usage
-					const total =
-						usage?.total_tokens ??
-						usage?.prompt_tokens + usage?.completion_tokens
-					if (Number.isSafeInteger(total) && total > 0) measured = total
-				} else {
-					console.log(`${model} HTTP ${response.status}`)
-					if ([401, 403, 404, 429, 503].includes(response.status))
-						controller.abort()
-				}
-				return response
-			} catch {
-				controller.abort()
-				throw new Error(`${model} request did not complete`)
-			} finally {
+			const deadline = AbortSignal.timeout(requestTimeout(outputCap))
+			const signal = AbortSignal.any([request.signal, deadline])
+			const started = Date.now()
+			const failed = (phase: string, error: unknown) => {
+				const reason = deadline.aborted
+					? 'deadline'
+					: requestFailure(signal, error)
+				console.log(
+					`M1a/07 request ${call} ${phase}: ${reason} (${Date.now() - started}ms)`,
+				)
+			}
+			const settle = async (measured?: number) => {
 				const tokens = measured ?? reserve
 				used += tokens - reserve
 				stats.tokens += tokens
 				stats.reserved += Number(measured === undefined)
-				await appendFile(
-					ledger,
-					`${new Date().toISOString().slice(0, 10)},${model},1,${tokens},0,${purpose}${measured === undefined ? ' (reserved upper bound)' : ''}\n`,
+				try {
+					await appendFile(
+						ledger,
+						`${new Date().toISOString().slice(0, 10)},${model},1,${tokens},0,${purpose}${measured === undefined ? ' (reserved upper bound)' : ''}\n`,
+					)
+				} catch {
+					ledgerFailed = true
+					controller.abort()
+				}
+			}
+			try {
+				const response = await fetch(request, { signal })
+				if (!response.ok) {
+					console.log(`${model} HTTP ${response.status}`)
+					if ([401, 403, 404, 429, 503].includes(response.status))
+						controller.abort()
+				}
+				const usage = observeOwnerBookUsage(response, settle, (error) =>
+					failed('body', error),
 				)
+				pendingUsage.add(usage)
+				void usage.then(() => pendingUsage.delete(usage))
+				return response
+			} catch (error) {
+				failed('headers', error)
+				await settle()
+				throw new Error(`${model} request did not complete`)
 			}
 		}
 		await mkdir(root, { recursive: true, mode: 0o700 })
@@ -229,7 +269,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		}
 		const options = {
 			previewConnection,
-			synthesisConnection: { ...synthesisConnection, contextWindow: 16_384 },
+			synthesisConnection: eventConnection,
+			requestTimeoutMs: timeoutFor(eventConnection),
 			language,
 			strategy: 'events' as const,
 			fetch: fetchReplay,
@@ -318,6 +359,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					)
 				const reference = await synthesizeVolume(whole, volumeId, chapterIds, {
 					connection: synthesisConnection,
+					requestTimeoutMs: timeoutFor(synthesisConnection),
 					language,
 					strategy: 'whole',
 					fetch: fetchReplay,
@@ -349,6 +391,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					JSON.stringify(fetched.synthesis) === JSON.stringify(chunked) &&
 					JSON.stringify(await reopened.read(confirmed)) ===
 						JSON.stringify(expected)
+				await Promise.all(pendingUsage)
+				if (ledgerFailed)
+					throw new Error('Could not write the private usage ledger')
 				const report = {
 					sha256,
 					chapters: 154,
@@ -380,8 +425,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				`M1a/07 did not pass during ${phase}${code}; see the redacted result and usage`,
 			)
 		} finally {
+			controller.abort()
+			await Promise.all(pendingUsage)
 			console.log(`M1a/07 usage: ${JSON.stringify(stats)}`)
 		}
 	},
-	1_200_000,
+	volumeTimeout,
 )

@@ -103,6 +103,7 @@ export interface SynthesisOptions {
 	maxEvents?: number
 	incremental?: boolean
 	rerun?: boolean
+	requestTimeoutMs?: number
 	signal?: AbortSignal
 	fetch?: typeof globalThis.fetch
 }
@@ -337,6 +338,7 @@ ${nextEvent.instructions}`
 			const response = await stream(model, normalizeContext({ messages }), {
 				apiKey: options.connection.apiKey,
 				signal: options.signal,
+				timeoutMs: options.requestTimeoutMs,
 				outputLimit,
 				cacheRetention: 'none',
 			}).result()
