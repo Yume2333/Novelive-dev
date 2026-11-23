@@ -1,4 +1,5 @@
 import { arr, bool, compile, int, obj } from '@earendil-works/pi-schema'
+import { parseModelJson } from '../../models/text'
 import { ContextLimitError, promptFits } from './budget'
 import { textOf, userMessage, type writingModel } from './request'
 
@@ -167,7 +168,7 @@ async function paragraphBoundary(
 
 function parsePlan(text: string): unknown {
 	try {
-		return JSON.parse(text.trim().replace(/^```(?:json)?\s*|\s*```$/gi, ''))
+		return parseModelJson(text)
 	} catch {
 		throw new Error('Scene source alignment returned invalid JSON')
 	}

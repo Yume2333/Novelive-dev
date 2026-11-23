@@ -214,8 +214,14 @@ export function outputTokenBudget(
 }
 
 export function parseModelJson(text: string): unknown {
-	const fenced = /^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(text.trim())
-	return JSON.parse(fenced?.[1] ?? text)
+	const fences =
+		/^[ \t]*```(?!`)(?:(?:json)?(?=[ \t{[])[ \t]*(?=[{["\d-]|(?:true|false|null)\b)([\s\S]*?)|[^\r\n]*?|([^\r\n]*)\r?\n([\s\S]*?)^[ \t]*)```[ \t]*\r?$/gim
+	for (const [, compact, language, content] of text.matchAll(fences)) {
+		if (compact !== undefined) return JSON.parse(compact)
+		const tag = language?.trim().toLowerCase()
+		if (tag === '' || tag === 'json') return JSON.parse(content)
+	}
+	return JSON.parse(text)
 }
 
 const descriptions: Partial<Record<Code, string>> = {

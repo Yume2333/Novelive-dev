@@ -12,6 +12,7 @@ import { imageDownloadUpstream } from '../../models/image/download'
 import {
 	buildTextModel,
 	createTextStream,
+	parseModelJson,
 	type TextConnection,
 	textResultError,
 } from '../../models/text'
@@ -216,9 +217,7 @@ export async function artJson<T>(
 	const text = response.content
 		.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 		.join('')
-	const json =
-		/^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(text.trim())?.[1] ?? text
-	const value: unknown = JSON.parse(json)
+	const value = parseModelJson(text)
 	const validated = compile(schema).validate(value)
 	if (!validated.ok)
 		throw new ArtResponseSchemaError(JSON.stringify(validated.errors), value)

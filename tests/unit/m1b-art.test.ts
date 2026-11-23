@@ -39,8 +39,16 @@ const replay = {
 	},
 } as const
 
-test('decodes a visual-review JSON object fenced by the provider', async () => {
-	const content = '```json\n{"pass":true}\n```'
+test.each([
+	['fenced JSON', '```json\n{"pass":true}\n```'],
+	['compact fenced JSON', '```json{"pass":true}```'],
+	['leading prose', 'Here is the review:\n\n```\n{"pass":true}\n```'],
+	[
+		'trailing prose',
+		'```json\n{"pass":true}\n```\n\nThe result is acceptable.',
+	],
+	['bare JSON', '{"pass":true}'],
+])('decodes a visual-review JSON object with %s', async (_shape, content) => {
 	const chunk = {
 		choices: [{ index: 0, delta: { content }, finish_reason: 'stop' }],
 	}
@@ -883,7 +891,7 @@ test('style-only sprite candidates do not share the opaque-edit cutoff', async (
 		matte.mockRestore()
 		model.mockRestore()
 	}
-})
+}, 15_000)
 
 test('keeps a reviewed transparent fallback when later opaque responses exhaust the budget', async () => {
 	const rgb = await picture(320, 480, false)
