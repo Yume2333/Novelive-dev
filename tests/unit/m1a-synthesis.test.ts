@@ -322,9 +322,22 @@ test('consolidates repeated candidate additions across events and remaps referen
 		status: 'candidate',
 	} as const
 	let calls = 0
+	let selections = 0
+	const sse = (result: unknown) =>
+		new Response(
+			`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+			{ headers: { 'content-type': 'text/event-stream' } },
+		)
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const request = new Request(input, init)
 		const body = await request.json()
+		if (body.messages[0].content.includes('Candidates:\n')) {
+			selections++
+			expect(body.messages[0].content).toMatch(
+				/character candidates[\s\S]*\n1 \{"id":"guide"[\s\S]*\n2 \{"id":"guide"/,
+			)
+			return sse({ keep: [1, 2] })
+		}
 		expect(body.messages[0].content).toContain(
 			'Never restate an already proposed entry',
 		)
@@ -380,6 +393,7 @@ test('consolidates repeated candidate additions across events and remaps referen
 		fetch,
 	})
 	expect(calls).toBe(2)
+	expect(selections).toBe(1)
 	expect(result.conflicts).toEqual([])
 	expect(result.biblePatch).toMatchObject([
 		{

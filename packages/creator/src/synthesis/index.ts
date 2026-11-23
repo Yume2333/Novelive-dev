@@ -35,7 +35,7 @@ import {
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
-import { reconcileNamedAdditions } from './consolidate'
+import { reconcileNamedAdditions, selectAdditions } from './consolidate'
 import { scopedOnlyBrief } from './incremental/context'
 import { synthesisInstructions, synthesisOutput } from './output'
 import {
@@ -62,6 +62,19 @@ const eventFields = {
 }
 const eventSchema = obj(eventFields)
 const nextEvent = synthesisOutput(eventSchema)
+const selection = synthesisOutput(obj({ keep: arr(int({ minimum: 1 })) }))
+const selectionScope: Record<string, string> = {
+	location:
+		'Keep one entry per recurring or consequential location; drop places mentioned only in passing and restatements.',
+	relation:
+		"Keep only relationships that shape the volume's plot across chapters, one per pair of characters; drop single-scene interactions and restatements.",
+	timeline:
+		"Keep one entry per turning point of the volume's main plot; drop steps inside the same turning point.",
+	foreshadowing:
+		'Keep only the major threads the volume sets up for later chapters or volumes; drop scene-level suspense, hints resolved by the next chapter, and restatements.',
+	glossary:
+		'Keep one entry per recurring or consequential term; drop terms used only in passing and restatements.',
+}
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
 const checkpointSchema = obj({
@@ -71,6 +84,7 @@ const checkpointSchema = obj({
 	basis: str(),
 	packet: int({ minimum: 0 }),
 	events: arr(eventSchema),
+	selections: opt(arr(arr(int({ minimum: 1 })))),
 	whole: nullable(outputSchema),
 	ready: bool(),
 	applied: bool(),
@@ -534,7 +548,7 @@ ${nextEvent.instructions}`
 		throw new Error('Existing Bible is too large for synthesis context')
 
 	const chapterSet = new Set(chapterIds)
-	async function request<T extends Output>(
+	async function request<T>(
 		prompt: string,
 		contract: ReturnType<typeof synthesisOutput<T>>,
 		check: (output: T) => void,
@@ -702,13 +716,81 @@ ${packets[packet]}`,
 			proposal.chapter ? proposal : (located.get(proposal.content) ?? proposal),
 		)
 	}
-	const biblePatch = reconcileNamedAdditions(
+	const reconciled = reconcileNamedAdditions(
 		[...ordered].map(({ item, chapter }) =>
 			chapter ? { ...item, observedChapter: chapter } : item,
 		),
 		bible,
 	)
-	const glossaryPatch = unique(parts.flatMap((part) => part.glossaryPatch))
+	const terms = unique(parts.flatMap((part) => part.glossaryPatch))
+	const progress = fitBytes(
+		skeleton.chapters
+			.map(({ chapterId, progress }) => `${chapterId}: ${progress}`)
+			.join('\n'),
+		historyBudget * 2,
+	)
+	let selectionIndex = 0
+	async function choose(kind: string, candidates: readonly unknown[]) {
+		const prompt = `${instructions}
+${selection.instructions}
+These ${kind} candidates were extracted packet by packet from this volume, so many restate, narrow or split one another. Choose the set a single whole-volume pass would return. ${selectionScope[kind] ?? `Keep every distinct ${kind} that meets the inclusion rules; drop a candidate only when it restates, narrows or splits another one for the same ${kind}, keeping the most complete.`} Return keep as the numbers of the kept candidates.
+Chapter progress:
+${progress}
+Candidates:
+`
+		const room = Math.max(256, budget - bytes(prompt) - 1024)
+		const lines = candidates.map((candidate) =>
+			fitBytes(
+				JSON.stringify(candidate, (_, value) =>
+					typeof value === 'string'
+						? Array.from(value).slice(0, 120).join('')
+						: value,
+				),
+				room - 8,
+			),
+		)
+		const chunks: string[][] = []
+		let size = 0
+		for (const line of lines) {
+			if (!chunks.length || size + bytes(line) + 8 > room) {
+				chunks.push([])
+				size = 0
+			}
+			chunks[chunks.length - 1].push(line)
+			size += bytes(line) + 8
+		}
+		const kept = new Set<number>()
+		let offset = 0
+		for (const chunk of chunks) {
+			let keep = state.selections?.[selectionIndex]
+			if (!keep) {
+				const answer = await request(
+					prompt + chunk.map((line, i) => `${i + 1} ${line}`).join('\n'),
+					selection,
+					(value) => {
+						if (
+							new Set(value.keep).size !== value.keep.length ||
+							value.keep.some((n) => n > chunk.length)
+						)
+							throw new Error(
+								`keep must list distinct candidate numbers from 1 to ${chunk.length}`,
+							)
+					},
+				)
+				keep = answer.keep
+				state.selections = [...(state.selections ?? []), keep]
+				await project.write(files.checkpoint, state)
+			}
+			selectionIndex++
+			for (const n of keep) kept.add(offset + n - 1)
+			offset += chunk.length
+		}
+		return kept
+	}
+	const { biblePatch, glossaryPatch } =
+		state.whole || (state.ready && !state.selections)
+			? { biblePatch: reconciled, glossaryPatch: terms }
+			: await selectAdditions(reconciled, terms, bible, choose)
 	options.signal?.throwIfAborted()
 	if (
 		hash(
