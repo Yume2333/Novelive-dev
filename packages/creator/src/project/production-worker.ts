@@ -289,7 +289,11 @@ export function chapterWorker(
 				).catch(async (error: unknown) => {
 					if (
 						error instanceof SpendBudgetError ||
-						(error instanceof Error && error.cause instanceof SpendBudgetError)
+						(error instanceof Error &&
+							error.cause instanceof SpendBudgetError) ||
+						(ctx.resumingBudget &&
+							error instanceof TextModelError &&
+							error.code === 'network')
 					) {
 						await project.writeFile(journal, JSON.stringify(progress))
 					} else {

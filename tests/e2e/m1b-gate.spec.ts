@@ -362,6 +362,12 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 			return
 		}
 		const initial = calls.length === malformedAttempts + 1
+		if (calls.length === malformedAttempts + 2) {
+			response
+				.writeHead(503, { 'content-type': 'application/json' })
+				.end(JSON.stringify({ error: { message: 'Service unavailable' } }))
+			return
+		}
 		const events = [
 			{
 				choices: [
@@ -531,7 +537,8 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 				)
 				.toContain('暮色中，一只纸船从桥下漂过。')
 			await expect(queue.getByText('已暂停：模型预算不足')).toHaveCount(0)
-			expect(calls).toHaveLength(malformedAttempts + 2)
+			expect(calls).toHaveLength(malformedAttempts + 3)
+			expect(calls.at(-1)).toEqual(calls.at(-2))
 			expect(JSON.stringify(calls.at(-1))).toContain(
 				'Repair only the supplied scene',
 			)
