@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
+import { playerProgressRequest } from '../../packages/creator/src/contract/player-progress'
 import { Project } from '../../packages/creator/src/project'
 import {
 	loadPlayerChapter,
@@ -19,6 +20,93 @@ import {
 import { context } from '../fixtures/script/context'
 
 const directories: string[] = []
+
+test('desktop progress IPC validates empty progress, slots, snapshots and capture bounds', () => {
+	const snapshot = {
+		position: { chapterId: 'ch1', sceneId: 'aaaabbbb', sentenceId: '0001' },
+		stage: {
+			background: null,
+			sprites: {},
+			cg: null,
+			foreground: null,
+			camera: {
+				motion: 'reset',
+				zoom: { scale: 1, target: 'stage' },
+				shake: null,
+			},
+			particle: null,
+			mask: null,
+			filter: null,
+			text: { kind: 'narration', content: [{ type: 'text', text: '开始' }] },
+		},
+		active: [],
+	}
+	const capture = {
+		operation: 'saveSlot',
+		workId: playerWorkId,
+		slot: { kind: 'quick' },
+		snapshot,
+		rect: { x: 0, y: 0, width: 480, height: 270 },
+	}
+	expect(playerProgressRequest.check(capture)).toBe(true)
+	expect(
+		playerProgressRequest.check({
+			...capture,
+			rect: { ...capture.rect, x: -1 },
+		}),
+	).toBe(false)
+	expect(
+		playerProgressRequest.check({
+			...capture,
+			rect: { ...capture.rect, width: 0 },
+		}),
+	).toBe(false)
+	expect(
+		playerProgressRequest.check({
+			...capture,
+			snapshot: { ...snapshot, active: [{ restore: 'unknown' }] },
+		}),
+	).toBe(false)
+	expect(
+		playerProgressRequest.check({ operation: 'load', workId: playerWorkId }),
+	).toBe(true)
+	expect(
+		playerProgressRequest.check({
+			operation: 'save',
+			workId: playerWorkId,
+			progress: { mainline: null, read: [], saves: [] },
+		}),
+	).toBe(true)
+	expect(
+		playerProgressRequest.check({
+			operation: 'thumbnail',
+			workId: playerWorkId,
+			slot: { kind: 'manual', slot: 60 },
+		}),
+	).toBe(true)
+	for (const input of [
+		null,
+		{ operation: 'load', workId: '' },
+		{
+			operation: 'thumbnail',
+			workId: playerWorkId,
+			slot: { kind: 'manual', slot: 61 },
+		},
+		{
+			operation: 'save',
+			workId: playerWorkId,
+			progress: { mainline: null, read: [{}], saves: [] },
+		},
+		{
+			operation: 'saveSlot',
+			workId: playerWorkId,
+			slot: { kind: 'quick' },
+			snapshot: {},
+			rect: { x: -1, y: 0, width: 480, height: 270 },
+		},
+	])
+		expect(playerProgressRequest.check(input)).toBe(false)
+})
 
 test('player chapter selection defaults to first and only admits published production chapters', async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'novelive-chapter-selection-'))

@@ -5,9 +5,10 @@ export function createPlayback(
 	render: (beat: Beat | undefined) => Promise<void>,
 	signal: AbortSignal,
 	onError: (error: unknown) => void,
+	startIndex = 0,
 ) {
 	const beats = scenes.flatMap((scene) => scene.beats)
-	let index = -1
+	let index = startIndex - 1
 	let busy = false
 	let stopped = false
 	let timer: ReturnType<typeof setTimeout> | undefined

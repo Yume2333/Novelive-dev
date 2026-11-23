@@ -22,6 +22,7 @@ import { usageCommands } from '../usage/contract'
 import { chatCommands } from './chat'
 import { editorCommands } from './editor'
 import { importCommands } from './import'
+import type { DesktopProgressApi } from './player-progress'
 import { productionCommands } from './production'
 
 export {
@@ -187,6 +188,7 @@ export interface Novelive {
 	pickFolder(): Promise<string | null>
 	pickFiles(kind: 'txt' | 'image'): Promise<string[]>
 	host: {
+		progress?: DesktopProgressApi
 		appState(): Promise<HostState>
 		openLogDir(): Promise<void>
 		restartCreator(): Promise<void>

@@ -2,12 +2,20 @@ import { type CompiledScene, compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { PlaybackMode } from '../../../../player/src/contract/progress'
+import type {
+	SentenceRef,
+	StageSnapshot,
+} from '../../../../player/src/contract'
+import type {
+	PlaybackMode,
+	SaveSlot,
+} from '../../../../player/src/contract/progress'
+import { PlaybackProgress } from '../../../../player/src/progress'
 import { playerEditorRoute } from '../../routes/player'
 import type { PlayerControlsController } from './controls/controller'
 import {
-	type ControlsProgress,
 	minimalControlsController,
+	sentenceKey,
 } from './controls/minimal-controller'
 import { type ControlChapter, PlayerControls } from './controls/PlayerControls'
 import { useChapterWait } from './controls/useChapterWait'
@@ -19,18 +27,29 @@ export function PlayerPage() {
 	const host = useRef<HTMLDivElement>(null)
 	const directoryRef = useRef<string>(undefined)
 	const compiledChapters = useRef(new Map<string, CompiledScene[]>())
-	const progress = useRef<ControlsProgress>({
-		read: new Set(),
-		mainline: null,
-		readChapters: new Set(),
-		chapterIds: [],
-	})
+	const chapterOrder = useRef<string[]>([])
+	const sentenceOrder = useRef(new Map<string, number>())
+	const compare = useCallback(
+		(a: SentenceRef, b: SentenceRef) =>
+			chapterOrder.current.indexOf(a.chapterId) -
+				chapterOrder.current.indexOf(b.chapterId) ||
+			(sentenceOrder.current.get(sentenceKey(a)) ?? 0) -
+				(sentenceOrder.current.get(sentenceKey(b)) ?? 0),
+		[],
+	)
+	const progress = useRef(new PlaybackProgress(compare))
+	const progressReady = useRef<Promise<void> | undefined>(undefined)
+	const latest = useRef<StageSnapshot | undefined>(undefined)
+	const [, redraw] = useState(0)
 	const [control, setControl] = useState<PlayerControlsController>()
 	const [chapters, setChapters] = useState<ControlChapter[]>([])
 	const [ended, setEnded] = useState(false)
 	const [awaitingClick, setAwaitingClick] = useState(false)
 	const [loaded, setLoaded] = useState<{
+		workId: string
 		linked: boolean
+		restore?: StageSnapshot
+		start?: SentenceRef
 		chapterId: string
 		mode: PlaybackMode
 		scenes: CompiledScene[]
@@ -39,17 +58,35 @@ export function PlayerPage() {
 	}>()
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
+	useEffect(() => {
+		void id
+		progressReady.current = undefined
+		progress.current = new PlaybackProgress(compare)
+		latest.current = undefined
+		directoryRef.current = undefined
+		compiledChapters.current.clear()
+		chapterOrder.current = []
+		sentenceOrder.current.clear()
+		setLoaded(undefined)
+	}, [id, compare])
 	const loadProject = useCallback(
 		async (
 			directory?: string,
 			chapterId?: string,
 			mode: PlaybackMode = 'main',
 			waitForClick = false,
+			restore?: StageSnapshot,
 		) => {
 			if (!id) return
 			setError('')
 			setLoading(true)
 			try {
+				progressReady.current ??= (async () => {
+					const saved = await window.novelive.host.progress?.load(id)
+					if (saved) progress.current = new PlaybackProgress(compare, saved)
+				})()
+				await progressReady.current
+				const resume = !chapterId ? progress.current.data.mainline : null
 				const {
 					linked,
 					script,
@@ -63,10 +100,14 @@ export function PlayerPage() {
 					...((directory ?? directoryRef.current)
 						? { directory: directory ?? directoryRef.current }
 						: {}),
-					...(chapterId ? { chapterId } : {}),
+					...((chapterId ?? resume?.chapterId)
+						? { chapterId: chapterId ?? resume?.chapterId }
+						: {}),
 					workId: id,
 				}).promise
+				let nextId = 0
 				const result = compileScript(script, {
+					makeId: (bytes) => (++nextId).toString(16).padStart(bytes * 2, '0'),
 					previous: compiledChapters.current
 						.get(chapter.chapterId)
 						?.map(({ scene }) => scene),
@@ -83,19 +124,35 @@ export function PlayerPage() {
 				if (!result.scenes.some((scene) => scene.beats.length))
 					throw new Error('本章还没有可播放的剧本')
 				compiledChapters.current.set(chapter.chapterId, result.scenes)
-				progress.current.chapterIds = chapters.map(
-					(chapter) => chapter.chapterId,
-				)
+				chapterOrder.current = chapters.map((chapter) => chapter.chapterId)
+				let rank = 0
+				for (const { scene, beats } of result.scenes)
+					for (const beat of beats) {
+						if (scene.id && beat.line?.id)
+							sentenceOrder.current.set(
+								sentenceKey({
+									chapterId: chapter.chapterId,
+									sceneId: scene.id,
+									sentenceId: beat.line.id,
+								}),
+								rank++,
+							)
+					}
 				if (directory) directoryRef.current = directory
 				setChapters(
 					chapters.map((chapter) => ({
 						...chapter,
-						read: progress.current.readChapters.has(chapter.chapterId),
+						read: progress.current.data.read.some(
+							(position) => position.chapterId === chapter.chapterId,
+						),
 					})),
 				)
 				setEnded(false)
 				setAwaitingClick(waitForClick)
 				setLoaded({
+					workId: id,
+					restore,
+					start: resume ?? undefined,
 					linked,
 					chapterId: chapter.chapterId,
 					mode,
@@ -119,7 +176,7 @@ export function PlayerPage() {
 				setLoading(false)
 			}
 		},
-		[id],
+		[id, compare],
 	)
 	useEffect(() => {
 		void loadProject()
@@ -129,8 +186,10 @@ export function PlayerPage() {
 		if (directory) await loadProject(directory)
 	}
 	useEffect(() => {
-		if (!loaded || awaitingClick || !host.current) return
+		if (!loaded || loaded.workId !== id || awaitingClick || !host.current)
+			return
 		const controller = new AbortController()
+		progress.current.mode = loaded.mode
 		const controls = minimalControlsController(
 			host.current,
 			loaded.chapterId,
@@ -142,14 +201,9 @@ export function PlayerPage() {
 		setControl(controls)
 		const unsubscribe = controls.subscribe(() => {
 			setEnded(controls.frame().ended)
-			setChapters((chapters) =>
-				chapters.map((chapter) => ({
-					...chapter,
-					read: progress.current.readChapters.has(chapter.chapterId),
-				})),
-			)
 		})
 		const fail = () => setError('无法加载舞台素材')
+		let restoring = !!loaded.restore
 		void mountMinimalPlayer(
 			host.current,
 			loaded.scenes,
@@ -164,12 +218,61 @@ export function PlayerPage() {
 			fail,
 			loaded.speakerNames,
 			controls.rendered,
+			{
+				chapterId: loaded.chapterId,
+				restore: loaded.restore,
+				start: loaded.start,
+				onSnapshot(snapshot) {
+					latest.current = snapshot
+					if (restoring) restoring = false
+					else progress.current.record(snapshot)
+					setChapters((chapters) =>
+						chapters.map((chapter) => ({
+							...chapter,
+							read: progress.current.data.read.some(
+								(position) => position.chapterId === chapter.chapterId,
+							),
+						})),
+					)
+					redraw((value) => value + 1)
+					if (id)
+						void window.novelive.host.progress
+							?.save(id, progress.current.data)
+							.catch(() => setError('无法保存阅读进度'))
+				},
+			},
 		).catch(fail)
 		return () => {
 			unsubscribe()
 			controller.abort()
 		}
-	}, [loaded, awaitingClick])
+	}, [loaded, awaitingClick, id])
+	async function save(slot: SaveSlot) {
+		const api = window.novelive.host.progress
+		const stage = host.current?.querySelector('.nl-player-stage')
+		if (!id || !api || !latest.current || !stage)
+			throw new Error('当前无法存档')
+		const bounds = stage.getBoundingClientRect()
+		const entry = await api.saveSlot(id, slot, latest.current, {
+			x: Math.max(0, Math.ceil(bounds.x)),
+			y: Math.max(0, Math.ceil(bounds.y)),
+			width: Math.floor(bounds.width),
+			height: Math.floor(bounds.height),
+		})
+		progress.current.putSave(entry)
+		await api.save(id, progress.current.data)
+		redraw((value) => value + 1)
+	}
+	async function restore(snapshot: StageSnapshot | null) {
+		if (snapshot)
+			await loadProject(
+				undefined,
+				snapshot.position.chapterId,
+				progress.current.mode,
+				false,
+				snapshot,
+			)
+	}
 	const nextChapter = loaded
 		? chapters[
 				chapters.findIndex(
@@ -194,7 +297,7 @@ export function PlayerPage() {
 			className="nl-player"
 			aria-label="播放器"
 			data-mode={loaded?.mode}
-			data-mainline={JSON.stringify(progress.current.mainline)}
+			data-mainline={JSON.stringify(progress.current.data.mainline)}
 		>
 			<div
 				className="nl-player-surface"
@@ -213,21 +316,34 @@ export function PlayerPage() {
 					surface={host.current}
 					chapters={chapters}
 					editorLinked={loaded.linked}
+					progress={progress.current.data}
+					history={progress.current.history}
+					workId={id ?? ''}
+					onSave={save}
+					onLoad={(slot) => restore(progress.current.loadSave(slot))}
+					onHistory={(index) => void restore(progress.current.jump(index))}
+					onHistoryStep={(direction) =>
+						void restore(
+							direction === 'back'
+								? progress.current.rollback()
+								: progress.current.forward(),
+						)
+					}
 					onChapter={(chapterId) =>
 						void loadProject(
 							undefined,
 							chapterId,
-							progress.current.readChapters.has(chapterId) ? 'reread' : 'main',
+							progress.current.data.read.some(
+								(position) => position.chapterId === chapterId,
+							)
+								? 'reread'
+								: 'main',
 						)
 					}
 					onEditor={(position) => {
 						if (id) navigate(playerEditorRoute(id, position))
 					}}
-					waiting={
-						ended && !nextChapter?.published
-							? nextChapter
-							: undefined
-					}
+					waiting={ended && !nextChapter?.published ? nextChapter : undefined}
 					awaitingClick={awaitingClick}
 					onResume={() => setAwaitingClick(false)}
 				/>

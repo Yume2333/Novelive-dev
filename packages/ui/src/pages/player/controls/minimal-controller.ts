@@ -4,36 +4,8 @@ import type {
 	SentenceRef,
 } from '../../../../../player/src/contract/playback'
 import type { PlaybackMode } from '../../../../../player/src/contract/progress'
+import type { PlaybackProgress } from '../../../../../player/src/progress'
 import type { ControlFrame, PlayerControlsController } from './controller'
-
-export interface ControlsProgress {
-	read: Set<string>
-	mainline: SentenceRef | null
-	readChapters: Set<string>
-	chapterIds: string[]
-	mainlineRank?: readonly [number, number]
-}
-
-export function recordReachedSentence(
-	progress: ControlsProgress,
-	position: SentenceRef,
-	mode: PlaybackMode,
-	beatIndex: number,
-) {
-	progress.read.add(sentenceKey(position))
-	progress.readChapters.add(position.chapterId)
-	const chapterIndex = progress.chapterIds.indexOf(position.chapterId)
-	const rank = progress.mainlineRank
-	if (
-		mode === 'main' &&
-		(!rank ||
-			chapterIndex > rank[0] ||
-			(chapterIndex === rank[0] && beatIndex >= rank[1]))
-	) {
-		progress.mainline = position
-		progress.mainlineRank = [chapterIndex, beatIndex]
-	}
-}
 
 export function sentenceKey(position: SentenceRef) {
 	return JSON.stringify([
@@ -48,7 +20,7 @@ export function minimalControlsController(
 	chapterId: string,
 	scenes: readonly CompiledScene[],
 	mode: PlaybackMode,
-	progress: ControlsProgress,
+	progress: PlaybackProgress,
 	signal: AbortSignal,
 ): PlayerControlsController & { rendered(beat: Beat | undefined): void } {
 	const beats = scenes.flatMap(({ scene, beats }) =>
@@ -71,7 +43,7 @@ export function minimalControlsController(
 			line?.type === 'text' && line.id && item.sceneId
 				? { chapterId, sceneId: item.sceneId, sentenceId: line.id }
 				: null
-		const read = position ? progress.read.has(sentenceKey(position)) : false
+		const read = position ? progress.isRead(position) : false
 		current = {
 			position,
 			read,
@@ -80,9 +52,6 @@ export function minimalControlsController(
 			).length,
 			ready: line?.type === 'text' && item?.beat.advance.kind === 'click',
 			ended: !item,
-		}
-		if (position) {
-			recordReachedSentence(progress, position, mode, index)
 		}
 		for (const listener of listeners) listener()
 	}

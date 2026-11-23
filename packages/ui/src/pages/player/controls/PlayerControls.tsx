@@ -11,6 +11,7 @@ import {
 	schedulePlayback,
 } from './controller'
 import './controls.css'
+import { type ProgressControlsProps, ProgressPanel } from './ProgressPanel'
 
 let rememberedSettings = { ...defaultPlayerSettings }
 
@@ -23,6 +24,13 @@ export interface ControlChapter {
 }
 
 export function PlayerControls({
+	workId,
+	progress,
+	history,
+	onSave,
+	onLoad,
+	onHistory,
+	onHistoryStep,
 	controller,
 	surface,
 	chapters,
@@ -32,7 +40,7 @@ export function PlayerControls({
 	waiting,
 	awaitingClick,
 	onResume,
-}: {
+}: ProgressControlsProps & {
 	controller?: PlayerControlsController
 	surface: HTMLElement | null
 	chapters: ControlChapter[]
@@ -43,14 +51,15 @@ export function PlayerControls({
 	awaitingClick: boolean
 	onResume(): void
 }) {
-	const [screen, setScreen] = useState<'menu' | 'settings' | 'chapters' | null>(
-		null,
-	)
+	const [screen, setScreen] = useState<
+		'menu' | 'settings' | 'chapters' | 'save' | 'load' | 'history' | null
+	>(null)
 	const [hidden, setHidden] = useState(false)
 	const [settings, setSettings] = useState(rememberedSettings)
 	const [auto, setAuto] = useState(false)
 	const [revision, setRevision] = useState(0)
 	const [failure, setFailure] = useState('')
+	const [notice, setNotice] = useState('')
 	const panel = useRef<HTMLElement>(null)
 	useEffect(() => {
 		if (screen)
@@ -135,6 +144,38 @@ export function PlayerControls({
 			setFailure('无法切换全屏')
 		}
 	}
+	function stopPlayback() {
+		setAuto(false)
+		setSettings((settings) => ({ ...settings, skipRead: false }))
+	}
+	async function slotAction(slot: Parameters<typeof onSave>[0], save: boolean) {
+		setScreen(null)
+		if (!save) stopPlayback()
+		setNotice('')
+		setFailure('')
+		try {
+			await new Promise<void>((resolve) =>
+				requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+			)
+			if (save) await onSave(slot)
+			else await onLoad(slot)
+			setNotice(save ? '存档成功' : '读档完成')
+		} catch (error) {
+			setFailure(error instanceof Error ? error.message : '存读档失败')
+		}
+	}
+	const title =
+		screen === 'menu'
+			? '系统菜单'
+			: screen === 'settings'
+				? '设置'
+				: screen === 'save'
+					? '存档'
+					: screen === 'load'
+						? '读档'
+						: screen === 'history'
+							? '历史记录'
+							: '章节'
 	const toggle = (label: string, checked: boolean, change: () => void) => (
 		<label className="nl-control-row">
 			<span>{label}</span>
@@ -169,6 +210,16 @@ export function PlayerControls({
 	)
 	return (
 		<>
+			{notice && !screen && (
+				<p className="nl-progress-notice" role="status">
+					{notice}
+				</p>
+			)}
+			{failure && !screen && (
+				<p className="nl-progress-notice" role="alert">
+					{failure}
+				</p>
+			)}
 			{!hidden && (waiting || awaitingClick) && (
 				<div className="nl-chapter-wait" role="status">
 					{awaitingClick ? (
@@ -196,13 +247,7 @@ export function PlayerControls({
 						className={`nl-controls-panel ${screen !== 'menu' ? 'nl-controls-page' : ''}`}
 						role="dialog"
 						aria-modal="true"
-						aria-label={
-							screen === 'menu'
-								? '系统菜单'
-								: screen === 'settings'
-									? '设置'
-									: '章节'
-						}
+						aria-label={title}
 						onClick={(event) => event.stopPropagation()}
 						onKeyDown={(event) => {
 							if (event.key === 'Tab') {
@@ -221,19 +266,50 @@ export function PlayerControls({
 							}
 						}}
 					>
-						<h2>
-							{screen === 'menu'
-								? '系统菜单'
-								: screen === 'settings'
-									? '设置'
-									: '章节'}
-						</h2>
+						<h2>{title}</h2>
 						<ScrollArea style={{ flex: 1, minHeight: 0 }}>
 							{screen === 'menu' ? (
 								<>
 									<button type="button" onClick={() => setScreen(null)}>
 										<Play size={18} strokeWidth={1.8} aria-hidden="true" />
 										返回游戏
+									</button>
+									<button
+										type="button"
+										disabled={
+											!window.novelive.host.progress ||
+											!controller?.frame().position
+										}
+										onClick={() => void slotAction({ kind: 'quick' }, true)}
+									>
+										快速存档
+									</button>
+									<button
+										type="button"
+										disabled={
+											!progress.saves.some(
+												(entry) => entry.slot.kind === 'quick',
+											)
+										}
+										onClick={() => void slotAction({ kind: 'quick' }, false)}
+									>
+										快速读档
+									</button>
+									<button
+										type="button"
+										disabled={
+											!window.novelive.host.progress ||
+											!controller?.frame().position
+										}
+										onClick={() => setScreen('save')}
+									>
+										存档
+									</button>
+									<button type="button" onClick={() => setScreen('load')}>
+										读档
+									</button>
+									<button type="button" onClick={() => setScreen('history')}>
+										历史记录
 									</button>
 									{toggle('自动播放', auto, () => setAuto(!auto))}
 									{toggle('跳过已读', settings.skipRead, () =>
@@ -317,6 +393,28 @@ export function PlayerControls({
 										</select>
 									</label>
 								</>
+							) : screen === 'save' ||
+								screen === 'load' ||
+								screen === 'history' ? (
+								<ProgressPanel
+									view={screen}
+									workId={workId}
+									progress={progress}
+									history={history}
+									onSave={onSave}
+									onLoad={onLoad}
+									onSlot={(slot) => void slotAction(slot, screen === 'save')}
+									onHistory={(index) => {
+										stopPlayback()
+										setScreen(null)
+										onHistory(index)
+									}}
+									onHistoryStep={(direction) => {
+										stopPlayback()
+										setScreen(null)
+										onHistoryStep(direction)
+									}}
+								/>
 							) : chapters.length ? (
 								chapters.map((chapter) => (
 									<button
