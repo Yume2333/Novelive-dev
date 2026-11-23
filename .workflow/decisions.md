@@ -928,3 +928,10 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 新增设定候选表、独立修订表，或直接调用综合阶段的自动合并（会保留已确认冲突而不执行创作者的明确批准）。
 - **Because:** 不迁移 M2/01 数据库，保持现有文件为内容真源；跨设定集的保守失效比漏检新内容安全。M2/03 可调用 `applyBibleProposal`，由会话层保留 proposal 生命周期所有权；独立设定页面同时提供现有表的 resolve 入口。
 - **Decided by:** agent (m2-editor/04)
+
+## 2026-11-23 - 表情差分丢失 alpha 后只用透明基准重试一次
+
+- **Decided:** 差分仍默认先传基准图、再传画风参考。表情差分返回无 alpha 时，只用透明基准立绘重试一次，记录移除画风参考，并照常送审；重试仍无 alpha 则暂停制作。造型基准图保留画风参考。
+- **Instead of:** 默认移除画风参考，或首次返回无 alpha 就暂停。
+- **Because:** M1b/11 的同一 Sunburst 编辑请求随透明基准图和不透明主视觉两张参考返回无 alpha；只移除主视觉、保持提示和参数不变后，原始 PNG 有 alpha。
+- **Decided by:** user

@@ -295,6 +295,95 @@ test('an expression edit requests facial changes without repainting the transpar
 	}
 })
 
+test.each([true, false])(
+	'an opaque expression retries once with just the base sprite (alpha restored: %s)',
+	async (restored) => {
+		const render = vi
+			.fn<ReturnType<typeof artModels.imageRenderer>>()
+			.mockImplementation(async (_prompt, refs, size) => ({
+				bytes: await picture(
+					size.width,
+					size.height,
+					refs.length === 1 && restored,
+				),
+			}))
+		const renderer = vi
+			.spyOn(artModels, 'imageRenderer')
+			.mockReturnValue(render)
+		const model = vi
+			.spyOn(artModels, 'artJson')
+			.mockImplementation(async (_connection, prompt) =>
+				prompt.startsWith('Visually audit')
+					? { pass: true, failedChecks: [], feedback: '' }
+					: { content: 'The brows furrow.' },
+			)
+		try {
+			await projectTest(async (project) => {
+				const art = service(project, replay)
+				const stylePath = 'assets/style-reference.png'
+				const basePath = 'assets/base-sprite.png'
+				await project.writeFile(stylePath, await picture(320, 180, false))
+				await project.writeFile(basePath, await picture(1024, 1536, true))
+				const styledBible = {
+					...bible,
+					style: {
+						...bible.style,
+						references: [{ path: stylePath, description: 'Main visual' }],
+					},
+				}
+				const jobs = await art.register(
+					[
+						{
+							id: 'ada/uniform/angry',
+							kind: 'expression',
+							description: '双眉压低',
+						},
+					],
+					styledBible,
+				)
+				const expression = jobs.find((job) => job.kind === 'expression')
+				if (!expression || !('baseAssetId' in expression))
+					throw new Error('Missing expression job')
+				await art.adopt(expression.baseAssetId, basePath)
+				expect(await art.draw(expression, styledBible)).toEqual(
+					restored
+						? { status: 'drawn' }
+						: {
+								status: 'unsupported',
+								issue: expect.stringContaining('alpha'),
+							},
+				)
+				expect(render).toHaveBeenCalledTimes(2)
+				const [[, original], [retryPrompt, retry, , transparent]] =
+					render.mock.calls
+				expect(original).toHaveLength(2)
+				expect(retry).toEqual([original[0]])
+				expect(transparent).toBe(true)
+				expect(retryPrompt).not.toContain('Image 2')
+				expect(retryPrompt).toContain('The brows furrow.')
+				const audit = model.mock.calls.filter(([, prompt]) =>
+					prompt.startsWith('Visually audit'),
+				)
+				if (restored) {
+					expect(audit).toHaveLength(1)
+					expect(audit[0][1]).toContain('rendered from the base sprite alone')
+					expect(audit[0][4]?.slice(1)).toEqual(original)
+				} else expect(audit).toHaveLength(0)
+				const entry = (await art.registry()).entries.find(
+					({ id }) => id === expression.assetId,
+				)
+				expect(entry).toMatchObject({
+					styleRefsDropped: true,
+					status: restored ? 'drawn' : 'pending',
+				})
+			})
+		} finally {
+			renderer.mockRestore()
+			model.mockRestore()
+		}
+	},
+)
+
 test('a moderation rewrite does not consume the technical redraw budget', async () => {
 	const render = vi
 		.fn<ReturnType<typeof artModels.imageRenderer>>()

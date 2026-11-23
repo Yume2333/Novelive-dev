@@ -125,11 +125,14 @@ export class ArtProduction {
 		}
 	}
 
-	private async update(id: string, status: RegistryEntry['status']) {
+	private async update(
+		id: string,
+		changes: Partial<Pick<RegistryEntry, 'status' | 'styleRefsDropped'>>,
+	) {
 		const registry = await this.registry()
 		const entry = registry.entries.find((item) => item.id === id)
 		if (!entry) throw new Error(`Unregistered asset: ${id}`)
-		entry.status = status
+		Object.assign(entry, changes)
 		await this.persistRegistry(registry)
 	}
 
@@ -150,7 +153,7 @@ export class ArtProduction {
 	}
 
 	private saveStatus(id: string, status: RegistryEntry['status']) {
-		return this.writeRegistry(() => this.update(id, status))
+		return this.writeRegistry(() => this.update(id, { status }))
 	}
 
 	private writeRegistry<T>(operation: () => Promise<T>) {
@@ -326,7 +329,16 @@ export class ArtProduction {
 		const output = base
 			? await sharp(base).metadata()
 			: this.outputSize(portrait)
-		const result = await this.paint(drawing, target, portrait, Boolean(base))
+		const result = await this.paint(
+			drawing,
+			target,
+			portrait,
+			Boolean(base),
+			() =>
+				this.writeRegistry(() =>
+					this.update(entry.id, { styleRefsDropped: true }),
+				),
+		)
 		if ('issue' in result) {
 			return result.unsupported || redraw
 				? {
@@ -376,6 +388,7 @@ export class ArtProduction {
 		target: Dimensions,
 		transparent: boolean,
 		derived = false,
+		onStyleRefsDropped?: () => Promise<void>,
 	) {
 		const refs = await Promise.all(
 			drawing.references.slice(0, 16).map(async (ref, i) => {
@@ -400,6 +413,7 @@ export class ArtProduction {
 		let feedback = ''
 		let reviewed: Buffer | undefined
 		let moderated = false
+		let triedBaseOnly = false
 		let attempt = 0
 		while (attempt <= this.options.image.retries) {
 			const content = await artJson(
@@ -438,11 +452,51 @@ export class ArtProduction {
 				continue
 			}
 			attempt++
-			const checked = await checkImage(result.bytes, target, {
+			const checkOptions = {
 				transparent,
 				base: derived ? refs[0] : undefined,
 				variant: drawing.kind === 'variant',
-			})
+			}
+			let checked = await checkImage(result.bytes, target, checkOptions)
+			let baseOnly = false
+			if (
+				'issue' in checked &&
+				checked.unsupported &&
+				drawing.kind === 'expression' &&
+				derived &&
+				promptDrawing.references.some(({ role }) => role === 'style') &&
+				!triedBaseOnly
+			) {
+				triedBaseOnly = baseOnly = true
+				await onStyleRefsDropped?.()
+				const retry = await this.render(
+					drawingPrompt(
+						{
+							...promptDrawing,
+							references: promptDrawing.references.slice(0, 1),
+						},
+						content.content,
+						'',
+					),
+					refs.slice(0, 1),
+					target,
+					transparent,
+				)
+				if ('error' in retry) {
+					this.options.signal?.throwIfAborted()
+					if (retry.error.code === 'unsupported')
+						return { issue: retry.error.message, unsupported: true } as const
+					issue = retry.error.message
+					feedback = issue
+					if (retry.error.code === 'moderation') {
+						if (moderated) break
+						moderated = true
+						feedback = moderationHint
+					}
+					continue
+				}
+				checked = await checkImage(retry.bytes, target, checkOptions)
+			}
 			if ('issue' in checked) {
 				if (checked.unsupported) return checked
 				issue = feedback = checked.issue
@@ -454,6 +508,11 @@ export class ArtProduction {
 					'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
 					`Original image brief (verify independently of the painter's rewrite): ${drawing.description}`,
+					...(baseOnly
+						? [
+								'This expression was rendered from the base sprite alone after the edit with style references lost alpha. Audit against the base sprite and the supplied style references.',
+							]
+						: []),
 					drawingPrompt(promptDrawing, content.content, '', 2),
 				].join('\n'),
 				auditSchema,

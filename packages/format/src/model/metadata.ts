@@ -102,6 +102,7 @@ export const assetRegistrySchema = obj(
 					path: str({ minLength: 1 }),
 					status: oneOf(['drawn', 'pending', 'placeholder']),
 					aliases: arr(str()),
+					styleRefsDropped: opt(lit(true)),
 				},
 				open,
 			),
