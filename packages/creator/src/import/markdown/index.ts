@@ -35,6 +35,7 @@ const yamlLine = new RegExp(String.raw`^(?:#|\s|-(?:\s|$)|${key}(?:\s|$))`)
 const nodeProperties = new RegExp(
 	String.raw`^${key}\s*(?:(?:&[\w-]+(?:\s+(?:!<[^>\s]*>|![\w!:/.-]*))?|(?:!<[^>\s]*>|![\w!:/.-]*)(?:\s+&[\w-]+)?)\s*)?(?:#.*)?$`,
 )
+const flowOpener = new RegExp(String.raw`^\s*${key}\s*[[{]`)
 const yamlKey = new RegExp(String.raw`^${key}(?:\s|$)`)
 
 function scalar(raw: string, rest: string[]) {
@@ -80,7 +81,7 @@ function frontMatter(text: string) {
 		if (!yamlLine.test(line) || (/^-(?:\s|$)/.test(line) && !list))
 			return { body: text, metadata }
 		if (yamlKey.test(line)) list = nodeProperties.test(line)
-		const opens = /^\s*[^\s#:-][^:]*:\s*[[{]/.test(line)
+		const opens = flowOpener.test(line)
 		if (yamlKey.test(line)) flow = opens
 		else if (opens) flow = true
 	}
