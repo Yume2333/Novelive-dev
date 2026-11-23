@@ -205,6 +205,11 @@ export function outputTokenBudget(
 	)
 }
 
+export function parseModelJson(text: string): unknown {
+	const fenced = /^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(text.trim())
+	return JSON.parse(fenced?.[1] ?? text)
+}
+
 const descriptions: Partial<Record<Code, string>> = {
 	auth: 'Model authentication failed',
 	not_found: 'Model or endpoint not found',

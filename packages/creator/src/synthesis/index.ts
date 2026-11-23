@@ -25,6 +25,7 @@ import {
 	buildTextModel,
 	createTextStream,
 	outputTokenBudget,
+	parseModelJson,
 	type TextConnection,
 	textResultError,
 } from '../models/text'
@@ -337,7 +338,7 @@ ${packetText.join('\n')}`
 				const text = response.content
 					.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 					.join('')
-				const validation = validator.validate(JSON.parse(text))
+				const validation = validator.validate(parseModelJson(text))
 				if (!validation.ok) throw new Error(JSON.stringify(validation.errors))
 				check(validation.value)
 				return validation.value

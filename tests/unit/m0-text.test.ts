@@ -11,6 +11,7 @@ import {
 	buildTextModel,
 	createTextStream,
 	outputTokenBudget,
+	parseModelJson,
 	suggestContextWindow,
 	testTextConnection,
 	textResultError,
@@ -37,6 +38,14 @@ const format = (options: Parameters<typeof createReplayFetch>[0] = {}) =>
 	})
 
 describe('M0 text model adapter', () => {
+	it.each(['{"ok":true}', '```json\n{"ok":true}\n```'])(
+		'decodes bare or fenced JSON: %s',
+		(text) => {
+			expect(parseModelJson(text)).toEqual({ ok: true })
+			expect(() => parseModelJson(`Unexpected preamble \n${text}`)).toThrow()
+		},
+	)
+
 	it('uses catalog output limits and bounds private-model slots by their configured cap', () => {
 		const gemini = buildTextModel(configured)
 		expect(gemini.maxTokens).toBe(64_000)

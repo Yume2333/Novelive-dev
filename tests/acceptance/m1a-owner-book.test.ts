@@ -10,7 +10,10 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { headingRules } from '../../packages/creator/src/import/txt'
-import type { TextConnection } from '../../packages/creator/src/models/text'
+import {
+	type TextConnection,
+	TextModelError,
+} from '../../packages/creator/src/models/text'
 import { Project } from '../../packages/creator/src/project'
 import {
 	importTxt,
@@ -29,7 +32,7 @@ const source = join(home, 'novelive-testbooks', 'yesou-puyan.txt')
 const root = join(home, '.local/novelive-tools/m1a-owner-book')
 const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
 const purpose = 'M1a/07 owner book'
-const previewModel = 'deepseek-v4.1-flash'
+const previewModel = 'gemini-3.8-flash'
 const synthesisModel = 'devin-swe-2'
 const cap = 30_000_000
 const series = {
@@ -84,7 +87,6 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		} as const
 		const previewConnection = {
 			...connection,
-			compat: 'deepseek',
 			model: previewModel,
 			contextWindow: 1_000_000,
 		} satisfies TextConnection
@@ -327,9 +329,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			} finally {
 				if (!closed) first.close()
 			}
-		} catch {
+		} catch (error) {
+			const code = error instanceof TextModelError ? ` [${error.code}]` : ''
 			throw new Error(
-				`M1a/07 did not pass during ${phase}; see the redacted result and usage`,
+				`M1a/07 did not pass during ${phase}${code}; see the redacted result and usage`,
 			)
 		} finally {
 			console.log(`M1a/07 usage: ${JSON.stringify(stats)}`)

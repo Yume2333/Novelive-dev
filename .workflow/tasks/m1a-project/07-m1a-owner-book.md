@@ -18,6 +18,6 @@
 ## Progress
 
 - 按本轮授权自行选用公版《野叟曝言》，实导入 20 卷／154 回。
-- Check after: `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → `Tests  1 failed (1)`。首回预览两次返回纯推理、无 JSON 正文。未执行整卷／分块对照、已确认设定和重启验收；保持未验收。
-- 严格 `pnpm check` → `Tests  333 passed (333)`。付费 2 次、24,058 tokens、0 张图。
+- Check after: `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → `Tests  1 failed (1)`。DeepSeek 禁用探针仍输出推理；已改用 Gemini 完成首卷 7 回预览及卷摘要。第一包综合的初始及修复响应未通过 schema，整卷对照、已确认设定和重启保持未验收。
+- 严格 `pnpm check` → `Tests  342 passed (342)`。累计付费 20 次、190,995 tokens、0 张图。
 - [脱敏凭据](../../evidence/m1a/owner/receipt.txt)

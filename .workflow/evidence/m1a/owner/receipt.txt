@@ -9,17 +9,21 @@ UTF-8 TXT：3,911,342 bytes；SHA-256 dc14b620b537561c3e0bb6f51eb939b5758eeaadd9
 正文及每回原页的 URL／版本／HTML SHA-256 清单位于 ~/novelive-testbooks/，不入 Git。TXT 保留目录的二十个真实分卷及章回；卷标题增加供导入识别的卷序。第 127 回的源页面含一个 U+FFFD，以缺字框标示，不猜补原字。
 
 本书优先于仅以回目为主的候选：该来源直接提供真实分卷和连续章回，不需要人工分卷。首卷「奮字卷之一」7 回，61,192 字符；覆盖真卷比较而不必为整本做模型调用。
-默认章回规则把第 82 回的一条正文误识为标题；测试通过现有导入选项要求「第…回」后有分隔空白，恢复 20 卷／154 回，不修改正文或产品的默认规则。生产预览用 deepseek-v4.1-flash；同一批预览复制给 devin-swe-2 的整卷控制和分块路径，比较规范化条目 ID 和操作。分块模拟受限上下文；重启复用同一已应用的检查点。
+默认章回规则把第 82 回的一条正文误识为标题；测试通过现有导入选项要求「第…回」后有分隔空白，恢复 20 卷／154 回，不修改正文或产品的默认规则。验收预览由 deepseek-v4.1-flash 回退到 gemini-3.8-flash，综合仍配置 devin-swe-2；不更改产品默认模型。成功时使用同一批预览对比整卷与受限上下文分块的规范化条目 ID 和操作，并检查重启能否复用已应用的检查点。
 
 NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts
 Error: M1a/07 did not pass during preview and chunked synthesis; see the redacted result and usage
  Test Files  1 failed (1)
       Tests  1 failed (1)
 
-导入与计数通过，但未生成首回预览。初次运行与改用 DeepSeek 兼容设置后重试均收到 HTTP 200；两次输出的 4,096 completion tokens 全为推理，SSE 没有正文帧，未写入预览。两次请求标识不同；未验证中转如何解释 thinking 设置。未发起整卷或分块综合请求，因此 F1、已确认设定保全及重启零调用均未得到真书验证，不记 W4 通过。
+原 DeepSeek 预览两次收到 HTTP 200，4,096 completion tokens 均耗在推理，无正文。单次 62-token 探针直接指定 `thinking: {type: "disabled"}`，仍返回 17 个 reasoning tokens；未另行请求其他参数。pi-ai 的 DeepSeek 兼容配置选自目录，但该目录模型的 off 值为 null，故兼容重试不能单独验证禁用参数。未假定中转支持禁用。
 
-调用账本：deepseek-v4.1-flash 2 次 × 12,029 tokens，共 24,058 实测 tokens、0 张图、无未计量预留。首轮导入失败在任何调用之前；两个付费预览均已记私有账本。预算 30,000,000 tokens／0 张；相同预览失败出现两次后停止。私有工程及录制存放于 ~/.local/novelive-tools/m1a-owner-book/，未提交。
+文本适配器现在将推理耗尽且无答案的响应标为 `reasoning_limit`，不按网络错误重试。预览和综合为推理模型在模型上限和上下文上限之内增加输出容量。接受单个 JSON 代码块而不放宽现有 schema；此前 Gemini 的首轮输出有代码块，末章的修复响应缺少所需字段。
+
+最新付费运行导入全书，首卷 7 回预览和分卷摘要均写入；分块为 6 个包。第一包的 devin-swe-2 首次响应缺 `event`、`is_last`，含错误的字段类型和 `upsert` 操作；修复响应仍缺 glossary 条目的 `status` 且包含未声明的 `changes` 字段。私有响应离线用同一 checkpoint schema 验证确认这些问题。未完成第一包，未发起整卷控制；F1、已确认设定保全、重启零调用仍未验证，不记 W4 通过。
+
+累计账本：20 次、190,995 实测 tokens、0 张图、无未计量预留（DeepSeek 3 次 24,120 含探针；Gemini 15 次 157,383；综合 2 次 9,492）。最新 Check 新增 3 次、19,261 tokens；首卷预览重用先前的录制。预算 30,000,000 tokens／0 张。私有工程及录制存放于 ~/.local/novelive-tools/m1a-owner-book/，未提交。
 
 NL_REPLAY=strict pnpm check
  Test Files  22 passed (22)
-      Tests  333 passed (333)
+      Tests  342 passed (342)
