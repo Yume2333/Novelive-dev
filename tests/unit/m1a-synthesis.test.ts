@@ -189,6 +189,13 @@ test.each([false, true])(
 		expect(
 			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
 		).toEqual(result)
+		expect(
+			await synthesizeVolume(project, 'v1', chapters, {
+				...args,
+				strategy: 'auto',
+				fetch,
+			}),
+		).toEqual(result)
 		expect(fetch).not.toHaveBeenCalled()
 	},
 )

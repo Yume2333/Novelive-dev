@@ -265,45 +265,10 @@ export async function synthesizeVolume(
 	)
 	if (previews.some((preview, i) => preview.chapterId !== chapterIds[i]))
 		throw new Error('Stored preview chapter ID does not match its file')
-	const inputs = {
-		previews,
-		language: options.language,
-		requirements: options.requirements,
-		strategy,
-		incremental,
-		...(options.scope ? { scope: options.scope } : {}),
-		...(options.previousDigests
-			? { previousDigests: options.previousDigests }
-			: {}),
-		model: model.id,
-		context: model.contextWindow,
-	}
-	const inputFingerprint = hash(inputs)
-	const packetFingerprint = (format: number) =>
-		hash({ packetFormat: format, ...inputs })
-	const fingerprint = packetFingerprint(packetFormat)
-	const saved = options.rerun
-		? undefined
-		: await existing(() => project.read(files.checkpoint))
-	if (
-		saved?.applied &&
-		(saved.inputFingerprint
-			? saved.inputFingerprint === inputFingerprint
-			: legacyPacketFormats.some(
-					(format) => saved.fingerprint === packetFingerprint(format),
-				))
-	)
-		return project.read(files.result)
-
 	const bible = await readBible(project)
 	const contextBible = options.scope
 		? await readBible(project, options.scope)
 		: bible
-	const basis = hash(bible)
-	const matching = saved?.fingerprint === fingerprint ? saved : undefined
-	const quarantined =
-		matching?.ready && matching.basis !== basis ? matching : undefined
-	const resumable = matching?.basis === basis ? matching : undefined
 	const outputLimit = outputTokenBudget(model)
 	const historyBudget = Math.min(1024, Math.floor(model.contextWindow / 16))
 	const packetOutputReserve = Math.min(
@@ -325,6 +290,45 @@ ${packetText.join('\n')}`
 		strategy === 'events' ||
 		(strategy === 'auto' &&
 			bytes(wholePrompt) + 384 > model.contextWindow - packetOutputReserve)
+	const inputs = {
+		previews,
+		language: options.language,
+		requirements: options.requirements,
+		strategy: useEvents ? 'events' : 'whole',
+		incremental,
+		...(options.scope ? { scope: options.scope } : {}),
+		...(options.previousDigests
+			? { previousDigests: options.previousDigests }
+			: {}),
+		model: model.id,
+		context: model.contextWindow,
+	}
+	const inputFingerprint = hash(inputs)
+	const fingerprint = hash({ packetFormat, ...inputs })
+	const saved = options.rerun
+		? undefined
+		: await existing(() => project.read(files.checkpoint))
+	if (saved?.applied) {
+		const equivalent = [inputs]
+		if ((saved.whole === null) === useEvents)
+			equivalent.push({ ...inputs, strategy: 'auto' })
+		if (
+			equivalent.some((input) =>
+				saved.inputFingerprint
+					? saved.inputFingerprint === hash(input)
+					: legacyPacketFormats.some(
+							(format) =>
+								saved.fingerprint === hash({ packetFormat: format, ...input }),
+						),
+			)
+		)
+			return project.read(files.result)
+	}
+	const basis = hash(bible)
+	const matching = saved?.fingerprint === fingerprint ? saved : undefined
+	const quarantined =
+		matching?.ready && matching.basis !== basis ? matching : undefined
+	const resumable = matching?.basis === basis ? matching : undefined
 	const eventPrompt = `${instructions}
 ${nextEvent.instructions}`
 	const outputReserve = useEvents
