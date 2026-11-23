@@ -170,7 +170,9 @@ export function imageRenderer(config: ImageConfig, options: ModelOptions) {
 			const referenceModerated =
 				failure.code === 'moderation' &&
 				error instanceof OpenAI.APIError &&
-				/^InputImageSensitiveContentDetected(?:\.|$)/i.test(error.code ?? '')
+				/^InputImage(?:SensitiveContentDetected|RiskDetection)(?:\.|$)/i.test(
+					error.code ?? '',
+				)
 			return {
 				error: failure,
 				...(referenceModerated && { referenceModerated: true }),

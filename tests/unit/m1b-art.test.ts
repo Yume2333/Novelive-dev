@@ -785,42 +785,87 @@ test.each([
 	{ rejection: 'none', first: 'costume-epub', calls: [1, 0, 0], onReopen: 0 },
 	{
 		rejection: 'prompt',
+		code: 'InputTextRiskDetection',
 		first: 'costume-epub',
 		calls: [1, 1, 0, 0],
 		onReopen: 0,
 	},
 	{
 		rejection: 'unknown',
+		code: 'OutputImageRiskDetection',
 		first: 'costume-1',
 		calls: [1, 1, 0, 0, 0],
 		onReopen: 2,
 	},
 	{
-		rejection: 'reference',
+		rejection: 'reference HTTP error',
+		code: 'InputImageRiskDetection',
+		first: 'costume-1',
+		calls: [1, 0, 0, 0],
+		onReopen: 1,
+	},
+	{
+		rejection: 'reference item error',
+		code: 'InputImageSensitiveContentDetected.PrivacyInformation',
 		first: 'costume-1',
 		calls: [1, 0, 0, 0],
 		onReopen: 1,
 	},
 ])(
 	'chooses the EPUB costume moderation retry for $rejection',
-	async ({ rejection, first, calls, onReopen }) => {
+	async ({ rejection, code, first, calls, onReopen }) => {
 		const rewritten = '上一次生成被内容审核拒绝，请收敛描写'
-		const render = vi
-			.fn<ReturnType<typeof artModels.imageRenderer>>()
-			.mockImplementation(async (prompt, refs, size, alpha) =>
-				alpha &&
-				refs.length &&
-				rejection !== 'none' &&
-				(rejection !== 'prompt' || !prompt.includes(rewritten))
-					? {
-							error: { code: 'moderation', message: '内容审核拒绝' },
-							...(rejection === 'reference' && { referenceModerated: true }),
-						}
-					: { bytes: await picture(size.width, size.height, alpha) },
-			)
+		type ImageRequest = {
+			prompt: string
+			image?: string[]
+			size: string
+			background?: string
+		}
+		const requests: ImageRequest[] = []
+		const render = artModels.imageRenderer
 		const renderer = vi
 			.spyOn(artModels, 'imageRenderer')
-			.mockReturnValue(render)
+			.mockImplementation((config) =>
+				render(
+					{ ...config, baseUrl: 'https://fixture.volces.com/api/v3' },
+					{
+						replay: {
+							mode: 'replay',
+							directory,
+							fetch: async (input, init) => {
+								const request = new Request(input, init)
+								expect(request.url).toBe(
+									'https://fixture.volces.com/api/v3/images/generations',
+								)
+								const body: ImageRequest = await request.json()
+								requests.push(body)
+								const alpha = body.background === 'transparent'
+								if (
+									alpha &&
+									body.image?.length &&
+									code &&
+									(rejection !== 'prompt' || !body.prompt.includes(rewritten))
+								) {
+									const error = { code, message: 'Content rejected' }
+									return rejection === 'reference item error'
+										? Response.json({ data: [{ error }] })
+										: Response.json({ error }, { status: 400 })
+								}
+								const [width, height] = body.size.split('x').map(Number)
+								return Response.json({
+									data: [
+										{
+											b64_json: (await picture(width, height, alpha)).toString(
+												'base64',
+											),
+										},
+									],
+								})
+							},
+						},
+					},
+				),
+			)
 		const model = vi
 			.spyOn(artModels, 'artJson')
 			.mockImplementation(async (_connection, prompt) =>
@@ -848,21 +893,25 @@ test.each([
 					'costume-2',
 					'costume-3',
 				])
-				const portraits = render.mock.calls.filter((call) => call[3])
-				expect(portraits.map(([, refs]) => refs.length)).toEqual(calls)
-				expect(portraits[0][0]).toContain('ada EPUB character design reference')
+				const portraits = requests.filter(
+					({ background }) => background === 'transparent',
+				)
+				expect(portraits.map(({ image }) => image?.length ?? 0)).toEqual(calls)
+				expect(portraits[0].prompt).toContain(
+					'ada EPUB character design reference',
+				)
 				if (rejection === 'prompt' || rejection === 'unknown') {
-					expect(portraits[1][0]).toContain(rewritten)
-					expect(portraits[1][1]).toEqual(portraits[0][1])
+					expect(portraits[1].prompt).toContain(rewritten)
+					expect(portraits[1].image).toEqual(portraits[0].image)
 				}
 				if (first === 'costume-1')
-					expect(portraits[calls.lastIndexOf(1) + 1][0]).not.toContain(
+					expect(portraits[calls.lastIndexOf(1) + 1].prompt).not.toContain(
 						'EPUB character design reference',
 					)
 				expect(
 					await art.candidates(bible, ['c1'], undefined, [], references),
 				).toEqual(pool)
-				expect(render).toHaveBeenCalledTimes(3 + calls.length + onReopen)
+				expect(requests).toHaveLength(3 + calls.length + onReopen)
 			})
 		} finally {
 			renderer.mockRestore()
