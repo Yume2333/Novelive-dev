@@ -271,6 +271,8 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 		assert(prior, 'Version 1 progress is missing')
 		await page.getByRole('button', { name: '返回书库' }).click()
 		await expect(page.getByRole('heading', { name: '书库' })).toBeVisible()
+		const playerCache = join(readerDir, 'cache', 'player')
+		await rm(playerCache, { recursive: true })
 		await promisify(execFile)(
 			executablePath,
 			[...args, '--no-sandbox', `--user-data-dir=${readerDir}`, release2],
@@ -282,6 +284,7 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 		await capture(page, 'update-review')
 		await page.getByRole('button', { name: '确认导入与更新' }).click()
 		await expect(page.getByText('已导入或更新 1 部作品。')).toBeVisible()
+		await expect(readdir(playerCache)).rejects.toMatchObject({ code: 'ENOENT' })
 		const currentKey = installedProgressKey(playerWorkId, 2)
 		const migrated = await page.evaluate(
 			(key) => window.novelive.host.progress?.load(key),

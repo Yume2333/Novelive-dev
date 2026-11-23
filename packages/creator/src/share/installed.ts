@@ -13,7 +13,11 @@ import { openPackage, PackageCodecError } from '@novelive/format/package/codec'
 import { compileScript } from '@novelive/format/script'
 import { toPlaybackBeats } from '../../../player/src/contract/playback'
 import type { ShareRequest } from '../contract/share'
-import { loadPlayerChapter, loadPlayerStatus } from '../project/player'
+import {
+	loadPlayerChapter,
+	loadPlayerCompilation,
+	loadPlayerStatus,
+} from '../project/player'
 import { optionalFile } from '../project/series/resolve'
 import { initializeExtractedProject } from './project'
 
@@ -165,7 +169,6 @@ export class InstalledPackages {
 			if (!selected.length) return []
 			await archive.extractTo(root)
 			initializeExtractedProject(root)
-			const cache = join(this.dataDir, 'cache')
 			const migrations: Migration[] = []
 			added = []
 			for (const entry of selected) {
@@ -183,21 +186,19 @@ export class InstalledPackages {
 				const update = updates.find((update) => update.workId === workId)
 				if (!update) continue
 				const beats = []
-				for (const { chapterId } of published) {
-					const content = await loadPlayerChapter(
-						root,
-						workId,
-						cache,
-						chapterId,
-					)
-					const {
-						chapter,
-						registry,
-						speakers,
-						speakerNames,
-						customMarks,
-						script,
-					} = content
+				for await (const {
+					chapterId,
+					chapter,
+					registry,
+					speakers,
+					speakerNames,
+					customMarks,
+					script,
+				} of loadPlayerCompilation(
+					root,
+					workId,
+					published.map((chapter) => chapter.chapterId),
+				)) {
 					let nextId = 0
 					const result = compileScript(script, {
 						makeId: (bytes) => (++nextId).toString(16).padStart(bytes * 2, '0'),
