@@ -19,7 +19,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { type Entry, openPromise } from 'yauzl'
 import { ZipFile } from 'yazl'
 import { Project } from '../../packages/creator/src/project'
-import { loadPlayerStatus } from '../../packages/creator/src/project/player'
+import {
+	loadPlayerChapter,
+	loadPlayerStatus,
+} from '../../packages/creator/src/project/player'
 import { InstalledPackages } from '../../packages/creator/src/share/installed'
 import {
 	exportProject,
@@ -127,6 +130,50 @@ describe('M5 .novelive archive', () => {
 		).toMatchObject({
 			chapters: [{ published: false }],
 		})
+	})
+
+	it('opens the first published chapter by default in a fork', async () => {
+		await rm(join(projectRoot, 'project.db'))
+		initializeExtractedProject(projectRoot)
+		using project = await Project.open(projectRoot)
+		const ref = { ...scope, chapterId: work.chapterIds[0] }
+		const first = await project.read(projectFiles.chapter(ref))
+		const second = { ...ref, chapterId: 'ch-2' }
+		const file = projectFiles.work(ref.volumeId, ref.workId)
+		await project.write(file, {
+			...(await project.read(file)),
+			chapterIds: [ref.chapterId, second.chapterId],
+		})
+		await project.write(projectFiles.chapter(ref), {
+			...first,
+			published: false,
+		})
+		await project.write(projectFiles.chapter(second), {
+			...first,
+			chapterId: second.chapterId,
+			published: true,
+		})
+		for (const sceneId of first.sceneIds)
+			await project.writeFile(
+				projectFiles.scene(second, sceneId),
+				await project.readFile(projectFiles.scene(ref, sceneId)),
+			)
+		await exportProject({ projectRoot, destination, scope })
+		using archive = await openPackage(destination)
+		const { projectRoot: fork, workIds } = await importProject(
+			archive,
+			directory,
+			directory,
+		)
+		const cache = join(directory, 'cache')
+		await expect(
+			loadPlayerChapter(fork, workIds[0], cache),
+		).resolves.toMatchObject({
+			chapter: { chapterId: second.chapterId },
+		})
+		await expect(
+			loadPlayerChapter(fork, workIds[0], cache, ref.chapterId),
+		).rejects.toMatchObject({ code: 'not_found' })
 	})
 
 	it('writes the host version only after a successful export', async () => {
