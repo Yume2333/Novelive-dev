@@ -28,7 +28,7 @@ function stored(): Locale {
 export const i18n = i18next.createInstance()
 void i18n.use(initReactI18next).init({
 	resources,
-	lng: typeof localStorage === 'undefined' ? 'zh-CN' : stored(),
+	lng: stored(),
 	fallbackLng: {
 		'zh-TW': ['zh-CN'],
 		ja: ['en', 'zh-CN'],
