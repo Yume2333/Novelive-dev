@@ -110,6 +110,7 @@ export function mountText(
 		}
 		while (revealed < ends[page] && delays[revealed] === 0) revealed++
 		paint()
+		if (awaitingClick) return
 		if (revealed < ends[page]) {
 			timer = setTimeout(
 				() => {
@@ -186,7 +187,7 @@ export function mountText(
 	return {
 		finished,
 		click() {
-			if (awaitingClick) {
+			if (awaitingClick && page === ends.length - 1) {
 				awaitingClick = false
 				resolveDone()
 				return true

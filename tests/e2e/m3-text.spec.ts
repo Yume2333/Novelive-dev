@@ -204,6 +204,19 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 			await expect(text).toHaveAttribute('data-revealed', '12')
 			await page.waitForTimeout(250)
 			await expect(display).toHaveText('点击补全后等第二次点击。')
+			await text.evaluate((host) => {
+				host.style.width = '2em'
+			})
+			await expect
+				.poll(async () => Number(await text.getAttribute('data-pages')))
+				.toBeGreaterThan(1)
+			await page.waitForTimeout(300)
+			await expect(text).toHaveAttribute('data-page', '1')
+			const heldPages = Number(await text.getAttribute('data-pages'))
+			for (let p = 2; p <= heldPages; p++) {
+				await advance()
+				await expect(text).toHaveAttribute('data-page', String(p))
+			}
 			await advance()
 			await expect(display).toHaveText('结束。', { timeout: 1000 })
 		} finally {
