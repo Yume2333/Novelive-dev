@@ -979,8 +979,8 @@ test.each(['current', 'previous', 'unversioned'] as const)(
 		}
 		using project = await Project.open(root)
 		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-			const prompt = (await new Request(input, init).clone().json()).messages[0]
-				.content
+			const { messages } = await new Request(input, init).json()
+			const prompt: string = messages[0].content
 			expect(checkOwnerBookResumePrompt(prompt, { packet: 2, events: 1 })).toBe(
 				'selection',
 			)
