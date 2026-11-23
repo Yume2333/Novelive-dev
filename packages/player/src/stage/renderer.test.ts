@@ -65,11 +65,45 @@ it('crossfades only the changed portrait while leaving background and other port
 	const { pictures } = internals(stage)
 	expect(pictures.alpha).toBe(1)
 	expect(pictures.children[0].alpha).toBe(1)
-	expect(pictures.children.slice(1).map((child) => child.alpha)).toEqual([
-		0.5, 0.5,
+	expect(
+		(pictures.children[1] as Container).children.map((child) => child.alpha),
+	).toEqual([0.5, 0.5])
+	stage.complete()
+	await finished
+})
+
+it('keeps both expressions together throughout concurrent face and move animations', async () => {
+	const stage = createStage()
+	const first = direct(
+		emptyStage(),
+		action('show', { slot: 'center' }, 'hero/coat/calm'),
+	)
+	await stage.commit(first, assets, [], true)
+	const face = action('face', { duration: 0.4 }, 'hero/coat/smile')
+	const move = action('move', {
+		slot: 'center',
+		target: 'left',
+		duration: 1,
+		easing: 'linear',
+	})
+	const finished = stage.commit(direct(direct(first, face), move), assets, [
+		face,
+		move,
+	])
+	const portrait = internals(stage).pictures.children[0] as Container
+	expect(portrait.x).toBe(480)
+	internals(stage).tick(0.2)
+	expect(portrait.x).toBe(432)
+	expect(
+		portrait.children.map((child) => [child.x, child.y, child.alpha]),
+	).toEqual([
+		[0, 0, 0.5],
+		[0, 0, 0.5],
 	])
 	stage.complete()
 	await finished
+	expect(portrait.x).toBe(240)
+	expect(portrait.children).toHaveLength(1)
 })
 
 it('finishes concurrent shake and zoom at the focused camera position', async () => {

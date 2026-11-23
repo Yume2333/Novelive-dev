@@ -135,8 +135,11 @@ export class PixiStage {
 		for (const [slot, item] of Object.entries(state.sprites).sort(
 			(a, b) => a[1].layer - b[1].layer,
 		)) {
-			const sprite = image(item.assetId, pictures, true)
-			sprite.position.set(item.transform.x, item.transform.y)
+			const portrait = new Container()
+			pictures.addChild(portrait)
+			portrait.position.set(item.transform.x, item.transform.y)
+			const sprite = image(item.assetId, portrait, true)
+			sprite.position.set(0, 0)
 			sprite.scale.x *= item.transform.scaleX
 			sprite.scale.y *= item.transform.scaleY
 			sprite.rotation = item.transform.rotation
@@ -152,12 +155,12 @@ export class PixiStage {
 				portraitChange &&
 				!instant
 			) {
-				const outgoing = image(prior.assetId, pictures, true)
-				outgoing.position.copyFrom(sprite.position)
+				const outgoing = image(prior.assetId, portrait, true)
+				outgoing.position.set(0, 0)
 				outgoing.scale.x *= prior.transform.scaleX
 				outgoing.scale.y *= prior.transform.scaleY
 				outgoing.rotation = prior.transform.rotation
-				pictures.setChildIndex(outgoing, pictures.getChildIndex(sprite))
+				portrait.setChildIndex(outgoing, portrait.getChildIndex(sprite))
 				this.animate(
 					Number(portraitChange.args.duration),
 					(p) => {
@@ -175,7 +178,7 @@ export class PixiStage {
 					previous.sprites[slot as keyof typeof slotX]?.transform.x ??
 					item.transform.x
 				this.animate(Number(move.args.duration), (p) => {
-					sprite.x =
+					portrait.x =
 						from +
 						(item.transform.x - from) * eased(p, String(move.args.easing))
 				})
