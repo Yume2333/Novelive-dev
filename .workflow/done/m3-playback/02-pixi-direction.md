@@ -13,6 +13,7 @@
 ## Progress
 
 - Completion: done.
+- Review follow-up: all Pixi layers are clipped together at the measured DOM text-box boundary, updated on viewport/text-box resize. The composite e2e compares text-panel pixels without particles against three particle-active frames. Strict Electron regression: 3 passed; repository checks: 31 files / 412 tests passed; isolated stage checks: 2 files / 8 tests passed. Regenerated `/home/ubuntu/m3-shots/stage-composite.png` visually confirms no particles in the panel.
 - Implemented JSON stage state, Pixi camera/CG/foreground/particles/filters/masks/transitions, snapshot restoration API, relative animations and a reference-counted 20–32 sentence asset window. Text stays in the DOM on `var(--font-body)`; no work stylesheet is injected.
 - Registered the image parser with a parser-level id and the current `parser` API. Particle textures use a canvas-backed source compatible with both Canvas and WebGL. Shared Electron protocol configuration is unchanged.
 - Check after: `NL_REPLAY=strict NL_STAGE_SHOTS=/home/ubuntu/m3-shots xvfb-run -a pnpm test:e2e --grep 'M3 stage directions|M1b minimal player'` → 3 passed. The M3 test uses software WebGL for real shader-filter pixel assertions on Linux CI and captures renderer errors.

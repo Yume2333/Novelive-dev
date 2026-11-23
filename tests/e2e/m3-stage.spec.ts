@@ -97,6 +97,7 @@ test('M3 stage directions render the direction set and four landscape fill crops
 				(effect) => [`@filter ${effect} value 0.5`, effect] as [string, string],
 			),
 			['@filter none\n@hide traveler', '空场'],
+			['@cg cg-test\n@filter sepia value 0.5', '合成基准'],
 			[
 				'@cg cg-test\n@particle sakura intensity 0.8\n@filter sepia value 0.5',
 				'合成演出',
@@ -140,6 +141,23 @@ test('M3 stage directions render the direction set and four landscape fill crops
 			await page.getByRole('button', { name: '打开本地工程' }).click()
 			const text = page.locator('.nl-player-text')
 			const canvas = page.locator('.nl-player canvas')
+			let panelWithoutParticles = Buffer.alloc(0)
+			async function panelPixels() {
+				const shot = sharp(
+					await page.locator('.nl-player-textbox').screenshot(),
+				)
+				const { width = 0, height = 0 } = await shot.metadata()
+				return shot
+					.extract({
+						left: Math.floor(width / 2),
+						top: 8,
+						width: Math.floor(width / 2) - 8,
+						height: height - 16,
+					})
+					.removeAlpha()
+					.raw()
+					.toBuffer()
+			}
 			async function pixel(x: number, y: number) {
 				const shot = await sharp(
 					await page.locator('.nl-player-stage').screenshot(),
@@ -195,8 +213,21 @@ test('M3 stage directions render the direction set and four landscape fill crops
 					await expect.poll(() => pixel(0.8, 0.3)).toEqual([16, 24, 48])
 				if (['sakura', '暗角', 'glitch'].includes(label))
 					await page.screenshot({ path: `${evidence}/stage-${label}.png` })
-				if (label === '合成演出')
+				if (label === '合成基准') {
+					panelWithoutParticles = await panelPixels()
+					expect(
+						panelWithoutParticles.every(
+							(value, i, pixels) => value === pixels[i % 3],
+						),
+					).toBe(true)
+				}
+				if (label === '合成演出') {
+					for (let frame = 0; frame < 3; frame++)
+						expect((await panelPixels()).equals(panelWithoutParticles)).toBe(
+							true,
+						)
 					await page.screenshot({ path: `${evidence}/stage-composite.png` })
+				}
 				if (label === '空场')
 					await expect.poll(() => pixel(0.25, 0.4)).toEqual([32, 48, 96])
 			}

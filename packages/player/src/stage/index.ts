@@ -70,7 +70,14 @@ export async function mountMinimalPlayer(
 	const element = document.createElement('div')
 	element.className = 'nl-player-stage'
 	host.append(element)
-	const stage = await mountStage(element, resources)
+	const viewport = document.createElement('div')
+	Object.assign(viewport.style, {
+		position: 'absolute',
+		inset: '0',
+		overflow: 'hidden',
+	})
+	element.append(viewport)
+	const stage = await mountStage(viewport, resources)
 	if (signal.aborted) {
 		element.remove()
 		await stage.destroy()
@@ -80,6 +87,25 @@ export async function mountMinimalPlayer(
 	overlay.className = 'nl-player-overlay'
 	overlay.style.fontFamily = 'var(--font-body)'
 	element.append(overlay)
+	const resizeObserver = new ResizeObserver(clipViewport)
+	function clipViewport() {
+		const box = overlay.querySelector<HTMLElement>('.nl-player-textbox')
+		const bottom = box
+			? Math.max(
+					0,
+					viewport.getBoundingClientRect().bottom -
+						box.getBoundingClientRect().top,
+				)
+			: 0
+		viewport.style.clipPath = `inset(0px 0px ${bottom}px 0px)`
+	}
+	function observeOverlay() {
+		resizeObserver.disconnect()
+		resizeObserver.observe(element)
+		const box = overlay.querySelector<HTMLElement>('.nl-player-textbox')
+		if (box) resizeObserver.observe(box)
+		clipViewport()
+	}
 	const beats = toPlaybackBeats('local', scenes, speakerNames)
 	let index = -1
 	let busy = false
@@ -91,6 +117,7 @@ export async function mountMinimalPlayer(
 			const beat = beats[++index]
 			if (!beat) {
 				overlay.textContent = '本章结束'
+				observeOverlay()
 				return
 			}
 			let state = stage.state
@@ -119,6 +146,7 @@ export async function mountMinimalPlayer(
 				box.append(content)
 				overlay.append(box)
 			}
+			observeOverlay()
 			if (beat.advance.kind !== 'click')
 				timer = setTimeout(
 					() => void advance(),
@@ -143,6 +171,7 @@ export async function mountMinimalPlayer(
 		'abort',
 		() => {
 			clearTimeout(timer)
+			resizeObserver.disconnect()
 			host.removeEventListener('click', click)
 			element.remove()
 			void stage.destroy()
