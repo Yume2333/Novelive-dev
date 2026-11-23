@@ -937,13 +937,13 @@ test.each(['current', 'previous', 'unversioned'] as const)(
 				packet: 1,
 				selections: [[1]],
 				ready: false,
-				selectionVersion: 3,
+				selectionVersion: 4,
 			})
 			if (version !== 'current') {
 				const { selectionVersion: _version, ...old } = checkpoint
 				await project.write(files.checkpoint, {
 					...old,
-					...(version === 'previous' ? { selectionVersion: 2 } : {}),
+					...(version === 'previous' ? { selectionVersion: 3 } : {}),
 					selections: [[2]],
 				})
 			}

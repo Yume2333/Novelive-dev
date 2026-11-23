@@ -36,6 +36,7 @@ import {
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
+import { canonicalizeAdditions } from './canonicalize'
 import { reconcileNamedAdditions, selectAdditions } from './consolidate'
 import { scopedOnlyBrief } from './incremental/context'
 import { synthesisInstructions, synthesisOutput } from './output'
@@ -148,7 +149,7 @@ export interface SynthesisOptions {
 
 const minimumEventLimit = 128
 const packetFormat = 7
-const selectionVersion = 3
+const selectionVersion = 4
 const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -822,7 +823,12 @@ ${packets[packet]}`
 		const terms = unique(parts.flatMap((part) => part.glossaryPatch))
 		return state.whole || (state.ready && !state.selections)
 			? { biblePatch: reconciled, glossaryPatch: terms }
-			: selectAdditions(reconciled, terms, bible, choose)
+			: selectAdditions(
+					canonicalizeAdditions(reconciled, bible, chapterIds),
+					terms,
+					bible,
+					choose,
+				)
 	}
 	if (
 		!state.selectedPatch &&

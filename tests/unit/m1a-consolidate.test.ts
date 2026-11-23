@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { canonicalizeAdditions } from '../../packages/creator/src/synthesis/canonicalize'
 import {
 	deduplicateNewTerms,
 	reconcileNamedAdditions,
@@ -15,6 +16,233 @@ const emptyBible = {
 	style: [],
 	glossary: [],
 }
+
+test('canonicalizes owner-named settings and groups standing relations without merging another type', () => {
+	const ada = {
+		id: 'ada',
+		name: 'Ada Lin',
+		aliases: ['Captain Lin'],
+		status: 'confirmed',
+	} as const
+	const location = {
+		id: 'bakery',
+		name: 'Ada Lin Bakery',
+		description: 'Brick ovens',
+		status: 'confirmed',
+	} as const
+	const bible = {
+		...emptyBible,
+		character: [{ ...ada, aliases: [...ada.aliases] }],
+		location: [location],
+	}
+	const relation = (
+		id: string,
+		from: string,
+		to: string,
+		description: string,
+		firstSeenChapter: string,
+	) =>
+		({
+			kind: 'relation',
+			op: 'add',
+			entry: {
+				id,
+				from,
+				to,
+				description,
+				firstSeenChapter,
+				status: 'candidate',
+			},
+		}) as const
+	const patch: BiblePatch = [
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				id: 'captain',
+				name: 'Captain Lin',
+				aliases: [],
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'location',
+			op: 'add',
+			entry: {
+				...location,
+				id: 'captains-bakery',
+				name: 'Captain Lin Bakery',
+				status: 'candidate',
+			},
+		},
+		relation(
+			'spouse',
+			'captain',
+			'mei',
+			'Spouse: Captain Lin is married to Mei',
+			'c2',
+		),
+		relation('marriage', 'mei', 'ada', 'Wife: Captain Lin marries Mei', 'c1'),
+		relation('mentor', 'ada', 'mei', 'Mentor: Ada Lin teaches Mei', 'c2'),
+	]
+	expect(canonicalizeAdditions(patch, bible, ['c1', 'c2'])).toMatchObject([
+		{ entry: { id: 'ada', name: 'Ada Lin' } },
+		{ entry: { id: 'bakery', name: 'Ada Lin Bakery' } },
+		{
+			entry: {
+				id: 'spouse',
+				from: 'mei',
+				to: 'ada',
+				description: 'Wife: Ada Lin marries Mei',
+				firstSeenChapter: 'c1',
+			},
+		},
+		patch[4],
+	])
+	expect(bible.character).toEqual([ada])
+	expect(bible.location).toEqual([location])
+})
+
+test('resolves only unique aliases and retains an owner-normalized setting ID for later proposals', () => {
+	const character = (id: string, name: string, aliases: string[]) =>
+		({ id, name, aliases, status: 'confirmed' }) as const
+	const bible = {
+		...emptyBible,
+		character: [
+			character('ada', 'Ada Lin', ['Captain Lin', 'Captain']),
+			character('mei', 'Mei Chen', ['Captain']),
+		],
+	}
+	const location = (id: string, name: string, op: 'add' | 'update' = 'add') =>
+		({
+			kind: 'location',
+			op,
+			entry: { id, name, description: 'An old mill', status: 'candidate' },
+		}) as const
+	const patch: BiblePatch = [
+		location('lin-mill', 'Ada Lin Mill'),
+		location('captain-lin-mill', 'Captain Lin Mill'),
+		location('captain-lin-mill', 'Captain Lin Mill', 'update'),
+		location('captain-mill', 'Captain Mill'),
+	]
+	expect(
+		canonicalizeAdditions(patch, bible, ['c1']).map(({ op, entry }) => ({
+			op,
+			...entry,
+		})),
+	).toMatchObject([
+		{
+			op: 'add',
+			id: 'lin-mill',
+			name: 'Ada Lin Mill',
+			aliases: ['Captain Lin Mill'],
+		},
+		{
+			op: 'add',
+			id: 'lin-mill',
+			name: 'Ada Lin Mill',
+			aliases: ['Captain Lin Mill'],
+		},
+		{
+			op: 'update',
+			id: 'lin-mill',
+			name: 'Ada Lin Mill',
+			aliases: ['Captain Lin Mill'],
+		},
+		{ op: 'add', id: 'captain-mill', name: 'Captain Mill' },
+	])
+})
+
+test('groups beats only within a chapter and preserves conflicting payoff or time', () => {
+	const bible = {
+		...emptyBible,
+		character: [
+			{
+				id: 'ada',
+				name: 'Ada Lin',
+				aliases: ['Captain Lin'],
+				status: 'confirmed' as const,
+			},
+			{
+				id: 'mei',
+				name: 'Mei Chen',
+				aliases: ['Pilot Mei'],
+				status: 'candidate' as const,
+			},
+		],
+	}
+	const timeline = (
+		id: string,
+		event: string,
+		chapterId: string,
+		storyTime?: string,
+	) =>
+		({
+			kind: 'timeline',
+			op: 'add',
+			entry: { id, event, chapterId, storyTime, status: 'candidate' },
+		}) as const
+	const hint = (id: string, description: string, resolvedChapter?: string) =>
+		({
+			kind: 'foreshadowing',
+			op: 'add',
+			entry: {
+				id,
+				description,
+				plantedChapter: 'c1',
+				resolvedChapter,
+				status: 'candidate',
+			},
+		}) as const
+	const event =
+		'Ada Lin escorts Mei Chen across the wooden bridge before the flood'
+	const echo =
+		'Captain Lin escorts Pilot Mei across the wooden bridge before the flood arrives'
+	const setup = 'Captain Lin hides the coded seal beneath the broken floorboard'
+	const patch: BiblePatch = [
+		timeline('crossing', event, 'c1'),
+		timeline('echo', echo, 'c1', 'dawn'),
+		timeline('night', echo, 'c1', 'night'),
+		timeline('another-chapter', echo, 'c2'),
+		timeline(
+			'reversed-roles',
+			'Pilot Mei escorts Captain Lin across the wooden bridge before the flood arrives',
+			'c1',
+		),
+		timeline(
+			'one-participant',
+			'Captain Lin crosses the wooden bridge before the flood arrives',
+			'c1',
+		),
+		hint('hidden-seal', setup),
+		hint(
+			'seal',
+			'Ada Lin hides the coded seal beneath the broken floorboard',
+			'c2',
+		),
+		hint('later-payoff', setup, 'c3'),
+	]
+	const result = canonicalizeAdditions(patch, bible, ['c1', 'c2', 'c3'])
+	expect(result.map(({ entry }) => entry.id)).toEqual([
+		'crossing',
+		'night',
+		'another-chapter',
+		'reversed-roles',
+		'one-participant',
+		'hidden-seal',
+		'later-payoff',
+	])
+	expect(result[0]).toMatchObject({
+		entry: { event: `${event} arrives`, chapterId: 'c1', storyTime: 'dawn' },
+	})
+	expect(result[5]).toMatchObject({
+		entry: {
+			description: setup.replace('Captain Lin', 'Ada Lin'),
+			plantedChapter: 'c1',
+			resolvedChapter: 'c2',
+		},
+	})
+})
 
 test.each([false, true])(
 	'keeps distinct homonyms separate (same alias: %s)',
