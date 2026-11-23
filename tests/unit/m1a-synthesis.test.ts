@@ -892,7 +892,8 @@ const selectionFixture = async (
 		overview: 'Ada meets a guide.',
 		chapters: chapters.map((chapterId) => ({
 			chapterId,
-			progress: 'They travel.',
+			progress:
+				chapterId === chapters[0] ? 'The market. '.repeat(180) : 'They travel.',
 		})),
 		event: 'The guide joins Ada.',
 		is_last: true,
@@ -911,51 +912,73 @@ const selectionFixture = async (
 	})
 }
 
-test('resumes the first unfinished selector without repeating extraction or saved picks', async () => {
-	await seed(root)
-	const args = { ...options, strategy: 'events' as const }
-	{
+test.each([false, true])(
+	'resumes without repeating extraction and only reuses compatible saved picks (legacy: %s)',
+	async (legacy) => {
+		await seed(root)
+		const args = { ...options, strategy: 'events' as const }
+		{
+			using project = await Project.open(root)
+			await expect(
+				synthesizeVolume(project, 'v1', chapters, {
+					...args,
+					fetch: async (input, init) => {
+						const prompt = (await new Request(input, init).clone().json())
+							.messages[0].content
+						if (prompt.includes('These glossary candidates'))
+							throw new Error('Selection interrupted')
+						return selectionFixture(input, init)
+					},
+				}),
+			).rejects.toMatchObject({ code: 'network' })
+			const checkpoint = await project.read(files.checkpoint)
+			expect(checkpoint).toMatchObject({
+				packet: 1,
+				selections: [[1]],
+				ready: false,
+				selectionVersion: 1,
+			})
+			if (legacy) {
+				const { selectionVersion: _version, ...old } = checkpoint
+				await project.write(files.checkpoint, { ...old, selections: [[2]] })
+			}
+		}
 		using project = await Project.open(root)
-		await expect(
-			synthesizeVolume(project, 'v1', chapters, {
-				...args,
-				fetch: async (input, init) => {
-					const prompt = (await new Request(input, init).clone().json())
-						.messages[0].content
-					if (prompt.includes('These glossary candidates'))
-						throw new Error('Selection interrupted')
-					return selectionFixture(input, init)
-				},
-			}),
-		).rejects.toMatchObject({ code: 'network' })
-		expect(await project.read(files.checkpoint)).toMatchObject({
-			packet: 1,
-			selections: [[1]],
-			ready: false,
+		const selectors: string[] = []
+		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+			const prompt = (await new Request(input, init).clone().json()).messages[0]
+				.content
+			expect(checkOwnerBookResumePrompt(prompt, { packet: 2, events: 1 })).toBe(
+				'selection',
+			)
+			expect(prompt).toContain('Keep nothing if no candidate qualifies.')
+			expect(prompt).toContain('c2: They travel.')
+			if (prompt.includes('These character candidates')) {
+				selectors.push('character')
+				expect(prompt).toContain(
+					'A one-scene character qualifies only when consequential',
+				)
+			} else {
+				selectors.push('glossary')
+				expect(prompt).toContain(
+					'Drop ordinary objects, generic offices and roles',
+				)
+			}
+			return selectionFixture(input, init)
 		})
-	}
-	using project = await Project.open(root)
-	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-		const prompt = (await new Request(input, init).clone().json()).messages[0]
-			.content
-		expect(checkOwnerBookResumePrompt(prompt, { packet: 2, events: 1 })).toBe(
-			'selection',
-		)
-		expect(prompt).toContain('These glossary candidates')
-		return selectionFixture(input, init)
-	})
-	const result = await synthesizeVolume(project, 'v1', chapters, {
-		...args,
-		fetch,
-	})
-	expect(fetch).toHaveBeenCalledTimes(1)
-	expect(result.biblePatch.map(({ entry }) => entry.id)).toEqual(['guide'])
-	expect(result.glossaryPatch.map(({ id }) => id)).toEqual(['seal'])
-	expect(
-		await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
-	).toEqual(result)
-	expect(fetch).toHaveBeenCalledTimes(1)
-})
+		const result = await synthesizeVolume(project, 'v1', chapters, {
+			...args,
+			fetch,
+		})
+		expect(selectors).toEqual(legacy ? ['character', 'glossary'] : ['glossary'])
+		expect(result.biblePatch.map(({ entry }) => entry.id)).toEqual(['guide'])
+		expect(result.glossaryPatch.map(({ id }) => id)).toEqual(['seal'])
+		expect(
+			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
+		).toEqual(result)
+		expect(fetch).toHaveBeenCalledTimes(legacy ? 2 : 1)
+	},
+)
 
 test.each([false, true])(
 	'partial publication never reinterprets saved selection picks (legacy: %s)',

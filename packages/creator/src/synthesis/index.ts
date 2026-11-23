@@ -65,12 +65,20 @@ const eventSchema = obj(eventFields)
 const nextEvent = synthesisOutput(eventSchema)
 const selection = synthesisOutput(obj({ keep: arr(int({ minimum: 1 })) }))
 const selectionScope: Record<string, string> = {
+	character:
+		'Keep a named or identifiable participant whose choices or role affect the plot, or who needs recurring character continuity. A one-scene character qualifies only when consequential. Drop passing mentions, stock roles and alternate IDs for a person already kept; recognize names, aliases and titles.',
+	location:
+		'Keep a recurring playable setting or the setting of a consequential scene that needs a distinct backdrop. Drop places only mentioned in passing, route waypoints, and incidental subdivisions or alternate names of the same setting.',
 	relation:
-		"Keep only relationships that shape the volume's plot across chapters, one per pair of characters; drop single-scene interactions and restatements.",
+		'Keep durable relationships that explain consequential choices or conflicts. Group both directions of the same pair, and keep one representative of the same standing relationship; descriptions in chapter-dated changes count as evidence. Drop co-presence, isolated interactions, and kinship or titles that do not affect the story.',
 	timeline:
-		"Keep one entry per turning point of the volume's main plot; drop steps inside the same turning point.",
+		'Keep only turning points that change the direction or outcome of a plot thread. Keep one representative of the whole event; omit scene beats, logistics, and retellings under another ID.',
 	foreshadowing:
-		'Keep only the major threads the volume sets up for later chapters or volumes; drop scene-level suspense, hints resolved by the next chapter, and restatements.',
+		'Keep deliberate setups with a consequential later payoff or an unresolved thread that must be tracked. Drop momentary suspense, speculation, and restatements of the same thread.',
+	style:
+		'Keep reusable visual direction or narrator voice that should apply beyond the scene. Drop commentary on plot, a chapter summary, and the mood of an individual scene.',
+	glossary:
+		'Keep a distinctive named organization, object, technique, title, or cultural expression whose consistent wording or pronunciation matters. Drop ordinary objects, generic offices and roles, and definitions with no continuity need. Character and place names belong in the Bible, not the glossary.',
 }
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
@@ -82,6 +90,7 @@ const checkpointSchema = obj({
 	packet: int({ minimum: 0 }),
 	events: arr(eventSchema),
 	selections: opt(arr(arr(int({ minimum: 1 })))),
+	selectionVersion: opt(int({ minimum: 1 })),
 	selectedPatch: opt(
 		obj({ biblePatch: biblePatchSchema, glossaryPatch: glossaryPatchSchema }),
 	),
@@ -139,6 +148,7 @@ export interface SynthesisOptions {
 
 const minimumEventLimit = 128
 const packetFormat = 7
+const selectionVersion = 1
 const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -814,17 +824,30 @@ ${packets[packet]}`
 			? { biblePatch: reconciled, glossaryPatch: terms }
 			: selectAdditions(reconciled, terms, bible, choose)
 	}
+	if (
+		!state.selectedPatch &&
+		state.selections &&
+		state.selectionVersion !== selectionVersion
+	) {
+		state.selections = []
+		state.selectionVersion = selectionVersion
+	}
+	const progressBudget = historyBudget * 2
+	const chapterRoom = Math.floor(progressBudget / skeleton.chapters.length)
 	const progress = fitBytes(
 		skeleton.chapters
-			.map(({ chapterId, progress }) => `${chapterId}: ${progress}`)
+			.map(({ chapterId, progress }) => {
+				const label = `${chapterId}: `
+				return `${label}${fitBytes(progress, Math.max(0, chapterRoom - bytes(label) - 1))}`
+			})
 			.join('\n'),
-		historyBudget * 2,
+		progressBudget,
 	)
 	let selectionIndex = 0
 	async function choose(kind: string, candidates: readonly unknown[]) {
 		const prompt = `${instructions}
 ${selection.instructions}
-These ${kind} candidates were extracted packet by packet from this volume, so many restate, narrow or split one another. Choose the set a single whole-volume pass would return. ${selectionScope[kind] ?? `Keep every distinct ${kind} that meets the inclusion rules; drop a candidate only when it restates, narrows or splits another one for the same ${kind}, keeping the most complete under the name the text usually uses.`} Return keep as the numbers of the kept candidates.
+These ${kind} candidates were extracted packet by packet from this volume, so many are incidental, restated or split across IDs. Keep a candidate only when the evidence shows why future scenes, continuity, or recurring assets need it. Accuracy, a name, or repeated extraction is not enough. ${selectionScope[kind]} Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
 Chapter progress:
 ${progress}
 `
@@ -856,7 +879,10 @@ ${progress}
 		for (const chunk of chunks) {
 			let keep = state.selections?.[selectionIndex]
 			if (!keep) {
-				const earlier = [...kept].map((i) => lines[i]).join('\n')
+				const earlier = [...kept]
+					.reverse()
+					.map((i) => lines[i])
+					.join('\n')
 				const answer = await request(
 					`${prompt}${earlier ? `Kept from earlier candidates; drop any candidate that restates one of these:\n${fitBytes(earlier, keptRoom)}\n` : ''}Candidates:\n${chunk.map((line, i) => `${i + 1} ${line}`).join('\n')}`,
 					selection,
@@ -872,6 +898,7 @@ ${progress}
 				)
 				keep = answer.keep
 				state.selections = [...(state.selections ?? []), keep]
+				state.selectionVersion = selectionVersion
 				await project.write(files.checkpoint, state)
 			}
 			selectionIndex++

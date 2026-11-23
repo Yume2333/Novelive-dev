@@ -135,6 +135,39 @@ const selectionKinds = [
 	'style',
 ] as const
 
+function groupRelationAdditions(additions: BiblePatch) {
+	const groups = new Map<string, BiblePatch>()
+	for (const item of additions) {
+		if (item.kind !== 'relation') continue
+		const key = JSON.stringify([item.entry.from, item.entry.to].sort())
+		const group = groups.get(key) ?? []
+		group.push(item)
+		groups.set(key, group)
+	}
+	return [...groups.values()].flat()
+}
+
+export function deduplicateNewTerms(
+	glossary: GlossaryPatch,
+	existing: GlossaryPatch,
+) {
+	const key = ({ original, written, pronunciation }: GlossaryPatch[number]) =>
+		JSON.stringify([
+			original.normalize('NFKC').trim(),
+			written.normalize('NFKC').trim(),
+			pronunciation?.normalize('NFKC').trim() ?? '',
+		])
+	const existingIds = new Set(existing.map(({ id }) => id))
+	const seen = new Set(existing.map(key))
+	return glossary.filter((term) => {
+		if (existingIds.has(term.id)) return true
+		const name = key(term)
+		if (seen.has(name)) return false
+		seen.add(name)
+		return true
+	})
+}
+
 /**
  * Lets `choose` keep a subset of each kind's additions, then removes changes
  * and references that only pointed at a dropped addition.
@@ -150,9 +183,11 @@ export async function selectAdditions(
 ) {
 	let selected = patch
 	for (const kind of selectionKinds) {
-		const additions = selected.filter(
+		const proposed = selected.filter(
 			(item) => item.kind === kind && item.op === 'add',
 		)
+		const additions =
+			kind === 'relation' ? groupRelationAdditions(proposed) : proposed
 		if (additions.length < 2) continue
 		const kept = await choose(
 			kind,
@@ -199,14 +234,16 @@ export async function selectAdditions(
 			return [item]
 		})
 	}
-	const terms = glossary.filter(
+	const uniqueGlossary = deduplicateNewTerms(glossary, bible.glossary)
+	const terms = uniqueGlossary.filter(
 		({ id }) => !bible.glossary.some((term) => term.id === id),
 	)
-	if (terms.length < 2) return { biblePatch: selected, glossaryPatch: glossary }
+	if (terms.length < 2)
+		return { biblePatch: selected, glossaryPatch: uniqueGlossary }
 	const kept = await choose('glossary', terms)
 	return {
 		biblePatch: selected,
-		glossaryPatch: glossary.filter(
+		glossaryPatch: uniqueGlossary.filter(
 			(term) => !terms.includes(term) || kept.has(terms.indexOf(term)),
 		),
 	}

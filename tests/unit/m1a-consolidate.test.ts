@@ -1,9 +1,10 @@
 import { expect, test } from 'vitest'
 import {
+	deduplicateNewTerms,
 	reconcileNamedAdditions,
 	selectAdditions,
 } from '../../packages/creator/src/synthesis/consolidate'
-import type { BiblePatch } from '../../packages/format/src/model'
+import type { BiblePatch, GlossaryPatch } from '../../packages/format/src/model'
 
 const emptyBible = {
 	character: [],
@@ -113,4 +114,82 @@ test('selection drops unchosen additions with their updates and dangling referen
 		'add:guides',
 	])
 	expect(glossaryPatch.map(({ original }) => original)).toEqual(['甲'])
+})
+
+test('selection compares alternate relation IDs and directions together without equating distinct relationships', async () => {
+	const relation = (id: string, from: string, to: string) => ({
+		kind: 'relation' as const,
+		op: 'add' as const,
+		entry: { id, from, to, description: id, status: 'candidate' as const },
+	})
+	const patch = [
+		relation('guardian', 'ada', 'lin'),
+		relation('rivals', 'ada', 'mei'),
+		relation('ward', 'lin', 'ada'),
+		relation('rivals-later', 'ada', 'lin'),
+	]
+	const result = await selectAdditions(
+		patch,
+		[],
+		emptyBible,
+		async (kind, entries) => {
+			expect(kind).toBe('relation')
+			expect(entries).toEqual([
+				patch[0].entry,
+				patch[2].entry,
+				patch[3].entry,
+				patch[1].entry,
+			])
+			return new Set([0, 2, 3])
+		},
+	)
+	expect(result.biblePatch).toEqual([patch[0], patch[1], patch[3]])
+})
+
+test('selection deduplicates identical glossary spellings across new IDs without discarding existing updates or different translations', async () => {
+	const term = (
+		id: string,
+		original: string,
+		written = original,
+	): GlossaryPatch[number] => ({
+		id,
+		original,
+		written,
+		category: 'item',
+		status: 'candidate',
+	})
+	const existing = [term('bell', 'Bell')]
+	const update = { ...existing[0], note: 'It opens the gate' }
+	const lantern = term('lantern', '燈', 'Lantern')
+	const otherReading = term('lantern-title', '燈', 'Beacon')
+	const differentPronunciation = {
+		...lantern,
+		id: 'lantern-surname',
+		pronunciation: 'tēng',
+	}
+	const glossary = [
+		term('bell-again', 'Bell'),
+		lantern,
+		term('lantern-again', '燈', 'Ｌａｎｔｅｒｎ'),
+		update,
+		otherReading,
+		differentPronunciation,
+	]
+	expect(deduplicateNewTerms(glossary, existing)).toEqual([
+		lantern,
+		update,
+		otherReading,
+		differentPronunciation,
+	])
+	const result = await selectAdditions(
+		[],
+		glossary,
+		{ ...emptyBible, glossary: existing },
+		async (kind, entries) => {
+			expect(kind).toBe('glossary')
+			expect(entries).toEqual([lantern, otherReading, differentPronunciation])
+			return new Set([0])
+		},
+	)
+	expect(result.glossaryPatch).toEqual([lantern, update])
 })
