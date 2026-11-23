@@ -298,6 +298,55 @@ test('a hard stop persists exactly one event and resumes after reopening without
 	}
 })
 
+test('resumes the same synthesis packet after changing the model output cap', async () => {
+	await seed(root)
+	const prompts: string[] = []
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		const body = await request.clone().json()
+		prompts.push(body.messages[0].content)
+		return packetFetch(request)
+	}
+	const packetOptions = {
+		...options,
+		connection: {
+			...connection,
+			contextWindow: 4096,
+			model: 'fixture-long-event',
+		},
+		strategy: 'events' as const,
+		fetch,
+	}
+	{
+		using project = await Project.open(root)
+		await project.write(projectFiles.preview(chapters[0]), {
+			...previews[0],
+			summary: 'A'.repeat(1600),
+		})
+		await expect(
+			synthesizeVolume(project, 'v1', chapters, {
+				...packetOptions,
+				maxEvents: 1,
+			}),
+		).rejects.toThrow('Synthesis reached its event limit (1)')
+	}
+	{
+		using project = await Project.open(root)
+		await expect(
+			synthesizeVolume(project, 'v1', chapters, {
+				...packetOptions,
+				connection: { ...packetOptions.connection, maxOutputTokens: 256 },
+				maxEvents: 2,
+			}),
+		).rejects.toThrow('Synthesis reached its event limit (2)')
+	}
+	expect(prompts).toHaveLength(2)
+	expect(prompts[1]).toContain('Events already extracted: 1')
+	expect(prompts[1].split('Chapter previews:\n')[1]).toBe(
+		prompts[0].split('Chapter previews:\n')[1],
+	)
+})
+
 test('the default event cap can cover a volume with more than 128 packets', async () => {
 	await seed(root)
 	using project = await Project.open(root)

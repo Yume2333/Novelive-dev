@@ -262,7 +262,11 @@ export async function synthesizeVolume(
 	const resumable = matching?.basis === basis ? matching : undefined
 	const maxTokens = outputTokenBudget(model)
 	const historyBudget = Math.min(1024, Math.floor(model.contextWindow / 16))
-	const budget = model.contextWindow - maxTokens - historyBudget
+	const packetOutputReserve = Math.min(
+		4096,
+		Math.floor(model.contextWindow / 4),
+	)
+	const budget = model.contextWindow - packetOutputReserve - historyBudget
 	const packetText = previews.map((preview) => JSON.stringify(preview))
 	const instructions = `Synthesize the ordered chapter previews in ${options.language}. Adaptation requirements: ${options.requirements ?? ''}.
 Return only JSON with overview, chapters [{chapterId,progress}], biblePatch [{kind,op,entry}], glossaryPatch [entry].
