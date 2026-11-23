@@ -602,7 +602,7 @@ test.each([
 	},
 )
 
-test('retries an expression with only the base after a composition failure', async () => {
+test('an expression uses only the base and retries composition and blocking audit failures', async () => {
 	const render = vi
 		.fn<ReturnType<typeof artModels.imageRenderer>>()
 		.mockImplementation(async (_prompt, _refs, { width, height }) => ({
@@ -620,18 +620,29 @@ test('retries an expression with only the base after a composition failure', asy
 	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
 	const model = vi
 		.spyOn(artModels, 'artJson')
-		.mockImplementation(async (_connection, prompt) =>
-			prompt.startsWith('Visually audit')
+		.mockImplementation(async (_connection, prompt) => {
+			if (prompt.startsWith('Visually audit') && render.mock.calls.length === 3)
+				return {
+					pass: false,
+					failedChecks: ['anchors', 'description'],
+					feedback: 'Keep the eyes aligned and raise the brows.',
+				}
+			return prompt.startsWith('Visually audit')
 				? { pass: true, failedChecks: [], feedback: '' }
-				: { content: 'Ada raises her eyebrows.' },
-		)
+				: { content: 'Ada raises her eyebrows.' }
+		})
 	try {
 		await projectTest(async (project) => {
-			const art = service(project, replay)
+			const art = service(project, replay, undefined, undefined, undefined, 2)
 			const path = 'assets/style.png'
 			await project.writeFile(path, await picture(320, 180, false))
 			const styled = {
 				...bible,
+				characters: bible.characters.map((character) => ({
+					...character,
+					description: 'Ada is a red fox with a cream muzzle.',
+					appearance: undefined,
+				})),
 				style: { ...bible.style, references: [{ path, description: 'Style' }] },
 			}
 			const [base, expression] = await art.register(
@@ -657,11 +668,47 @@ test('retries an expression with only the base after a composition failure', asy
 			)
 			expect(audit?.[4]?.slice(1)).toEqual([await project.readFile(path)])
 			expect(await art.draw(expression, styled)).toEqual({ status: 'drawn' })
-			expect(render.mock.calls[1][1]).toHaveLength(2)
+			expect(render).toHaveBeenCalledTimes(4)
+			expect(render.mock.calls[1][1]).toHaveLength(1)
 			expect(render.mock.calls[2][1]).toEqual([render.mock.calls[1][1][0]])
+			expect(render.mock.calls[3][1]).toEqual(render.mock.calls[1][1])
 			expect(render.mock.calls[2][0]).toContain(
 				'pixel-aligned outside the face',
 			)
+			expect(render.mock.calls[3][0]).toContain(
+				'Keep the eyes aligned and raise the brows.',
+			)
+			expect(render.mock.calls[1][0]).toContain('Expression cue: Curious')
+			expect(render.mock.calls[1][0]).toContain(
+				'Preserve: Ada is a red fox with a cream muzzle.',
+			)
+			expect(render.mock.calls[1][0]).toContain('蓝色制服')
+			expect(render.mock.calls[1][0]).not.toContain(styled.style.description)
+			const expressionPainter = model.mock.calls.filter(([, prompt]) =>
+				prompt.includes('expression: Curious'),
+			)
+			expect(expressionPainter).toHaveLength(3)
+			expect(expressionPainter[0][1]).toContain(
+				'Character preservation context (not part of the expression cue): Ada is a red fox with a cream muzzle.',
+			)
+			const expressionAudits = model.mock.calls.filter(([, prompt]) =>
+				prompt.includes('Image 2 is the accepted base.'),
+			)
+			expect(expressionAudits).toHaveLength(2)
+			for (const [, prompt, , , images] of expressionAudits) {
+				expect(prompt).toContain('saved cue (description)')
+				expect(prompt).toContain('anchors and key colors against the base')
+				expect(prompt).toContain('Judge style only by preservation')
+				expect(prompt).toContain(
+					"Original image brief (verify independently of the painter's rewrite): Curious",
+				)
+				expect(prompt).toContain(
+					'Character preservation context: Ada is a red fox with a cream muzzle.',
+				)
+				expect(prompt).not.toContain(styled.style.description)
+				expect(images).toHaveLength(2)
+				expect(images?.slice(1)).toEqual(render.mock.calls[1][1])
+			}
 		})
 	} finally {
 		renderer.mockRestore()

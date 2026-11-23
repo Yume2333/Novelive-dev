@@ -8,8 +8,6 @@ const descriptions = {
 	character: 'Draw a costume base sprite.',
 	location: 'Draw a location base background.',
 	cg: 'Draw a full scene illustration.',
-	expression:
-		'Edit only the facial features specified below in the base sprite.',
 	variant: 'Edit only the specified conditions in the base background.',
 	'main-visual':
 		'Draw a landscape main visual that establishes the work’s art style.',
@@ -29,6 +27,12 @@ export type Drawing = {
 	keep: readonly string[]
 }
 
+export function expressionPreservation(drawing: Drawing) {
+	return [drawing.characterDescriptionFallback, ...drawing.keep]
+		.filter(Boolean)
+		.join('；')
+}
+
 export function drawingPrompt(
 	drawing: Drawing,
 	content: string,
@@ -36,6 +40,15 @@ export function drawingPrompt(
 	firstReference = 1,
 ) {
 	const { kind, style, references, characters, keep } = drawing
+	if (kind === 'expression')
+		return [
+			`Edit only the brows, eyes and mouth of Image ${firstReference}. Expression cue: ${drawing.description}`,
+			content,
+			feedback,
+			`Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face. Preserve the base colors, shading and linework; do not restyle it. Preserve: ${expressionPreservation(drawing)}.`,
+		]
+			.filter(Boolean)
+			.join(' ')
 	const styleIndices = references.flatMap(({ role }, index) =>
 		role === 'style' ? [index + firstReference] : [],
 	)
@@ -76,7 +89,7 @@ export function drawingPrompt(
 	const framing =
 		kind === 'character'
 			? 'Center the character from the top of the head to above the knees, with a little headroom and the legs cut by the bottom edge above the knees. Use a transparent background without a floor or shadow. Match semitransparent edges to adjacent clothing or skin.'
-			: kind === 'expression' || kind === 'variant'
+			: kind === 'variant'
 				? `Keep everything else aligned to Image ${firstReference}: ${keep.join('；')}.`
 				: `Keep the subject in the central 4:3 safe area of the 16:9 canvas; extend only the surroundings to the left and right.${kind === 'location' ? ' Show an empty scene without people.' : ''}`
 	const suffix = styleIndices.length

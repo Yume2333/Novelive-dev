@@ -43,7 +43,12 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 			)
 		if (body.model === 'fixture-art-bad-image')
 			return Response.json({ data: [{ b64_json: 'bm90IGFuIGltYWdl' }] })
-		if (body.prompt.includes('Edit only')) {
+		if (body.prompt.includes('Edit only the brows, eyes and mouth')) {
+			assert.ok(form)
+			assert.equal(form.getAll('image[]').length, 1)
+			assert.match(body.prompt, /pixel-aligned outside the face/)
+			assert.doesNotMatch(body.prompt, /style references?/)
+		} else if (body.prompt.includes('Edit only')) {
 			assert.ok(form)
 			assert.match(body.prompt, /Images 2–3 are style references/)
 			assert.match(body.prompt, /Image 1 is the .* base image/)
