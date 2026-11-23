@@ -101,7 +101,7 @@ test('M0 settings saves five slots and runs recorded text and vision requests', 
 				appearance
 					.getByRole('combobox', { name: '界面语言' })
 					.locator('option'),
-			).toHaveText(['简体中文'])
+			).toHaveText(['简体中文', '繁體中文', 'English', '日本語'])
 			await appearance
 				.getByRole('combobox', { name: '主题', exact: true })
 				.selectOption('dark')
