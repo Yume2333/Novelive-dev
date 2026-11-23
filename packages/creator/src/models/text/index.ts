@@ -43,6 +43,9 @@ const vendors: Record<Exclude<Settings['compat'], 'auto'>, BuiltinProvider> = {
 const minimumContext = 4096
 const relayReasoningModels = new Set(['devin-swe-2'])
 const watchdogMs = 90_000
+const minHeaderDeadlineMs = 90_000
+const maxHeaderDeadlineMs = 600_000
+const headerMsPerOutputToken = 25
 const cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
 const noUsage: Usage = { ...cost, totalTokens: 0, cost: { ...cost, total: 0 } }
 
@@ -356,6 +359,18 @@ export function createTextStream(
 		async function run() {
 			for (let attempt = 0; ; ) {
 				if (options?.signal?.aborted) return fail('cancelled')
+				const headerDeadline =
+					options?.timeoutMs ??
+					Math.min(
+						maxHeaderDeadlineMs,
+						Math.max(
+							minHeaderDeadlineMs,
+							headerMsPerOutputToken *
+								(smallCompletionsWindow
+									? maxTokens
+									: clampMaxTokensToContext(model, context, maxTokens)),
+						),
+					)
 				const idle = new AbortController()
 				const signal = options?.signal
 					? AbortSignal.any([options.signal, idle.signal])
@@ -392,7 +407,7 @@ export function createTextStream(
 							)
 						},
 						signal,
-						timeoutMs: options?.timeoutMs ?? watchdogMs,
+						timeoutMs: headerDeadline,
 						maxRetries: policy.requestRetries ?? 2,
 						fetch: async (input, init) => {
 							status = undefined

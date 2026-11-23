@@ -40,7 +40,6 @@ export class ChatModels {
 				stream(model, context, {
 					...options,
 					cacheRetention: 'none',
-					timeoutMs: 90_000,
 				}),
 			getApiKey: () => connection.apiKey,
 			initialState: {
@@ -108,7 +107,6 @@ export class ChatModels {
 				apiKey: connection.apiKey,
 				signal,
 				cacheRetention: 'none',
-				timeoutMs: 90_000,
 			},
 		)
 		const result = await stream.result()
