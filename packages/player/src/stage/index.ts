@@ -97,7 +97,11 @@ export async function mountMinimalPlayer(
 	signal: AbortSignal,
 	onError: (error: unknown) => void,
 	speakerNames: Readonly<Record<string, string>> = {},
-	options: { chapterId?: string; progress?: PlaybackProgress } = {},
+	options: {
+		chapterId?: string
+		progress?: PlaybackProgress
+		initialActions?: readonly CompiledAction[]
+	} = {},
 ) {
 	const element = document.createElement('div')
 	element.className = 'nl-player-stage'
@@ -254,6 +258,12 @@ export async function mountMinimalPlayer(
 		},
 		{ once: true },
 	)
+	if (options.initialActions) {
+		let initial = stage.state
+		for (const action of options.initialActions)
+			initial = direct(initial, action)
+		await stage.commit(initial, lookahead(beats, 0), [], true)
+	}
 	await advance()
 	return {
 		progress,

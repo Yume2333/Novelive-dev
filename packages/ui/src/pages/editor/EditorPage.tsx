@@ -247,17 +247,12 @@ export function EditorPage() {
 			return
 		}
 		const beats = current.beats.slice(index)
-		const first = beats[0]
-		if (first)
-			beats[0] = {
-				...first,
-				actions: [
-					...result.scenes
-						.slice(0, sceneIndex)
-						.flatMap((item) => item.beats.flatMap((beat) => beat.actions)),
-					...current.beats.slice(0, index + 1).flatMap((beat) => beat.actions),
-				],
-			}
+		const initialActions = [
+			...result.scenes
+				.slice(0, sceneIndex)
+				.flatMap((item) => item.beats.flatMap((beat) => beat.actions)),
+			...current.beats.slice(0, index).flatMap((beat) => beat.actions),
+		]
 		const paths = new Map(
 			opening.registry.entries.map((entry) => [entry.id, entry.path]),
 		)
@@ -278,7 +273,7 @@ export function EditorPage() {
 			fail,
 			opening.speakerNames,
 			undefined,
-			{ customMarks: opening.settings.customMarks },
+			{ customMarks: opening.settings.customMarks, initialActions },
 		).catch(fail)
 		return () => abort.abort()
 	}, [preview, opening, scene, sceneIndex, draft, line])
