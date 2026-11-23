@@ -40,7 +40,7 @@ export { type ArtBible, type ArtJob, type ManifestItem, planArt } from './plan'
 type RegistryEntry = AssetRegistry['entries'][number]
 type CostumeCandidateBudget = {
 	opaqueStreak: number
-	mattingError?: MattingUnavailableError
+	matting: { error?: MattingUnavailableError }
 }
 const opaqueCandidateLimit = 2
 type Candidate = { id: string; cachePath: string }
@@ -580,17 +580,17 @@ export class ArtProduction {
 			})
 			if ('issue' in checked && checked.unsupported) {
 				if (
-					candidateBudget?.mattingError &&
+					candidateBudget?.matting.error &&
 					candidateBudget.opaqueStreak >= opaqueCandidateLimit
 				)
-					throw candidateBudget.mattingError
+					throw candidateBudget.matting.error
 				let recovered: Buffer
 				try {
 					recovered = await removeBackground(result.bytes, this.options.signal)
 				} catch (error) {
 					this.options.signal?.throwIfAborted()
 					if (error instanceof MattingUnavailableError) {
-						if (candidateBudget) candidateBudget.mattingError = error
+						if (candidateBudget) candidateBudget.matting.error = error
 						throw error
 					}
 					return checked
@@ -644,17 +644,17 @@ export class ArtProduction {
 		)
 		const cachePath = (path: string) =>
 			projectFiles.style(styleScope).path.replace('bible/style.json', path)
-		const candidateBudget: CostumeCandidateBudget = { opaqueStreak: 0 }
+		const matting: CostumeCandidateBudget['matting'] = {}
 		const saveCandidate = async (
 			drawing: Drawing,
 			path: string,
 			portrait: boolean,
 			optionalReference = false,
+			candidateBudget?: CostumeCandidateBudget,
 		) => {
 			if (!(await this.file(path))) {
 				if (
-					portrait &&
-					candidateBudget.mattingError &&
+					candidateBudget?.matting.error &&
 					candidateBudget.opaqueStreak >= opaqueCandidateLimit
 				)
 					return false
@@ -664,7 +664,7 @@ export class ArtProduction {
 					portrait,
 					false,
 					optionalReference,
-					portrait ? candidateBudget : undefined,
+					candidateBudget,
 				)
 				let png: Buffer
 				if ('issue' in result) {
@@ -719,18 +719,6 @@ export class ArtProduction {
 			)
 		}
 		const characters: VisualCandidates['characters'] = []
-		const saveCostumeCandidate = async (
-			drawing: Drawing,
-			path: string,
-			optionalReference = false,
-		) => {
-			try {
-				return await saveCandidate(drawing, path, true, optionalReference)
-			} catch (error) {
-				if (!(error instanceof MattingUnavailableError)) throw error
-				return false
-			}
-		}
 		for (const character of bible.characters) {
 			if (
 				!character.major ||
@@ -738,6 +726,28 @@ export class ArtProduction {
 				!firstVolumeChapters.includes(character.firstSeenChapter)
 			)
 				continue
+			const budget = {
+				edit: { matting, opaqueStreak: 0 },
+				generate: { matting, opaqueStreak: 0 },
+			}
+			const saveCostumeCandidate = async (
+				drawing: Drawing,
+				path: string,
+				optionalReference = false,
+			) => {
+				try {
+					return await saveCandidate(
+						drawing,
+						path,
+						true,
+						optionalReference,
+						drawing.references.length ? budget.edit : budget.generate,
+					)
+				} catch (error) {
+					if (!(error instanceof MattingUnavailableError)) throw error
+					return false
+				}
+			}
 			const illustration = illustrations?.get(character.id)
 			const illustrationKey = illustration
 				? createHash('sha256')
@@ -800,7 +810,7 @@ export class ArtProduction {
 			mainVisuals,
 			characters,
 			supplemental,
-			...(candidateBudget.mattingError ? { mattingUnavailable: true } : {}),
+			...(matting.error ? { mattingUnavailable: true } : {}),
 		}
 	}
 

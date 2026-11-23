@@ -542,7 +542,10 @@ test('removes an opaque sprite background before validating and auditing the res
 			async (prompt, refs, { width, height }, transparent) => ({
 				bytes: !transparent
 					? landscape
-					: nativeCandidate && !refs.length && prompt.includes('造型候选 1')
+					: nativeCandidate &&
+							(refs.length
+								? prompt.includes('银色外套')
+								: prompt.includes('造型候选 1'))
 						? await picture(width, height, true)
 						: opaque,
 			}),
@@ -554,7 +557,11 @@ test('removes an opaque sprite background before validating and auditing the res
 			async (_connection, prompt, _schema, _options, images) => {
 				if (!prompt.startsWith('Visually audit'))
 					return {
-						content: prompt.includes('造型候选 1') ? '造型候选 1' : 'Ada',
+						content: prompt.includes('银色外套')
+							? '银色外套'
+							: prompt.includes('造型候选 1')
+								? '造型候选 1'
+								: 'Ada',
 					}
 				const { data, info } = await sharp(images?.[0])
 					.raw()
@@ -602,20 +609,41 @@ test('removes an opaque sprite background before validating and auditing the res
 			render.mockClear()
 			nativeCandidate = true
 			const withIllustration = await art.candidates(
-				twoCostumes,
+				{
+					...twoCostumes,
+					characters: [
+						...twoCostumes.characters,
+						{
+							...ada,
+							id: 'bea',
+							name: 'Bea',
+							costumes: [{ id: 'jacket', description: '银色外套' }],
+						},
+					],
+				},
 				['c1'],
 				'assets/main.webp',
 				[],
-				new Map([['ada', { id: 'illustration-1', cachePath: illustration }]]),
+				new Map(
+					['ada', 'bea'].map((id) => [
+						id,
+						{ id: 'illustration-1', cachePath: illustration },
+					]),
+				),
 			)
 			expect(withIllustration).toMatchObject({
 				mattingUnavailable: true,
 				characters: [
 					{ costumeId: 'uniform', candidates: [{ id: 'costume-1' }] },
+					{
+						characterId: 'bea',
+						costumeId: 'jacket',
+						candidates: [{ id: 'costume-epub' }],
+					},
 				],
 			})
 			expect(portraitRequests().map(([, refs]) => refs.length)).toEqual([
-				1, 0, 0, 0,
+				1, 0, 0, 0, 1, 1, 0, 0,
 			])
 			nativeCandidate = false
 			const [fallback] = await art.register(
