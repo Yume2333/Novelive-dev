@@ -402,6 +402,13 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			workId,
 		)
 		expect(imageAfter.revision).not.toBe(imageBefore.revision)
+		const imageStatus = page.getByRole('status', { name: '图片已替换' })
+		await expect(imageStatus).toHaveText('图片已替换')
+		expect(
+			await imageStatus.evaluate(
+				(node) => !!node.closest('[aria-busy="true"]'),
+			),
+		).toBe(false)
 		await expect(page.locator('body')).toHaveAttribute(
 			'data-image-loading-observed',
 			'true',

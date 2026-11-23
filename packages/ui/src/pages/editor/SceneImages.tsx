@@ -25,11 +25,13 @@ export function SceneImages({
 	const [choices, setChoices] = useState<Choices>()
 	const [revision, setRevision] = useState('')
 	const [generating, setGenerating] = useState(false)
+	const [generationStatus, setGenerationStatus] = useState('')
 	const assetId = selection || assets[0]?.id
 	if (!assetId) return null
 	const generate = (count: number) =>
 		void run(async () => {
 			setGenerating(true)
+			setGenerationStatus('正在生成图片')
 			try {
 				setChoices(undefined)
 				const { revision } = await window.novelive.call(
@@ -46,25 +48,33 @@ export function SceneImages({
 					count,
 					...(instruction.trim() ? { instruction: instruction.trim() } : {}),
 				}).promise
-				if (result.status === 'applied') await onApplied(assetId)
-				else {
+				if (result.status === 'applied') {
+					await onApplied(assetId)
+					setGenerationStatus('图片已替换')
+				} else {
 					setRevision(revision)
 					setChoices(result)
+					setGenerationStatus('候选图片已生成')
 				}
+			} catch (error) {
+				setGenerationStatus('图片生成失败')
+				throw error
 			} finally {
 				setGenerating(false)
 			}
 		})
 	return (
 		<section aria-label="场景图片">
-			{generating && (
+			{generationStatus && (
 				<div
 					className="editor-image-loading"
 					role="status"
-					aria-label="正在生成图片"
+					aria-label={generationStatus}
 				>
-					<LoaderCircle aria-hidden="true" size={18} strokeWidth={1.8} />
-					正在生成图片…
+					{generating && (
+						<LoaderCircle aria-hidden="true" size={18} strokeWidth={1.8} />
+					)}
+					{generationStatus}
 				</div>
 			)}
 			<div className="editor-toolbar">
