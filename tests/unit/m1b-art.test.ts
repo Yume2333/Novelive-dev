@@ -781,50 +781,61 @@ test('uses a supplied character design in both costume candidate rendering and a
 	}
 }, 30_000)
 
-test('offers one generated costume candidate that uses the matched EPUB illustration', async () => {
-	const render = vi
-		.fn<ReturnType<typeof artModels.imageRenderer>>()
-		.mockImplementation(async (_prompt, _refs, size, alpha) => ({
-			bytes: await picture(size.width, size.height, alpha),
-		}))
-	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
-	const model = vi
-		.spyOn(artModels, 'artJson')
-		.mockImplementation(async (_connection, prompt) =>
-			prompt.startsWith('Visually audit')
-				? { pass: true, failedChecks: [], feedback: '' }
-				: { content: '窗光' },
-		)
-	try {
-		await projectTest(async (project) => {
-			const path = 'source/imports/illustrations/illustration-1.png'
-			await project.writeFile(path, await picture(64, 96, false))
-			const art = service(project, replay)
-			const references = new Map([
-				['ada', { id: 'illustration-1', cachePath: path }],
-			])
-			const pool = await art.candidates(
-				bible,
-				['c1'],
-				undefined,
-				[],
-				references,
+test.each([
+	{ rejected: false, first: 'costume-epub', calls: [1, 0, 0] },
+	{ rejected: true, first: 'costume-1', calls: [1, 0, 0, 0] },
+])(
+	'uses normal costume options if the matched EPUB image is rejected ($rejected)',
+	async ({ rejected, first, calls }) => {
+		const render = vi
+			.fn<ReturnType<typeof artModels.imageRenderer>>()
+			.mockImplementation(async (_prompt, refs, size, alpha) =>
+				rejected && alpha && refs.length
+					? { error: { code: 'moderation', message: '内容审核拒绝' } }
+					: { bytes: await picture(size.width, size.height, alpha) },
 			)
-			expect(pool.characters[0].candidates.map(({ id }) => id)).toEqual([
-				'costume-epub',
-				'costume-2',
-				'costume-3',
-			])
-			const portraits = render.mock.calls.filter((call) => call[3])
-			expect(portraits.map(([, refs]) => refs.length)).toEqual([1, 0, 0])
-			expect(portraits[0][0]).toContain('ada EPUB character design reference')
-			expect(
-				await art.candidates(bible, ['c1'], undefined, [], references),
-			).toEqual(pool)
-			expect(render).toHaveBeenCalledTimes(6)
-		})
-	} finally {
-		renderer.mockRestore()
-		model.mockRestore()
-	}
-}, 30_000)
+		const renderer = vi
+			.spyOn(artModels, 'imageRenderer')
+			.mockReturnValue(render)
+		const model = vi
+			.spyOn(artModels, 'artJson')
+			.mockImplementation(async (_connection, prompt) =>
+				prompt.startsWith('Visually audit')
+					? { pass: true, failedChecks: [], feedback: '' }
+					: { content: '窗光' },
+			)
+		try {
+			await projectTest(async (project) => {
+				const path = 'source/imports/illustrations/illustration-1.png'
+				await project.writeFile(path, await picture(64, 96, false))
+				const art = service(project, replay)
+				const references = new Map([
+					['ada', { id: 'illustration-1', cachePath: path }],
+				])
+				const pool = await art.candidates(
+					bible,
+					['c1'],
+					undefined,
+					[],
+					references,
+				)
+				expect(pool.characters[0].candidates.map(({ id }) => id)).toEqual([
+					first,
+					'costume-2',
+					'costume-3',
+				])
+				const portraits = render.mock.calls.filter((call) => call[3])
+				expect(portraits.map(([, refs]) => refs.length)).toEqual(calls)
+				expect(portraits[0][0]).toContain('ada EPUB character design reference')
+				expect(
+					await art.candidates(bible, ['c1'], undefined, [], references),
+				).toEqual(pool)
+				expect(render).toHaveBeenCalledTimes(rejected ? 8 : 6)
+			})
+		} finally {
+			renderer.mockRestore()
+			model.mockRestore()
+		}
+	},
+	30_000,
+)

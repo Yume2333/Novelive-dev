@@ -448,6 +448,7 @@ export class ArtProduction {
 		target: Dimensions,
 		transparent: boolean,
 		derived = false,
+		omitOnModeration = false,
 	) {
 		const refs = await Promise.all(
 			drawing.references.slice(0, 16).map(async (ref, i) => {
@@ -499,6 +500,7 @@ export class ArtProduction {
 				if (result.error.code === 'unsupported')
 					return { issue, unsupported: true } as const
 				if (result.error.code === 'moderation') {
+					if (omitOnModeration) return { issue, moderated: true } as const
 					if (moderated) break
 					moderated = true
 					feedback = moderationHint
@@ -567,20 +569,23 @@ export class ArtProduction {
 		)
 		const cachePath = (path: string) =>
 			projectFiles.style(styleScope).path.replace('bible/style.json', path)
-		const candidate = async (
-			id: string,
+		const saveCandidate = async (
 			drawing: Drawing,
 			path: string,
-			portrait = false,
+			portrait: boolean,
+			omitOnModeration = false,
 		) => {
 			if (!(await this.file(path))) {
 				const result = await this.paint(
 					drawing,
 					this.nativeSize(portrait),
 					portrait,
+					false,
+					omitOnModeration,
 				)
 				let png: Buffer
 				if ('issue' in result) {
+					if ('moderated' in result) return false
 					if (!('reviewed' in result) || !result.reviewed)
 						throw new Error(result.issue)
 					png = result.reviewed
@@ -598,6 +603,15 @@ export class ArtProduction {
 					recordProfile(this.project, path, profile),
 				)
 			}
+			return true
+		}
+		const candidate = async (
+			id: string,
+			drawing: Drawing,
+			path: string,
+			portrait = false,
+		) => {
+			await saveCandidate(drawing, path, portrait)
 			return { id, cachePath: path }
 		}
 		const style = bible.style.description
@@ -641,32 +655,46 @@ export class ArtProduction {
 				const designReference = characterDesignReference(character)
 				if (designReference) references.push(designReference)
 				for (const i of [1, 2, 3]) {
-					const imported = i === 1 ? illustration : undefined
-					const id = imported ? 'costume-epub' : `costume-${i}`
-					const file = imported ? `${id}-${illustrationKey}` : id
+					const drawing: Drawing = {
+						kind: 'character',
+						description: `造型候选 ${i}：${costume.description}`,
+						style,
+						references,
+						characters: [character],
+						keep: [],
+					}
+					const directory = `candidates/characters/${character.id}/${costume.id}`
+					if (i === 1 && illustration) {
+						const path = cachePath(
+							`${directory}/costume-epub-${illustrationKey}.webp`,
+						)
+						const saved = await saveCandidate(
+							{
+								...drawing,
+								references: [
+									...this.styleReferences(bible.style),
+									{
+										role: 'identity',
+										path: illustration.cachePath,
+										label: `${character.id} EPUB character design reference`,
+									},
+								],
+							},
+							path,
+							true,
+							true,
+						)
+						if (saved) {
+							candidates.push({ id: 'costume-epub', cachePath: path })
+							continue
+						}
+					}
+					const id = `costume-${i}`
 					candidates.push(
 						await candidate(
 							id,
-							{
-								kind: 'character',
-								description: `造型候选 ${i}：${costume.description}`,
-								style,
-								references: imported
-									? [
-											...this.styleReferences(bible.style),
-											{
-												role: 'identity',
-												path: imported.cachePath,
-												label: `${character.id} EPUB character design reference`,
-											},
-										]
-									: references,
-								characters: [character],
-								keep: [],
-							},
-							cachePath(
-								`candidates/characters/${character.id}/${costume.id}/${file}.webp`,
-							),
+							drawing,
+							cachePath(`${directory}/${id}.webp`),
 							true,
 						),
 					)
