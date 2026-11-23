@@ -9,6 +9,7 @@ import { EventReplay } from './chat/events'
 import { registerChat } from './chat/register'
 import { createConfigStore } from './config'
 import {
+	type CommandInput,
 	type CreatorFrame,
 	clientFrame,
 	creatorCommandError,
@@ -366,17 +367,24 @@ registry.register('model.testImage', async (_payload, signal) => {
 	})
 })
 
-registry.register('import.txt', async (payload) => {
-	const { importTxtProject } = await import('./project-pipeline')
-	const result = await importTxtProject(payload)
-	if (result.status === 'ready')
-		await (await getProduction()).remember(result.workId, result.projectDir)
+async function importFile(payload: CommandInput<'import.file'>) {
+	const { importFileProject } = await import('./import/wizard')
+	const result = await importFileProject(payload)
+	if (result.status === 'ready') {
+		const service = await getProduction()
+		for (const workId of result.workIds)
+			await service.remember(workId, result.projectDir)
+	}
 	return result
-})
+}
+registry.register('import.file', importFile)
+registry.register('import.txt', importFile)
 registry.register('import.revise', async ({ projectDir, layout }) => {
 	const { reviseTxtProject } = await import('./project-pipeline')
 	const result = await reviseTxtProject(projectDir, layout)
-	await (await getProduction()).remember(result.workId, result.projectDir)
+	const service = await getProduction()
+	for (const workId of result.workIds)
+		await service.remember(workId, result.projectDir)
 	return result
 })
 

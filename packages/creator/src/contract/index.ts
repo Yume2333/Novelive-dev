@@ -186,7 +186,7 @@ export interface Novelive {
 	): () => void
 	resourceUrl(path: string): string
 	pickFolder(): Promise<string | null>
-	pickFiles(kind: 'txt' | 'image'): Promise<string[]>
+	pickFiles(kind: 'source' | 'txt' | 'image'): Promise<string[]>
 	host: {
 		progress?: DesktopProgressApi
 		appState(): Promise<HostState>

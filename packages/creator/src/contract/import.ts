@@ -92,9 +92,11 @@ export const importLayoutSchema = obj({
 
 export const importWizardSchema = obj({
 	status: lit('ready'),
+	format: oneOf(['txt', 'epub', 'markdown', 'docx', 'pdf']),
+	workIds: arr(workId, { minItems: 1 }),
 	projectDir: text,
 	workId,
-	encoding,
+	encoding: opt(encoding),
 	paragraphs: start,
 	layout: importLayoutSchema,
 	suggested: importLayoutSchema,
@@ -102,23 +104,31 @@ export const importWizardSchema = obj({
 	references: arr(text),
 })
 
-export const importCommands = {
-	'import.txt': {
-		input: obj({
-			sourcePath: text,
-			folder: text,
-			title: text,
-			encoding: opt(encoding),
-			references: arr(text, { maxItems: 3 }),
+const fileImport = {
+	input: obj({
+		sourcePath: text,
+		folder: text,
+		title: text,
+		encoding: opt(encoding),
+		references: arr(text, { maxItems: 3 }),
+	}),
+	output: union([
+		obj({
+			status: lit('encoding'),
+			candidates: arr(obj({ encoding, preview: str() }), { minItems: 2 }),
 		}),
-		output: union([
-			obj({
-				status: lit('encoding'),
-				candidates: arr(obj({ encoding, preview: str() }), { minItems: 2 }),
-			}),
-			importWizardSchema,
-		]),
-	},
+		importWizardSchema,
+		obj({
+			status: lit('unsupported'),
+			format: lit('pdf'),
+			reason: lit('no_extractable_text'),
+		}),
+	]),
+}
+
+export const importCommands = {
+	'import.file': fileImport,
+	'import.txt': fileImport,
 	'import.revise': {
 		input: obj({ projectDir: text, layout: importLayoutSchema }),
 		output: importWizardSchema,

@@ -29,10 +29,10 @@ import {
 	startVolume,
 } from './layout'
 
-type Result = CommandOutput<'import.txt'>
+type Result = CommandOutput<'import.file'>
 type Wizard = Extract<Result, { status: 'ready' }>
 type Candidates = Extract<Result, { status: 'encoding' }>['candidates']
-type Encoding = NonNullable<CommandInput<'import.txt'>['encoding']>
+type Encoding = NonNullable<CommandInput<'import.file'>['encoding']>
 
 const languages = [
 	['zh-CN', '简体中文'],
@@ -86,10 +86,12 @@ export function ImportPage() {
 
 	const pickSource = () =>
 		run(async () => {
-			const [path] = await window.novelive.pickFiles('txt')
+			const [path] = await window.novelive.pickFiles('source')
 			if (!path) return
 			setSource(path)
-			setTitle(fileName(path).replace(/\.txt$/i, ''))
+			setTitle(
+				fileName(path).replace(/\.(txt|epub|md|markdown|docx|pdf)$/i, ''),
+			)
 			setCandidates(undefined)
 			setEncoding(undefined)
 		})
@@ -107,13 +109,17 @@ export function ImportPage() {
 		})
 	const start = () =>
 		run(async () => {
-			const result = await window.novelive.call('import.txt', {
+			const result = await window.novelive.call('import.file', {
 				sourcePath: source,
 				folder: location,
 				title: title.trim(),
 				encoding,
 				references,
 			}).promise
+			if (result.status === 'unsupported') {
+				setError('扫描版 PDF 无可提取文字，暂不支持 OCR')
+				return
+			}
 			if (result.status === 'encoding') {
 				setCandidates(result.candidates)
 				setEncoding(undefined)
@@ -321,7 +327,14 @@ function Review({
 							</option>
 						))}
 					</select>
-					<span className={styles.value}>{encodingNames[wizard.encoding]}</span>
+					<span className={styles.value}>
+						{wizard.format === 'markdown'
+							? 'Markdown'
+							: wizard.format.toUpperCase()}
+						{wizard.format === 'txt' && wizard.encoding
+							? ` · ${encodingNames[wizard.encoding]}`
+							: ''}
+					</span>
 				</label>
 				{wizard.references.length > 0 && (
 					<label className={styles.row}>

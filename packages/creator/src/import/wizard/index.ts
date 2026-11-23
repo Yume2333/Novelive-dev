@@ -5,7 +5,12 @@ import {
 	type ImportReport,
 	projectFiles,
 } from '@novelive/format/model'
+import type { ExtractedBook, ImportExtraction } from '../../contract/import'
 import { Project } from '../../project'
+import { extractDocx } from '../docx'
+import { extractEpub } from '../epub'
+import { extractMarkdown } from '../markdown'
+import { extractPdf } from '../pdf'
 import {
 	detectTxtEncoding,
 	importTxt,
@@ -27,9 +32,11 @@ export interface ImportLayout {
 
 export interface ImportWizardView {
 	status: 'ready'
+	format: 'txt' | ExtractedBook['format']
+	workIds: string[]
 	projectDir: string
 	workId: string
-	encoding: TxtEncoding
+	encoding?: TxtEncoding
 	paragraphs: number
 	layout: ImportLayout
 	suggested: ImportLayout
@@ -38,7 +45,8 @@ export interface ImportWizardView {
 }
 
 type WizardReport = ImportReport & {
-	encoding: TxtEncoding
+	format?: ImportWizardView['format']
+	encoding?: TxtEncoding
 	structure: TxtStructure
 	references?: string[]
 	layout?: ImportLayout
@@ -199,6 +207,7 @@ export async function readImportWizard(
 	const title = report.check?.title ?? ''
 	const language = report.check?.language ?? 'zh-CN'
 	const { confirmWithReferences } = await firstSettings(project)
+	const ids = await workIds(project)
 	const suggested = suggestedLayout(
 		report.structure,
 		title,
@@ -207,8 +216,10 @@ export async function readImportWizard(
 	)
 	return {
 		status: 'ready',
+		format: report.format ?? 'txt',
+		workIds: ids,
 		projectDir: project.root,
-		workId: (await workIds(project))[0],
+		workId: ids[0],
 		encoding: report.encoding,
 		paragraphs: originals(report.structure).reduce(
 			(sum, { chapter }) => sum + chapter.paragraphs.length,
@@ -242,11 +253,31 @@ export async function importTxtProject(options: {
 	encoding?: TxtEncoding
 	references: string[]
 }) {
+	return importProject(options, 'txt')
+}
+
+export async function importFileProject(
+	options: Parameters<typeof importTxtProject>[0],
+) {
+	const extension = extname(options.sourcePath).toLowerCase()
+	const format =
+		extension === '.md' || extension === '.markdown'
+			? 'markdown'
+			: extension.slice(1)
+	if (!['txt', 'epub', 'markdown', 'docx', 'pdf'].includes(format))
+		throw invalid('不支持的原文格式')
+	return importProject(options, format as ImportWizardView['format'])
+}
+
+async function importProject(
+	options: Parameters<typeof importTxtProject>[0],
+	format: ImportWizardView['format'],
+) {
 	for (const path of options.references)
 		if (!referenceTypes.has(extname(path).toLowerCase()))
 			throw invalid(`不支持的参考图格式：${basename(path)}`)
 	const bytes = await readFile(options.sourcePath)
-	if (!options.encoding) {
+	if (format === 'txt' && !options.encoding) {
 		const candidates = detectTxtEncoding(bytes)
 		if (!candidates.length)
 			throw { code: 'unsupported', message: '无法识别原文编码' }
@@ -258,6 +289,17 @@ export async function importTxtProject(options: {
 					preview,
 				})),
 			}
+	}
+	let book: ExtractedBook | undefined
+	if (format !== 'txt') {
+		const extraction: ImportExtraction = await {
+			epub: extractEpub,
+			markdown: extractMarkdown,
+			docx: extractDocx,
+			pdf: extractPdf,
+		}[format](bytes)
+		if (extraction.status === 'unsupported') return extraction
+		book = extraction.book
 	}
 	const root = join(options.folder, folderName(options.title))
 	let project: Project
@@ -275,10 +317,55 @@ export async function importTxtProject(options: {
 	}
 	using opened = project
 	try {
-		await importTxt(opened, bytes, {
-			title: options.title.trim(),
-			encoding: options.encoding,
-		})
+		if (book) {
+			let chapterIndex = 0
+			const structure: TxtStructure = {
+				findings: [],
+				volumes: book.volumes.map((volume, v) => ({
+					volumeId: `v${String(v + 1).padStart(4, '0')}`,
+					title: volume.title,
+					chapters: volume.chapters.map((chapter) => ({
+						chapterId: `ch${String(++chapterIndex).padStart(4, '0')}`,
+						title: chapter.title,
+						line: chapterIndex,
+						paragraphs: chapter.paragraphs.map((text, p) => ({
+							id: `p${String(p + 1).padStart(4, '0')}`,
+							text,
+						})),
+						notes: chapter.notes,
+					})),
+				})),
+			}
+			const title = options.title.trim()
+			const language = book.metadata.language ?? 'zh-CN'
+			await writeTxtLayout(opened, structure.volumes, { title, language })
+			await opened.writeFile(
+				projectFiles.original(format === 'markdown' ? 'md' : format),
+				bytes,
+			)
+			const report: WizardReport = {
+				formatVersion,
+				format,
+				structure,
+				volumeSuggestions: structure.volumes.map((volume) => ({
+					title: volume.title,
+					firstChapterId: volume.chapters[0].chapterId,
+					lastChapterId: volume.chapters[volume.chapters.length - 1].chapterId,
+				})),
+				check: { title, language, chapterFindings: [] },
+			}
+			await opened.write(projectFiles.importReport, report)
+			const series = await opened.read(projectFiles.series)
+			await opened.write(projectFiles.series, {
+				...series,
+				volumeIds: structure.volumes.map((volume) => volume.volumeId),
+			})
+		} else {
+			await importTxt(opened, bytes, {
+				title: options.title.trim(),
+				encoding: options.encoding,
+			})
+		}
 		const references: string[] = []
 		await mkdir(join(opened.root, 'source/references'), { recursive: true })
 		for (const [i, path] of options.references.entries()) {
