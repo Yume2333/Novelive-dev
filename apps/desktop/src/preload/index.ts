@@ -168,6 +168,9 @@ ipcRenderer.on('novelive:locate', (_event, path: string) => {
 window.addEventListener('novelive:player-waiting', (event) => {
 	ipcRenderer.send('novelive:player-waiting', (event as CustomEvent).detail)
 })
+window.addEventListener('novelive:language', (event) => {
+	ipcRenderer.send('novelive:language', (event as CustomEvent).detail)
+})
 window.addEventListener('hashchange', () => {
 	ipcRenderer.send('novelive:player-waiting', null)
 })

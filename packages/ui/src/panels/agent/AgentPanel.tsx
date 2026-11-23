@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
+import { scoped } from '../../i18n'
 import styles from './AgentPanel.module.css'
 import { Composer } from './Composer'
 import {
@@ -27,6 +28,8 @@ import {
 	siblingsOf,
 	useAgentChat,
 } from './session'
+
+const t = scoped('agent')
 
 type Chat = ReturnType<typeof useAgentChat>
 
@@ -47,10 +50,10 @@ function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
 					onClose()
 				}}
 			>
-				<Plus aria-hidden="true" size={15} /> 新会话
+				<Plus aria-hidden="true" size={15} /> {t('新会话')}
 			</button>
 			<ScrollArea className={styles.menuScroll}>
-				<ul aria-label="会话" className={styles.menuList}>
+				<ul aria-label={t('会话')} className={styles.menuList}>
 					{chat.sessions.map((session) => (
 						<li key={session.sessionId} className={styles.sessionRow}>
 							{renaming === session.sessionId ? (
@@ -61,7 +64,7 @@ function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
 										if (title.trim())
 											guard(
 												chat.rename(session.sessionId, title.trim()),
-												'没能重命名',
+												t('没能重命名'),
 											)
 										setRenaming(undefined)
 									}}
@@ -70,7 +73,7 @@ function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
 										// biome-ignore lint/a11y/noAutofocus: 点了重命名就该能直接打字
 										autoFocus
 										className={styles.field}
-										aria-label="会话名称"
+										aria-label={t('会话名称')}
 										value={title}
 										onChange={(event) => setTitle(event.target.value)}
 										onBlur={() => setRenaming(undefined)}
@@ -79,24 +82,24 @@ function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
 							) : deleting === session.sessionId ? (
 								<div className={styles.renameForm}>
 									<span className={styles.cardTitle}>
-										删除「{session.title}」？
+										{t('删除「{{title}}」？', { title: session.title })}
 									</span>
 									<button
 										type="button"
 										className={styles.button}
 										onClick={() => setDeleting(undefined)}
 									>
-										取消
+										{t('取消')}
 									</button>
 									<button
 										type="button"
 										className={styles.danger}
 										onClick={() => {
-											guard(chat.remove(session.sessionId), '没能删除')
+											guard(chat.remove(session.sessionId), t('没能删除'))
 											setDeleting(undefined)
 										}}
 									>
-										删除
+										{t('删除')}
 									</button>
 								</div>
 							) : (
@@ -115,7 +118,7 @@ function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
 									<button
 										type="button"
 										className={styles.iconButton}
-										aria-label={`重命名 ${session.title}`}
+										aria-label={t('重命名 {{title}}', { title: session.title })}
 										onClick={() => {
 											setTitle(session.title)
 											setRenaming(session.sessionId)
@@ -126,7 +129,7 @@ function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
 									<button
 										type="button"
 										className={styles.iconButton}
-										aria-label={`删除 ${session.title}`}
+										aria-label={t('删除 {{title}}', { title: session.title })}
 										onClick={() => setDeleting(session.sessionId)}
 									>
 										<Trash2 aria-hidden="true" size={14} />
@@ -157,14 +160,14 @@ function EditBox({
 		<div className={styles.editBox}>
 			<ScrollField
 				autoFocus
-				aria-label="编辑消息"
+				aria-label={t('编辑消息')}
 				rows={3}
 				value={text}
 				onChange={(event) => setText(event.target.value)}
 			/>
 			<div className={styles.actions}>
 				<button type="button" className={styles.button} onClick={onCancel}>
-					取消
+					{t('取消')}
 				</button>
 				<button
 					type="button"
@@ -172,7 +175,7 @@ function EditBox({
 					disabled={!allowEmpty && !text.trim()}
 					onClick={() => onSend(text.trim())}
 				>
-					重新发送
+					{t('重新发送')}
 				</button>
 			</div>
 		</div>
@@ -249,19 +252,19 @@ export function AgentPanel({
 					type="button"
 					className={styles.sessionButton}
 					aria-expanded={menu}
-					aria-label="切换会话"
+					aria-label={t('切换会话')}
 					onClick={() => setMenu(!menu)}
 				>
 					<span className={styles.sessionTitle}>
-						{snapshot?.session.title ?? '新会话'}
+						{snapshot?.session.title ?? t('新会话')}
 					</span>
 					<ChevronDown aria-hidden="true" size={15} />
 				</button>
 				<button
 					type="button"
 					className={styles.iconButton}
-					aria-label={full ? '退出全屏' : '全屏'}
-					title={full ? '退出全屏' : '全屏'}
+					aria-label={full ? t('退出全屏') : t('全屏')}
+					title={full ? t('退出全屏') : t('全屏')}
 					onClick={onToggleFull}
 				>
 					{full ? (
@@ -273,8 +276,8 @@ export function AgentPanel({
 				<button
 					type="button"
 					className={styles.iconButton}
-					aria-label="关闭 Agent"
-					title="关闭（Ctrl/⌘+J）"
+					aria-label={t('关闭 Agent')}
+					title={t('关闭（Ctrl/⌘+J）')}
 					onClick={onClose}
 				>
 					<X aria-hidden="true" size={16} />
@@ -285,8 +288,9 @@ export function AgentPanel({
 				<div className={styles.messages}>
 					{chat.loaded && path.length === 0 && (
 						<p className={styles.empty}>
-							可以让 Agent
-							改设定、调术语、重写场景或重做章节，所有改动都会先给你确认。
+							{t(
+								'可以让 Agent 改设定、调术语、重写场景或重做章节，所有改动都会先给你确认。',
+							)}
 						</p>
 					)}
 					{snapshot &&
@@ -296,8 +300,8 @@ export function AgentPanel({
 									<details key={entry.id} className={styles.summary}>
 										<summary>
 											{entry.kind === 'compaction'
-												? '较早的内容已压缩成摘要'
-												: '另一条分支的摘要'}
+												? t('较早的内容已压缩成摘要')
+												: t('另一条分支的摘要')}
 										</summary>
 										<p>{entry.summary}</p>
 									</details>
@@ -323,7 +327,9 @@ export function AgentPanel({
 									key={entry.id}
 									className={styles.message}
 									data-role={entry.role}
-									aria-label={entry.role === 'user' ? '我的消息' : 'Agent 回复'}
+									aria-label={
+										entry.role === 'user' ? t('我的消息') : t('Agent 回复')
+									}
 								>
 									{editing === entry.id ? (
 										<EditBox
@@ -333,7 +339,7 @@ export function AgentPanel({
 											onSend={(next) => {
 												setEditing(undefined)
 												void send(next, images, entry.parentId).catch(() =>
-													chat.setError('没能重新发送'),
+													chat.setError(t('没能重新发送')),
 												)
 											}}
 										/>
@@ -356,11 +362,11 @@ export function AgentPanel({
 									)}
 									<div className={styles.messageTools}>
 										{siblings.length > 1 && (
-											<nav className={styles.branches} aria-label="分支">
+											<nav className={styles.branches} aria-label={t('分支')}>
 												<button
 													type="button"
 													className={styles.iconButton}
-													aria-label="上一个分支"
+													aria-label={t('上一个分支')}
 													disabled={index === 0 || streaming}
 													onClick={() => go(-1)}
 												>
@@ -372,7 +378,7 @@ export function AgentPanel({
 												<button
 													type="button"
 													className={styles.iconButton}
-													aria-label="下一个分支"
+													aria-label={t('下一个分支')}
 													disabled={index === siblings.length - 1 || streaming}
 													onClick={() => go(1)}
 												>
@@ -384,8 +390,8 @@ export function AgentPanel({
 											<button
 												type="button"
 												className={styles.iconButton}
-												aria-label="编辑后重新发送"
-												title="编辑后重新发送"
+												aria-label={t('编辑后重新发送')}
+												title={t('编辑后重新发送')}
 												disabled={streaming}
 												onClick={() => setEditing(entry.id)}
 											>
@@ -410,7 +416,9 @@ export function AgentPanel({
 				disabled={!chat.loaded}
 				onAttach={chat.attach}
 				onSend={(text, ids) => send(text, ids, snapshot?.headId ?? null)}
-				onStop={() => void chat.stop().catch(() => chat.setError('没能停止'))}
+				onStop={() =>
+					void chat.stop().catch(() => chat.setError(t('没能停止')))
+				}
 				onPreview={(src, name) => setPreview({ src, name })}
 			/>
 			{preview && (
@@ -424,7 +432,7 @@ export function AgentPanel({
 					<button
 						type="button"
 						className={styles.iconButton}
-						aria-label="关闭预览"
+						aria-label={t('关闭预览')}
 						onClick={() => dialog.current?.close()}
 					>
 						<X aria-hidden="true" size={16} />

@@ -1,0 +1,19 @@
+{
+	"{{imageCount}} 张图片": "{{imageCount}} images",
+	"{{projectId}}：{{reason}}": "{{projectId}}: {{reason}}",
+	"仅供参考，统计已发生的调用；不估算费用，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。": "For reference only. Counts calls that have already occurred; does not estimate costs, set budgets, or stop automatically. Style changes only trigger a notice and do not automatically mark images as expired.",
+	"以下项目未计入统计，其他项目的记录仍然显示。": "The following projects are not included in the statistics; records for other projects are still shown.",
+	"图片数量": "Image count",
+	"已发生用量": "Usage to date",
+	"文本输入 tokens": "Text input tokens",
+	"文本输出 tokens": "Text output tokens",
+	"无法读取用量记录": "Unable to read usage records",
+	"暂无用量记录": "No usage records yet",
+	"暂无过期素材": "No expired assets",
+	"正在读取用量": "Loading usage…",
+	"用量": "Usage",
+	"用量说明": "Usage notes",
+	"输入 {{inputTokens}} / 输出 {{outputTokens}} · 缓存读取 {{cacheReadTokens}} / 写入 {{cacheWriteTokens}}": "Input {{inputTokens}} / output {{outputTokens}} · cache read {{cacheReadTokens}} / write {{cacheWriteTokens}}",
+	"过期素材": "Expired assets",
+	"部分项目无法读取": "Some projects could not be read"
+}

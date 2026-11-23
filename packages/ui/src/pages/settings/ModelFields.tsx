@@ -5,7 +5,10 @@ import type {
 } from '@novelive/creator/contract'
 import { useRef, useState } from 'react'
 import { InfoTooltip } from '../../components/InfoTooltip'
+import { msg, scoped } from '../../i18n'
 import styles from './SettingsPage.module.css'
+
+const t = scoped('settings')
 
 type Models = MaskedConfig['models']
 type TextModel = Models['fast'] & { inheritFast?: boolean }
@@ -17,9 +20,9 @@ export type ModelDraft = {
 }
 
 export const themes = [
-	['light', '亮'],
-	['dark', '暗'],
-	['system', '跟随系统'],
+	['light', msg('亮')],
+	['dark', msg('暗')],
+	['system', msg('跟随系统')],
 ] as const
 
 const formats = [
@@ -32,13 +35,17 @@ const formats = [
 	['anthropic-messages', 'Anthropic Messages', 'https://api.anthropic.com'],
 ] as const
 const compatibility = [
-	['auto', '自动', ''],
+	['auto', msg('自动'), ''],
 	['openai', 'OpenAI', 'https://api.openai.com/v1'],
 	['deepseek', 'DeepSeek', 'https://api.deepseek.com/v1'],
-	['qwen', '通义千问', 'https://dashscope.aliyuncs.com/compatible-mode/v1'],
-	['zhipu', '智谱', 'https://open.bigmodel.cn/api/paas/v4'],
+	[
+		'qwen',
+		msg('通义千问'),
+		'https://dashscope.aliyuncs.com/compatible-mode/v1',
+	],
+	['zhipu', msg('智谱'), 'https://open.bigmodel.cn/api/paas/v4'],
 	['openrouter', 'OpenRouter', 'https://openrouter.ai/api/v1'],
-	['anthropic-compat', '兼容 Anthropic', 'https://api.anthropic.com'],
+	['anthropic-compat', msg('兼容 Anthropic'), 'https://api.anthropic.com'],
 ] as const
 
 export function Select<T extends string | number>({
@@ -117,7 +124,7 @@ function integer(text: string, minimum: number) {
 	if (!text.trim() || !Number.isSafeInteger(number) || number < minimum)
 		throw {
 			code: 'invalid_config',
-			message: `请输入不小于 ${minimum} 的整数。`,
+			message: t('请输入不小于 {{minimum}} 的整数。', { minimum }),
 		}
 	return number
 }
@@ -187,10 +194,12 @@ export function useTextFields(
 		fields: (
 			<>
 				<div className={styles.field}>
-					<span>兼容哪家</span>
+					<span>{t('兼容哪家')}</span>
 					<Select
-						label="兼容哪家"
-						options={compatibility}
+						label={t('兼容哪家')}
+						options={compatibility.map(
+							([value, name, url]) => [value, t(name), url] as const,
+						)}
 						value={connection.compat}
 						disabled={inherited}
 						onChange={(compat) => {
@@ -203,9 +212,9 @@ export function useTextFields(
 					/>
 				</div>
 				<div className={styles.field}>
-					<span>接口格式</span>
+					<span>{t('接口格式')}</span>
 					<Select
-						label="接口格式"
+						label={t('接口格式')}
 						options={formats}
 						value={connection.format}
 						disabled={inherited}
@@ -233,20 +242,20 @@ export function useTextFields(
 									suggest({ ...draft, inheritFast }, inheritFast)
 							}}
 						/>{' '}
-						同快速模型
+						{t('同快速模型')}
 					</label>
 				)}
 				<Input
-					label="接口地址"
+					label={t('接口地址')}
 					value={connection.baseUrl}
 					placeholder="https://…"
 					disabled={inherited}
 					onChange={(event) => change({ baseUrl: event.target.value })}
 				/>
 				<Input
-					label="模型名"
+					label={t('模型名')}
 					value={draft.model}
-					placeholder="模型名"
+					placeholder={t('模型名')}
 					onChange={(event) =>
 						change({ model: event.target.value, context: '', output: '' })
 					}
@@ -258,17 +267,17 @@ export function useTextFields(
 					}}
 				/>
 				<Input
-					label="上下文长度"
+					label={t('上下文长度')}
 					value={draft.context}
 					inputMode="numeric"
-					placeholder="模型上下文窗口 tokens（至少 4096）"
+					placeholder={t('模型上下文窗口 tokens（至少 4096）')}
 					onChange={(event) => change({ context: event.target.value })}
 				/>
 				<Input
-					label="最大输出量"
+					label={t('最大输出量')}
 					value={draft.output}
 					inputMode="numeric"
-					placeholder="留空则按模型自动设置"
+					placeholder={t('留空则按模型自动设置')}
 					onChange={(event) => change({ output: event.target.value })}
 				/>
 				<ApiKeyInput
@@ -317,15 +326,15 @@ export function useImageFields(
 		fields: (
 			<>
 				<Input
-					label="接口地址"
+					label={t('接口地址')}
 					value={draft.baseUrl}
 					placeholder="https://…"
 					onChange={(event) => change({ baseUrl: event.target.value })}
 				/>
 				<Input
-					label="模型名"
+					label={t('模型名')}
 					value={draft.model}
-					placeholder="模型名"
+					placeholder={t('模型名')}
 					onChange={(event) => change({ model: event.target.value })}
 				/>
 				<div className={styles.fullField}>
@@ -335,84 +344,87 @@ export function useImageFields(
 					/>
 				</div>
 				<div className={styles.field}>
-					<span>生图质量</span>
+					<span>{t('生图质量')}</span>
 					<Select
-						label="生图质量"
+						label={t('生图质量')}
 						value={draft.quality}
 						options={[
-							['high', '高'],
-							['medium', '中'],
-							['low', '低'],
+							['high', t('高')],
+							['medium', t('中')],
+							['low', t('低')],
 						]}
 						onChange={(quality) => change({ quality })}
 					/>
 				</div>
 				<div className={styles.field}>
 					<span className={styles.fieldLabel}>
-						原生长边上限
-						<InfoTooltip label="原生长边上限说明" text="超出部分由本地放大" />
+						{t('原生长边上限')}
+						<InfoTooltip
+							label={t('原生长边上限说明')}
+							text={t('超出部分由本地放大')}
+						/>
 					</span>
 					<Select
-						label="原生长边上限"
+						label={t('原生长边上限')}
 						value={draft.nativeMaxEdge}
 						options={[
-							[1536, '1536 · Codex 渠道'],
+							[1536, t('1536 · Codex 渠道')],
 							[2048, '2048'],
-							[2560, '2560 · OpenAI 官方 API'],
+							[2560, t('2560 · OpenAI 官方 API')],
 							[2816, '2816 · Seedream 5.x'],
-							[3840, '3840 · 4K（OpenAI 实验 / Seedream 4.5）'],
+							[3840, t('3840 · 4K（OpenAI 实验 / Seedream 4.5）')],
 						]}
 						onChange={(nativeMaxEdge) => change({ nativeMaxEdge })}
 					/>
 				</div>
 				<Input
-					label="同时出图数"
+					label={t('同时出图数')}
 					inputMode="numeric"
 					value={draft.concurrency}
 					onChange={(event) => change({ concurrency: event.target.value })}
 				/>
 				<Input
-					label="生图失败重试次数"
+					label={t('生图失败重试次数')}
 					inputMode="numeric"
 					value={draft.retries}
 					onChange={(event) => change({ retries: event.target.value })}
 				/>
 				<div className={styles.postProcess}>
 					<div className={styles.field}>
-						<span>后处理</span>
+						<span>{t('后处理')}</span>
 						<Select
-							label="后处理"
+							label={t('后处理')}
 							value={draft.postProcess}
 							options={[
-								['off', '关'],
-								['single', '放大降噪（默认）'],
-								['double', '双重放大降噪'],
+								['off', t('关')],
+								['single', t('放大降噪（默认）')],
+								['double', t('双重放大降噪')],
 							]}
 							onChange={(postProcess) => change({ postProcess })}
 						/>
 					</div>
 					<div className={styles.field}>
 						<span className={styles.fieldLabel}>
-							放大档位
+							{t('放大档位')}
 							{draft.upscaleTier !== 'anime' && (
 								<InfoTooltip
-									label="放大档位说明"
+									label={t('放大档位说明')}
 									text={
 										draft.upscaleTier === 'fast'
-											? '低性能机用，画质下降'
-											: '少改原画，保留纹理细节'
+											? t('低性能机用，画质下降')
+											: t('少改原画，保留纹理细节')
 									}
 								/>
 							)}
 						</span>
 						<Select
-							label="放大档位"
+							label={t('放大档位')}
 							value={draft.upscaleTier}
 							disabled={draft.postProcess === 'off'}
 							options={[
-								['anime', '动漫（默认）'],
-								['fast', '快速'],
-								['detail', '保留细节'],
+								['anime', t('动漫（默认）')],
+								['fast', t('快速')],
+								['detail', t('保留细节')],
 							]}
 							onChange={(upscaleTier) => change({ upscaleTier })}
 						/>

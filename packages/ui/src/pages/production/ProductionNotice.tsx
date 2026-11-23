@@ -1,6 +1,9 @@
 import { X } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
+import { scoped } from '../../i18n'
 import styles from './Production.module.css'
+
+const t = scoped('production')
 
 export function ProductionNotice({ children }: { children: ReactNode }) {
 	const [dismissed, setDismissed] = useState(false)
@@ -11,7 +14,7 @@ export function ProductionNotice({ children }: { children: ReactNode }) {
 			<button
 				className={styles.button}
 				type="button"
-				aria-label="关闭提示"
+				aria-label={t('关闭提示')}
 				onClick={() => setDismissed(true)}
 			>
 				<X size={16} aria-hidden="true" />

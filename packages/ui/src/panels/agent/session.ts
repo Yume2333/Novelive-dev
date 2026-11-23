@@ -4,6 +4,9 @@ import type {
 	EventEnvelope,
 } from '@novelive/creator/contract'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { scoped } from '../../i18n'
+
+const t = scoped('agent')
 
 export type Snapshot = CommandOutput<'chat.get'>
 export type ChatSession = Snapshot['session']
@@ -145,7 +148,7 @@ export function useAgentChat(workId: string) {
 		active.current = null
 		setSnapshot(null)
 		setError('')
-		void load().catch(fail('无法读取会话'))
+		void load().catch(fail(t('无法读取会话')))
 		void call('production.get', { workId }).then(
 			(production) => setChapterTitles(production.chapterTitles ?? {}),
 			() => setChapterTitles({}),
@@ -162,7 +165,7 @@ export function useAgentChat(workId: string) {
 				)
 		})
 		const offReady = window.novelive.on('creator.ready', () => {
-			void load().catch(fail('无法读取会话'))
+			void load().catch(fail(t('无法读取会话')))
 		})
 		return () => {
 			offEvent()
@@ -200,8 +203,8 @@ export function useAgentChat(workId: string) {
 		error,
 		setError,
 		open: (sessionId: string, headId?: string) =>
-			open(sessionId, headId).catch(fail('无法打开会话')),
-		create: () => create().catch(fail('无法新建会话')),
+			open(sessionId, headId).catch(fail(t('无法打开会话'))),
+		create: () => create().catch(fail(t('无法新建会话'))),
 		async rename(sessionId: string, title: string) {
 			const renamed = await call('chat.rename', { workId, sessionId, title })
 			setSessions((list) =>
@@ -225,7 +228,7 @@ export function useAgentChat(workId: string) {
 			return call('chat.attach', {
 				workId,
 				sessionId: session.sessionId,
-				name: file.name || '粘贴的图片',
+				name: file.name || t('粘贴的图片'),
 				mimeType: file.type as Attachment['mimeType'],
 				base64: btoa(binary),
 			})
@@ -253,7 +256,7 @@ export function useAgentChat(workId: string) {
 			try {
 				next = await call('chat.get', { workId, sessionId, headId })
 			} catch {
-				setError('消息已发出，但没能刷新会话')
+				setError(t('消息已发出，但没能刷新会话'))
 				return
 			}
 			if (active.current === sessionId)

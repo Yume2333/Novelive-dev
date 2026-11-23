@@ -928,3 +928,11 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 新增设定候选表、独立修订表，或直接调用综合阶段的自动合并（会保留已确认冲突而不执行创作者的明确批准）。
 - **Because:** 不迁移 M2/01 数据库，保持现有文件为内容真源；跨设定集的保守失效比漏检新内容安全。M2/03 可调用 `applyBibleProposal`，由会话层保留 proposal 生命周期所有权；独立设定页面同时提供现有表的 resolve 入口。
 - **Decided by:** agent (m2-editor/04)
+
+## 2026-11-23 - 界面文案以简体中文原文为键
+
+- **Decided:** i18next + react-i18next，键就是简体中文原文，按页面分命名空间（每个文件 `const t = scoped('<命名空间>')`，模块级常量用 `msg()` 标记、渲染处再 `t()`）；中文目录由脚本从源码抽取，单元测试保证源码里没有漏网的中文字面量。切换语言时重新挂载页面，不给每个组件加 hook。繁中、日文、英文先由模型翻译，日文缺键回退英文。
+- **Instead of:** 人工起的点分键（`library.empty.title`）；每个组件 `useTranslation()`；切换语言后整窗重载。
+- **Because:** 原文当键不改简体中文源文案、改动面最小，抽取后不会出现键和文案对不上；重新挂载只丢设置页的临时状态，整窗重载要重连创作端；日文用户更可能读懂英文而不是简体中文。
+- **Revisit when:** 同一中文在不同上下文需要不同译法且无法靠命名空间区分，或引入复数敏感的语言。
+

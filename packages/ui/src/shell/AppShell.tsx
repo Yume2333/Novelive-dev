@@ -18,29 +18,33 @@ import {
 	Workflow,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet, useLocation, useMatch } from 'react-router-dom'
 import { ScrollArea } from '../components/ScrollArea'
+import { msg, scoped, setLocale } from '../i18n'
 import { AgentPanel } from '../panels/agent/AgentPanel'
 import { workRoute } from '../routes/production'
 import styles from './AppShell.module.css'
 import { GlobalProductionQueue } from './GlobalProductionQueue'
 
+const t = scoped('shell')
+
 const navigation = [
-	{ to: '/', icon: LibraryBig, name: '书库' },
-	{ to: '/usage', icon: BarChart3, name: '用量' },
-	{ to: '/settings', icon: Settings, name: '设置' },
+	{ to: '/', icon: LibraryBig, name: msg('书库') },
+	{ to: '/usage', icon: BarChart3, name: msg('用量') },
+	{ to: '/settings', icon: Settings, name: msg('设置') },
 ]
 const themes = [
-	{ value: 'light', icon: Sun, name: '亮色' },
-	{ value: 'dark', icon: Moon, name: '暗色' },
-	{ value: 'system', icon: Contrast, name: '跟随系统' },
+	{ value: 'light', icon: Sun, name: msg('亮色') },
+	{ value: 'dark', icon: Moon, name: msg('暗色') },
+	{ value: 'system', icon: Contrast, name: msg('跟随系统') },
 ] as const
 const workNavigation = [
-	{ route: 'work', icon: LibraryBig, name: '概览' },
-	{ route: 'play', icon: Play, name: '游玩' },
-	{ route: 'production', icon: Workflow, name: '制作' },
-	{ route: 'editor', icon: Pencil, name: '编辑' },
-	{ route: 'bible', icon: LibraryBig, name: '设定集' },
+	{ route: 'work', icon: LibraryBig, name: msg('概览') },
+	{ route: 'play', icon: Play, name: msg('游玩') },
+	{ route: 'production', icon: Workflow, name: msg('制作') },
+	{ route: 'editor', icon: Pencil, name: msg('编辑') },
+	{ route: 'bible', icon: LibraryBig, name: msg('设定集') },
 ] as const
 export interface SettingsHost {
 	config: CommandOutput<'config.get'> | undefined
@@ -62,6 +66,8 @@ export function AppShell() {
 	const [agentPosition, setAgentPosition] =
 		useState<CommandInput<'chat.send'>['position']>()
 	const theme = config && 'theme' in config ? config.theme : 'system'
+	const language = config && 'language' in config ? config.language : undefined
+	const { i18n } = useTranslation()
 	const updateConfig = useCallback(async (patch: ConfigUpdate) => {
 		const saved = await window.novelive.call('config.update', patch).promise
 		setConfig(saved)
@@ -70,6 +76,10 @@ export function AppShell() {
 	const resetConfig = useCallback(async () => {
 		setConfig(await window.novelive.call('config.reset', {}).promise)
 	}, [])
+
+	useEffect(() => {
+		if (language) setLocale(language)
+	}, [language])
 
 	useEffect(() => {
 		const query = window.matchMedia('(prefers-color-scheme: dark)')
@@ -132,7 +142,9 @@ export function AppShell() {
 			await window.novelive.host[action]()
 		} catch {
 			setHostError(
-				action === 'openLogDir' ? '无法打开日志目录' : '无法重新启动创作端',
+				action === 'openLogDir'
+					? t('无法打开日志目录')
+					: t('无法重新启动创作端'),
 			)
 		}
 	}
@@ -160,7 +172,7 @@ export function AppShell() {
 				<ScrollArea className={styles.sideScroll}>
 					<div className={styles.sideContent}>
 						<div className={styles.brand}>Novelive</div>
-						<nav aria-label="全局导航" className={styles.navigation}>
+						<nav aria-label={t('全局导航')} className={styles.navigation}>
 							{navigation.map(({ to, icon: Icon, name }) => (
 								<NavLink
 									key={to}
@@ -169,12 +181,12 @@ export function AppShell() {
 									to={to}
 								>
 									<Icon aria-hidden="true" size={19} strokeWidth={1.8} />
-									{name}
+									{t(name)}
 								</NavLink>
 							))}
 						</nav>
 						{workId && (
-							<nav aria-label="作品导航" className={styles.navigation}>
+							<nav aria-label={t('作品导航')} className={styles.navigation}>
 								{workNavigation.map(({ route, icon: Icon, name }) => (
 									<NavLink
 										key={route}
@@ -183,14 +195,14 @@ export function AppShell() {
 										to={workRoute(route, workId)}
 									>
 										<Icon aria-hidden="true" size={19} strokeWidth={1.8} />
-										{name}
+										{t(name)}
 									</NavLink>
 								))}
 								<button
 									type="button"
 									className={styles.navLink}
 									aria-pressed={agentOpen}
-									title="Agent（Ctrl/⌘+J）"
+									title={t('Agent（Ctrl/⌘+J）')}
 									onClick={() => setAgentOpen(!agentOpen)}
 								>
 									<MessageSquareText
@@ -203,18 +215,18 @@ export function AppShell() {
 							</nav>
 						)}
 						<GlobalProductionQueue />
-						<fieldset className={styles.themes} aria-label="主题">
+						<fieldset className={styles.themes} aria-label={t('主题')}>
 							{themes.map(({ value, icon: Icon, name }) => (
 								<button
 									key={value}
 									type="button"
-									aria-label={name}
-									title={name}
+									aria-label={t(name)}
+									title={t(name)}
 									aria-pressed={theme === value}
 									disabled={!ready || !config || 'configError' in config}
 									onClick={() => {
 										void updateConfig({ theme: value }).catch(() =>
-											setHostError('无法保存主题'),
+											setHostError(t('无法保存主题')),
 										)
 									}}
 								>
@@ -223,7 +235,7 @@ export function AppShell() {
 							))}
 						</fieldset>
 						<p role="status" className={styles.announcer}>
-							{ready ? '创作端已就绪' : '创作端未就绪'}
+							{ready ? t('创作端已就绪') : t('创作端未就绪')}
 						</p>
 					</div>
 				</ScrollArea>
@@ -234,22 +246,22 @@ export function AppShell() {
 						<AlertTriangle aria-hidden="true" size={18} />
 						<span>
 							{interruption === 'breaker'
-								? '创作端连续 3 次未能启动，自动重启已暂停。'
+								? t('创作端连续 3 次未能启动，自动重启已暂停。')
 								: interruption === 'failed'
-									? '创作端启动失败。'
-									: '创作端已断开，正在尝试重新连接。'}
+									? t('创作端启动失败。')
+									: t('创作端已断开，正在尝试重新连接。')}
 						</span>
 						<button
 							type="button"
 							onClick={() => void runHostAction('openLogDir')}
 						>
-							日志
+							{t('日志')}
 						</button>
 						<button
 							type="button"
 							onClick={() => void runHostAction('restartCreator')}
 						>
-							重新启动
+							{t('重新启动')}
 						</button>
 					</div>
 				)}
@@ -258,7 +270,10 @@ export function AppShell() {
 						{hostError}
 					</p>
 				)}
-				<ScrollArea key={pathname} className={styles.mainScroll}>
+				<ScrollArea
+					key={`${i18n.language}:${pathname}`}
+					className={styles.mainScroll}
+				>
 					<Outlet
 						context={
 							{

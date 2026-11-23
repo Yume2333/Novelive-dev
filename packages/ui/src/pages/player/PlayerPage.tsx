@@ -22,6 +22,9 @@ import { type ControlChapter, PlayerControls } from './controls/PlayerControls'
 import { containsSentence, restoredChapterMode } from './controls/position'
 import { useChapterWait } from './controls/useChapterWait'
 import './player.css'
+import { scoped } from '../../i18n'
+
+const t = scoped('player')
 
 export function PlayerPage() {
 	const { id } = useParams()
@@ -126,9 +129,9 @@ export function PlayerPage() {
 						result.diagnostics.map((item) => item.message).join('\n'),
 					)
 				if (!result.scenes.some((scene) => scene.beats.length))
-					throw new Error('本章还没有可播放的剧本')
+					throw new Error(t('本章还没有可播放的剧本'))
 				if (restore && !containsSentence(result.scenes, restore.position))
-					throw new Error('存档中的句子已不存在')
+					throw new Error(t('存档中的句子已不存在'))
 				const validatedMode = onValidated?.() ?? mode
 				compiledChapters.current.set(chapter.chapterId, result.scenes)
 				chapterOrder.current = chapters.map((chapter) => chapter.chapterId)
@@ -183,7 +186,9 @@ export function PlayerPage() {
 					!('code' in cause) ||
 					cause.code !== 'not_found'
 				)
-					setError(cause instanceof Error ? cause.message : '无法打开本地工程')
+					setError(
+						cause instanceof Error ? cause.message : t('无法打开本地工程'),
+					)
 				return false
 			} finally {
 				setLoading(false)
@@ -215,7 +220,7 @@ export function PlayerPage() {
 		const unsubscribe = controls.subscribe(() => {
 			setEnded(controls.frame().ended)
 		})
-		const fail = () => setError('无法加载舞台素材')
+		const fail = () => setError(t('无法加载舞台素材'))
 		let restoring = !!loaded.restore
 		void mountMinimalPlayer(
 			host.current,
@@ -223,7 +228,7 @@ export function PlayerPage() {
 			{
 				resolveAsset: (asset) => {
 					const path = loaded.paths.get(asset)
-					if (!path) throw new Error('找不到素材')
+					if (!path) throw new Error(t('找不到素材'))
 					return window.novelive.resourceUrl(path)
 				},
 			},
@@ -233,6 +238,7 @@ export function PlayerPage() {
 			controls.rendered,
 			{
 				customMarks: loaded.customMarks,
+				endText: t('本章结束'),
 				chapterId: loaded.chapterId,
 				restore: loaded.restore,
 				start: loaded.start,
@@ -252,7 +258,7 @@ export function PlayerPage() {
 					if (id)
 						void window.novelive.host.progress
 							?.save(id, progress.current.data)
-							.catch(() => setError('无法保存阅读进度'))
+							.catch(() => setError(t('无法保存阅读进度')))
 				},
 			},
 		).catch(fail)
@@ -265,7 +271,7 @@ export function PlayerPage() {
 		const api = window.novelive.host.progress
 		const stage = host.current?.querySelector('.nl-player-stage')
 		if (!id || !api || !latest.current || !stage)
-			throw new Error('当前无法存档')
+			throw new Error(t('当前无法存档'))
 		const bounds = stage.getBoundingClientRect()
 		const entry = await api.saveSlot(id, slot, latest.current, {
 			x: Math.max(0, Math.ceil(bounds.x)),
@@ -290,7 +296,7 @@ export function PlayerPage() {
 				snapshot,
 				onValidated,
 			)
-			if (!loaded) throw new Error('无法读取存档')
+			if (!loaded) throw new Error(t('无法读取存档'))
 		}
 	}
 	function restoreHistory(index: number) {
@@ -302,7 +308,7 @@ export function PlayerPage() {
 					progress.current.data,
 					snapshot.position.chapterId,
 				)
-			}).catch(() => setError('无法读取历史记录'))
+			}).catch(() => setError(t('无法读取历史记录')))
 	}
 	const nextChapter = loaded
 		? chapters[
@@ -326,7 +332,7 @@ export function PlayerPage() {
 	return (
 		<main
 			className="nl-player"
-			aria-label="播放器"
+			aria-label={t('播放器')}
 			data-mode={loaded?.mode}
 			data-mainline={JSON.stringify(progress.current.data.mainline)}
 		>
@@ -394,7 +400,7 @@ export function PlayerPage() {
 					disabled={loading}
 					onClick={() => void openProject()}
 				>
-					{loading ? '正在加载' : '打开本地工程'}
+					{loading ? t('正在加载') : t('打开本地工程')}
 				</button>
 			)}
 			{error && (

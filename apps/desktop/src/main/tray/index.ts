@@ -8,6 +8,7 @@ import {
 	nativeImage,
 	Tray,
 } from 'electron'
+import { onLanguage, t } from '../i18n'
 
 const run = promisify(execFile)
 
@@ -57,9 +58,9 @@ export function installLifecycle(options: {
 			if (options.active()) {
 				const { response } = await dialog.showMessageBox({
 					type: 'question',
-					title: '退出 Novelive',
-					message: '制作仍在进行，确定停止制作并退出？',
-					buttons: ['继续制作', '停止并退出'],
+					title: t('退出 Novelive'),
+					message: t('制作仍在进行，确定停止制作并退出？'),
+					buttons: [t('继续制作'), t('停止并退出')],
 					defaultId: 0,
 					cancelId: 0,
 					noLink: true,
@@ -74,14 +75,15 @@ export function installLifecycle(options: {
 			prompting = false
 		}
 	}
-	const menu = Menu.buildFromTemplate([
-		{ label: '打开 Novelive', click: show },
-		{ type: 'separator' },
-		{
-			label: '退出 Novelive',
-			click: () => void quit(),
-		},
-	])
+	const menu = () =>
+		Menu.buildFromTemplate([
+			{ label: t('打开 Novelive'), click: show },
+			{ type: 'separator' },
+			{
+				label: t('退出 Novelive'),
+				click: () => void quit(),
+			},
+		])
 	try {
 		const pixels = Buffer.alloc(22 * 22 * 4)
 		for (let y = 2; y < 20; y += 1) {
@@ -95,7 +97,8 @@ export function installLifecycle(options: {
 			nativeImage.createFromBitmap(pixels, { width: 22, height: 22 }),
 		)
 		tray.setToolTip('Novelive')
-		tray.setContextMenu(menu)
+		tray.setContextMenu(menu())
+		onLanguage(() => tray?.setContextMenu(menu()))
 		tray.on('click', show)
 	} catch {
 		tray = undefined

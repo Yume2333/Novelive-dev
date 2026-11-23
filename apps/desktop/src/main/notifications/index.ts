@@ -3,12 +3,13 @@ import {
 	productionSnapshotEvent,
 } from '@novelive/creator/contract'
 import { type BrowserWindow, ipcMain, Notification } from 'electron'
+import { msg, t } from '../i18n'
 
 const titles = {
-	confirm: '等待确认',
-	attention: '需要处理',
-	done: '制作完成',
-	chapter: '新章已就绪',
+	confirm: msg('等待确认'),
+	attention: msg('需要处理'),
+	done: msg('制作完成'),
+	chapter: msg('新章已就绪'),
 } as const
 
 export function cleanText(value: string) {
@@ -43,7 +44,7 @@ export function installNotifications(
 	) {
 		if (!Notification.isSupported()) return
 		const notification = new Notification({
-			title: titles[kind],
+			title: t(titles[kind]),
 			body: cleanText(body),
 		})
 		notifications.add(notification)
@@ -70,7 +71,7 @@ export function installNotifications(
 			return
 		const before = previous.get(snapshot.workId)
 		previous.set(snapshot.workId, snapshot)
-		const title = snapshot.title ?? '作品'
+		const title = snapshot.title ?? t('作品')
 		if (
 			snapshot.status === 'confirm' &&
 			(before?.phase !== snapshot.phase || before.status !== 'confirm')
@@ -78,13 +79,13 @@ export function installNotifications(
 			const visual = snapshot.phase === 'confirm-visual'
 			notify(
 				'confirm',
-				`${title} · ${visual ? '角色设定 / 主视觉' : '第一章试玩'}`,
+				`${title} · ${visual ? t('角色设定 / 主视觉') : t('第一章试玩')}`,
 				snapshot.workId,
 				`/confirm/${visual ? 'visual' : 'first'}`,
 			)
 		}
 		if (snapshot.phase === 'done' && before?.phase !== 'done')
-			notify('done', `${title} · 全部章节`, snapshot.workId, '')
+			notify('done', `${title} · ${t('全部章节')}`, snapshot.workId, '')
 		const issue = snapshot.chapters.find(
 			(chapter) =>
 				chapter.issue &&
@@ -98,7 +99,12 @@ export function installNotifications(
 			(snapshot.blockedChapterId &&
 				snapshot.blockedChapterId !== before?.blockedChapterId)
 		)
-			notify('attention', `${title} · 制作`, snapshot.workId, '/production')
+			notify(
+				'attention',
+				`${title} · ${t('制作')}`,
+				snapshot.workId,
+				'/production',
+			)
 		if (waiting === snapshot.workId && !window()?.isFocused()) {
 			const chapter = snapshot.chapters.find(
 				(item) =>
@@ -111,7 +117,7 @@ export function installNotifications(
 			if (chapter) {
 				notify(
 					'chapter',
-					`${title} · ${snapshot.chapterTitles?.[chapter.chapterId] ?? '新章'}`,
+					`${title} · ${snapshot.chapterTitles?.[chapter.chapterId] ?? t('新章')}`,
 					snapshot.workId,
 					'/play',
 				)

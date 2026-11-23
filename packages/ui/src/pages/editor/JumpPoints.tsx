@@ -1,5 +1,8 @@
 import { useId, useRef, useState } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
+import { scoped } from '../../i18n'
+
+const t = scoped('editor')
 
 export function JumpPoints({
 	script,
@@ -35,11 +38,11 @@ export function JumpPoints({
 	}
 	return (
 		<div className="editor-jumps">
-			<span>快捷位置</span>
+			<span>{t('快捷位置')}</span>
 			<button
 				ref={trigger}
 				type="button"
-				aria-label="快捷位置"
+				aria-label={t('快捷位置')}
 				aria-haspopup="menu"
 				aria-expanded={expanded}
 				popoverTarget={id}
@@ -52,14 +55,14 @@ export function JumpPoints({
 					menu.current?.showPopover()
 				}}
 			>
-				跳转到句子
+				{t('跳转到句子')}
 			</button>
 			<div
 				ref={menu}
 				id={id}
 				popover="auto"
 				role="menu"
-				aria-label="快捷位置"
+				aria-label={t('快捷位置')}
 				className="editor-jump-menu"
 				style={position}
 				onToggle={() => {

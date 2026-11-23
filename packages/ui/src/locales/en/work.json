@@ -1,0 +1,19 @@
+{
+	"作品": "Works",
+	"作品概览": "Work overview",
+	"创作端已断开，等待重新连接。": "Authoring client disconnected. Waiting to reconnect.",
+	"创作端未连接。": "Authoring client not connected.",
+	"制作提示": "Production notice",
+	"开始游玩": "Start playing",
+	"无法读取制作状态，请重试。": "Unable to load production status. Please try again.",
+	"暂无章节": "No chapters yet",
+	"查看制作": "View production",
+	"正在读取制作状态…": "Loading production status…",
+	"确认第一章": "Confirm chapter 1",
+	"章节": "Chapters",
+	"第 {{value}} 章": "Chapter {{value}}",
+	"第一卷角色和主视觉已就绪，等待确认。": "The characters and key visual for volume 1 are ready. Awaiting confirmation.",
+	"第一章已发布，可以先试玩，再继续制作。": "Chapter 1 is published. Try it now, then continue production.",
+	"选择主视觉": "Select key visual",
+	"重新读取": "Reload"
+}

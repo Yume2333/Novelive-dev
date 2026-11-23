@@ -1,9 +1,12 @@
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
+import { scoped } from '../../../i18n'
 import { workRoute } from '../../../routes/production'
 import styles from '../Production.module.css'
 import queueStyles from './ProductionQueuePanel.module.css'
+
+const t = scoped('production')
 
 type WorkRow = { link: { workId: string }; title: string }
 type InactiveRow = WorkRow & {
@@ -19,20 +22,20 @@ type Props = {
 }
 
 function inactiveLabel(work: InactiveRow) {
-	if (work.status === 'done') return '已完成'
+	if (work.status === 'done') return t('已完成')
 	switch (work.reason) {
 		case 'confirm_visual':
-			return '待确认主视觉'
+			return t('待确认主视觉')
 		case 'confirm_first':
-			return '待确认第一章'
+			return t('待确认第一章')
 		case 'chapter_failed':
-			return '章节需要处理'
+			return t('章节需要处理')
 		case 'image_unsupported':
-			return '出图需要处理'
+			return t('出图需要处理')
 		case 'crashed':
-			return '异常退出后已暂停'
+			return t('异常退出后已暂停')
 		default:
-			return '已暂停'
+			return t('已暂停')
 	}
 }
 
@@ -49,36 +52,39 @@ export function ProductionQueuePanel({
 			className={`${styles.card} ${queueStyles.panel}`}
 			aria-labelledby={heading}
 		>
-			<h2 id={heading}>制作队列</h2>
+			<h2 id={heading}>{t('制作队列')}</h2>
 			{!queue.active && !queue.queued.length && !queue.inactive.length && (
-				<p className={styles.lead}>暂无制作任务</p>
+				<p className={styles.lead}>{t('暂无制作任务')}</p>
 			)}
 			{queue.active && (
 				<div className={`${styles.row} ${queueStyles.row}`}>
-					<WorkLink work={queue.active} label="制作中" />
+					<WorkLink work={queue.active} label={t('制作中')} />
 					<button
 						className={`${styles.button} ${queueStyles.actions}`}
 						type="button"
 						disabled={busy}
 						onClick={() => queue.active && onStop(queue.active.link.workId)}
 					>
-						立即停止
+						{t('立即停止')}
 					</button>
 				</div>
 			)}
 			{queue.queued.length > 0 && (
-				<ol className={styles.list} aria-label="排队中">
+				<ol className={styles.list} aria-label={t('排队中')}>
 					{queue.queued.map((work, index) => (
 						<li
 							className={`${styles.row} ${queueStyles.row}`}
 							key={work.link.workId}
 						>
-							<WorkLink work={work} label={`排队中 · ${index + 1}`} />
+							<WorkLink
+								work={work}
+								label={t('排队中 · {{value}}', { value: index + 1 })}
+							/>
 							<div className={`${styles.actions} ${queueStyles.actions}`}>
 								<button
 									className={styles.button}
 									type="button"
-									aria-label={`提前：${work.title}`}
+									aria-label={t('提前：{{title}}', { title: work.title })}
 									disabled={busy || index === 0}
 									onClick={() => onMove(work.link.workId, -1)}
 								>
@@ -87,7 +93,7 @@ export function ProductionQueuePanel({
 								<button
 									className={styles.button}
 									type="button"
-									aria-label={`延后：${work.title}`}
+									aria-label={t('延后：{{title}}', { title: work.title })}
 									disabled={busy || index === queue.queued.length - 1}
 									onClick={() => onMove(work.link.workId, 1)}
 								>
@@ -99,7 +105,7 @@ export function ProductionQueuePanel({
 				</ol>
 			)}
 			{queue.inactive.length > 0 && (
-				<ul className={styles.list} aria-label="未在排队">
+				<ul className={styles.list} aria-label={t('未在排队')}>
 					{queue.inactive.map((work) => (
 						<li
 							className={`${styles.row} ${queueStyles.row}`}
@@ -123,7 +129,7 @@ export function ProductionQueuePanel({
 									disabled={busy}
 									onClick={() => onContinue(work.link.workId)}
 								>
-									继续制作
+									{t('继续制作')}
 								</button>
 							)}
 						</li>

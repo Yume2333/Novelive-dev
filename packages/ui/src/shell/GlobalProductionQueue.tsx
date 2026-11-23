@@ -7,8 +7,11 @@ import { Workflow, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { ScrollArea } from '../components/ScrollArea'
+import { scoped } from '../i18n'
 import { ProductionQueuePanel } from '../pages/production/queue/ProductionQueuePanel'
 import styles from './GlobalProductionQueue.module.css'
+
+const t = scoped('shell')
 
 export function GlobalProductionQueue() {
 	const [queue, setQueue] = useState<CommandOutput<'production.getQueue'>>()
@@ -37,7 +40,7 @@ export function GlobalProductionQueue() {
 				},
 				() => {
 					if (active && current === revision)
-						setError('无法读取制作队列，请重试')
+						setError(t('无法读取制作队列，请重试'))
 				},
 			)
 		}
@@ -52,7 +55,7 @@ export function GlobalProductionQueue() {
 		const offDown = window.novelive.on('creator.down', () => {
 			revision++
 			setQueue(undefined)
-			setError('创作端已断开，等待重新连接。')
+			setError(t('创作端已断开，等待重新连接。'))
 		})
 		void window.novelive.host.appState().then((state) => {
 			if (active && revision === 0 && state.creator === 'ready') load()
@@ -75,10 +78,12 @@ export function GlobalProductionQueue() {
 				setError(
 					/[\u3400-\u9fff]/.test(failure.message)
 						? failure.message
-						: '模型配置无效，请在设置中检查接口地址、API Key、模型名和上下文长度。',
+						: t(
+								'模型配置无效，请在设置中检查接口地址、API Key、模型名和上下文长度。',
+							),
 				)
 			} else {
-				setError('队列操作失败，请重试')
+				setError(t('队列操作失败，请重试'))
 			}
 		} finally {
 			setBusy(false)
@@ -86,7 +91,7 @@ export function GlobalProductionQueue() {
 	}
 	const status =
 		queue?.active || queue?.queued.length
-			? '制作中'
+			? t('制作中')
 			: queue?.inactive.some(
 						(work) =>
 							work.status === 'awaiting_confirm' ||
@@ -94,16 +99,16 @@ export function GlobalProductionQueue() {
 								work.reason !== 'stopped' &&
 								work.reason !== 'crashed'),
 					)
-				? '待确认'
+				? t('待确认')
 				: queue?.inactive.some((work) => work.status === 'paused')
-					? '已停止'
-					: '空闲'
+					? t('已停止')
+					: t('空闲')
 	return (
 		<>
 			<button
 				type="button"
 				className={styles.status}
-				aria-label={`全局制作状态：${status}`}
+				aria-label={t('全局制作状态：{{status}}', { status })}
 				aria-expanded={open}
 				onClick={() => {
 					setReload((value) => value + 1)
@@ -117,14 +122,14 @@ export function GlobalProductionQueue() {
 			<dialog
 				ref={dialog}
 				className={styles.drawer}
-				aria-label="制作队列"
+				aria-label={t('制作队列')}
 				onClose={() => setOpen(false)}
 			>
 				<header className={styles.header}>
 					<button
 						type="button"
 						className={styles.close}
-						aria-label="关闭制作队列"
+						aria-label={t('关闭制作队列')}
 						onClick={() => dialog.current?.close()}
 					>
 						<X aria-hidden="true" size={18} strokeWidth={1.8} />
@@ -132,7 +137,7 @@ export function GlobalProductionQueue() {
 				</header>
 				<ScrollArea className={styles.scroll}>
 					{error && <p role="alert">{error}</p>}
-					{!queue && !error && <p role="status">正在读取制作队列</p>}
+					{!queue && !error && <p role="status">{t('正在读取制作队列')}</p>}
 					{queue && (
 						<ProductionQueuePanel
 							queue={queue}
@@ -167,7 +172,7 @@ export function GlobalProductionQueue() {
 							disabled={busy}
 							onClick={() => setReload((value) => value + 1)}
 						>
-							重新读取
+							{t('重新读取')}
 						</button>
 					)}
 				</ScrollArea>

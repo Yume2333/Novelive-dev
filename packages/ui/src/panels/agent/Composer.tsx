@@ -8,8 +8,11 @@ import {
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { OverlayScrollbar } from '../../components/ScrollArea'
+import { scoped } from '../../i18n'
 import styles from './AgentPanel.module.css'
 import type { Attachment } from './session'
+
+const t = scoped('agent')
 
 const imageTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 type Pending = { attachment: Attachment; url: string }
@@ -91,7 +94,7 @@ export function Composer({
 				])
 			}
 		} catch {
-			setError('图片没能加进来')
+			setError(t('图片没能加进来'))
 		}
 	}
 	const remove = (id: string) =>
@@ -115,7 +118,7 @@ export function Composer({
 			setText('')
 			setExpanded(false)
 		} catch {
-			setError('没能发出，请重试')
+			setError(t('没能发出，请重试'))
 		} finally {
 			setBusy(false)
 		}
@@ -124,13 +127,13 @@ export function Composer({
 	return (
 		<div className={styles.composer}>
 			{pending.length > 0 && (
-				<ul className={styles.pending} aria-label="待发送的图片">
+				<ul className={styles.pending} aria-label={t('待发送的图片')}>
 					{pending.map(({ attachment, url }) => (
 						<li key={attachment.id} className={styles.pendingItem}>
 							<button
 								type="button"
 								className={styles.thumb}
-								aria-label={`查看图片 ${attachment.name}`}
+								aria-label={t('查看图片 {{name}}', { name: attachment.name })}
 								onClick={() => onPreview(url, attachment.name)}
 							>
 								<img src={url} alt={attachment.name} />
@@ -138,7 +141,7 @@ export function Composer({
 							<button
 								type="button"
 								className={styles.remove}
-								aria-label={`移除 ${attachment.name}`}
+								aria-label={t('移除 {{name}}', { name: attachment.name })}
 								onClick={() => remove(attachment.id)}
 							>
 								<X aria-hidden="true" size={12} />
@@ -151,8 +154,8 @@ export function Composer({
 				<button
 					type="button"
 					className={styles.iconButton}
-					aria-label="添加图片"
-					title="添加图片"
+					aria-label={t('添加图片')}
+					title={t('添加图片')}
 					disabled={disabled}
 					onClick={() => picker.current?.click()}
 				>
@@ -173,8 +176,8 @@ export function Composer({
 					<textarea
 						ref={input}
 						className={styles.input}
-						aria-label="给 Agent 发消息"
-						placeholder="说说想改什么，可以直接贴图"
+						aria-label={t('给 Agent 发消息')}
+						placeholder={t('说说想改什么，可以直接贴图')}
 						rows={1}
 						data-expanded={expanded}
 						data-capped={capped || expanded}
@@ -204,8 +207,8 @@ export function Composer({
 						<button
 							type="button"
 							className={`${styles.iconButton} ${styles.expand}`}
-							aria-label={expanded ? '收起输入框' : '放大输入框'}
-							title={expanded ? '收起' : '放大'}
+							aria-label={expanded ? t('收起输入框') : t('放大输入框')}
+							title={expanded ? t('收起') : t('放大')}
 							onClick={() => setExpanded(!expanded)}
 						>
 							{expanded ? (
@@ -220,8 +223,8 @@ export function Composer({
 					<button
 						type="button"
 						className={styles.iconButton}
-						aria-label="停止"
-						title="停止"
+						aria-label={t('停止')}
+						title={t('停止')}
 						onClick={onStop}
 					>
 						<Square aria-hidden="true" size={15} />
@@ -230,8 +233,8 @@ export function Composer({
 					<button
 						type="button"
 						className={styles.send}
-						aria-label="发送"
-						title="发送（Enter）"
+						aria-label={t('发送')}
+						title={t('发送（Enter）')}
 						disabled={
 							disabled || busy || (!text.trim() && pending.length === 0)
 						}

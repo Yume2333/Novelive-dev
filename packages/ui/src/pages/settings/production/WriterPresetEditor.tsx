@@ -1,7 +1,10 @@
 import type { WriterPreset } from '@novelive/creator/contract'
 import { useRef, useState } from 'react'
 import { OverlayScrollbar } from '../../../components/ScrollArea'
+import { scoped } from '../../../i18n'
 import styles from '../SettingsPage.module.css'
+
+const t = scoped('settings')
 
 function TextArea({
 	name,
@@ -41,7 +44,7 @@ export function WriterPresetEditor({
 	)
 	return (
 		<form
-			aria-label="编辑写手预设"
+			aria-label={t('编辑写手预设')}
 			className={styles.presetEditor}
 			onSubmit={(event) => {
 				event.preventDefault()
@@ -68,18 +71,18 @@ export function WriterPresetEditor({
 			}}
 		>
 			<label className={styles.field}>
-				预设名称
+				{t('预设名称')}
 				<input name="name" defaultValue={preset.name} required />
 			</label>
-			<TextArea name="style" label="文风说明" value={preset.style} />
+			<TextArea name="style" label={t('文风说明')} value={preset.style} />
 			<TextArea
 				name="constraints"
-				label="输出约束"
+				label={t('输出约束')}
 				value={preset.constraints}
 			/>
 			<div className={styles.results}>
 				<label className={styles.field}>
-					温度
+					{t('温度')}
 					<input
 						type="number"
 						name="temperature"
@@ -101,7 +104,7 @@ export function WriterPresetEditor({
 					/>
 				</label>
 				<label className={styles.field}>
-					最大输出
+					{t('最大输出')}
 					<input
 						type="number"
 						name="maxTokens"
@@ -111,29 +114,29 @@ export function WriterPresetEditor({
 					/>
 				</label>
 			</div>
-			<section aria-label="输出替换规则">
+			<section aria-label={t('输出替换规则')}>
 				{rows.map(({ id, find, replace }, index) => (
 					<div className={styles.replacement} key={id}>
 						<input
 							name={`find-${id}`}
-							aria-label={`查找 ${index + 1}`}
+							aria-label={t('查找 {{value}}', { value: index + 1 })}
 							defaultValue={find}
-							placeholder="查找"
+							placeholder={t('查找')}
 							required
 						/>
 						<input
 							name={`replace-${id}`}
-							aria-label={`替换为 ${index + 1}`}
+							aria-label={t('替换为 {{value}}', { value: index + 1 })}
 							defaultValue={replace}
-							placeholder="替换为"
+							placeholder={t('替换为')}
 						/>
 						<button
 							type="button"
-							aria-label={`移除替换规则 ${index + 1}`}
+							aria-label={t('移除替换规则 {{value}}', { value: index + 1 })}
 							disabled={busy}
 							onClick={() => setRows(rows.filter((row) => row.id !== id))}
 						>
-							移除
+							{t('移除')}
 						</button>
 					</div>
 				))}
@@ -144,15 +147,15 @@ export function WriterPresetEditor({
 						setRows([...rows, { id: nextRow.current++, find: '', replace: '' }])
 					}
 				>
-					添加替换规则
+					{t('添加替换规则')}
 				</button>
 			</section>
 			<div className={styles.actions}>
 				<button type="button" disabled={busy} onClick={cancel}>
-					取消
+					{t('取消')}
 				</button>
 				<button type="submit" disabled={busy}>
-					保存预设
+					{t('保存预设')}
 				</button>
 			</div>
 		</form>

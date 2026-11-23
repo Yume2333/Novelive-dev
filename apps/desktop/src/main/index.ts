@@ -14,6 +14,7 @@ import {
 } from 'electron'
 import { cacheResponse } from '../../../../packages/creator/src/host-runtime/cache'
 import { installProgressIpc } from '../progress-ipc'
+import { t } from './i18n'
 import { installNotifications } from './notifications'
 import { installLifecycle } from './tray'
 
@@ -216,10 +217,10 @@ app.whenReady().then(async () => {
 				kind === 'image' ? ['openFile', 'multiSelections'] : ['openFile'],
 			filters:
 				kind === 'image'
-					? [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+					? [{ name: t('图片'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
 					: [
 							{
-								name: '原文',
+								name: t('原文'),
 								extensions: ['txt', 'epub', 'md', 'markdown', 'docx', 'pdf'],
 							},
 						],

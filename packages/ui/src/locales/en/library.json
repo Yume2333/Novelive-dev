@@ -1,0 +1,11 @@
+{
+	"书库": "Library",
+	"书库还是空的": "Your library is empty",
+	"导入原文": "Import source text",
+	"已发布 {{published}} / {{chapters}} 章": "Published {{published}} / {{chapters}} chapters",
+	"我的工程": "My projects",
+	"无法读取书库": "Could not load library",
+	"有 {{unreadableCount}} 部作品无法读取": "{{unreadableCount}} works could not be read",
+	"正在读取书库": "Loading library",
+	"还没有作品": "No works yet"
+}

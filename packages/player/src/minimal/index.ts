@@ -25,6 +25,7 @@ export async function mountMinimalPlayer(
 		restore?: StageSnapshot
 		start?: SentenceRef
 		onSnapshot?(snapshot: StageSnapshot): void
+		endText?: string
 	} = {},
 ): Promise<void> {
 	const app = new Application()
@@ -131,7 +132,7 @@ export async function mountMinimalPlayer(
 		textRenderer = undefined
 		displayedLine = undefined
 		if (!current) {
-			overlay.textContent = '本章结束'
+			overlay.textContent = options.endText ?? '本章结束'
 			return
 		}
 		for (const action of current.actions) {

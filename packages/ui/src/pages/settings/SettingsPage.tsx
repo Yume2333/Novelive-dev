@@ -23,6 +23,7 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Collapse } from '../../components/Collapse'
+import { localeNames, locales, msg, scoped } from '../../i18n'
 import type { SettingsHost } from '../../shell/AppShell'
 import {
 	type ModelDraft,
@@ -34,16 +35,18 @@ import {
 import { ProductionSettings } from './production/ProductionSettings'
 import styles from './SettingsPage.module.css'
 
+const t = scoped('settings')
+
 const textSlots = [
-	['fast', '快速模型', Zap],
-	['main', '主模型', Brain],
-	['writing', '写作模型', FilePenLine],
-	['visual', '视觉模型', Eye],
+	['fast', msg('快速模型'), Zap],
+	['main', msg('主模型'), Brain],
+	['writing', msg('写作模型'), FilePenLine],
+	['visual', msg('视觉模型'), Eye],
 ] as const
 const capabilities = [
-	['generate', '文生图'],
-	['transparent', '透明底'],
-	['edit', '图片编辑'],
+	['generate', msg('文生图')],
+	['transparent', msg('透明底')],
+	['edit', msg('图片编辑')],
 ] as const
 
 type ImageTests = CommandOutput<'model.testImage'>
@@ -56,24 +59,26 @@ function readableError(error: unknown): CommandError {
 			: undefined
 	const code = failure?.code ?? 'internal'
 	const message = {
-		auth: '鉴权失败，请检查接口地址、API Key 和模型名。',
-		not_found: '接口或模型不存在，请检查接口地址和模型名。',
-		network: '连接中断或服务暂不可用，请检查接口地址、API Key 和模型名后重试。',
-		moderation: '请求被内容审核拒绝。',
-		context_limit: '内容超出模型的上下文限制，请选择上下文更长的模型。',
-		reasoning_limit: '模型用完了推理额度，未返回答案。请尝试其他模型。',
-		stale_revision: '内容已改变，请刷新后重试。',
+		auth: t('鉴权失败，请检查接口地址、API Key 和模型名。'),
+		not_found: t('接口或模型不存在，请检查接口地址和模型名。'),
+		network: t(
+			'连接中断或服务暂不可用，请检查接口地址、API Key 和模型名后重试。',
+		),
+		moderation: t('请求被内容审核拒绝。'),
+		context_limit: t('内容超出模型的上下文限制，请选择上下文更长的模型。'),
+		reasoning_limit: t('模型用完了推理额度，未返回答案。请尝试其他模型。'),
+		stale_revision: t('内容已改变，请刷新后重试。'),
 		invalid_config:
 			failure?.message && /[\u3400-\u9fff]/.test(failure.message)
 				? failure.message
-				: '配置无效，请检查接口地址、API Key、模型名和上下文长度。',
-		unsupported: failure?.message ?? '当前模型不支持此项。',
-		cancelled: '已取消测试。',
-		creator_down: '创作端已断开，重新连接后可再测试。',
+				: t('配置无效，请检查接口地址、API Key、模型名和上下文长度。'),
+		unsupported: failure?.message ?? t('当前模型不支持此项。'),
+		cancelled: t('已取消测试。'),
+		creator_down: t('创作端已断开，重新连接后可再测试。'),
 		internal:
 			failure?.message && /[\u3400-\u9fff]/.test(failure.message)
 				? failure.message
-				: '操作失败，请重试。',
+				: t('操作失败，请重试。'),
 	}[code]
 	return { code, message }
 }
@@ -88,20 +93,20 @@ function IconTile({ icon: Icon }: { icon: LucideIcon }) {
 
 function ImageResults({ results }: { results: ImageTests }) {
 	return (
-		<section className={styles.results} aria-label="图片测试结果">
+		<section className={styles.results} aria-label={t('图片测试结果')}>
 			{capabilities.map(([capability, title]) => {
 				const result = results[capability]
 				const error = result.ok ? undefined : readableError(result.error)
 				return (
 					<div key={capability} className={styles.result}>
-						<strong>{title}</strong>
+						<strong>{t(title)}</strong>
 						{result.ok ? (
 							<>
 								<img
 									src={window.novelive.resourceUrl(result.thumbnail)}
-									alt={`${title}测试缩略图`}
+									alt={t('{{title}}测试缩略图', { title: t(title) })}
 								/>
-								<span className={styles.success}>测试成功</span>
+								<span className={styles.success}>{t('测试成功')}</span>
 							</>
 						) : (
 							<small className={styles.error} data-error-code={error?.code}>
@@ -185,7 +190,7 @@ function ModelCard({
 					<IconTile icon={icon} />
 					<span className={styles.summary}>
 						<strong>{title}</strong>
-						<small>{summary || '未填写模型名'}</small>
+						<small>{summary || t('未填写模型名')}</small>
 					</span>
 					<ChevronDown
 						className={styles.chevron}
@@ -194,7 +199,7 @@ function ModelCard({
 					/>
 				</button>
 				<small className={configured ? styles.success : styles.muted}>
-					{configured ? '已配置' : '未配置'}
+					{configured ? t('已配置') : t('未配置')}
 				</small>
 				{phase === 'testing' ? (
 					<button
@@ -202,7 +207,7 @@ function ModelCard({
 						type="button"
 						onClick={() => work.current?.abort()}
 					>
-						取消
+						{t('取消')}
 					</button>
 				) : (
 					<button
@@ -211,7 +216,7 @@ function ModelCard({
 						disabled={busy}
 						onClick={() => void run(true)}
 					>
-						<Cable size={14} aria-hidden="true" /> 测试
+						<Cable size={14} aria-hidden="true" /> {t('测试')}
 					</button>
 				)}
 			</div>
@@ -222,19 +227,19 @@ function ModelCard({
 					data-error-code={error?.code}
 				>
 					{phase === 'testing' ? (
-						'正在测试…'
+						t('正在测试…')
 					) : phase === 'saving' ? (
-						'正在保存…'
+						t('正在保存…')
 					) : error ? (
 						error.message
 					) : complete ? (
 						<>
-							<Check size={14} aria-hidden="true" /> 连接成功
+							<Check size={14} aria-hidden="true" /> {t('连接成功')}
 						</>
 					) : images ? (
-						'测试完成，请查看各项结果。'
+						t('测试完成，请查看各项结果。')
 					) : (
-						'已保存'
+						t('已保存')
 					)}
 				</p>
 			)}
@@ -250,7 +255,7 @@ function ModelCard({
 							disabled={busy || !draft.dirty}
 							onClick={() => void run(false)}
 						>
-							保存
+							{t('保存')}
 						</button>
 					</div>
 				</div>
@@ -300,7 +305,7 @@ function ImageCard({
 	const draft = useImageFields(model, update)
 	return (
 		<ModelCard
-			title="图片模型"
+			title={t('图片模型')}
 			icon={Image}
 			summary={[model.model, model.baseUrl].filter(Boolean).join(' · ')}
 			configured={Boolean(model.model && model.baseUrl && model.apiKeyMasked)}
@@ -342,19 +347,19 @@ export function SettingsPage() {
 	}
 	return (
 		<section className={styles.page}>
-			<h1>设置</h1>
+			<h1>{t('设置')}</h1>
 			{error && (
 				<p role="alert" className={styles.warning}>
 					{error}
 				</p>
 			)}
 			{!config ? (
-				<p className={styles.muted}>正在读取设置…</p>
+				<p className={styles.muted}>{t('正在读取设置…')}</p>
 			) : 'configError' in config ? (
 				<div className={styles.warning} role="alert">
 					<AlertTriangle size={19} aria-hidden="true" />
 					<div>
-						<strong>配置文件无法读取</strong>
+						<strong>{t('配置文件无法读取')}</strong>
 						<p>{config.configError.reason}</p>
 						<p className={styles.path}>{config.configError.path}</p>
 					</div>
@@ -366,19 +371,19 @@ export function SettingsPage() {
 							void apply(resetConfig).finally(() => setResetting(false))
 						}}
 					>
-						重置配置
+						{t('重置配置')}
 					</button>
 				</div>
 			) : (
 				<>
 					<section aria-labelledby="model-settings">
-						<h2 id="model-settings">模型</h2>
+						<h2 id="model-settings">{t('模型')}</h2>
 						<div className={styles.cards}>
 							{textSlots.map(([slot, title, icon]) => (
 								<TextCard
 									key={slot}
 									slot={slot}
-									title={title}
+									title={t(title)}
 									icon={icon}
 									models={config.models}
 									update={updateConfig}
@@ -392,22 +397,26 @@ export function SettingsPage() {
 						/>
 					</section>
 					<section aria-labelledby="appearance-settings">
-						<h2 id="appearance-settings">界面</h2>
+						<h2 id="appearance-settings">{t('界面')}</h2>
 						<div className={`${styles.card} ${styles.appearance}`}>
-							<SettingRow title="界面语言" icon={Globe}>
+							<SettingRow title={t('界面语言')} icon={Globe}>
 								<Select
-									label="界面语言"
-									options={[['zh-CN', '简体中文']]}
+									label={t('界面语言')}
+									options={locales.map(
+										(locale) => [locale, localeNames[locale]] as const,
+									)}
 									value={config.language}
 									onChange={(language) =>
 										void apply(() => updateConfig({ language }))
 									}
 								/>
 							</SettingRow>
-							<SettingRow title="主题" icon={Contrast}>
+							<SettingRow title={t('主题')} icon={Contrast}>
 								<Select
-									label="主题"
-									options={themes}
+									label={t('主题')}
+									options={themes.map(
+										([value, name]) => [value, t(name)] as const,
+									)}
 									value={config.theme}
 									onChange={(theme) =>
 										void apply(() => updateConfig({ theme }))
@@ -417,11 +426,11 @@ export function SettingsPage() {
 						</div>
 					</section>
 					<section aria-labelledby="project-settings">
-						<h2 id="project-settings">工程</h2>
+						<h2 id="project-settings">{t('工程')}</h2>
 						<div className={styles.card}>
-							<SettingRow title="默认工程位置" icon={FolderOpen}>
+							<SettingRow title={t('默认工程位置')} icon={FolderOpen}>
 								<small className={styles.path}>
-									{config.projectDir || '未设置'}
+									{config.projectDir || t('未设置')}
 								</small>
 								<button
 									type="button"
@@ -433,25 +442,25 @@ export function SettingsPage() {
 										})
 									}
 								>
-									更改
+									{t('更改')}
 								</button>
 							</SettingRow>
 						</div>
 					</section>
 					<section aria-labelledby="about-settings">
-						<h2 id="about-settings">关于</h2>
+						<h2 id="about-settings">{t('关于')}</h2>
 						<div className={`${styles.card} ${styles.about}`}>
 							<div className={styles.row}>
 								<IconTile icon={BookOpen} />
 								<span>
 									<strong>Novelive</strong>
-									<small>把小说改编为视觉小说并直接游玩。</small>
+									<small>{t('把小说改编为视觉小说并直接游玩。')}</small>
 								</span>
 								<small>v0.1.0 · AGPL-3.0</small>
 							</div>
 							<div className={styles.aboutLinks}>
-								<span>第三方许可（待提供）</span>
-								<span>源代码（待接入）</span>
+								<span>{t('第三方许可（待提供）')}</span>
+								<span>{t('源代码（待接入）')}</span>
 							</div>
 						</div>
 					</section>
