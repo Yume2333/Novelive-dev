@@ -341,7 +341,8 @@ test('requests a schema repair for bare model-generated place IDs after a stagin
 			expect(prompt).toContain('Repair the staging patch and manifest')
 			expect(prompt).toContain('/items/0/id')
 			expect(prompt).toContain('/items/2/id')
-			expect(prompt).toContain('place/variant')
+			expect(prompt).toContain('location: place/variant')
+			expect(prompt).toContain('character: character/costume/expression')
 		}
 		return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
 			headers: { 'content-type': 'text/event-stream' },

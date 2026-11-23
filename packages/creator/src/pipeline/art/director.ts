@@ -7,7 +7,12 @@ import {
 } from '@novelive/format/script'
 import { buildTextModel, type TextConnection } from '../../models/text'
 import { ArtResponseSchemaError, artJson, type ModelOptions } from './models'
-import { type ArtBible, type ManifestItem, planArt } from './plan'
+import {
+	type ArtBible,
+	manifestIdShapes,
+	type ManifestItem,
+	planArt,
+} from './plan'
 
 const responseSchema = obj({
 	patch: str(),
@@ -20,6 +25,10 @@ const responseSchema = obj({
 	),
 	merges: map(assetId),
 })
+
+const manifestIdGuidance = Object.entries(manifestIdShapes)
+	.map(([kind, shape]) => `${kind}: ${shape}`)
+	.join('; ')
 
 export type CgReferences = { costumes: readonly string[]; location?: string }
 type ScriptOptions = NonNullable<Parameters<typeof parseScript>[1]>
@@ -194,7 +203,7 @@ export async function directChapterArt(
 			).catch((error: unknown) => {
 				if (!(error instanceof ArtResponseSchemaError) || schemaRepair)
 					throw error
-				schemaRepair = `Repair the JSON manifest: ${error.message}. Use lowercase ASCII asset IDs with digits, underscores or hyphens. Use place/variant for locations, character/costume or character/costume/expression for characters, and cg-name for CGs. Do not use a bare place ID; make manifest IDs and patch references agree.`
+				schemaRepair = `Repair the JSON manifest: ${error.message}. Use lowercase ASCII asset IDs with digits, underscores or hyphens. Required ID shapes by kind: ${manifestIdGuidance}. Do not use a bare place ID; make manifest IDs and patch references agree.`
 			})
 			if (!result) continue
 			try {
