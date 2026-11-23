@@ -79,11 +79,9 @@ export function installLifecycle(options: {
 		{ type: 'separator' },
 		{
 			label: '退出 Novelive',
-			accelerator: 'CmdOrCtrl+Q',
 			click: () => void quit(),
 		},
 	])
-	Menu.setApplicationMenu(menu)
 	try {
 		const pixels = Buffer.alloc(22 * 22 * 4)
 		for (let y = 2; y < 20; y += 1) {

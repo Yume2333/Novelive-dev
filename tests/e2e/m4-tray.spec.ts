@@ -9,7 +9,7 @@ const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
 )
 
-test('M4 desktop lifecycle keeps the real creator alive without a tray and reopens from the app menu', async () => {
+test('M4 desktop lifecycle keeps the real creator alive without a tray and reopens on activation', async () => {
 	const profile = mkdtempSync(join(tmpdir(), 'novelive-tray-'))
 	writeFileSync(join(profile, 'gdbus'), '#!/bin/sh\necho "(<false>,)"\n', {
 		mode: 0o755,
@@ -44,9 +44,7 @@ test('M4 desktop lifecycle keeps the real creator alive without a tray and reope
 		expect(
 			(await page.evaluate(() => window.novelive.host.appState())).generation,
 		).toBe(before.generation)
-		await desktop.evaluate(({ Menu }) =>
-			Menu.getApplicationMenu()?.items[0].click(),
-		)
+		await desktop.evaluate(({ app }) => app.emit('activate'))
 		await expect(
 			page.getByRole('heading', { name: '书库', exact: true }),
 		).toBeVisible()
@@ -63,9 +61,7 @@ test('M4 desktop lifecycle keeps the real creator alive without a tray and reope
 				),
 			)
 			.toBe(false)
-		await desktop.evaluate(({ Menu }) =>
-			Menu.getApplicationMenu()?.items[0].click(),
-		)
+		await desktop.evaluate(({ app }) => app.emit('activate'))
 		expect(
 			await desktop.evaluate(({ BrowserWindow }) =>
 				BrowserWindow.getAllWindows()[0].isVisible(),
@@ -98,6 +94,7 @@ test('M4 desktop lifecycle confirms active quit, cancels safely and cleans up on
 		const result = await desktop.evaluate(
 			async ({ app, dialog, Menu }, code) => {
 				app.removeAllListeners('before-quit')
+				const defaultMenu = Menu.getApplicationMenu()
 				const exported: {
 					installLifecycle?: (options: {
 						window(): undefined
@@ -128,18 +125,26 @@ test('M4 desktop lifecycle confirms active quit, cancels safely and cleans up on
 						cleaned += 1
 					},
 				})
-				Menu.getApplicationMenu()?.items[2].click()
+				const menuPreserved = Menu.getApplicationMenu() === defaultMenu
+				const requestQuit = () =>
+					app.emit('before-quit', { preventDefault() {} } as Electron.Event)
+				requestQuit()
 				await new Promise((resolve) => setImmediate(resolve))
 				const cancelled = { cleaned, prompts, quits }
 				response = 1
-				Menu.getApplicationMenu()?.items[2].click()
+				requestQuit()
 				await new Promise((resolve) => setImmediate(resolve))
 				app.quit = realQuit
-				return { cancelled, accepted: { cleaned, prompts, quits } }
+				return {
+					menuPreserved,
+					cancelled,
+					accepted: { cleaned, prompts, quits },
+				}
 			},
 			source,
 		)
 		expect(result).toEqual({
+			menuPreserved: true,
 			cancelled: { cleaned: 0, prompts: 1, quits: 0 },
 			accepted: { cleaned: 1, prompts: 2, quits: 1 },
 		})
