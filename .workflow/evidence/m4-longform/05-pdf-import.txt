@@ -1,8 +1,8 @@
 $ NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-pdf.test.ts
  Test Files  1 passed (1)
-      Tests  11 passed (11)
-   Start at  03:09:14
-   Duration  395ms (tests 51%, import 27%, transform 20%, worker 1%)
+      Tests  16 passed (16)
+   Start at  03:31:59
+   Duration  436ms (tests 58%, import 26%, transform 16%, worker 1%)
 
 $ pnpm typecheck
 $ tsc --noEmit
@@ -10,7 +10,7 @@ exit 0
 
 $ pnpm lint
 $ biome check && stylelint 'packages/ui/src/**/*.css'
-Checked 245 files in 123ms. No fixes applied.
+Checked 245 files in 113ms. No fixes applied.
 Found 1 info.
 exit 0 (pre-existing useTemplate info in tests/fixtures/text-models/build-synthetic.ts)
 
@@ -40,3 +40,16 @@ extractedBookSchema requires paragraphs minItems: 1. Direct parseTxt probe of co
 matter followed by Chapter 1 produces a preface with paragraphs: [], notes: ["版权页"].
 Mapping this unchanged into importExtractionSchema gives: notes-only contract valid: false.
 No shared schema was changed; PDF's notes-only chapter filter remains pending a contract decision.
+
+Round 2 review fixes (supersede previous edge heuristics):
+4bf8d82 classifies top/bottom zones by >1.5x spacing gaps and computes margins/spacing from body only.
+7b7cd06 strips repeated edges only in zones, retaining repeated prose and the first top heading.
+d9f1e72 strips bare-number zones only with consistent offsets on at least three pages, regardless of x;
+explicit dashed/Chinese page numbers are stripped only in zones. Nonsequenced numeric chapters remain.
+1eaa1e2 continues unmarked soft-wrapped note lines on the same page; page changes close note paragraphs.
+The original notes fixture now explicitly indents the following body paragraph to distinguish it from
+a wrapped note; original expected body/notes are unchanged.
+dba769b indexes folio offsets by zone in Map<string, Set<number>>, avoiding cross-page nested scans.
+New regression fixtures cover left folios, repeated prose, nonsequenced zone chapters, two-page
+insufficient evidence, wrapped notes and forty-page folio sequences. Earlier header/folio fixtures
+now encode actual vertical header/footer separation rather than ordinary prose spacing.
