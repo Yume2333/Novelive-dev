@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
 import { Project } from './index'
+import { chapterStates, isChapterPublished } from './publication'
 import { resolveBible, resolveRegistry } from './series/resolve'
 
 async function playerChapters(
@@ -11,17 +12,13 @@ async function playerChapters(
 	workId: string,
 	chapterIds: readonly string[],
 ) {
-	const states = project.database
-		.prepare('SELECT chapter_id, user_state FROM chapter WHERE work_id = ?')
-		.all(workId)
+	const states = chapterStates(project, workId)
 	return Promise.all(
 		chapterIds.map(async (chapterId) => {
 			const document = await project.read(
 				projectFiles.chapter({ volumeId, workId, chapterId }),
 			)
-			const state = states.find(
-				(row) => row.chapter_id === chapterId,
-			)?.user_state
+			const state = states.get(chapterId)
 			const task = project.database
 				.prepare(
 					"SELECT phase FROM task WHERE work_id = ? AND ref_id = ? AND kind IN ('chapter', 'redo_chapter') ORDER BY seq DESC LIMIT 1",
@@ -38,9 +35,11 @@ async function playerChapters(
 			return {
 				chapterId,
 				title: document.title,
-				published:
-					state === 'published' ||
-					(states.length === 0 && document.sceneIds.length > 0),
+				published: isChapterPublished(
+					states,
+					chapterId,
+					document.sceneIds.length > 0,
+				),
 				progress:
 					state === 'producing'
 						? `制作中 · ${phases[String(task?.phase)] ?? '等待'}`

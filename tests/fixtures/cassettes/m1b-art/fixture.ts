@@ -5,6 +5,7 @@ import {
 	ArtProduction,
 	directChapterArt,
 } from '../../../../packages/creator/src/pipeline/art'
+import type { Profile } from '../../../../packages/creator/src/pipeline/postprocess'
 import type { Project } from '../../../../packages/creator/src/project'
 import type { ReplayOptions } from '../../../../packages/creator/src/replay'
 
@@ -83,6 +84,10 @@ export function service(
 	replay: ReplayOptions,
 	imageModel = 'fixture-art-image',
 	visualModel = 'fixture-art-visual',
+	profile: Profile = {
+		mode: 'off',
+		tier: 'anime',
+	},
 ) {
 	return new ArtProduction(project, {
 		replay,
@@ -97,8 +102,8 @@ export function service(
 			concurrency: 2,
 			retries: 1,
 			quality: 'medium',
-			postProcess: 'off',
-			upscaleTier: 'anime',
+			postProcess: profile.mode,
+			upscaleTier: profile.tier,
 		},
 	})
 }
