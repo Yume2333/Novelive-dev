@@ -30,6 +30,10 @@ type StageHarness = {
 	>
 	saved: StageSnapshot
 	abort: AbortController
+	preview: import('../../packages/player/src/stage').PixiStage
+	mounting: ReturnType<
+		typeof import('../../packages/player/src/stage').mountMinimalPlayer
+	>
 }
 
 test('M3 save stage renders WebP thumbnails and restores state, replay actions and text', async () => {
@@ -305,6 +309,131 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			await player.restore(player.snapshot)
 		})
 		await expect(page.locator('.nl-player-overlay')).toHaveText('本章结束')
+		await page.evaluate(() =>
+			(globalThis as unknown as StageHarness).abort.abort(),
+		)
+		await page.evaluate(
+			({ scenes, background, portrait }) => {
+				const runtime = globalThis as unknown as StageHarness
+				const scene = scenes[0]
+				const first = scene.beats[0]
+				scene.beats = [
+					{
+						...first,
+						actions: [
+							first.actions[0],
+							{
+								type: 'action',
+								name: 'move',
+								args: {
+									slot: 'center',
+									target: 'left',
+									duration: 1,
+									easing: 'linear',
+								},
+								assets: [],
+								line: 1,
+								col: 1,
+							},
+						],
+					},
+				]
+				const host = document.createElement('div')
+				host.className = 'nl-player'
+				document.body.replaceChildren(host)
+				runtime.abort = new AbortController()
+				const commit = runtime.StageTest.PixiStage.prototype.commit
+				runtime.StageTest.PixiStage.prototype.commit = function (...args) {
+					const animation = commit.apply(this, args)
+					if (args[2]?.some((action) => action.name === 'move')) {
+						runtime.preview = this
+						this.app.ticker.stop()
+						this.app.render()
+						runtime.StageTest.PixiStage.prototype.commit = commit
+					}
+					return animation
+				}
+				runtime.mounting = runtime.StageTest.mountMinimalPlayer(
+					host,
+					[scene],
+					{
+						resolveAsset: (id) => {
+							if (id === 'room/undrawn')
+								throw new Error('Undrawn earlier background')
+							return `data:image/png;base64,${id === 'room/dusk' ? background : portrait}`
+						},
+					},
+					runtime.abort.signal,
+					(error) => {
+						throw error
+					},
+					{},
+					{
+						initialActions: [
+							{
+								type: 'action',
+								name: 'bg',
+								args: { transition: 'none' },
+								assets: [{ id: 'room/undrawn' }],
+								line: 1,
+								col: 1,
+							},
+							{
+								type: 'action',
+								name: 'show',
+								args: { slot: 'center', transition: 'none' },
+								assets: [{ id: 'traveler/coat/calm' }],
+								line: 1,
+								col: 1,
+							},
+						],
+					},
+				)
+			},
+			{ scenes: compiled.scenes, background, portrait },
+		)
+		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		const previewPixel = async (x: number) => {
+			const point = await page.evaluate(async (x) => {
+				await new Promise<void>((resolve) =>
+					requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+				)
+				const { preview } = globalThis as unknown as StageHarness
+				preview.app.render()
+				const bounds = preview.app.canvas.getBoundingClientRect()
+				return {
+					left: Math.round(
+						bounds.left + preview.app.stage.x + x * preview.app.stage.scale.x,
+					),
+					top: Math.round(
+						bounds.top + preview.app.stage.y + 270 * preview.app.stage.scale.y,
+					),
+				}
+			}, x)
+			return [
+				...(await sharp(await page.screenshot())
+					.extract({ ...point, width: 1, height: 1 })
+					.removeAlpha()
+					.raw()
+					.toBuffer()),
+			]
+		}
+		expect(await previewPixel(480)).toEqual([224, 96, 48])
+		expect(await previewPixel(240)).toEqual([32, 48, 96])
+		await page.evaluate(() => {
+			const { preview } = globalThis as unknown as StageHarness
+			;(preview as unknown as { tick(seconds: number): void }).tick(0.5)
+			preview.app.render()
+		})
+		expect(await previewPixel(360)).toEqual([224, 96, 48])
+		expect(await previewPixel(480)).toEqual([32, 48, 96])
+		await page.evaluate(async () => {
+			const runtime = globalThis as unknown as StageHarness
+			runtime.preview.complete()
+			runtime.preview.app.render()
+			await runtime.mounting
+		})
+		expect(await previewPixel(240)).toEqual([224, 96, 48])
 		await page.evaluate(() =>
 			(globalThis as unknown as StageHarness).abort.abort(),
 		)

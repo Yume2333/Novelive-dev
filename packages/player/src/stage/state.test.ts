@@ -1,6 +1,6 @@
 import type { CompiledAction } from '@novelive/format/script'
 import { describe, expect, it } from 'vitest'
-import { direct, emptyStage, stageAssets } from './state'
+import { direct, emptyStage, previewOpening, stageAssets } from './state'
 
 const action = (
 	name: CompiledAction['name'],
@@ -9,6 +9,40 @@ const action = (
 ): CompiledAction => ({ type: 'action', line: 1, col: 1, name, args, assets })
 
 describe('stage direction state', () => {
+	it('keeps preview movement and expression origins while omitting assets replaced by cuts', () => {
+		const prior = direct(
+			direct(
+				emptyStage(),
+				action('bg', { transition: 'none' }, [{ id: 'room/undrawn' }]),
+			),
+			action('show', { slot: 'center' }, [{ id: 'hero/coat/calm' }]),
+		)
+		const selected = [
+			action('bg', { transition: 'none' }, [{ id: 'room/dusk' }]),
+			action('face', { duration: 1 }, [{ id: 'hero/coat/smile' }]),
+			action('move', { slot: 'center', target: 'left', duration: 1 }),
+		]
+		const opening = previewOpening(prior, selected)
+		expect(stageAssets(opening)).toEqual(['room/dusk', 'hero/coat/calm'])
+		expect(opening.sprites.center?.transform.x).toBe(480)
+		expect(selected.reduce(direct, opening).sprites.center).toMatchObject({
+			assetId: 'hero/coat/smile',
+			transform: { x: 240 },
+		})
+		expect(prior.background?.assetId).toBe('room/undrawn')
+	})
+	it('keeps outgoing assets for animated preview transitions and supports empty openings', () => {
+		const prior = direct(
+			emptyStage(),
+			action('bg', { transition: 'none' }, [{ id: 'room/dusk' }]),
+		)
+		expect(
+			previewOpening(prior, [
+				action('bg', { transition: 'fade' }, [{ id: 'room/night' }]),
+			]),
+		).toEqual(prior)
+		expect(previewOpening(emptyStage(), [])).toEqual(emptyStage())
+	})
 	it('resets a replacement character to its requested slot after a move', () => {
 		const moved = direct(
 			direct(

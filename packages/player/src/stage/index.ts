@@ -14,7 +14,7 @@ import {
 } from '../progress'
 import { AssetWindow, lookahead } from './assets'
 import { PixiStage } from './renderer'
-import { direct, emptyStage, stageAssets } from './state'
+import { direct, emptyStage, previewOpening, stageAssets } from './state'
 
 export { AssetWindow, lookahead } from './assets'
 export { PixiStage } from './renderer'
@@ -209,9 +209,12 @@ export async function mountMinimalPlayer(
 				return
 			}
 			let state = stage.state
-			if (index === 0)
+			if (index === 0 && options.initialActions) {
 				for (const action of options.initialActions ?? [])
 					state = direct(state, action)
+				state = previewOpening(state, beat.actions)
+				await stage.commit(state, lookahead(beats, index + 1), [], true)
+			}
 			for (const action of beat.actions) state = direct(state, action)
 			state.text = beat.cue.kind === 'text' ? beat.cue.text : null
 			let incoming: StageSnapshot | null = null

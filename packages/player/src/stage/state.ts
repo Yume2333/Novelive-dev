@@ -139,6 +139,21 @@ export function direct(state: StageState, action: CompiledAction): StageState {
 	return next
 }
 
+export function previewOpening(
+	state: StageState,
+	actions: readonly CompiledAction[],
+): StageState {
+	return actions.reduce(
+		(opening, action) =>
+			['cg', 'fg'].includes(action.name) ||
+			(['bg', 'show', 'hide'].includes(action.name) &&
+				action.args.transition === 'none')
+				? direct(opening, action)
+				: opening,
+		state,
+	)
+}
+
 export function stageAssets(state: StageState): string[] {
 	return [
 		state.background?.assetId,
