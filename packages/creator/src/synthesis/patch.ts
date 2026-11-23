@@ -486,7 +486,11 @@ export async function applyPatches(
 	chapters: ReadonlySet<string>,
 	seriesChapters = chapters,
 	onPublished?: (bible: Bible) => void,
-): Promise<{ conflicts: BiblePatch; glossaryConflicts: GlossaryPatch }> {
+): Promise<{
+	conflicts: BiblePatch
+	glossaryConflicts: GlossaryPatch
+	consolidatedAdds: Map<Patch, Patch | null>
+}> {
 	const chapterOrder = new Map(
 		Array.from(seriesChapters, (id, index) => [id, index]),
 	)
@@ -496,6 +500,7 @@ export async function applyPatches(
 	const characterDeletions: (() => Promise<void>)[] = []
 	const removedCharacters = new Set<string>()
 	const accepted = new Set<Patch>()
+	const consolidatedAdds = new Map<Patch, Patch | null>()
 	const published = structuredClone(bible)
 	let survivingCharacters = bible.character
 	let survivingRelations = bible.relation
@@ -593,6 +598,57 @@ export async function applyPatches(
 				entries.set(id, normalized)
 				changed.add(id)
 			}
+		}
+		const byId = new Map<string, Patch[]>()
+		for (const item of patch) {
+			if (item.kind !== kind) continue
+			const group = byId.get(item.entry.id) ?? []
+			group.push(item)
+			byId.set(item.entry.id, group)
+		}
+		const originalIds = new Set(original.map(({ id }) => id))
+		for (const [id, group] of byId) {
+			const entry = entries.get(id)
+			if (
+				!entry ||
+				group.length < 2 ||
+				originalIds.has(id) ||
+				group.some((item) => item.op !== 'add' || !accepted.has(item))
+			)
+				continue
+			const fields =
+				kind === 'character'
+					? ['aliases', 'addresses', 'costumes', 'expressions', 'references']
+					: kind === 'location'
+						? ['variants', 'references']
+						: kind === 'style'
+							? ['references']
+							: []
+			for (const field of fields) {
+				const arrays = group.flatMap(({ entry }) => {
+					const value = (entry as Record<string, unknown>)[field]
+					return Array.isArray(value) ? [value as unknown[]] : []
+				})
+				if (!arrays.length) continue
+				const keyed = new Map<unknown, unknown>()
+				for (const value of arrays.flat()) {
+					const object = value && typeof value === 'object' ? value : undefined
+					const key =
+						kind === 'style' && object && 'path' in object
+							? object.path
+							: object && 'id' in object
+								? object.id
+								: value
+					if (kind === 'style') keyed.delete(key)
+					keyed.set(key, value)
+				}
+				const merged = unique([...keyed.values()])
+				Object.assign(entry, {
+					[field]: kind === 'style' ? merged.slice(-3) : merged,
+				})
+			}
+			consolidatedAdds.set(group[0], { ...group[0], entry } as Patch)
+			for (const item of group.slice(1)) consolidatedAdds.set(item, null)
 		}
 		const survivors = [...entries.values()]
 		Object.assign(published, { [kind]: survivors })
@@ -722,5 +778,5 @@ export async function applyPatches(
 	if (changed) await write(projectFiles.glossary(scope), [...terms.values()])
 	published.glossary = [...terms.values()]
 	onPublished?.(published)
-	return { conflicts, glossaryConflicts }
+	return { conflicts, glossaryConflicts, consolidatedAdds }
 }

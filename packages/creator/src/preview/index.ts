@@ -14,6 +14,7 @@ import {
 	buildTextModel,
 	createTextStream,
 	outputTokenBudget,
+	parseModelJson,
 	type TextConnection,
 	textResultError,
 } from '../models/text'
@@ -156,7 +157,7 @@ export async function previewBook(
 				.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 				.join('')
 			try {
-				const value: unknown = JSON.parse(text)
+				const value = parseModelJson(text)
 				const checked = (digest ? digestFields : fields).validate(value)
 				if (!checked.ok) throw new Error(JSON.stringify(checked.errors))
 				return checked.value
