@@ -1,5 +1,6 @@
 import type { Message, Tool } from '@earendil-works/pi-ai'
 import { arr, compile, obj, oneOf, str } from '@earendil-works/pi-schema'
+import { paragraphIdPattern } from '@novelive/format/model'
 import { ContextLimitError, fitUnits, promptFits } from './budget'
 import { textOf, userMessage, type writingModel } from './request'
 import {
@@ -74,7 +75,7 @@ const tools: Tool[] = [
 	},
 ]
 
-function citationTool(paragraphIds: string[]): Tool {
+function citationTool(paragraphIds: string[], usePattern: boolean): Tool {
 	return {
 		name: 'submit_review',
 		description: 'Submit all source-grounded issues, or an empty issue list.',
@@ -89,7 +90,11 @@ function citationTool(paragraphIds: string[]): Tool {
 							...strings('paragraphId', 'quote', 'issue').properties,
 							paragraphId: {
 								type: 'string',
-								...(paragraphIds.length ? { enum: paragraphIds } : {}),
+								...(usePattern
+									? { pattern: paragraphIdPattern }
+									: paragraphIds.length
+										? { enum: paragraphIds }
+										: {}),
 							},
 							category: { type: 'string', enum: categories },
 						},
@@ -101,7 +106,7 @@ function citationTool(paragraphIds: string[]): Tool {
 	}
 }
 
-function reviewTools(chapter: ReviewContext) {
+function reviewTools(chapter: ReviewContext, usePattern = false) {
 	const scoped = tools.map((tool) => {
 		if (
 			tool.name === 'read_bible' &&
@@ -118,7 +123,13 @@ function reviewTools(chapter: ReviewContext) {
 			}
 		return tool
 	})
-	return [...scoped, citationTool(chapter.paragraphs.map(({ id }) => id))]
+	return [
+		...scoped,
+		citationTool(
+			chapter.paragraphs.map(({ id }) => id),
+			usePattern,
+		),
+	]
 }
 
 function bibleSection(bible: string, selector: string) {
@@ -200,6 +211,7 @@ export async function reviewFidelity(
 		paragraphs: readonly SourceParagraph[],
 		draft: string,
 		partial: boolean,
+		usePattern = false,
 	) => {
 		const id = 'call_'.padEnd(64, 'x')
 		const name = 'read_source_range'
@@ -220,7 +232,7 @@ export async function reviewFidelity(
 		const limits = { ...model, inputLimit: model.inputLimit - argumentsSize }
 		return [JSON.stringify(paragraphs), overflow].every((reply) =>
 			promptFits(limits, {
-				tools: reviewTools({ ...chapter, paragraphs }),
+				tools: reviewTools({ ...chapter, paragraphs }, usePattern),
 				messages: [
 					userMessage(
 						fidelityPrompt({ ...chapter, paragraphs }, draft, partial),
@@ -242,26 +254,35 @@ export async function reviewFidelity(
 		const excerpt = (body: readonly string[]) =>
 			scopedScene(heading, paragraphs, body)
 		const whole = excerpt(lines)
-		if (fits(paragraphs, whole, false)) {
+		const wholeFits = fits(paragraphs, whole, false)
+		if (
+			wholeFits ||
+			(lines.length <= 1 && fits(paragraphs, whole, false, true))
+		) {
 			for (const issue of await reviewWindow(
 				model,
 				{ ...chapter, paragraphs },
 				whole,
 				false,
+				!wholeFits,
 			))
 				issues.set(JSON.stringify(issue), issue)
 			continue
 		}
 		for (const body of fitUnits(
 			lines.length ? lines : [''],
-			(batch) => fits(paragraphs, excerpt(batch), true),
+			(batch) =>
+				fits(paragraphs, excerpt(batch), true) ||
+				(batch.length === 1 && fits(paragraphs, excerpt(batch), true, true)),
 			'Fidelity scene line',
 		)) {
+			const draft = excerpt(body)
 			for (const issue of await reviewWindow(
 				model,
 				{ ...chapter, paragraphs },
-				excerpt(body),
+				draft,
 				true,
+				!fits(paragraphs, draft, true),
 			))
 				issues.set(JSON.stringify(issue), issue)
 		}
@@ -290,8 +311,9 @@ async function reviewWindow(
 	chapter: ReviewContext,
 	script: string,
 	partial: boolean,
+	usePattern = false,
 ) {
-	const activeTools = reviewTools(chapter)
+	const activeTools = reviewTools(chapter, usePattern)
 	const messages: Message[] = [
 		userMessage(fidelityPrompt(chapter, script, partial)),
 	]
