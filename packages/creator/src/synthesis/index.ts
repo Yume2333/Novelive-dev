@@ -760,20 +760,50 @@ ${nextEvent.instructions}`
 		)
 		const complete =
 			'When no distinct event or new fact remains in this packet, use is_last:true and empty arrays instead of restating it.'
-		const prompt = (instruction: string) => `${eventPrompt}
+		const prompt = (
+			instruction: string,
+			entries = registry.text,
+			history = summaries,
+		) => `${eventPrompt}
 Extract only the next event in packet ${packet + 1}/${packets.length}. ${instruction}
 Events already extracted: ${state.events.length}
 Already proposed entries:
-${registry.text}
-Recent event summaries: ${summaries}
+${entries}
+Recent event summaries: ${history}
 Chapter previews:
 ${packets[packet]}`
+		let extractionPrompt = prompt(
+			registry.compact
+				? `Compare this packet with the saved events and proposed IDs below. Skip restatements, including rewordings; return progress and qualifying facts only for the next uncovered event. Describe relations as standing relationships, naming their kind first. ${complete}`
+				: 'Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Describe a relation as the standing relationship between the pair, naming its kind first, not the scene that shows it. Set is_last when done.',
+		)
+		let focusedPrompt = prompt(
+			`Return one short JSON answer: the next uncovered plot event, its progress and only its new qualifying facts. Do not rescan for earlier events or restate proposed entries. Describe relations as standing relationships, naming their kind first. ${complete}`,
+		)
+		if (
+			legacyState &&
+			Math.max(bytes(extractionPrompt), bytes(focusedPrompt)) +
+				bytes(repairPrefix) >=
+				budget
+		) {
+			const extract =
+				'Return the next uncovered event, its progress and new facts. Set is_last when the packet is complete.'
+			const focus =
+				'Return short JSON for the next uncovered event, or set is_last if done.'
+			const messageRoom = budget - bytes(repairPrefix) - 1
+			const historyRoom =
+				messageRoom -
+				Math.max(bytes(prompt(extract, '', '')), bytes(prompt(focus, '', '')))
+			const history = recentEvents(
+				state.events,
+				Math.min(historyBudget, historyRoom),
+				true,
+			)
+			extractionPrompt = prompt(extract, '', history)
+			focusedPrompt = prompt(focus, '', history)
+		}
 		const event = await request(
-			prompt(
-				registry.compact
-					? `Compare this packet with the saved events and proposed IDs below. Skip restatements, including rewordings; return progress and qualifying facts only for the next uncovered event. Describe relations as standing relationships, naming their kind first. ${complete}`
-					: 'Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Describe a relation as the standing relationship between the pair, naming its kind first, not the scene that shows it. Set is_last when done.',
-			),
+			extractionPrompt,
 			nextEvent,
 			(value: Event) => {
 				if (!value.is_last && repeatsPacketEvent(value, packetEvents))
@@ -784,9 +814,7 @@ ${packets[packet]}`
 				if (value.is_last && packet === packets.length - 1)
 					combine(volumeId, chapterIds, [...state.events, value])
 			},
-			prompt(
-				`Return one short JSON answer: the next uncovered plot event, its progress and only its new qualifying facts. Do not rescan for earlier events or restate proposed entries. Describe relations as standing relationships, naming their kind first. ${complete}`,
-			),
+			focusedPrompt,
 		)
 		state.events.push(event)
 		if (event.is_last) state.packet++
