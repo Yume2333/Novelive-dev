@@ -33,7 +33,12 @@ import { projectFiles } from '../../packages/format/src/model'
 import { scoreAgainstConsensus } from './bible-patch-score'
 import { checkOwnerBookResumePrompt } from './owner-book-resume'
 import {
+	type WholeBookRun,
+	wholeBookSelectionTargets,
+} from './owner-book-targets'
+import {
 	observeOwnerBookUsage,
+	ownerBookSelectionBatchCap,
 	ownerBookSelectionCap,
 	reserveOwnerBookSelection,
 } from './owner-book-usage'
@@ -44,6 +49,7 @@ const root = join(home, '.local/novelive-tools/m1a-owner-book')
 const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
 const fullPurpose = 'M1a/07 owner book with shared inclusion criteria'
 const selectionPurpose = 'M1a/07 W4 selection-only 700k'
+const batchPurpose = 'M1a/07 W4 aligned selection batch 300k'
 const savedEvents = 81
 const savedPackets = 7
 const previewModel = 'gemini-3.8-flash'
@@ -104,8 +110,17 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const checkpointSource = process.env.NL_OWNER_BOOK_SELECTION_SOURCE
 		const runDirectory = process.env.NL_OWNER_BOOK_RUN_DIR
 		const dryRun = process.env.NL_OWNER_BOOK_SELECTION_STUB
-		const purpose = checkpointSource ? selectionPurpose : fullPurpose
+		const batch = process.env.NL_OWNER_BOOK_SELECTION_BATCH === '1'
+		const selectionCap = batch
+			? ownerBookSelectionBatchCap
+			: ownerBookSelectionCap
+		const purpose = batch
+			? batchPurpose
+			: checkpointSource
+				? selectionPurpose
+				: fullPurpose
 		if (
+			(batch && !checkpointSource) ||
 			(dryRun &&
 				(!checkpointSource || !['complete', 'cap'].includes(dryRun))) ||
 			(checkpointSource &&
@@ -117,6 +132,15 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			throw new Error(
 				'Selection-only requires a separate run directory and the saved main model',
 			)
+		const recorded: { volumeId: string; runs: WholeBookRun[] } = JSON.parse(
+			await readFile(join(fixtures, 'whole-runs.json'), 'utf8'),
+		)
+		const selectionTargets = wholeBookSelectionTargets(recorded.runs)
+		const stubLedger =
+			dryRun && batch && runDirectory
+				? join(dirname(runDirectory), 'stub-usage.csv')
+				: undefined
+		const usageLedger = stubLedger ?? ledger
 		let expectedResume: { packet: number; events: number } | undefined
 		const baseUrl = dryRun
 			? 'https://relay.invalid'
@@ -174,9 +198,14 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const pendingUsage = new Set<Promise<void>>()
 		let ledgerFailed = false
 		let reservationExceeded = false
-		for (const line of (dryRun ? '' : await readFile(ledger, 'utf8')).split(
-			'\n',
-		)) {
+		const priorUsage =
+			dryRun && !stubLedger
+				? ''
+				: await readFile(usageLedger, 'utf8').catch((error) => {
+						if (stubLedger && error.code === 'ENOENT') return ''
+						throw error
+					})
+		for (const line of priorUsage.split('\n')) {
 			const [, , , tokens, , reason] = line.split(',')
 			if (reason?.startsWith(purpose)) used += Number(tokens)
 		}
@@ -208,9 +237,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				controller.abort()
 				throw new Error('Resume attempted a paid preview request')
 			}
-			if (dryRun === 'cap') used = ownerBookSelectionCap
+			if (dryRun === 'cap') used = selectionCap
 			const reserve = checkpointSource
-				? reserveOwnerBookSelection(used, text, outputCap)
+				? reserveOwnerBookSelection(used, text, outputCap, selectionCap)
 				: Buffer.byteLength(text) + outputCap + 1024
 			if (
 				reserve === undefined ||
@@ -252,10 +281,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				used += tokens - reserve
 				stats.tokens += tokens
 				stats.reserved += Number(measured === undefined)
-				if (dryRun) return
+				if (dryRun && !stubLedger) return
 				try {
 					await appendFile(
-						ledger,
+						usageLedger,
 						`${new Date().toISOString().slice(0, 10)},${model},1,${tokens},0,${purpose}${measured === undefined ? ' (reserved upper bound)' : ''}\n`,
 					)
 				} catch {
@@ -282,9 +311,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 									},
 								],
 								usage: {
-									prompt_tokens: 1,
+									prompt_tokens: batch ? 69_999 : 1,
 									completion_tokens: 1,
-									total_tokens: 2,
+									total_tokens: batch ? 70_000 : 2,
 								},
 							})}\n\ndata: [DONE]\n\n`,
 							{ headers: { 'content-type': 'text/event-stream' } },
@@ -359,6 +388,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			previewConnection,
 			synthesisConnection: eventConnection,
 			selectionConnection,
+			selectionTargets,
 			requestTimeoutMs: timeoutFor(selectionConnection),
 			language,
 			strategy: 'events' as const,
@@ -507,7 +537,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 						const report = {
 							status: 'paused at token cap',
 							used,
-							cap: ownerBookSelectionCap,
+							cap: selectionCap,
 							selections: paused.selections?.length,
 							stats,
 						}
@@ -533,9 +563,6 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				expect(checkpoint.packet).toBeGreaterThan(1)
 				expect(checkpoint.applied).toBe(true)
 				phase = 'consensus comparison'
-				const recorded = JSON.parse(
-					await readFile(join(fixtures, 'whole-runs.json'), 'utf8'),
-				)
 				expect(recorded.volumeId).toBe(volumeId)
 				const score = scoreAgainstConsensus(
 					recorded.runs,
@@ -570,6 +597,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					throw new Error('Could not write the private usage ledger')
 				if (reservationExceeded) controller.signal.throwIfAborted()
 				const report = {
+					status: score.normalized >= 0.9 ? 'passed' : 'below W4 threshold',
 					sha256,
 					chapters: 154,
 					volumes: 20,

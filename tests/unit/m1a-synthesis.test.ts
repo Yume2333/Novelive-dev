@@ -31,6 +31,8 @@ import {
 
 let directory: string
 let root: string
+const inclusionCriteria =
+	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
 const stream = (result: unknown) =>
 	new Response(
 		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
@@ -570,6 +572,12 @@ test('whole-volume replay persists a skeleton, candidates and conflicts without 
 	const result = await synthesizeVolume(project, 'v1', chapters, {
 		...options,
 		strategy: 'whole',
+		fetch: async (input, init) => {
+			const request = new Request(input, init)
+			const { messages } = await request.clone().json()
+			expect(messages[0].content.split('\n')).toContain(inclusionCriteria)
+			return strict(request)
+		},
 	})
 	expect(result.chapters.map(({ chapterId }) => chapterId)).toEqual(chapters)
 	expect(await project.read(projectFiles.skeleton('v1'))).toMatchObject({
@@ -794,6 +802,7 @@ test('a saturated packet shows recent unique IDs from each kind and can finish w
 				id: 'signal',
 				original: 'harbor signal: blue',
 				written: 'blue signal',
+				note: 'The signal marks the harbor entrance at night. '.repeat(40),
 				status: 'candidate',
 			},
 		],
@@ -939,7 +948,7 @@ const selectionFixture = async (
 	})
 }
 
-test.each(['current', 'previous', 'unversioned'] as const)(
+test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
 	'resumes without repeating extraction and only reuses compatible saved picks (checkpoint: %s)',
 	async (version) => {
 		await seed(root)
@@ -966,13 +975,13 @@ test.each(['current', 'previous', 'unversioned'] as const)(
 				packet: 1,
 				selections: [[1, 3]],
 				ready: false,
-				selectionVersion: 5,
+				selectionVersion: 6,
 			})
-			if (version !== 'current') {
+			if (version === 'previous' || version === 'unversioned') {
 				const { selectionVersion: _version, ...old } = checkpoint
 				await project.write(files.checkpoint, {
 					...old,
-					...(version === 'previous' ? { selectionVersion: 4 } : {}),
+					...(version === 'previous' ? { selectionVersion: 5 } : {}),
 					selections: [[2]],
 				})
 			}
@@ -986,10 +995,11 @@ test.each(['current', 'previous', 'unversioned'] as const)(
 			)
 			expect(prompt).toContain('Keep nothing if no candidate qualifies.')
 			expect(prompt).toContain('c2: They travel.')
-			expect(prompt).toContain(
+			expect(prompt.split('\n')).toContain(inclusionCriteria)
+			expect(prompt).not.toContain(
 				'A one-scene character qualifies only when consequential',
 			)
-			expect(prompt).toContain(
+			expect(prompt).not.toContain(
 				'Drop ordinary objects, generic offices and roles',
 			)
 			expect(
@@ -1010,6 +1020,9 @@ test.each(['current', 'previous', 'unversioned'] as const)(
 		})
 		const result = await synthesizeVolume(project, 'v1', chapters, {
 			...args,
+			...(version === 'changed target'
+				? { selectionTargets: { glossary: 2 } }
+				: {}),
 			fetch,
 		})
 		expect(result.biblePatch.map(({ entry }) => entry.id)).toEqual(['guide'])
@@ -1020,6 +1033,49 @@ test.each(['current', 'previous', 'unversioned'] as const)(
 		expect(fetch).toHaveBeenCalledTimes(version === 'current' ? 0 : 1)
 	},
 )
+
+test('soft size targets require a reason for exceeding a kind but do not trim justified picks', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const picks = [1, 2, 3]
+	let selectionCalls = 0
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		const { messages } = await request.clone().json()
+		if (!candidatePositions(messages[0].content))
+			return selectionFixture(request)
+		selectionCalls++
+		expect(messages[0].content).toContain(
+			'Soft size targets for kept candidates (not quotas): character: 1, glossary: 1',
+		)
+		expect(messages[0].content).toContain(
+			"You may exceed a kind's target only with a justification.",
+		)
+		if (selectionCalls === 1)
+			return stream({
+				keep: picks,
+				justifications: [{ kind: 'character', reason: 'A recurring role.' }],
+			})
+		expect(messages[1].content).toContain(
+			'Justify keeping more than 1 glossary candidates',
+		)
+		return stream({
+			keep: picks,
+			justifications: [
+				{ kind: 'glossary', reason: 'Both terms name consequential objects.' },
+			],
+		})
+	}
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		strategy: 'events',
+		selectionTargets: { character: 1, glossary: 1 },
+		fetch,
+	})
+	expect(selectionCalls).toBe(2)
+	expect(result.glossaryPatch.map(({ id }) => id)).toEqual(['key', 'seal'])
+	expect((await project.read(files.checkpoint)).selections).toEqual([picks])
+})
 
 test.each([false, true])(
 	'partial publication never reinterprets saved selection picks (legacy: %s)',

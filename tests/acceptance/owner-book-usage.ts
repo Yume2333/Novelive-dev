@@ -1,12 +1,14 @@
 export const ownerBookSelectionCap = 700_000
+export const ownerBookSelectionBatchCap = 300_000
 
 export function reserveOwnerBookSelection(
 	used: number,
 	requestBody: string,
 	outputCap: number,
+	cap = ownerBookSelectionCap,
 ) {
 	const reserve = Buffer.byteLength(requestBody) + outputCap + 1024
-	return used + reserve <= ownerBookSelectionCap ? reserve : undefined
+	return used + reserve <= cap ? reserve : undefined
 }
 
 async function readResponseUsage(response: Response) {

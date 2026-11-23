@@ -68,23 +68,13 @@ const eventFields = {
 }
 const eventSchema = obj(eventFields)
 const nextEvent = synthesisOutput(eventSchema)
-const selection = synthesisOutput(obj({ keep: arr(int({ minimum: 1 })) }))
-const selectionScope: Record<string, string> = {
-	character:
-		'Keep a named or identifiable participant whose choices or role affect the plot, or who needs recurring character continuity. A one-scene character qualifies only when consequential. Use later observations to recognize supporting roles established after the first appearance. Drop passing mentions, stock roles and alternate IDs for a person already kept; recognize names, aliases and titles.',
-	location:
-		'Keep a recurring playable setting or the setting of a consequential scene that needs a distinct backdrop. Prefer the actual playable setting over its broader region or an incidental subdivision. Drop passing mentions, route waypoints and alternate names of the same setting.',
-	relation:
-		'Keep durable relationships that explain consequential choices or conflicts, or establish character or family roles that the adaptation must keep consistent even if introduced once. Group both directions of the same pair, and keep one representative of the same standing relationship; descriptions in chapter-dated changes count as evidence. Drop co-presence, isolated interactions, and incidental kinship or titles.',
-	timeline:
-		'Keep only turning points that change the direction or outcome of a plot thread. Keep one representative of the whole event, not the separate approach, confrontation and aftermath unless each independently changes the plot. Omit scene beats, logistics and retellings under another ID.',
-	foreshadowing:
-		'Keep deliberate setups with a consequential later payoff or an unresolved thread that must be tracked. Drop momentary suspense, speculation, and restatements of the same thread.',
-	style:
-		'Keep reusable visual direction or narrator voice that should apply beyond the scene. Drop commentary on plot, a chapter summary, and the mood of an individual scene.',
-	glossary:
-		'Keep a distinctive named organization, object, technique, title, or cultural expression whose consistent wording or pronunciation matters, or whose meaning is needed to understand a consequential event. Prefer a representative with an exact source spelling and useful usage note over a vague gloss. Drop ordinary objects, generic offices and roles, and definitions with no continuity need. Character and place names belong in the Bible, not the glossary.',
-}
+const keepPositions = arr(int({ minimum: 1 }))
+const selection = synthesisOutput(
+	obj({
+		keep: keepPositions,
+		justifications: opt(arr(obj({ kind: str(), reason: str() }))),
+	}),
+)
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
 const checkpointSchema = obj({
@@ -140,6 +130,7 @@ type Event = Static<typeof eventSchema>
 export interface SynthesisOptions {
 	connection: TextConnection
 	selectionConnection?: TextConnection
+	selectionTargets?: Readonly<Partial<Record<SelectionGroup['kind'], number>>>
 	language: string
 	requirements?: string
 	strategy?: 'auto' | 'whole' | 'events'
@@ -155,7 +146,7 @@ export interface SynthesisOptions {
 
 const minimumEventLimit = 128
 const packetFormat = 7
-const selectionVersion = 5
+const selectionVersion = 6
 const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -872,40 +863,58 @@ ${packets[packet]}`
 			})
 			.join('\n')
 		let position = 0
-		const numbered = groups.map(({ kind, entries }) => ({
-			kind,
-			lines: entries.map(
+		const numbered = groups.map(({ kind, entries }) => {
+			const first = position + 1
+			const target = options.selectionTargets?.[kind]
+			if (target !== undefined && (!Number.isSafeInteger(target) || target < 0))
+				throw new Error(`Invalid selection target for ${kind}`)
+			const lines = entries.map(
 				(entry) => `${++position} ${JSON.stringify({ kind, ...entry })}`,
-			),
-		}))
-		const promptFor = (batches: typeof numbered) => `${instructions}
+			)
+			return { kind, first, last: position, target, lines }
+		})
+		const promptFor = (scopes: typeof numbered) => {
+			const targets = scopes.flatMap(({ kind, target }) =>
+				target === undefined ? [] : [`${kind}: ${target}`],
+			)
+			return `${instructions}
 ${selection.instructions}
-Select from these canonical candidates across the whole volume. Compare evidence from early and late chapters and keep the entries the adaptation needs for consequential scenes, continuity, or recurring assets. Accuracy, a name, or repeated extraction is not enough. Observations are evidence about the same entry, not separate choices. Keep one representative for repeated people, places, relationships, or plot beats. Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
-${batches.map(({ kind }) => `${kind}: ${selectionScope[kind]}`).join('\n')}
-Respond with only the JSON object, with no commentary before or after it.
+Select from these canonical candidates across the whole volume. Compare evidence from early and late chapters. Observations are evidence about the same entry, not separate choices. Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
+${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. You may exceed a kind's target only with a justification. For each kind over target, return its kind and a brief reason tied to the inclusion rules in justifications.\n` : ''}Respond with only the JSON object, with no commentary before or after it.
 Chapter progress:
 ${progress}
 Candidates:
-${batches.flatMap(({ lines }) => lines).join('\n')}`
+${scopes.flatMap(({ lines }) => lines).join('\n')}`
+		}
 		const fits = (prompt: string) =>
 			bytes(prompt) + bytes(repairPrefix) < selectionBudget
 		const whole = promptFor(numbered)
 		const batches = fits(whole)
-			? [{ prompt: whole, count: position }]
+			? [{ prompt: whole, scopes: numbered }]
 			: numbered.map((group) => ({
 					prompt: promptFor([group]),
-					count: group.lines.length,
+					scopes: [group],
 				}))
 		if (batches.some(({ prompt }) => !fits(prompt)))
 			throw new Error(
 				'A whole-volume candidate kind exceeds the selection context budget',
 			)
-		const plan = hash(batches.map(({ count }) => count))
+		const plan = hash(
+			batches.map(({ scopes }) =>
+				scopes.map(({ kind, first, last, target }) => [
+					kind,
+					first,
+					last,
+					target,
+				]),
+			),
+		)
 		if (state.selectionPlan !== plan) state.selections = []
 		state.selectionPlan = plan
 		const kept = new Set<number>()
-		let offset = 0
-		for (const [index, { prompt, count }] of batches.entries()) {
+		for (const [index, { prompt, scopes }] of batches.entries()) {
+			const { first } = scopes[0]
+			const { last } = scopes[scopes.length - 1]
 			let keep = state.selections?.[index]
 			if (!keep) {
 				const answer = await request(
@@ -914,11 +923,25 @@ ${batches.flatMap(({ lines }) => lines).join('\n')}`
 					(value) => {
 						if (
 							new Set(value.keep).size !== value.keep.length ||
-							value.keep.some((n) => n <= offset || n > offset + count)
+							value.keep.some((n) => n < first || n > last)
 						)
 							throw new Error(
-								`keep must list distinct candidate numbers from ${offset + 1} to ${offset + count}`,
+								`keep must list distinct candidate numbers from ${first} to ${last}`,
 							)
+						for (const scope of scopes) {
+							const { kind, target } = scope
+							if (
+								target !== undefined &&
+								value.keep.filter((n) => n >= scope.first && n <= scope.last)
+									.length > target &&
+								!value.justifications?.some(
+									(item) => item.kind === kind && item.reason.trim(),
+								)
+							)
+								throw new Error(
+									`Justify keeping more than ${target} ${kind} candidates`,
+								)
+						}
 					},
 					undefined,
 					{
@@ -934,7 +957,6 @@ ${batches.flatMap(({ lines }) => lines).join('\n')}`
 				await project.write(files.checkpoint, state)
 			}
 			for (const n of keep) kept.add(n)
-			offset += count
 		}
 		return kept
 	}

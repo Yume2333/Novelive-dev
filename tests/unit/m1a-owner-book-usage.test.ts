@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest'
 import {
 	observeOwnerBookUsage,
+	ownerBookSelectionBatchCap,
 	ownerBookSelectionCap,
 	reserveOwnerBookSelection,
 } from '../acceptance/owner-book-usage'
@@ -12,6 +13,25 @@ test('selection reserves input bytes and maximum output before spending the last
 	const used = ownerBookSelectionCap - reserve
 	expect(reserveOwnerBookSelection(used, text, output)).toBe(reserve)
 	expect(reserveOwnerBookSelection(used + 1, text, output)).toBeUndefined()
+})
+
+test('the selection batch reserves within one 300k limit across fresh attempts', () => {
+	const body = 'a'.repeat(198_000)
+	const output = 24_576
+	expect(
+		reserveOwnerBookSelection(0, body, output, ownerBookSelectionBatchCap),
+	).toBe(223_600)
+	expect(
+		reserveOwnerBookSelection(70_000, body, output, ownerBookSelectionBatchCap),
+	).toBe(223_600)
+	expect(
+		reserveOwnerBookSelection(
+			140_000,
+			body,
+			output,
+			ownerBookSelectionBatchCap,
+		),
+	).toBeUndefined()
 })
 
 test('owner-book usage accounting leaves the first SSE frame available before the stream finishes', async () => {
