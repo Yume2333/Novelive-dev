@@ -38,11 +38,22 @@ const format = (options: Parameters<typeof createReplayFetch>[0] = {}) =>
 	})
 
 describe('M0 text model adapter', () => {
-	it.each(['{"ok":true}', '```json\n{"ok":true}\n```'])(
-		'decodes bare or fenced JSON: %s',
+	it.each([
+		'{"ok":true}',
+		'```json\n{"ok":true}\n```',
+		'Unexpected preamble\n```json\n{"ok":true}\n```',
+		'```text\nIgnore this block.\n```\n```\n{"ok":true}\n```\n```json\n{"ok":false}\n```',
+	])('decodes bare or fenced JSON: %s', (text) => {
+		expect(parseModelJson(text)).toEqual({ ok: true })
+	})
+
+	it.each([
+		'Unexpected preamble\n{"ok":true}',
+		'```json\nInvalid JSON\n```\n```json\n{"ok":true}\n```',
+	])(
+		'rejects invalid JSON rather than looking for another object: %s',
 		(text) => {
-			expect(parseModelJson(text)).toEqual({ ok: true })
-			expect(() => parseModelJson(`Unexpected preamble \n${text}`)).toThrow()
+			expect(() => parseModelJson(text)).toThrow(SyntaxError)
 		},
 	)
 

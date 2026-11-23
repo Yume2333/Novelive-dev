@@ -1,6 +1,7 @@
 import type { Message, Tool } from '@earendil-works/pi-ai'
 import { arr, compile, obj, oneOf, str } from '@earendil-works/pi-schema'
 import { paragraphIdPattern } from '@novelive/format/model'
+import { parseModelJson } from '../../models/text'
 import { ContextLimitError, fitUnits, promptFits } from './budget'
 import { textOf, userMessage, type writingModel } from './request'
 import {
@@ -474,9 +475,7 @@ export async function reviewStyle(
 function styleIssues(response: string) {
 	let value: unknown
 	try {
-		value = JSON.parse(
-			response.trim().replace(/^```(?:json)?\s*|\s*```$/gi, ''),
-		)
+		value = parseModelJson(response)
 	} catch {
 		throw new Error('Style review returned invalid JSON')
 	}

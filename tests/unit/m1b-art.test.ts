@@ -39,8 +39,15 @@ const replay = {
 	},
 } as const
 
-test('decodes a visual-review JSON object fenced by the provider', async () => {
-	const content = '```json\n{"pass":true}\n```'
+test.each([
+	['fenced JSON', '```json\n{"pass":true}\n```'],
+	['leading prose', 'Here is the review:\n\n```\n{"pass":true}\n```'],
+	[
+		'trailing prose',
+		'```json\n{"pass":true}\n```\n\nThe result is acceptable.',
+	],
+	['bare JSON', '{"pass":true}'],
+])('decodes a visual-review JSON object with %s', async (_shape, content) => {
 	const chunk = {
 		choices: [{ index: 0, delta: { content }, finish_reason: 'stop' }],
 	}
