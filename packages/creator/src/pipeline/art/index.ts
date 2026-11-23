@@ -49,6 +49,7 @@ type PaintStop =
 	| 'reference'
 	| 'matting'
 	| 'unsupported'
+	| 'provider-unsupported'
 type Candidate = { id: string; cachePath: string }
 type VisualCandidates = {
 	mainVisuals: Candidate[]
@@ -398,10 +399,11 @@ export class ArtProduction {
 					? { status: 'unsupported', issue: result.issue }
 					: this.savePlaceholder(entry.id, result.issue, result.reason)
 			}
-			return result.stop === 'unsupported' || redraw
+			const unsupported =
+				result.stop === 'unsupported' || result.stop === 'provider-unsupported'
+			return unsupported || redraw
 				? {
-						status:
-							result.stop === 'unsupported' ? 'unsupported' : 'placeholder',
+						status: unsupported ? 'unsupported' : 'placeholder',
 						issue: result.issue,
 					}
 				: this.savePlaceholder(entry.id, result.issue)
@@ -502,7 +504,6 @@ export class ArtProduction {
 		derived = false,
 		optionalReference = false,
 		candidateBudget?: CostumeCandidateBudget,
-		onTechnicalPass?: (png: Buffer) => void,
 	) {
 		const refs = await Promise.all(
 			drawing.references.slice(0, 16).map(async (ref, i) => {
@@ -566,7 +567,8 @@ export class ArtProduction {
 			if ('error' in result) {
 				this.options.signal?.throwIfAborted()
 				issue = result.error.message
-				if (result.error.code === 'unsupported') return stopped('unsupported')
+				if (result.error.code === 'unsupported')
+					return stopped('provider-unsupported')
 				if (result.error.code === 'moderation') {
 					if (optionalReference && (result.referenceModerated || moderated))
 						return stopped('reference')
@@ -648,7 +650,6 @@ export class ArtProduction {
 				continue
 			}
 			reviewed = checked.png
-			onTechnicalPass?.(reviewed)
 			const judge = await artJson(
 				this.options.visual,
 				[
@@ -755,7 +756,7 @@ export class ArtProduction {
 			for (const costume of character.costumes ?? []) {
 				const candidates: Candidate[] = []
 				let fallback: (Candidate & { png?: Buffer }) | undefined
-				let failure: { error: unknown } | undefined
+				let failure: Error | undefined
 				const collect = async (
 					id: string,
 					drawing: Drawing,
@@ -774,34 +775,27 @@ export class ArtProduction {
 					const mode = drawing.references.length ? budget.edit : budget.generate
 					if (mode.matting.error && mode.opaqueStreak >= opaqueCandidateLimit)
 						return false
-					let retained: Buffer | undefined
-					let visible = false
-					try {
-						const result = await this.paint(
-							drawing,
-							this.nativeSize(true),
-							true,
-							false,
-							optionalReference,
-							mode,
-							(png) => {
-								retained = png
-							},
-						)
-						visible = 'png' in result || result.mainWouldOffer
+					const result = await this.paint(
+						drawing,
+						this.nativeSize(true),
+						true,
+						false,
+						optionalReference,
+						mode,
+					)
+					if ('issue' in result) {
+						if (result.stop === 'provider-unsupported')
+							throw new Error(result.issue)
 						if (
-							'issue' in result &&
 							result.stop !== 'reference' &&
 							result.stop !== 'matting' &&
 							!(result.stop === 'moderation' && matting.error)
 						)
-							failure ??= { error: new Error(result.issue) }
-					} catch (error) {
-						this.options.signal?.throwIfAborted()
-						failure ??= { error }
+							failure ??= new Error(result.issue)
 					}
+					const retained = 'png' in result ? result.png : result.reviewed
 					if (!retained) return false
-					if (!visible) {
+					if ('issue' in result && !result.mainWouldOffer) {
 						fallback ??= { id, cachePath: fallbackPath, png: retained }
 						return false
 					}
@@ -853,7 +847,7 @@ export class ArtProduction {
 					if (png) await persistCandidate(cachePath, png, true)
 					candidates.push({ id, cachePath })
 				}
-				if (!candidates.length && failure) throw failure.error
+				if (!candidates.length && failure) throw failure
 				if (candidates.length)
 					characters.push({
 						characterId: character.id,

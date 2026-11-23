@@ -1063,7 +1063,7 @@ test.each(
 		'opaque budget',
 		'matting unavailable',
 		'technical retries',
-		'provider unsupported',
+		'EPUB provider unsupported',
 	].flatMap((stop) => [false, true].map((retained) => ({ stop, retained }))),
 )('resolves $stop with retained=$retained', async ({ stop, retained }) => {
 	const opaque = await picture(320, 480, false)
@@ -1074,6 +1074,7 @@ test.each(
 	} as const
 	const invalid = { bytes: Buffer.from('invalid image') }
 	const epub = stop.startsWith('EPUB')
+	const capabilityError = stop === 'EPUB provider unsupported'
 	const cached = stop.endsWith('cached choice')
 	const opaqueResponse = { bytes: opaque }
 	const failures = {
@@ -1086,7 +1087,7 @@ test.each(
 		'opaque budget': [opaqueResponse, opaqueResponse],
 		'matting unavailable': [opaqueResponse],
 		'technical retries': [invalid, invalid, invalid],
-		'provider unsupported': [
+		'EPUB provider unsupported': [
 			{ error: { code: 'unsupported', message: 'Unsupported' } } as const,
 		],
 	}
@@ -1098,9 +1099,10 @@ test.each(
 	let portraitRequests = 0
 	const renderer = vi
 		.spyOn(artModels, 'imageRenderer')
-		.mockReturnValue(async (_prompt, _refs, _size, transparent) => {
+		.mockReturnValue(async (_prompt, refs, _size, transparent) => {
 			if (!transparent) return { bytes: landscape }
 			portraitRequests++
+			if (capabilityError && !refs.length) return { bytes: portrait }
 			return pending.shift() ?? opaqueResponse
 		})
 	const matte = vi
@@ -1151,7 +1153,10 @@ test.each(
 						])
 					: undefined,
 			)
-			if (retained) {
+			if (capabilityError) {
+				await expect(pool).rejects.toThrow('Unsupported')
+				expect(portraitRequests).toBe(retained ? 2 : 1)
+			} else if (retained) {
 				const { characters } = await pool
 				expect(characters).toMatchObject([
 					{
@@ -1171,11 +1176,7 @@ test.each(
 				expect((await pool).characters).toEqual([])
 			} else {
 				const message =
-					stop === 'technical retries'
-						? '图片无法解码。'
-						: stop === 'provider unsupported'
-							? 'Unsupported'
-							: 'Refused'
+					stop === 'technical retries' ? '图片无法解码。' : 'Refused'
 				await expect(pool).rejects.toThrow(message)
 			}
 			expect(portraitRequests).toBeGreaterThanOrEqual(primary.length)
