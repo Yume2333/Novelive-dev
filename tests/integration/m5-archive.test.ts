@@ -144,15 +144,16 @@ describe('M5 .novelive archive', () => {
 			...(await project.read(file)),
 			chapterIds: [ref.chapterId, second.chapterId],
 		})
-		await project.write(projectFiles.chapter(ref), {
-			...first,
-			published: false,
-		})
 		await project.write(projectFiles.chapter(second), {
 			...first,
 			chapterId: second.chapterId,
-			published: true,
 		})
+		project.tasks.registerWork({ workId: workA, title: work.title })
+		project.database
+			.prepare(
+				"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, ?, 0, 'producing'), (?, ?, 1, 'published')",
+			)
+			.run(workA, ref.chapterId, workA, second.chapterId)
 		for (const sceneId of first.sceneIds)
 			await project.writeFile(
 				projectFiles.scene(second, sceneId),

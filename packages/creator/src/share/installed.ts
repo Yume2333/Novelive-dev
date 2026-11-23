@@ -98,12 +98,17 @@ export class InstalledPackages {
 		)
 		if (!work) throw new Error('未找到此版本的作品')
 		const root = join(this.directory, work.installation)
+		const first =
+			chapterId ??
+			(await loadPlayerStatus(root, workId)).chapters.find(
+				(chapter) => chapter.published,
+			)?.chapterId
 		return {
 			...(await loadPlayerChapter(
 				root,
 				workId,
 				join(this.dataDir, 'cache'),
-				chapterId,
+				first,
 			)),
 			linked: false,
 		}
