@@ -87,7 +87,7 @@ export function mountText(
 			if (rt)
 				rt.style.visibility = Array.from(
 					ruby.querySelectorAll<HTMLElement>('[data-glyph]'),
-				).every((glyph) => Number(glyph.dataset.glyph) < revealed)
+				).some((glyph) => Number(glyph.dataset.glyph) < revealed)
 					? 'visible'
 					: 'hidden'
 		}
