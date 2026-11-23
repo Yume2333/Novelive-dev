@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -151,6 +152,46 @@ const strict = createReplayFetch({
 })
 const options = { connection, language: 'en', fetch: strict }
 const files = synthesisFiles('v1')
+
+test.each([false, true])(
+	'reopens a completed synthesis across packet format changes (legacy: %s)',
+	async (legacy) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const args = { ...options, strategy: 'whole' as const }
+		const result = await synthesizeVolume(project, 'v1', chapters, args)
+		const checkpoint = await project.read(files.checkpoint)
+		const inputs = {
+			previews: await Promise.all(
+				chapters.map((id) => project.read(projectFiles.preview(id))),
+			),
+			language: args.language,
+			strategy: args.strategy,
+			incremental: false,
+			model: connection.model,
+			context: connection.contextWindow,
+		}
+		await project.write(
+			files.checkpoint,
+			legacy
+				? {
+						...checkpoint,
+						inputFingerprint: undefined,
+						fingerprint: createHash('sha256')
+							.update(JSON.stringify({ packetFormat: 2, ...inputs }))
+							.digest('hex'),
+					}
+				: { ...checkpoint, fingerprint: 'old-packet-format' },
+		)
+		const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+			throw new Error('Completed synthesis should be reused')
+		})
+		expect(
+			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
+		).toEqual(result)
+		expect(fetch).not.toHaveBeenCalled()
+	},
+)
 
 test('whole synthesis requests a complete chapter-by-chapter patch, not a shortlist', async () => {
 	await seed(root)

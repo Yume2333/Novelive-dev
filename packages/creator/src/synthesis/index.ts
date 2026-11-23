@@ -62,6 +62,7 @@ const inclusionCriteria =
 const checkpointSchema = obj({
 	...version,
 	fingerprint: str(),
+	inputFingerprint: opt(str()),
 	basis: str(),
 	packet: int({ minimum: 0 }),
 	events: arr(eventSchema),
@@ -116,6 +117,8 @@ export interface SynthesisOptions {
 }
 
 const minimumEventLimit = 128
+const packetFormat = 5
+const legacyPacketFormats = [1, 2, 3, 4, 5]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const bytes = (text: string) => Buffer.byteLength(text)
@@ -257,8 +260,7 @@ export async function synthesizeVolume(
 	)
 	if (previews.some((preview, i) => preview.chapterId !== chapterIds[i]))
 		throw new Error('Stored preview chapter ID does not match its file')
-	const fingerprint = hash({
-		packetFormat: 5,
+	const inputs = {
 		previews,
 		language: options.language,
 		requirements: options.requirements,
@@ -266,11 +268,22 @@ export async function synthesizeVolume(
 		incremental,
 		model: model.id,
 		context: model.contextWindow,
-	})
+	}
+	const inputFingerprint = hash(inputs)
+	const packetFingerprint = (format: number) =>
+		hash({ packetFormat: format, ...inputs })
+	const fingerprint = packetFingerprint(packetFormat)
 	const saved = options.rerun
 		? undefined
 		: await existing(() => project.read(files.checkpoint))
-	if (saved?.fingerprint === fingerprint && saved.applied)
+	if (
+		saved?.applied &&
+		(saved.inputFingerprint
+			? saved.inputFingerprint === inputFingerprint
+			: legacyPacketFormats.some(
+					(format) => saved.fingerprint === packetFingerprint(format),
+				))
+	)
 		return project.read(files.result)
 
 	const bible = await readBible(project)
@@ -559,6 +572,10 @@ ${packets[packet]}`,
 	}
 	await project.write(projectFiles.skeleton(volumeId), skeleton)
 	await project.write(files.result, result)
-	await project.write(files.checkpoint, { ...state, applied: true })
+	await project.write(files.checkpoint, {
+		...state,
+		inputFingerprint,
+		applied: true,
+	})
 	return result
 }
