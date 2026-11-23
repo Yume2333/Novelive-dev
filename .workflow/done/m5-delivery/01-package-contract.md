@@ -7,7 +7,6 @@
 **Read first:** `.workflow/specs/m5-delivery.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
 **Check:** `NL_REPLAY=strict pnpm exec vitest run tests/unit/m5-package-contract.test.ts` → 身份、版本、包条目及宿主载荷契约测试通过。
 **Base commit:** c9fda5e5c38a59b4709bdd277998f72605c40f3a
-**Status:** paused
 
 - [x] 冻结 exports/import operation 与存档迁移形状；先引入文档指定 ZIP 依赖。
 
@@ -15,4 +14,6 @@
 
 - Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m5-package-contract.test.ts` → Test Files 1 passed (1), Tests 18 passed (18)；严格回放 `pnpm check` → Test Files 57 passed (57), Tests 727 passed | 1 skipped (728)。
 - 实际调用包契约函数及宿主载荷校验器；ZIP 编解码、存档迁移执行和 Electron 接线分别由后续任务验收，本任务未运行付费测试。
-- Review: skipped — 当前会话不能启动独立 workflow-reviewer 或 security-reviewer；合入前待审查，未归档。
+- 最终复验：严格回放 `pnpm check` → Test Files 57 passed (57), Tests 731 passed | 1 skipped (732)；Linux checks and Electron smoke 通过。
+- Review: pass (base c9fda5e5c38a59b4709bdd277998f72605c40f3a, reviewer Devin Review)
+- [PR #70](https://github.com/Yume2333/Novelive-dev/pull/70) 于 `f45881d` 合并；Devin Review 对最终提交 `c694fe5` 报告成功。审查意见已分流：`ac77379` 验证桌面响应与请求操作一致；`0210e73` 将旧存档缩略图清理及回归验收纳入 M5/03。
