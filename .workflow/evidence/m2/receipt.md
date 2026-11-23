@@ -2,6 +2,72 @@
 
 Branch: `devin/1795402319-m2-gate`.
 
+## PR #57 round 2
+
+Started from confirmed HEAD `c905614e0e54d6884b50a033660d40d876150515`.
+Each actionable finding was reproduced before fixing it:
+
+- A (`8cf2d60`): after saving a text change and replacing an image, Undo was
+  disabled. Refresh only the changed image cache path through
+  `production.resolveAsset`; the gate now undoes that text change after redraw.
+- B (`c2f830a`): the picker returned `room/nigh` for `room/night`, while missing
+  an aliased portrait and short `@face`. Use the script compiler's resolved
+  action assets, with tests for aliases, short faces, prefixes, empty scenes,
+  pending assets and invalid scripts.
+- C (`1c79090`): manually reverting a dirty draft after an Agent update disabled
+  discard despite a pending chapter refresh. Keep discard available until the
+  pending refresh is consumed; the gate exercises manual revert then discard.
+- D: production chat now adds minimal JSON position instructions. A fake model
+  request previously lacked the supplied scene ID; its regression checks the
+  actual system message. The gate prompt no longer supplies chapter/scene IDs,
+  so the real proposal relies on implicit editor context.
+- E (`4407bb2`, formatting `dc82200`): generation previously exposed no status
+  or spinner. Add an accessible generation status with the existing lucide
+  LoaderCircle pattern, token motion and reduced-motion support. The gate
+  observes the spinner during generation and verifies successful completion.
+- F (`e1ab730`): the old test used both filters at once and could not distinguish
+  them. Test each independently; removing either production filter made the
+  strengthened test fail (`expected recovered`, `received temporary`). Restore
+  production code unchanged before the full check.
+- G: retained the pre-existing styled native selects. The production settings
+  `Select` in `ModelFields.tsx` is itself a native select; no shared custom
+  dropdown exists in the production component directory. Editor selectors
+  already use token surfaces, radius and focus styling in `editor.css`. The
+  prototype's custom dropdown is not a production component.
+
+Authorized recording ran once and passed: **2 paid requests**, both
+`gemini-3.8-flash` (response metadata `gemini-3.8-flash-n`). Proposal:
+1206 input + 566 output = 1772 tokens. Continuation: 1805 input + 65 output =
+1870 tokens. Total: **3011 input + 631 output = 3642 tokens**. The unchanged
+writer request reused its successful recording; all image calls used existing
+offline fixtures. Both private usage ledgers contain actual usage, not output
+reservations. The committed cassette contains the new proposal/continuation
+and the reused writer response. Audit: path-only endpoints, content-type-only
+headers, no URLs, authorization headers or absolute home paths in metadata or
+decoded SSE bodies.
+
+Final strict checks:
+
+```text
+Checked 305 files in 137ms. No fixes applied.
+Found 1 info.
+Test Files 43 passed (43)
+Tests 563 passed | 1 skipped (564)
+```
+
+```sh
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 revise a work|M2 editor'
+```
+
+```text
+✓ tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (8.8s)
+10 passed (20.7s)
+```
+
+Refreshed the M2 screenshots from this strict run. Display `:0` was not used.
+Earlier sections below preserve the first-round receipt and original usage;
+the position-context blocker described there is now resolved by round 2.
+
 ## Real desktop Check
 
 ```sh
