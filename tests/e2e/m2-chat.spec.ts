@@ -328,6 +328,10 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 			await expect(panel.getByText('"field": "年龄"')).toBeVisible()
 			await expect(panel.getByText('"来源": "第一章"')).toBeVisible()
 			await expect(panel.getByText('核对第二章称呼')).toBeVisible()
+			for (const block of await panel.locator('pre').all()) {
+				await expect(block).toHaveCSS('font-family', /Noto Sans CJK SC/)
+				await expect(block).toHaveCSS('font-family', /monospace/)
+			}
 			await capture(page, 'tool-detail')
 
 			const input = panel.getByRole('textbox', { name: '给 Agent 发消息' })
@@ -376,6 +380,17 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 				panel.getByRole('button', { name: /compare_image\s*运行中/ }),
 			).toBeVisible()
 			await capture(page, 'streaming')
+			const toolHead = panel.getByRole('button', {
+				name: /compare_image\s*运行中/,
+			})
+			await expect(toolHead).toHaveCSS('font-family', /Noto Sans CJK SC/)
+			await expect(toolHead.getByText('运行中')).toHaveCSS(
+				'font-family',
+				/Noto Sans CJK SC/,
+			)
+			await expect(
+				panel.getByRole('button', { name: '思考过程' }).last(),
+			).toHaveCSS('font-family', /Noto Sans CJK SC/)
 
 			await panel.getByRole('button', { name: '停止', exact: true }).click()
 			await expect(
