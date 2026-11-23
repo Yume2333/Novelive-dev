@@ -36,7 +36,7 @@ tests/fixtures/text-models/build-synthetic.ts:63:3 lint/style/useTemplate  FIXAB
      85  85 │   }
 
 
-Checked 305 files in 137ms. No fixes applied.
+Checked 305 files in 149ms. No fixes applied.
 Found 1 info.
 $ vitest run
 
@@ -45,5 +45,5 @@ $ vitest run
 
  Test Files  43 passed (43)
       Tests  563 passed | 1 skipped (564)
-   Start at  04:08:08
-   Duration  26.30s (tests 92%, import 7%, transform 1%)
+   Start at  04:15:21
+   Duration  29.34s (tests 93%, import 7%, transform 1%)

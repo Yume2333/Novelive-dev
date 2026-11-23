@@ -2,6 +2,44 @@
 
 Branch: `devin/1795402319-m2-gate`.
 
+## PR #57 round 3
+
+Confirmed starting HEAD `5bbcdabb2164b347493ecaa3d43fb49e4725cc1a`.
+
+- H (`ea706ae`): the live spinner was nested under the busy workbench; a gate
+  observer requiring a non-busy announcement reproduced the missing update.
+  Retain the final success/candidate/error status after generation and after
+  `aria-busy` becomes false. The gate asserts the persistent completion status
+  has no busy ancestor. Loading still shows the spinner.
+- I (`e386f39`): inspect the actual image URL after `Image.decode()` in the
+  renderer, not just the backend revision. Compare the initial/replacement
+  content-hash filenames, require the replacement URL returned by production,
+  and require the selected candidate's hash after adoption. A mutation that
+  skipped updating the editor cache path failed with the old `editor/ca136a...`
+  URL instead of the expected `production/02a735...` URL. Production code was
+  restored before final verification.
+- CI compatibility (`8912605`): main's new player text renderer has a hidden
+  measurement copy, so `textContent` doubles the sentence. Assert visible
+  `innerText` instead; keep the exact expected sentence assertion.
+
+No additional recordings or provider requests were made in round 3. Refreshed
+screenshots include `07-image-redrawn.png` with its persistent completion status.
+
+```text
+Checked 305 files in 149ms. No fixes applied.
+Found 1 info.
+Test Files 43 passed (43)
+Tests 563 passed | 1 skipped (564)
+```
+
+```text
+✓ tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (12.3s)
+1 passed (14.5s)
+```
+
+Commands: `NL_REPLAY=strict pnpm check` and
+`NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 revise a work'`.
+
 ## PR #57 round 2
 
 Started from confirmed HEAD `c905614e0e54d6884b50a033660d40d876150515`.

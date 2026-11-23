@@ -1,4 +1,4 @@
-$ pnpm build && playwright test --grep 'M2 revise a work|M2 editor'
+$ pnpm build && playwright test --grep 'M2 revise a work'
 $ pnpm --filter @novelive/desktop build
 $ electron-vite build
 vite v7.2.7 building ssr environment for production...
@@ -59,13 +59,13 @@ out/main/chunks/client-B_wyAP3K.js                              954.72 kB
 out/main/chunks/index-BgS5ybJj.js                             1,240.29 kB
 out/main/chunks/google-shared-DSHGrtMa.js                     1,527.42 kB
 out/main/chunks/index-v6jqN50r.js                             2,002.54 kB
-✓ built in 5.34s
+✓ built in 4.91s
 vite v7.2.7 building ssr environment for production...
 transforming...
 ✓ 27 modules transformed.
 rendering chunks...
 out/preload/index.cjs  120.62 kB
-✓ built in 147ms
+✓ built in 148ms
 vite v7.2.7 building client environment for production...
 transforming...
 ✓ 3288 modules transformed.
@@ -90,31 +90,22 @@ rendering chunks...
 ../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-Ba7eOkfT.woff2  1,142.55 kB
 ../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-CN8EQoOj.woff   1,564.08 kB
 ../../apps/desktop/out/renderer/assets/index-CbFRh3nb.css                                            66.63 kB
-../../apps/desktop/out/renderer/assets/highlighted-body-PUFBAJJF-BFEfnKIa.js                          0.80 kB
-../../apps/desktop/out/renderer/assets/getTextureBatchBindGroup-lbbaVPSl.js                           0.94 kB
-../../apps/desktop/out/renderer/assets/canvasUtils-BYPNrM-N.js                                       13.47 kB
-../../apps/desktop/out/renderer/assets/getTexelRangeRects-BNUaApa_.js                                19.18 kB
-../../apps/desktop/out/renderer/assets/webworkerAll-iZapzvAL.js                                      34.97 kB
-../../apps/desktop/out/renderer/assets/CanvasPool-Dqy5f4Nl.js                                        64.92 kB
-../../apps/desktop/out/renderer/assets/browserAll-D3EX8k6y.js                                       102.79 kB
-../../apps/desktop/out/renderer/assets/WebGPURenderer-DbsdvOZX.js                                   123.79 kB
-../../apps/desktop/out/renderer/assets/WebGLRenderer-C-kkkjc9.js                                    152.19 kB
-../../apps/desktop/out/renderer/assets/RenderTargetSystem-CZJrOBbU.js                               167.68 kB
-../../apps/desktop/out/renderer/assets/CanvasRenderer-ChpHgLg5.js                                   281.00 kB
-../../apps/desktop/out/renderer/assets/index-DCo6_Vvy.js                                          3,025.02 kB
-✓ built in 4.82s
+../../apps/desktop/out/renderer/assets/highlighted-body-PUFBAJJF-_tWF960Y.js                          0.80 kB
+../../apps/desktop/out/renderer/assets/getTextureBatchBindGroup-7ZGHOA6l.js                           0.94 kB
+../../apps/desktop/out/renderer/assets/canvasUtils-CKcVeVm9.js                                       13.47 kB
+../../apps/desktop/out/renderer/assets/getTexelRangeRects-BlE4fIsj.js                                19.18 kB
+../../apps/desktop/out/renderer/assets/webworkerAll-C7DjZUvO.js                                      34.97 kB
+../../apps/desktop/out/renderer/assets/CanvasPool-Dy67vsCJ.js                                        64.92 kB
+../../apps/desktop/out/renderer/assets/browserAll-DQ2s74mC.js                                       102.79 kB
+../../apps/desktop/out/renderer/assets/WebGPURenderer-BnL6i040.js                                   123.79 kB
+../../apps/desktop/out/renderer/assets/WebGLRenderer-CnXg7K7H.js                                    152.19 kB
+../../apps/desktop/out/renderer/assets/RenderTargetSystem-q5UiBR28.js                               167.68 kB
+../../apps/desktop/out/renderer/assets/CanvasRenderer-Hve35bct.js                                   281.00 kB
+../../apps/desktop/out/renderer/assets/index-DseQ69fm.js                                          3,025.36 kB
+✓ built in 7.65s
 
-Running 10 tests using 2 workers
+Running 1 test using 1 worker
 
-  ✓   1 tests/e2e/m2-editor.spec.ts:85:1 › M2 editor preview locates source and current line, edits, undoes and previews a fixed project (1.7s)
-  ✓   3 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture normal (2.6s)
-  ✓   2 tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (8.8s)
-  ✓   4 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture empty (1.2s)
-  ✓   5 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture failure (1.2s)
-  ✓   6 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture stale (1.3s)
-  ✓   7 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture crlf (1.8s)
-  ✓   8 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture leading (1.4s)
-  ✓   9 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture effects (2.1s)
-  ✓  10 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture long (2.1s)
+  ✓  1 tests/e2e/m2-gate.spec.ts:51:1 › M2 revise a work through editor and Agent in real Electron (12.3s)
 
-  10 passed (20.7s)
+  1 passed (14.5s)
