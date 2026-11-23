@@ -8,7 +8,12 @@ import {
 } from '@novelive/format/model'
 import sharp from 'sharp'
 import { expect, test, vi } from 'vitest'
+import {
+	applyBibleProposal,
+	bibleRevision,
+} from '../../packages/creator/src/bible/editing'
 import { propagateStaleness } from '../../packages/creator/src/bible/staleness'
+import { ChatStore } from '../../packages/creator/src/chat/store'
 import { createConfigStore } from '../../packages/creator/src/config'
 import { testTextConnection } from '../../packages/creator/src/models/text'
 import * as artModels from '../../packages/creator/src/pipeline/art/models'
@@ -396,3 +401,94 @@ test('text provider usage preserves resolved slots even when every slot uses the
 		vi.unstubAllEnvs()
 	}
 })
+
+test.each(['style', 'glossary'] as const)(
+	'%s proposal approval ignores malformed asset registries when nothing becomes stale',
+	async (kind) => {
+		await fixture(async (project) => {
+			const registry = projectFiles.assetRegistry({ level: 'series' })
+			await project.writeFile(registry.path, '{"invalid":"registry"}')
+			await expect(project.read(registry)).rejects.toBeDefined()
+			const base = {
+				volumeId: 'v1',
+				expectedRevision: bibleRevision(await readBible(project)),
+			}
+			const payload =
+				kind === 'style'
+					? {
+							...base,
+							kind: 'bible',
+							changes: [
+								{
+									kind: 'style',
+									op: 'update',
+									entry: {
+										id: 'style',
+										description: 'Ink wash',
+										status: 'candidate',
+									},
+								},
+							],
+						}
+					: {
+							...base,
+							kind: 'glossary',
+							changes: [
+								{
+									id: 'boat',
+									original: 'boat',
+									written: 'Boat',
+									category: 'object',
+									status: 'candidate',
+								},
+							],
+						}
+			project.database
+				.prepare(
+					'INSERT INTO proposal(proposal_id, work_id, kind, prompt, payload, created_at) VALUES (?, ?, ?, ?, ?, 0)',
+				)
+				.run(
+					'edit',
+					workId,
+					payload.kind,
+					'Edit',
+					JSON.stringify({ chapterIds: [], payload }),
+				)
+			const proposal = new ChatStore(project.database, workId).proposal(
+				'edit',
+			).proposal
+			const reads = vi.spyOn(project, 'read')
+			try {
+				await expect(applyBibleProposal(project, proposal)).resolves.toEqual({
+					status: 'applied',
+				})
+				expect(
+					reads.mock.calls.some(([file]) => file.path === registry.path),
+				).toBe(false)
+			} finally {
+				reads.mockRestore()
+			}
+			const after = await readBible(project)
+			if (kind === 'style')
+				expect(after.style).toEqual([
+					expect.objectContaining({
+						description: 'Ink wash',
+						status: 'confirmed',
+					}),
+				])
+			else
+				expect(after.glossary).toEqual([
+					expect.objectContaining({
+						original: 'boat',
+						written: 'Boat',
+						status: 'confirmed',
+					}),
+				])
+			expect(
+				project.database
+					.prepare("SELECT * FROM asset WHERE status = 'stale'")
+					.all(),
+			).toEqual([])
+		})
+	},
+)

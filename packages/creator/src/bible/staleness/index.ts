@@ -40,6 +40,7 @@ export async function propagateStaleness(
 	after: Bible,
 ) {
 	const prefixes = stalePrefixes(before, after)
+	if (!prefixes.length) return
 	const matches = (id: string, family: Family) =>
 		prefixes.some(
 			(target) => target.family === family && id.startsWith(target.prefix),
