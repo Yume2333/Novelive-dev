@@ -8,6 +8,15 @@ import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
 
+test('closes a wrapped note when the font returns to body height', async () => {
+	const result = await extractPdf(await fixture('note-font-height'))
+	if (result.status !== 'ready') throw new Error('Expected text PDF')
+	expect(result.book.volumes[0].chapters[0]).toMatchObject({
+		paragraphs: ['Body before.', 'Body resumes and ends.'],
+		notes: ['[1] Small note begins and continues'],
+	})
+})
+
 test('removes explicit edge folios from sparse pages even without a detected zone', async () => {
 	const result = await extractPdf(await fixture('sparse-folios'))
 	if (result.status !== 'ready') throw new Error('Expected text PDF')

@@ -20,11 +20,12 @@ function pdf(pages, image = false, cjk = false) {
 							text,
 							x = 20,
 							y = 350 - index * 18,
+							height = 12,
 						} = typeof line === 'string' ? { text: line } : line
 						const encoded = cjk
 							? `<${Array.from(text, (char) => char.charCodeAt(0).toString(16).padStart(4, '0')).join('')}>`
 							: `(${text.replace(/[\\()]/g, '\\$&')})`
-						return `BT /F1 12 Tf ${x} ${y} Td ${encoded} Tj ET`
+						return `BT /F1 ${height} Tf ${x} ${y} Td ${encoded} Tj ET`
 					})
 					.join('\n')
 		objects.push(
@@ -48,6 +49,20 @@ function pdf(pages, image = false, cjk = false) {
 }
 
 for (const [name, pages, image, cjk] of [
+	[
+		'note-font-height',
+		[
+			[
+				{ text: 'Chapter 1' },
+				{ text: 'Body before.' },
+				{ text: '[1] Small note begins', height: 8 },
+				{ text: 'and continues', height: 8.4 },
+				{ text: 'Body resumes', height: 12 },
+				{ text: 'and ends.', height: 12 },
+			],
+		],
+		false,
+	],
 	[
 		'sparse-folios',
 		[

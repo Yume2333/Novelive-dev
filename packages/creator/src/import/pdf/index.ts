@@ -65,6 +65,7 @@ function mergeLines(lines: Line[]) {
 			),
 	)
 	let noteParagraph = false
+	let noteHeight = 0
 	for (const [i, line] of lines.entries()) {
 		const previous = lines[i - 1]
 		const boundary =
@@ -72,6 +73,8 @@ function mergeLines(lines: Line[]) {
 			notes[i] ||
 			(notes[i - 1] && !noteBlocks[i - 1]) ||
 			(noteParagraph && previous.page !== line.page) ||
+			(noteParagraph &&
+				Math.abs(line.height - noteHeight) > Math.max(0.5, noteHeight * 0.1)) ||
 			heading(line.text) ||
 			heading(previous.text) ||
 			/[。！？…」』”".!?][\s）)\]’']*$/u.test(previous.text) ||
@@ -81,6 +84,7 @@ function mergeLines(lines: Line[]) {
 		if (boundary) {
 			paragraphs.push(line.text)
 			noteParagraph = notes[i]
+			noteHeight = line.height
 		} else {
 			const last = paragraphs.length - 1
 			if (/[A-Za-z]-$/u.test(paragraphs[last]) && /^[a-z]/u.test(line.text))
