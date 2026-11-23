@@ -834,6 +834,69 @@ test('keeps a reviewed transparent fallback when later opaque responses exhaust 
 	}
 })
 
+test('retries after an unmattable image instead of immediately offering a rejected fallback', async () => {
+	const opaque = await picture(320, 480, false)
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const approved = await sharp(portrait)
+		.negate({ alpha: false })
+		.png()
+		.toBuffer()
+	const responses = [portrait, opaque, approved, opaque, opaque]
+	let portraitReviews = 0
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, _refs, _size, transparent) => {
+			const bytes = transparent ? responses.shift() : landscape
+			if (!bytes) throw new Error('Unexpected extra portrait request')
+			return { bytes }
+		})
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+			return prompt.includes('造型候选') && ++portraitReviews === 1
+				? {
+						pass: false,
+						failedChecks: ['style'],
+						feedback: 'Try another style',
+					}
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay, undefined, undefined, undefined, 2)
+			const pool = await art.candidates(bible, ['c1'], 'assets/main.webp')
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [{ characterId: 'ada', candidates: [{ id: 'costume-1' }] }],
+			})
+			expect(portraitReviews).toBe(2)
+			expect(responses).toHaveLength(0)
+			const { cachePath } = pool.characters[0].candidates[0]
+			const saved = sharp(await project.readFile(cachePath))
+			const { width, height } = await saved.metadata()
+			const pixel = await saved
+				.extract({
+					left: Math.floor(width / 2),
+					top: Math.floor(height / 2),
+					width: 1,
+					height: 1,
+				})
+				.raw()
+				.toBuffer()
+			expect(pixel[0]).toBeGreaterThan(128)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(
 		'Invalid staging patch',

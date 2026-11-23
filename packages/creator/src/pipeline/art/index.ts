@@ -598,7 +598,16 @@ export class ArtProduction {
 					if (error instanceof MattingUnavailableError) {
 						if (candidateBudget) {
 							candidateBudget.matting.error = error
-							if (reviewed) return { issue, reviewed }
+							if (reviewed) {
+								if (
+									attempt <= this.options.image.retries &&
+									candidateBudget.opaqueStreak < opaqueCandidateLimit
+								) {
+									feedback = issue
+									continue
+								}
+								return { issue, reviewed }
+							}
 						}
 						throw error
 					}
