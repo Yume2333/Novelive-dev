@@ -897,6 +897,75 @@ test('retries after an unmattable image instead of immediately offering a reject
 	}
 })
 
+test('retains a transparent EPUB costume when both repair prompts are moderated', async () => {
+	const opaque = await picture(320, 480, false)
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const moderated = {
+		error: { code: 'moderation', message: 'Content rejected' },
+	} as const
+	const responses = [
+		{ bytes: portrait },
+		{ bytes: opaque },
+		moderated,
+		moderated,
+		{ bytes: opaque },
+		{ bytes: opaque },
+	]
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(async (_prompt, _refs, _size, transparent) => {
+			const response = transparent ? responses.shift() : { bytes: landscape }
+			if (!response) throw new Error('Unexpected extra portrait request')
+			return response
+		})
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+			return prompt.includes('造型候选')
+				? {
+						pass: false,
+						failedChecks: ['style'],
+						feedback: 'Try another style',
+					}
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const illustration = 'source/references/illustration-1.png'
+			await project.writeFile(illustration, landscape)
+			const art = service(project, replay, undefined, undefined, undefined, 2)
+			const pool = await art.candidates(
+				bible,
+				['c1'],
+				'assets/main.webp',
+				[],
+				new Map([['ada', { id: 'illustration-1', cachePath: illustration }]]),
+			)
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [
+					{ characterId: 'ada', candidates: [{ id: 'costume-epub' }] },
+				],
+			})
+			expect(
+				render.mock.calls
+					.filter(([, , , transparent]) => transparent)
+					.map(([, refs]) => refs.length),
+			).toEqual([1, 1, 1, 1, 0, 0])
+		})
+	} finally {
+		renderer.mockRestore()
+		matte.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(
 		'Invalid staging patch',

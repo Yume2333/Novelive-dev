@@ -553,7 +553,9 @@ export class ArtProduction {
 					return { issue, unsupported: true } as const
 				if (result.error.code === 'moderation') {
 					if (optionalReference && (result.referenceModerated || moderated))
-						return { issue, moderated: true } as const
+						return reviewed
+							? { issue, reviewed }
+							: ({ issue, moderated: true } as const)
 					if (moderated) break
 					moderated = true
 					feedback = moderationHint
