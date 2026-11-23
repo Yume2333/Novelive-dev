@@ -21,7 +21,7 @@ import {
 import { existing } from '../synthesis/patch'
 import { withUsage } from '../usage'
 import { Project } from './index'
-import { loadPlayerChapter } from './player'
+import { loadPlayerChapter, loadPlayerStatus } from './player'
 import {
 	chapterWorker,
 	productionBible,
@@ -416,6 +416,13 @@ export function createProduction(
 				[...sessions.values()].map(async (session) =>
 					(await session).refreshSettings(),
 				),
+			)
+		},
+		async playerStatus(workId: string, selected?: string) {
+			const linked = await existing(() => readFile(binding(workId), 'utf8'))
+			return loadPlayerStatus(
+				linked ?? selected ?? fail('not_found', '请选择本地工程'),
+				workId,
 			)
 		},
 		async player(workId: string, selected?: string, chapterId?: string) {

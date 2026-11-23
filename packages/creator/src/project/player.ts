@@ -4,6 +4,72 @@ import { dirname, extname, join } from 'node:path'
 import { type AssetRegistry, projectFiles } from '@novelive/format/model'
 import { Project } from './index'
 
+async function playerChapters(
+	project: Project,
+	volumeId: string,
+	workId: string,
+	chapterIds: readonly string[],
+) {
+	const states = project.database
+		.prepare('SELECT chapter_id, user_state FROM chapter WHERE work_id = ?')
+		.all(workId)
+	return Promise.all(
+		chapterIds.map(async (chapterId) => {
+			const document = await project.read(
+				projectFiles.chapter({ volumeId, workId, chapterId }),
+			)
+			const state = states.find(
+				(row) => row.chapter_id === chapterId,
+			)?.user_state
+			const task = project.database
+				.prepare(
+					"SELECT phase FROM task WHERE work_id = ? AND ref_id = ? AND kind IN ('chapter', 'redo_chapter') ORDER BY seq DESC LIMIT 1",
+				)
+				.get(workId, chapterId)
+			const phases: Record<string, string> = {
+				write: '写作',
+				review: '审稿',
+				stage: '演出',
+				await_draw: '出图',
+				queued: '等待',
+				done: '完成',
+			}
+			return {
+				chapterId,
+				title: document.title,
+				published:
+					state === 'published' ||
+					(states.length === 0 && document.sceneIds.length > 0),
+				progress:
+					state === 'producing'
+						? `制作中 · ${phases[String(task?.phase)] ?? '等待'}`
+						: state === 'published'
+							? '已发布'
+							: '等待',
+			}
+		}),
+	)
+}
+
+export async function loadPlayerStatus(directory: string, workId: string) {
+	using project = await Project.open(directory)
+	const series = await project.read(projectFiles.series)
+	for (const volumeId of series.volumeIds) {
+		const volume = await project.read(projectFiles.volume(volumeId))
+		if (!volume.workIds.includes(workId)) continue
+		const work = await project.read(projectFiles.work(volumeId, workId))
+		return {
+			chapters: await playerChapters(
+				project,
+				volumeId,
+				workId,
+				work.chapterIds,
+			),
+		}
+	}
+	throw { code: 'not_found', message: '工程中找不到这部作品' }
+}
+
 export async function loadPlayerChapter(
 	directory: string,
 	workId: string,
@@ -16,44 +82,11 @@ export async function loadPlayerChapter(
 		const volume = await project.read(projectFiles.volume(volumeId))
 		if (!volume.workIds.includes(workId)) continue
 		const work = await project.read(projectFiles.work(volumeId, workId))
-		const states = project.database
-			.prepare('SELECT chapter_id, user_state FROM chapter WHERE work_id = ?')
-			.all(workId)
-		const chapters = await Promise.all(
-			work.chapterIds.map(async (chapterId) => {
-				const document = await project.read(
-					projectFiles.chapter({ volumeId, workId, chapterId }),
-				)
-				const state = states.find(
-					(row) => row.chapter_id === chapterId,
-				)?.user_state
-				const task = project.database
-					.prepare(
-						"SELECT phase FROM task WHERE work_id = ? AND ref_id = ? AND kind IN ('chapter', 'redo_chapter') ORDER BY seq DESC LIMIT 1",
-					)
-					.get(workId, chapterId)
-				const phases: Record<string, string> = {
-					write: '写作',
-					review: '审稿',
-					stage: '演出',
-					await_draw: '出图',
-					queued: '等待',
-					done: '完成',
-				}
-				return {
-					chapterId,
-					title: document.title,
-					published:
-						state === 'published' ||
-						(states.length === 0 && document.sceneIds.length > 0),
-					progress:
-						state === 'producing'
-							? `制作中 · ${phases[String(task?.phase)] ?? '等待'}`
-							: state === 'published'
-								? '已发布'
-								: '等待',
-				}
-			}),
+		const chapters = await playerChapters(
+			project,
+			volumeId,
+			workId,
+			work.chapterIds,
 		)
 		const chapterId = selectedChapterId ?? work.chapterIds[0]
 		if (!chapterId) throw { code: 'not_found', message: '作品还没有章节' }

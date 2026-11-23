@@ -53,16 +53,14 @@ export function useChapterWait({
 		}
 		if (!waiting) return
 		const work = workId
-		const chapter = current
 		let cancelled = false
 		let busy = false
 		async function refresh() {
 			if (busy) return
 			busy = true
 			try {
-				const result = await window.novelive.call('production.playerChapter', {
+				const result = await window.novelive.call('production.playerStatus', {
 					workId: work,
-					chapterId: chapter.chapterId,
 					...(directory ? { directory } : {}),
 				}).promise
 				if (cancelled) return

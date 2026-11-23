@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
 import { Project } from '../../packages/creator/src/project'
-import { loadPlayerChapter } from '../../packages/creator/src/project/player'
+import {
+	loadPlayerChapter,
+	loadPlayerStatus,
+} from '../../packages/creator/src/project/player'
 import { projectFiles } from '../../packages/format/src/model'
 import { type Beat, compileScript } from '../../packages/format/src/script'
 import { createPlayback } from '../../packages/player/src/minimal/playback'
@@ -102,6 +105,24 @@ test('player chapter selection defaults to first and only admits published produ
 	await expect(
 		loadPlayerChapter(root, playerWorkId, cache),
 	).rejects.toMatchObject({ code: 'not_found' })
+	{
+		using project = await Project.open(root)
+		await project.writeFile(
+			projectFiles.assetRegistry({ level: 'series' }).path,
+			'{',
+		)
+	}
+	expect(
+		(await loadPlayerStatus(root, playerWorkId)).chapters.map(
+			({ published }) => published,
+		),
+	).toEqual([false, true])
+	await expect(loadPlayerStatus(root, 'missing')).rejects.toMatchObject({
+		code: 'not_found',
+	})
+	await expect(
+		loadPlayerChapter(root, playerWorkId, cache, 'ch2'),
+	).rejects.toThrow()
 })
 afterEach(async () => {
 	vi.useRealTimers()

@@ -68,7 +68,20 @@ export const productionSnapshotSchema = obj({
 	),
 })
 
+const playerChaptersSchema = arr(
+	obj({
+		chapterId: entityId,
+		title: str(),
+		published: bool(),
+		progress: str(),
+	}),
+)
+
 export const productionCommands = {
+	'production.playerStatus': {
+		input: obj({ ...work, directory: opt(str({ minLength: 1 })) }),
+		output: obj({ chapters: playerChaptersSchema }),
+	},
 	'production.playerChapter': {
 		input: obj({
 			...work,
@@ -77,14 +90,7 @@ export const productionCommands = {
 		}),
 		output: obj({
 			linked: bool(),
-			chapters: arr(
-				obj({
-					chapterId: entityId,
-					title: str(),
-					published: bool(),
-					progress: str(),
-				}),
-			),
+			chapters: playerChaptersSchema,
 			script: str(),
 			chapter: chapterSchema,
 			registry: assetRegistrySchema,
