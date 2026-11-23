@@ -43,9 +43,14 @@ let directory: string
 let root: string
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
-const stream = (result: unknown) =>
+const providerUsage = {
+	prompt_tokens: 20,
+	completion_tokens: 7,
+	total_tokens: 27,
+}
+const stream = (result: unknown, usage?: typeof providerUsage) =>
 	new Response(
-		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage })}\n\ndata: [DONE]\n\n`,
 		{ headers: { 'content-type': 'text/event-stream' } },
 	)
 const candidatePositions = (prompt: string) =>
@@ -950,6 +955,9 @@ test('a saturated packet shows recent unique IDs from each kind and can finish w
 test.each([false, true])(
 	'packet reasoning-only responses get one focused retry (still reasoning only: %s)',
 	async (stillReasoning) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		vi.stubEnv('NL_USAGE_CSV', '')
 		await seed(root)
 		using project = await Project.open(root)
 		const prompts: string[] = []
@@ -957,23 +965,31 @@ test.each([false, true])(
 			const { messages } = await new Request(input, init).json()
 			const prompt: string = messages[0].content
 			const candidates = candidatePositions(prompt)
-			if (candidates) return stream({ keep: candidates })
+			if (candidates) return stream({ keep: candidates }, providerUsage)
 			prompts.push(prompt)
 			if (!stillReasoning && prompt.includes('Return one short JSON answer'))
-				return stream({
-					event: 'Ada opens the tower.',
-					overview: '',
-					chapters: chapters.map((chapterId) => ({
-						chapterId,
-						progress: 'Ada opens the tower.',
-					})),
-					biblePatch: [{ kind: 'location', op: 'add', entry: candidateTower }],
-					glossaryPatch: [],
-					is_last: true,
-				})
+				return stream(
+					{
+						event: 'Ada opens the tower.',
+						overview: '',
+						chapters: chapters.map((chapterId) => ({
+							chapterId,
+							progress: 'Ada opens the tower.',
+						})),
+						biblePatch: [
+							{ kind: 'location', op: 'add', entry: candidateTower },
+						],
+						glossaryPatch: [],
+						is_last: true,
+					},
+					providerUsage,
+				)
 			const chunks = [
 				{ choices: [{ index: 0, delta: { reasoning_content: 'Thinking' } }] },
-				{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+				{
+					choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+					usage: providerUsage,
+				},
 			]
 			return new Response(
 				`${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
@@ -984,7 +1000,12 @@ test.each([false, true])(
 			...options,
 			connection: { ...connection, model: 'devin-swe-2' },
 			strategy: 'events',
-			fetch,
+			fetch: createReplayFetch({
+				mode: 'record',
+				directory: join(directory, 'recordings'),
+				fetch,
+				spend: projectSpend(project.database),
+			}),
 		})
 		if (stillReasoning)
 			await expect(result).rejects.toMatchObject({ code: 'reasoning_limit' })
@@ -992,6 +1013,11 @@ test.each([false, true])(
 		expect(prompts[0]).not.toContain('Return one short JSON answer')
 		expect(new Set(prompts).size).toBe(2)
 		expect(prompts.at(-1)).toContain('Return one short JSON answer')
+		expect(
+			project.database
+				.prepare('SELECT DISTINCT actual_tokens FROM spend_reservation')
+				.all(),
+		).toEqual([{ actual_tokens: 27 }])
 		expect(prompts.at(-1)?.split('Chapter previews:\n')[1]).toEqual(
 			prompts[0].split('Chapter previews:\n')[1],
 		)

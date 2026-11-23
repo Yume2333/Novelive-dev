@@ -521,6 +521,12 @@ export function createTextStream(
 							(result.stopReason === 'length' && part.type === 'toolCall'),
 					)
 				const watchdog = idle.signal.aborted
+				const reasoningOnly =
+					!watchdog &&
+					empty &&
+					result.content.some(
+						(part) => part.type === 'thinking' && part.thinking.trim(),
+					)
 				const code =
 					watchdog || empty ? 'network' : classify(result, status, fields)
 				const failedResult =
@@ -541,7 +547,8 @@ export function createTextStream(
 						!rejected &&
 						((ok && (!settled || (failedResult && code === 'internal'))) ||
 							watchdog ||
-							(code === 'network' && (failedResult || empty))))
+							(code === 'network' &&
+								(failedResult || (empty && !(settled && reasoningOnly))))))
 				) {
 					const reason = watchdog
 						? 'stream idle timeout (watchdog)'
@@ -568,13 +575,7 @@ export function createTextStream(
 						!settled,
 					)
 				}
-				if (
-					!watchdog &&
-					empty &&
-					result.content.some(
-						(part) => part.type === 'thinking' && part.thinking.trim(),
-					)
-				) {
+				if (reasoningOnly) {
 					const raised = Math.min(maxTokens * 2, outputLimit)
 					const canRaise = smallCompletionsWindow
 						? raised > maxTokens
