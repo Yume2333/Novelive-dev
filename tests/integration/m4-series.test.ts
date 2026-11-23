@@ -576,6 +576,17 @@ test('production updates the effective asset and style owners without hiding art
 	expect(
 		(await p.read(projectFiles.assetRegistry(scope))).entries[0].status,
 	).toBe('drawn')
+	const ref = {
+		volumeId: joined.volumeId,
+		workId: joined.workId,
+		chapterId: joined.chapterIds[0],
+	}
+	const chapter = projectFiles.chapter(ref)
+	await p.write(chapter, { ...(await p.read(chapter)), sceneIds: ['aaaabbbb'] })
+	await p.writeFile(
+		projectFiles.scene(ref, 'aaaabbbb'),
+		'scene Arrival\nsource p0001\n@bg room/day\n: A room.\n',
+	)
 	const playback = await loadPlayerChapter(
 		p.root,
 		joined.workId,

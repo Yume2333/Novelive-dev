@@ -153,3 +153,22 @@ Found 1 info.
 ```
 
 Lint's only informational diagnostic remains the unrelated `useTemplate` suggestion in `tests/fixtures/text-models/build-synthetic.ts`. `git diff --check` and `git diff origin/main --check` exit 0. The new read-auto Electron case seeds three read sentence IDs, skips both `cont` and caption text containing 60-second initial/trailing pauses, and verifies the first unread auto sentence stays at zero revealed glyphs. No text-layer source or API changes.
+
+## CI interoperability with merged series tests
+
+The series artwork integration now prepares a minimal produced scene before calling the player loader. `joinSeries` creates chapter metadata with `sceneIds: []` and no production-state rows, so it is not yet eligible for playback; this fixture preparation preserves the loader's published-chapter eligibility and every existing artwork assertion.
+
+```text
+NL_REPLAY=strict pnpm test tests/integration/m4-series.test.ts
+Test Files  1 passed (1)
+Tests  8 passed (8)
+
+pnpm typecheck
+$ tsc --noEmit
+
+pnpm lint
+Checked 316 files in 152ms. No fixes applied.
+Found 1 info.
+```
+
+`git diff --check` and `git diff origin/main --check` exit 0. No production code or CI configuration changes.
