@@ -173,7 +173,7 @@ export function mountText(
 			offsets = [0]
 			heights = [lineHeight * 3]
 		}
-		page = ends.findIndex(end => end > anchor)
+		page = ends.findIndex((end) => end > anchor)
 		if (page === -1) page = ends.length - 1
 		host.style.height = `${lineHeight * 3}px`
 		schedule()
@@ -185,7 +185,10 @@ export function mountText(
 	return {
 		finished,
 		click() {
-			if (revealed < ends[page] || (page === ends.length - 1 && trailingPending)) {
+			if (
+				revealed < ends[page] ||
+				(page === ends.length - 1 && trailingPending)
+			) {
 				if (page === ends.length - 1) {
 					pause = 0
 					trailingPending = false

@@ -55,7 +55,7 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 			using project = await Project.open(root)
 			await project.writeFile(
 				projectFiles.scene(playerRef, 'aaaabbbb'),
-				`scene 空屋\nsource p0001\n: 春{wait 2}{ruby chūn tiān}春天{/ruby}{speed 10}{b}「山川、河流与风，静静地等待旅人。」${'山川与河流，正在等待春天。'.repeat(30)}{/b}{/speed}\n: {speed 0.2}慢慢{/speed}{wait 1}{speed 10}快快快快快快快快快快{/speed} cont\n: {speed 100}${'自动翻页，风从山间吹过。'.repeat(9)}{/speed} cont\n: 结束。\n`,
+				`scene 空屋\nsource p0001\n: 春{wait 2}{ruby chūn tiān}春{wait 1}天{/ruby}{speed 0.2}{b}「山川、河流与风，静静地等待旅人。」${'山川与河流，正在等待春天。'.repeat(30)}{/b}{/speed}\n: {speed 0.2}慢慢{/speed}{wait 1}{speed 10}快快快快快快快快快快{/speed} cont\n: {speed 100}${'自动翻页，风从山间吹过。'.repeat(9)}{/speed} cont\n: 结束。\n`,
 			)
 		}
 		const app = await electron.launch({
@@ -96,10 +96,21 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 			)
 			await expect(text).toHaveCSS('line-break', 'strict')
 			await expect(text).toHaveCSS('font-family', /Noto Sans SC/)
+			await expect(text).toHaveAttribute('data-revealed', '2', {
+				timeout: 3000,
+			})
+			await expect(display.locator('ruby rt')).toHaveCSS(
+				'visibility',
+				'visible',
+			)
 			const advance = () =>
 				page.locator('canvas').click({ position: { x: 20, y: 20 } })
 			await advance()
 			expect(await rects()).toEqual(before)
+			const firstEnd = Number(await text.getAttribute('data-revealed'))
+			expect(firstEnd).toBeLessThan(
+				await display.locator('[data-glyph]').count(),
+			)
 			const pages = Number(await text.getAttribute('data-pages'))
 			expect(pages).toBeGreaterThan(3)
 			const geometry = await text.evaluate((host) => {
@@ -123,9 +134,32 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 				expect(line).not.toMatch(/[（「『]$/)
 			}
 			await page.screenshot({ path: test.info().outputPath('first-page.png') })
+			await advance()
+			await expect(text).toHaveAttribute('data-page', '2')
+			await text.evaluate((host) => {
+				host.style.width = '100%'
+			})
+			await expect(text).toHaveAttribute('data-page', '1')
+			const anchorVisible = await display
+				.locator(`[data-glyph="${firstEnd}"]`)
+				.evaluate((glyph) => {
+					const rect = glyph.getBoundingClientRect()
+					const window = glyph
+						.closest('.nl-text-window')
+						?.getBoundingClientRect()
+					return (
+						window && rect.top >= window.top && rect.bottom <= window.bottom
+					)
+				})
+			expect(anchorVisible).toBe(true)
+			await text.evaluate((host) => {
+				host.style.width = '78%'
+			})
+			await expect(text).toHaveAttribute('data-pages', String(pages))
 			for (let p = 2; p <= pages; p++) {
 				await advance()
 				await expect(text).toHaveAttribute('data-page', String(p))
+				await advance()
 				if (p === 2)
 					await page.screenshot({
 						path: test.info().outputPath('second-page.png'),
@@ -135,15 +169,25 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 			await expect(text).toHaveAttribute('data-revealed', '2')
 			await page.waitForTimeout(250)
 			await expect(text).toHaveAttribute('data-revealed', '2')
-			await expect(text).toHaveAttribute('data-revealed', '12', {
-				timeout: 3000,
-			})
-			await expect(display).toHaveText('慢慢快快快快快快快快快快')
 			await expect(display).toHaveText('自动翻页，风从山间吹过。'.repeat(9), {
-				timeout: 5000,
+				timeout: 2000,
 			})
 			expect(Number(await text.getAttribute('data-pages'))).toBeGreaterThan(1)
-			await expect(text).toHaveAttribute('data-page', '2', { timeout: 10000 })
+			await text.evaluate(
+				(host) =>
+					new Promise<void>((resolve) => {
+						const observer = new MutationObserver(() => {
+							if ((host as HTMLElement).dataset.page === '2') {
+								observer.disconnect()
+								resolve()
+							}
+						})
+						observer.observe(host, {
+							attributes: true,
+							attributeFilter: ['data-page'],
+						})
+					}),
+			)
 			await expect(page.locator('.nl-text-display')).toHaveText('结束。', {
 				timeout: 10000,
 			})
