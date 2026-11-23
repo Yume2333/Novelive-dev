@@ -201,6 +201,14 @@ test('bounds chapter review quotes without shrinking generation references or sa
 			})
 			return { bytes: await picture(size.width, size.height, false) }
 		})
+	const postprocess = vi
+		.spyOn(upscale, 'postprocess')
+		.mockImplementation(async (image, { target, fit }) =>
+			sharp(image)
+				.resize({ ...target, fit })
+				.png()
+				.toBuffer(),
+		)
 	const model = vi
 		.spyOn(artModels, 'artJson')
 		.mockImplementation(
@@ -259,7 +267,7 @@ test('bounds chapter review quotes without shrinking generation references or sa
 					concurrency: 1,
 					retries: 0,
 					quality: 'medium',
-					postProcess: 'off',
+					postProcess: 'single',
 					upscaleTier: 'anime',
 				},
 			})
@@ -276,6 +284,10 @@ test('bounds chapter review quotes without shrinking generation references or sa
 				confirmed,
 			)
 			expect(await art.draw(job, confirmed)).toEqual({ status: 'drawn' })
+			expect(postprocess).toHaveBeenCalledTimes(1)
+			expect(
+				await sharp(postprocess.mock.calls[0][0]).metadata(),
+			).toMatchObject({ width: 2048, height: 1152 })
 			expect(await project.readFile(path)).toEqual(original)
 			expect(
 				model.mock.calls.filter(([, prompt]) =>
@@ -286,6 +298,7 @@ test('bounds chapter review quotes without shrinking generation references or sa
 	} finally {
 		render.mockRestore()
 		model.mockRestore()
+		postprocess.mockRestore()
 	}
 }, 30_000)
 
