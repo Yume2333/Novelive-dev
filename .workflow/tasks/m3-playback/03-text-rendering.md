@@ -7,4 +7,13 @@
 **Read first:** `.workflow/specs/m3-playback.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
 **Check:** `NL_REPLAY=strict pnpm test:e2e --grep 'M3 text typography'` → 真实 DOM 显示禁则、ruby、停顿、分速、标签和三行分页。
 
-- [ ] 双层布局稳定换行，提升显示层不重排；无句长硬限制及自动播放/跳过兼容。
+- [x] 双层布局稳定换行，提升显示层不重排；无句长硬限制及自动播放/跳过兼容。
+
+## Progress
+
+- Boundary amendment: owner approved localized integration in `packages/player/src/minimal/index.ts` and `packages/player/src/minimal/playback.ts` (mount/dispose, click routing, timed completion hook); all rendering logic remains in `src/text/`.
+- Base commit: f08f8b7
+- Check after: `NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M3 text typography'` → `2 passed (17.8s)`. Real Electron DOM verifies stable glyph bounds across reveal, Chromium kinsoku, ruby, bold tags, pause and speed timing, manual sentence pagination, and timed multi-page advancement. Log: `/home/ubuntu/m3-03-check.log`; screenshots: `test-results/m3-text-M3-text-typography-3344b-s-tags-and-three-line-pages/{first,second}-page.png` (visually inspected; generated artifacts, not committed under the file boundary).
+- Verification: `pnpm typecheck` and `pnpm lint` exit 0 (lint reports one existing informational `useTemplate` suggestion in `tests/fixtures/text-models/build-synthetic.ts`); relevant unit suites `m1b-player` and `m3-contract`: 2 files / 10 tests passed. Timing unit cases run within the scoped Playwright spec: empty, instant, nested speed, accumulated and trailing pauses. No model calls or cassettes needed.
+- Defaults: 30 ms/grapheme, 30px / 78% box, maximum three lines per page; prefer a two-line page when its ending is punctuation. Use bundled `--font-body`, Chromium line breaking, grapheme spans and full-sentence cloned layout; page clipping and translation preserve markup without reflow. Auto dwell is `(1200 + 80 × page characters) / multiplier`; `TextOptions.skip` completes the whole sentence immediately for the controls task to consume.
+- Review: skipped — this Sidekick session has no fresh reviewer/subagent tool; independent review remains for the lead. No task archive, spec changes or landing performed because the requested deliverable is a pushed feature branch and the file boundary excludes those operations.

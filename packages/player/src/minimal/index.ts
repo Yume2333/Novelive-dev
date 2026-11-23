@@ -1,6 +1,7 @@
 import type { Beat, CompiledScene, TextLine } from '@novelive/format/script'
 import { Application, Sprite, Texture } from 'pixi.js'
 import { loadPlayerImage, type PlayerResources } from '../index'
+import { mountText } from '../text'
 import { createPlayback } from './playback'
 
 export async function mountMinimalPlayer(
@@ -27,6 +28,7 @@ export async function mountMinimalPlayer(
 	const textures = new Map<string, Texture>()
 	const cast = new Map<string, { id: string; sprite: Sprite }>()
 	let background: Sprite | undefined
+	let textRenderer: ReturnType<typeof mountText> | undefined
 	const texture = async (id: string) => {
 		let result = textures.get(id)
 		if (!result) {
@@ -37,7 +39,7 @@ export async function mountMinimalPlayer(
 		}
 		return result
 	}
-	function showText(line: TextLine) {
+	function showText(line: TextLine, auto: boolean) {
 		const box = document.createElement('div')
 		box.className =
 			line.kind === 'caption' ? 'nl-player-caption' : 'nl-player-textbox'
@@ -51,13 +53,13 @@ export async function mountMinimalPlayer(
 		}
 		const text = document.createElement('div')
 		text.className = 'nl-player-text'
-		text.textContent = line.content
-			.map((part) => (part.type === 'text' ? part.text : ''))
-			.join('')
 		box.append(text)
 		overlay.replaceChildren(box)
+		textRenderer = mountText(text, line.content, { auto })
 	}
 	async function render(current: Beat | undefined) {
+		textRenderer?.dispose()
+		textRenderer = undefined
 		if (!current) {
 			overlay.textContent = '本章结束'
 			return
@@ -99,15 +101,25 @@ export async function mountMinimalPlayer(
 				}
 			}
 		}
-		if (current.line?.type === 'text') showText(current.line)
+		if (current.line?.type === 'text')
+			showText(current.line, current.advance.kind !== 'click')
 		else overlay.replaceChildren()
 	}
-	const playback = createPlayback(scenes, render, signal, onError)
-	const click = playback.click
+	const playback = createPlayback(
+		scenes,
+		render,
+		signal,
+		onError,
+		() => textRenderer?.finished ?? Promise.resolve(),
+	)
+	const click = () => {
+		if (!textRenderer?.click()) playback.click()
+	}
 	host.addEventListener('click', click)
 	signal.addEventListener(
 		'abort',
 		() => {
+			textRenderer?.dispose()
 			host.removeEventListener('click', click)
 			stage.remove()
 			app.destroy(false, { children: true })
