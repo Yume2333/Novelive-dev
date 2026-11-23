@@ -1,5 +1,5 @@
 import type { ProductionSnapshot } from '@novelive/creator/contract'
-import { Check } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Page } from '../../components/Page'
@@ -75,6 +75,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 	const [characterIds, setCharacterIds] = useState<Record<string, string>>({})
 	const [supplemental, setSupplemental] = useState(() => defaults.slice(1, 3))
 	const [showAll, setShowAll] = useState(false)
+	const [mattingNoticeDismissed, setMattingNoticeDismissed] = useState(false)
 	const visibleImported = importedCandidates.filter(
 		({ id }) =>
 			showAll ||
@@ -131,10 +132,20 @@ function VisualChoices({ visual }: { visual: Visual }) {
 			<p className={styles.lead}>
 				确认点 1 / 2 · 选择首卷主要角色的设定和全作统一的主视觉。
 			</p>
-			{visual.mattingUnavailable && (
-				<p role="status" className={styles.notice}>
-					本地去背景不可用；无法生成透明底的角色可以使用占位图继续制作。
-				</p>
+			{visual.mattingUnavailable && !mattingNoticeDismissed && (
+				<div className={styles.actions}>
+					<span role="status" className={styles.lead}>
+						本地去背景不可用；无法生成透明底的角色可以使用占位图继续制作。
+					</span>
+					<button
+						className={styles.button}
+						type="button"
+						aria-label="关闭提示"
+						onClick={() => setMattingNoticeDismissed(true)}
+					>
+						<X size={16} aria-hidden="true" />
+					</button>
+				</div>
 			)}
 			{imported?.fallback ? (
 				<p className={styles.notice} role="status">
