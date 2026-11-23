@@ -370,7 +370,7 @@ registry.register('model.testImage', async (_payload, signal) => {
 async function importFile(payload: CommandInput<'import.file'>) {
 	const { importFileProject } = await import('./import/wizard')
 	const result = await importFileProject(payload)
-	if (result.status === 'ready') {
+	if (result.status === 'ready' || result.status === 'joined') {
 		const service = await getProduction()
 		for (const workId of result.workIds)
 			await service.remember(workId, result.projectDir)
@@ -379,6 +379,10 @@ async function importFile(payload: CommandInput<'import.file'>) {
 }
 registry.register('import.file', importFile)
 registry.register('import.txt', importFile)
+registry.register('import.target', async ({ projectDir }) => {
+	const { readImportTarget } = await import('./import/wizard/join')
+	return readImportTarget(projectDir)
+})
 registry.register(
 	'import.revise',
 	async ({ projectDir, layout, selectedIllustrations }) => {

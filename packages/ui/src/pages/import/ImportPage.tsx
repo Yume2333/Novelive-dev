@@ -69,6 +69,9 @@ export function ImportPage() {
 	const [candidates, setCandidates] = useState<Candidates>()
 	const [encoding, setEncoding] = useState<Encoding>()
 	const [wizard, setWizard] = useState<Wizard>()
+	const [joining, setJoining] = useState(false)
+	const [joinTarget, setJoinTarget] = useState<CommandOutput<'import.target'>>()
+	const [joined, setJoined] = useState<Extract<Result, { status: 'joined' }>>()
 	const [layout, setLayout] = useState<ImportLayout>()
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState('')
@@ -114,10 +117,17 @@ export function ImportPage() {
 		run(async () => {
 			const result = await window.novelive.call('import.file', {
 				sourcePath: source,
-				folder: location,
+				folder: joining ? (joinTarget?.projectDir ?? '') : location,
 				title: title.trim(),
 				encoding,
-				references,
+				references: joining ? [] : references,
+				join:
+					joining && joinTarget
+						? {
+								projectDir: joinTarget.projectDir,
+								seriesId: joinTarget.seriesId,
+							}
+						: undefined,
 			}).promise
 			if (result.status === 'unsupported') {
 				setError('扫描版 PDF 无可提取文字，暂不支持 OCR')
@@ -126,6 +136,10 @@ export function ImportPage() {
 			if (result.status === 'encoding') {
 				setCandidates(result.candidates)
 				setEncoding(undefined)
+				return
+			}
+			if (result.status === 'joined') {
+				setJoined(result)
 				return
 			}
 			setWizard(result)
@@ -146,6 +160,30 @@ export function ImportPage() {
 			navigate(workRoute('work', wizard.workId))
 		})
 
+	if (joined)
+		return (
+			<section className={styles.page}>
+				<header className={styles.header}>
+					<h1>已加入系列</h1>
+					<button
+						type="button"
+						className={styles.primary}
+						onClick={() => navigate(workRoute('work', joined.workId))}
+					>
+						进入作品
+					</button>
+				</header>
+				<section className={styles.card} aria-label="新增卷">
+					{joined.volumes.map((volume) => (
+						<div className={styles.row} key={volume.volumeId}>
+							<span className={styles.value}>{volume.title}</span>
+							<span>{volume.chapters} 章</span>
+						</div>
+					))}
+				</section>
+			</section>
+		)
+
 	if (wizard && layout)
 		return (
 			<Review
@@ -161,7 +199,11 @@ export function ImportPage() {
 		)
 
 	const ready =
-		source && title.trim() && location && (!candidates || encoding) && !busy
+		source &&
+		title.trim() &&
+		(joining ? joinTarget : location) &&
+		(!candidates || encoding) &&
+		!busy
 	return (
 		<section className={styles.page}>
 			<header className={styles.header}>
@@ -181,6 +223,29 @@ export function ImportPage() {
 				</p>
 			)}
 			<div className={styles.card}>
+				<fieldset className={styles.card}>
+					<legend className={styles.cardTitle}>导入方式</legend>
+					<label className={styles.row}>
+						<input
+							type="radio"
+							name="import-mode"
+							checked={!joining}
+							disabled={busy}
+							onChange={() => setJoining(false)}
+						/>
+						<span>新建工程</span>
+					</label>
+					<label className={styles.row}>
+						<input
+							type="radio"
+							name="import-mode"
+							checked={joining}
+							disabled={busy}
+							onChange={() => setJoining(true)}
+						/>
+						<span>加入已有系列</span>
+					</label>
+				</fieldset>
 				<div className={styles.row}>
 					<FileText aria-hidden="true" size={18} />
 					<span className={styles.label}>原文</span>
@@ -202,49 +267,95 @@ export function ImportPage() {
 						onChange={(event) => setTitle(event.target.value)}
 					/>
 				</label>
-				<div className={styles.row}>
-					<FolderOpen aria-hidden="true" size={18} />
-					<span className={styles.label}>保存位置</span>
-					<span className={styles.value}>{location || '未设置'}</span>
-					<button
-						type="button"
-						disabled={busy}
-						onClick={() => void pickLocation()}
-					>
-						选择文件夹
-					</button>
-				</div>
-				<div className={styles.row}>
-					<ImagePlus aria-hidden="true" size={18} />
-					<span className={styles.label}>参考图</span>
-					<span className={styles.value}>
-						{references.length ? `${references.length} 张` : '无'}
-					</span>
-					<button
-						type="button"
-						disabled={busy || references.length >= 3}
-						onClick={() => void pickReferences()}
-					>
-						添加图片
-					</button>
-				</div>
-				{references.map((path) => (
-					<div key={path} className={`${styles.row} ${styles.sub}`}>
-						<span className={styles.value}>{fileName(path)}</span>
-						<button
-							type="button"
-							className={styles.icon}
-							aria-label={`移除 ${fileName(path)}`}
-							onClick={() =>
-								setReferences((current) =>
-									current.filter((item) => item !== path),
-								)
-							}
-						>
-							<X aria-hidden="true" size={14} />
-						</button>
-					</div>
-				))}
+				{joining ? (
+					<>
+						<div className={styles.row}>
+							<FolderOpen aria-hidden="true" size={18} />
+							<span className={styles.label}>已有工程</span>
+							<span className={styles.value}>
+								{joinTarget?.projectDir ?? '未选择'}
+							</span>
+							<button
+								type="button"
+								disabled={busy}
+								onClick={() =>
+									void run(async () => {
+										const projectDir = await window.novelive.pickFolder()
+										if (!projectDir) return
+										setJoinTarget(undefined)
+										setJoinTarget(
+											await window.novelive.call('import.target', {
+												projectDir,
+											}).promise,
+										)
+									})
+								}
+							>
+								选择已有工程
+							</button>
+						</div>
+						{joinTarget && (
+							<label className={styles.row}>
+								<span className={styles.label}>系列</span>
+								<select value={joinTarget.seriesId} disabled={busy}>
+									<option value={joinTarget.seriesId}>
+										{joinTarget.title || joinTarget.seriesId}
+									</option>
+								</select>
+							</label>
+						)}
+						<div className={styles.row}>
+							<span className={styles.label}>参考图</span>
+							<span className={styles.value}>沿用已有工程</span>
+						</div>
+					</>
+				) : (
+					<>
+						<div className={styles.row}>
+							<FolderOpen aria-hidden="true" size={18} />
+							<span className={styles.label}>保存位置</span>
+							<span className={styles.value}>{location || '未设置'}</span>
+							<button
+								type="button"
+								disabled={busy}
+								onClick={() => void pickLocation()}
+							>
+								选择文件夹
+							</button>
+						</div>
+						<div className={styles.row}>
+							<ImagePlus aria-hidden="true" size={18} />
+							<span className={styles.label}>参考图</span>
+							<span className={styles.value}>
+								{references.length ? `${references.length} 张` : '无'}
+							</span>
+							<button
+								type="button"
+								disabled={busy || references.length >= 3}
+								onClick={() => void pickReferences()}
+							>
+								添加图片
+							</button>
+						</div>
+						{references.map((path) => (
+							<div key={path} className={`${styles.row} ${styles.sub}`}>
+								<span className={styles.value}>{fileName(path)}</span>
+								<button
+									type="button"
+									className={styles.icon}
+									aria-label={`移除 ${fileName(path)}`}
+									onClick={() =>
+										setReferences((current) =>
+											current.filter((item) => item !== path),
+										)
+									}
+								>
+									<X aria-hidden="true" size={14} />
+								</button>
+							</div>
+						))}
+					</>
+				)}
 			</div>
 			{candidates && (
 				<fieldset className={styles.card} aria-label="原文编码">

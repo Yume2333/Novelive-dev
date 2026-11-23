@@ -118,6 +118,25 @@ export const importWizardSchema = obj({
 	selectedIllustrations: arr(text, { maxItems: 3, uniqueItems: true }),
 })
 
+const importJoinedSchema = obj({
+	status: lit('joined'),
+	format: oneOf(['txt', 'epub', 'markdown', 'docx', 'pdf']),
+	projectDir: text,
+	seriesId: entityId,
+	workId,
+	workIds: arr(workId, { minItems: 1 }),
+	volumes: arr(
+		obj({
+			volumeId: entityId,
+			workId,
+			title: text,
+			chapters: int({ minimum: 1 }),
+		}),
+		{ minItems: 1 },
+	),
+})
+export type ImportJoined = Static<typeof importJoinedSchema>
+
 const fileImport = {
 	input: obj({
 		sourcePath: text,
@@ -125,6 +144,7 @@ const fileImport = {
 		title: text,
 		encoding: opt(encoding),
 		references: arr(text, { maxItems: 3 }),
+		join: opt(importJoinTargetSchema),
 	}),
 	output: union([
 		obj({
@@ -132,6 +152,7 @@ const fileImport = {
 			candidates: arr(obj({ encoding, preview: str() }), { minItems: 2 }),
 		}),
 		importWizardSchema,
+		importJoinedSchema,
 		obj({
 			status: lit('unsupported'),
 			format: lit('pdf'),
@@ -141,6 +162,10 @@ const fileImport = {
 }
 
 export const importCommands = {
+	'import.target': {
+		input: obj({ projectDir: text }),
+		output: obj({ projectDir: text, seriesId: entityId, title: str() }),
+	},
 	'import.file': fileImport,
 	'import.txt': fileImport,
 	'import.revise': {

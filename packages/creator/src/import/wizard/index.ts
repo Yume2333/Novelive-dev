@@ -5,7 +5,11 @@ import {
 	type ImportReport,
 	projectFiles,
 } from '@novelive/format/model'
-import type { ExtractedBook, ImportExtraction } from '../../contract/import'
+import type {
+	ExtractedBook,
+	ImportExtraction,
+	ImportJoinTarget,
+} from '../../contract/import'
 import { Project } from '../../project'
 import { extractDocx } from '../docx'
 import { extractEpub } from '../epub'
@@ -24,6 +28,7 @@ import {
 	type StoredIllustration,
 	type WizardIllustration,
 } from './illustrations'
+import { joinImportedVolumes } from './join'
 
 export interface ImportLayout {
 	title: string
@@ -266,6 +271,7 @@ export async function importTxtProject(options: {
 	title: string
 	encoding?: TxtEncoding
 	references: string[]
+	join?: ImportJoinTarget
 }) {
 	return importProject(options, 'txt')
 }
@@ -316,6 +322,7 @@ async function importProject(
 		if (extraction.status === 'unsupported') return extraction
 		book = extraction.book
 	}
+	if (options.join) return joinImportedVolumes(options, bytes, format, book)
 	const root = join(options.folder, folderName(options.title))
 	let project: Project
 	try {
@@ -429,13 +436,18 @@ export async function reviseTxtProject(
 	if (externalReferences.length + selected.length > 3)
 		throw invalid('最多选择 3 张参考图')
 	const volumes = applyLayout(report.structure, layout)
+	const ids = await workIds(project)
+	if (
+		ids.length !==
+		(report.layout?.volumes.length ?? report.structure.volumes.length)
+	)
+		throw invalid('系列已添加新卷，不能重新划分原文')
 	const references = [...externalReferences]
 	for (const candidate of selectedCandidates) {
 		const path = `source/references/${candidate.id}.png`
 		await project.writeFile(path, await project.readFile(candidate.cachePath))
 		references.push(path)
 	}
-	const ids = await workIds(project)
 	const settings = {
 		...(await firstSettings(project)),
 		confirmWithReferences: layout.confirmWithReferences,
