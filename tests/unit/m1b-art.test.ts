@@ -288,6 +288,14 @@ test('bounds chapter review quotes without shrinking generation references or sa
 			expect(
 				await sharp(postprocess.mock.calls[0][0]).metadata(),
 			).toMatchObject({ width: 2048, height: 1152 })
+			const entry = (await art.registry()).entries.find(
+				(entry) => entry.id === job.assetId,
+			)
+			const profiles = await readProfiles(project)
+			expect(entry && profiles[entry.path]?.profile).toEqual({
+				mode: 'single',
+				tier: 'anime',
+			})
 			expect(await project.readFile(path)).toEqual(original)
 			expect(
 				model.mock.calls.filter(([, prompt]) =>
