@@ -653,7 +653,7 @@ test('a hard stop persists exactly one event and resumes after reopening without
 			fetch,
 		})
 		expect(fetch).toHaveBeenCalledTimes(2)
-		expect(result.biblePatch).toHaveLength(3)
+		expect(result.biblePatch).toHaveLength(2)
 		expect(result.conflicts).toHaveLength(1)
 		expect(
 			await project.read(projectFiles.character(scope, 'ada')),
@@ -1130,8 +1130,8 @@ test.each([
 	},
 	{
 		model: 'fixture-returning-proposal',
-		count: 3,
-		chapters: ['c1', 'c2', 'c3'],
+		count: 1,
+		chapters: ['c1'],
 		expected: [
 			{ chapterId: 'c2', field: 'identity', value: 'Captain' },
 			{ chapterId: 'c3', field: 'identity', value: 'Cartographer' },
@@ -1162,6 +1162,8 @@ test.each([
 			),
 		).toEqual(observed)
 		expect(result.conflicts).toEqual([])
+		if (model === 'fixture-returning-proposal')
+			expect(result.biblePatch[0].entry).toMatchObject({ changes: expected })
 		expect(
 			await project.read(projectFiles.character(scope, 'ada')),
 		).toMatchObject({
@@ -1195,10 +1197,7 @@ test('the later same-chapter candidate alias update wins', async () => {
 			entry,
 			observedChapter,
 		]),
-	).toMatchObject([
-		[{ aliases: ['Zulu'] }, 'c2'],
-		[{ aliases: ['Alpha'] }, 'c2'],
-	])
+	).toMatchObject([[{ aliases: ['Alpha'] }, 'c2']])
 	expect((await project.read(file)).entries[0].aliases).toEqual(['Alpha'])
 })
 
@@ -1213,7 +1212,6 @@ test('deduplication retains the first addition and the first competing identity 
 	})
 	expect(result.biblePatch.map(({ entry, op }) => [entry.id, op])).toEqual([
 		['guide', 'add'],
-		['ada', 'update'],
 		['ada', 'update'],
 	])
 	expect(result.biblePatch[0].entry).toMatchObject({ aliases: ['Navigator'] })
@@ -1252,7 +1250,7 @@ test('consolidated style references prioritize the latest repeat before applying
 			references: images.map(reference),
 		},
 	}))
-	const { conflicts, consolidatedAdds } = await applyPatches(
+	const { conflicts, consolidated } = await applyPatches(
 		project,
 		await readBible(project),
 		patch,
@@ -1264,7 +1262,7 @@ test('consolidated style references prioritize the latest repeat before applying
 	expect((await readBible(project)).style).toContainEqual(
 		expect.objectContaining({ id: 'layout', references }),
 	)
-	expect(consolidatedAdds.get(patch[0])).toMatchObject({
+	expect(consolidated.get(patch[0])).toMatchObject({
 		entry: { references },
 	})
 })
@@ -1666,6 +1664,45 @@ test('a proposal cannot smuggle fixed facts onto confirmed characters as tempora
 	expect((await readBible(project)).character).toMatchObject([
 		{ ...confirmed, changes: [temporal] },
 	])
+})
+
+test('a confirmed character keeps its knowledge and history when a proposal adds unconfirmed facts', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const file = projectFiles.character(scope, confirmed.id)
+	const known = { chapterId: 'c1', fact: 'The guide knows the way' }
+	const baseline = {
+		formatVersion: 1 as const,
+		entries: [{ ...confirmed, aliases: [], knows: [known] }],
+	}
+	await project.write(file, baseline)
+	const proposal = {
+		kind: 'character',
+		op: 'update',
+		entry: {
+			id: confirmed.id,
+			name: confirmed.name,
+			status: 'candidate',
+			knows: [known, { chapterId: 'c2', fact: 'The road is closed' }],
+			changes: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
+		},
+	} satisfies BiblePatch[number]
+	const { conflicts, consolidated } = await applyPatches(
+		project,
+		await readBible(project),
+		[
+			{
+				...proposal,
+				entry: { ...proposal.entry, knows: [known], changes: [] },
+			},
+			proposal,
+		],
+		[],
+		new Set(chapters),
+	)
+	expect(await project.read(file)).toEqual(baseline)
+	expect(conflicts).toMatchObject([proposal])
+	expect(consolidated.get(proposal)).toBeNull()
 })
 
 test.each(['explicit', 'observed'])(

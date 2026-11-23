@@ -911,7 +911,7 @@ ${progress}
 	const conflictReason =
 		quarantineReason ?? 'Bible changed before synthesis publication'
 	let publicationBase: ReturnType<typeof bibleEntryBases> | undefined
-	const { conflicts, glossaryConflicts, consolidatedAdds } = canPublish
+	const { conflicts, glossaryConflicts, consolidated } = canPublish
 		? await applyPatches(
 				project,
 				latest,
@@ -924,7 +924,7 @@ ${progress}
 				},
 			)
 		: {
-				consolidatedAdds: undefined,
+				consolidated: undefined,
 				conflicts: biblePatch
 					.filter(({ op }) => op !== 'none')
 					.map((item) => ({
@@ -945,8 +945,8 @@ ${progress}
 	const result: VolumeSynthesis = {
 		...skeleton,
 		biblePatch: biblePatch.flatMap((item) => {
-			const consolidated = consolidatedAdds?.get(item)
-			return consolidated === null ? [] : [consolidated ?? item]
+			const merged = consolidated?.get(item)
+			return merged === null ? [] : [merged ?? item]
 		}),
 		glossaryPatch,
 		conflicts,
