@@ -24,6 +24,7 @@ type EntryRow = Row &
 				data: {
 					role: ChatMessage['role']
 					parts: Part[]
+					status?: ChatMessage['status']
 					turn?: Turn
 					position?: Position
 				}
@@ -181,7 +182,12 @@ export class ChatStore {
 				`UPDATE session_entry SET content = ? WHERE session_id = ? AND entry_id = ?`,
 			)
 			.run(
-				JSON.stringify({ role: 'assistant', parts: message.parts, turn }),
+				JSON.stringify({
+					role: 'assistant',
+					parts: message.parts,
+					status: message.status,
+					turn,
+				}),
 				id,
 				message.id,
 			)
@@ -294,6 +300,7 @@ export class ChatStore {
 					kind: row.kind,
 					role: row.data.role,
 					parts: this.hydrate(row.data.parts, false),
+					...(row.data.status ? { status: row.data.status } : {}),
 				}
 	}
 

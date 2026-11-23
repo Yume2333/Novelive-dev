@@ -119,6 +119,7 @@ const message = obj({
 	kind: lit('message'),
 	role: oneOf(['user', 'assistant']),
 	parts: arr(messagePart),
+	status: opt(oneOf(['cancelled', 'failed'])),
 })
 const sessionEntry = union([
 	message,

@@ -477,7 +477,10 @@ export class ChatService {
 					) {
 						if (event.message.content.length)
 							run.message.parts.push(...assistantParts(event.message))
-						else if (event.message.stopReason === 'aborted')
+						else if (
+							event.message.stopReason === 'aborted' ||
+							event.message.stopReason === 'error'
+						)
 							run.message.parts.push(...run.preview)
 						run.preview = []
 					} else if (
@@ -507,6 +510,9 @@ export class ChatService {
 		} finally {
 			if (run.preview.length) run.message.parts.push(...run.preview)
 			run.preview = []
+			if (status === 'cancelled' || status === 'failed')
+				run.message.status = status
+			else delete run.message.status
 			this.store.save(sessionId, run.message, run.turn)
 			this.active.delete(sessionId)
 			this.emit(sessionId, run, status)
