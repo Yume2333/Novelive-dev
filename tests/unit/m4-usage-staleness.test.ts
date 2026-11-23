@@ -6,6 +6,7 @@ import {
 	formatVersion,
 	projectFiles,
 } from '@novelive/format/model'
+import sharp from 'sharp'
 import { expect, test, vi } from 'vitest'
 import { propagateStaleness } from '../../packages/creator/src/bible/staleness'
 import { createConfigStore } from '../../packages/creator/src/config'
@@ -66,40 +67,93 @@ async function fixture(
 	}
 }
 
-test('visual-confirmation portraits without drawing tasks appear in the stale projection', async () => {
-	await fixture(async (project, profile) => {
-		const before = await readBible(project)
-		before.character = [
-			{
-				id: 'ada',
-				name: 'Ada',
-				aliases: [],
-				status: 'confirmed',
-				appearance: { description: 'Black hair' },
-				costumes: [{ id: 'uniform', description: 'Uniform' }],
-			},
-		]
-		await project.write(projectFiles.assetRegistry({ level: 'series' }), {
-			formatVersion,
-			entries: [
+test.each(['appearance', 'costume'] as const)(
+	'real visual confirmation without drawing tasks projects portraits stale after a %s edit',
+	async (change) => {
+		await fixture(async (project, profile) => {
+			const before = await readBible(project)
+			before.character = [
 				{
+					id: 'ada',
+					name: 'Ada',
+					aliases: [],
+					status: 'confirmed',
+					appearance: { description: 'Black hair' },
+					costumes: [{ id: 'uniform', description: 'Uniform' }],
+				},
+			]
+			const config = createConfigStore(profile)
+			await config.update(configuration)
+			const network = vi.fn(async () => {
+				throw new Error('Network forbidden')
+			})
+			const { art } = chapterWorker(
+				project,
+				'v1',
+				await project.read(projectFiles.work('v1', workId)),
+				await productionModels(config),
+				{ mode: 'strict', fetch: network },
+			)
+			const service = art()
+			await project.writeFile(
+				'source/candidate.png',
+				await sharp({
+					create: { width: 4, height: 4, channels: 4, background: '#eeeeee' },
+				})
+					.png()
+					.toBuffer(),
+			)
+			const candidate = { id: 'approved', cachePath: 'source/candidate.png' }
+			await service.confirmVisual(
+				bible.style,
+				{
+					mainVisuals: [candidate],
+					supplemental: [],
+					characters: [
+						{
+							characterId: 'ada',
+							costumeId: 'uniform',
+							candidates: [candidate],
+						},
+					],
+				},
+				{
+					mainVisualId: candidate.id,
+					supplementalIds: [],
+					characters: [
+						{
+							characterId: 'ada',
+							costumeId: 'uniform',
+							candidateId: candidate.id,
+						},
+					],
+				},
+			)
+			expect((await service.registry()).entries).toEqual([
+				expect.objectContaining({
 					id: 'ada/uniform/neutral',
 					type: 'character',
-					path: 'assets/portrait.webp',
 					status: 'drawn',
-					aliases: [],
-				},
-			],
+				}),
+			])
+			expect(project.database.prepare('SELECT * FROM asset').all()).toEqual([])
+			expect(project.database.prepare('SELECT * FROM task').all()).toEqual([])
+			const after = structuredClone(before)
+			if (change === 'appearance')
+				after.character[0].appearance = { description: 'Silver hair' }
+			else {
+				const costume = after.character[0].costumes?.[0]
+				if (!costume) throw new Error('Missing fixture costume')
+				costume.description = 'New uniform'
+			}
+			await propagateStaleness(project, before, after)
+			expect((await listUsage(profile)).staleAssets).toEqual([
+				{ workId, assetKey: 'ada/uniform/neutral' },
+			])
+			expect(network).not.toHaveBeenCalled()
 		})
-		expect(project.database.prepare('SELECT * FROM asset').all()).toEqual([])
-		const after = structuredClone(before)
-		after.character[0].appearance = { description: 'Silver hair' }
-		await propagateStaleness(project, before, after)
-		expect((await listUsage(profile)).staleAssets).toEqual([
-			{ workId, assetKey: 'ada/uniform/neutral' },
-		])
-	})
-})
+	},
+)
 
 test('characters and locations with the same Bible id invalidate only their own asset family', async () => {
 	await fixture(async (project, profile) => {
