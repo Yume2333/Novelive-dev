@@ -1,0 +1,32 @@
+Base: bb12fa20a21b5fb537757a0b3b9e4005adebd6ff
+All model-capable runs used NL_REPLAY=strict; these cases make no model calls.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 desktop lifecycle'
+Running 3 tests using 1 worker
+  ✓  1 tests/e2e/m4-tray.spec.ts:12:1 › M4 desktop lifecycle keeps the real creator alive without a tray and reopens from the app menu (427ms)
+  ✓  2 tests/e2e/m4-tray.spec.ts:80:1 › M4 desktop lifecycle confirms active quit, cancels safely and cleans up only on acceptance (265ms)
+  ✓  3 tests/e2e/m4-tray.spec.ts:156:1 › M4 desktop lifecycle validates notifications, strips tags, limits text and locates all four destinations (362ms)
+  3 passed (2.0s)
+
+$ NL_REPLAY=strict xvfb-run -a pnpm exec playwright test tests/e2e/m0-shell.spec.ts tests/e2e/m0-lifecycle.spec.ts
+  4 passed (2.2s)
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-production-contract.test.ts tests/unit/m1b-production-worker.test.ts
+ Test Files  2 passed (2)
+      Tests  14 passed (14)
+   Start at  03:06:16
+   Duration  1.96s (tests 62%, transform 23%, import 15%)
+
+$ pnpm typecheck
+$ tsc --noEmit
+Exit code: 0
+
+$ pnpm exec biome check apps/desktop/src/main/tray apps/desktop/src/main/notifications apps/desktop/src/main/index.ts apps/desktop/src/preload/index.ts tests/e2e/m4-tray.spec.ts
+Checked 5 files in 6ms. No fixes applied.
+
+Coverage limitations:
+- The window and creator are real Electron processes, but the tray-host probe is substituted with true/false gdbus fixtures.
+- The active-quit test loads the lifecycle module inside Electron with an active callback and stubs the dialog response, cleanup callback and final app.quit. It does not prove cleanup during actual model production.
+- Notification instances and IPC validators are real; Notification.show/isSupported and click emission are substituted. Hash navigation reaches the real preload and renderer.
+- Native tray icon/popup rendering, native notification service delivery/clicks, Windows/macOS, active production cleanup and sleep blocking are not visually/end-to-end verified.
+- M3 must emit the player-waiting DOM event before the new-chapter path is reachable from the application UI.
