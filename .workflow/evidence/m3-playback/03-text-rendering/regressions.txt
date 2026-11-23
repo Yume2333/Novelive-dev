@@ -1,16 +1,19 @@
-Command: NL_REPLAY=strict xvfb-run -a pnpm test:e2e tests/e2e/m1b-player.spec.ts tests/e2e/m2-editor.spec.ts tests/e2e/m3-text.spec.ts
+Command: NL_REPLAY=strict xvfb-run -a pnpm exec playwright test tests/e2e/m1b-player.spec.ts tests/e2e/m2-editor.spec.ts
+Uses the desktop build from the typography Check.
 
-Scoped regression results (typography result recorded separately in check.txt):
-  ✓   4 tests/e2e/m2-editor.spec.ts:85:1 › M2 editor preview locates source and current line, edits, undoes and previews a fixed project (1.9s)
-  ✓   1 tests/e2e/m1b-player.spec.ts:21:2 › M1b minimal player renders local compiled beats and advances all four text kinds (2.5s)
-  ✓   6 tests/e2e/m1b-player.spec.ts:21:2 › M1b minimal player renders local compiled beats and advances all four text kinds and reports a missing referenced asset (2.2s)
-  ✓   5 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture normal (2.7s)
-  ✓   7 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture empty (1.2s)
-  ✓   8 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture failure (1.2s)
-  ✓   9 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture stale (1.4s)
-  ✓  10 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture crlf (2.0s)
-  ✓  11 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture leading (1.5s)
-  ✓  12 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture effects (2.1s)
-  ✓  13 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture long (2.3s)
 
-11 regression cases passed.
+Running 11 tests using 2 workers
+
+  ✓   2 tests/e2e/m2-editor.spec.ts:85:1 › M2 editor preview locates source and current line, edits, undoes and previews a fixed project (1.7s)
+  ✓   1 tests/e2e/m1b-player.spec.ts:21:2 › M1b minimal player renders local compiled beats and advances all four text kinds (2.4s)
+  ✓   4 tests/e2e/m1b-player.spec.ts:21:2 › M1b minimal player renders local compiled beats and advances all four text kinds and reports a missing referenced asset (2.2s)
+  ✓   3 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture normal (2.7s)
+  ✓   5 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture empty (1.1s)
+  ✓   6 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture failure (1.2s)
+  ✓   7 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture stale (1.3s)
+  ✓   8 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture crlf (1.8s)
+  ✓   9 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture leading (1.5s)
+  ✓  10 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture effects (2.1s)
+  ✓  11 tests/e2e/m2-editor.spec.ts:344:3 › contract-render › M2 editor contract fixture long (2.1s)
+
+  11 passed (20.3s)

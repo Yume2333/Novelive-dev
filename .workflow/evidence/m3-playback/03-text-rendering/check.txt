@@ -2,7 +2,7 @@ Command: NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M3 text typography'
 
 Running 2 tests using 1 worker
 
-  ✓  1 tests/e2e/m3-text.spec.ts:20:1 › M3 text typography timing units: empty, instant, nested speed and pauses (14ms)
-  ✓  2 tests/e2e/m3-text.spec.ts:44:1 › M3 text typography: stable CJK, ruby, pauses, speed segments, tags and three-line pages (13.0s)
+  ✓  1 tests/e2e/m3-text.spec.ts:20:1 › M3 text typography timing units: empty, instant, nested speed and pauses (13ms)
+  ✓  2 tests/e2e/m3-text.spec.ts:44:1 › M3 text typography: stable CJK, ruby, pauses, speed segments, tags and three-line pages (13.4s)
 
-  2 passed (13.8s)
+  2 passed (14.2s)
