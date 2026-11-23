@@ -386,10 +386,10 @@ export function EditorPage() {
 									>
 										保存当前句
 									</button>
-									<button
-										type="button"
-										disabled={!dirty || busy}
-										onClick={discard}
+										<button
+											type="button"
+											disabled={(!dirty && !pendingRefresh) || busy}
+											onClick={discard}
 									>
 										放弃修改
 									</button>
