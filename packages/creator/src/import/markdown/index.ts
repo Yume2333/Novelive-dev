@@ -31,6 +31,8 @@ const wide =
 const hard = '\u0000'
 
 const yamlLine = /^(?:#|\s|-(?:\s|$)|[^\s#:-][^:]*:(?:\s|$))/
+const nodeProperties =
+	/:\s*(?:(?:&[\w-]+(?:\s+(?:!<[^>\s]*>|![\w!:/.-]*))?|(?:!<[^>\s]*>|![\w!:/.-]*)(?:\s+&[\w-]+)?)\s*)?(?:#.*)?$/
 const yamlKey = /^[^\s#:-][^:]*:(?:\s|$)/
 
 function scalar(raw: string, rest: string[]) {
@@ -75,8 +77,7 @@ function frontMatter(text: string) {
 		if (flow && /^[\]}][\]},\s]*(?:#.*)?$/.test(line)) continue
 		if (!yamlLine.test(line) || (/^-(?:\s|$)/.test(line) && !list))
 			return { body: text, metadata }
-		if (yamlKey.test(line))
-			list = /:\s*(?:&[\w-]+\s*)?(?:![\w!:/.-]*\s*)?(?:#.*)?$/.test(line)
+		if (yamlKey.test(line)) list = nodeProperties.test(line)
 		const opens = /^\s*[^\s#:-][^:]*:\s*[[{]/.test(line)
 		if (yamlKey.test(line)) flow = opens
 		else if (opens) flow = true
