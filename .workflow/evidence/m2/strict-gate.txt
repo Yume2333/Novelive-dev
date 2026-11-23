@@ -51,20 +51,20 @@ out/main/chunks/openai-codex-responses-B_YY1fC8.js               52.67 kB
 out/main/chunks/node-Clf1jJk1.js                                 89.74 kB
 out/main/chunks/project-qxYdt8o9.js                              93.43 kB
 out/main/chunks/production-b49YfytD.js                          139.69 kB
-out/main/creator.js                                             223.01 kB
+out/main/creator.js                                             223.65 kB
 out/main/chunks/src-Xd8rjocR.js                                 241.30 kB
 out/main/chunks/anthropic-messages-CQygpsaK.js                  570.57 kB
 out/main/chunks/client-B_wyAP3K.js                              954.72 kB
 out/main/chunks/index-CojPk0t-.js                             1,239.86 kB
 out/main/chunks/google-shared-DSE8j_3E.js                     1,527.42 kB
 out/main/chunks/index-Bh5ig4de.js                             2,002.54 kB
-✓ built in 4.51s
+✓ built in 4.80s
 vite v7.2.7 building ssr environment for production...
 transforming...
 ✓ 24 modules transformed.
 rendering chunks...
 out/preload/index.cjs  117.01 kB
-✓ built in 130ms
+✓ built in 120ms
 vite v7.2.7 building client environment for production...
 transforming...
 ✓ 3282 modules transformed.
@@ -88,42 +88,23 @@ rendering chunks...
 ../../apps/desktop/out/renderer/assets/manrope-latin-700-normal-DGRFkw-m.woff                        18.41 kB
 ../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-Ba7eOkfT.woff2  1,142.55 kB
 ../../apps/desktop/out/renderer/assets/noto-sans-sc-chinese-simplified-400-normal-CN8EQoOj.woff   1,564.08 kB
-../../apps/desktop/out/renderer/assets/index-D65P-ihK.css                                            62.47 kB
-../../apps/desktop/out/renderer/assets/highlighted-body-PUFBAJJF-C40CqTfO.js                          0.80 kB
-../../apps/desktop/out/renderer/assets/getTextureBatchBindGroup-DjhVKtx4.js                           0.94 kB
-../../apps/desktop/out/renderer/assets/canvasUtils-C64H5_2n.js                                       13.47 kB
-../../apps/desktop/out/renderer/assets/getTexelRangeRects-Dy7u8B1V.js                                19.18 kB
-../../apps/desktop/out/renderer/assets/webworkerAll-Bv3I2Uy7.js                                      34.97 kB
-../../apps/desktop/out/renderer/assets/CanvasPool-MP1UrtC1.js                                        64.92 kB
-../../apps/desktop/out/renderer/assets/browserAll-DhisHkAC.js                                       102.79 kB
-../../apps/desktop/out/renderer/assets/WebGPURenderer-B8YgHXq1.js                                   123.79 kB
-../../apps/desktop/out/renderer/assets/WebGLRenderer-CYSGsffe.js                                    152.19 kB
-../../apps/desktop/out/renderer/assets/RenderTargetSystem-BCi4xFXM.js                               167.68 kB
-../../apps/desktop/out/renderer/assets/CanvasRenderer-LElXvujF.js                                   281.00 kB
-../../apps/desktop/out/renderer/assets/index-CML0Gi_R.js                                          3,008.79 kB
-✓ built in 4.50s
+../../apps/desktop/out/renderer/assets/index-DOUzarng.css                                            62.95 kB
+../../apps/desktop/out/renderer/assets/highlighted-body-PUFBAJJF-5_JGAXHw.js                          0.80 kB
+../../apps/desktop/out/renderer/assets/getTextureBatchBindGroup-UAE5rMvO.js                           0.94 kB
+../../apps/desktop/out/renderer/assets/canvasUtils-P3XQtCt3.js                                       13.47 kB
+../../apps/desktop/out/renderer/assets/getTexelRangeRects-BFNPT_uW.js                                19.18 kB
+../../apps/desktop/out/renderer/assets/webworkerAll-DMaIPlzj.js                                      34.97 kB
+../../apps/desktop/out/renderer/assets/CanvasPool-CvdM-p6E.js                                        64.92 kB
+../../apps/desktop/out/renderer/assets/browserAll-CuqzgCxF.js                                       102.79 kB
+../../apps/desktop/out/renderer/assets/WebGPURenderer-DANszXWB.js                                   123.79 kB
+../../apps/desktop/out/renderer/assets/WebGLRenderer-DD4rSu8D.js                                    152.19 kB
+../../apps/desktop/out/renderer/assets/RenderTargetSystem-Dkon_aQ0.js                               167.68 kB
+../../apps/desktop/out/renderer/assets/CanvasRenderer-3sI4z1Be.js                                   281.00 kB
+../../apps/desktop/out/renderer/assets/index-Dg4_iRIi.js                                          3,009.01 kB
+✓ built in 4.90s
 
 Running 1 test using 1 worker
 
-  ✘  1 tests/e2e/m2-gate.spec.ts:52:1 › M2 revise a work through editor and Agent in real Electron (2.7s)
+  ✓  1 tests/e2e/m2-gate.spec.ts:52:1 › M2 revise a work through editor and Agent in real Electron (4.6s)
 
-
-  1) tests/e2e/m2-gate.spec.ts:52:1 › M2 revise a work through editor and Agent in real Electron ───
-
-    Error: Missing strict replay cassette: POST 139b150a39b3ef23 (/home/ubuntu/repos/Novelive-dev/tests/fixtures/cassettes/m2-gate)
-
-      200 | 						/Missing strict replay cassette:[^\n]+/,
-      201 | 					)
-    > 202 | 					if (missing) throw new Error(missing[0])
-          | 					                   ^
-      203 | 					return card
-      204 | 						.getByRole('button', { name: '确认', exact: true })
-      205 | 						.isVisible()
-        at expect.poll.timeout (/home/ubuntu/repos/Novelive-dev/tests/e2e/m2-gate.spec.ts:202:25)
-        at /home/ubuntu/repos/Novelive-dev/tests/e2e/m2-gate.spec.ts:195:3
-
-    Error Context: test-results/m2-gate-M2-revise-a-work-t-d5ace--and-Agent-in-real-Electron/error-context.md
-
-  1 failed
-    tests/e2e/m2-gate.spec.ts:52:1 › M2 revise a work through editor and Agent in real Electron ────
-[ELIFECYCLE] Command failed with exit code 1.
+  1 passed (5.6s)

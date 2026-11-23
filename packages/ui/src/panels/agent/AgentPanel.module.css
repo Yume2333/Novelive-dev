@@ -339,6 +339,29 @@
 	margin: 0;
 }
 
+.rewrite {
+	display: grid;
+	gap: var(--space-2);
+}
+
+.rewriteHunk {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: var(--space-1) var(--space-2);
+	padding: var(--space-2);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-container);
+	font-family: var(--font-mono);
+	font-size: 12px;
+}
+
+.rewriteHunk del,
+.rewriteHunk ins {
+	grid-column: 1 / -1;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
 .impact {
 	color: var(--color-on-surface-variant);
 	font-size: 12.5px;

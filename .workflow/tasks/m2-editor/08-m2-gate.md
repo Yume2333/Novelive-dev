@@ -9,24 +9,13 @@
 
 **付费调用：** 只由协调者在交接中明确指定的串行主线会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
 
-- [ ] 接线并比对原型，CJK 文本效果和最小播放器预览保留；严格回放，不新增付费调用。
+- [x] 接线并比对原型，CJK 文本效果和最小播放器预览保留；严格回放，不新增付费调用。
 
 ## Progress
 
-Status: blocked
-
-- 仅等录制：已接线五个 `editor.*` 命令，真实宿主的 editor / Agent 共用生产会话的 `CreativeRevisions`；重绘候选复制到应用缓存。新增编辑导航、Agent 场景位置、确认后的逐项勾选应用及编辑器刷新。当前后端始终返回空 `markSuggestions`，故 `resolveMark` 校验章节版本后返回 `not_found`，不捏造不存在的建议。
-- `M2 revise a work` 已在真实 Electron 严格离线走到首次 Agent 模型请求：原文定位、最小播放器、编辑入口只应用勾选差异、Agent 加载及中文按钮均已验证。缺档为 `POST 139b150a39b3ef23 (tests/fixtures/cassettes/m2-gate)`。确认卡、Agent 重写、中文代码块和重开持久化的断言已写好，但录制前不声称通过；复选框保留未完成。现有 `m2-chat` 不含 `propose_rewrite_scene`，不替代本门禁。
-- 主线在仓库根目录绑定已有 relay secrets `NL_IMAGE_BASE_URL` / `NL_IMAGE_API_KEY` 后，仅需运行：
-
-  ```sh
-  mkdir -p "$HOME/novelive-private/m2-gate"
-  NL_REPLAY=record \
-  NL_CHAT_CASSETTE_DIR="$HOME/novelive-private/m2-gate" \
-  NL_USAGE_CSV="$HOME/novelive-private/usage.csv" \
-  xvfb-run -a pnpm test:e2e --grep 'M2 revise a work'
-  ```
-
-- 预计新增 **3 次** `gemini-3.8-flash` OpenAI chat-completion 调用：Agent 提议（含中文代码块）、确认后的 writing 重写、main 续答；均通过真实宿主配置，12000 context / 1024 max output / compat auto。初次 editor 重写严格复用 M2/07 cassette，不花费调用。数量为正常路径预期，不是硬性预算；模型额外工具调用或重试会增加次数。避免以 `deepseek/devin-swe-2` 录制新的聊天（可能耗尽输出于 reasoning）。本会话未进行真实录制或模型网络调用。
-- 私有 cassette 为 `$HOME/novelive-private/m2-gate/cassette.jsonl` 及可选 `cassette-files/`，每个真实请求前追加私有 usage CSV；不提交。离线复验用同一目录并将 `NL_REPLAY` 改为 `strict`，不需 secrets。默认提交目录 `tests/fixtures/cassettes/m2-gate/` 目前仅放操作说明；截图、严格失败输出和短回执提交在 `.workflow/evidence/m2/`。录制完整通过后再补 Agent 中文代码块及重开截图、验收并勾选。
-- 检查：`NL_REPLAY=strict pnpm check` → 29 files / 393 tests passed；后续 UI 调整后 typecheck / lint 通过；既有 editor / chat / routes Electron 检查 12 passed。回执见 `.workflow/evidence/m2/receipt.md`，现有三张截图为原文与预览、编辑器勾选差异和 Agent 加载状态。
+- 已完成真实 Electron 门禁。默认 `tests/fixtures/cassettes/m2-gate/` 含三份已审查响应；无需 secrets 或 `NL_CHAT_CASSETTE_DIR`，`NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 revise a work'` → **1 passed (5.6s)**。原文定位、最小预览、编辑入口只应用勾选差异、Agent 加载、中文代码块及确认按钮、Agent 确认后选择性应用、重开后的剧本与历史记录全部通过。
+- editor / Agent 共用生产会话的 `CreativeRevisions`，候选图复制到应用缓存，编辑器随 Agent 应用刷新。当前后端始终返回空 `markSuggestions`；注册的 `resolveMark` 校验版本后对不存在的建议返回 `not_found`，不新增建议生产器。
+- 用户随后明确授权本会话绑定 `NL_IMAGE_BASE_URL` / `NL_IMAGE_API_KEY` 录制，并提交隐私审查后的 cassette。实际 **4 次** `gemini-3.8-flash` 请求尝试：3 次完成（提议、writing、续答），1 次 writing 因测试旧 5 秒超时被取消，未返回用量。完成请求合计 **3222 input / 1129 output / 4351 tokens**；取消请求实际 input/output 未知，1024 输出预留不冒充实际用量。私有账本 `$HOME/novelive-private/usage.csv` 与 `$HOME/memory/poke_5b9601/files/novelive/usage.csv` 均已记录四次尝试；不提交账本、原始日志或 secrets。
+- 录制因真实测试失败续跑：修正同时匹配工具详情的代码块定位器，将模型等待与已有 90 秒模型超时对齐；录制恢复时复用已成功响应，避免重复付费。初次编辑器重写仍复用 M2/07 的既有离线 cassette。后续截图和验证均严格离线。
+- 隐私审查解码了三份 SSE 及元数据：只含 `content-type` 响应头和 `/v1/chat/completions` 路径，无 key、auth header、relay host/URL、绝对 home 路径。录制与配置说明在 `tests/fixtures/cassettes/m2-gate/README.md`。
+- `NL_REPLAY=strict pnpm check` → **29 files / 394 tests passed**，覆盖 typecheck / lint / unit；既有 editor / chat / routes Electron 结果为 12 passed。完整检查输出和用量明细见 `.workflow/evidence/m2/receipt.md`；新增中文确认卡、Agent 勾选差异、应用后和重开截图，保留最小播放器与自定义滚动条。

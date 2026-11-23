@@ -1,16 +1,29 @@
 # M2 gate replay
 
-The cassette is pending an authorized mainline recording. No model calls were
-made while implementing this gate. The test uses the real desktop host's config
-and replay layer; it does not replace the preload bridge or inject chat replies.
+The approved cassette contains three real `gemini-3.8-flash` responses: the Agent
+`propose_rewrite_scene` call with a Chinese code block, the confirmed scene rewrite,
+and the Agent continuation. The provider reports `gemini-3.8-flash-n` in SSE
+metadata. Requests use the same desktop configuration and replay layer as the
+application; no preload replacement or injected Agent reply is involved.
 
-Expected paid requests: three `gemini-3.8-flash` chat-completion calls (proposal,
-confirmed scene rewrite, confirmation continuation), each capped at 1024 output
-tokens. The initial editor rewrite reuses the committed M2/07 cassette without a
-provider call. Provider misbehavior can produce additional tool-loop requests;
-the expected three requests are not a hard budget enforcement mechanism.
+From the repository root, without secrets or directory overrides:
 
-An authorized mainline session can run from the repository root:
+```sh
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 revise a work'
+```
+
+The test defaults to this directory. The initial editor rewrite reuses the
+committed M2/07 fixture through the production fallback. UUIDs and generated NVS
+line IDs are normalized only in gate request identities; model, prompts and tool
+schemas remain hashed and recorded responses are unchanged. Earlier production
+fixtures retain their original identity algorithm.
+
+Privacy review decoded all three SSE bodies and checked the JSONL metadata:
+only `content-type` response headers, path-only request endpoints, no API keys,
+authorization headers, relay hostname/URL, or absolute home paths. The private
+recording and usage ledgers remain outside the repository.
+
+Authorized recording command (not needed for normal checks):
 
 ```sh
 mkdir -p "$HOME/novelive-private/m2-gate"
@@ -20,22 +33,16 @@ NL_USAGE_CSV="$HOME/novelive-private/usage.csv" \
 xvfb-run -a pnpm test:e2e --grep 'M2 revise a work'
 ```
 
-Bind `NL_IMAGE_BASE_URL` and `NL_IMAGE_API_KEY` from the provisioned relay secrets
-in that session's environment. Do not put them into a file or commit private
-recordings. A root relay URL is normalized to `/v1`. Both text slots are explicitly
-configured in the desktop host as `gemini-3.8-flash`, OpenAI completions, 12000-token
-context, 1024 maximum output tokens, compatibility `auto`. The initial offline
-writer call alone uses the existing `devin-swe-2` fixture configuration.
+Recording requires provisioned `NL_IMAGE_BASE_URL` and `NL_IMAGE_API_KEY` in the
+exec environment. A root relay URL is normalized to `/v1`. Main and writing use
+OpenAI completions, `gemini-3.8-flash`, 12000-token context, maximum output 1024,
+compatibility `auto`; shared budgeting reduces the Agent request cap to 768.
+Recording resumes successful matching responses instead of purchasing them
+again; missing or failed responses still require provider calls. Live-model
+assertions allow the existing 90-second model timeout to complete.
 
-Replay the private recording with the same command, replacing `record` with
-`strict`; no secrets are needed for replay. Without the directory override the
-gate looks for a sanitized, approved cassette in this directory. Request UUIDs
-and generated NVS line IDs are normalized only for these gate replay identities;
-all content, model names and tool schemas remain part of the hash. Production
-first checks the existing M2/07 fixtures with their original hash algorithm.
-
-The replay layer appends a per-request reservation to the private usage CSV before
-each actual request, including failed requests. It never logs authorization or
-relay addresses. The private cassette contains the three responses and optional
-external bodies. Committed screenshots and the short verification receipt belong
-in `.workflow/evidence/m2/`, not in the private directory.
+Completed response usage: 3222 input + 1129 output = 4351 tokens. One earlier
+writer attempt was cancelled by the test timeout before it returned usage; its
+actual tokens are unknown, not zero. Both private usage ledgers include that
+attempt separately as an output reservation, not actual usage. See
+`.workflow/evidence/m2/receipt.md` for per-call accounting and screenshots.

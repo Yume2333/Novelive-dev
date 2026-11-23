@@ -21,6 +21,7 @@ export interface ReplayOptions {
 	delayMs?: number
 	normalizeIds?: boolean
 	fallbackDirectory?: string
+	reuseRecorded?: boolean
 }
 
 const bodyLimit = 256 * 1024
@@ -336,6 +337,24 @@ export function createReplayFetch(
 			}
 		}
 		if (mode === 'record') {
+			if (options.reuseRecorded) {
+				const text = await readFile(index, 'utf8').catch((error) => {
+					if (!missing(error)) throw error
+					return ''
+				})
+				const recorded = text
+					.split('\n')
+					.filter(Boolean)
+					.map((line) => JSON.parse(line))
+				if (
+					recorded.some((row) => row.key === identity.key && row.status < 300)
+				)
+					return createReplayFetch({
+						...options,
+						mode: 'strict',
+						fallbackDirectory: undefined,
+					})(request)
+			}
 			if (process.env.NL_USAGE_CSV) {
 				const body = request.headers
 					.get('content-type')
@@ -410,7 +429,11 @@ export function createReplayFetch(
 				}
 				return row
 			})
-			.filter((row) => row.key === identity.key)
+			.filter(
+				(row) =>
+					row.key === identity.key &&
+					(!options.reuseRecorded || row.status < 300),
+			)
 		if (rows.length === 0) {
 			if (mode === 'strict') {
 				const message = `Missing strict replay cassette: ${identity.method} ${identity.key} (${directory})`

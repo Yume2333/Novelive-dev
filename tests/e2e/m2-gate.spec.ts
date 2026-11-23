@@ -50,7 +50,7 @@ async function capture(page: Page, name: string) {
 }
 
 test('M2 revise a work through editor and Agent in real Electron', async () => {
-	test.setTimeout(180_000)
+	test.setTimeout(330_000)
 	const recording = process.env.NL_REPLAY === 'record'
 	if (
 		recording &&
@@ -207,18 +207,22 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 				{ timeout: 95_000 },
 			)
 			.toBe(true)
-		await expect(agent.locator('pre')).toContainText('纸船与灯火')
+		await expect(
+			agent.locator('pre').filter({ hasText: '纸船与灯火' }),
+		).toBeVisible()
 		await expect(script).not.toContainText('笛声')
 		await capture(page, '04-agent-cjk-confirm')
 		await card.getByRole('button', { name: '确认', exact: true }).click()
 		const chatDiff = card.getByRole('region', { name: '重写差异' })
-		await expect(chatDiff.getByRole('checkbox')).not.toHaveCount(0)
+		await expect(chatDiff.getByRole('checkbox')).not.toHaveCount(0, {
+			timeout: 95_000,
+		})
 		await expect(
 			agent.getByText('已生成，请勾选差异', { exact: true }),
-		).toBeVisible()
+		).toBeVisible({ timeout: 95_000 })
 		await expect(
 			agent.getByRole('button', { name: '停止', exact: true }),
-		).toHaveCount(0)
+		).toHaveCount(0, { timeout: 95_000 })
 		for (const box of await chatDiff.getByRole('checkbox').all())
 			await box.uncheck()
 		await expect(
@@ -229,6 +233,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			.filter({ hasText: '笛声' })
 			.getByRole('checkbox')
 			.check()
+		await capture(page, '05-agent-rewrite-selected')
 		await chatDiff.getByRole('button', { name: '应用勾选差异' }).click()
 		await expect(script).toContainText('笛声')
 		await expect(script).toContainText('慢慢')

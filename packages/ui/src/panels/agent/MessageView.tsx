@@ -194,9 +194,9 @@ function ProposalCard({
 	return (
 		<section className={styles.proposal} aria-label="确认卡">
 			{rewrite && (
-				<section aria-label="重写差异">
+				<section className={styles.rewrite} aria-label="重写差异">
 					{rewrite.hunks.map((hunk) => (
-						<label key={hunk.id} className={styles.card}>
+						<label key={hunk.id} className={styles.rewriteHunk}>
 							<input
 								type="checkbox"
 								checked={selected.includes(hunk.id)}
@@ -208,7 +208,7 @@ function ProposalCard({
 									)
 								}
 							/>
-							{hunk.id}
+							<span>{hunk.id}</span>
 							<del>{hunk.before.join('\n')}</del>
 							<ins>{hunk.after.join('\n')}</ins>
 						</label>

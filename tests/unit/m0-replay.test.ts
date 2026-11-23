@@ -10,6 +10,33 @@ const rowFile = 'cassette.jsonl'
 const stream =
 	'data: {"delta":"first"}\n\ndata: {"delta":"second"}\n\ndata: [DONE]\n\n'
 
+test('resuming a gate recording reuses successful identities and records only missing requests', async () => {
+	const upstream = vi.fn(async () => new Response('response'))
+	const options = {
+		mode: 'record' as const,
+		directory,
+		reuseRecorded: true,
+		fetch: upstream,
+	}
+	const first = createReplayFetch(options)
+	expect(await (await first(origin)).text()).toBe('response')
+	const resumed = createReplayFetch(options)
+	expect(await (await resumed(origin)).text()).toBe('response')
+	expect(upstream).toHaveBeenCalledTimes(1)
+	expect(await (await resumed(`${origin}/next`)).text()).toBe('response')
+	expect(upstream).toHaveBeenCalledTimes(2)
+	expect(
+		(await readFile(join(directory, rowFile), 'utf8')).trim().split('\n'),
+	).toHaveLength(2)
+	upstream.mockResolvedValueOnce(new Response('temporary', { status: 503 }))
+	const failed = await resumed(`${origin}/retry`)
+	expect(failed.status).toBe(503)
+	await failed.text()
+	await (await resumed(`${origin}/retry`)).text()
+	expect((await resumed(`${origin}/retry`)).status).toBe(200)
+	expect(upstream).toHaveBeenCalledTimes(4)
+})
+
 test('gate recording reserves private usage and strict misses retain only the request identity', async () => {
 	const usage = join(directory, 'usage.csv')
 	const missing = join(directory, 'missing.txt')

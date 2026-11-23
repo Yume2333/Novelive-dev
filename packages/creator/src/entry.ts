@@ -203,7 +203,11 @@ async function openChat(workId: string) {
 			config,
 			cacheDir,
 			process.env.NL_CHAT_CASSETTE_DIR
-				? { directory: process.env.NL_CHAT_CASSETTE_DIR, normalizeIds: true }
+				? {
+						directory: process.env.NL_CHAT_CASSETTE_DIR,
+						normalizeIds: true,
+						reuseRecorded: true,
+					}
 				: strictReplayOptions(),
 			(event) => {
 				const envelope: EventEnvelope = {
@@ -255,6 +259,7 @@ function loadProduction() {
 						directory: process.env.NL_PRODUCTION_CASSETTE_DIR,
 						fallbackDirectory: process.env.NL_PRODUCTION_FALLBACK_DIR,
 						normalizeIds: true,
+						reuseRecorded: true,
 					}
 				: strictReplayOptions(),
 			publish,
