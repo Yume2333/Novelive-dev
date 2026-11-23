@@ -210,7 +210,8 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 			await expect
 				.poll(async () => Number(await text.getAttribute('data-pages')))
 				.toBeGreaterThan(1)
-			await page.waitForTimeout(300)
+			const heldCharacters = await display.locator('[data-glyph]').count()
+			await page.waitForTimeout(1200 + 80 * heldCharacters + 250)
 			await expect(text).toHaveAttribute('data-page', '1')
 			const heldPages = Number(await text.getAttribute('data-pages'))
 			for (let p = 2; p <= heldPages; p++) {
