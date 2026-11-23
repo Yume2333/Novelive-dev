@@ -119,7 +119,7 @@ export class CreativeRevisions {
 		)
 		if (selected.length !== input.hunkIds.length)
 			throw { code: 'not_found', message: '找不到所选的重写差异。' }
-		return this.editor.replaceScene(
+		const snapshot = await this.editor.replaceScene(
 			{ ...proposal, instruction: '' },
 			'rewrite',
 			(nvs) => {
@@ -127,6 +127,13 @@ export class CreativeRevisions {
 				return applyHunks(nvs, selected)
 			},
 		)
+		if (selected.length)
+			this.project.database
+				.prepare(
+					"UPDATE proposal SET payload = json_remove(payload, '$.rewrite') WHERE work_id = ? AND json_extract(payload, '$.rewrite.proposalId') = ?",
+				)
+				.run(input.workId, input.proposalId)
+		return snapshot
 	}
 
 	async regenerateImage(

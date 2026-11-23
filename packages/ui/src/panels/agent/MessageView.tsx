@@ -152,9 +152,11 @@ export function ScrollField(props: ComponentProps<'textarea'>) {
 
 function ProposalCard({
 	proposal,
+	savedRewrite,
 	actions,
 }: {
 	proposal: Proposal
+	savedRewrite?: RewriteProposal
 	actions: ProposalActions
 }) {
 	const [current, setCurrent] = useState(proposal)
@@ -164,8 +166,10 @@ function ProposalCard({
 	const [reason, setReason] = useState('')
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState('')
-	const [rewrite, setRewrite] = useState<RewriteProposal>()
-	const [selected, setSelected] = useState<string[]>([])
+	const [rewrite, setRewrite] = useState(savedRewrite)
+	const [selected, setSelected] = useState<string[]>(
+		savedRewrite?.hunks.map((hunk) => hunk.id) ?? [],
+	)
 	const chapters = current.chapterIds.map(
 		(chapterId) => actions.chapterTitles[chapterId] ?? chapterId,
 	)
@@ -411,6 +415,7 @@ export function MessageParts({
 					<ProposalCard
 						key={part.proposal.id}
 						proposal={part.proposal}
+						savedRewrite={part.rewrite}
 						actions={actions}
 					/>
 				)

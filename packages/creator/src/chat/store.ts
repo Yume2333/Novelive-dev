@@ -353,7 +353,11 @@ export class ChatStore {
 	hydrate(parts: Part[], streaming: boolean): Part[] {
 		return parts.map((part) =>
 			part.type === 'proposal'
-				? { ...part, proposal: this.proposal(part.proposal.id).proposal }
+				? {
+						...part,
+						proposal: this.proposal(part.proposal.id).proposal,
+						rewrite: this.proposal(part.proposal.id).rewrite,
+					}
 				: !streaming && part.type === 'subtask' && part.status === 'running'
 					? { ...part, status: 'cancelled' }
 					: part,

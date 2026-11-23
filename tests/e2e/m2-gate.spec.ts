@@ -223,6 +223,9 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(
 			agent.getByRole('button', { name: '停止', exact: true }),
 		).toHaveCount(0, { timeout: 95_000 })
+		await page.getByRole('button', { name: 'Agent', exact: true }).click()
+		await page.getByRole('button', { name: 'Agent', exact: true }).click()
+		await expect(chatDiff).toBeVisible()
 		for (const box of await chatDiff.getByRole('checkbox').all())
 			await box.uncheck()
 		await expect(
@@ -235,7 +238,9 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			.check()
 		await capture(page, '05-agent-rewrite-selected')
 		await script.fill(
-			(await script.innerText()).replace('桥下很安静', '未保存的桥下修改'),
+			(await script.locator('.cm-line').allTextContents())
+				.join('\n')
+				.replace('桥下很安静', '未保存的桥下修改'),
 		)
 		await chatDiff.getByRole('button', { name: '应用勾选差异' }).click()
 		await expect(
@@ -269,6 +274,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		expect(reopened).toEqual(history)
 		await page.getByRole('button', { name: 'Agent', exact: true }).click()
 		await expect(page.getByText('已确认', { exact: true })).toBeVisible()
+		await expect(page.getByRole('region', { name: '重写差异' })).toHaveCount(0)
 		await capture(page, '06-reopened-persisted')
 	} finally {
 		await app.close()
