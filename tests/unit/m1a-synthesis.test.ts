@@ -369,6 +369,7 @@ test.each([
 	async ({ response, errors }) => {
 		await seed(root)
 		using project = await Project.open(root)
+		const contextWindow = 16_384
 		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 			const { messages } = await new Request(input, init).json()
 			const prompt = messages[0].content as string
@@ -381,12 +382,10 @@ test.each([
 			if (messages.length === 2) {
 				for (const expected of errors)
 					expect(messages[1].content).toContain(expected)
-				if (
-					Buffer.byteLength(JSON.stringify(response)) > connection.contextWindow
-				) {
+				if (Buffer.byteLength(JSON.stringify(response)) > contextWindow) {
 					expect(
 						Buffer.byteLength(prompt + messages[1].content),
-					).toBeLessThanOrEqual(connection.contextWindow - 4096)
+					).toBeLessThanOrEqual(contextWindow - 4096)
 					expect(messages[1].content).not.toContain('\uFFFD')
 				} else {
 					expect(messages[1].content).toContain(
@@ -414,6 +413,7 @@ test.each([
 		await expect(
 			synthesizeVolume(project, 'v1', chapters, {
 				...options,
+				connection: { ...connection, contextWindow },
 				strategy: 'events',
 				fetch,
 			}),
