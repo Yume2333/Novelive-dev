@@ -87,11 +87,11 @@ export class PlaybackProgress {
 	}
 
 	openChapter(chapterId: string): PlaybackMode {
-		this.mode = this.progress.read.some(
-			(entry) => entry.chapterId === chapterId,
-		)
-			? 'reread'
-			: 'main'
+		this.mode =
+			this.progress.mainline?.chapterId !== chapterId &&
+			this.progress.read.some((entry) => entry.chapterId === chapterId)
+				? 'reread'
+				: 'main'
 		return this.mode
 	}
 

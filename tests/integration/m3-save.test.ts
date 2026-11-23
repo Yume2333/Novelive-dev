@@ -133,13 +133,24 @@ test('retains 200 snapshots, rolls across chapters, forwards and branches withou
 test('reread records read sentences without moving mainline, which advances only in main mode', () => {
 	const progress = new PlaybackProgress(compare)
 	progress.record(snapshot(100))
+	progress.record(snapshot(200))
 	expect(progress.openChapter('chapter-1')).toBe('reread')
 	progress.record(snapshot(150))
 	expect(progress.isRead(snapshot(150).position)).toBe(true)
-	expect(progress.data.mainline).toEqual(snapshot(100).position)
-	expect(progress.openChapter('chapter-2')).toBe('main')
-	progress.record(snapshot(200))
 	expect(progress.data.mainline).toEqual(snapshot(200).position)
+	expect(progress.openChapter('chapter-3')).toBe('main')
+	progress.record(snapshot(300))
+	expect(progress.data.mainline).toEqual(snapshot(300).position)
+})
+
+test('opening the current mainline chapter continues in main mode despite read sentences', () => {
+	const progress = new PlaybackProgress(compare)
+	progress.record(snapshot(100))
+	progress.record(snapshot(200))
+	expect(progress.openChapter('chapter-1')).toBe('reread')
+	expect(progress.openChapter('chapter-2')).toBe('main')
+	progress.record(snapshot(250))
+	expect(progress.data.mainline).toEqual(snapshot(250).position)
 })
 
 test('reopens application-data progress, 60 manual + 1 quick slots, WebP thumbnails and unfinished performances', async () => {
