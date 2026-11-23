@@ -1,4 +1,4 @@
-# M2 gate — accepted
+# M2 gate — desktop regression receipt
 
 Branch: `devin/1795402319-m2-gate`.
 
@@ -13,8 +13,8 @@ the reviewed committed `tests/fixtures/cassettes/m2-gate/` cassette.
 
 ```text
 Running 1 test using 1 worker
-  ✓  1 tests/e2e/m2-gate.spec.ts:52:1 › M2 revise a work through editor and Agent in real Electron (4.6s)
-  1 passed (5.6s)
+  ✓  1 tests/e2e/m2-gate.spec.ts:52:1 › M2 revise a work through editor and Agent in real Electron (8.3s)
+  1 passed (9.3s)
 ```
 
 Full output: `strict-gate.txt`. Real Electron verifies source location from the
@@ -24,6 +24,30 @@ buttons, `propose_rewrite_scene` approval, disabled application with no checked
 hunks, selective Agent hunk application, and scene/history/approved-chat
 persistence after closing and reopening the application. The unchecked first
 Agent hunk is not applied. Screenshot capture also asserts no native scrollbars.
+The final run used `pnpm exec playwright test --grep 'M2 revise a work'` against
+the same already-built desktop artifact; the full build-and-gate command above
+also passed during this review (1 passed, 11.5s).
+
+## PR #57 review follow-up
+
+All review checks used strict replay; no additional provider requests were made.
+Display `:0` was not used.
+
+| Finding | Resolution |
+| --- | --- |
+| 1: Agent refresh discards a dirty draft | `f84d083`: retain the draft and defer refresh until explicit discard; gate asserts both. |
+| 2: Approved hunks disappear on Agent reopen | `66cd389`: hydrate the persisted rewrite and retire it after successful application; gate reopens before and after applying. |
+| 3: First-chapter redo rejected at its checkpoint | `73c0f56`: permit only the completed first chapter at `confirm_first`; unit test proves later chapters remain gated. |
+| 4: Position missing from model instructions | **Unresolved, authorization needed.** A fake upstream captured a `projectChat` request for `改写这里` with an editor position but no `aabbccdd` in the model request. `ChatService.generate` reads an optional instructions callback which `projectChat` does not set. Adding it changes request hashes and requires a newly authorized cassette recording; neither prompt nor cassette was changed. The gate currently supplies IDs explicitly in its user prompt, so its pass does not verify implicit position context. |
+| 5: Equivalent script formatting rejected | `d0be287`: match hunk line IDs against the verified raw scene base; unit tests cover compact narration and stale reapplication. |
+| 6: Gate absent from CI smoke | `a4ee1f5`: include M2 and update the creation navigation expectation for the editor route. |
+| 7: No redraw controls | `549acd4`, `28a2047`, `d499c32`: expose redraw, cached candidate previews and selection; assert asset revision change and two persisted image-history records. Existing `m2-revisions` fixtures cover all calls offline. |
+| 8: Intermediate fallback miss logged | `5758a13`: log only terminal misses; unit test asserts no log on a primary hit and exactly one log on a terminal miss. |
+| 9: Unstyled markdown code blocks | `49358e8`: token surfaces, aligned language/actions, CJK-safe mono font and wrapping without a native scrollbar; strict gate asserts computed geometry and styles. |
+
+The redraw cassette uses the same blue geometric subject as the initial image:
+revision/history assertions verify replacement, not a new artistic appearance.
+Screenshot `07-image-redrawn.png` waits for assets and player text to load.
 
 ## Screenshots
 
@@ -35,6 +59,7 @@ Agent hunk is not applied. Screenshot capture also asserts no native scrollbars.
   checked, with 应用勾选差异 visible.
 - `05-agent-rewrite-applied.png`: only the selected Agent hunk persisted in script.
 - `06-reopened-persisted.png`: reopened script, approved proposal and CJK reply.
+- `07-image-redrawn.png`: real editor redraw controls and loaded player preview.
 
 ## CI checks
 
@@ -43,16 +68,16 @@ in `ci-check.txt`. The only informational Biome finding is the existing one in
 untouched `tests/fixtures/text-models/build-synthetic.ts`.
 
 ```text
-Checked 242 files in 110ms. No fixes applied.
+Checked 243 files in 109ms. No fixes applied.
 Found 1 info.
  Test Files  29 passed (29)
-      Tests  394 passed (394)
+      Tests  397 passed (397)
 ```
 
-Previous relevant editor/chat/routes checks remain in `existing-e2e.txt`:
+Relevant editor/chat/routes checks remain in `existing-e2e.txt`:
 
 ```text
-  12 passed (18.7s)
+  12 passed (19.3s)
 ```
 
 ## Authorized recording and usage

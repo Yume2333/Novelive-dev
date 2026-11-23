@@ -13,6 +13,7 @@
 
 ## Progress
 
+- PR #57 审查回归：保留 Agent 更新前的未保存编辑，重开 Agent 恢复已确认差异；首章重做仍保留后续章确认门禁；兼容紧凑 NVS 行格式。CI smoke 纳入本门禁，补齐编辑器单张重绘、缓存候选图及选择入口，仅用既有 m2-revisions cassette；代码块用 Tokens / CJK mono / 自动换行，更新 `04-agent-cjk-confirm.png`，新增 `07-image-redrawn.png`。严格门禁 1 passed (9.3s)，check 为 29 files / 397 tests，既有 editor / chat / routes 为 12 passed。**仍需授权：** 当前 editor position 未进入模型 prompt，已用假 upstream 复现；修正会改变已录制请求 hash，本轮未改 prompt、未重新录制、未新增付费调用。详见 receipt 的逐项记录。
 - 已完成真实 Electron 门禁。默认 `tests/fixtures/cassettes/m2-gate/` 含三份已审查响应；无需 secrets 或 `NL_CHAT_CASSETTE_DIR`，`NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 revise a work'` → **1 passed (5.6s)**。原文定位、最小预览、编辑入口只应用勾选差异、Agent 加载、中文代码块及确认按钮、Agent 确认后选择性应用、重开后的剧本与历史记录全部通过。
 - editor / Agent 共用生产会话的 `CreativeRevisions`，候选图复制到应用缓存，编辑器随 Agent 应用刷新。当前后端始终返回空 `markSuggestions`；注册的 `resolveMark` 校验版本后对不存在的建议返回 `not_found`，不新增建议生产器。
 - 用户随后明确授权本会话绑定 `NL_IMAGE_BASE_URL` / `NL_IMAGE_API_KEY` 录制，并提交隐私审查后的 cassette。实际 **4 次** `gemini-3.8-flash` 请求尝试：3 次完成（提议、writing、续答），1 次 writing 因测试旧 5 秒超时被取消，未返回用量。完成请求合计 **3222 input / 1129 output / 4351 tokens**；取消请求实际 input/output 未知，1024 输出预留不冒充实际用量。私有账本 `$HOME/novelive-private/usage.csv` 与 `$HOME/memory/poke_5b9601/files/novelive/usage.csv` 均已记录四次尝试；不提交账本、原始日志或 secrets。
