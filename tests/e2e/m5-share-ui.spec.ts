@@ -84,7 +84,7 @@ test('M5 share surfaces confirm overwrite after adding the package extension', a
 					let confirms = 0
 					dialog.showSaveDialog = async () => ({
 						canceled: false,
-						filePath: paths.shift(),
+					filePath: paths.shift() ?? '',
 					})
 					dialog.showMessageBox = async () => ({
 						response: confirms++ === 1 ? 1 : 0,
