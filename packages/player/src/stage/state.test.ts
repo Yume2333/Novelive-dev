@@ -9,6 +9,67 @@ const action = (
 ): CompiledAction => ({ type: 'action', line: 1, col: 1, name, args, assets })
 
 describe('stage direction state', () => {
+	it('preserves ordinary playback when a move precedes a hard-cut character replacement', () => {
+		const prior = direct(
+			emptyStage(),
+			action('show', { slot: 'center' }, [{ id: 'hero/coat/calm' }]),
+		)
+		const selected = [
+			action('move', { slot: 'center', target: 'left', duration: 1 }),
+			action('show', { slot: 'center', transition: 'none' }, [
+				{ id: 'other/coat/calm' },
+			]),
+		]
+		const opening = previewOpening(prior, selected)
+		expect(opening).toEqual(prior)
+		expect(selected.reduce(direct, opening)).toEqual(
+			selected.reduce(direct, prior),
+		)
+		expect(selected.reduce(direct, opening).sprites.center?.transform.x).toBe(
+			480,
+		)
+	})
+	it.each(['left', 'center', 'right'] as const)(
+		'keeps safe cuts and mixed portrait cues equivalent to ordinary playback in %s',
+		(slot) => {
+			const prior = direct(
+				direct(
+					emptyStage(),
+					action('bg', { transition: 'none' }, [{ id: 'room/undrawn' }]),
+				),
+				action('show', { slot }, [{ id: 'hero/coat/calm' }]),
+			)
+			for (const selected of [
+				[
+					action('bg', { transition: 'none' }, [{ id: 'room/dusk' }]),
+					action('move', { slot, target: 'left' }),
+					action('show', { slot, transition: 'none' }, [
+						{ id: 'other/coat/calm' },
+					]),
+				],
+				[
+					action('show', { slot, transition: 'none' }, [
+						{ id: 'other/coat/calm' },
+					]),
+					action('move', { slot, target: 'left' }),
+				],
+				[
+					action('hide', { target: slot, transition: 'none' }),
+					action('show', { slot, transition: 'none' }, [
+						{ id: 'hero/coat/calm' },
+					]),
+					action('move', { slot, target: 'left' }),
+				],
+			]) {
+				const opening = previewOpening(prior, selected)
+				expect(selected.reduce(direct, opening)).toEqual(
+					selected.reduce(direct, prior),
+				)
+				if (selected[0].name === 'bg')
+					expect(stageAssets(opening)).not.toContain('room/undrawn')
+			}
+		},
+	)
 	it('keeps preview movement and expression origins while omitting assets replaced by cuts', () => {
 		const prior = direct(
 			direct(

@@ -143,15 +143,21 @@ export function previewOpening(
 	state: StageState,
 	actions: readonly CompiledAction[],
 ): StageState {
-	return actions.reduce(
-		(opening, action) =>
-			['cg', 'fg'].includes(action.name) ||
-			(['bg', 'show', 'hide'].includes(action.name) &&
-				action.args.transition === 'none')
-				? direct(opening, action)
-				: opening,
-		state,
-	)
+	const final = JSON.stringify(actions.reduce(direct, state))
+	return actions.reduce((opening, action) => {
+		if (
+			!['cg', 'fg'].includes(action.name) &&
+			!(
+				['bg', 'show', 'hide'].includes(action.name) &&
+				action.args.transition === 'none'
+			)
+		)
+			return opening
+		const candidate = direct(opening, action)
+		return JSON.stringify(actions.reduce(direct, candidate)) === final
+			? candidate
+			: opening
+	}, state)
 }
 
 export function stageAssets(state: StageState): string[] {
