@@ -234,7 +234,15 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			.getByRole('checkbox')
 			.check()
 		await capture(page, '05-agent-rewrite-selected')
+		await script.fill(
+			(await script.innerText()).replace('桥下很安静', '未保存的桥下修改'),
+		)
 		await chatDiff.getByRole('button', { name: '应用勾选差异' }).click()
+		await expect(
+			page.getByText('章节已更新，当前修改已保留；放弃修改后加载新版本'),
+		).toBeVisible()
+		await expect(script).toContainText('未保存的桥下修改')
+		await page.getByRole('button', { name: '放弃修改', exact: true }).click()
 		await expect(script).toContainText('笛声')
 		await expect(script).toContainText('慢慢')
 		await expect(script).not.toContainText('缓缓')

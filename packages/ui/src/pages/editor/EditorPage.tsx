@@ -43,20 +43,28 @@ export function EditorPage() {
 	}>()
 	const [preview, setPreview] = useState(0)
 	const [refresh, setRefresh] = useState(0)
+	const [pendingRefresh, setPendingRefresh] = useState(false)
+	const chapter = opening?.chapter
+	const scene = chapter?.scenes[sceneIndex]
+	const dirty =
+		!!scene &&
+		draft.replace(/\r\n?/g, '\n') !== scene.nvs.replace(/\r\n?/g, '\n')
 	useEffect(() => {
 		const changed = (event: Event) => {
 			const { workId, chapterId: changedChapter } = (event as CustomEvent)
 				.detail
-			if (workId === id && changedChapter === chapterId)
-				setRefresh((value) => value + 1)
+			if (workId === id && changedChapter === chapterId) {
+				if (dirty) {
+					setPendingRefresh(true)
+					setError('章节已更新，当前修改已保留；放弃修改后加载新版本')
+				} else setRefresh((value) => value + 1)
+			}
 		}
 		window.addEventListener('novelive:chapter-changed', changed)
 		return () => window.removeEventListener('novelive:chapter-changed', changed)
-	}, [id, chapterId])
+	}, [id, chapterId, dirty])
 	const stage = useRef<HTMLDivElement>(null)
 	const sourceViewport = useRef<HTMLDivElement>(null)
-	const chapter = opening?.chapter
-	const scene = chapter?.scenes[sceneIndex]
 	useEffect(() => {
 		if (scene)
 			setAgentPosition?.({
@@ -67,9 +75,6 @@ export function EditorPage() {
 			})
 		return () => setAgentPosition?.(undefined)
 	}, [scene, chapterId, setAgentPosition])
-	const dirty =
-		!!scene &&
-		draft.replace(/\r\n?/g, '\n') !== scene.nvs.replace(/\r\n?/g, '\n')
 	useEffect(() => {
 		if (source && scene)
 			sourceViewport.current
@@ -193,9 +198,15 @@ export function EditorPage() {
 		if (saved.revision !== target.expectedRevision)
 			setUndoCount((count) => count + 1)
 	}
+	function discard() {
+		if (pendingRefresh) {
+			setPendingRefresh(false)
+			setRefresh((value) => value + 1)
+		} else if (scene) setDraft(scene.nvs)
+	}
 	function undo() {
 		if (dirty && scene) {
-			setDraft(scene.nvs)
+			discard()
 			return
 		}
 		if (!target || !undoCount) return
@@ -377,7 +388,7 @@ export function EditorPage() {
 									<button
 										type="button"
 										disabled={!dirty || busy}
-										onClick={() => setDraft(scene.nvs)}
+										onClick={discard}
 									>
 										放弃修改
 									</button>
