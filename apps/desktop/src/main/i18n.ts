@@ -10,6 +10,13 @@ const tables: Record<string, Record<string, string>[]> = {
 }
 let locale = 'zh-CN'
 const listeners = new Set<() => void>()
+let synced: () => void
+const ready = new Promise<void>((resolve) => {
+	synced = resolve
+})
+
+export const languageReady = (timeout: number) =>
+	Promise.race([ready, new Promise((resolve) => setTimeout(resolve, timeout))])
 
 export const msg = (key: string) => key
 
@@ -23,8 +30,10 @@ export function onLanguage(listener: () => void) {
 }
 
 ipcMain.on('novelive:language', (_event, value: unknown) => {
-	if (typeof value !== 'string' || value === locale) return
+	if (typeof value !== 'string') return
 	if (value !== 'zh-CN' && !(value in tables)) return
+	synced()
+	if (value === locale) return
 	locale = value
 	for (const listener of listeners) listener()
 })

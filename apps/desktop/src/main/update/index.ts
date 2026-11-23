@@ -2,7 +2,7 @@ import { access, constants } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { app, type BrowserWindow, dialog, shell } from 'electron'
 import updaters from 'electron-updater'
-import { t } from '../i18n'
+import { languageReady, t } from '../i18n'
 import { checkUpdate, updatePolicy } from './policy'
 
 export function installUpdates(options: {
@@ -68,6 +68,7 @@ export function installUpdates(options: {
 		}
 		try {
 			const result = await checkUpdate(engine, policy)
+			if (!manual) await languageReady(15_000)
 			if (result.kind === 'current') {
 				if (manual) await prompt(t('已是最新版本。'))
 			} else if (result.kind === 'manual') {
