@@ -249,7 +249,9 @@ test('a leading thematic break is not front matter; YAML comments, escapes and b
 		).volumes[0].chapters[0].paragraphs,
 	).toEqual(['Mara: Stay here.', 'Take the lantern.', 'The ship left.'])
 	expect(
-		extract('---\ntitle: 港\ntags:\n- sea\n- port\n---\n正文。\n').metadata,
+		extract(
+			'---\ntitle: 港\ntags:\n- sea\nkinds: &k !!seq\n- port\n---\n正文。\n',
+		).metadata,
 	).toEqual({ title: '港' })
 	expect(
 		extract('---\ntitle: Matching a literal ]\nlang: en\n---\nText.\n')
