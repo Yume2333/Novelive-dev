@@ -2,12 +2,14 @@
 
 **Effort:** m1b-production
 **Executor:** spine (paid calls)
-**Blocked by:** 09, 10, m1a-project/07
+**Blocked by:** 09, 10
 **Covers:** W4
 **Task type:** spike
 **Files:** .workflow/evidence/m1b/owner/
 **Read first:** `.workflow/specs/m1b-production.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
-**Check:** 仅串行主线执行 `NL_REPLAY=record pnpm dev` → 使用授权真书导入、确认、试玩、继续制作并记录作品验收和用量。并行会话不领取本任务，严格回放不能替代本 Check。
+**Check:** 仅串行主线执行 `NL_REPLAY=record pnpm dev` → 在 Electron 导入《野叟曝言》，使用整卷综合（指纹一致时复用预览与综合），确认主视觉、试玩第一章、手动继续制作并验证后续章发布；记录质量与用量（最多 40 张图、20M tokens）。并行会话不领取本任务，严格回放不能替代本 Check。
+
+本任务只验收整卷制作路径。M1a/07 的分块 F1 仍是 [owner-review](../../owner-review.md) 中的开放项，另行处理，不阻塞本任务。
 
 **付费调用：** 只由协调者在交接中明确指定的串行主线会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
 
