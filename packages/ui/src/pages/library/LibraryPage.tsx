@@ -5,12 +5,16 @@ import { Link } from 'react-router-dom'
 import { EmptyState, Page, PageAction } from '../../components/Page'
 import { productionRoutes, workRoute } from '../../routes/production'
 import styles from './LibraryPage.module.css'
+import { ImportPackage } from './share/ImportPackage'
 
 export function LibraryPage() {
 	const [library, setLibrary] = useState<CommandOutput<'library.list'>>()
 	const [error, setError] = useState(false)
+	const [revision, setRevision] = useState(0)
+	const share = window.novelive.host.share
 
 	useEffect(() => {
+		void revision
 		let active = true
 		let pending:
 			| ReturnType<typeof window.novelive.call<'library.list'>>
@@ -43,15 +47,27 @@ export function LibraryPage() {
 			off()
 			pending?.cancel()
 		}
-	}, [])
+	}, [revision])
 
 	return (
 		<Page
 			title="书库"
 			action={
-				<PageAction icon={FileUp} to={productionRoutes.import}>
-					导入原文
-				</PageAction>
+				<div className={styles.actions}>
+					{share && (
+						<ImportPackage
+							api={share}
+							pickPackage={async () =>
+								(await window.novelive.pickFiles('package'))[0]
+							}
+							pickProjectFolder={() => window.novelive.pickFolder()}
+							onImported={() => setRevision((n) => n + 1)}
+						/>
+					)}
+					<PageAction icon={FileUp} to={productionRoutes.import}>
+						导入原文
+					</PageAction>
+				</div>
 			}
 		>
 			{error ? (

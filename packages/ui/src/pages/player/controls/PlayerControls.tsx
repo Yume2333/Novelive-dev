@@ -27,6 +27,7 @@ export function PlayerControls({
 	workId,
 	progress,
 	history,
+	legacySaves,
 	onSave,
 	onLoad,
 	onHistory,
@@ -403,6 +404,7 @@ export function PlayerControls({
 									workId={workId}
 									progress={progress}
 									history={history}
+									legacySaves={legacySaves}
 									onSave={onSave}
 									onLoad={onLoad}
 									onSlot={(slot) => void slotAction(slot, screen === 'save')}

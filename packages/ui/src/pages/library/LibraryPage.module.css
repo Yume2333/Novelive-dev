@@ -1,3 +1,9 @@
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+}
+
 .projects {
 	margin-top: var(--space-7);
 }

@@ -47,6 +47,9 @@ const visualChoices = {
 
 export const productionSnapshotSchema = obj({
 	...work,
+	exportTarget: opt(
+		obj({ projectRoot: str({ minLength: 1 }), volumeId: entityId }),
+	),
 	title: opt(str()),
 	summary: opt(str()),
 	chapterTitles: opt(map(str())),

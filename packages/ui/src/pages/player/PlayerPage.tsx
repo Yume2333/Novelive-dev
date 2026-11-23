@@ -14,6 +14,7 @@ import type {
 import { PlaybackProgress, slotKey } from '../../../../player/src/progress'
 import { playerEditorRoute } from '../../routes/player'
 import type { PlayerControlsController } from './controls/controller'
+import type { LegacySaveActions } from './controls/legacy-saves/LegacySavePanel'
 import {
 	minimalControlsController,
 	sentenceKey,
@@ -23,7 +24,11 @@ import { containsSentence, restoredChapterMode } from './controls/position'
 import { useChapterWait } from './controls/useChapterWait'
 import './player.css'
 
-export function PlayerPage() {
+export function PlayerPage({
+	legacySaves,
+}: {
+	legacySaves?: LegacySaveActions
+}) {
 	const { id } = useParams()
 	const navigate = useNavigate()
 	const host = useRef<HTMLDivElement>(null)
@@ -349,6 +354,7 @@ export function PlayerPage() {
 					editorLinked={loaded.linked}
 					progress={progress.current.data}
 					history={progress.current.history}
+					legacySaves={legacySaves}
 					workId={id ?? ''}
 					onSave={save}
 					onLoad={(slot) =>

@@ -425,6 +425,7 @@ export function createProduction(
 				const result = queue.snapshot(workId)
 				return {
 					...result,
+					exportTarget: { projectRoot: project.root, volumeId },
 					title: work.title,
 					summary,
 					chapterTitles,

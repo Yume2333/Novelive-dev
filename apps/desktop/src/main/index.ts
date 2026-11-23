@@ -213,6 +213,13 @@ app.whenReady().then(async () => {
 		return result.filePaths[0] ?? null
 	})
 	ipcMain.handle('novelive:pick-files', async (_event, kind: unknown) => {
+		if (kind === 'package') {
+			const result = await dialog.showOpenDialog({
+				properties: ['openFile'],
+				filters: [{ name: 'Novelive 作品包', extensions: ['novelive'] }],
+			})
+			return result.filePaths
+		}
 		if (kind !== 'source' && kind !== 'txt' && kind !== 'image') return []
 		const result = await dialog.showOpenDialog({
 			properties:
@@ -228,6 +235,16 @@ app.whenReady().then(async () => {
 						],
 		})
 		return result.filePaths
+	})
+	ipcMain.handle('novelive:pick-package-destination', async () => {
+		const result = await dialog.showSaveDialog({
+			defaultPath: '作品.novelive',
+			filters: [{ name: 'Novelive 作品包', extensions: ['novelive'] }],
+		})
+		if (result.canceled || !result.filePath) return null
+		return /\.novelive$/i.test(result.filePath)
+			? result.filePath
+			: `${result.filePath}.novelive`
 	})
 	ipcMain.handle('novelive:open-log-dir', async () => {
 		await mkdir(logDir(), { recursive: true })
