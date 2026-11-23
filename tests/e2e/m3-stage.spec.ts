@@ -25,6 +25,10 @@ type StageHarness = {
 		Pick<
 			typeof import('../../packages/player/src/progress'),
 			'PlaybackProgress'
+		> &
+		Pick<
+			typeof import('../../packages/ui/src/pages/player/controls/controller'),
+			'defaultPlayerSettings' | 'schedulePlayback'
 		>
 	controls: ReturnType<
 		typeof import('../../packages/ui/src/pages/player/controls/minimal-controller').minimalControlsController
@@ -57,7 +61,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 				name: 'stage-controls-regression',
 				transform(source: string, id: string) {
 					if (id === entry)
-						return `${source}\nexport { PlaybackProgress }\nexport { minimalControlsController } from ${JSON.stringify(resolve('packages/ui/src/pages/player/controls/minimal-controller.ts'))}`
+						return `${source}\nexport { PlaybackProgress }\nexport { minimalControlsController } from ${JSON.stringify(resolve('packages/ui/src/pages/player/controls/minimal-controller.ts'))}\nexport { defaultPlayerSettings, schedulePlayback } from ${JSON.stringify(resolve('packages/ui/src/pages/player/controls/controller.ts'))}`
 				},
 			},
 		],
@@ -629,6 +633,129 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 						?.transform.x,
 			),
 		).toBe(240)
+		await page.evaluate(() =>
+			(globalThis as unknown as StageHarness).abort.abort(),
+		)
+		await page.evaluate(
+			async ({ scenes, background, portrait }) => {
+				const runtime = globalThis as unknown as StageHarness
+				const scene = scenes[0]
+				const first = scene.beats[0]
+				const second = scene.beats.find((beat) => beat.line?.id === '0002')
+				if (first.line?.type !== 'text' || second?.line?.type !== 'text')
+					throw new Error('Missing autoplay fixtures')
+				scene.beats = [
+					first,
+					{
+						...second,
+						actions: second.actions.map((action) =>
+							action.name === 'move'
+								? { ...action, args: { ...action.args, duration: 60 } }
+								: action,
+						),
+						advance: { kind: 'click' },
+					},
+					{
+						...first,
+						actions: [],
+						line: {
+							...first.line,
+							id: '0003',
+							content: [{ type: 'text', text: 'Autoplay completed' }],
+						},
+					},
+				]
+				const host = document.createElement('div')
+				host.className = 'nl-player'
+				host.style.setProperty('--player-text-delay', '0ms')
+				document.body.replaceChildren(host)
+				runtime.abort = new AbortController()
+				const progress = new runtime.StageTest.PlaybackProgress((a, b) =>
+					a.sentenceId.localeCompare(b.sentenceId),
+				)
+				runtime.controls = runtime.StageTest.minimalControlsController(
+					host,
+					'chapter',
+					[scene],
+					'main',
+					progress,
+					runtime.abort.signal,
+				)
+				const settings = {
+					...runtime.StageTest.defaultPlayerSettings,
+					autoPlaySpeedMultiplier: 0.25,
+				}
+				let cancel = () => {}
+				const unsubscribe = runtime.controls.subscribe(() => {
+					cancel()
+					cancel = runtime.StageTest.schedulePlayback(
+						runtime.controls,
+						settings,
+						true,
+						false,
+					)
+				})
+				runtime.abort.signal.addEventListener(
+					'abort',
+					() => {
+						cancel()
+						unsubscribe()
+					},
+					{ once: true },
+				)
+				const commit = runtime.StageTest.PixiStage.prototype.commit
+				runtime.StageTest.PixiStage.prototype.commit = function (...args) {
+					const animation = commit.apply(this, args)
+					if (args[2]?.some((action) => action.name === 'move')) {
+						runtime.preview = this
+						this.app.ticker.stop()
+						runtime.StageTest.PixiStage.prototype.commit = commit
+					}
+					return animation
+				}
+				const player = await runtime.StageTest.mountMinimalPlayer(
+					host,
+					[scene],
+					{
+						resolveAsset: (id) =>
+							`data:image/png;base64,${id === 'room/dusk' ? background : portrait}`,
+					},
+					runtime.abort.signal,
+					(error) => {
+						throw error
+					},
+					{},
+					runtime.controls.rendered,
+					{
+						chapterId: 'chapter',
+						onSnapshot(saved) {
+							runtime.latest = saved
+							progress.record(saved)
+						},
+					},
+				)
+				if (!player) throw new Error('Missing autoplay player')
+				runtime.player = player
+			},
+			{ scenes: compiled.scenes, background, portrait },
+		)
+		await expect(page.locator('.nl-text-display')).toHaveText('Second')
+		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+			'aria-busy',
+			'true',
+		)
+		await expect(page.locator('.nl-text-display')).toHaveText(
+			'Autoplay completed',
+		)
+		expect(
+			await page.evaluate(() =>
+				(
+					globalThis as unknown as StageHarness
+				).player.progress.history.entries.map(
+					(entry) => entry.position.sentenceId,
+				),
+			),
+		).toEqual(['0001', '0002', '0003'])
 		await page.evaluate(() =>
 			(globalThis as unknown as StageHarness).abort.abort(),
 		)

@@ -196,6 +196,12 @@ export async function mountMinimalPlayer(
 	function setBusy(value: boolean) {
 		busy = value
 		element.ariaBusy = String(value)
+		if (!value) {
+			const text = overlay.querySelector<HTMLElement>('.nl-player-text')
+			const finished = text?.dataset.textFinished
+			if (text && finished !== undefined)
+				text.setAttribute('data-text-finished', finished)
+		}
 	}
 	let timer: ReturnType<typeof setTimeout> | undefined
 	let scheduleId = 0
