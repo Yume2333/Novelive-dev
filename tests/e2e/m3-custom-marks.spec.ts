@@ -77,7 +77,11 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 							css: 'font-size: 72px; letter-spacing: 0.04em',
 							perChar: true,
 						},
-						shift: { css: 'transform: translateX(12px)', perChar: false },
+						shift: {
+							css: 'color: navy; transform: translateY(500px)',
+							perChar: false,
+						},
+						char: { css: 'color: teal', perChar: false },
 					},
 				},
 			})
@@ -102,7 +106,9 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 				'scene 夜空\nsource p0001\n@bg room/dusk\n: 萤火{unsafe}照亮了{/unsafe}{wave}夜空{/wave}。 #0001\n' +
 					': {speed 100}前{large}大字{/large}后{/speed} #0002\n' +
 					`: {speed 100}{shift}${'山川'.repeat(20)}{/shift}{/speed} #0003\n` +
-					': {speed 100}萤火{wave}夜空{/wave}{/speed} #0004\n',
+					': {speed 100}萤火{wave}夜空{/wave}{/speed} #0004\n' +
+					': {speed 100}{char}名字{/char}{/speed} #0005\n' +
+					`: {speed 100}{shout}{large}${'大声'.repeat(20)}{/large}{/shout}{/speed} #0006\n`,
 			)
 		}
 		await mkdir(join(profile, 'projects'), { recursive: true })
@@ -186,10 +192,7 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			await expect(display).toHaveText('山川'.repeat(20))
 			const shift = display.locator('[data-mark-style="shift"]')
 			const shiftStyle = await shift.evaluate((element) => ({
-				left: element.getBoundingClientRect().left,
-				layoutLeft: document
-					.querySelector('.nl-text-layout [data-mark-style="shift"]')
-					?.getBoundingClientRect().left,
+				transform: getComputedStyle(element).transform,
 				lines: new Set(
 					Array.from(element.querySelectorAll('[data-glyph]'), (glyph) =>
 						Math.round(glyph.getBoundingClientRect().top),
@@ -198,12 +201,12 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			}))
 			expect
 				.soft(
-					shiftStyle.left - (shiftStyle.layoutLeft ?? 0),
-					'run translation is painted',
+					shiftStyle.transform,
+					'unsafe to paginate translations are ignored',
 				)
-				.toBeCloseTo(12)
+				.toBe('none')
 			expect
-				.soft(shiftStyle.lines, 'transformed run still wraps')
+				.soft(shiftStyle.lines, 'run still wraps after dropping the transform')
 				.toBeGreaterThan(1)
 			await expect(playback).toHaveAttribute('data-text-finished', 'true')
 			await advance()
@@ -220,6 +223,21 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 					'innermost mark supplies glyph color',
 				)
 				.toBe('rgb(142, 232, 255)')
+			await expect(playback).toHaveAttribute('data-text-finished', 'true')
+			await advance()
+			await expect(display).toHaveText('名字')
+			await expect
+				.soft(display.locator('[data-mark-style="char"]'))
+				.toHaveCSS('color', 'rgb(0, 128, 128)', { timeout: 1000 })
+			await expect(playback).toHaveAttribute('data-text-finished', 'true')
+			await advance()
+			await expect(display).toHaveText('大声'.repeat(20))
+			expect
+				.soft(
+					Number(await playback.getAttribute('data-pages')),
+					'large custom glyphs under shout paginate',
+				)
+				.toBeGreaterThan(1)
 		} finally {
 			await app.close()
 		}

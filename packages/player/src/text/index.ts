@@ -103,7 +103,10 @@ export function mountText(
 				if (priority || !element.style.getPropertyPriority(property))
 					element.style.setProperty(property, value, priority)
 			}
-			if (layer === layout && element.style.fontSize) styledMetrics = true
+			if (element.style.fontSize) {
+				element.dataset.markSize = ''
+				if (layer === layout) styledMetrics = true
+			}
 		}
 	}
 	const visible = Array.from(
