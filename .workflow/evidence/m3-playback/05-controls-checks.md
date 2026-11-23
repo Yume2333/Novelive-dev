@@ -13,22 +13,15 @@ $ tsc --noEmit
 ```text
 $ biome check && stylelint 'packages/ui/src/**/*.css'
 tests/fixtures/text-models/build-synthetic.ts:63:3 lint/style/useTemplate  FIXABLE
-Checked 289 files in 185ms. No fixes applied.
+Checked 291 files in 145ms. No fixes applied.
 Found 1 info.
 ```
 
-`NL_REPLAY=strict pnpm test tests/integration/m3-save.test.ts tests/unit/m1b-player.test.ts` (exit 0)
+`NL_REPLAY=strict pnpm test tests/integration/m3-save.test.ts tests/unit/m1b-player.test.ts tests/unit/player-progress-ipc.test.ts` (exit 0)
 
 ```text
-Test Files  2 passed (2)
-Tests       16 passed (16)
-```
-
-After rebasing onto the newly merged M4/08 startup, the affected loader/IPC suite was rerun (`NL_REPLAY=strict pnpm test tests/unit/m1b-player.test.ts`, exit 0):
-
-```text
-Test Files  1 passed (1)
-Tests       6 passed (6)
+Test Files  3 passed (3)
+Tests       20 passed (20)
 ```
 
 `NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M3 player controls'` (exit 0)
@@ -40,7 +33,7 @@ Running 5 tests using 1 worker
   ✓ settings and reread in the real Electron player
   ✓ chapter wait in the real Electron player
   ✓ reread successor in the real Electron player
-  5 passed (17.1s)
+  5 passed (19.0s)
 ```
 
 `NL_REPLAY=strict xvfb-run -a pnpm exec playwright test tests/e2e/m1b-player.spec.ts` (exit 0)
@@ -62,4 +55,15 @@ Notification delivery itself belongs to M4/08; this change emits `novelive:playe
 
 ## Review and limitations
 
-Review skipped: no independent reviewer/subagent spawning tool is available in this session. An independent workflow/security review is still needed at effort close. Read/mainline and saves now persist using M3/04; settings and session history remain in memory. The minimal snapshot renderer restores background, sprites and dialogue text, not the full stage's camera/effects/audio or interrupted animations. No paid calls or replay cassette changes were needed.
+Devin Review findings on `91e7841` were addressed in separate commits:
+
+- `7389335`: missing persisted resume sentences fall back to the chapter start.
+- `9002779`: history restores select playback mode from the target chapter, including returning from reread to mainline.
+- `e9d7758`: validate saved/history positions before committing history changes or replacing the mounted stage; invalid saves leave the existing player usable.
+- `dd8bd24`: snapshots capture displayed restored text, including after the underlying script changes.
+- `b0863f7`: load-dialog initial focus skips disabled controls, including entirely empty grids.
+- `6b60c68`: history requests no thumbnails; grid requests share validated cached progress, refreshed on writes. Unit coverage checks 60 concurrent requests, empty slots, untrusted senders and corrupt persisted data.
+
+Real Electron coverage includes stale resume IDs after restart, history reread → mainline with subsequent forward progress, invalid save rejection without losing stage/history, and re-saving an old-text snapshot after an actual scene rewrite.
+
+The initial implementation skipped independent workflow review because no reviewer-spawning tool was available; independent workflow/security review is still needed at effort close. Read/mainline and saves persist using M3/04; settings and session history remain in memory. The minimal snapshot renderer restores background, sprites and dialogue text, not the full stage's camera/effects/audio or interrupted animations. No paid calls or replay cassette changes were needed.

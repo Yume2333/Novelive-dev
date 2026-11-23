@@ -38,11 +38,12 @@ test('restoring history selects main mode for the mainline and unread chapters',
 })
 
 test('persisted resume positions are checked against the current chapter', () => {
-	const result = compileScript('scene 空屋\n: 开始。', {
+	const result = compileScript('scene 空屋\nsource p0001\n: 开始。', {
 		...context,
+		paragraphIds: ['p0001'],
 		sceneIds: ['aaaabbbb'],
 	})
-	if (!result.ok) throw new Error('compile failed')
+	if (!result.ok) throw new Error(JSON.stringify(result.diagnostics))
 	const scene = result.scenes[0]
 	const position = {
 		chapterId: 'ch1',
