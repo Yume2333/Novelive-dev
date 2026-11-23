@@ -895,18 +895,32 @@ ${scopes.flatMap(({ lines }) => lines).join('\n')}`
 		const fits = (prompt: string) =>
 			bytes(prompt) + bytes(repairPrefix) < selectionBudget
 		const whole = promptFor(numbered)
-		const batches = fits(whole)
-			? [{ prompt: whole, scopes: numbered }]
-			: numbered.map((group) => ({
-					prompt: promptFor([group]),
-					scopes: [group],
-				}))
-		if (batches.some(({ prompt }) => !fits(prompt)))
-			throw new Error(
-				'A whole-volume candidate kind exceeds the selection context budget',
-			)
+		const batches: (typeof numbered)[] = []
+		const addBatch = (group: (typeof numbered)[number]) => {
+			if (fits(promptFor([group]))) {
+				batches.push([group])
+				return
+			}
+			if (group.lines.length === 1)
+				throw new Error(
+					`A ${group.kind} candidate exceeds the selection context budget`,
+				)
+			const middle = Math.floor(group.lines.length / 2)
+			addBatch({
+				...group,
+				last: group.first + middle - 1,
+				lines: group.lines.slice(0, middle),
+			})
+			addBatch({
+				...group,
+				first: group.first + middle,
+				lines: group.lines.slice(middle),
+			})
+		}
+		if (fits(whole)) batches.push(numbered)
+		else for (const group of numbered) addBatch(group)
 		const plan = hash(
-			batches.map(({ scopes }) =>
+			batches.map((scopes) =>
 				scopes.map(({ kind, first, last, target }) => [
 					kind,
 					first,
@@ -918,13 +932,21 @@ ${scopes.flatMap(({ lines }) => lines).join('\n')}`
 		if (state.selectionPlan !== plan) state.selections = []
 		state.selectionPlan = plan
 		const kept = new Set<number>()
-		for (const [index, { prompt, scopes }] of batches.entries()) {
+		const keptByKind = new Map<SelectionGroup['kind'], number>()
+		for (const [index, batch] of batches.entries()) {
+			const scopes = batch.map((scope) => ({
+				...scope,
+				target:
+					scope.target === undefined
+						? undefined
+						: Math.max(0, scope.target - (keptByKind.get(scope.kind) ?? 0)),
+			}))
 			const { first } = scopes[0]
 			const { last } = scopes[scopes.length - 1]
 			let keep = state.selections?.[index]
 			if (!keep) {
 				const answer = await request(
-					prompt,
+					promptFor(scopes),
 					selection,
 					(value) => {
 						if (
@@ -963,6 +985,12 @@ ${scopes.flatMap(({ lines }) => lines).join('\n')}`
 				await project.write(files.checkpoint, state)
 			}
 			for (const n of keep) kept.add(n)
+			for (const { kind, first, last } of scopes)
+				keptByKind.set(
+					kind,
+					(keptByKind.get(kind) ?? 0) +
+						keep.filter((n) => n >= first && n <= last).length,
+				)
 		}
 		return kept
 	}

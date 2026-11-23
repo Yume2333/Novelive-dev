@@ -1034,6 +1034,75 @@ test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
 	},
 )
 
+test('splits an oversized kind and resumes at the next global range', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const glossaryPatch = [1, 2, 3, 4].map((n) => ({
+		...term,
+		id: `term-${n}`,
+		original: `Term ${n}`,
+		written: `Term ${n}`,
+		note: 'A consequential description. '.repeat(80),
+		status: 'candidate',
+	}))
+	const args = {
+		...options,
+		strategy: 'events' as const,
+		selectionConnection: { ...connection, contextWindow: 8192 },
+		selectionTargets: { glossary: 2 },
+	}
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		const prompt: string = messages[0].content
+		const positions = candidatePositions(prompt)
+		if (!positions)
+			return stream({
+				overview: 'Four terms.',
+				chapters: chapters.map((chapterId) => ({
+					chapterId,
+					progress: 'Travel.',
+				})),
+				event: 'Travel.',
+				is_last: true,
+				biblePatch: [],
+				glossaryPatch,
+			})
+		if (positions[0] !== 1) throw new Error('Selection interrupted')
+		expect(positions).toEqual([1])
+		expect(prompt).toContain('glossary: 2')
+		return stream({ keep: positions })
+	})
+	await expect(
+		synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
+	).rejects.toThrow()
+	expect(await project.read(files.checkpoint)).toMatchObject({
+		packet: 1,
+		selections: [[1]],
+	})
+	let resumed = 0
+	const resume = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		const prompt: string = messages[0].content
+		const n = ++resumed
+		expect(candidatePositions(prompt)).toEqual([n + 1])
+		expect(prompt).toContain(`glossary: ${n === 1 ? 1 : 0}`)
+		return stream({
+			keep: [n + 1],
+			justifications: [{ kind: 'glossary', reason: 'A consequential term.' }],
+		})
+	})
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...args,
+		fetch: resume,
+	})
+	expect(result.glossaryPatch).toEqual(glossaryPatch)
+	expect(resume).toHaveBeenCalledTimes(3)
+	expect(
+		await synthesizeVolume(project, 'v1', chapters, { ...args, fetch: resume }),
+	).toEqual(result)
+	expect(resume).toHaveBeenCalledTimes(3)
+})
+
 test('soft size targets require a reason for exceeding a kind but do not trim justified picks', async () => {
 	await seed(root)
 	using project = await Project.open(root)
