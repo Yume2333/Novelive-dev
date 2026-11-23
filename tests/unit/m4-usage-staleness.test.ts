@@ -406,6 +406,13 @@ test.each(['style', 'glossary'] as const)(
 	'%s proposal approval ignores malformed asset registries when nothing becomes stale',
 	async (kind) => {
 		await fixture(async (project) => {
+			if (kind === 'style')
+				await project.write(projectFiles.style({ level: 'series' }), {
+					formatVersion,
+					entries: [
+						{ id: 'style', description: 'Original style', status: 'confirmed' },
+					],
+				})
 			const registry = projectFiles.assetRegistry({ level: 'series' })
 			await project.writeFile(registry.path, '{"invalid":"registry"}')
 			await expect(project.read(registry)).rejects.toBeDefined()
