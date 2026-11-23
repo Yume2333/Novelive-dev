@@ -87,7 +87,14 @@ export function ChapterRecords({
 					<li key={seq}>
 						<strong>
 							{stepName[step]} ·{' '}
-							{{ running: '进行中', done: '完成', failed: '失败' }[status]}
+							{
+								{
+									running: '进行中',
+									done: '完成',
+									failed: '失败',
+									cancelled: '已取消',
+								}[status]
+							}
 						</strong>
 						<time dateTime={at}>{new Date(at).toLocaleString('zh-CN')}</time>
 						<p>{message}</p>

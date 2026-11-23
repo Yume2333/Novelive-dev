@@ -120,7 +120,7 @@ export const productionChapterRecordEvent = compile(
 		payload: obj({
 			...chapter,
 			step: chapterStepSchema,
-			status: oneOf(['running', 'done', 'failed']),
+			status: oneOf(['running', 'done', 'failed', 'cancelled']),
 			message: str(),
 			detail: opt(str()),
 		}),

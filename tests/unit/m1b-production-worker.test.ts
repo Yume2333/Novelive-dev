@@ -5,8 +5,10 @@ import { projectFiles } from '@novelive/format/model'
 import sharp from 'sharp'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createConfigStore } from '../../packages/creator/src/config'
+import { productionChapterRecordEvent } from '../../packages/creator/src/contract/production'
 import { importTxtProject } from '../../packages/creator/src/import/wizard'
 import { Project } from '../../packages/creator/src/project'
+import { createProduction } from '../../packages/creator/src/project/production'
 import {
 	chapterWorker,
 	productionModels,
@@ -14,6 +16,7 @@ import {
 import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
 import { bible } from '../fixtures/cassettes/m1b-art/fixture'
 import { configuration, original } from '../fixtures/cassettes/m1b-gate/fixture'
+import { ScriptedWorker } from '../fixtures/scheduler/m1b/worker'
 
 let directory: string
 
@@ -150,6 +153,7 @@ test('a painter exception materializes both base and variant placeholders before
 			return jobs
 		},
 	})
+	project.tasks.registerWork({ workId, title: work.title })
 	try {
 		queue.start(workId, ['ch0001'])
 		queue.confirmVisual(workId)
@@ -216,4 +220,56 @@ test('staging depends on a reused pending image absent from the new manifest', a
 	expect(await worker.stage({ ...ctx, chapterId: second })).toMatchObject([
 		{ assetId: 'room/day' },
 	])
+})
+
+test('records a manually interrupted chapter as cancelled when production reopens', async () => {
+	const { projectDir, workId } = await fixture()
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	{
+		using project = await Project.open(projectDir)
+		project.tasks.registerWork({ workId, title: 'Paper boat' })
+		const worker = new ScriptedWorker()
+		worker.hold('write:ch0001')
+		const queue = new ChapterScheduler(project.database, worker)
+		try {
+			queue.start(workId, ['ch0001'])
+			queue.confirmVisual(workId)
+			expect(queue.stop(workId).abortedRunning).toBe(1)
+			worker.release('write:ch0001')
+			await queue.idle()
+		} finally {
+			queue.dispose()
+		}
+	}
+	const production = createProduction(
+		directory,
+		config,
+		{
+			fetch: async () => {
+				throw new Error('Reopening a stopped project should not call providers')
+			},
+		},
+		() => {},
+		() => {},
+	)
+	try {
+		await production.remember(workId, projectDir)
+		const session = await production.get(workId)
+		const events = session.records
+			.map(({ event }) => event)
+			.filter((event) => productionChapterRecordEvent.check(event))
+		expect(events).toMatchObject([
+			{
+				payload: {
+					chapterId: 'ch0001',
+					step: 'write',
+					status: 'cancelled',
+					message: '已取消',
+				},
+			},
+		])
+	} finally {
+		await production.close()
+	}
 })
