@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { copyFile, mkdir, readFile, rename, rm } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import {
@@ -13,6 +14,7 @@ import type {
 import type { TextConnection } from '../../models/text'
 import type { ModelOptions } from '../../pipeline/art/models'
 import { Project } from '../../project'
+import { existing } from '../../synthesis/patch'
 import { extractDocx } from '../docx'
 import { extractEpub } from '../epub'
 import { classifyIllustrations } from '../epub/illustrations'
@@ -271,9 +273,37 @@ export async function screenImportedIllustrations(
 	if (!candidates.length) return undefined
 	const choices = candidates.map(({ id, cachePath }) => ({ id, cachePath }))
 	try {
-		const extraction = await extractEpub(
-			await project.readFile(projectFiles.original('epub')),
-		)
+		const bytes = await project.readFile(projectFiles.original('epub'))
+		const model = await connection()
+		const key = createHash('sha256')
+			.update(
+				JSON.stringify([
+					1,
+					choices,
+					bible,
+					model.model,
+					model.baseUrl,
+					model.format,
+					model.compat,
+					model.contextWindow,
+				]),
+			)
+			.update(bytes)
+			.digest('hex')
+		const path = `source/imports/screening/${key}.txt`
+		const cached = await existing(() => project.readFile(path))
+		const hits = cached?.toString()
+		const output = (recommended: readonly boolean[]) => ({
+			fallback: false,
+			candidates: choices.map((choice, index) => ({
+				...choice,
+				recommended: recommended[index],
+			})),
+		})
+		options.signal?.throwIfAborted()
+		if (hits?.length === choices.length && /^[01]+$/.test(hits))
+			return output(Array.from(hits, (value) => value === '1'))
+		const extraction = await extractEpub(bytes)
 		const ids = new Set(candidates.map(({ id }) => id))
 		const illustrations = extraction.book.illustrations.filter((_, index) =>
 			ids.has(`illustration-${index + 1}`),
@@ -283,16 +313,12 @@ export async function screenImportedIllustrations(
 		const results = await classifyIllustrations(
 			{ ...extraction, book: { ...extraction.book, illustrations } },
 			bible,
-			await connection(),
+			model,
 			options,
 		)
-		return {
-			fallback: false,
-			candidates: choices.map((choice, index) => ({
-				...choice,
-				recommended: results[index].label !== 'irrelevant',
-			})),
-		}
+		const recommended = results.map(({ label }) => label !== 'irrelevant')
+		await project.writeFile(path, recommended.map(Number).join(''))
+		return output(recommended)
 	} catch {
 		options.signal?.throwIfAborted()
 		return {

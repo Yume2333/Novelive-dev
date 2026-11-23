@@ -702,28 +702,34 @@ test.each(classificationCases)(
 			})
 			if (view.status !== 'ready') throw new Error('Expected EPUB import')
 			await reviseTxtProject(view.projectDir, view.layout, ['illustration-1'])
-			using project = await Project.open(view.projectDir)
 			const fetch = vi.fn(() => {
 				throw new Error('Network must not run')
 			})
-			const screen = (directory: string) =>
-				screenImportedIllustrations(
+			const screen = async (
+				directory: string,
+				model = visualConnection.model,
+			) => {
+				using project = await Project.open(view.projectDir)
+				return await screenImportedIllustrations(
 					project,
 					sample.bible,
-					async () => visualConnection,
+					async () => ({ ...visualConnection, model }),
 					{ replay: { mode: 'strict', directory, fetch } },
 				)
+			}
 			const candidate = {
 				id: 'illustration-1',
 				cachePath: 'source/imports/illustrations/illustration-1.png',
 			}
-			await expect(screen(syntheticDirectory)).resolves.toEqual({
+			const screened = {
 				fallback: false,
 				candidates: [
 					{ ...candidate, recommended: sample.label !== 'irrelevant' },
 				],
-			})
-			await expect(screen(folder)).resolves.toEqual({
+			}
+			await expect(screen(syntheticDirectory)).resolves.toEqual(screened)
+			await expect(screen(folder)).resolves.toEqual(screened)
+			await expect(screen(folder, 'another-visual-model')).resolves.toEqual({
 				fallback: true,
 				candidates: [{ ...candidate, recommended: false }],
 			})
