@@ -14,6 +14,7 @@
 
 - Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-history.test.ts` → 1 个测试文件、7 个测试通过，见 `.workflow/evidence/m2-editor/02-edit-history.txt`。
 - 审查回归：`@move` 后仍编辑原槽位；目标句后恢复原表情，同场后续句和相邻场景不继承编辑。
-- Review: blocked (base 0bf76ad045f9180ed1683ab7a372974519b557e4) — 单句表情影响后续句；已修复，待独立复核。
+- Review: pass (base 0bf76ad045f9180ed1683ab7a372974519b557e4, reviewer 529e284ab81d45528e028462a4f00e22)
 - 真实服务路径：用 `Project.create/open` 建立并重开磁盘工程，核对 .nvs、work.json、project.db 审计及会话级撤销；Electron 与调度接线留给后续任务。
 - 未调用模型，无需新增 cassette。
+- M2/05 接线：从已打开生产服务的工程读取规则；刚导入的工程尚未初始化作品的数据库记录。
