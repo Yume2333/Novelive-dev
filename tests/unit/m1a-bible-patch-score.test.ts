@@ -84,6 +84,35 @@ test('uses a maximum one-to-one assignment when candidate aliases overlap', () =
 	expect(scoreBiblePatches(a, patch(b.biblePatch.slice(0, 1))).shared).toBe(1)
 })
 
+test('timeline matching requires the same chapter, a shared participant, and a shared key action', () => {
+	const cast = [
+		{ id: 'wen', name: '文素臣', aliases: ['文白'] },
+		{ id: 'wei', name: '未鸞吹', aliases: [] },
+		{ id: 'lu', name: '陸海', aliases: [] },
+		{ id: 'bao', name: '鮑同', aliases: [] },
+	]
+	const timeline = (event: string, chapterId = 'ch0003') =>
+		patch([
+			{
+				kind: 'timeline',
+				op: 'add',
+				entry: { id: 'event', event, chapterId, status: 'candidate' },
+			},
+		])
+	const rescue = timeline('文素臣在湖堤擊退惡僕，救下未鸞吹')
+	const arrest = timeline('文素臣在湖堤擊退惡僕，逮捕未鸞吹')
+	const paraphrase = '文白在湖堤擊退惡僕，救下未鸞吹後離開'
+	expect(scoreBiblePatches(rescue, arrest, cast).shared).toBe(0)
+	expect(scoreBiblePatches(rescue, timeline(paraphrase), cast).shared).toBe(1)
+	expect(
+		scoreBiblePatches(rescue, timeline(paraphrase, 'ch0004'), cast).shared,
+	).toBe(0)
+	expect(
+		scoreBiblePatches(rescue, timeline('陸海在湖堤擊退惡僕，救下鮑同'), cast)
+			.shared,
+	).toBe(0)
+})
+
 test('matches relations whose participants include an existing character absent from both patches', () => {
 	const relation = (to: string): BiblePatch[number] => ({
 		kind: 'relation',

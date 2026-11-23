@@ -52,14 +52,31 @@ function sameAction(a: string, b: string) {
 	)
 }
 
+function timelineAction(text: string, participants: Names[]) {
+	const labels = [...new Set(participants.flatMap((names) => [...names]))]
+		.filter((label) => label.length > 1)
+		.sort((a, b) => b.length - a.length)
+	return labels.reduce(
+		(action, label) => action.replaceAll(label, ''),
+		normalize(text),
+	)
+}
+
+function sameTimelineAction(a: string, b: string) {
+	if (a === b) return a.length > 0
+	const left = grams(a)
+	const right = grams(b)
+	const shared = [...left].filter((part) => right.has(part)).length
+	return shared > 0 && shared / (left.size + right.size - shared) >= 0.65
+}
+
 type Entry = { op: string; kind: string } & (
 	| { names: Names }
 	| { action: string; chapter?: string; participants: Names[] }
 )
 
 function content(patch: Patch, existing: readonly CharacterNames[]): Entry[] {
-	const characters = new Map<string, Names>()
-	const existingNames = new Map(
+	const characters = new Map(
 		existing.map((entry) => [
 			entry.id,
 			names(entry, entry.name, entry.originalName),
@@ -96,21 +113,19 @@ function content(patch: Patch, existing: readonly CharacterNames[]): Entry[] {
 					action: item.entry.description,
 					chapter: item.entry.firstSeenChapter ?? observedChapter,
 					participants: [item.entry.from, item.entry.to].map(
-						(id) =>
-							new Set([
-								...(characters.get(id) ?? []),
-								...(existingNames.get(id) ?? []),
-							]),
+						(id) => characters.get(id) ?? new Set(),
 					),
 				}
-			case 'timeline':
+			case 'timeline': {
+				const participants = mentioned(item.entry.event)
 				return {
 					kind,
 					op,
-					action: item.entry.event,
+					action: timelineAction(item.entry.event, participants),
 					chapter: item.entry.chapterId,
-					participants: mentioned(item.entry.event),
+					participants,
 				}
+			}
 			case 'foreshadowing':
 				return {
 					kind,
@@ -158,6 +173,12 @@ function sameEntry(a: Entry, b: Entry) {
 	if (a.kind !== b.kind || a.op !== b.op) return false
 	if ('names' in a && 'names' in b) return overlap(a.names, b.names)
 	if (!('action' in a && 'action' in b) || a.chapter !== b.chapter) return false
+	if (a.kind === 'timeline')
+		return (
+			a.participants.some((left) =>
+				b.participants.some((right) => overlap(left, right)),
+			) && sameTimelineAction(a.action, b.action)
+		)
 	const participantsMatch =
 		a.participants.length >= 2 &&
 		a.participants.length === b.participants.length &&
@@ -165,10 +186,7 @@ function sameEntry(a: Entry, b: Entry) {
 			a.participants.length
 	if (a.kind === 'relation')
 		return participantsMatch && sameAction(a.action, b.action)
-	return (
-		sameAction(a.action, b.action) ||
-		(a.kind === 'timeline' && participantsMatch)
-	)
+	return sameAction(a.action, b.action)
 }
 
 export function scoreBiblePatches(
