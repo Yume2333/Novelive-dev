@@ -257,6 +257,10 @@ test('a leading thematic break is not front matter; YAML comments, escapes and b
 		extract('---\nPlates: ![a](a.png) ![b](b.png)\n- one\n\n---\n\nEnd.\n')
 			.volumes[0].chapters[0].paragraphs,
 	).toEqual(['Plates:', 'one', 'End.'])
+	expect(
+		extract('---\nNote: she said: !\n- go\n\n---\n\nEnd.\n').volumes[0]
+			.chapters[0].paragraphs,
+	).toEqual(['Note: she said: !', 'go', 'End.'])
 	extract(
 		`---\nIllustration: !Map ${Array.from({ length: 26 }, (_, i) => `a${i}=1`).join('&')} of the harbor.\n- x\n---\nEnd.\n`,
 	)

@@ -5,8 +5,8 @@ $ NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-markdown.test.ts
 
  Test Files  1 passed (1)
       Tests  11 passed (11)
-   Start at  04:14:49
-   Duration  246ms (import 50%, tests 33%, transform 14%, worker 2%)
+   Start at  04:15:09
+   Duration  372ms (import 44%, tests 36%, transform 16%, worker 4%)
 
 $ pnpm exec tsx tests/fixtures/source/markdown/extract.ts tests/fixtures/source/markdown/multivolume.md
 风起之城 [zh-Hans]
