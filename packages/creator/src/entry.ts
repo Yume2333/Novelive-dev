@@ -6,6 +6,7 @@ import { dirname, extname, join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
 import { getBible, openBibleProject } from './bible/editing'
 import { registerChat } from './chat'
+import { EventReplay } from './chat/events'
 import { projectChat } from './chat/project'
 import { createConfigStore } from './config'
 import {
@@ -131,13 +132,13 @@ registry.register('editor.saveRules', async (input) => {
 	return saveRules(project, volumeId, input)
 })
 const chats = new Map<string, ReturnType<typeof openChat>>()
-const events: EventEnvelope[] = []
+const events = new EventReplay()
 let eventSeq = 0
 let closingChat = false
 
 function publish(envelope: EventEnvelope) {
 	envelope.seq = ++eventSeq
-	events.push(envelope)
+	events.append(envelope)
 	sendEvent?.({ type: 'event', generation, envelope })
 }
 
@@ -297,13 +298,9 @@ registry.register('import.revise', async ({ projectDir, layout }) => {
 })
 
 registry.register('events.list', async ({ scope, scopeId, afterSeq }) => ({
-	events:
-		scope === 'work'
-			? events.filter(
-					(event) => event.scopeId === scopeId && event.seq > afterSeq,
-				)
-			: [],
-	gap: false,
+	...(scope === 'work'
+		? events.list(scopeId, afterSeq)
+		: { events: [], gap: false }),
 	snapshot: scope === 'app' ? { ready: true, generation } : null,
 }))
 
