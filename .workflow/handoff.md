@@ -10,7 +10,7 @@
 
 Yume 授权自主开 PR 和合入 main；按产品调性自行选型，并报告选项及未选理由。不要因单个 PR 合入触发的工单自动关闭而把整个交付标成完成。全程开发与测试预算：**500 张图，其他模型少于 1000M tokens**。真跑单执行者；离线常用 `NL_REPLAY=strict`，合成回放不可替代真书、真机或平台实测。
 
-- 测试中继：`https://cli.shizukuyume.com`，文本和图像共用存储的 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`。只绑定引用，不粘贴值，不提交凭据。
+- 测试中继：文本和图像共用存储的 `NL_IMAGE_BASE_URL`、`NL_IMAGE_API_KEY`。只绑定引用，不粘贴值，不提交中转地址或凭据。
 - 图像：`gpt-image-2.6-sunburst`；`gpt-image-2.6-flare` 已试，未解决真实表情编辑丢 alpha。文本：`devin-swe-2`（256K、快而强，主控与写作）、`deepseek-v4.1-flash`（1M、能力中等、低成本快速槽）、`gemini-3.8-flash`（1M、文笔较好，写作及 JSON 回退）、`gemini-3.5-flash-lite`（能力弱，仅轻量多模态，不用于关键判断）。
 - 真书：夏敬渠《野叟曝言》，维基文库一百五十四回本，公版中文原著、章回和人物跨度适合验证长篇抽取、制作与重启。原始 TXT 在 `~/novelive-testbooks/yesou-puyan.txt`。项目、原始录制、日志和截图在 `~/.local/novelive-tools/` 下，M1b/11 在 `m1b11-run/` 子目录；M4 抽查在对应 VM 的 `~/novelive-private/m4-spot/`。私有账本在 `~/memory/poke_5b9601/files/novelive/usage.csv`。原文与私有工件均不进 git。
 
