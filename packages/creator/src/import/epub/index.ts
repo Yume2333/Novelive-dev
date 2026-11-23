@@ -115,6 +115,15 @@ function document(path: string, root: Element): Document {
 					].includes(child.name),
 				))
 		) {
+			for (const element of node.children
+				.filter((child) => typeof child !== 'string')
+				.flatMap((child) => [
+					child,
+					...all(child, 'span'),
+					...all(child, 'a'),
+				])) {
+				if (element.attrs.id) anchors.set(element.attrs.id, blocks.length)
+			}
 			const plain = (element: Element): string =>
 				element.children
 					.map((child) => {

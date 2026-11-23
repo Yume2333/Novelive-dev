@@ -76,6 +76,21 @@ test('keeps chapter blocks inside article wrappers', async () => {
 	])
 })
 
+test('keeps TOC chapter breaks at inline anchors', async () => {
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/chapter.xhtml': xhtml(
+				'<h1 id="one">Chapter One</h1><p>First.</p><p><span id="two"/>Second.</p>',
+			),
+		}),
+	)
+	expect(book.volumes[0].chapters.map((chapter) => chapter.title)).toEqual([
+		'Nav One',
+		'Nav Two',
+	])
+	expect(book.volumes[0].chapters[1].paragraphs).toEqual(['Second.'])
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)
