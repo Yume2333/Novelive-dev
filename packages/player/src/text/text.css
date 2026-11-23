@@ -25,6 +25,9 @@
 	inset: 0 0 auto;
 	overflow: hidden;
 }
+.nl-text-mark-char.nl-text-mark-transform {
+	display: inline-block;
+}
 .nl-text-viewport [data-mark="em"] {
 	font-style: italic;
 }

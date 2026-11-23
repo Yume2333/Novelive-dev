@@ -1,3 +1,4 @@
+import type { WorkSettings } from '@novelive/format/model'
 import { type CompiledScene, compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -56,6 +57,7 @@ export function PlayerPage() {
 		scenes: CompiledScene[]
 		paths: Map<string, string>
 		speakerNames: Record<string, string>
+		customMarks: WorkSettings['customMarks']
 	}>()
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
@@ -117,7 +119,7 @@ export function PlayerPage() {
 					sceneIds: chapter.sceneIds,
 					assets: registry.entries,
 					speakers,
-					customMarks,
+					customMarks: Object.keys(customMarks),
 				})
 				if (!result.ok)
 					throw new Error(
@@ -169,6 +171,7 @@ export function PlayerPage() {
 						registry.entries.map((entry) => [entry.id, entry.path]),
 					),
 					speakerNames,
+					customMarks,
 				})
 				return true
 			} catch (cause) {
@@ -229,6 +232,7 @@ export function PlayerPage() {
 			loaded.speakerNames,
 			controls.rendered,
 			{
+				customMarks: loaded.customMarks,
 				chapterId: loaded.chapterId,
 				restore: loaded.restore,
 				start: loaded.start,

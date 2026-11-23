@@ -277,6 +277,8 @@ export function EditorPage() {
 			abort.signal,
 			fail,
 			opening.speakerNames,
+			undefined,
+			{ customMarks: opening.settings.customMarks },
 		).catch(fail)
 		return () => abort.abort()
 	}, [preview, opening, scene, sceneIndex, draft, line])

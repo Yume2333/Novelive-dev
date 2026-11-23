@@ -1,8 +1,11 @@
+import type { WorkSettings } from '@novelive/format/model'
 import type { Inline } from '@novelive/format/script'
+import { markDeclarations } from './custom-marks'
 import { textTiming } from './timing'
 import './text.css'
 
 export interface TextOptions {
+	customMarks?: WorkSettings['customMarks']
 	millisecondsPerCharacter?: number
 	auto?: boolean
 	continueImmediately?: boolean
@@ -23,11 +26,14 @@ export function mountText(
 		content,
 		options.millisecondsPerCharacter ?? 30,
 	)
-	const stack: HTMLElement[] = [layout]
+	const styles = new Map<string, ReturnType<typeof markDeclarations>>()
+	const stack: { element: HTMLElement; perChar?: string }[] = [
+		{ element: layout },
+	]
 	let pause = trailingPause
 	let trailingPending = trailingPause > 0
 	for (const part of content) {
-		const current = stack[stack.length - 1]
+		const current = stack[stack.length - 1].element
 		if (part.type === 'pause') continue
 		if (part.type === 'open') {
 			const element = document.createElement(
@@ -36,8 +42,18 @@ export function mountText(
 			element.dataset.mark = part.name
 			element.className = `nl-text-mark-${part.name}`
 			if (part.name === 'ruby') element.dataset.reading = part.argument ?? ''
+			const marks = options.customMarks
+			const mark =
+				marks && Object.hasOwn(marks, part.name) ? marks[part.name] : undefined
+			if (mark && !styles.has(part.name))
+				styles.set(part.name, markDeclarations(part.name, mark.css))
+			const styled = !!styles.get(part.name)?.length
+			if (styled && !mark?.perChar) element.dataset.markStyle = part.name
 			current.append(element)
-			stack.push(element)
+			stack.push({
+				element,
+				perChar: styled && mark?.perChar ? part.name : undefined,
+			})
 		} else if (part.type === 'close') {
 			if (current.tagName === 'RUBY') {
 				const rt = document.createElement('rt')
@@ -51,7 +67,16 @@ export function mountText(
 			}).segment(part.text)) {
 				const glyph = document.createElement('span')
 				glyph.dataset.glyph = String(glyphs.length)
-				glyph.textContent = segment
+				let target = glyph
+				for (const { perChar } of stack) {
+					if (!perChar) continue
+					const effect = document.createElement('span')
+					effect.className = 'nl-text-mark-char'
+					effect.dataset.markStyle = perChar
+					target.append(effect)
+					target = effect
+				}
+				target.textContent = segment
 				current.append(glyph)
 				glyphs.push(glyph)
 			}
@@ -60,6 +85,20 @@ export function mountText(
 	const display = layout.cloneNode(true) as HTMLElement
 	display.className = 'nl-text-display'
 	display.removeAttribute('aria-hidden')
+	for (const layer of [layout, display]) {
+		for (const element of layer.querySelectorAll<HTMLElement>(
+			'[data-mark-style]',
+		)) {
+			for (const [property, value, priority] of styles.get(
+				element.dataset.markStyle ?? '',
+			) ?? []) {
+				if (priority || !element.style.getPropertyPriority(property))
+					element.style.setProperty(property, value, priority)
+			}
+			if (element.style.transform)
+				element.classList.add('nl-text-mark-transform')
+		}
+	}
 	const visible = Array.from(
 		display.querySelectorAll<HTMLElement>('[data-glyph]'),
 	)
