@@ -45,15 +45,40 @@ test('successful recording reuse composes with replay failure filtering without 
 	const record = createReplayFetch({ mode: 'record', directory, fetch })
 	await (await record(origin)).text()
 	await (await record(origin)).text()
-	for (const mode of ['replay', 'strict'] as const) {
+	for (const { mode, reuseRecorded, ignoreRecordedFailures, expected } of [
+		{
+			mode: 'replay',
+			reuseRecorded: false,
+			ignoreRecordedFailures: false,
+			expected: 'temporary',
+		},
+		{
+			mode: 'replay',
+			reuseRecorded: false,
+			ignoreRecordedFailures: true,
+			expected: 'recovered',
+		},
+		{
+			mode: 'strict',
+			reuseRecorded: true,
+			ignoreRecordedFailures: false,
+			expected: 'recovered',
+		},
+		{
+			mode: 'strict',
+			reuseRecorded: true,
+			ignoreRecordedFailures: true,
+			expected: 'recovered',
+		},
+	] as const) {
 		const replay = createReplayFetch({
 			mode,
 			directory,
 			fetch,
-			reuseRecorded: true,
-			ignoreRecordedFailures: true,
+			reuseRecorded,
+			ignoreRecordedFailures,
 		})
-		expect(await (await replay(origin)).text()).toBe('recovered')
+		expect(await (await replay(origin)).text()).toBe(expected)
 		if (mode === 'strict')
 			await expect(replay(`${origin}/missing`)).rejects.toThrow(
 				'Missing strict replay cassette:',
