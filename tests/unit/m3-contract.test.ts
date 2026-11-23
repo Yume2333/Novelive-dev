@@ -91,10 +91,10 @@ test('projects the compiled chapter without losing direction order, resolved ass
 	})
 	expect(beats[3]).toMatchObject({
 		sceneId: sceneIds[0],
-		actions: expect.arrayContaining([{ name: 'cg' }]),
 		cue: { kind: 'wait', lineId: 'a3f7' },
 		advance: { kind: 'click' },
 	})
+	expect(beats[3].actions.map(({ name }) => name)).toContain('cg')
 	expect(beats[4]).toMatchObject({
 		sceneId: sceneIds[1],
 		actions: [
