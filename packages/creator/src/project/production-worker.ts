@@ -264,11 +264,12 @@ export function chapterWorker(
 					staged.merges,
 					ref(ctx.chapterId),
 				)
+				const { entries } = await service.registry()
 				const output = compiled(staged.script, chapter, {
 					...options,
 					script: {
 						...options.script,
-						assets: (await service.registry()).entries,
+						assets: entries,
 					},
 				})
 				for (const job of jobs)
@@ -276,6 +277,17 @@ export function chapterWorker(
 						drawing(job.assetId),
 						JSON.stringify({ job, cg: staged.cgReferences.get(job.assetId) }),
 					)
+				const dependencies = new Map(jobs.map((job) => [job.assetId, job]))
+				const byId = new Map(entries.map((entry) => [entry.id, entry]))
+				for (const { beats } of output.scenes)
+					for (const { actions } of beats)
+						for (const { assets } of actions)
+							for (const { id } of assets) {
+								if (dependencies.has(id) || byId.get(id)?.status === 'drawn')
+									continue
+								const { job } = await drawingMetadata(id)
+								dependencies.set(id, job)
+							}
 				const sceneIds: string[] = []
 				for (const { scene } of output.scenes) {
 					if (!scene.id) throw new Error('Missing compiled scene ID')
@@ -295,7 +307,7 @@ export function chapterWorker(
 					cg: updated.cg,
 					sceneIds,
 				})
-				return jobs
+				return [...dependencies.values()]
 			}),
 		async isDrawn(_workId, job) {
 			const item = (await art().registry()).entries.find(
@@ -307,9 +319,7 @@ export function chapterWorker(
 			)
 		},
 		async draw(job, ctx) {
-			const metadata: { job: ArtJob; cg?: CgReferences } = JSON.parse(
-				(await project.readFile(drawing(job.assetId))).toString(),
-			)
+			const metadata = await drawingMetadata(job.assetId)
 			return art(ctx.signal).draw(
 				metadata.job,
 				(await productionBible(project)).art,
@@ -319,6 +329,11 @@ export function chapterWorker(
 		placeholder(job, issue, signal) {
 			return art(signal).savePlaceholder(job.assetId, issue)
 		},
+	}
+	async function drawingMetadata(
+		id: string,
+	): Promise<{ job: ArtJob; cg?: CgReferences }> {
+		return JSON.parse((await project.readFile(drawing(id))).toString())
 	}
 	return {
 		worker,

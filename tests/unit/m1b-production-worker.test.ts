@@ -171,3 +171,49 @@ test('a painter exception materializes both base and variant placeholders before
 		queue.dispose()
 	}
 })
+
+test('staging depends on a reused pending image absent from the new manifest', async () => {
+	const { projectDir, workId } = await fixture()
+	using project = await Project.open(projectDir)
+	const work = await project.read(projectFiles.work('v0001', workId))
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	let chapter = 0
+	const fetch: typeof globalThis.fetch = async () =>
+		completion({
+			patch: 'PUT <4:\n@bg room/day',
+			items:
+				++chapter === 1
+					? [{ id: 'room/day', kind: 'location', description: 'Sunny' }]
+					: [],
+			merges: {},
+		})
+	const { worker, art } = chapterWorker(
+		project,
+		'v0001',
+		work,
+		await productionModels(config),
+		{ fetch },
+	)
+	const ctx = {
+		workId,
+		link: 'none',
+		desensitized: false,
+		signal: new AbortController().signal,
+	} as const
+	const [first, second] = work.chapterIds
+	for (const chapterId of work.chapterIds)
+		await project.writeFile(
+			`source/production/${chapterId}/draft.nvs`,
+			'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n',
+		)
+	expect(await worker.stage({ ...ctx, chapterId: first })).toMatchObject([
+		{ assetId: 'room/day' },
+	])
+	expect((await art().registry()).entries).toMatchObject([
+		{ id: 'room/day', status: 'pending' },
+	])
+	expect(await worker.stage({ ...ctx, chapterId: second })).toMatchObject([
+		{ assetId: 'room/day' },
+	])
+})
