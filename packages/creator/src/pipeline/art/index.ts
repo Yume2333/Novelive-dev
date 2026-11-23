@@ -43,6 +43,12 @@ type CostumeCandidateBudget = {
 	matting: { error?: MattingUnavailableError }
 }
 const opaqueCandidateLimit = 2
+type PaintStop =
+	| 'retries'
+	| 'moderation'
+	| 'reference'
+	| 'matting'
+	| 'unsupported'
 type Candidate = { id: string; cachePath: string }
 type VisualCandidates = {
 	mainVisuals: Candidate[]
@@ -392,9 +398,10 @@ export class ArtProduction {
 					? { status: 'unsupported', issue: result.issue }
 					: this.savePlaceholder(entry.id, result.issue, result.reason)
 			}
-			return result.unsupported || redraw
+			return result.stop === 'unsupported' || redraw
 				? {
-						status: result.unsupported ? 'unsupported' : 'placeholder',
+						status:
+							result.stop === 'unsupported' ? 'unsupported' : 'placeholder',
 						issue: result.issue,
 					}
 				: this.savePlaceholder(entry.id, result.issue)
@@ -495,6 +502,7 @@ export class ArtProduction {
 		derived = false,
 		optionalReference = false,
 		candidateBudget?: CostumeCandidateBudget,
+		onTechnicalPass?: (png: Buffer) => void,
 	) {
 		const refs = await Promise.all(
 			drawing.references.slice(0, 16).map(async (ref, i) => {
@@ -518,6 +526,15 @@ export class ArtProduction {
 		let issue = '没有生成可用图片。'
 		let feedback = ''
 		let reviewed: Buffer | undefined
+		let neededUnavailableMatting = false
+		const stopped = (stop: PaintStop, message = issue) => ({
+			issue: message,
+			reviewed,
+			stop,
+			mainWouldOffer:
+				!neededUnavailableMatting &&
+				(stop === 'retries' || stop === 'moderation'),
+		})
 		let moderated = false
 		let attempt = 0
 		let baseOnly = false
@@ -549,20 +566,11 @@ export class ArtProduction {
 			if ('error' in result) {
 				this.options.signal?.throwIfAborted()
 				issue = result.error.message
-				if (result.error.code === 'unsupported')
-					return { issue, unsupported: true } as const
+				if (result.error.code === 'unsupported') return stopped('unsupported')
 				if (result.error.code === 'moderation') {
-					const mattingUnavailable = candidateBudget?.matting.error
-					if (
-						(optionalReference && result.referenceModerated) ||
-						(moderated && (optionalReference || mattingUnavailable))
-					)
-						return {
-							issue,
-							reviewed: mattingUnavailable ? reviewed : undefined,
-							moderated: true,
-						} as const
-					if (moderated) break
+					if (optionalReference && (result.referenceModerated || moderated))
+						return stopped('reference')
+					if (moderated) return stopped('moderation')
 					moderated = true
 					feedback = moderationHint
 					continue
@@ -593,8 +601,7 @@ export class ArtProduction {
 					candidateBudget.matting.error &&
 					candidateBudget.opaqueStreak >= opaqueCandidateLimit
 				) {
-					if (reviewed) return { issue, reviewed }
-					throw candidateBudget.matting.error
+					return stopped('matting', candidateBudget.matting.error.message)
 				}
 			}
 			if ('issue' in checked && checked.unsupported) {
@@ -605,35 +612,32 @@ export class ArtProduction {
 					this.options.signal?.throwIfAborted()
 					if (error instanceof MattingUnavailableError) {
 						if (candidateBudget) {
+							neededUnavailableMatting = true
 							candidateBudget.matting.error = error
-							if (reviewed) {
-								if (
-									attempt <= this.options.image.retries &&
-									candidateBudget.opaqueStreak < opaqueCandidateLimit
-								) {
-									feedback = issue
-									continue
-								}
-								return { issue, reviewed }
+							if (
+								reviewed &&
+								attempt <= this.options.image.retries &&
+								candidateBudget.opaqueStreak < opaqueCandidateLimit
+							) {
+								feedback = issue
+								continue
 							}
+							return stopped('matting', error.message)
 						}
 						throw error
 					}
-					return checked
+					return stopped('unsupported', checked.issue)
 				}
 				checked = await checkImage(recovered, target, checks)
 			}
 			if ('issue' in checked) {
-				if (checked.unsupported) return checked
+				if (checked.unsupported) return stopped('unsupported', checked.issue)
 				if (
 					nativeTransparency === false &&
 					candidateBudget?.matting.error &&
-					attempt > this.options.image.retries &&
-					!reviewed
+					attempt > this.options.image.retries
 				)
-					throw candidateBudget.matting.error
-				if (attempt > this.options.image.retries)
-					return { issue: checked.issue, reviewed, technical: true } as const
+					return stopped('matting', candidateBudget.matting.error.message)
 				if (
 					drawing.kind === 'expression' &&
 					(checked.issue === spriteFrameIssue ||
@@ -643,6 +647,8 @@ export class ArtProduction {
 				issue = feedback = checked.issue
 				continue
 			}
+			reviewed = checked.png
+			onTechnicalPass?.(reviewed)
 			const judge = await artJson(
 				this.options.visual,
 				[
@@ -656,11 +662,10 @@ export class ArtProduction {
 				[checked.png, ...editReferences],
 			)
 			if (judge.pass && judge.failedChecks.length === 0) return checked
-			reviewed = checked.png
 			issue = feedback =
 				judge.feedback || `视觉审核未通过：${judge.failedChecks.join('、')}`
 		}
-		return { issue, reviewed }
+		return stopped('retries')
 	}
 
 	async candidates(
@@ -694,81 +699,40 @@ export class ArtProduction {
 			)
 			await this.writeRegistry(() => recordProfile(this.project, path, profile))
 		}
-		const saveCandidate = async (
-			drawing: Drawing,
-			path: string,
-			portrait: boolean,
-			optionalReference = false,
-			candidateBudget?: CostumeCandidateBudget,
-			hasFallback = false,
-		) => {
-			if (!(await this.file(path))) {
-				const fallbackPath = path.replace(/\.webp$/, '-fallback.webp')
-				if (candidateBudget && (await this.file(fallbackPath)))
-					return { cachePath: fallbackPath }
-				if (
-					candidateBudget?.matting.error &&
-					candidateBudget.opaqueStreak >= opaqueCandidateLimit
-				)
-					return false
-				const result = await this.paint(
-					drawing,
-					this.nativeSize(portrait),
-					portrait,
-					false,
-					optionalReference,
-					candidateBudget,
-				)
-				let png: Buffer
-				if ('issue' in result) {
-					if ('reviewed' in result && result.reviewed) {
-						if (candidateBudget?.matting.error)
-							return { cachePath: fallbackPath, png: result.reviewed }
-						png = result.reviewed
-					} else if (
-						'moderated' in result ||
-						(hasFallback && 'technical' in result)
-					) {
-						return false
-					} else {
-						throw new Error(result.issue)
-					}
-				} else {
-					png = result.png
-				}
-				await persistCandidate(path, png, portrait)
-			}
-			return true
-		}
-		const candidate = async (
-			id: string,
-			drawing: Drawing,
-			path: string,
-			portrait = false,
-		) => {
-			await saveCandidate(drawing, path, portrait)
-			return { id, cachePath: path }
-		}
 		const style = bible.style.description
 		const mainVisuals: Candidate[] = []
 		for (const i of [1, 2, 3]) {
 			const id = `visual-${i}`
-			mainVisuals.push(
+			const path =
 				i === 1 && creatorMainVisual
-					? { id, cachePath: creatorMainVisual }
-					: await candidate(
-							id,
-							{
-								kind: 'main-visual',
-								description: `构图候选 ${i}：${style}`,
-								style,
-								references: this.styleReferences(bible.style),
-								characters: [],
-								keep: [],
-							},
-							cachePath(`candidates/style/${id}.webp`),
-						),
-			)
+					? creatorMainVisual
+					: cachePath(`candidates/style/${id}.webp`)
+			if (path !== creatorMainVisual && !(await this.file(path))) {
+				const result = await this.paint(
+					{
+						kind: 'main-visual',
+						description: `构图候选 ${i}：${style}`,
+						style,
+						references: this.styleReferences(bible.style),
+						characters: [],
+						keep: [],
+					},
+					this.nativeSize(false),
+					false,
+				)
+				const png =
+					'png' in result
+						? result.png
+						: result.mainWouldOffer
+							? result.reviewed
+							: undefined
+				if (!png)
+					throw new Error(
+						'issue' in result ? result.issue : '没有生成可用图片。',
+					)
+				await persistCandidate(path, png, false)
+			}
+			mainVisuals.push({ id, cachePath: path })
 		}
 		const characters: VisualCandidates['characters'] = []
 		for (const character of bible.characters) {
@@ -782,26 +746,6 @@ export class ArtProduction {
 				edit: { matting, opaqueStreak: 0 },
 				generate: { matting, opaqueStreak: 0 },
 			}
-			const saveCostumeCandidate = async (
-				drawing: Drawing,
-				path: string,
-				optionalReference = false,
-				hasFallback = false,
-			) => {
-				try {
-					return await saveCandidate(
-						drawing,
-						path,
-						true,
-						optionalReference,
-						drawing.references.length ? budget.edit : budget.generate,
-						hasFallback,
-					)
-				} catch (error) {
-					if (!(error instanceof MattingUnavailableError)) throw error
-					return false
-				}
-			}
 			const illustration = illustrations?.get(character.id)
 			const illustrationKey = illustration
 				? createHash('sha256')
@@ -811,21 +755,59 @@ export class ArtProduction {
 			for (const costume of character.costumes ?? []) {
 				const candidates: Candidate[] = []
 				let fallback: (Candidate & { png?: Buffer }) | undefined
+				let failure: { error: unknown } | undefined
 				const collect = async (
 					id: string,
 					drawing: Drawing,
 					path: string,
 					optionalReference = false,
 				) => {
-					const saved = await saveCostumeCandidate(
-						drawing,
-						path,
-						optionalReference,
-						Boolean(fallback),
-					)
-					if (saved === true) candidates.push({ id, cachePath: path })
-					else if (saved) fallback ??= { id, ...saved }
-					return saved === true
+					if (await this.file(path)) {
+						candidates.push({ id, cachePath: path })
+						return true
+					}
+					const fallbackPath = path.replace(/\.webp$/, '-fallback.webp')
+					if (await this.file(fallbackPath)) {
+						fallback ??= { id, cachePath: fallbackPath }
+						return false
+					}
+					const mode = drawing.references.length ? budget.edit : budget.generate
+					if (mode.matting.error && mode.opaqueStreak >= opaqueCandidateLimit)
+						return false
+					let retained: Buffer | undefined
+					let visible = false
+					try {
+						const result = await this.paint(
+							drawing,
+							this.nativeSize(true),
+							true,
+							false,
+							optionalReference,
+							mode,
+							(png) => {
+								retained = png
+							},
+						)
+						visible = 'png' in result || result.mainWouldOffer
+						if (
+							'issue' in result &&
+							result.stop !== 'reference' &&
+							result.stop !== 'matting' &&
+							!(result.stop === 'moderation' && matting.error)
+						)
+							failure ??= { error: new Error(result.issue) }
+					} catch (error) {
+						this.options.signal?.throwIfAborted()
+						failure ??= { error }
+					}
+					if (!retained) return false
+					if (!visible) {
+						fallback ??= { id, cachePath: fallbackPath, png: retained }
+						return false
+					}
+					await persistCandidate(path, retained, true)
+					candidates.push({ id, cachePath: path })
+					return true
 				}
 				const references = this.styleReferences(bible.style)
 				const designReference = characterDesignReference(character)
@@ -871,6 +853,7 @@ export class ArtProduction {
 					if (png) await persistCandidate(cachePath, png, true)
 					candidates.push({ id, cachePath })
 				}
+				if (!candidates.length && failure) throw failure.error
 				if (candidates.length)
 					characters.push({
 						characterId: character.id,

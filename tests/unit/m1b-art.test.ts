@@ -1054,6 +1054,139 @@ test('offers all technically valid costume options after visual rejection when m
 	}
 })
 
+test.each(
+	[
+		'plain moderation',
+		'plain moderation before a cached choice',
+		'EPUB moderation',
+		'EPUB reference refusal',
+		'opaque budget',
+		'matting unavailable',
+		'technical retries',
+		'provider unsupported',
+	].flatMap((stop) => [false, true].map((retained) => ({ stop, retained }))),
+)('resolves $stop with retained=$retained', async ({ stop, retained }) => {
+	const opaque = await picture(320, 480, false)
+	const portrait = await picture(320, 480, true)
+	const landscape = await picture(320, 180, false)
+	const moderation = {
+		error: { code: 'moderation', message: 'Refused' },
+	} as const
+	const invalid = { bytes: Buffer.from('invalid image') }
+	const epub = stop.startsWith('EPUB')
+	const cached = stop.endsWith('cached choice')
+	const opaqueResponse = { bytes: opaque }
+	const failures = {
+		'plain moderation': [moderation, moderation],
+		'plain moderation before a cached choice': [moderation, moderation],
+		'EPUB moderation': [moderation, moderation],
+		'EPUB reference refusal': [
+			{ ...moderation, referenceModerated: true } as const,
+		],
+		'opaque budget': [opaqueResponse, opaqueResponse],
+		'matting unavailable': [opaqueResponse],
+		'technical retries': [invalid, invalid, invalid],
+		'provider unsupported': [
+			{ error: { code: 'unsupported', message: 'Unsupported' } } as const,
+		],
+	}
+	const primary = failures[stop as keyof typeof failures]
+	const pending = [
+		...(retained && !cached ? [{ bytes: portrait }] : []),
+		...primary,
+	]
+	let portraitRequests = 0
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, _refs, _size, transparent) => {
+			if (!transparent) return { bytes: landscape }
+			portraitRequests++
+			return pending.shift() ?? opaqueResponse
+		})
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+			return prompt.includes('造型候选')
+				? {
+						pass: false,
+						failedChecks: ['style'],
+						feedback: 'Try another style',
+					}
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const illustration = 'source/references/illustration-1.png'
+			if (epub) await project.writeFile(illustration, landscape)
+			if (retained && cached)
+				await project.writeFile(
+					projectFiles
+						.style({ level: 'series' })
+						.path.replace(
+							'bible/style.json',
+							'candidates/characters/ada/uniform/costume-2.webp',
+						),
+					await sharp(portrait).webp().toBuffer(),
+				)
+			const art = service(
+				project,
+				replay,
+				undefined,
+				undefined,
+				undefined,
+				stop === 'matting unavailable' ? 1 : 2,
+			)
+			const pool = art.candidates(
+				bible,
+				['c1'],
+				'assets/main.webp',
+				[],
+				epub
+					? new Map([
+							['ada', { id: 'illustration-1', cachePath: illustration }],
+						])
+					: undefined,
+			)
+			if (retained) {
+				const { characters } = await pool
+				expect(characters).toMatchObject([
+					{
+						characterId: 'ada',
+						candidates: [
+							{
+								id: epub ? 'costume-epub' : cached ? 'costume-2' : 'costume-1',
+							},
+						],
+					},
+				])
+			} else if (
+				epub ||
+				stop === 'opaque budget' ||
+				stop === 'matting unavailable'
+			) {
+				expect((await pool).characters).toEqual([])
+			} else {
+				const message =
+					stop === 'technical retries'
+						? '图片无法解码。'
+						: stop === 'provider unsupported'
+							? 'Unsupported'
+							: 'Refused'
+				await expect(pool).rejects.toThrow(message)
+			}
+			expect(portraitRequests).toBeGreaterThanOrEqual(primary.length)
+		})
+	} finally {
+		model.mockRestore()
+		matte.mockRestore()
+		renderer.mockRestore()
+	}
+})
+
 test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(
 		'Invalid staging patch',
