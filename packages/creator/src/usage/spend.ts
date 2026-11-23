@@ -35,7 +35,16 @@ function totalUsage(value: unknown) {
 	return valid(total) && total > 0 ? total : undefined
 }
 
-async function quote(request: Request) {
+export function requestedOutputTokens(
+	request: Request,
+	body: Record<string, unknown>,
+) {
+	return new URL(request.url).pathname.replace(/\/$/, '').endsWith('/responses')
+		? body.max_output_tokens
+		: (body.max_completion_tokens ?? body.max_tokens)
+}
+
+export async function quoteSpend(request: Request) {
 	const path = new URL(request.url).pathname.replace(/\/$/, '')
 	try {
 		if (request.method !== 'POST') throw new Error()
@@ -57,9 +66,7 @@ async function quote(request: Request) {
 		if (!responses && !/\/(?:chat\/completions|messages)$/.test(path))
 			throw new Error()
 		const body = object(await request.clone().json())
-		const output = responses
-			? body.max_output_tokens
-			: (body.max_completion_tokens ?? body.max_tokens)
+		const output = requestedOutputTokens(request, body)
 		const input = responses ? body.input : body.messages
 		if (
 			!valid(output) ||
@@ -167,11 +174,15 @@ function observeUsage(response: Response, settle: (tokens: number) => void) {
 export function projectSpend(database: DatabaseSync) {
 	return async (
 		request: Request,
-		send: (request: Request) => Promise<Response>,
+		send: (
+			request: Request,
+			quote: Awaited<ReturnType<typeof quoteSpend>>,
+		) => Promise<Response>,
 	) => {
 		const tokenCap = cap(process.env.NL_RUN_TOKEN_CAP, 'NL_RUN_TOKEN_CAP')
 		const imageCap = cap(process.env.NL_RUN_IMAGE_CAP, 'NL_RUN_IMAGE_CAP')
-		const { tokens, images } = await quote(request)
+		const quote = await quoteSpend(request)
+		const { tokens, images } = quote
 		request.signal.throwIfAborted()
 		database.exec(`CREATE TABLE IF NOT EXISTS spend_reservation (
 			id INTEGER PRIMARY KEY,
@@ -209,7 +220,10 @@ export function projectSpend(database: DatabaseSync) {
 			`)
 				.run(actualTokens, actualImages, row.id)
 		}
-		const response = await send(new Request(request, { redirect: 'error' }))
+		const response = await send(
+			new Request(request, { redirect: 'error' }),
+			quote,
+		)
 		if (!response.ok) return response
 		const type = response.headers.get('content-type') ?? ''
 		if (!images && type.includes('text/event-stream'))

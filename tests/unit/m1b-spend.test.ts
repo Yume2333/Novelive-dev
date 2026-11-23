@@ -1,3 +1,6 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { obj } from '@earendil-works/pi-schema'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -10,6 +13,47 @@ import { projectSpend } from '../../packages/creator/src/usage/spend'
 import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
 
 afterEach(() => vi.unstubAllEnvs())
+
+test('Responses recording logs the full SQLite reservation before dispatch', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-spend-'))
+	try {
+		const usage = join(directory, 'usage.csv')
+		vi.stubEnv('NL_USAGE_CSV', usage)
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		using database = new DatabaseSync(':memory:')
+		const fetch = vi.fn(async () => {
+			const row = database
+				.prepare('SELECT tokens, images FROM spend_reservation')
+				.get()
+			expect(row?.tokens).toBeGreaterThan(512)
+			expect(await readFile(usage, 'utf8')).toContain(
+				`,fixture-responses,1,${row?.tokens},${row?.images},cassette recording (reserved tokens and images)\n`,
+			)
+			return Response.json({ usage: { input_tokens: 11, output_tokens: 19 } })
+		})
+		const dispatch = createReplayFetch({
+			mode: 'record',
+			directory,
+			fetch,
+			spend: projectSpend(database),
+		})
+		await (
+			await dispatch('https://example.invalid/v1/responses', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					model: 'fixture-responses',
+					max_output_tokens: 512,
+					input: 'Hello',
+				}),
+			})
+		).text()
+		expect(fetch).toHaveBeenCalledOnce()
+	} finally {
+		await rm(directory, { recursive: true, force: true })
+	}
+})
 
 test('each dispatch reserves again, failed attempts stay reserved, and terminal usage settles', async () => {
 	vi.stubEnv('NL_REPLAY', '')

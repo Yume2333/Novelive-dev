@@ -3,7 +3,11 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 import { arr, compile, int, obj, opt, str } from '@earendil-works/pi-schema'
-import type { projectSpend } from '../usage/spend'
+import {
+	type projectSpend,
+	quoteSpend,
+	requestedOutputTokens,
+} from '../usage/spend'
 
 export type ReplayMode = 'record' | 'replay' | 'strict'
 export type ReplayFault =
@@ -279,7 +283,8 @@ export function createReplayFetch(
 	const send = options.fetch ?? globalThis.fetch
 	const spend = options.spend
 	const upstream: typeof fetch = spend
-		? (input, init) => spend(new Request(input, init), send)
+		? (input, init) =>
+				spend(new Request(input, init), (admitted) => send(admitted))
 		: send
 	if (!mode) return upstream
 	const directory =
@@ -399,8 +404,13 @@ export function createReplayFetch(
 						fallbackDirectory: undefined,
 					})(request)
 			}
-			const recordSend = async (admitted: Request) => {
+			const recordSend = async (
+				admitted: Request,
+				quote?: Awaited<ReturnType<typeof quoteSpend>>,
+			) => {
 				if (process.env.NL_USAGE_CSV) {
+					const reservation =
+						quote ?? (await quoteSpend(admitted).catch(() => undefined))
 					const body = admitted.headers
 						.get('content-type')
 						?.includes('application/json')
@@ -408,7 +418,7 @@ export function createReplayFetch(
 						: {}
 					await appendFile(
 						process.env.NL_USAGE_CSV,
-						`${new Date().toISOString().slice(0, 10)},${String(body.model ?? 'image').replaceAll(',', '')},1,${body.max_tokens ?? body.max_completion_tokens ?? 0},0,cassette recording (reserved output tokens)\n`,
+						`${new Date().toISOString().slice(0, 10)},${String(body.model ?? 'image').replaceAll(',', '')},1,${reservation?.tokens ?? requestedOutputTokens(admitted, body) ?? 0},${reservation?.images ?? 0},cassette recording (${reservation ? 'reserved tokens and images' : 'reserved output tokens'})\n`,
 					)
 				}
 				return send(admitted)
