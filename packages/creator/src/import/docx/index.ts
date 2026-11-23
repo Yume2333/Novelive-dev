@@ -83,6 +83,8 @@ function bodyText(node: Element): string {
 	if (!wordNamespaces.has(node.uri)) return ''
 	if (['del', 'drawing', 'pict', 'instrText'].includes(node.name)) return ''
 	if (node.name === 'tab') return '\t'
+	if (node.name === 'noBreakHyphen') return '‑'
+	if (node.name === 'softHyphen') return ''
 	if (['br', 'cr'].includes(node.name)) return '\n'
 	return node.children
 		.map((child) =>

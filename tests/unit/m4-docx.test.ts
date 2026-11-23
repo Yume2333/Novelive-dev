@@ -29,6 +29,12 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 }
 
 describe('DOCX extraction', () => {
+	test('retains nonbreaking hyphens and drops optional soft hyphens', async () => {
+		const book = await extract(
+			'<w:p><w:r><w:t>well</w:t><w:noBreakHyphen/><w:t>known</w:t><w:softHyphen/><w:t>word</w:t></w:r></w:p>',
+		)
+		expect(book.volumes[0].chapters[0].paragraphs).toEqual(['well‑knownword'])
+	})
 	test('does not collect text box paragraphs within images or drawings', async () => {
 		const book = await extract(
 			p('正文。') +
