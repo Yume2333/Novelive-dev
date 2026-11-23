@@ -140,7 +140,10 @@ export async function loadPlayerChapter(
 		(work.derivedFrom
 			? chapters.find((chapter) => chapter.published)?.chapterId
 			: work.chapterIds[0])
-	if (!chapters.find((chapter) => chapter.chapterId === chapterId)?.published)
+	if (
+		chapterId === undefined ||
+		!chapters.find((chapter) => chapter.chapterId === chapterId)?.published
+	)
 		throw { code: 'not_found', message: '章节尚未发布' }
 	const [{ chapter, script }, { registry, speakers, speakerNames }] =
 		await Promise.all([
