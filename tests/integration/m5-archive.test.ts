@@ -18,6 +18,17 @@ import { exportPackage, openPackage } from '@novelive/format/package/codec'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { type Entry, openPromise } from 'yauzl'
 import { ZipFile } from 'yazl'
+import { Project } from '../../packages/creator/src/project'
+import {
+	loadPlayerChapter,
+	loadPlayerStatus,
+} from '../../packages/creator/src/project/player'
+import { InstalledPackages } from '../../packages/creator/src/share/installed'
+import {
+	exportProject,
+	importProject,
+	initializeExtractedProject,
+} from '../../packages/creator/src/share/project'
 import { migratePackageJson } from '../../packages/format/src/package/migrations'
 import {
 	artPath,
@@ -88,6 +99,108 @@ async function invalidNameArchive(name: string) {
 }
 
 describe('M5 .novelive archive', () => {
+	it('keeps a chapter with staged scenes unpublished in both kinds of import', async () => {
+		await rm(join(projectRoot, 'project.db'))
+		initializeExtractedProject(projectRoot)
+		using project = await Project.open(projectRoot)
+		project.tasks.registerWork({ workId: workA, title: work.title })
+		project.database
+			.prepare(
+				"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, ?, 0, 'producing')",
+			)
+			.run(workA, work.chapterIds[0])
+		await exportProject({ projectRoot, destination, scope })
+		const installed = await InstalledPackages.open(directory, directory)
+		await installed.install(
+			destination,
+			[],
+			async (_, publish) => publish(),
+			async () => {},
+		)
+		expect(installed.list()).toMatchObject([{ chapters: 1, published: 0 }])
+		await expect(
+			installed.chapter(workA, 1, work.chapterIds[0]),
+		).rejects.toMatchObject({
+			code: 'not_found',
+		})
+		using archive = await openPackage(destination)
+		const fork = await importProject(archive, directory, directory)
+		expect(
+			await loadPlayerStatus(fork.projectRoot, fork.workIds[0]),
+		).toMatchObject({
+			chapters: [{ published: false }],
+		})
+	})
+
+	it('opens the first published chapter by default in a fork', async () => {
+		await rm(join(projectRoot, 'project.db'))
+		initializeExtractedProject(projectRoot)
+		using project = await Project.open(projectRoot)
+		const ref = { ...scope, chapterId: work.chapterIds[0] }
+		const first = await project.read(projectFiles.chapter(ref))
+		const second = { ...ref, chapterId: 'ch-2' }
+		const file = projectFiles.work(ref.volumeId, ref.workId)
+		await project.write(file, {
+			...(await project.read(file)),
+			chapterIds: [ref.chapterId, second.chapterId],
+		})
+		await project.write(projectFiles.chapter(second), {
+			...first,
+			chapterId: second.chapterId,
+		})
+		project.tasks.registerWork({ workId: workA, title: work.title })
+		project.database
+			.prepare(
+				"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, ?, 0, 'producing'), (?, ?, 1, 'published')",
+			)
+			.run(workA, ref.chapterId, workA, second.chapterId)
+		for (const sceneId of first.sceneIds)
+			await project.writeFile(
+				projectFiles.scene(second, sceneId),
+				await project.readFile(projectFiles.scene(ref, sceneId)),
+			)
+		await exportProject({ projectRoot, destination, scope })
+		using archive = await openPackage(destination)
+		const { projectRoot: fork, workIds } = await importProject(
+			archive,
+			directory,
+			directory,
+		)
+		const cache = join(directory, 'cache')
+		await expect(
+			loadPlayerChapter(fork, workIds[0], cache),
+		).resolves.toMatchObject({
+			chapter: { chapterId: second.chapterId },
+		})
+		await expect(
+			loadPlayerChapter(fork, workIds[0], cache, ref.chapterId),
+		).rejects.toMatchObject({ code: 'not_found' })
+	})
+
+	it('writes the host version only after a successful export', async () => {
+		await rm(join(projectRoot, 'project.db'))
+		initializeExtractedProject(projectRoot)
+		const version = async () =>
+			JSON.parse(await readFile(join(projectRoot, workPath), 'utf8')).version
+		await mkdir(destination)
+		await expect(
+			exportProject({ projectRoot, destination, scope }),
+		).rejects.toThrow()
+		expect(await version()).toBe(0)
+		await rm(destination, { recursive: true })
+		for (const release of [1, 2]) {
+			expect(await exportProject({ projectRoot, destination, scope })).toEqual([
+				{ workId: workA, version: release },
+			])
+			expect(await version()).toBe(release)
+			using archive = await openPackage(destination)
+			expect(archive.works[0].work).toMatchObject({
+				formatVersion: 1,
+				version: release,
+			})
+		}
+	})
+
 	it('uses the physical ZIP marker, UTF-8 filenames and locked compression', async () => {
 		await exportPackage({ projectRoot, destination, scope })
 		const zip = await openPromise(destination, { lazyEntries: true })

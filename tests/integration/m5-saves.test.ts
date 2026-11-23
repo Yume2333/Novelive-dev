@@ -1,11 +1,21 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+	mkdir,
+	mkdtemp,
+	readFile,
+	rename,
+	rm,
+	writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterEach, expect, test } from 'vitest'
 import { FileProgressStore } from '../../apps/desktop/src/save-data'
+import { packageProgressId } from '../../apps/desktop/src/save-data/package-writes'
 import { workProgress } from '../../packages/creator/src/contract/player-progress'
+import { InstalledPackages } from '../../packages/creator/src/share/installed'
+import { exportProject } from '../../packages/creator/src/share/project'
 import type {
 	PlaybackBeat,
 	SentenceRef,
@@ -18,6 +28,7 @@ import {
 	emptyStage,
 	stageAssets,
 } from '../../packages/player/src/stage/state'
+import { playerWorkId, seedPlayerProject } from '../fixtures/minimal-player'
 
 const directories: string[] = []
 afterEach(async () => {
@@ -93,6 +104,179 @@ function spriteDirection(
 		assets: [{ id, slot: 'left' }],
 	}
 }
+
+test('restores every work’s progress and legacy saves when package publication fails', async () => {
+	const { directory, store } = await createStore()
+	const ids = [workId, 'another-work']
+	for (const id of ids) {
+		await store.saveSlot(id, quick, snapshot(first), await capture('#123456'))
+		await store.saveSlot(
+			id,
+			manual,
+			snapshot(removedChapter),
+			await capture('#654321'),
+		)
+		await store.migrate({
+			workId: id,
+			fromVersion: 1,
+			toVersion: 2,
+			chapters: [[textBeat(first)]],
+		})
+	}
+	const before = await Promise.all(
+		ids.map(async (id) => ({
+			progress: await store.load(id),
+			legacy: await store.loadLegacySaves(id),
+		})),
+	)
+	const original = await readFile(join(directory, 'progress.json'), 'utf8')
+	await expect(
+		store.migrateAndPublish(
+			ids.map((id) => ({
+				workId: id,
+				fromVersion: 2,
+				toVersion: 3,
+				chapters: [[textBeat(otherChapter)]],
+			})),
+			async () => {
+				const staged = await readFile(join(directory, 'progress.json'), 'utf8')
+				expect(staged).not.toEqual(original)
+				throw new Error('publish failed')
+			},
+		),
+	).rejects.toThrow('publish failed')
+	expect(
+		await Promise.all(
+			ids.map(async (id) => ({
+				progress: await store.load(id),
+				legacy: await store.loadLegacySaves(id),
+			})),
+		),
+	).toEqual(before)
+})
+
+test('blocks writes for an unresolved migration until its backup is recovered', async () => {
+	const { directory, store } = await createStore()
+	const image = await capture('#123456')
+	await store.saveSlot(workId, quick, snapshot(first), image)
+	const before = await store.load(workId)
+	const path = join(directory, 'progress.json')
+	const staged = join(directory, 'staged-progress.json')
+	await expect(
+		store.migrateAndPublish(
+			[
+				{
+					workId,
+					fromVersion: 1,
+					toVersion: 2,
+					chapters: [[textBeat(otherChapter)]],
+				},
+			],
+			async () => {
+				await rename(path, staged)
+				await mkdir(path)
+				throw new Error('publish failed')
+			},
+		),
+	).rejects.toThrow('Save migration rollback failed')
+	await rm(path, { recursive: true })
+	await rename(staged, path)
+	await expect(
+		store.save(workId, { mainline: first, read: [], saves: [] }),
+	).rejects.toThrow('Restart Novelive')
+	await expect(
+		store.saveSlot(workId, quick, snapshot(otherChapter), image),
+	).rejects.toThrow('Restart Novelive')
+	await expect(store.deleteLegacySave(workId, 1, quick)).rejects.toThrow(
+		'Restart Novelive',
+	)
+	await expect(
+		store.save('other-work', { mainline: null, read: [], saves: [] }),
+	).resolves.toBeUndefined()
+	await store.recoverPackageMigration(
+		(id, version) => id === workId && version === 1,
+	)
+	expect(await store.load(workId)).toEqual(before)
+	await expect(
+		store.saveSlot(workId, quick, snapshot(otherChapter), image),
+	).resolves.toBeDefined()
+})
+
+test.each([false, true])(
+	'reopens the installed library and recovers interrupted saves (index replaced: %s)',
+	async (published) => {
+		const { userData, store } = await createStore()
+		const documents = join(userData, 'Documents')
+		const projectRoot = join(userData, 'project')
+		const release1 = join(userData, 'first.novelive')
+		const release2 = join(userData, 'second.novelive')
+		const scope = { level: 'series' } as const
+		const image = await capture('#123456')
+		await seedPlayerProject(projectRoot, image, image)
+		await exportProject({ projectRoot, destination: release1, scope })
+		await exportProject({ projectRoot, destination: release2, scope })
+		const library = await InstalledPackages.open(userData, documents)
+		const trash = async () => {}
+		await library.install(release1, [], async (_, publish) => publish(), trash)
+		const key = packageProgressId(playerWorkId)
+		await store.saveSlot(key, quick, snapshot(first), image)
+		const before = await store.load(key)
+		const staged = Promise.withResolvers<void>()
+		const release = Promise.withResolvers<void>()
+		const interrupted = new Error('simulated interruption before publication')
+		const migration = library.install(
+			release2,
+			[{ workId: playerWorkId, installedVersion: 2, incomingVersion: 3 }],
+			(migrations, publish) =>
+				store.migrateAndPublish(
+					migrations.map(
+						({ workId, installedVersion, incomingVersion, chapters }) => ({
+							workId: packageProgressId(workId),
+							fromVersion: installedVersion,
+							toVersion: incomingVersion,
+							chapters,
+						}),
+					),
+					async () => {
+						if (published) await publish()
+						staged.resolve()
+						await release.promise
+						if (!published) throw interrupted
+					},
+				),
+			trash,
+		)
+		try {
+			await Promise.race([staged.promise, migration])
+			const installed = await InstalledPackages.open(userData, documents)
+			expect(installed.list()).toMatchObject([
+				{ workId: playerWorkId, version: published ? 3 : 2 },
+			])
+			const restarted = new FileProgressStore(userData)
+			expect((await restarted.load(key))?.saves).toEqual([])
+			const versions = new Map(
+				installed
+					.list()
+					.map(({ workId, version }) => [packageProgressId(workId), version]),
+			)
+			const hasVersion = (id: string, version: number) =>
+				versions.get(id) === version
+			await restarted.recoverPackageMigration(hasVersion)
+			expect(await restarted.load(key)).toEqual(
+				published ? { ...before, saves: [] } : before,
+			)
+			expect(await restarted.loadLegacySaves(key)).toMatchObject(
+				published ? [{ version: 2 }] : [],
+			)
+			await restarted.recoverPackageMigration(hasVersion)
+		} finally {
+			release.resolve()
+			await migration.catch((error) => {
+				if (error !== interrupted) throw error
+			})
+		}
+	},
+)
 
 test('restores the new release sprite in time for its next expression change', async () => {
 	const { store } = await createStore()

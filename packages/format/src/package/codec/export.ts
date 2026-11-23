@@ -6,6 +6,7 @@ import { type PassThrough, Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { ZipFile } from 'yazl'
 import {
+	type ChapterRef,
 	type ProjectDocument,
 	type ProjectScope,
 	projectFiles,
@@ -34,6 +35,7 @@ export type PackageExportOptions = {
 	destination: string
 	scope: ProjectScope
 	includeSource?: boolean
+	isPublished?: (ref: ChapterRef, hasScenes: boolean) => boolean
 }
 
 type ExportEntry = { path: string; data?: Buffer }
@@ -106,7 +108,12 @@ function jsonEntry(path: string, data: object): ExportEntry {
 }
 
 async function* selectedEntries(
-	{ projectRoot: root, scope, includeSource }: PackageExportOptions,
+	{
+		projectRoot: root,
+		scope,
+		includeSource,
+		isPublished,
+	}: PackageExportOptions,
 	works: PackageWork[],
 ): AsyncGenerator<ExportEntry> {
 	const series = await readProjectDocument(root, projectFiles.series)
@@ -152,7 +159,15 @@ async function* selectedEntries(
 				const chapter = await readProjectDocument(root, file)
 				if (chapter.chapterId !== chapterId)
 					throw corrupt(file.path, 'chapter ID mismatch')
-				yield jsonEntry(file.path, chapter)
+				yield jsonEntry(
+					file.path,
+					isPublished
+						? {
+								...chapter,
+								published: isPublished(ref, chapter.sceneIds.length > 0),
+							}
+						: chapter,
+				)
 				for (const sceneId of chapter.sceneIds)
 					yield { path: projectFiles.scene(ref, sceneId) }
 			}

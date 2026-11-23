@@ -70,6 +70,7 @@
 	"读档槽位 {{index}}": "Load slot {{index}}",
 	"跳过已读": "Skip read lines",
 	"返回游戏": "Return to game",
+	"返回书库": "Return to library",
 	"返回菜单": "Back to menu",
 	"这些存档无法在当前版本读取，可以保留或删除。": "These saves can't be read in the current version. You can keep or delete them.",
 	"隐藏界面": "Hide UI"

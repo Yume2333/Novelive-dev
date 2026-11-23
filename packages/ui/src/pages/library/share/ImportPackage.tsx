@@ -1,5 +1,5 @@
 import type { DesktopShareApi, ShareResponse } from '@novelive/creator/contract'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ShareDialog } from '../../../components/ShareDialog'
 import styles from '../../../components/ShareDialog.module.css'
 import { scoped } from '../../../i18n'
@@ -33,6 +33,7 @@ export function ImportPackage({
 	const [error, setError] = useState('')
 	const [imported, setImported] = useState<number>()
 	const [projectImported, setProjectImported] = useState(false)
+	const busyRef = useRef(false)
 	const works = review?.works ?? []
 	const updates = works.flatMap((entry) =>
 		entry.relation === 'update'
@@ -51,15 +52,24 @@ export function ImportPackage({
 		imported !== undefined || (review !== undefined && !canImport)
 
 	async function inspect() {
+		try {
+			const packagePath = await pickPackage()
+			if (packagePath) await inspectPath(packagePath)
+		} catch {
+			setOpen(true)
+			setError(t('无法检查作品包，请重新选择。'))
+		}
+	}
+
+	const inspectPath = useRef(async (packagePath: string) => {
+		busyRef.current = true
 		setBusy(true)
+		setOpen(true)
 		setError('')
 		setReview(undefined)
 		setImported(undefined)
 		setProjectImported(false)
 		try {
-			const packagePath = await pickPackage()
-			if (!packagePath) return
-			setOpen(true)
 			const response = await api.call({
 				operation: 'inspectImport',
 				packagePath,
@@ -67,12 +77,29 @@ export function ImportPackage({
 			if (response.ok) setReview({ packagePath, works: response.result.works })
 			else setError(response.error.message)
 		} catch {
-			setOpen(true)
 			setError(t('无法检查作品包，请重新选择。'))
 		} finally {
+			busyRef.current = false
 			setBusy(false)
 		}
-	}
+	}).current
+	useEffect(() => {
+		const installed = window.novelive?.host.installed
+		if (!installed || open || busy) return
+		async function take() {
+			if (busyRef.current) return
+			busyRef.current = true
+			try {
+				const path = await installed?.takeOpenFile()
+				if (path) await inspectPath(path)
+			} finally {
+				busyRef.current = false
+			}
+		}
+		const off = window.novelive.on('package.open', () => void take())
+		void take()
+		return off
+	}, [busy, inspectPath, open])
 
 	async function importPackage(asProject: boolean) {
 		if (!review) return

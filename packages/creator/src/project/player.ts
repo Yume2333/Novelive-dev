@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
-import { projectFiles } from '@novelive/format/model'
+import { type ChapterRef, projectFiles } from '@novelive/format/model'
 import { Project } from './index'
 import { chapterStates, isChapterPublished } from './publication'
 import { resolveBible, resolveRegistry } from './series/resolve'
@@ -38,7 +38,7 @@ async function playerChapters(
 				published: isChapterPublished(
 					states,
 					chapterId,
-					document.sceneIds.length > 0,
+					document.published ?? document.sceneIds.length > 0,
 				),
 				progress:
 					state === 'producing'
@@ -51,23 +51,73 @@ async function playerChapters(
 	)
 }
 
-export async function loadPlayerStatus(directory: string, workId: string) {
-	using project = await Project.open(directory)
+async function playerWork(project: Project, workId: string) {
 	const series = await project.read(projectFiles.series)
 	for (const volumeId of series.volumeIds) {
 		const volume = await project.read(projectFiles.volume(volumeId))
 		if (!volume.workIds.includes(workId)) continue
-		const work = await project.read(projectFiles.work(volumeId, workId))
 		return {
-			chapters: await playerChapters(
-				project,
-				volumeId,
-				workId,
-				work.chapterIds,
-			),
+			volumeId,
+			work: await project.read(projectFiles.work(volumeId, workId)),
 		}
 	}
 	throw { code: 'not_found', message: '工程中找不到这部作品' }
+}
+
+export async function loadPlayerStatus(directory: string, workId: string) {
+	using project = await Project.open(directory)
+	const { volumeId, work } = await playerWork(project, workId)
+	return {
+		chapters: await playerChapters(project, volumeId, workId, work.chapterIds),
+	}
+}
+
+async function readPlayerScript(project: Project, ref: ChapterRef) {
+	const chapter = await project.read(projectFiles.chapter(ref))
+	const scripts = await Promise.all(
+		chapter.sceneIds.map(async (sceneId) =>
+			(await project.readFile(projectFiles.scene(ref, sceneId))).toString(
+				'utf8',
+			),
+		),
+	)
+	return { chapter, script: scripts.join('\n\n') }
+}
+
+async function readPlayerResources(
+	project: Project,
+	volumeId: string,
+	workId: string,
+) {
+	const scope = { level: 'work', volumeId, workId } as const
+	const [bible, registry] = await Promise.all([
+		resolveBible(project, scope),
+		resolveRegistry(project, scope),
+	])
+	const characters = bible.character.map(({ id, name }) => [id, name] as const)
+	return {
+		registry,
+		speakers: characters.map(([id]) => id),
+		speakerNames: Object.fromEntries(characters),
+	}
+}
+
+export async function* loadPlayerCompilation(
+	directory: string,
+	workId: string,
+	chapterIds: readonly string[],
+) {
+	using project = await Project.open(directory)
+	const { volumeId, work } = await playerWork(project, workId)
+	const resources = await readPlayerResources(project, volumeId, workId)
+	for (const chapterId of chapterIds) {
+		yield {
+			chapterId,
+			...(await readPlayerScript(project, { volumeId, workId, chapterId })),
+			...resources,
+			customMarks: work.settings.customMarks,
+		}
+	}
 }
 
 export async function loadPlayerChapter(
@@ -77,70 +127,58 @@ export async function loadPlayerChapter(
 	selectedChapterId?: string,
 ) {
 	using project = await Project.open(directory)
-	const series = await project.read(projectFiles.series)
-	for (const volumeId of series.volumeIds) {
-		const volume = await project.read(projectFiles.volume(volumeId))
-		if (!volume.workIds.includes(workId)) continue
-		const work = await project.read(projectFiles.work(volumeId, workId))
-		const chapters = await playerChapters(
-			project,
-			volumeId,
-			workId,
-			work.chapterIds,
-		)
-		const chapterId = selectedChapterId ?? work.chapterIds[0]
-		if (!chapterId) throw { code: 'not_found', message: '作品还没有章节' }
-		if (!chapters.find((chapter) => chapter.chapterId === chapterId)?.published)
-			throw { code: 'not_found', message: '章节尚未发布' }
-		const ref = { volumeId, workId, chapterId }
-		const chapter = await project.read(projectFiles.chapter(ref))
-		const scripts = await Promise.all(
-			chapter.sceneIds.map(async (sceneId) =>
-				(await project.readFile(projectFiles.scene(ref, sceneId))).toString(
-					'utf8',
-				),
-			),
-		)
-		const scope = { level: 'work', volumeId, workId } as const
-		const [bible, registry] = await Promise.all([
-			resolveBible(project, scope),
-			resolveRegistry(project, scope),
+	const { volumeId, work } = await playerWork(project, workId)
+	const chapters = await playerChapters(
+		project,
+		volumeId,
+		workId,
+		work.chapterIds,
+	)
+	if (!chapters.length) throw { code: 'not_found', message: '作品还没有章节' }
+	const chapterId =
+		selectedChapterId ??
+		(work.derivedFrom
+			? chapters.find((chapter) => chapter.published)?.chapterId
+			: work.chapterIds[0])
+	if (
+		chapterId === undefined ||
+		!chapters.find((chapter) => chapter.chapterId === chapterId)?.published
+	)
+		throw { code: 'not_found', message: '章节尚未发布' }
+	const [{ chapter, script }, { registry, speakers, speakerNames }] =
+		await Promise.all([
+			readPlayerScript(project, { volumeId, workId, chapterId }),
+			readPlayerResources(project, volumeId, workId),
 		])
-		const speakers = new Map(
-			bible.character.map((entry) => [entry.id, entry.name]),
-		)
-		const assets = await Promise.all(
-			registry.entries.map(async (entry) => {
-				const missing = () => ({
-					...entry,
-					path: `player/unavailable/${createHash('sha256').update(`${project.root}/${entry.id}`).digest('hex')}${extname(entry.path)}`,
-				})
-				if (entry.status === 'pending') return missing()
-				let bytes: Buffer
-				try {
-					bytes = await project.readFile(entry.path)
-				} catch (error) {
-					if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-						return missing()
-					throw error
-				}
-				const hash = createHash('sha256').update(bytes).digest('hex')
-				const path = `player/${hash}${extname(entry.path)}`
-				const destination = join(cacheDir, path)
-				await mkdir(dirname(destination), { recursive: true })
-				await writeFile(destination, bytes)
-				return { ...entry, path }
-			}),
-		)
-		return {
-			chapters,
-			script: scripts.join('\n\n'),
-			chapter,
-			registry: { formatVersion: 1 as const, entries: assets },
-			speakers: [...speakers.keys()],
-			speakerNames: Object.fromEntries(speakers),
-			customMarks: work.settings.customMarks,
-		}
+	const assets = await Promise.all(
+		registry.entries.map(async (entry) => {
+			const missing = () => ({
+				...entry,
+				path: `player/unavailable/${createHash('sha256').update(`${project.root}/${entry.id}`).digest('hex')}${extname(entry.path)}`,
+			})
+			if (entry.status === 'pending') return missing()
+			let bytes: Buffer
+			try {
+				bytes = await project.readFile(entry.path)
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code === 'ENOENT') return missing()
+				throw error
+			}
+			const hash = createHash('sha256').update(bytes).digest('hex')
+			const path = `player/${hash}${extname(entry.path)}`
+			const destination = join(cacheDir, path)
+			await mkdir(dirname(destination), { recursive: true })
+			await writeFile(destination, bytes)
+			return { ...entry, path }
+		}),
+	)
+	return {
+		chapters,
+		script,
+		chapter,
+		registry: { formatVersion: 1 as const, entries: assets },
+		speakers,
+		speakerNames,
+		customMarks: work.settings.customMarks,
 	}
-	throw { code: 'not_found', message: '工程中找不到这部作品' }
 }

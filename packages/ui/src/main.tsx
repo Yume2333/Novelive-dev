@@ -37,6 +37,7 @@ if (root)
 			<HashRouter>
 				<Routes>
 					<Route path={productionRoutes.play} element={<PlayerPage />} />
+					<Route path="/package/:id/:version" element={<PlayerPage />} />
 					<Route element={<AppShell />}>
 						<Route index element={<LibraryPage />} />
 						<Route path="import" element={<ImportPage />} />

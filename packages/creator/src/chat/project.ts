@@ -41,9 +41,9 @@ export function projectProposals(
 								: {}),
 						},
 					}
-				const expectedRevision = await revisions.chapterRevision(
-					intent.chapterId,
-				)
+				const expectedRevision = await (intent.kind === 'redoChapter'
+					? revisions.redoChapterRevision(intent.chapterId)
+					: revisions.chapterRevision(intent.chapterId))
 				return {
 					prompt: intent.reason,
 					chapterIds: [intent.chapterId],

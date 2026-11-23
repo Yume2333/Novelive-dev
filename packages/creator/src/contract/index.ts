@@ -39,6 +39,7 @@ export {
 export * from './chat'
 export * from './editor'
 export * from './import'
+export { installedProgressKey } from './player-progress'
 export * from './production'
 export * from './queue'
 export * from './share'
@@ -182,6 +183,7 @@ export interface NoveliveEvents {
 	'creator.ready': { generation: number }
 	'creator.down': { generation: number }
 	event: EventEnvelope
+	'package.open': undefined
 }
 
 export interface Novelive {
@@ -203,6 +205,23 @@ export interface Novelive {
 	host: {
 		progress?: DesktopProgressApi
 		share?: DesktopShareApi
+		installed?: {
+			list(): Promise<
+				{
+					workId: string
+					title: string
+					version: number
+					chapters: number
+					published: number
+				}[]
+			>
+			chapter(
+				workId: string,
+				version: number,
+				chapterId?: string,
+			): Promise<CommandOutput<'production.playerChapter'>>
+			takeOpenFile(): Promise<string | null>
+		}
 		about?: {
 			info(): Promise<{ version: string; packaged: boolean }>
 			open(kind: 'license' | 'notices' | 'source'): Promise<void>

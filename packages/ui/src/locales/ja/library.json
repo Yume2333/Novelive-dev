@@ -1,4 +1,6 @@
 {
+	"导入的作品": "インポートした作品",
+	"v{{version}} · 已发布 {{published}} / {{chapters}} 章": "v{{version}} · {{published}} / {{chapters}} 章を公開済み",
 	"v{{installed}} → v{{version}} · 可更新": "v{{installed}} → v{{version}} · 更新可能",
 	"v{{version}} · 已安装较新的 v{{installed}}，不会替换": "v{{version}} · より新しい v{{installed}} がインストール済みのため置き換えません",
 	"v{{version}} · 已导入": "v{{version}} · インポート済み",

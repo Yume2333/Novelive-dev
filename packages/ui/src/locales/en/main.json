@@ -1,4 +1,8 @@
 {
+	"无法检查作品包，请重新选择。": "Couldn't verify the work package. Please select it again.",
+	"无法写入作品包或工程，请检查磁盘空间和目录权限。": "Couldn't write the work package or project. Check disk space and folder permissions.",
+	"此作品包需要更新版本的 Novelive。": "This work package requires a newer version of Novelive.",
+	"作品包或所选范围已变更，请重新检查。": "The work package or export scope has changed. Please check it again.",
 	"Novelive 作品包": "Novelive work package",
 	"Novelive 更新": "Novelive update",
 	"「{{name}}」已存在，是否替换？": "\"{{name}}\" already exists. Replace it?",

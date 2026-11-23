@@ -1,6 +1,8 @@
 import type { BrowserWindow } from 'electron'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { installProgressIpc } from '../../apps/desktop/src/progress-ipc'
+import { PackageWrites } from '../../apps/desktop/src/save-data/package-writes'
+import { installedProgressKey } from '../../packages/creator/src/contract'
 import type { WorkProgress } from '../../packages/player/src/contract'
 
 const store = vi.hoisted(() => ({
@@ -55,10 +57,13 @@ beforeEach(() => {
 	store.thumbnail.mockResolvedValue(Buffer.from('image'))
 	store.saveSlot.mockResolvedValue(progress.saves[0])
 })
-async function setup() {
+async function setup(
+	installed?: Parameters<typeof installProgressIpc>[1],
+	capturePage = async () => ({ toPNG: () => Buffer.from('capture') }),
+) {
 	const webContents = {
 		mainFrame: {},
-		capturePage: async () => ({ toPNG: () => Buffer.from('capture') }),
+		capturePage,
 	}
 	await installProgressIpc(
 		() =>
@@ -66,11 +71,55 @@ async function setup() {
 				webContents,
 				getContentSize: () => [960, 540],
 			}) as unknown as BrowserWindow,
+		installed,
 	)
 	const handle = store.handle.mock.calls[0][1]
 	const event = { sender: webContents, senderFrame: webContents.mainFrame }
 	return { invoke: (input: unknown) => handle(event, input), handle, event }
 }
+
+test('stops old installed sessions and drains a capture before migration', async () => {
+	const id = '12345678-1234-1234-1234-123456789abc'
+	const writes = new PackageWrites()
+	const capture = Promise.withResolvers<{ toPNG(): Buffer<ArrayBuffer> }>()
+	let version = 1
+	const { invoke } = await setup(
+		{ writes, hasVersion: (workId, v) => workId === id && v === version },
+		() => capture.promise,
+	)
+	const workId = installedProgressKey(id, 1)
+	const saving = invoke({
+		operation: 'saveSlot',
+		workId,
+		slot: progress.saves[0].slot,
+		snapshot: progress.saves[0].snapshot,
+		rect: { x: 0, y: 0, width: 480, height: 270 },
+	})
+	const migrate = vi.fn()
+	const updating = writes.stopAndDrain([id]).then(() => {
+		migrate()
+		version = 2
+		writes.resume([id])
+	})
+	const request = { operation: 'save', workId, progress }
+	await expect(invoke(request)).rejects.toThrow('作品正在更新')
+	expect(migrate).not.toHaveBeenCalled()
+	capture.resolve({ toPNG: () => Buffer.from('capture') })
+	await saving
+	await updating
+	expect(store.saveSlot).toHaveBeenCalledWith(
+		`package:${id}`,
+		expect.anything(),
+		expect.anything(),
+		expect.anything(),
+	)
+	expect(store.saveSlot.mock.invocationCallOrder[0]).toBeLessThan(
+		migrate.mock.invocationCallOrder[0],
+	)
+	await expect(invoke(request)).rejects.toThrow('作品版本已更新')
+	await invoke({ ...request, workId: installedProgressKey(id, 2) })
+	expect(store.save).toHaveBeenCalledExactlyOnceWith(`package:${id}`, progress)
+})
 test('thumbnail grids share validated progress and refresh after slot writes', async () => {
 	const { invoke } = await setup()
 	const thumbnail = {

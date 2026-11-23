@@ -1,7 +1,8 @@
+import { installedProgressKey } from '@novelive/creator/contract'
 import type { WorkSettings } from '@novelive/format/model'
 import { type CompiledScene, compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type {
 	SentenceRef,
@@ -32,7 +33,10 @@ export function PlayerPage({
 }: {
 	legacySaves?: LegacySaveActions
 }) {
-	const { id } = useParams()
+	const { id, version } = useParams()
+	const progressId =
+		id && version ? installedProgressKey(id, Number(version)) : id
+	const progressApi = window.novelive.host.progress
 	const navigate = useNavigate()
 	const host = useRef<HTMLDivElement>(null)
 	const directoryRef = useRef<string>(undefined)
@@ -70,7 +74,7 @@ export function PlayerPage({
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
 	useEffect(() => {
-		void id
+		void progressId
 		progressReady.current = undefined
 		progress.current = new PlaybackProgress(compare)
 		latest.current = undefined
@@ -79,7 +83,7 @@ export function PlayerPage({
 		chapterOrder.current = []
 		sentenceOrder.current.clear()
 		setLoaded(undefined)
-	}, [id, compare])
+	}, [progressId, compare])
 	const loadProject = useCallback(
 		async (
 			directory?: string,
@@ -89,12 +93,12 @@ export function PlayerPage({
 			restore?: StageSnapshot,
 			onValidated?: () => PlaybackMode,
 		) => {
-			if (!id) return
+			if (!id || !progressId) return
 			setError('')
 			setLoading(true)
 			try {
 				progressReady.current ??= (async () => {
-					const saved = await window.novelive.host.progress?.load(id)
+					const saved = await progressApi?.load(progressId)
 					if (saved) progress.current = new PlaybackProgress(compare, saved)
 				})()
 				await progressReady.current
@@ -108,15 +112,22 @@ export function PlayerPage({
 					speakerNames,
 					customMarks,
 					chapters,
-				} = await window.novelive.call('production.playerChapter', {
-					...((directory ?? directoryRef.current)
-						? { directory: directory ?? directoryRef.current }
-						: {}),
-					...((chapterId ?? resume?.chapterId)
-						? { chapterId: chapterId ?? resume?.chapterId }
-						: {}),
-					workId: id,
-				}).promise
+				} =
+					version && window.novelive.host.installed
+						? await window.novelive.host.installed.chapter(
+								id,
+								Number(version),
+								chapterId ?? resume?.chapterId,
+							)
+						: await window.novelive.call('production.playerChapter', {
+								...((directory ?? directoryRef.current)
+									? { directory: directory ?? directoryRef.current }
+									: {}),
+								...((chapterId ?? resume?.chapterId)
+									? { chapterId: chapterId ?? resume?.chapterId }
+									: {}),
+								workId: id,
+							}).promise
 				let nextId = 0
 				const result = compileScript(script, {
 					makeId: (bytes) => (++nextId).toString(16).padStart(bytes * 2, '0'),
@@ -199,7 +210,7 @@ export function PlayerPage({
 				setLoading(false)
 			}
 		},
-		[id, compare],
+		[id, compare, progressApi, progressId, version],
 	)
 	useEffect(() => {
 		void loadProject()
@@ -260,9 +271,9 @@ export function PlayerPage({
 						})),
 					)
 					redraw((value) => value + 1)
-					if (id)
-						void window.novelive.host.progress
-							?.save(id, progress.current.data)
+					if (progressId)
+						void progressApi
+							?.save(progressId, progress.current.data)
 							.catch(() => setError(t('无法保存阅读进度')))
 				},
 			},
@@ -271,21 +282,21 @@ export function PlayerPage({
 			unsubscribe()
 			controller.abort()
 		}
-	}, [loaded, awaitingClick, id])
+	}, [loaded, awaitingClick, id, progressApi, progressId])
 	async function save(slot: SaveSlot) {
 		const api = window.novelive.host.progress
 		const stage = host.current?.querySelector('.nl-player-stage')
-		if (!id || !api || !latest.current || !stage)
+		if (!progressId || !api || !latest.current || !stage)
 			throw new Error(t('当前无法存档'))
 		const bounds = stage.getBoundingClientRect()
-		const entry = await api.saveSlot(id, slot, latest.current, {
+		const entry = await api.saveSlot(progressId, slot, latest.current, {
 			x: Math.max(0, Math.ceil(bounds.x)),
 			y: Math.max(0, Math.ceil(bounds.y)),
 			width: Math.floor(bounds.width),
 			height: Math.floor(bounds.height),
 		})
 		progress.current.putSave(entry)
-		await api.save(id, progress.current.data)
+		await api.save(progressId, progress.current.data)
 		redraw((value) => value + 1)
 	}
 	async function restore(
@@ -333,7 +344,17 @@ export function PlayerPage({
 		loadChapter: loadProject,
 		setChapters,
 		onError: setError,
+		offline: Boolean(version),
 	})
+	const listLegacy = progressApi?.listLegacy
+	const deleteLegacy = progressApi?.deleteLegacy
+	const packageLegacySaves = useMemo(
+		() =>
+			version && listLegacy && deleteLegacy
+				? { list: listLegacy, remove: deleteLegacy }
+				: undefined,
+		[version, listLegacy, deleteLegacy],
+	)
 	return (
 		<main
 			className="nl-player"
@@ -358,10 +379,11 @@ export function PlayerPage({
 					surface={host.current}
 					chapters={chapters}
 					editorLinked={loaded.linked}
+					onLibrary={version ? () => navigate('/') : undefined}
 					progress={progress.current.data}
 					history={progress.current.history}
-					legacySaves={legacySaves}
-					workId={id ?? ''}
+					legacySaves={legacySaves ?? packageLegacySaves}
+					workId={progressId ?? ''}
 					onSave={save}
 					onLoad={(slot) =>
 						restore(
@@ -395,12 +417,16 @@ export function PlayerPage({
 					onEditor={(position) => {
 						if (id) navigate(playerEditorRoute(id, position))
 					}}
-					waiting={ended && !nextChapter?.published ? nextChapter : undefined}
+					waiting={
+						!version && ended && !nextChapter?.published
+							? nextChapter
+							: undefined
+					}
 					awaitingClick={awaitingClick}
 					onResume={() => setAwaitingClick(false)}
 				/>
 			)}
-			{!loaded && (
+			{!loaded && !version && (
 				<button
 					type="button"
 					disabled={loading}

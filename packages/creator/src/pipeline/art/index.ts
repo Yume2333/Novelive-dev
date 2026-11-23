@@ -91,7 +91,7 @@ const isDrawnBase = ({ type, status }: RegistryEntry) =>
 	status === 'drawn' && (type === 'character' || type === 'location')
 
 export class ArtProduction {
-	private readonly render
+	private render: ReturnType<typeof imageRenderer> | undefined
 	private readonly registryFile
 	private readonly scope: ProjectScope
 
@@ -101,7 +101,6 @@ export class ArtProduction {
 	) {
 		this.scope = options.scope ?? { level: 'series' }
 		this.registryFile = projectFiles.assetRegistry(this.scope)
-		this.render = imageRenderer(options.image, options)
 	}
 
 	private scoped(path: string) {
@@ -505,6 +504,8 @@ export class ArtProduction {
 		optionalReference = false,
 		candidateBudget?: CostumeCandidateBudget,
 	) {
+		this.render ??= imageRenderer(this.options.image, this.options)
+		const render = this.render
 		const refs = await Promise.all(
 			drawing.references.slice(0, 16).map(async (ref, i) => {
 				const image = sharp(await this.project.readFile(ref.path))
@@ -557,7 +558,7 @@ export class ArtProduction {
 				baseOnly
 					? `Edit only the brows, eyes and mouth of Image ${firstReference}: ${content.content} ${issue} Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face.`
 					: drawingPrompt(promptDrawing, content.content, issue, firstReference)
-			const result = await this.render(
+			const result = await render(
 				describe(1, feedback),
 				editReferences,
 				target,

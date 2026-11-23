@@ -5,6 +5,7 @@ import {
 	readdir,
 	readFile,
 	rename,
+	rm,
 	unlink,
 	writeFile,
 } from 'node:fs/promises'
@@ -26,9 +27,32 @@ import { slotKey } from '../../../../packages/player/src/progress'
 import { migrateProgress } from '../../../../packages/player/src/progress/migrations'
 
 type ProgressFile = WorkProgress & { legacySaves?: readonly LegacySaveGroup[] }
+type StoredMigration = Omit<
+	ProgressMigrationInput,
+	'positions' | 'progress' | 'legacySaves'
+> & {
+	chapters: readonly (readonly PlaybackBeat[])[]
+}
+type MigrationBackup = Pick<
+	StoredMigration,
+	'workId' | 'fromVersion' | 'toVersion'
+> & {
+	stored: ProgressMigrationResult
+}
+
+function migratedProgress(
+	{ chapters, ...update }: StoredMigration,
+	stored: ProgressMigrationResult,
+) {
+	const positions = chapters.flatMap((chapter) =>
+		chapter.flatMap(({ cue }) => (cue.kind === 'text' ? [cue.position] : [])),
+	)
+	return migrateProgress({ ...update, ...stored, positions }, chapters)
+}
 
 export class FileProgressStore implements ProgressStore {
 	private pending: Promise<unknown> = Promise.resolve()
+	private readonly journaledWorks = new Set<string>()
 
 	constructor(private readonly userData: string) {}
 
@@ -44,6 +68,18 @@ export class FileProgressStore implements ProgressStore {
 		const result = this.pending.then(run)
 		this.pending = result.catch(() => {})
 		return result
+	}
+
+	private checkWritable(workId: string) {
+		if (this.journaledWorks.has(workId))
+			throw new Error('Restart Novelive to recover this work’s saves')
+	}
+
+	private enqueueWrite<T>(workId: string, run: () => Promise<T>): Promise<T> {
+		return this.enqueue(() => {
+			this.checkWritable(workId)
+			return run()
+		})
 	}
 
 	async load(workId: string): Promise<WorkProgress | null> {
@@ -77,9 +113,51 @@ export class FileProgressStore implements ProgressStore {
 		await rename(temporary, join(directory, 'progress.json'))
 	}
 
+	private get migrationJournal() {
+		return join(this.userData, 'player-progress', 'pending-package-update.json')
+	}
+
+	private async restoreMigration(backups: readonly MigrationBackup[]) {
+		for (const { workId, stored } of backups) await this.write(workId, stored)
+	}
+
+	private async clearMigrationJournal() {
+		await rm(this.migrationJournal, { force: true })
+		this.journaledWorks.clear()
+	}
+
+	recoverPackageMigration(
+		hasVersion: (workId: string, version: number) => boolean,
+	) {
+		return this.enqueue(async () => {
+			let backups: MigrationBackup[]
+			try {
+				backups = JSON.parse(await readFile(this.migrationJournal, 'utf8'))
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+				throw error
+			}
+			for (const { workId } of backups) this.journaledWorks.add(workId)
+			if (
+				!backups.every(({ workId, toVersion }) => hasVersion(workId, toVersion))
+			) {
+				if (
+					!backups.every(({ workId, fromVersion }) =>
+						hasVersion(workId, fromVersion),
+					)
+				)
+					throw new Error(
+						'Package migration journal does not match the installed library',
+					)
+				await this.restoreMigration(backups)
+			}
+			await this.clearMigrationJournal()
+		})
+	}
+
 	save(workId: string, progress: WorkProgress): Promise<void> {
 		const copy = structuredClone(progress)
-		return this.enqueue(async () => {
+		return this.enqueueWrite(workId, async () => {
 			const stored = await this.read(workId)
 			await this.write(workId, {
 				progress: copy,
@@ -88,33 +166,66 @@ export class FileProgressStore implements ProgressStore {
 		})
 	}
 
-	migrate(
-		input: Omit<
-			ProgressMigrationInput,
-			'positions' | 'progress' | 'legacySaves'
-		> & {
-			chapters: readonly (readonly PlaybackBeat[])[]
-		},
-	): Promise<ProgressMigrationResult> {
-		const { chapters, ...update } = structuredClone(input)
-		return this.enqueue(async () => {
+	migrate(input: StoredMigration): Promise<ProgressMigrationResult> {
+		const update = structuredClone(input)
+		return this.enqueueWrite(update.workId, async () => {
 			const stored = await this.read(update.workId)
 			if (!stored)
 				return {
 					progress: { mainline: null, read: [], saves: [] },
 					legacySaves: [],
 				}
-			const positions = chapters.flatMap((chapter) =>
-				chapter.flatMap(({ cue }) =>
-					cue.kind === 'text' ? [cue.position] : [],
-				),
-			)
-			const migrated = migrateProgress(
-				{ ...update, ...stored, positions },
-				chapters,
-			)
+			const migrated = migratedProgress(update, stored)
 			await this.write(update.workId, migrated)
 			return migrated
+		})
+	}
+
+	migrateAndPublish(
+		inputs: readonly StoredMigration[],
+		publish: () => Promise<void>,
+	) {
+		const updates = structuredClone(inputs)
+		return this.enqueue(async () => {
+			const backups: MigrationBackup[] = []
+			const migrated: Array<[string, ProgressMigrationResult]> = []
+			for (const update of updates) {
+				const { workId, fromVersion, toVersion } = update
+				this.checkWritable(workId)
+				const stored = await this.read(workId)
+				if (!stored) continue
+				backups.push({ workId, fromVersion, toVersion, stored })
+				migrated.push([workId, migratedProgress(update, stored)])
+			}
+			if (!backups.length) return publish()
+			const journal = this.migrationJournal
+			const temporary = `${journal}.tmp`
+			try {
+				await access(journal)
+				throw new Error('A previous package migration requires recovery')
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+			}
+			await writeFile(temporary, JSON.stringify(backups), 'utf8')
+			await rename(temporary, journal)
+			for (const { workId } of backups) this.journaledWorks.add(workId)
+			try {
+				for (const [workId, stored] of migrated)
+					await this.write(workId, stored)
+				await publish()
+			} catch (error) {
+				try {
+					await this.restoreMigration(backups)
+					await this.clearMigrationJournal()
+				} catch (rollbackError) {
+					throw new AggregateError(
+						[error, rollbackError],
+						'Save migration rollback failed',
+					)
+				}
+				throw error
+			}
+			await this.clearMigrationJournal()
 		})
 	}
 
@@ -129,7 +240,7 @@ export class FileProgressStore implements ProgressStore {
 		slot: SaveSlot,
 	): Promise<void> {
 		const name = slotKey(slot)
-		return this.enqueue(async () => {
+		return this.enqueueWrite(workId, async () => {
 			const stored = await this.read(workId)
 			if (!stored) return
 			const legacySaves = stored.legacySaves
@@ -173,7 +284,7 @@ export class FileProgressStore implements ProgressStore {
 	): Promise<SaveEntry> {
 		const name = slotKey(slot)
 		const captured = structuredClone({ slot, snapshot, stageCapture })
-		return this.enqueue(async () => {
+		return this.enqueueWrite(workId, async () => {
 			const image = await sharp(captured.stageCapture)
 				.resize(saveThumbnail.width, saveThumbnail.height, { fit: 'cover' })
 				.webp()

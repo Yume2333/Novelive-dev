@@ -2,6 +2,10 @@ appId: dev.novelive.desktop
 productName: Novelive
 icon: ../../prototype/public/icon/novelive-icon-light.svg
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+fileAssociations:
+  - ext: novelive
+    name: Novelive Work Package
+    mimeType: application/vnd.novelive+zip
 files:
   - out/**
   - "!out/licenses/**"
