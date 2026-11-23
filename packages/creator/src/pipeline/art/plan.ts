@@ -41,6 +41,20 @@ const validId = compile(assetId).check
 const normalize = (value: string) =>
 	value.normalize('NFKC').trim().toLowerCase()
 
+function manifestIdError(id: string, kind: Kind) {
+	const shape = manifestIdShapes[kind]
+	if (!validId(id) || id.split('/').length !== shape.split('/').length)
+		return `Invalid ${kind} asset ${JSON.stringify(id)}; expected ${shape}`
+}
+
+export function validateManifestIds(items: readonly ManifestItem[]) {
+	const errors = items.flatMap(({ id, kind }, i) => {
+		const error = manifestIdError(id, kind)
+		return error ? [`/items/${i}/id: ${error}`] : []
+	})
+	if (errors.length) throw new Error(errors.join('\n'))
+}
+
 // The director supplies semantic merges; identical registered descriptions
 // also resolve without another model decision.
 export function planArt(
@@ -59,14 +73,7 @@ export function planArt(
 	const cg: { id: string; description: string }[] = []
 	const prefix = (id: string) => id.slice(0, id.lastIndexOf('/'))
 	const leaf = (id: string) => id.slice(id.lastIndexOf('/') + 1)
-	function check(id: string, kind: Kind) {
-		if (
-			!validId(id) ||
-			id.split('/').length !== manifestIdShapes[kind].split('/').length
-		)
-			throw new Error(`Invalid ${kind} asset: ${id}`)
-	}
-	for (const item of items) check(item.id, item.kind)
+	validateManifestIds(items)
 	const declared = new Map(items.map((item) => [item.id, item]))
 	function add(
 		id: string,
@@ -129,7 +136,8 @@ export function planArt(
 				registered?.id ??
 				(exact ? item.id : merges[item.id]) ??
 				(equivalent ? `${prefix(item.id)}/${equivalent.id}` : item.id)
-			check(canonical, 'expression')
+			const error = manifestIdError(canonical, 'expression')
+			if (error) throw new Error(error)
 			if (prefix(canonical) !== prefix(item.id))
 				throw new Error(`Expression synonym crosses costumes: ${item.id}`)
 			const baseId = base(

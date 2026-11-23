@@ -12,6 +12,7 @@ import {
 	type ManifestItem,
 	manifestIdShapes,
 	planArt,
+	validateManifestIds,
 } from './plan'
 
 const responseSchema = obj({
@@ -30,8 +31,14 @@ const manifestIdGuidance = Object.entries(manifestIdShapes)
 	.map(([kind, shape]) => `${kind}: ${shape}`)
 	.join('; ')
 
-function rejectedReply(reply: unknown) {
-	return `Edit the rejected response, preserving unchanged items and stage directions:\n${JSON.stringify(reply)}`
+function repairReply(phase: string, error: string, reply?: unknown) {
+	return [
+		`Repair the ${phase}: ${error}`,
+		'Return only the corrected JSON object. Apply the asset ID contract above to every item, and update affected patch and merge references together. Preserve unchanged items and stage directions.',
+		...(reply === undefined
+			? []
+			: [`Rejected response:\n${JSON.stringify(reply)}`]),
+	].join('\n')
 }
 
 export type CgReferences = { costumes: readonly string[]; location?: string }
@@ -166,10 +173,35 @@ export async function directChapterArt(
 	if (parsed.diagnostics.some((item) => item.code.startsWith('E_')))
 		throw new Error('The art director requires a valid chapter script')
 	const context = JSON.stringify({ bible, registry })
+	const ids = JSON.stringify({
+		characters: bible.characters.map(({ id, costumes, expressions }) => ({
+			id,
+			costumes: costumes?.map(({ id }) => id) ?? [],
+			expressions: expressions?.map(({ id }) => id) ?? [],
+		})),
+		places: bible.locations.map(({ id, variants }) => ({
+			id,
+			variants: variants?.map(({ id }) => id) ?? [],
+		})),
+		registered: registry.entries.map(({ id, type, aliases }) => ({
+			id,
+			kind: type,
+			aliases,
+		})),
+	})
+	const assetContract = [
+		`Asset ID contract — required items[].id shape by kind: ${manifestIdGuidance}.`,
+		'Each segment starts with a lowercase ASCII letter or digit; the rest may also include underscores and hyphens. Slashes separate segments. Bare character and place IDs are not asset IDs.',
+		'For kind "character" (a costume base) use all three segments, ending in neutral for a new default base (e.g. ada/uniform/neutral), never ada or ada/uniform. An expression uses the same character/costume prefix with its own expression ID.',
+		'For kind "location" (a place base) use both segments, ending in day for a new default base (e.g. room/day), never room. A variant uses the same place prefix with its own variant ID.',
+		`Exact IDs from the bible and registry: ${ids}`,
+		'Copy IDs verbatim for known characters, costumes, expressions, places and variants. Reuse registered asset IDs rather than naming the same asset again. For an asset that needs a new ID, follow the same rules. Keep patch and merge references consistent with the registered or declared asset IDs.',
+	].join('\n')
 	const scenes = parsed.scenes.map(formatScene)
 	const budget =
 		Math.floor((buildTextModel(options.main).contextWindow - 4096) / 4) -
 		context.length -
+		assetContract.length -
 		1024
 	const batches = script.length <= budget ? [script] : scenes
 	const items: ManifestItem[] = []
@@ -184,8 +216,9 @@ export async function directChapterArt(
 		const brief = [
 			'You are the art director. Add stage directions to the numbered NVS script without changing dialogue, scene headings or source ranges.',
 			'Reply with JSON {"patch":"...","items":[{"id":"asset-id","kind":"character|location|cg|expression|variant","description":"one visible description"}],"merges":{"synonymous-expression-id":"registered-expression-id"}}.',
-			'Patch operations on original 1-based lines: PUT <N:, PUT >N:, PUT N.=M: followed by stage directions on new lines; CUT N deletes a stage direction. In IDs use place/variant, character/costume/expression, or cg-name. Do not label existing/pending or invent base links.',
+			'Patch operations on original 1-based lines: PUT <N:, PUT >N:, PUT N.=M: followed by stage directions on new lines; CUT N deletes a stage direction. Do not label existing/pending or invent base links.',
 			'Use @bg place/variant, @show character/costume/expression left|center|right, and @cg cg-name.',
+			assetContract,
 			`Bible and registered assets: ${context}`,
 			...(batches.length > 1
 				? [
@@ -211,14 +244,11 @@ export async function directChapterArt(
 				if (!(error instanceof ArtResponseFormatError) || triedFormatRepair)
 					throw error
 				triedFormatRepair = true
-				repair = `Repair the JSON manifest: ${error.message}. Use lowercase ASCII asset IDs with digits, underscores or hyphens. Required ID shapes by kind: ${manifestIdGuidance}. Do not use a bare place ID; make manifest IDs and patch references agree.${
-					error.rejected === undefined
-						? ''
-						: ` ${rejectedReply(error.rejected)}`
-				}`
+				repair = repairReply('JSON manifest', error.message, error.rejected)
 			})
 			if (!result) continue
 			try {
+				validateManifestIds(result.items)
 				const resultScript = applyStagingPatch(
 					batch,
 					result.patch,
@@ -247,7 +277,11 @@ export async function directChapterArt(
 			} catch (error) {
 				if (triedStagingRepair) throw error
 				triedStagingRepair = true
-				repair = `Repair the staging patch and manifest: ${String(error)}\n${rejectedReply(result)}`
+				repair = repairReply(
+					'staging patch and manifest',
+					error instanceof Error ? error.message : String(error),
+					result,
+				)
 			}
 		}
 	}

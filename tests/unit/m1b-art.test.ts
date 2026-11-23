@@ -1857,6 +1857,74 @@ test('staging repair edits the schema-corrected reply, not the original rejectio
 	}
 })
 
+test('repairs a bare place ID and then reports every incomplete character asset by item path', async () => {
+	const location = { id: 'room', kind: 'location', description: 'Classroom' }
+	const character = {
+		id: 'ada/uniform',
+		kind: 'character',
+		description: 'Blue uniform',
+	}
+	const coat = { ...character, id: 'ada/coat', description: 'Coat' }
+	const reply = (place: string, uniform: string, outerwear: string) => ({
+		patch: `PUT <4:\n@bg ${place}\n@show ${uniform} center\nPUT >4:\n@show ${outerwear} center`,
+		items: [
+			{ ...location, id: place },
+			{ ...character, id: uniform },
+			{ ...coat, id: outerwear },
+		],
+		merges: {},
+	})
+	const corrected = reply('room/day', 'ada/uniform/neutral', 'ada/coat/neutral')
+	const registry = planArt(
+		[{ id: 'room/day', kind: 'location', description: 'Classroom' }],
+		bible,
+		empty,
+	).registry
+	const fetch = artReplies(
+		...[
+			reply('room', character.id, coat.id),
+			reply('room/day', character.id, coat.id),
+			corrected,
+		].map((answer) => JSON.stringify(answer)),
+	)
+	const staged = await directChapterArt(script, bible, registry, {
+		main,
+		replay: { ...replay, mode: 'replay', fetch },
+	})
+	expect(staged.items).toEqual(corrected.items)
+	const plan = planArt(staged.items, bible, registry, staged.merges)
+	expect(
+		compileScript(staged.script, {
+			assets: plan.registry.entries,
+			speakers: ['ada'],
+			paragraphIds: ['p0001'],
+		}).ok,
+	).toBe(true)
+	expect(fetch).toHaveBeenCalledTimes(3)
+	const prompts = await Promise.all(
+		fetch.mock.calls.map(async ([input, init]) => {
+			const { messages } = await new Request(input, init).json()
+			return messages[0].content[0].text as string
+		}),
+	)
+	for (const prompt of prompts) {
+		expect(prompt).toContain('character: character/costume/expression')
+		expect(prompt).toContain('never ada or ada/uniform')
+		expect(prompt).toContain('"id":"ada","costumes":["uniform"]')
+		expect(prompt).toContain('"id":"room/day","kind":"location"')
+	}
+	expect(prompts[1]).toContain('"/items/0/id","keyword":"pattern"')
+	expect(prompts[2]).toContain(
+		'/items/1/id: Invalid character asset "ada/uniform"; expected character/costume/expression',
+	)
+	expect(prompts[2]).toContain(
+		'/items/2/id: Invalid character asset "ada/coat"; expected character/costume/expression',
+	)
+	expect(prompts[2]).toContain(
+		'update affected patch and merge references together',
+	)
+})
+
 test('preserves configured custom marks through staging and rejects unconfigured marks', async () => {
 	const marked = script.replace('窗外下雨了。', '{wave}窗外下雨了。{/wave}')
 	const model = vi.spyOn(artModels, 'artJson').mockResolvedValueOnce({
