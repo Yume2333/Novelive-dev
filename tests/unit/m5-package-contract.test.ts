@@ -16,10 +16,10 @@ import {
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { Novelive } from '../../packages/creator/src/contract'
 import {
+	checkShareResponse,
 	type ProgressMigrationInput,
 	type ProgressMigrationResult,
 	shareRequest,
-	shareResponse,
 } from '../../packages/creator/src/contract/share'
 import type {
 	SaveEntry,
@@ -192,8 +192,10 @@ describe('M5 desktop share and migration contracts', () => {
 				projectRoot: '/projects/copy',
 				workIds: [copyId],
 			},
-		])
-			expect(shareResponse.check({ ok: true, result })).toBe(true)
+		] as const)
+			expect(checkShareResponse(result.operation, { ok: true, result })).toBe(
+				true,
+			)
 		for (const code of [
 			'corrupt_package',
 			'unsupported_format',
@@ -202,14 +204,14 @@ describe('M5 desktop share and migration contracts', () => {
 			'stale_import',
 		]) {
 			expect(
-				shareResponse.check({
+				checkShareResponse('inspectImport', {
 					ok: false,
 					error: { code, message: 'Cannot import' },
 				}),
 			).toBe(true)
 		}
 		expect(
-			shareResponse.check({
+			checkShareResponse('inspectImport', {
 				ok: true,
 				result: {
 					operation: 'inspectImport',
@@ -217,6 +219,17 @@ describe('M5 desktop share and migration contracts', () => {
 				},
 			}),
 		).toBe(false)
+	})
+
+	it('rejects a valid success payload for a different operation', () => {
+		const response: unknown = {
+			ok: true,
+			result: { operation: 'export', works: [work] },
+		}
+		expect(checkShareResponse('inspectImport', response)).toBe(false)
+		if (!checkShareResponse('export', response) || !response.ok)
+			throw new Error('Expected a valid export response')
+		expectTypeOf(response.result.operation).toEqualTypeOf<'export'>()
 	})
 
 	it('types host results by operation and keeps old saves versioned outside WorkProgress', () => {

@@ -119,20 +119,28 @@ const responses = union([
 	obj({ ok: lit(true), result: results }),
 	obj({ ok: lit(false), error }),
 ])
-export const shareResponse = compile(responses)
+const shareResponse = compile(responses)
 export type ShareResponse = Static<typeof responses>
+
+type ShareResponseFor<Operation extends ShareRequest['operation']> =
+	| {
+			ok: true
+			result: Extract<Static<typeof results>, { operation: Operation }>
+	  }
+	| Extract<ShareResponse, { ok: false }>
+
+export function checkShareResponse<Operation extends ShareRequest['operation']>(
+	expectedOperation: Operation,
+	input: unknown,
+): input is ShareResponseFor<Operation> {
+	return (
+		shareResponse.check(input) &&
+		(!input.ok || input.result.operation === expectedOperation)
+	)
+}
 
 export interface DesktopShareApi {
 	call<Request extends ShareRequest>(
 		request: Request,
-	): Promise<
-		| {
-				ok: true
-				result: Extract<
-					Static<typeof results>,
-					{ operation: Request['operation'] }
-				>
-		  }
-		| Extract<ShareResponse, { ok: false }>
-	>
+	): Promise<ShareResponseFor<Request['operation']>>
 }
