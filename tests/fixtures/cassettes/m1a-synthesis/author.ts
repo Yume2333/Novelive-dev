@@ -27,6 +27,9 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 	const eventIndex = Number(
 		/^Events already extracted: (\d+)$/m.exec(prompt)?.[1] ?? 0,
 	)
+	const candidates = prompt.split('Candidates:\n')[1]
+	if (candidates !== undefined)
+		return sse({ keep: candidates.split('\n').map((_, i) => i + 1) })
 	const lastPacket = packet?.[1] === packet?.[2]
 	const packetText = prompt.split('Chapter previews:\n')[1] ?? ''
 	const fragmentChapter = /^Chapter ([\w-]+):$/m.exec(packetText)?.[1]
@@ -100,6 +103,10 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 			},
 		] as unknown as typeof changes
 	}
+	return sse(result)
+}
+
+function sse(result: unknown) {
 	return new Response(
 		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
 		{

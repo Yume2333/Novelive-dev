@@ -369,6 +369,8 @@ function merge<T extends Entry>(
 	const before = current as (Entry & Record<string, unknown>) | undefined
 	const after = { ...(current ?? candidate) } as T & Record<string, unknown>
 	const proposedChanges = changesOf(candidate)
+	const knows = Array.isArray(incoming.knows) ? incoming.knows : undefined
+	const known = Array.isArray(before?.knows) ? before.knows : []
 	if (temporal) delete incoming[temporal]
 	const metadata = new Set([
 		'status',
@@ -381,6 +383,9 @@ function merge<T extends Entry>(
 	const fixedConflict =
 		current?.status === 'confirmed' &&
 		(proposedChanges.some(({ field }) => field !== temporal) ||
+			knows?.some(
+				(fact) => !known.some((prior) => isDeepStrictEqual(prior, fact)),
+			) ||
 			Object.entries(incoming).some(
 				([key, value]) =>
 					!metadata.has(key) && !isDeepStrictEqual(before?.[key], value),
@@ -463,7 +468,8 @@ function merge<T extends Entry>(
 		if (temporal === 'identity') delete after[temporal]
 		else Object.assign(after, { [temporal]: '' })
 	}
-	if (current?.status !== 'confirmed') Object.assign(after, incoming)
+	if (current?.status === 'confirmed') return { entry: current }
+	Object.assign(after, incoming)
 	for (const field of ['firstSeenChapter', 'revealedChapter'] as const)
 		if (current?.[field] !== undefined) after[field] = current[field]
 	const changes = unique([
@@ -474,12 +480,9 @@ function merge<T extends Entry>(
 		Object.assign(after, {
 			changes,
 		})
-	if (Array.isArray(incoming.knows))
+	if (knows)
 		Object.assign(after, {
-			knows: unique([
-				...(Array.isArray(before?.knows) ? before.knows : []),
-				...incoming.knows,
-			]),
+			knows: unique([...known, ...knows]),
 		})
 	return { entry: after }
 }
@@ -495,7 +498,7 @@ export async function applyPatches(
 ): Promise<{
 	conflicts: BiblePatch
 	glossaryConflicts: GlossaryPatch
-	consolidatedAdds: Map<Patch, Patch | null>
+	consolidated: Map<Patch, Patch | null>
 }> {
 	const chapterOrder = new Map(
 		Array.from(seriesChapters, (id, index) => [id, index]),
@@ -506,7 +509,7 @@ export async function applyPatches(
 	const characterDeletions: (() => Promise<void>)[] = []
 	const removedCharacters = new Set<string>()
 	const accepted = new Set<Patch>()
-	const consolidatedAdds = new Map<Patch, Patch | null>()
+	const consolidated = new Map<Patch, Patch | null>()
 	const published = structuredClone(bible)
 	let survivingCharacters = bible.character
 	let survivingRelations = bible.relation
@@ -526,6 +529,7 @@ export async function applyPatches(
 		const histories = new Map<string, History>()
 		const changed = new Set<string>()
 		const deferred = new Map<string, Patch[]>()
+		const deleted = new Map<string, Patch>()
 		const rejectDeferred = (id: string, reason: string) => {
 			for (const item of deferred.get(id) ?? []) {
 				conflicts.push({
@@ -553,6 +557,7 @@ export async function applyPatches(
 					chapters.has(current.firstSeenChapter)
 				) {
 					entries.delete(current.id)
+					deleted.set(id, item)
 					histories.delete(current.id)
 					changed.add(current.id)
 					if (kind === 'character') removedCharacters.add(current.id)
@@ -614,24 +619,31 @@ export async function applyPatches(
 		}
 		const originalIds = new Set(original.map(({ id }) => id))
 		for (const [id, group] of byId) {
+			if (group.length < 2) continue
 			const entry = entries.get(id)
-			if (
-				!entry ||
-				group.length < 2 ||
-				originalIds.has(id) ||
-				group.some((item) => item.op !== 'add' || !accepted.has(item))
-			)
+			const removal = deleted.get(id)
+			const merged = group
+				.slice(removal ? group.indexOf(removal) + 1 : 0)
+				.filter((item) => accepted.has(item))
+			for (const item of group) consolidated.set(item, null)
+			if (!entry || !merged.length) {
+				if (removal && originalIds.has(id)) consolidated.set(group[0], removal)
 				continue
+			}
 			const fields =
-				kind === 'character'
-					? ['aliases', 'addresses', 'costumes', 'expressions', 'references']
-					: kind === 'location'
-						? ['variants', 'references']
-						: kind === 'style'
-							? ['references']
-							: []
+				merged.length < 2 ||
+				merged[0].op !== 'add' ||
+				(originalIds.has(id) && !removal)
+					? []
+					: kind === 'character'
+						? ['aliases', 'addresses', 'costumes', 'expressions', 'references']
+						: kind === 'location'
+							? ['variants', 'references']
+							: kind === 'style'
+								? ['references']
+								: []
 			for (const field of fields) {
-				const arrays = group.flatMap(({ entry }) => {
+				const arrays = merged.flatMap(({ entry }) => {
 					const value = (entry as Record<string, unknown>)[field]
 					return Array.isArray(value) ? [value as unknown[]] : []
 				})
@@ -648,13 +660,14 @@ export async function applyPatches(
 					if (kind === 'style') keyed.delete(key)
 					keyed.set(key, value)
 				}
-				const merged = unique([...keyed.values()])
+				const values = unique([...keyed.values()])
 				Object.assign(entry, {
-					[field]: kind === 'style' ? merged.slice(-3) : merged,
+					[field]: kind === 'style' ? values.slice(-3) : values,
 				})
 			}
-			consolidatedAdds.set(group[0], { ...group[0], entry } as Patch)
-			for (const item of group.slice(1)) consolidatedAdds.set(item, null)
+			const op = originalIds.has(id) ? 'update' : 'add'
+			const source = merged.find((item) => item.op === op) ?? merged[0]
+			consolidated.set(group[0], { ...source, op, entry } as Patch)
 		}
 		const survivors = [...entries.values()]
 		Object.assign(published, { [kind]: survivors })
@@ -737,13 +750,15 @@ export async function applyPatches(
 	if (blocked.size || invalid.size) {
 		const allowed: BiblePatch = []
 		const rejected: BiblePatch = []
+		const excluded = new Set<Patch>()
 		for (const item of patch) {
 			const missing = invalid.get(item)
 			const referenced =
 				item.kind === 'character' &&
 				item.op === 'delete' &&
 				blocked.has(item.entry.id)
-			if (referenced || missing)
+			if (referenced || missing) {
+				excluded.add(item)
 				rejected.push({
 					...item,
 					entry: {
@@ -754,7 +769,7 @@ export async function applyPatches(
 							: `Referenced character is not published: ${missing}`,
 					},
 				} as Patch)
-			else allowed.push(item)
+			} else allowed.push(item)
 		}
 		const result = await applyPatches(
 			project,
@@ -765,6 +780,7 @@ export async function applyPatches(
 			seriesChapters,
 			onPublished,
 		)
+		for (const item of excluded) result.consolidated.set(item, null)
 		return { ...result, conflicts: [...rejected, ...result.conflicts] }
 	}
 
@@ -784,5 +800,5 @@ export async function applyPatches(
 	if (changed) await write(projectFiles.glossary(scope), [...terms.values()])
 	published.glossary = [...terms.values()]
 	onPublished?.(published)
-	return { conflicts, glossaryConflicts, consolidatedAdds }
+	return { conflicts, glossaryConflicts, consolidated }
 }
