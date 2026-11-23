@@ -4,6 +4,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Usage } from '@earendil-works/pi-ai'
 import { projectFiles } from '@novelive/format/model'
+import type { TextSlot } from '../config/schema'
 import type { CommandOutput } from '../contract'
 import type { ProductionUsage } from '../contract/queue'
 import { Project } from '../project'
@@ -61,18 +62,23 @@ export function usageMethods<T extends object>(
 	})
 }
 
-export function recordTextUsage(model: string, usage: Usage) {
+export function recordTextUsage(
+	model: string,
+	usage: Usage,
+	slot: TextSlot = 'main',
+) {
 	const current = context.getStore()
 	if (!current) return
 	const { project, workId, phase } = current
 	project.database
 		.prepare(`INSERT INTO usage
 		(usage_id, work_id, at, slot, purpose, model, usage_input, usage_output, usage_cache_read, usage_cache_write)
-		VALUES (?, ?, ?, 'main', ?, ?, ?, ?, ?, ?)`)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 		.run(
 			randomUUID(),
 			workId,
 			Date.now(),
+			slot,
 			phase,
 			model,
 			usage.input,

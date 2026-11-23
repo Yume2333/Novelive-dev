@@ -9,6 +9,7 @@ import {
 import { expect, test, vi } from 'vitest'
 import { propagateStaleness } from '../../packages/creator/src/bible/staleness'
 import { createConfigStore } from '../../packages/creator/src/config'
+import { testTextConnection } from '../../packages/creator/src/models/text'
 import * as artModels from '../../packages/creator/src/pipeline/art/models'
 import { Project } from '../../packages/creator/src/project'
 import {
@@ -20,6 +21,7 @@ import {
 	listUsage,
 	recordImageUsage,
 	recordTextUsage,
+	withUsage,
 } from '../../packages/creator/src/usage'
 import { bible } from '../fixtures/cassettes/m1b-art/fixture'
 import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
@@ -288,4 +290,55 @@ test('usage keeps readable history and distinguishes broken bindings from empty 
 			{ projectId: 'moved', reason: '项目已移动或不存在' },
 		])
 	})
+})
+
+test('text provider usage preserves resolved slots even when every slot uses the same model', async () => {
+	vi.stubEnv('NL_REPLAY', 'strict')
+	try {
+		await fixture(async (project, profile) => {
+			const store = createConfigStore(profile)
+			const connection = configuration.models.fast
+			await store.update({
+				models: {
+					fast: connection,
+					main: { ...connection, inheritFast: false },
+					writing: { ...connection, inheritFast: false },
+					visual: { ...connection, inheritFast: false },
+				},
+			})
+			const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+				const chunks = [
+					{ choices: [{ index: 0, delta: { content: 'OK' } }] },
+					{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+					{ choices: [], usage: { prompt_tokens: 11, completion_tokens: 7 } },
+				]
+				return new Response(
+					`${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
+					{ headers: { 'content-type': 'text/event-stream' } },
+				)
+			})
+			for (const slot of ['fast', 'main', 'writing', 'visual'] as const) {
+				const model = await store.resolveTextModel(slot)
+				await withUsage(project, workId, 'write', () =>
+					testTextConnection(model, { fetch }),
+				)
+			}
+			expect(
+				project.database
+					.prepare(
+						'SELECT slot, usage_input, usage_output FROM usage ORDER BY at, rowid',
+					)
+					.all(),
+			).toEqual(
+				['fast', 'main', 'writing', 'visual'].map((slot) => ({
+					slot,
+					usage_input: 11,
+					usage_output: 7,
+				})),
+			)
+			expect(fetch).toHaveBeenCalledTimes(4)
+		})
+	} finally {
+		vi.unstubAllEnvs()
+	}
 })
