@@ -7,6 +7,9 @@ export function useChapterWait({
 	current,
 	ended,
 	nextChapterId,
+	nextChapterPublished,
+	nextChapterRead,
+	newestPublished,
 	directory,
 	loadChapter,
 	setChapters,
@@ -16,6 +19,9 @@ export function useChapterWait({
 	current?: { chapterId: string; mode: PlaybackMode }
 	ended: boolean
 	nextChapterId?: string
+	nextChapterPublished: boolean
+	nextChapterRead: boolean
+	newestPublished: boolean
 	directory?: string
 	loadChapter(
 		directory: undefined,
@@ -26,8 +32,9 @@ export function useChapterWait({
 	setChapters(update: (chapters: ControlChapter[]) => ControlChapter[]): void
 	onError(message: string): void
 }) {
+	const waiting = ended && newestPublished && !nextChapterPublished
 	useEffect(() => {
-		if (!ended || !nextChapterId || !workId) return
+		if (!waiting || !nextChapterId || !workId) return
 		window.dispatchEvent(
 			new CustomEvent('novelive:player-waiting', { detail: workId }),
 		)
@@ -36,9 +43,15 @@ export function useChapterWait({
 				new CustomEvent('novelive:player-waiting', { detail: null }),
 			)
 		}
-	}, [ended, nextChapterId, workId])
+	}, [waiting, nextChapterId, workId])
 	useEffect(() => {
 		if (!ended || !current || !workId || !nextChapterId) return
+		const mode = nextChapterRead ? 'reread' : 'main'
+		if (nextChapterPublished) {
+			void loadChapter(undefined, nextChapterId, mode, true)
+			return
+		}
+		if (!waiting) return
 		const work = workId
 		const chapter = current
 		let cancelled = false
@@ -58,7 +71,7 @@ export function useChapterWait({
 				)
 				if (ready?.published) {
 					cancelled = true
-					await loadChapter(undefined, ready.chapterId, chapter.mode, true)
+					await loadChapter(undefined, ready.chapterId, mode, true)
 				} else
 					setChapters((previous) =>
 						result.chapters.map((chapter) => ({
@@ -85,6 +98,9 @@ export function useChapterWait({
 		current,
 		workId,
 		nextChapterId,
+		nextChapterPublished,
+		nextChapterRead,
+		waiting,
 		directory,
 		loadChapter,
 		setChapters,

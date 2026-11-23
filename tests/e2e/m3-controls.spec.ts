@@ -103,7 +103,11 @@ test.describe('M3 player controls', () => {
 		expect(advances).toBe(2)
 	})
 
-	for (const scenario of ['settings and reread', 'chapter wait'] as const) {
+	for (const scenario of [
+		'settings and reread',
+		'chapter wait',
+		'reread successor',
+	] as const) {
 		test(`${scenario} in the real Electron player`, async () => {
 			const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-controls-'))
 			const root = join(directory, 'project')
@@ -151,6 +155,12 @@ test.describe('M3 player controls', () => {
 						"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, 'ch1', 1, 'published'), (?, 'ch2', 2, 'producing')",
 					)
 					.run(playerWorkId, playerWorkId)
+				if (scenario === 'reread successor')
+					project.database
+						.prepare(
+							"UPDATE chapter SET user_state = 'published' WHERE chapter_id = 'ch2'",
+						)
+						.run()
 			}
 			const app = await electron.launch({
 				executablePath: require('electron'),
@@ -160,6 +170,17 @@ test.describe('M3 player controls', () => {
 			try {
 				const page = await app.firstWindow()
 				await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+				await page.evaluate(() => {
+					document.body.dataset.playerWaitEntries = '0'
+					window.addEventListener('novelive:player-waiting', (event) => {
+						const detail = (event as CustomEvent<string | null>).detail
+						document.body.dataset.playerWaiting = JSON.stringify(detail)
+						if (detail)
+							document.body.dataset.playerWaitEntries = String(
+								Number(document.body.dataset.playerWaitEntries) + 1,
+							)
+					})
+				})
 				await app.evaluate(({ dialog }, path) => {
 					dialog.showOpenDialog = async () => ({
 						canceled: false,
@@ -301,14 +322,33 @@ test.describe('M3 player controls', () => {
 					await expect(page).toHaveURL(
 						/\/edit\?chapterId=ch1&sceneId=.+&lineId=.+/,
 					)
+				} else if (scenario === 'reread successor') {
+					await page.keyboard.press('Escape')
+					await page.getByRole('button', { name: '章节', exact: true }).click()
+					await page.getByRole('button', { name: /空屋/ }).click()
+					await expect(page.getByRole('main')).toHaveAttribute(
+						'data-mode',
+						'reread',
+					)
+					await expect(text).toHaveText('你好，世界。')
+					for (let index = 0; index < 6; index++) await advance()
+					await page
+						.getByRole('button', { name: '下一章已就绪，点击开始' })
+						.click()
+					await expect(text).toHaveText('自动开场')
+					await expect(page.getByRole('main')).toHaveAttribute(
+						'data-mode',
+						'main',
+					)
+					await expect(page.getByRole('main')).toHaveAttribute(
+						'data-mainline',
+						/"chapterId":"ch2"/,
+					)
+					await expect(page.locator('body')).toHaveAttribute(
+						'data-player-wait-entries',
+						'0',
+					)
 				} else {
-					await page.evaluate(() => {
-						window.addEventListener('novelive:player-waiting', (event) => {
-							document.body.dataset.playerWaiting = JSON.stringify(
-								(event as CustomEvent<string | null>).detail,
-							)
-						})
-					})
 					for (let index = 0; index < 6; index++) await advance()
 					await expect(page.getByRole('status')).toContainText('下一章 · 晨光')
 					await expect(page.getByRole('status')).toContainText('制作中')

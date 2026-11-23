@@ -177,11 +177,23 @@ export function PlayerPage() {
 				) + 1
 			]
 		: undefined
+	const newestPublished =
+		!!loaded &&
+		!chapters
+			.slice(
+				chapters.findIndex(
+					(chapter) => chapter.chapterId === loaded.chapterId,
+				) + 1,
+			)
+			.some((chapter) => chapter.published)
 	useChapterWait({
 		workId: id,
 		current: loaded,
 		ended,
 		nextChapterId: nextChapter?.chapterId,
+		nextChapterPublished: nextChapter?.published ?? false,
+		nextChapterRead: nextChapter?.read ?? false,
+		newestPublished,
 		directory: directoryRef.current,
 		loadChapter: loadProject,
 		setChapters,
@@ -221,7 +233,11 @@ export function PlayerPage() {
 					onEditor={(position) => {
 						if (id) navigate(playerEditorRoute(id, position))
 					}}
-					waiting={ended ? nextChapter : undefined}
+					waiting={
+						ended && newestPublished && !nextChapter?.published
+							? nextChapter
+							: undefined
+					}
 					awaitingClick={awaitingClick}
 					onResume={() => setAwaitingClick(false)}
 				/>
