@@ -430,6 +430,45 @@ test('rejects mismatched derivation sizes and RGB transparency, not legitimate R
 	).toEqual({ issue: '差分图尺寸与基准图不一致。' })
 })
 
+test('removes an opaque sprite background before validating and auditing the result', async () => {
+	const svg = Buffer.from(
+		'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><path fill="#e8dfd7" d="M0 0h300v450H0z"/><ellipse fill="#3d2536" cx="150" cy="122" rx="49" ry="63"/><ellipse fill="#e1a07f" cx="150" cy="126" rx="36" ry="48"/><path fill="#5230a0" d="M112 175q-44 12-51 81l18 92 22-14 2 116h94l2-116 22 14 18-92q-7-69-51-81z"/></svg>',
+	)
+	const opaque = await sharp(svg).removeAlpha().png().toBuffer()
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async () => ({ bytes: opaque }))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(
+			async (_connection, prompt, _schema, _options, images) => {
+				if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+				const { data, info } = await sharp(images?.[0])
+					.raw()
+					.toBuffer({ resolveWithObject: true })
+				expect(info.channels).toBe(4)
+				expect(data[3]).toBe(0)
+				const center =
+					Math.floor(info.height / 2) * info.width + Math.floor(info.width / 2)
+				expect(data[center * 4 + 3]).toBe(255)
+				return { pass: true, failedChecks: [], feedback: '' }
+			},
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay)
+			const [sprite] = await art.register(
+				[{ id: 'ada/uniform/neutral', kind: 'character', description: 'Ada' }],
+				bible,
+			)
+			expect(await art.draw(sprite, bible)).toEqual({ status: 'drawn' })
+		})
+	} finally {
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+}, 15_000)
+
 test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(
 		'Invalid staging patch',
