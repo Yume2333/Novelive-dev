@@ -5,6 +5,7 @@
 **Blocked by:** 09, 10
 **Covers:** W4
 **Task type:** spike
+**Status:** blocked
 **Files:** .workflow/evidence/m1b/owner/
 **Read first:** `.workflow/specs/m1b-production.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
 **Check:** 仅串行主线执行 `NL_REPLAY=record pnpm dev` → 使用授权真书导入、确认、试玩、继续制作并记录作品验收和用量。并行会话不领取本任务，严格回放不能替代本 Check。
@@ -17,4 +18,10 @@
 
 M1a 恢复与综合代码已在 `f9dd863` 合入 main（[#86](https://github.com/Yume2333/Novelive-dev/pull/86)），满足本任务的代码前提。M1a/07 的 0.90 门槛仍未通过，待[所有者评审](../../owner-review.md)，不再付费跑 M1a W4；该比较验收不再是本任务的前置。
 
-获授权的串行窗口已完成 [《浮生六記》制作前探针](../../evidence/m1b/owner/probes.md)，实测 8,818 tokens、1 张图，全部核销。主模型单字段限额 128、供应方报告输出 509；后续保留该主模型并采用 5 倍输出预留、80% 软停止线、每张 7,000 tokens 的生图／编辑估算，不将观察值冒充供应方上界。窗口已释放，等待下一次串行授权执行原 Check；未启动完整真书验收。
+获授权的串行窗口已完成 [《浮生六記》制作前探针](../../evidence/m1b/owner/probes.md)，实测 8,818 tokens、1 张图，全部核销。主模型单字段限额 128、供应方报告输出 509；后续保留该主模型并采用 5 倍输出预留、80% 软停止线、每张 7,000 tokens 的生图／编辑估算，不将观察值冒充供应方上界。
+
+Check after: 在 #92 合入后的 `27ef7dc` 从干净工作树检查新授权窗口的硬上限；启动前阻塞，未运行 Electron 或调用付费模型。完整的[检查状态与对账](../../evidence/m1b/owner/live-run-27ef7dc.md)已记录；本窗口零消耗、零未核销，已释放全部 2,000,000 tokens／50 张图。验收项未勾选。
+
+## Blocked
+
+需先确认中转能对本窗口强制执行实际计费的 2,000,000 tokens／50 张图上限。当前客户端只在发送前检查估算，无法阻止已派发请求按超过预留的实际用量结算。
