@@ -331,7 +331,16 @@ test.describe('M3 player controls', () => {
 						'reread',
 					)
 					await expect(text).toHaveText('你好，世界。')
-					for (let index = 0; index < 6; index++) await advance()
+					for (const line of [
+						'我在想什么？',
+						'风从窗边吹过。',
+						'黄昏时分',
+						'屋子静了。',
+					]) {
+						await advance()
+						await expect(text).toHaveText(line)
+					}
+					await advance()
 					await page
 						.getByRole('button', { name: '下一章已就绪，点击开始' })
 						.click()
