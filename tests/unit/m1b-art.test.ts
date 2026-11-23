@@ -843,13 +843,15 @@ test('retries after an unmattable image instead of immediately offering a reject
 		.png()
 		.toBuffer()
 	const responses = [portrait, opaque, approved, opaque, opaque]
+	const portraitPrompts: string[] = []
 	let portraitReviews = 0
 	const matte = vi
 		.spyOn(background, 'removeBackground')
 		.mockRejectedValue(new background.MattingUnavailableError(undefined))
 	const renderer = vi
 		.spyOn(artModels, 'imageRenderer')
-		.mockReturnValue(async (_prompt, _refs, _size, transparent) => {
+		.mockReturnValue(async (prompt, _refs, _size, transparent) => {
+			if (transparent) portraitPrompts.push(prompt)
 			const bytes = transparent ? responses.shift() : landscape
 			if (!bytes) throw new Error('Unexpected extra portrait request')
 			return { bytes }
@@ -875,6 +877,8 @@ test('retries after an unmattable image instead of immediately offering a reject
 				characters: [{ characterId: 'ada', candidates: [{ id: 'costume-1' }] }],
 			})
 			expect(portraitReviews).toBe(2)
+			expect(portraitPrompts[1]).toContain('Try another style')
+			expect(portraitPrompts[2]).toContain('Try another style')
 			expect(responses).toHaveLength(0)
 			const { cachePath } = pool.characters[0].candidates[0]
 			const saved = sharp(await project.readFile(cachePath))
