@@ -75,7 +75,7 @@ export function mountText(
 				for (const { perChar } of stack) {
 					if (!perChar) continue
 					const effect = document.createElement('span')
-					effect.className = 'nl-text-mark-char'
+					effect.dataset.markGlyph = ''
 					effect.dataset.markStyle = perChar
 					target.append(effect)
 					target = effect
@@ -94,7 +94,7 @@ export function mountText(
 			'[data-mark-style], [data-mark-inheritance]',
 		)) {
 			const inherited = element.dataset.markInheritance
-			const glyph = element.classList.contains('nl-text-mark-char')
+			const glyph = element.hasAttribute('data-mark-glyph')
 			for (const [property, value, priority] of styles.get(
 				element.dataset.markStyle ?? inherited ?? '',
 			) ?? []) {
