@@ -1,27 +1,16 @@
 m2-editor/03 — 供应商录制
-Base: 5ea3d49acbdb1f0a33431c53e2edfab57c01ca9d (main)
+Base: 8da7e2e (main，含共享输出预算修复)
 录制脚本、聊天请求构建、模型适配、回放及依赖锁与 fc1517e 一致。
 
-NL_REPLAY=record pnpm --filter @novelive/desktop exec tsx ../../tests/fixtures/cassettes/m2-chat/record.ts
-M2 chat recording stopped after 4 calls. Check the private cassette for the last completed request.
-四条 devin-swe-2 响应均为 HTTP 200 / finish_reason=length，只含推理，
-没有回答或工具调用。使用私有 cassette 严格回放复现：附图及两次文本请求
-进入 done，但没有文字；压缩报「会话压缩未返回摘要」。未执行提议、
-拒绝后续或取消路径。未替换合成 fixture，私有录制不提交。
+角色：主聊天 gemini-3.8-flash（devin-swe-2 在附图回复上报 reasoning_limit），
+压缩摘要 devin-swe-2。未改产品默认模型。
 
-NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
- Test Files  1 passed (1)
-      Tests  7 passed (7)
+录制与回放驱动在仓库外（私有），复用 tests/fixtures/cassettes/m2-chat/fixture.ts
+的会话、提示词和回放 fixture，增加按角色切换、累计预算和端到端断言。
+私有 cassette 不提交，不替换合成 fixture。
 
-私有账本：4 次调用，16,853 实测 tokens，0 张生成图片。附图是输入。
-
-共享输出预算合并后的重录（main 8da7e2e）。
-devin-swe-2 的首条附图回复仍报 reasoning_limit；仅将主聊天改为
-gemini-3.8-flash，压缩摘要仍由 devin-swe-2 生成。未改产品默认模型。
-使用仓库外的录制驱动，复用 record.ts 的会话、提示词和回放 fixture，
-增加按角色切换、累计预算及端到端断言。私有结果不提交，不替换合成 fixture。
-
-M2/03 record passed
+录制：NL_REPLAY=record pnpm --filter @novelive/desktop exec tsx <私有驱动>
+回放：NL_REPLAY=strict pnpm --filter @novelive/desktop exec tsx <私有驱动>
 私有严格回放（无网络、0 次付费调用）：
 Attachment passed
 Text passed
@@ -38,5 +27,5 @@ NL_REPLAY=strict pnpm check
  Test Files  25 passed (25)
       Tests  359 passed (359)
 
-本轮私有账本：共 10 次调用，26,267 实测 tokens，加 1 条未返回用量的
-4,659-token 预留，共计 30,926 tokens（上限 1,000,000），0 张生成图片。
+私有账本：10 次调用，26,267 实测 tokens，加 1 条未返回用量的 4,659-token 预留，
+共计 30,926 tokens（上限 1,000,000），0 张生成图片。
