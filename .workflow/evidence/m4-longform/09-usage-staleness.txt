@@ -4,16 +4,16 @@ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 usage and stale assets'
 
 Running 1 test using 1 worker
 
-  ✓  1 tests/e2e/m4-usage.spec.ts:36:1 › M4 usage and stale assets (9.1s)
+  ✓  1 tests/e2e/m4-usage.spec.ts:36:1 › M4 usage and stale assets (8.2s)
 
-  1 passed (10.2s)
+  1 passed (9.1s)
 
 pnpm typecheck
 $ tsc --noEmit
 Exit code: 0
 
 pnpm lint
-Checked 249 files in 121ms. No fixes applied.
+Checked 249 files in 96ms. No fixes applied.
 Found 1 info.
 Exit code: 0
 Existing informational useTemplate notice: tests/fixtures/text-models/build-synthetic.ts:63.
@@ -43,6 +43,16 @@ The added unit tests cover registry-only portraits, character/location ID
 collisions, real chapterWorker/ArtProduction entry-point attribution with stubbed
 models and forbidden network, partial/empty usage histories, and actual text
 adapter recording for all four resolved slots (including identical model IDs).
+
+Round-two regression coverage:
+NL_REPLAY=strict pnpm test tests/unit/m4-usage-staleness.test.ts
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+
+Portrait tests now invoke real ArtProduction.confirmVisual and verify both the
+asset and task tables remain empty before appearance/costume edits materialize
+the stale projection. Style/glossary approvals with a malformed asset registry
+apply successfully without reading the registry. Both cases prohibit network.
 
 Screenshots: 09-usage-staleness.png and 09-stale-assets.png.
 The application shell provides ScrollArea; the test checks no native scrollbar.
