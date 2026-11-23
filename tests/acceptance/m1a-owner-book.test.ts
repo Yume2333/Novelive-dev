@@ -26,15 +26,16 @@ import {
 	synthesizeVolume,
 	type VolumeSynthesis,
 } from '../../packages/creator/src/synthesis'
-import { type BiblePatch, projectFiles } from '../../packages/format/src/model'
+import { projectFiles } from '../../packages/format/src/model'
+import { scoreBiblePatches } from './bible-patch-score'
 
 const home = homedir()
 const source = join(home, 'novelive-testbooks', 'yesou-puyan.txt')
 const root = join(home, '.local/novelive-tools/m1a-owner-book')
 const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
-const purpose = 'M1a/07 owner book after shared output budgeting'
+const purpose = 'M1a/07 owner book with shared inclusion criteria'
 const previewModel = 'gemini-3.8-flash'
-const cap = 15_000_000
+const cap = 5_000_000
 const series = {
 	formatVersion: 1,
 	seriesId: 'yesou-puyan',
@@ -56,18 +57,6 @@ const bookHeadingRules = headingRules.map((rule) =>
 )
 const digest = (body: Uint8Array) =>
 	createHash('sha256').update(body).digest('hex')
-
-function normalized(entries: BiblePatch) {
-	return new Set(
-		entries.map(({ kind, op, entry }) => {
-			const id = entry.id
-				.normalize('NFKC')
-				.toLowerCase()
-				.replace(/[\p{P}\s]/gu, '')
-			return `${kind}:${op}:${id}`
-		}),
-	)
-}
 
 test.skipIf(process.env.NL_REPLAY !== 'record')(
 	'M1a/07 imports a complete public-domain book and compares one real volume on disk',
@@ -334,13 +323,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					fetch: fetchReplay,
 					signal: controller.signal,
 				})
-				const wholeSet = normalized(reference.biblePatch)
-				const eventSet = normalized(chunked.biblePatch)
-				const both = [...wholeSet].filter((id) => eventSet.has(id)).length
-				const f1 =
-					wholeSet.size + eventSet.size
-						? (2 * both) / (wholeSet.size + eventSet.size)
-						: 0
+				const score = scoreBiblePatches(reference, chunked)
 				const expected = { formatVersion: 1, entries: [entry] }
 				const confirmedIntact =
 					JSON.stringify(await whole.read(confirmed)) ===
@@ -374,12 +357,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					previewBytes,
 					packets: checkpoint.packet,
 					events: checkpoint.events.length,
-					whole: wholeSet.size,
-					chunked: eventSet.size,
-					shared: both,
-					wholeOnly: wholeSet.size - both,
-					chunkedOnly: eventSet.size - both,
-					f1,
+					...score,
 					confirmedIntact,
 					restartRequests,
 					restartIntact,
@@ -391,7 +369,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				)
 				console.log(JSON.stringify(report))
 				expect(confirmedIntact && restartIntact).toBe(true)
-				expect(f1).toBeGreaterThanOrEqual(0.9)
+				phase = 'normalized BiblePatch F1'
+				expect(score.f1).toBeGreaterThanOrEqual(0.9)
 			} finally {
 				if (!closed) first.close()
 			}

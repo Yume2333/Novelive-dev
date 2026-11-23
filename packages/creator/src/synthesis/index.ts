@@ -53,6 +53,8 @@ const eventSchema = obj({
 	is_last: bool(),
 })
 const nextEvent = synthesisOutput(eventSchema)
+const inclusionCriteria =
+	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
 const checkpointSchema = obj({
 	...version,
 	fingerprint: str(),
@@ -240,7 +242,7 @@ export async function synthesizeVolume(
 	if (previews.some((preview, i) => preview.chapterId !== chapterIds[i]))
 		throw new Error('Stored preview chapter ID does not match its file')
 	const fingerprint = hash({
-		packetFormat: 3,
+		packetFormat: 4,
 		previews,
 		language: options.language,
 		requirements: options.requirements,
@@ -269,7 +271,8 @@ export async function synthesizeVolume(
 	)
 	const packetText = previews.map((preview) => JSON.stringify(preview))
 	const instructions = `Synthesize the ordered chapter previews in ${options.language}. Adaptation requirements: ${options.requirements ?? ''}.
-Return one JSON object. Use stable IDs, actual chapter IDs for provenance, and existing or extracted character IDs for relations. Mark main characters as major and new entries as candidate. Preserve confirmed facts; ${incremental ? 'do not delete in successive volumes.' : 'delete only mistaken candidates from this volume.'}
+Return JSON. Use stable IDs, real chapter IDs, and character IDs for relations. Mark main characters major and new entries candidate. Preserve confirmed facts; ${incremental ? 'never delete.' : 'delete only this volume’s mistaken candidates.'}
+${inclusionCriteria}
 Existing entries:
 ${JSON.stringify(bible)}`
 	const wholePrompt = `${instructions}
