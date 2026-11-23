@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { isDeepStrictEqual } from 'node:util'
 import { formatVersion, projectFiles, type Work } from '@novelive/format/model'
 import { ChatStore, type ProposalSource } from '../../chat/store'
 import type { CommandInput, CommandOutput, Proposal } from '../../contract'
 import { Project } from '../../project'
 import { existing, readBible } from '../../synthesis/patch'
+import { propagateStaleness } from '../staleness'
 import { prepareBiblePatch } from './patch'
 import {
 	bridgeBibleSources,
@@ -180,31 +180,6 @@ export async function getBible(
 	}
 }
 
-function stalePrefixes(before: Bible, after: Bible) {
-	const prefixes: string[] = []
-	for (const character of before.character) {
-		const next = after.character.find(({ id }) => id === character.id)
-		if (!next || !isDeepStrictEqual(character.appearance, next.appearance))
-			prefixes.push(`${character.id}/`)
-		else
-			for (const costume of character.costumes ?? []) {
-				if (
-					costume.description !==
-					next.costumes?.find(({ id }) => id === costume.id)?.description
-				)
-					prefixes.push(`${character.id}/${costume.id}/`)
-			}
-	}
-	for (const location of before.location) {
-		if (
-			location.description !==
-			after.location.find(({ id }) => id === location.id)?.description
-		)
-			prefixes.push(`${location.id}/`)
-	}
-	return prefixes
-}
-
 async function apply(
 	project: Project,
 	proposal: Proposal,
@@ -244,19 +219,7 @@ async function apply(
 			path,
 			`${JSON.stringify({ formatVersion, entries }, null, '\t')}\n`,
 		)
-	const prefixes = stalePrefixes(before, after)
-	const assets = project.database
-		.prepare(
-			"SELECT work_id, asset_key FROM asset WHERE kind != 'cg' AND status IN ('drawn','stale')",
-		)
-		.all()
-	for (const asset of assets)
-		if (prefixes.some((prefix) => String(asset.asset_key).startsWith(prefix)))
-			project.database
-				.prepare(
-					"UPDATE asset SET status = 'stale' WHERE work_id = ? AND asset_key = ?",
-				)
-				.run(asset.work_id, asset.asset_key)
+	propagateStaleness(project, before, after)
 	return { status: 'applied' }
 }
 

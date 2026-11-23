@@ -1,0 +1,39 @@
+M4/09 usage and staleness verification
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 usage and stale assets'
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/e2e/m4-usage.spec.ts:36:1 › M4 usage and stale assets (7.7s)
+
+  1 passed (8.7s)
+
+pnpm typecheck
+$ tsc --noEmit
+Exit code: 0
+
+pnpm lint
+Checked 247 files in 102ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+Existing informational useTemplate notice: tests/fixtures/text-models/build-synthetic.ts:63.
+
+NL_REPLAY=strict pnpm exec vitest run tests/unit/m1b-production-worker.test.ts
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+
+NL_REPLAY=strict pnpm exec vitest run tests/unit/m0-text.test.ts tests/unit/m1b-art.test.ts tests/unit/m2-bible-chat.test.ts tests/unit/m2-bible-sources.test.ts
+ Test Files  4 passed (4)
+      Tests  63 passed (63)
+
+Real path: Electron sidebar -> usage (empty), writer/reviewer and image pipeline
+using existing strict cassettes -> usage via IPC -> Bible approval of style,
+appearance, costume and location proposals -> stale asset projection -> reload.
+The test compares the IPC ledger with persisted project.db records, checks that
+style changes do not stale images, checks CG/unrelated exclusions, and rejects a
+broken project binding rather than silently showing zero usage. No paid calls.
+
+Screenshots: 09-usage-staleness.png and 09-stale-assets.png.
+The application shell provides ScrollArea; the test checks no native scrollbar.
+
+Review: skipped — no reviewer/subagent/session tool is available in this host.

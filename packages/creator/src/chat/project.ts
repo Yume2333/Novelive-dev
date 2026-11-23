@@ -5,6 +5,7 @@ import type { CreativeRevisions } from '../editor/revisions'
 import type { Project } from '../project'
 import type { ReplayOptions } from '../replay'
 import { readBible, validatePatch } from '../synthesis/patch'
+import { usageMethods } from '../usage'
 import { type ChatEvent, ChatService, type ProposalActions } from './index'
 
 const isStale = (error: unknown) =>
@@ -177,14 +178,19 @@ export async function projectChat(
 			'INSERT OR IGNORE INTO work (work_id, title, queue_pos, created_at) VALUES (?, ?, 0, ?)',
 		)
 		.run(workId, title, Date.now())
-	return new ChatService({
-		database: project.database,
+	return usageMethods(
+		new ChatService({
+			database: project.database,
+			workId,
+			cacheDir,
+			mainModel: () => config.resolveTextModel('main'),
+			summaryModel: () => config.resolveTextModel('fast'),
+			proposals: projectProposals(project, workId, revisions),
+			replay,
+			emit,
+		}),
+		project,
 		workId,
-		cacheDir,
-		mainModel: () => config.resolveTextModel('main'),
-		summaryModel: () => config.resolveTextModel('fast'),
-		proposals: projectProposals(project, workId, revisions),
-		replay,
-		emit,
-	})
+		'chat',
+	)
 }

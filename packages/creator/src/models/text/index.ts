@@ -22,6 +22,7 @@ import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import type { MaskedConfig } from '../../config/index.js'
 import type { CommandError } from '../../contract/index.js'
 import { createReplayFetch } from '../../replay/index.js'
+import { recordTextUsage } from '../../usage'
 
 type Settings = MaskedConfig['models']['fast']
 type Format = Settings['format']
@@ -431,6 +432,7 @@ export function createTextStream(
 				} finally {
 					clearTimeout(timer)
 				}
+				recordTextUsage(model.id, result.usage)
 				usage = usage ? sumUsage(usage, result.usage) : result.usage
 				if (options?.signal?.aborted)
 					return fail('cancelled', undefined, result)
