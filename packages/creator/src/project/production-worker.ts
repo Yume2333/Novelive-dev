@@ -1,9 +1,15 @@
 import { createHash } from 'node:crypto'
-import { projectFiles, type Work } from '@novelive/format/model'
+import { formatVersion, projectFiles, type Work } from '@novelive/format/model'
 import { compileScript, formatScript } from '@novelive/format/script'
 import type { createConfigStore } from '../config'
 import { TextModelError } from '../models/text'
-import { type ArtJob, ArtProduction, directChapterArt } from '../pipeline/art'
+import {
+	type ArtBible,
+	type ArtJob,
+	ArtProduction,
+	directChapterArt,
+	planArt,
+} from '../pipeline/art'
 import type { CgReferences } from '../pipeline/art/director'
 import {
 	reviewChapter,
@@ -347,6 +353,19 @@ export function chapterWorker(
 			return art(signal).savePlaceholder(job.assetId, issue)
 		},
 	}
+	// Portraits picked at visual approval are registered without a drawing job.
+	async function confirmedPortrait(assetId: string, bible: ArtBible) {
+		const [characterId] = assetId.split('/')
+		const character = bible.characters.find(({ id }) => id === characterId)
+		if (!character) throw new Error(`No drawing record for ${assetId}`)
+		const [job] = planArt(
+			[{ id: assetId, kind: 'character', description: character.name }],
+			bible,
+			{ formatVersion, entries: [] },
+		).jobs
+		if (!job) throw new Error(`No drawing record for ${assetId}`)
+		return { job, cg: undefined }
+	}
 	async function drawingMetadata(
 		id: string,
 	): Promise<{ job: ArtJob; cg?: CgReferences }> {
@@ -388,13 +407,11 @@ export function chapterWorker(
 			target: { path: string; instruction?: string },
 			signal: AbortSignal,
 		) {
-			const metadata = await drawingMetadata(assetId)
-			return art(signal).redraw(
-				metadata.job,
-				(await productionBible(project)).art,
-				metadata.cg,
-				target,
-			)
+			const bible = (await productionBible(project)).art
+			const metadata =
+				(await existing(() => drawingMetadata(assetId))) ??
+				(await confirmedPortrait(assetId, bible))
+			return art(signal).redraw(metadata.job, bible, metadata.cg, target)
 		},
 		adoptImage: (assetId: string, source: string) =>
 			art().adopt(assetId, source),
