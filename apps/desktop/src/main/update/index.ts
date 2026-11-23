@@ -68,7 +68,7 @@ export function installUpdates(options: {
 		}
 		try {
 			const result = await checkUpdate(engine, policy)
-			if (!manual) await languageReady(15_000)
+			if (!manual && result.kind !== 'current') await languageReady(15_000)
 			if (result.kind === 'current') {
 				if (manual) await prompt(t('已是最新版本。'))
 			} else if (result.kind === 'manual') {
