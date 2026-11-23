@@ -169,17 +169,18 @@ export async function checkImage(
 		transparent: boolean
 		base?: Buffer
 		variant: boolean
-		onAlpha?: (hasAlpha: boolean) => void
+		onTransparency?: (hasTransparency: boolean) => void
 	},
 ): Promise<{ png: Buffer } | { issue: string; unsupported?: true }> {
 	try {
 		const { width, height, hasAlpha } = await sharp(input).metadata()
-		options.onAlpha?.(hasAlpha)
-		if (options.transparent && !hasAlpha)
+		if (options.transparent && !hasAlpha) {
+			options.onTransparency?.(false)
 			return {
 				issue: '透明底能力不支持（图片没有 alpha 通道）；请换图片模型。',
 				unsupported: true,
 			}
+		}
 		if (options.base && (width !== target.width || height !== target.height))
 			return { issue: '差分图尺寸与基准图不一致。' }
 		const fit =
@@ -191,7 +192,9 @@ export async function checkImage(
 			.png()
 			.toBuffer()
 		if (options.transparent) {
-			if (!(await hasTransparency(png))) return { issue: '全透明像素不足。' }
+			const transparentEnough = await hasTransparency(png)
+			options.onTransparency?.(transparentEnough)
+			if (!transparentEnough) return { issue: '全透明像素不足。' }
 			const raster = await pixels(png)
 			if (checkerboard(raster)) return { issue: '立绘绘制了棋盘格背景。' }
 			let frame = bounds(raster)

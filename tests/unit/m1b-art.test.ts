@@ -6,6 +6,7 @@ import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
 import sharp from 'sharp'
 import { expect, test, vi } from 'vitest'
+import * as background from '../../packages/creator/src/pipeline/art/background'
 import { checkImage } from '../../packages/creator/src/pipeline/art/check'
 import {
 	applyStagingPatch,
@@ -680,6 +681,51 @@ test('removes an opaque sprite background before validating and auditing the res
 		model.mockRestore()
 	}
 }, 15_000)
+
+test('an opaque RGBA response counts toward the unavailable-matting candidate limit', async () => {
+	const rgb = await picture(320, 480, false)
+	const rgba = await sharp(rgb).ensureAlpha().png().toBuffer()
+	const landscape = await picture(320, 180, false)
+	let portraits = 0
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(
+			async (_prompt, _refs, { width, height }, transparent) => ({
+				bytes: !transparent
+					? landscape
+					: ++portraits === 1
+						? rgb
+						: portraits === 2
+							? rgba
+							: await picture(width, height, true),
+			}),
+		)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: 'Ada' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const pool = await service(project, replay).candidates(
+				bible,
+				['c1'],
+				'assets/main.webp',
+			)
+			expect(pool).toMatchObject({ mattingUnavailable: true, characters: [] })
+			expect(portraits).toBe(2)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
 
 test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(

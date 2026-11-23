@@ -570,20 +570,20 @@ export class ArtProduction {
 			}
 			let checked = await checkImage(result.bytes, target, {
 				...checks,
-				onAlpha: candidateBudget
-					? (hasAlpha) => {
-							candidateBudget.opaqueStreak = hasAlpha
+				onTransparency: candidateBudget
+					? (transparentEnough) => {
+							candidateBudget.opaqueStreak = transparentEnough
 								? 0
 								: candidateBudget.opaqueStreak + 1
 						}
 					: undefined,
 			})
+			if (
+				candidateBudget?.matting.error &&
+				candidateBudget.opaqueStreak >= opaqueCandidateLimit
+			)
+				throw candidateBudget.matting.error
 			if ('issue' in checked && checked.unsupported) {
-				if (
-					candidateBudget?.matting.error &&
-					candidateBudget.opaqueStreak >= opaqueCandidateLimit
-				)
-					throw candidateBudget.matting.error
 				let recovered: Buffer
 				try {
 					recovered = await removeBackground(result.bytes, this.options.signal)
