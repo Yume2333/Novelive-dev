@@ -1,3 +1,4 @@
+import { EventEmitter, once } from 'node:events'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -5,6 +6,11 @@ import { projectFiles } from '@novelive/format/model'
 import sharp from 'sharp'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createConfigStore } from '../../packages/creator/src/config'
+import type {
+	Command,
+	CommandInput,
+	CreatorFrame,
+} from '../../packages/creator/src/contract'
 import { productionChapterRecordEvent } from '../../packages/creator/src/contract/production'
 import { importTxtProject } from '../../packages/creator/src/import/wizard'
 import { Project } from '../../packages/creator/src/project'
@@ -466,5 +472,146 @@ test('a settings save changes the next step of an active production session', as
 	} finally {
 		releaseWriter.resolve()
 		await production.close()
+	}
+})
+
+test('creator config.update applies the new image model and concurrency to queued draws', async () => {
+	const { projectDir, workId } = await fixture()
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	{
+		using project = await Project.open(projectDir)
+		const work = await project.read(projectFiles.work('v0001', workId))
+		const { art } = chapterWorker(
+			project,
+			'v0001',
+			work,
+			await productionModels(config),
+		)
+		const jobs = await art().register(
+			['room/day', 'bridge/day', 'garden/day'].map((id) => ({
+				id,
+				kind: 'location',
+				description: 'Sunny',
+			})),
+			bible,
+		)
+		for (const job of jobs)
+			await project.writeFile(
+				`source/production/art/${job.assetId}.json`,
+				JSON.stringify({ job }),
+			)
+		project.tasks.registerWork({ workId, title: work.title })
+		const worker = new ScriptedWorker({ ch0001: jobs })
+		worker.hold('draw:room/day')
+		const scheduler = new ChapterScheduler(project.database, worker, {
+			imageConcurrency: 1,
+		})
+		try {
+			scheduler.start(workId, ['ch0001'])
+			scheduler.confirmVisual(workId)
+			await expect.poll(() => worker.count('draw:room/day')).toBe(1)
+			scheduler.stop(workId)
+			await scheduler.idle()
+		} finally {
+			scheduler.dispose()
+		}
+	}
+	await createProduction(
+		directory,
+		config,
+		undefined,
+		() => {},
+		() => {},
+	).remember(workId, projectDir)
+
+	const generation = 1
+	const parent = new EventEmitter()
+	const port = new EventEmitter()
+	const parentPort = Object.getOwnPropertyDescriptor(process, 'parentPort')
+	Object.defineProperty(process, 'parentPort', {
+		configurable: true,
+		value: {
+			once: parent.once.bind(parent),
+			postMessage: (frame: { type: string; active?: boolean }) =>
+				parent.emit('frame', frame),
+		},
+	})
+	const transport = Object.assign(port, {
+		start() {},
+		postMessage(frame: CreatorFrame) {
+			port.emit('frame', frame)
+		},
+	})
+	let requestId = 0
+	async function call<K extends Command>(command: K, payload: CommandInput<K>) {
+		const id = ++requestId
+		const response = new Promise<CreatorFrame>((resolve) => {
+			const receive = (frame: CreatorFrame) => {
+				if (frame.type === 'event' || frame.requestId !== id) return
+				port.off('frame', receive)
+				resolve(frame)
+			}
+			port.on('frame', receive)
+		})
+		port.emit('message', {
+			data: { type: 'call', generation, requestId: id, command, payload },
+		})
+		const frame = await response
+		if (frame.type !== 'result') throw new Error(JSON.stringify(frame))
+		return frame.result
+	}
+	const requests: string[] = []
+	const oldDraw = Promise.withResolvers<void>()
+	const newDraws = Promise.withResolvers<void>()
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		if (!request.url.endsWith('/images/generations'))
+			return completion({ content: 'Sunny' })
+		const { model } = await request.json()
+		requests.push(model)
+		await (requests.length === 1 ? oldDraw.promise : newDraws.promise)
+		return Response.json({ data: [{ b64_json: 'dGVzdA==' }] })
+	}
+	vi.stubEnv('NL_CREATOR_GENERATION', String(generation))
+	vi.stubEnv('NL_CREATOR_DATA_DIR', directory)
+	vi.stubGlobal('fetch', fetch)
+	let connected = false
+	try {
+		await import('../../packages/creator/src/entry')
+		const ready = once(parent, 'frame')
+		parent.emit('message', { ports: [transport] })
+		connected = true
+		await ready
+		await call('production.continue', { workId })
+		await expect
+			.poll(() => requests)
+			.toEqual([configuration.models.image.model])
+		await call('config.update', {
+			models: { image: { model: 'fixture-updated-image', concurrency: 2 } },
+		})
+		oldDraw.resolve()
+		await expect
+			.poll(() => requests)
+			.toEqual([
+				configuration.models.image.model,
+				'fixture-updated-image',
+				'fixture-updated-image',
+			])
+		newDraws.resolve()
+		await expect
+			.poll(() => call('production.get', { workId }))
+			.toMatchObject({ phase: 'confirm-first' })
+	} finally {
+		oldDraw.resolve()
+		newDraws.resolve()
+		if (connected) {
+			const closed = once(parent, 'frame')
+			port.emit('close')
+			await closed
+		}
+		if (parentPort) Object.defineProperty(process, 'parentPort', parentPort)
+		else Reflect.deleteProperty(process, 'parentPort')
+		vi.unstubAllGlobals()
 	}
 })

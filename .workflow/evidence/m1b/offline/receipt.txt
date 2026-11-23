@@ -6,7 +6,7 @@ Checks (Node 24, pnpm 12, Electron 45; Electron under Xvfb):
     1 passed (20.1s)
   NL_REPLAY=strict pnpm check
     Test Files  22 passed (22)
-         Tests  332 passed (332)
+         Tests  333 passed (333)
   NL_REPLAY=strict pnpm exec playwright test tests/e2e/m1b-wizard.spec.ts tests/e2e/m1b-creation-ui.spec.ts tests/e2e/m1b-player.spec.ts tests/e2e/m1b-production-contract.spec.ts
     7 passed (3.9s)
 
@@ -37,6 +37,8 @@ Production regressions:
   Invalid staging leaves no registry entry without drawing instructions,
   a reused variant waits for its base even when the base has no queue entry,
   and a settings save during writing changes the next review request.
+  A creator config.update command changes the image model for the next draws
+  and lets two queued draws start together without restarting production.
 
 Full viewport visual evidence (1280 x 800; set NL_M1B_GATE_EVIDENCE to regenerate):
   01-import.png
