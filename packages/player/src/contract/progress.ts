@@ -31,6 +31,25 @@ export interface WorkProgress {
 	saves: readonly SaveEntry[]
 }
 
+export interface LegacySaveGroup {
+	version: number
+	saves: readonly SaveEntry[]
+}
+
+export interface ProgressMigrationInput {
+	workId: string
+	fromVersion: number
+	toVersion: number
+	positions: readonly SentenceRef[]
+	progress: WorkProgress
+	legacySaves: readonly LegacySaveGroup[]
+}
+
+export interface ProgressMigrationResult {
+	progress: WorkProgress
+	legacySaves: readonly LegacySaveGroup[]
+}
+
 export interface ProgressStore {
 	load(workId: string): Promise<WorkProgress | null>
 	save(workId: string, progress: WorkProgress): Promise<void>
