@@ -106,6 +106,24 @@ test('preserves direct prose around nested block paragraphs', async () => {
 	])
 })
 
+test('normalizes source wrapping without inventing paragraph or chapter breaks', async () => {
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/nav.xhtml': undefined,
+			'OPS/toc.ncx': undefined,
+			'OPS/chapter.xhtml': xhtml(
+				'<h1>Chapter\nOne</h1><p>A wrapped\nsentence.<br/>An explicit break.</p>',
+			),
+		}),
+	)
+	expect(book.volumes[0].chapters).toHaveLength(1)
+	expect(book.volumes[0].chapters[0].paragraphs).toEqual([
+		'Chapter One',
+		'A wrapped sentence.',
+		'An explicit break.',
+	])
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)

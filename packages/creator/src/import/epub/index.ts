@@ -127,7 +127,7 @@ function document(path: string, root: Element): Document {
 			const plain = (element: Element): string =>
 				element.children
 					.map((child) => {
-						if (typeof child === 'string') return child
+						if (typeof child === 'string') return child.replace(/\s+/g, ' ')
 						if (
 							['aside', 'script', 'style'].includes(child.name) ||
 							/(?:note|noteref)/.test(child.attrs['epub:type'] ?? '')
