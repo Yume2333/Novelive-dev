@@ -379,8 +379,9 @@ test.each([false, true])(
 	async (cover) => {
 		const extraction = await extractEpub(
 			await epub({
-				'OPS/book.opf': `<package><manifest><item id="cover" href="cover.xhtml"/><item id="body" href="chapter.xhtml"/><item id="image" href="images/picture.svg" media-type="image/svg+xml"/></manifest><spine>${cover ? '<itemref idref="cover"/>' : ''}<itemref idref="body"/></spine></package>`,
-				'OPS/cover.xhtml': xhtml('<img src="images/picture.svg"/>'),
+				'OPS/book.opf': `<package><manifest><item id="cover" href="cover.xhtml"/><item id="body" href="chapter.xhtml"/><item id="image" href="images/picture.svg" media-type="image/svg+xml"/>${cover ? '<item id="cover-image" href="images/cover.svg" media-type="image/svg+xml"/>' : ''}</manifest><spine>${cover ? '<itemref idref="cover"/>' : ''}<itemref idref="body"/></spine></package>`,
+				'OPS/cover.xhtml': xhtml('<img src="images/cover.svg"/>'),
+				'OPS/images/cover.svg': cover ? image : undefined,
 				'OPS/chapter.xhtml': xhtml(
 					'<img src="images/picture.svg"/><h1>Chapter One</h1><p>First.</p>',
 				),
@@ -388,6 +389,13 @@ test.each([false, true])(
 		)
 		expect(extraction.book.volumes).toHaveLength(1)
 		expect(extraction.book.volumes[0].chapters).toHaveLength(1)
+		expect(extraction.book.illustrations).toHaveLength(cover ? 2 : 1)
+		if (cover)
+			expect(extraction.book.illustrations[0]).toEqual({
+				archivePath: 'OPS/images/cover.svg',
+				volume: 0,
+				chapter: 0,
+			})
 		expect(extraction.book.illustrations.at(-1)).toEqual({
 			archivePath: 'OPS/images/picture.svg',
 			volume: 0,
@@ -400,6 +408,13 @@ test.each([false, true])(
 				reason: 'Match',
 			})
 		await classifyIllustrations(extraction, 'Bible', connection, {})
+		if (cover) {
+			const coverPrompt = vi.mocked(artJson).mock.calls[0][1]
+			expect(coverPrompt).toContain('"chapter":null')
+			expect(coverPrompt).toContain('"nearby":""')
+			expect(coverPrompt).not.toContain('Chapter One')
+			expect(coverPrompt).not.toContain('First.')
+		}
 		const prompt = vi.mocked(artJson).mock.calls.at(-1)?.[1]
 		expect(prompt).toContain('"chapter":"Chapter One"')
 		expect(prompt).toContain('First.')
