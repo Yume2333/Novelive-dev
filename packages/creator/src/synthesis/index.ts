@@ -302,7 +302,12 @@ const packetChapters = (packet = '') =>
 	new Set(Array.from(packet.matchAll(/^Chapter ([\w-]+):$/gm), ([, id]) => id))
 
 function matchesRecordedPackets(checkpoint: Checkpoint, packets: string[]) {
-	if (!packets.length || packets.length !== checkpoint.packet) return false
+	if (
+		!packets.length ||
+		checkpoint.packet > packets.length ||
+		(checkpoint.ready && checkpoint.packet !== packets.length)
+	)
+		return false
 	const recorded = new Set<string>()
 	let index = 0
 	for (const event of checkpoint.events) {
@@ -318,7 +323,12 @@ function matchesRecordedPackets(checkpoint: Checkpoint, packets: string[]) {
 			return false
 		recorded.clear()
 	}
-	return index === packets.length
+	return (
+		index === checkpoint.packet &&
+		[...recorded].every((chapter) =>
+			packetChapters(packets[index]).has(chapter),
+		)
+	)
 }
 
 function eventPacketBudget(
@@ -508,7 +518,7 @@ export async function synthesizeVolume(
 	)
 		return project.read(files.result)
 	const legacyFormat =
-		saved?.ready && !saved.applied
+		saved && !saved.applied && (saved.ready || saved.events.length > 0)
 			? legacyPacketFormats.find((format) => matchesPacket(saved, [format]))
 			: undefined
 	const bible = await readBible(project)
@@ -554,14 +564,17 @@ ${packetText.join('\n')}`
 					),
 				)
 			: undefined
-	const legacyReady =
+	const basis = hash(bible)
+	const legacyState =
 		legacyFormat !== undefined &&
 		saved &&
+		(saved.ready || saved.basis === basis) &&
 		(saved.whole ||
 			(legacyPackets && matchesRecordedPackets(saved, legacyPackets)))
 			? saved
 			: undefined
-	const useEvents = legacyReady
+	const legacyReady = legacyState?.ready ? legacyState : undefined
+	const useEvents = legacyState
 		? savedMode === 'events'
 		: strategy === 'events' ||
 			(strategy === 'auto' &&
@@ -569,8 +582,7 @@ ${packetText.join('\n')}`
 	const inputs = inputsFor(useEvents ? 'events' : 'whole')
 	const inputFingerprint = hash(inputs)
 	const fingerprint = hash({ packetFormat, ...inputs })
-	const basis = hash(bible)
-	const matching = saved?.fingerprint === fingerprint ? saved : legacyReady
+	const matching = saved?.fingerprint === fingerprint ? saved : legacyState
 	let quarantineReason =
 		matching?.ready && matching.basis !== basis
 			? 'Bible changed before synthesis publication'
@@ -603,7 +615,7 @@ ${nextEvent.instructions}`
 		bytes(eventPrompt),
 	)
 	const packets =
-		legacyReady && legacyPackets
+		legacyState && legacyPackets
 			? legacyPackets
 			: useEvents && packetBudget > 0
 				? previewPackets(packetText, chapterIds, packetBudget)
@@ -721,7 +733,23 @@ ${nextEvent.instructions}`
 		const packetEvents = state.events.slice(
 			state.events.findLastIndex(({ is_last }) => is_last) + 1,
 		)
-		const registry = proposedEntries(state.events, packetEvents, registryBudget)
+		const registry = proposedEntries(
+			state.events,
+			packetEvents,
+			legacyState
+				? Math.max(
+						0,
+						Math.min(
+							registryBudget,
+							budget -
+								bytes(eventPrompt) -
+								bytes(packets[packet]) -
+								historyBudget -
+								768,
+						),
+					)
+				: registryBudget,
+		)
 		const summaries = recentEvents(
 			registry.compact ? packetEvents : state.events,
 			historyBudget,

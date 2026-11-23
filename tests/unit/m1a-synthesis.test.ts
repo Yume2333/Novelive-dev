@@ -635,72 +635,94 @@ test('only an explicit rerun re-synthesizes a completed volume with the same inp
 	).toMatchObject({ entries: [confirmed] })
 })
 
-test('a hard stop persists exactly one event and resumes after reopening without replaying it', async () => {
-	await seed(root)
-	const fetch = vi.fn<typeof globalThis.fetch>(strict)
-	const select = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-		const request = new Request(input, init)
-		const { messages } = await request.clone().json()
-		const candidates = candidatePositions(messages[0].content)
-		return candidates ? stream({ keep: candidates }) : fetch(request)
-	})
-	{
-		using project = await Project.open(root)
-		await expect(
-			synthesizeVolume(project, 'v1', chapters, {
-				...options,
-				strategy: 'events',
-				maxEvents: 1,
-				fetch: select,
-			}),
-		).rejects.toThrow('Synthesis reached its event limit (1)')
-		expect(fetch).toHaveBeenCalledTimes(1)
-		expect(await project.read(files.checkpoint)).toMatchObject({
-			applied: false,
-			events: [{ event: 'Synthetic event 1', is_last: false }],
+test.each([7, 6])(
+	'a hard stop resumes without replaying the saved event (packet format %s)',
+	async (packetFormat) => {
+		await seed(root)
+		const fetch = vi.fn<typeof globalThis.fetch>(strict)
+		const select = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+			const request = new Request(input, init)
+			const { messages } = await request.clone().json()
+			const candidates = candidatePositions(messages[0].content)
+			return candidates ? stream({ keep: candidates }) : fetch(request)
 		})
-		await expect(
-			project.read(projectFiles.skeleton('v1')),
-		).rejects.toMatchObject({ code: 'ENOENT' })
-		expect(
-			await project.read(projectFiles.character(scope, 'ada')),
-		).toMatchObject({ entries: [confirmed] })
-	}
-	{
-		using project = await Project.open(root)
-		const result = await synthesizeVolume(project, 'v1', chapters, {
-			...options,
-			strategy: 'events',
-			fetch: select,
-		})
-		expect(fetch).toHaveBeenCalledTimes(2)
-		expect(result.biblePatch).toHaveLength(2)
-		expect(result.conflicts).toHaveLength(1)
-		expect(
-			await project.read(projectFiles.character(scope, 'ada')),
-		).toMatchObject({
-			entries: [
-				{
-					...confirmed,
-					changes: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
-				},
-			],
-		})
-		expect(await project.read(files.checkpoint)).toMatchObject({
-			applied: true,
-			events: [{ is_last: false }, { is_last: true }],
-		})
-		expect(
-			await synthesizeVolume(project, 'v1', chapters, {
+		{
+			using project = await Project.open(root)
+			await expect(
+				synthesizeVolume(project, 'v1', chapters, {
+					...options,
+					strategy: 'events',
+					maxEvents: 1,
+					fetch: select,
+				}),
+			).rejects.toThrow('Synthesis reached its event limit (1)')
+			expect(fetch).toHaveBeenCalledTimes(1)
+			expect(await project.read(files.checkpoint)).toMatchObject({
+				applied: false,
+				events: [{ event: 'Synthetic event 1', is_last: false }],
+			})
+			await expect(
+				project.read(projectFiles.skeleton('v1')),
+			).rejects.toMatchObject({ code: 'ENOENT' })
+			expect(
+				await project.read(projectFiles.character(scope, 'ada')),
+			).toMatchObject({ entries: [confirmed] })
+			if (packetFormat === 6) {
+				const checkpoint = await project.read(files.checkpoint)
+				await project.write(files.checkpoint, {
+					...checkpoint,
+					fingerprint: createHash('sha256')
+						.update(
+							JSON.stringify({
+								packetFormat,
+								previews,
+								language: options.language,
+								strategy: 'events',
+								incremental: false,
+								model: connection.model,
+								context: connection.contextWindow,
+							}),
+						)
+						.digest('hex'),
+				})
+			}
+		}
+		{
+			using project = await Project.open(root)
+			const result = await synthesizeVolume(project, 'v1', chapters, {
 				...options,
 				strategy: 'events',
 				fetch: select,
-			}),
-		).toEqual(result)
-		expect(fetch).toHaveBeenCalledTimes(2)
-		expect(select).toHaveBeenCalledTimes(3)
-	}
-})
+			})
+			expect(fetch).toHaveBeenCalledTimes(2)
+			expect(result.biblePatch).toHaveLength(2)
+			expect(result.conflicts).toHaveLength(1)
+			expect(
+				await project.read(projectFiles.character(scope, 'ada')),
+			).toMatchObject({
+				entries: [
+					{
+						...confirmed,
+						changes: [{ chapterId: 'c2', field: 'identity', value: 'Captain' }],
+					},
+				],
+			})
+			expect(await project.read(files.checkpoint)).toMatchObject({
+				applied: true,
+				events: [{ is_last: false }, { is_last: true }],
+			})
+			expect(
+				await synthesizeVolume(project, 'v1', chapters, {
+					...options,
+					strategy: 'events',
+					fetch: select,
+				}),
+			).toEqual(result)
+			expect(fetch).toHaveBeenCalledTimes(2)
+			expect(select).toHaveBeenCalledTimes(3)
+		}
+	},
+)
 
 test('same event wording preserves new facts but a repeat needs progress or packet completion', async () => {
 	await seed(root)
