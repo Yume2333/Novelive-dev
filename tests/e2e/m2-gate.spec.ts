@@ -334,6 +334,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		)
 		await page.getByRole('button', { name: '从当前句预览' }).click()
 		await expect(page.locator('canvas')).toBeVisible()
+		await expect(page.locator('.nl-player-text')).toContainText('暮色里')
 		const imageBefore = await page.evaluate(
 			(workId) =>
 				window.novelive.call('editor.imageRevision', {
@@ -371,6 +372,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		)
 		expect(imageAfter.revision).not.toBe(imageBefore.revision)
 		await expect(page.locator('canvas')).toBeVisible()
+		await expect(page.locator('.nl-player-text')).toContainText('暮色里')
 		await capture(page, '07-image-redrawn')
 		await page.getByRole('textbox', { name: '重绘要求' }).fill('')
 		await page
