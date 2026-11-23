@@ -161,6 +161,10 @@ export const editorCommands = {
 		}),
 		output: chapterSnapshot,
 	},
+	'editor.imageRevision': {
+		input: obj({ ...workTarget, assetId }),
+		output: obj({ revision: revisionSchema }),
+	},
 	'editor.regenerateImage': {
 		input: obj({
 			...imageRevision,

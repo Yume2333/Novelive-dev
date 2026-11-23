@@ -276,6 +276,64 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(page.getByText('已确认', { exact: true })).toBeVisible()
 		await expect(page.getByRole('region', { name: '重写差异' })).toHaveCount(0)
 		await capture(page, '06-reopened-persisted')
+		await page.getByRole('button', { name: 'Agent', exact: true }).click()
+		await page.evaluate(
+			(patch) => window.novelive.call('config.update', patch).promise,
+			configuration,
+		)
+		await page.getByRole('textbox', { name: '重绘要求' }).fill('光线更柔和')
+		await page
+			.getByRole('button', { name: '出一张，直接替换', exact: true })
+			.click()
+		await expect
+			.poll(async () => {
+				const diagnostics = await readFile(missingLog, 'utf8').catch(() => '')
+				if (diagnostics) throw new Error(diagnostics)
+				const alerts = await page.getByRole('alert').allTextContents()
+				if (alerts.length) throw new Error(alerts.join('\n'))
+				return (
+					await page.evaluate(
+						(workId) =>
+							window.novelive.call('editor.history', { workId }).promise,
+						workId,
+					)
+				).entries.filter((entry) => entry.kind === 'image').length
+			})
+			.toBe(1)
+		await capture(page, '07-image-redrawn')
+		await page.getByRole('textbox', { name: '重绘要求' }).fill('')
+		await page
+			.getByRole('button', { name: '多出几张再挑', exact: true })
+			.click()
+		const candidates = page.getByRole('region', { name: '候选图片' })
+		await expect(candidates.getByRole('img')).toHaveCount(2)
+		await expect
+			.poll(() =>
+				candidates
+					.getByRole('img')
+					.evaluateAll((images) =>
+						images.every(
+							(image) => (image as HTMLImageElement).naturalWidth > 0,
+						),
+					),
+			)
+			.toBe(true)
+		await candidates
+			.getByRole('button', { name: '选择版本 2', exact: true })
+			.click()
+		await expect(candidates).toHaveCount(0)
+		await expect
+			.poll(
+				async () =>
+					(
+						await page.evaluate(
+							(workId) =>
+								window.novelive.call('editor.history', { workId }).promise,
+							workId,
+						)
+					).entries.filter((entry) => entry.kind === 'image').length,
+			)
+			.toBe(2)
 	} finally {
 		await app.close()
 		await rm(root, { recursive: true, force: true })

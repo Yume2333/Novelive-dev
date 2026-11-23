@@ -97,6 +97,11 @@ registry.register('editor.applyRewrite', async (input) =>
 registry.register('editor.selectImage', async (input) =>
 	(await revisionsFor(input.workId)).selectImage(input),
 )
+registry.register('editor.imageRevision', async (input) => ({
+	revision: await (await revisionsFor(input.workId)).imageRevision(
+		input.assetId,
+	),
+}))
 registry.register('editor.regenerateImage', async (input, signal) => {
 	const result = await (await revisionsFor(input.workId)).regenerateImage(
 		input,

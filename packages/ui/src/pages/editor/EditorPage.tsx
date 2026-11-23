@@ -10,6 +10,7 @@ import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
 import { ScrollArea } from '../../components/ScrollArea'
 import { JumpPoints } from './JumpPoints'
+import { SceneImages } from './SceneImages'
 import { ScriptEditor } from './ScriptEditor'
 import '../player/player.css'
 import './editor.css'
@@ -405,6 +406,18 @@ export function EditorPage() {
 									className="editor-stage"
 									ref={stage}
 									aria-label="舞台预览"
+								/>
+								<SceneImages
+									key={scene.sceneId}
+									workId={id}
+									assets={opening.registry.entries.filter(
+										(asset) =>
+											scene.nvs.includes(asset.id) &&
+											asset.status !== 'pending',
+									)}
+									disabled={busy || dirty}
+									run={run}
+									onApplied={() => setRefresh((value) => value + 1)}
 								/>
 								<div
 									className="editor-toolbar"

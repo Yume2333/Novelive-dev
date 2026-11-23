@@ -75,6 +75,13 @@
 	background: var(--panel-75);
 }
 
+.editor-image-candidates img {
+	display: block;
+	width: 120px;
+	height: 120px;
+	object-fit: contain;
+}
+
 .editor-code .cm-editor {
 	height: 360px;
 	font-family: var(--font-body);
