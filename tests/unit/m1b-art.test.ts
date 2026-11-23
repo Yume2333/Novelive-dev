@@ -934,6 +934,7 @@ test.each([
 		...(keepEpub
 			? [{ bytes: opaque }, moderated, moderated]
 			: [
+					{ bytes: opaque },
 					{ ...moderated, referenceModerated: true } as const,
 					{ bytes: portrait },
 				]),
@@ -988,7 +989,7 @@ test.each([
 					.filter(([, , , transparent]) => transparent)
 					.map(([, refs]) => refs.length),
 			).toEqual([
-				...(keepEpub ? [1, 1, 1, 1] : [1, 1, 0]),
+				...(keepEpub ? [1, 1, 1, 1] : [1, 1, 1, 0]),
 				...(replacementFails ? [0, 0, 0] : []),
 				0,
 				0,
@@ -998,6 +999,57 @@ test.each([
 	} finally {
 		renderer.mockRestore()
 		matte.mockRestore()
+		model.mockRestore()
+	}
+})
+
+test('offers all technically valid costume options after visual rejection when matting works', async () => {
+	const opaque = await picture(320, 480, false)
+	const portrait = await picture(320, 480, true)
+	const landscape = await picture(320, 180, false)
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockResolvedValue(portrait)
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, _refs, _size, transparent) => ({
+			bytes: transparent ? opaque : landscape,
+		}))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+			return prompt.includes('造型候选')
+				? {
+						pass: false,
+						failedChecks: ['style'],
+						feedback: 'Try another style',
+					}
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const illustration = 'source/references/illustration-1.png'
+			await project.writeFile(illustration, landscape)
+			const art = service(project, replay, undefined, undefined, undefined, 0)
+			const pool = await art.candidates(
+				bible,
+				['c1'],
+				'assets/main.webp',
+				[],
+				new Map([['ada', { id: 'illustration-1', cachePath: illustration }]]),
+			)
+			expect(pool.mattingUnavailable).toBeUndefined()
+			expect(pool.characters[0].candidates.map(({ id }) => id)).toEqual([
+				'costume-epub',
+				'costume-2',
+				'costume-3',
+			])
+			expect(matte).toHaveBeenCalledTimes(3)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
 		model.mockRestore()
 	}
 })

@@ -552,11 +552,16 @@ export class ArtProduction {
 				if (result.error.code === 'unsupported')
 					return { issue, unsupported: true } as const
 				if (result.error.code === 'moderation') {
+					const mattingUnavailable = candidateBudget?.matting.error
 					if (
 						(optionalReference && result.referenceModerated) ||
-						(candidateBudget && moderated)
+						(moderated && (optionalReference || mattingUnavailable))
 					)
-						return { issue, reviewed, moderated: true } as const
+						return {
+							issue,
+							reviewed: mattingUnavailable ? reviewed : undefined,
+							moderated: true,
+						} as const
 					if (moderated) break
 					moderated = true
 					feedback = moderationHint
@@ -717,7 +722,7 @@ export class ArtProduction {
 				let png: Buffer
 				if ('issue' in result) {
 					if ('reviewed' in result && result.reviewed) {
-						if (candidateBudget)
+						if (candidateBudget?.matting.error)
 							return { cachePath: fallbackPath, png: result.reviewed }
 						png = result.reviewed
 					} else if (
