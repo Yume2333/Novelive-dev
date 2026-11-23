@@ -49,7 +49,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 		},
 	})
 	const compiled = compileScript(
-		'scene 夜\nsource p0001\n@bg room/dusk transition none\n@show traveler/coat/calm center\n: First #0001\n@move center left duration 0.01\n: Second #0002',
+		'scene 夜\nsource p0001\n@bg room/dusk transition none\n@show traveler/coat/calm center\n: First #0001\n@move center left duration 0.01\n: Second #0002\n@camera reset duration 0.4\n@filter brightness value 0.5\n: Dim #0003',
 		{ ...context, paragraphIds: ['p0001'], sceneIds: ['aaaabbbb'] },
 	)
 	if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics))
@@ -69,12 +69,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 	).toString('base64')
 	const app = await electron.launch({
 		executablePath: require('electron'),
-		args: [
-			'apps/desktop',
-			'--enable-unsafe-swiftshader',
-			'--use-gl=angle',
-			'--use-angle=swiftshader',
-		],
+		args: ['apps/desktop'],
 		env: { ...process.env, NL_REPLAY: 'strict', ELECTRON_RENDERER_URL: '' },
 	})
 	try {
@@ -111,6 +106,12 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			{ scenes: compiled.scenes, background, portrait },
 		)
 		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		console.log(
+			'Default renderer:',
+			await page
+				.locator('canvas')
+				.evaluate((canvas) => (canvas.getContext('2d') ? 'canvas' : 'webgl')),
+		)
 		const capture = async () =>
 			Buffer.from(
 				await page.evaluate(async () =>
@@ -146,6 +147,27 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			await player.restore(saved)
 		})
 		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		await page.evaluate(async () => {
+			const { player, saved } = globalThis as unknown as StageHarness
+			await player.restore(saved)
+		})
+		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
+		await expect(page.locator('.nl-player-text')).toHaveText('Second')
+		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
+		await expect(page.locator('.nl-player-text')).toHaveText('Dim')
+		await expect
+			.poll(async () => [
+				...(await sharp(await page.screenshot())
+					.extract({ left: 20, top: 100, width: 1, height: 1 })
+					.removeAlpha()
+					.raw()
+					.toBuffer()),
+			])
+			.toEqual([16, 24, 48])
+		await page.evaluate(async () => {
+			const { player, saved } = globalThis as unknown as StageHarness
+			await player.restore(saved)
+		})
 		expect(
 			await page.evaluate(() => {
 				const { player, saved } = globalThis as unknown as StageHarness
@@ -271,7 +293,11 @@ test('M3 stage directions render the direction set and four landscape fill crops
 			['@mask vignette strength 0.8', '暗角'],
 			['@mask none', '无遮罩'],
 			...['blur', 'brightness', 'sepia', 'glitch'].map(
-				(effect) => [`@filter ${effect} value 0.5`, effect] as [string, string],
+				(effect) =>
+					[
+						`@camera reset duration 0.4\n@filter ${effect} value 0.5`,
+						effect,
+					] as [string, string],
 			),
 			['@filter none\n@hide traveler', '空场'],
 			['@cg cg-test\n@filter sepia value 0.5', '合成基准'],

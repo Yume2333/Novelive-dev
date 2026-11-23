@@ -7,6 +7,7 @@ import {
 	Graphics,
 	Particle,
 	ParticleContainer,
+	RendererType,
 	Sprite,
 	Texture,
 } from 'pixi.js'
@@ -44,6 +45,7 @@ export class PixiStage {
 	private state: StageState | undefined
 	private time = 0
 	private observer: ResizeObserver | undefined
+	private canvasFilter = 'none'
 
 	async mount(host: HTMLElement) {
 		await this.app.init({
@@ -102,7 +104,7 @@ export class PixiStage {
 
 	thumbnail(visibleHeight = 1) {
 		this.app.render()
-		return captureThumbnail(this.app.canvas, visibleHeight)
+		return captureThumbnail(this.app.canvas, visibleHeight, this.canvasFilter)
 	}
 
 	commit(
@@ -315,6 +317,20 @@ export class PixiStage {
 	private setFilter(state: StageState) {
 		for (const filter of this.world.filters ?? []) filter.destroy()
 		const filter = state.filter
+		if (this.app.renderer?.type === RendererType.CANVAS) {
+			this.world.filters = []
+			this.canvasFilter = !filter
+				? 'none'
+				: filter.effect === 'brightness'
+					? `brightness(${filter.value})`
+					: filter.effect === 'blur'
+						? `blur(${filter.value * 10}px)`
+						: filter.effect === 'sepia'
+							? `sepia(${Math.min(1, filter.value)})`
+							: 'none'
+			this.app.canvas.style.filter = this.canvasFilter
+			return
+		}
 		if (!filter) {
 			this.world.filters = []
 			return

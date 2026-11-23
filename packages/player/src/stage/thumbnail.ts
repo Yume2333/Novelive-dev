@@ -3,12 +3,14 @@ import { saveThumbnail } from '../contract/progress'
 export async function captureThumbnail(
 	source: HTMLCanvasElement,
 	visibleHeight = 1,
+	filter = 'none',
 ): Promise<Uint8Array> {
 	const canvas = document.createElement('canvas')
 	canvas.width = saveThumbnail.width
 	canvas.height = saveThumbnail.height
 	const context = canvas.getContext('2d')
 	if (!context) throw new Error('无法创建存档缩略图')
+	context.filter = filter
 	const height = source.height * visibleHeight
 	const scale = Math.max(canvas.width / source.width, canvas.height / height)
 	const cropWidth = canvas.width / scale
