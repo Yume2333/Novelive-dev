@@ -904,7 +904,12 @@ test('retries after an unmattable image instead of immediately offering a reject
 test.each([
 	{ terminal: 'both repair prompts are moderated', first: 'costume-epub' },
 	{ terminal: 'the repair reference is refused', first: 'costume-1' },
-])('offers $first after $terminal', async ({ first }) => {
+	{
+		terminal: 'the plain replacement fails every technical check',
+		first: 'costume-epub',
+		replacementFails: true,
+	},
+])('offers $first after $terminal', async ({ first, replacementFails }) => {
 	const opaque = await picture(320, 480, false)
 	const landscape = await picture(320, 180, false)
 	const portrait = await picture(320, 480, true)
@@ -912,6 +917,16 @@ test.each([
 		error: { code: 'moderation', message: 'Content rejected' },
 	} as const
 	const keepEpub = first === 'costume-epub'
+	const blank = await sharp({
+		create: {
+			width: 320,
+			height: 480,
+			channels: 4,
+			background: { r: 0, g: 0, b: 0, alpha: 0 },
+		},
+	})
+		.png()
+		.toBuffer()
 	const responses: Awaited<
 		ReturnType<ReturnType<typeof artModels.imageRenderer>>
 	>[] = [
@@ -922,6 +937,9 @@ test.each([
 					{ ...moderated, referenceModerated: true } as const,
 					{ bytes: portrait },
 				]),
+		...(replacementFails
+			? Array.from({ length: 3 }, () => ({ bytes: blank }))
+			: []),
 		{ bytes: opaque },
 		{ bytes: opaque },
 	]
@@ -969,7 +987,12 @@ test.each([
 				render.mock.calls
 					.filter(([, , , transparent]) => transparent)
 					.map(([, refs]) => refs.length),
-			).toEqual(keepEpub ? [1, 1, 1, 1, 0, 0] : [1, 1, 0, 0, 0])
+			).toEqual([
+				...(keepEpub ? [1, 1, 1, 1] : [1, 1, 0]),
+				...(replacementFails ? [0, 0, 0] : []),
+				0,
+				0,
+			])
 			expect(portraitReviews).toBe(keepEpub ? 1 : 2)
 		})
 	} finally {

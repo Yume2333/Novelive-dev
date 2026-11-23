@@ -627,6 +627,8 @@ export class ArtProduction {
 					!reviewed
 				)
 					throw candidateBudget.matting.error
+				if (attempt > this.options.image.retries)
+					return { issue: checked.issue, reviewed, technical: true } as const
 				if (
 					drawing.kind === 'expression' &&
 					(checked.issue === spriteFrameIssue ||
@@ -693,6 +695,7 @@ export class ArtProduction {
 			portrait: boolean,
 			optionalReference = false,
 			candidateBudget?: CostumeCandidateBudget,
+			hasFallback = false,
 		) => {
 			if (!(await this.file(path))) {
 				const fallbackPath = path.replace(/\.webp$/, '-fallback.webp')
@@ -717,7 +720,10 @@ export class ArtProduction {
 						if (candidateBudget)
 							return { cachePath: fallbackPath, png: result.reviewed }
 						png = result.reviewed
-					} else if ('moderated' in result) {
+					} else if (
+						'moderated' in result ||
+						(hasFallback && 'technical' in result)
+					) {
 						return false
 					} else {
 						throw new Error(result.issue)
@@ -775,6 +781,7 @@ export class ArtProduction {
 				drawing: Drawing,
 				path: string,
 				optionalReference = false,
+				hasFallback = false,
 			) => {
 				try {
 					return await saveCandidate(
@@ -783,6 +790,7 @@ export class ArtProduction {
 						true,
 						optionalReference,
 						drawing.references.length ? budget.edit : budget.generate,
+						hasFallback,
 					)
 				} catch (error) {
 					if (!(error instanceof MattingUnavailableError)) throw error
@@ -808,6 +816,7 @@ export class ArtProduction {
 						drawing,
 						path,
 						optionalReference,
+						Boolean(fallback),
 					)
 					if (saved === true) candidates.push({ id, cachePath: path })
 					else if (saved) fallback ??= { id, ...saved }
