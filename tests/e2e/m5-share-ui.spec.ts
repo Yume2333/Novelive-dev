@@ -261,6 +261,12 @@ test('M5 share surfaces review export, approve updates and import as a project i
 
 			const pick = page.getByRole('button', { name: '导入作品包' })
 			const preview = page.getByRole('dialog', { name: '导入作品包' })
+			const glass = await page.evaluate(() =>
+				getComputedStyle(document.documentElement)
+					.getPropertyValue('--panel-70')
+					.trim(),
+			)
+			await expect(pick).toHaveCSS('background-color', glass)
 			await pick.click()
 			await expect(preview.getByRole('alert')).toHaveText('不支持此作品包格式')
 			await preview.getByRole('button', { name: '关闭' }).click()

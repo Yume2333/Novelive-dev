@@ -2,6 +2,7 @@ import type { DesktopShareApi, ShareResponse } from '@novelive/creator/contract'
 import { useState } from 'react'
 import { ShareDialog } from '../../../components/ShareDialog'
 import styles from '../../../components/ShareDialog.module.css'
+import libraryStyles from '../LibraryPage.module.css'
 
 type Inspection = Extract<ShareResponse, { ok: true }>['result']
 type InspectedWork = Extract<
@@ -115,7 +116,7 @@ export function ImportPackage({
 		<>
 			<button
 				type="button"
-				className={styles.button}
+				className={libraryStyles.packageAction}
 				disabled={busy}
 				onClick={() => void inspect()}
 			>
