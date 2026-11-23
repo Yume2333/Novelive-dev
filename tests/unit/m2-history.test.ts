@@ -15,6 +15,10 @@ import {
 	ProjectEditor,
 } from '../../packages/creator/src/editor/history'
 import {
+	pendingMarks,
+	replaceMarkSuggestions,
+} from '../../packages/creator/src/editor/marks'
+import {
 	captureChapterRules,
 	formatChapterRules,
 	saveRules,
@@ -47,6 +51,116 @@ const secondScene = 'scene 门外\nsource p0002-p0002\n\nrin: 走吧。 #a001\n'
 const editedLine =
 	'rin: {letter}灯{/letter}{ruby míng}明{/ruby}{wait 0.4}{speed 0.6}灭。{/speed}'
 let directory: string
+
+test('mark resolution is versioned, persistent, and does not replace a registered mark', async () => {
+	using project = await fixture()
+	const editor = new ProjectEditor(project, volumeId, workId)
+	const before = await editor.open(target)
+	const accept = { name: 'glow', css: 'color: #ffa;', perChar: true }
+	const reject = { name: 'fade', css: 'opacity: 0.8;', perChar: false }
+	await replaceMarkSuggestions(project, volumeId, target, [
+		accept,
+		reject,
+		{ ...accept, css: 'color: red;' },
+		{ ...accept, name: 'letter' },
+	])
+	const pending = await editor.snapshot(target)
+	expect(pending.markSuggestions).toEqual([
+		{ id: expect.any(String), ...accept },
+		{ id: expect.any(String), ...reject },
+	])
+	expect(
+		(await project.read(workFile)).settings.customMarks,
+	).not.toHaveProperty('glow')
+	const request = {
+		...target,
+		editorId: before.editorId,
+		suggestionId: pending.markSuggestions[0].id,
+		expectedRevision: before.chapter.revision,
+		decision: 'accept' as const,
+	}
+	await expect(editor.resolveMark(request)).rejects.toMatchObject({
+		code: 'stale_revision',
+	})
+	const accepted = await editor.resolveMark({
+		...request,
+		expectedRevision: pending.revision,
+	})
+	expect(accepted.markSuggestions).toEqual([pending.markSuggestions[1]])
+	const rejection = {
+		...request,
+		suggestionId: pending.markSuggestions[1].id,
+		decision: 'reject' as const,
+	}
+	await expect(
+		editor.resolveMark({ ...rejection, expectedRevision: pending.revision }),
+	).rejects.toMatchObject({ code: 'stale_revision' })
+	const rejected = await editor.resolveMark({
+		...rejection,
+		expectedRevision: accepted.revision,
+	})
+	expect(rejected.markSuggestions).toEqual([])
+	expect(rejected.revision).not.toBe(accepted.revision)
+	await expect(
+		editor.resolveMark({ ...rejection, expectedRevision: rejected.revision }),
+	).rejects.toMatchObject({ code: 'not_found' })
+	using reopened = await Project.open(project.root)
+	const view = await new ProjectEditor(reopened, volumeId, workId).open(target)
+	expect(view.chapter).toEqual(rejected)
+	expect(view.settings.customMarks).toEqual({
+		letter: { css: 'color: navy;', perChar: false },
+		glow: { css: accept.css, perChar: accept.perChar },
+	})
+	expect(view.settingsRevision).not.toBe(before.settingsRevision)
+})
+
+test('a replacement draft supplants the pending marks only for its own chapter', async () => {
+	using project = await fixture()
+	const glow = { name: 'glow', css: 'color: #ffa;', perChar: true }
+	const fade = { name: 'fade', css: 'opacity: 0.8;', perChar: false }
+	const otherChapter = { workId, chapterId: 'ch0002' }
+	await replaceMarkSuggestions(project, volumeId, target, [glow, fade])
+	await replaceMarkSuggestions(project, volumeId, otherChapter, [glow])
+	const previous = pendingMarks(project, target)
+	const unaffected = pendingMarks(project, otherChapter)
+	const revised = { ...glow, css: 'text-shadow: 0 0 4px #ffa;', perChar: false }
+	await replaceMarkSuggestions(project, volumeId, target, [revised])
+	const replacement = pendingMarks(project, target)
+	expect(replacement).toEqual([{ id: expect.any(String), ...revised }])
+	expect(replacement[0].id).not.toBe(previous[0].id)
+	await replaceMarkSuggestions(project, volumeId, target, [])
+	expect(pendingMarks(project, target)).toEqual([])
+	expect(pendingMarks(project, otherChapter)).toEqual(unaffected)
+})
+
+test('accepting an unrelated work mark does not invalidate another chapter revision', async () => {
+	using project = await fixture()
+	const other = { workId, chapterId: 'ch0002' }
+	await project.write(projectFiles.chapter({ ...other, volumeId }), {
+		formatVersion,
+		chapterId: other.chapterId,
+		title: '第二章',
+		paragraphIds: ['p0001'],
+		sceneIds: [],
+		cg: [],
+	})
+	await project.writeFile(projectFiles.chapterText(other.chapterId), '走吧。')
+	const editor = new ProjectEditor(project, volumeId, workId)
+	await replaceMarkSuggestions(project, volumeId, target, [
+		{ name: 'glow', css: 'color: #ffa;', perChar: true },
+	])
+	const otherBefore = await editor.snapshot(other)
+	const { chapter, editorId } = await editor.open(target)
+	const accepted = await editor.resolveMark({
+		...target,
+		editorId,
+		expectedRevision: chapter.revision,
+		suggestionId: chapter.markSuggestions[0].id,
+		decision: 'accept',
+	})
+	expect(accepted.revision).not.toBe(chapter.revision)
+	expect((await editor.snapshot(other)).revision).toBe(otherBefore.revision)
+})
 
 async function fixture() {
 	directory = await mkdtemp(join(tmpdir(), 'novelive-m2-history-'))

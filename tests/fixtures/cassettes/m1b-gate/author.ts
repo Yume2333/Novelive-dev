@@ -3,7 +3,9 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createConfigStore } from '../../../../packages/creator/src/config'
+import { ProjectEditor } from '../../../../packages/creator/src/editor/history'
 import { importTxtProject } from '../../../../packages/creator/src/import/wizard'
+import { Project } from '../../../../packages/creator/src/project'
 import { createProduction } from '../../../../packages/creator/src/project/production'
 import { createReplayFetch } from '../../../../packages/creator/src/replay'
 import { bible, picture } from '../m1b-art/fixture'
@@ -89,7 +91,11 @@ const synthetic: typeof globalThis.fetch = async (input, init) => {
 		return completion(
 			second
 				? 'scene 灯火\nsource p0001\n\n: 桥边的灯亮了，纸船继续向前漂。'
-				: 'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。',
+				: [
+						'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。',
+						'@propose-mark {"name":"dusk-glow","css":"color: #aabbff;","perChar":true}',
+						'@propose-mark {"name":"boat-trail","css":"opacity: 0.8;","perChar":false}',
+					].join('\n'),
 		)
 	}
 	if (prompt.startsWith('You are the art director')) {
@@ -242,6 +248,23 @@ try {
 			'confirm-first',
 			JSON.stringify(session.snapshot()),
 		)
+		{
+			using project = await Project.open(projectDir)
+			const editor = new ProjectEditor(project, 'v0001', workId)
+			const target = { workId, chapterId: 'ch0001' }
+			const { chapter, editorId } = await editor.open(target)
+			const dusk = chapter.markSuggestions.find(
+				({ name }) => name === 'dusk-glow',
+			)
+			assert.ok(dusk)
+			await editor.resolveMark({
+				...target,
+				editorId,
+				expectedRevision: chapter.revision,
+				suggestionId: dusk.id,
+				decision: 'accept',
+			})
+		}
 		await config.update({ models: { writing: { model: rejectedWriter } } })
 		await session.continue()
 		await session.queue.idle()

@@ -12,6 +12,7 @@ export function ScriptEditor({
 	insert,
 	onUndo,
 	readOnly,
+	autoFocus,
 }: {
 	value: string
 	onChange: (value: string) => void
@@ -20,12 +21,14 @@ export function ScriptEditor({
 	insert: { before: string; after: string; key: number } | undefined
 	onUndo: () => void
 	readOnly: boolean
+	autoFocus: boolean
 }) {
 	const host = useRef<HTMLDivElement>(null)
 	const view = useRef<EditorView>(null)
 	const scroll = useRef<HTMLElement>(null)
 	const callbacks = useRef({ onChange, onLine, onUndo })
 	const initial = useRef(value)
+	const unfocusedPosition = useRef(autoFocus ? undefined : position)
 	const editable = useRef(new Compartment())
 	callbacks.current = { onChange, onLine, onUndo }
 	useLayoutEffect(() => {
@@ -87,7 +90,7 @@ export function ScriptEditor({
 	}, [value])
 	useEffect(() => {
 		const editor = view.current
-		if (!editor) return
+		if (!editor || position === unfocusedPosition.current) return
 		const line = editor.state.doc.line(
 			Math.min(Math.max(position.line, 1), editor.state.doc.lines),
 		)

@@ -28,7 +28,7 @@ export function chapterHistoryHead(
 	return project.database
 		.prepare(
 			`SELECT history_id FROM history
-			WHERE work_id = ? AND chapter_id = ? AND scene_id IS NOT NULL
+			WHERE work_id = ? AND chapter_id = ? AND (scene_id IS NOT NULL OR kind = 'resolve-mark')
 			ORDER BY rowid DESC LIMIT 1`,
 		)
 		.get(workId, chapterId)?.history_id

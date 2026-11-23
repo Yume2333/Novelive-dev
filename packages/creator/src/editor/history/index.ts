@@ -15,6 +15,7 @@ import {
 import type { CommandInput, CommandOutput } from '../../contract'
 import type { Project } from '../../project'
 import { existing } from '../../synthesis/patch'
+import { discardAcceptedMarks, discardMark, pendingMarks } from '../marks'
 import { settingsRevision } from '../rules'
 import {
 	chapterHistoryHead,
@@ -89,6 +90,73 @@ export class ProjectEditor {
 		return withProjectEdits(this.project, async () => {
 			this.checkWork(input.workId)
 			return (await this.loadChapter(input.chapterId)).snapshot
+		})
+	}
+
+	resolveMark(input: CommandInput<'editor.resolveMark'>): Promise<Snapshot> {
+		return withProjectEdits(this.project, async () => {
+			const editor = this.openEditor(input)
+			const model = await this.loadChapter(input.chapterId)
+			this.checkRevision(model.snapshot, input.expectedRevision)
+			const { project, workId, volumeId } = this
+			const mark = model.snapshot.markSuggestions.find(
+				({ id }) => id === input.suggestionId,
+			)
+			if (!mark) throw { code: 'not_found', message: '找不到这个标记提议。' }
+			const { name, css, perChar } = mark
+			const db = project.database
+			const accept = input.decision === 'accept'
+			const record = () => {
+				db.exec('BEGIN')
+				try {
+					if (accept) {
+						discardAcceptedMarks(project, workId, name)
+						db.prepare(
+							'UPDATE work SET settings_rev = settings_rev + 1 WHERE work_id = ?',
+						).run(workId)
+					} else discardMark(project, workId, mark.id)
+					const id = recordHistory(project, workId, {
+						kind: 'resolve-mark',
+						origin: 'creator',
+						chapterId: input.chapterId,
+						previous: JSON.stringify(mark),
+						next: accept ? JSON.stringify({ name, css, perChar }) : null,
+					})
+					db.exec('COMMIT')
+					return id
+				} catch (error) {
+					db.exec('ROLLBACK')
+					throw error
+				}
+			}
+			if (accept) {
+				if (Object.hasOwn(model.settings.customMarks, name))
+					throw {
+						code: 'stale_revision',
+						message: '这个标记已存在，请刷新后重试。',
+					}
+				const file = projectFiles.work(volumeId, workId)
+				const before = (await project.readFile(file.path)).toString('utf8')
+				const work = await project.read(file)
+				const settings = {
+					...work.settings,
+					customMarks: {
+						...work.settings.customMarks,
+						[name]: { css, perChar },
+					},
+				}
+				await writeAuditedFile(
+					project,
+					file.path,
+					before,
+					`${JSON.stringify({ ...work, settings }, null, '\t')}\n`,
+					record,
+				)
+			} else record()
+			const { snapshot } = await this.loadChapter(input.chapterId)
+			if (editor.revision === model.snapshot.revision)
+				editor.revision = snapshot.revision
+			return snapshot
 		})
 	}
 
@@ -280,7 +348,7 @@ export class ProjectEditor {
 		return {
 			...snapshot,
 			scenes,
-			revision: this.revision(model.chapter, snapshot.paragraphs, scenes, id),
+			revision: this.revision(model.chapter, { ...snapshot, scenes }, id),
 		}
 	}
 
@@ -290,11 +358,21 @@ export class ProjectEditor {
 
 	private revision(
 		chapter: unknown,
-		paragraphs: Snapshot['paragraphs'],
-		scenes: Snapshot['scenes'],
+		{
+			paragraphs,
+			scenes,
+			markSuggestions,
+		}: Pick<Snapshot, 'paragraphs' | 'scenes' | 'markSuggestions'>,
 		head: unknown,
 	) {
-		return contentRevision([this.workId, chapter, paragraphs, scenes, head])
+		return contentRevision([
+			this.workId,
+			chapter,
+			paragraphs,
+			scenes,
+			markSuggestions,
+			head,
+		])
 	}
 
 	private async loadChapter(chapterId: string) {
@@ -341,17 +419,19 @@ export class ProjectEditor {
 				),
 			}
 		})
-		const snapshot: Snapshot = {
+		const content = {
 			workId,
 			chapterId,
 			title: chapter.title,
 			paragraphs,
 			scenes,
-			markSuggestions: [],
+			markSuggestions: pendingMarks(project, { workId, chapterId }),
+		}
+		const snapshot: Snapshot = {
+			...content,
 			revision: this.revision(
 				chapter,
-				paragraphs,
-				scenes,
+				content,
 				chapterHistoryHead(project, workId, chapterId),
 			),
 		}
