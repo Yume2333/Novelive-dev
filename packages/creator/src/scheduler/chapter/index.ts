@@ -481,15 +481,10 @@ export class ChapterScheduler {
 			JOIN asset a ON a.work_id = t.work_id AND a.asset_key = t.ref_id
 			LEFT JOIN asset b ON b.work_id = a.work_id AND b.asset_key = a.base_key
 			WHERE t.kind = 'image' AND t.status = 'queued' AND w.status IN ('active', 'awaiting_confirm')
+				AND (a.base_key IS NULL OR b.status IN ('drawn', 'placeholder'))
 			ORDER BY t.priority DESC, t.seq`,
 		)
 		for (const task of queued) {
-			if (
-				task.base_status !== null &&
-				task.base_status !== 'drawn' &&
-				task.base_status !== 'placeholder'
-			)
-				continue
 			if (slots <= 0) break
 			slots--
 			this.launch(task, () =>

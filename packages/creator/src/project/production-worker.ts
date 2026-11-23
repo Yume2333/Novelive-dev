@@ -284,6 +284,12 @@ export function chapterWorker(
 										const { job } = await drawingMetadata(id)
 										dependencies.set(id, job)
 									}
+						for (const job of dependencies.values()) {
+							if ('baseAssetId' in job && !dependencies.has(job.baseAssetId)) {
+								const { job: base } = await drawingMetadata(job.baseAssetId)
+								dependencies.set(base.assetId, base)
+							}
+						}
 						for (const job of jobs) {
 							ctx.signal.throwIfAborted()
 							await project.writeFile(

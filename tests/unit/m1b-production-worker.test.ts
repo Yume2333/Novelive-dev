@@ -339,3 +339,65 @@ test('invalid staging does not advertise assets without drawing metadata on retr
 		job: { assetId: 'room/day' },
 	})
 })
+
+test('a reused pending variant queues its missing base before the variant', async () => {
+	const { projectDir, workId } = await fixture()
+	using project = await Project.open(projectDir)
+	const work = await project.read(projectFiles.work('v0001', workId))
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	let stages = 0
+	const fetch: typeof globalThis.fetch = async () =>
+		completion({
+			patch: 'PUT <4:\n@bg room/night',
+			items:
+				++stages === 1
+					? [{ id: 'room/night', kind: 'variant', description: 'Night' }]
+					: [],
+			merges: {},
+		})
+	const { worker } = chapterWorker(
+		project,
+		'v0001',
+		work,
+		await productionModels(config),
+		{ fetch },
+	)
+	const [first, second] = work.chapterIds
+	for (const chapterId of work.chapterIds)
+		await project.writeFile(
+			`source/production/${chapterId}/draft.nvs`,
+			'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n',
+		)
+	await worker.stage({
+		workId,
+		chapterId: first,
+		link: 'none',
+		desensitized: false,
+		signal: new AbortController().signal,
+	})
+	project.tasks.registerWork({ workId, title: work.title })
+	const drawn = new Set<string>()
+	const queue = new ChapterScheduler(project.database, {
+		...worker,
+		async write() {},
+		async review() {},
+		async draw(job) {
+			if (job.baseAssetId && !drawn.has(job.baseAssetId))
+				throw new Error('Variant dispatched before its base')
+			drawn.add(job.assetId)
+			return { status: 'drawn' }
+		},
+	})
+	try {
+		queue.start(workId, [second])
+		queue.confirmVisual(workId)
+		await queue.idle()
+		expect([...drawn]).toEqual(['room/day', 'room/night'])
+		expect(queue.snapshot(workId).chapters).toMatchObject([
+			{ status: 'published' },
+		])
+	} finally {
+		queue.dispose()
+	}
+})
