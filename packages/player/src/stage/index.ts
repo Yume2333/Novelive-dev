@@ -193,10 +193,12 @@ export async function mountMinimalPlayer(
 	let snapshot: StageSnapshot | null = null
 	let index = startIndex - 1
 	let busy = false
+	let rearmOnIdle = false
 	function setBusy(value: boolean) {
 		busy = value
 		element.ariaBusy = String(value)
-		if (!value) {
+		if (!value && rearmOnIdle) {
+			rearmOnIdle = false
 			const text = overlay.querySelector<HTMLElement>('.nl-player-text')
 			const finished = text?.dataset.textFinished
 			if (text && finished !== undefined)
@@ -350,8 +352,10 @@ export async function mountMinimalPlayer(
 		}
 	}
 	const click = () => {
-		if (busy) stage.complete()
-		else if (!textRenderer?.click() && beats[index]?.advance.kind === 'click')
+		if (busy) {
+			rearmOnIdle = true
+			stage.complete()
+		} else if (!textRenderer?.click() && beats[index]?.advance.kind === 'click')
 			void advance()
 	}
 	const settingsChanged = () => {

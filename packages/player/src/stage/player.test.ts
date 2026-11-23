@@ -1,6 +1,10 @@
 import { compileScript } from '@novelive/format/script'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { context } from '../../../../tests/fixtures/script/context'
+import {
+	defaultPlayerSettings,
+	schedulePlayback,
+} from '../../../ui/src/pages/player/controls/controller'
 import { minimalControlsController } from '../../../ui/src/pages/player/controls/minimal-controller'
 import type { StageSnapshot } from '../contract'
 import { PlaybackProgress } from '../progress'
@@ -226,6 +230,77 @@ it('publishes the new canonical save and history while its move is still animati
 	await player?.restore(saved)
 	expect(player?.state).toEqual(saved.stage)
 	abort.abort()
+})
+
+it('keeps the autoplay deadline when an animation settles halfway through its dwell', async () => {
+	vi.useFakeTimers()
+	let cancel = () => {}
+	const abort = new AbortController()
+	try {
+		const elements = vi.spyOn(document, 'createElement')
+		const host = new Element()
+		const scenes = fixture()
+		const rendered = vi.fn()
+		await mountMinimalPlayer(
+			host as unknown as HTMLElement,
+			scenes,
+			resources,
+			abort.signal,
+			vi.fn(),
+			{},
+			rendered,
+		)
+		const overlay = elements.mock.results.find(
+			({ value }) => value.className === 'nl-player-overlay',
+		)?.value
+		if (!overlay) throw new Error('Missing text overlay')
+		const animation = Promise.withResolvers<void>()
+		vi.spyOn(PixiStage.prototype, 'commit').mockReturnValueOnce(
+			animation.promise,
+		)
+		host.dispatchEvent(new Event('click'))
+		await vi.advanceTimersByTimeAsync(0)
+		expect(rendered).toHaveBeenLastCalledWith(scenes[0].beats[1])
+		const advance = vi.fn(() => host.dispatchEvent(new Event('click')))
+		const controller = {
+			mode: 'main' as const,
+			frame: () => ({
+				position,
+				characters: 0,
+				read: false,
+				ready: true,
+				pageReady: true,
+				scripted: false,
+				ended: false,
+			}),
+			subscribe: vi.fn(() => () => {}),
+			advance,
+			applySettings: vi.fn(),
+		}
+		const text = document.createElement('div')
+		text.dataset.textFinished = 'true'
+		text.setAttribute = vi.fn(() => {
+			cancel()
+			cancel = schedulePlayback(controller, defaultPlayerSettings, true, false)
+		})
+		vi.spyOn(overlay, 'querySelector').mockImplementation((selector) =>
+			selector === '.nl-player-text' ? text : null,
+		)
+		cancel = schedulePlayback(controller, defaultPlayerSettings, true, false)
+		await vi.advanceTimersByTimeAsync(600)
+		animation.resolve()
+		await vi.advanceTimersByTimeAsync(0)
+		expect(text.setAttribute).not.toHaveBeenCalled()
+		await vi.advanceTimersByTimeAsync(599)
+		expect(advance).not.toHaveBeenCalled()
+		await vi.advanceTimersByTimeAsync(1)
+		expect(advance).toHaveBeenCalledOnce()
+		expect(rendered).toHaveBeenLastCalledWith(scenes[0].beats[2])
+	} finally {
+		cancel()
+		abort.abort()
+		vi.useRealTimers()
+	}
 })
 
 it('stops skip-read at an animated unread auto sentence before it can bypass text waits', async () => {
