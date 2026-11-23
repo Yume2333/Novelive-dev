@@ -1,7 +1,15 @@
-import type { BiblePatch, GlossaryPatch } from '../../packages/format/src/model'
+import type {
+	BiblePatch,
+	Character,
+	GlossaryPatch,
+} from '../../packages/format/src/model'
 
 type Patch = { biblePatch: BiblePatch; glossaryPatch: GlossaryPatch }
 type Names = Set<string>
+type CharacterNames = Pick<
+	Character,
+	'id' | 'name' | 'originalName' | 'aliases'
+>
 
 function normalize(text: string) {
 	return text
@@ -49,8 +57,14 @@ type Entry = { op: string; kind: string } & (
 	| { action: string; chapter?: string; participants: Names[] }
 )
 
-function content(patch: Patch): Entry[] {
+function content(patch: Patch, existing: readonly CharacterNames[]): Entry[] {
 	const characters = new Map<string, Names>()
+	const existingNames = new Map(
+		existing.map((entry) => [
+			entry.id,
+			names(entry, entry.name, entry.originalName),
+		]),
+	)
 	for (const item of patch.biblePatch) {
 		if (item.kind !== 'character') continue
 		const { entry } = item
@@ -82,7 +96,11 @@ function content(patch: Patch): Entry[] {
 					action: item.entry.description,
 					chapter: item.entry.firstSeenChapter ?? observedChapter,
 					participants: [item.entry.from, item.entry.to].map(
-						(id) => characters.get(id) ?? new Set(),
+						(id) =>
+							new Set([
+								...(characters.get(id) ?? []),
+								...(existingNames.get(id) ?? []),
+							]),
 					),
 				}
 			case 'timeline':
@@ -153,9 +171,13 @@ function sameEntry(a: Entry, b: Entry) {
 	)
 }
 
-export function scoreBiblePatches(whole: Patch, chunked: Patch) {
-	const left = content(whole)
-	const right = content(chunked)
+export function scoreBiblePatches(
+	whole: Patch,
+	chunked: Patch,
+	existing: readonly CharacterNames[] = [],
+) {
+	const left = content(whole, existing)
+	const right = content(chunked, existing)
 	const shared = matchCount(left, right, sameEntry)
 	return {
 		whole: left.length,

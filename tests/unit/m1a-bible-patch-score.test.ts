@@ -83,3 +83,38 @@ test('uses a maximum one-to-one assignment when candidate aliases overlap', () =
 	expect(scoreBiblePatches(a, b).f1).toBe(1)
 	expect(scoreBiblePatches(a, patch(b.biblePatch.slice(0, 1))).shared).toBe(1)
 })
+
+test('matches relations whose participants include an existing character absent from both patches', () => {
+	const relation = (to: string): BiblePatch[number] => ({
+		kind: 'relation',
+		op: 'add',
+		entry: {
+			id: 'alliance',
+			from: 'wen',
+			to,
+			firstSeenChapter: 'ch0004',
+			description: '結拜為兄妹',
+			status: 'candidate',
+		},
+	})
+	const cast = (id: string): BiblePatch[number] => ({
+		kind: 'character',
+		op: 'add',
+		entry: { id, name: '未鸞吹', aliases: [], status: 'candidate' },
+	})
+	const existing = [{ id: 'wen', name: '文素臣', aliases: ['文白'] }]
+	const whole = patch([cast('wei'), relation('wei')])
+	const chunked = patch([cast('wei-2'), relation('wei-2')])
+	expect(scoreBiblePatches(whole, chunked, existing)).toMatchObject({
+		whole: 2,
+		chunked: 2,
+		shared: 2,
+	})
+	expect(
+		scoreBiblePatches(
+			whole,
+			patch([cast('wei-2'), relation('unresolved')]),
+			existing,
+		).shared,
+	).toBe(1)
+})

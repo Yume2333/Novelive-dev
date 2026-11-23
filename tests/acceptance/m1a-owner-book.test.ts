@@ -28,6 +28,7 @@ import {
 	synthesizeVolume,
 	type VolumeSynthesis,
 } from '../../packages/creator/src/synthesis'
+import { readBible } from '../../packages/creator/src/synthesis/patch'
 import { projectFiles } from '../../packages/format/src/model'
 import { scoreBiblePatches } from './bible-patch-score'
 import { observeOwnerBookUsage } from './owner-book-usage'
@@ -341,6 +342,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					}
 				}
 				phase = 'preview and chunked synthesis'
+				const existingCharacters = (await readBible(first)).character
 				const result = await prepareVolume(first, volumeId, options)
 				chunked = result.synthesis
 				previewBytes = result.previews.reduce(
@@ -365,7 +367,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					fetch: fetchReplay,
 					signal: controller.signal,
 				})
-				const score = scoreBiblePatches(reference, chunked)
+				const score = scoreBiblePatches(reference, chunked, existingCharacters)
 				const expected = { formatVersion: 1, entries: [entry] }
 				const confirmedIntact =
 					JSON.stringify(await whole.read(confirmed)) ===
