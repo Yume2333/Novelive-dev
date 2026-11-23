@@ -6,7 +6,6 @@ import type {
 } from '@novelive/format/script'
 import { toPlaybackBeats } from '../contract/playback'
 import type {
-	ActivePerformance,
 	PlayerResources,
 	StageSnapshot,
 	StageState,
@@ -298,10 +297,24 @@ export async function mountMinimalPlayer(
 				onBeat?.(undefined)
 				return
 			}
+			const report = () => {
+				if (signal.aborted) return
+				onBeat?.(sourceBeats[index])
+				if (beat.cue.kind === 'text') {
+					snapshot = captureSnapshot(
+						beat.cue.position,
+						{ ...stage.state, text: stage.state.text ?? beat.cue.text },
+						[{ restore: 'restart-text' }],
+					)
+					progress.record(snapshot)
+					options.onSnapshot?.(structuredClone(snapshot))
+				}
+			}
 			if (restoring) {
 				const saved = restoring
 				restoring = undefined
 				await stage.restore(saved, lookahead(beats, index + 1))
+				report()
 			} else {
 				let state = stage.state
 				if (index === startIndex && initialActions?.length) {
@@ -311,41 +324,18 @@ export async function mountMinimalPlayer(
 				}
 				for (const action of beat.actions) state = direct(state, action)
 				state.text = beat.cue.kind === 'text' ? beat.cue.text : null
-				let incoming: StageSnapshot | null = null
-				if (beat.cue.kind === 'text') {
-					const active: ActivePerformance[] = beat.actions.map((action) =>
-						['move', 'shake'].includes(action.name)
-							? { restore: 'skip-relative' }
-							: { restore: 'replay-state', action },
-					)
-					incoming = captureSnapshot(
-						beat.cue.position,
-						{ ...state, text: beat.cue.text },
-						[...active, { restore: 'restart-text' }],
-					)
-				}
 				await stage.commit(
 					state,
 					lookahead(beats, index + 1),
 					beat.actions,
 					false,
 					() => {
-						if (incoming) snapshot = incoming
 						renderText(state.text)
+						report()
 					},
 				)
 			}
 			if (signal.aborted) return
-			onBeat?.(sourceBeats[index])
-			if (beat.cue.kind === 'text') {
-				snapshot = captureSnapshot(
-					beat.cue.position,
-					{ ...stage.state, text: stage.state.text ?? beat.cue.text },
-					[{ restore: 'restart-text' }],
-				)
-				progress.record(snapshot)
-				options.onSnapshot?.(structuredClone(snapshot))
-			}
 			void schedule(beat)
 		} catch (error) {
 			onError(error)

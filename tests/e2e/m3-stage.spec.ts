@@ -20,7 +20,16 @@ const require = createRequire(
 )
 
 type StageHarness = {
-	StageTest: typeof import('../../packages/player/src/stage')
+	StageTest: typeof import('../../packages/player/src/stage') &
+		typeof import('../../packages/ui/src/pages/player/controls/minimal-controller') &
+		Pick<
+			typeof import('../../packages/player/src/progress'),
+			'PlaybackProgress'
+		>
+	controls: ReturnType<
+		typeof import('../../packages/ui/src/pages/player/controls/minimal-controller').minimalControlsController
+	>
+	latest: StageSnapshot
 	player: NonNullable<
 		Awaited<
 			ReturnType<
@@ -39,13 +48,23 @@ type StageHarness = {
 test('M3 save stage renders WebP thumbnails and restores state, replay actions and text', async () => {
 	test.setTimeout(120_000)
 	const { build } = await import(require.resolve('vite'))
+	const entry = resolve('packages/player/src/stage/index.ts')
 	const bundle = await build({
 		configFile: false,
 		logLevel: 'error',
+		plugins: [
+			{
+				name: 'stage-controls-regression',
+				transform(source: string, id: string) {
+					if (id === entry)
+						return `${source}\nexport { PlaybackProgress }\nexport { minimalControlsController } from ${JSON.stringify(resolve('packages/ui/src/pages/player/controls/minimal-controller.ts'))}`
+				},
+			},
+		],
 		build: {
 			write: false,
 			lib: {
-				entry: resolve('packages/player/src/stage/index.ts'),
+				entry,
 				name: 'StageTest',
 				formats: ['iife'],
 			},
@@ -462,6 +481,154 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			await runtime.mounting
 		})
 		expect(await previewPixel(240)).toEqual([224, 96, 48])
+		await page.evaluate(() =>
+			(globalThis as unknown as StageHarness).abort.abort(),
+		)
+		await page.evaluate(
+			async ({ scenes, background, portrait }) => {
+				const runtime = globalThis as unknown as StageHarness
+				const scene = scenes[0]
+				const first = scene.beats[0]
+				const second = scene.beats.find((beat) => beat.line?.id === '0002')
+				if (first.line?.type !== 'text' || second?.line?.type !== 'text')
+					throw new Error('Missing animated sentence fixtures')
+				scene.beats = [
+					{
+						...first,
+						line: { ...first.line, kind: 'caption' },
+						advance: { kind: 'auto' },
+					},
+					{
+						...second,
+						actions: second.actions.map((action) =>
+							action.name === 'move'
+								? { ...action, args: { ...action.args, duration: 1 } }
+								: action,
+						),
+						line: {
+							...second.line,
+							kind: 'caption',
+							content: [
+								{ type: 'text', text: 'Unread' },
+								{ type: 'pause', seconds: 30 },
+							],
+						},
+						advance: { kind: 'auto' },
+					},
+				]
+				const host = document.createElement('div')
+				host.className = 'nl-player'
+				host.style.setProperty('--player-text-delay', '0ms')
+				document.body.replaceChildren(host)
+				runtime.abort = new AbortController()
+				const firstPosition = {
+					chapterId: 'chapter',
+					sceneId: scene.scene.id ?? '',
+					sentenceId: '0001',
+				}
+				const progress = new runtime.StageTest.PlaybackProgress(
+					(a, b) => a.sentenceId.localeCompare(b.sentenceId),
+					{ mainline: firstPosition, read: [firstPosition], saves: [] },
+				)
+				runtime.controls = runtime.StageTest.minimalControlsController(
+					host,
+					'chapter',
+					[scene],
+					'main',
+					progress,
+					runtime.abort.signal,
+				)
+				const commit = runtime.StageTest.PixiStage.prototype.commit
+				runtime.StageTest.PixiStage.prototype.commit = function (...args) {
+					const animation = commit.apply(this, args)
+					if (args[2]?.some((action) => action.name === 'move')) {
+						runtime.preview = this
+						this.app.ticker.stop()
+						runtime.StageTest.PixiStage.prototype.commit = commit
+					}
+					return animation
+				}
+				const player = await runtime.StageTest.mountMinimalPlayer(
+					host,
+					[scene],
+					{
+						resolveAsset: (id) =>
+							`data:image/png;base64,${id === 'room/dusk' ? background : portrait}`,
+					},
+					runtime.abort.signal,
+					(error) => {
+						throw error
+					},
+					{},
+					runtime.controls.rendered,
+					{
+						chapterId: 'chapter',
+						onSnapshot(saved) {
+							runtime.latest = saved
+							progress.record(saved)
+						},
+					},
+				)
+				if (!player) throw new Error('Missing animated player')
+				runtime.player = player
+				runtime.controls.advance(true)
+			},
+			{ scenes: compiled.scenes, background, portrait },
+		)
+		await expect(page.locator('.nl-text-display')).toHaveText('Unread')
+		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+			'aria-busy',
+			'true',
+		)
+		const duringAnimation = await page.evaluate(() => {
+			const runtime = globalThis as unknown as StageHarness
+			runtime.saved = structuredClone(runtime.latest)
+			const frame = runtime.controls.frame()
+			runtime.controls.advance(true)
+			return {
+				frame,
+				saved: runtime.saved,
+				history: runtime.player.progress.history.entries,
+			}
+		})
+		expect(duringAnimation.frame).toMatchObject({
+			position: { sentenceId: '0002' },
+			read: false,
+			scripted: true,
+		})
+		expect(duringAnimation.saved.position.sentenceId).toBe('0002')
+		expect(duringAnimation.saved.active).toEqual([{ restore: 'restart-text' }])
+		expect(duringAnimation.history).toHaveLength(2)
+		expect(duringAnimation.history.at(-1)).toEqual(duringAnimation.saved)
+		await expect(page.locator('.nl-player-text')).toHaveAttribute(
+			'data-text-finished',
+			'false',
+		)
+		await expect(page.locator('.nl-player-text')).toHaveAttribute(
+			'data-page',
+			'1',
+		)
+		await page.evaluate(() =>
+			(globalThis as unknown as StageHarness).preview.complete(),
+		)
+		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+			'aria-busy',
+			'false',
+		)
+		await page.evaluate(async () => {
+			const runtime = globalThis as unknown as StageHarness
+			await runtime.player.restore(runtime.saved)
+			runtime.preview.app.render()
+		})
+		await expect(page.locator('.nl-text-display')).toHaveText('Unread')
+		expect(await previewPixel(240)).toEqual([224, 96, 48])
+		expect(
+			await page.evaluate(
+				() =>
+					(globalThis as unknown as StageHarness).player.state.sprites.center
+						?.transform.x,
+			),
+		).toBe(240)
 		await page.evaluate(() =>
 			(globalThis as unknown as StageHarness).abort.abort(),
 		)

@@ -1,7 +1,9 @@
 import { compileScript } from '@novelive/format/script'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { context } from '../../../../tests/fixtures/script/context'
+import { minimalControlsController } from '../../../ui/src/pages/player/controls/minimal-controller'
 import type { StageSnapshot } from '../contract'
+import { PlaybackProgress } from '../progress'
 import { mountText } from '../text'
 import { AssetWindow } from './assets'
 import { mountMinimalPlayer } from './index'
@@ -47,7 +49,19 @@ class Element extends EventTarget {
 }
 
 beforeEach(() => {
+	vi.mocked(mountText).mockImplementation(() => ({
+		finished: Promise.resolve(),
+		click: () => false,
+		dispose: vi.fn(),
+	}))
 	vi.stubGlobal('document', { createElement: () => new Element() })
+	vi.stubGlobal(
+		'MutationObserver',
+		class {
+			observe() {}
+			disconnect() {}
+		},
+	)
 	vi.stubGlobal(
 		'ResizeObserver',
 		class {
@@ -165,6 +179,117 @@ it('starts at the requested sentence, reconstructs prior state, and delivers ori
 	await vi.waitFor(() => expect(rendered).toHaveBeenLastCalledWith(undefined))
 	expect(snapshots).toHaveBeenCalledTimes(2)
 	abort.abort()
+})
+
+it('publishes the new canonical save and history while its move is still animating', async () => {
+	const elements = vi.spyOn(document, 'createElement')
+	const host = new Element()
+	const abort = new AbortController()
+	const scenes = fixture()
+	const snapshots = vi.fn()
+	const rendered = vi.fn()
+	const player = await mountMinimalPlayer(
+		host as unknown as HTMLElement,
+		scenes,
+		resources,
+		abort.signal,
+		vi.fn(),
+		{},
+		rendered,
+		{ chapterId: 'chapter', onSnapshot: snapshots },
+	)
+	const animation = Promise.withResolvers<void>()
+	vi.spyOn(PixiStage.prototype, 'commit').mockReturnValueOnce(animation.promise)
+	host.dispatchEvent(new Event('click'))
+	await vi.waitFor(() => expect(snapshots).toHaveBeenCalledTimes(2))
+	expect(rendered).toHaveBeenLastCalledWith(scenes[0].beats[1])
+	const saved = snapshots.mock.calls[1][0] as StageSnapshot
+	const stage = elements.mock.results.find(
+		({ value }) => value.className === 'nl-player-stage',
+	)?.value
+	expect(stage?.ariaBusy).toBe('true')
+	expect(saved.position).toEqual(position)
+	expect(saved.stage.sprites.center?.transform.x).toBe(240)
+	expect(saved.active).toEqual([{ restore: 'restart-text' }])
+	expect(player?.snapshot).toEqual(saved)
+	expect(player?.progress.history.entries).toHaveLength(2)
+	expect(player?.progress.history.entries.at(-1)).toEqual(saved)
+	animation.resolve()
+	await vi.waitFor(() => expect(stage?.ariaBusy).toBe('false'))
+	expect(player?.progress.history.entries).toHaveLength(2)
+	await player?.restore(saved)
+	expect(player?.state).toEqual(saved.stage)
+	abort.abort()
+})
+
+it('stops skip-read at an animated unread auto sentence before it can bypass text waits', async () => {
+	vi.useFakeTimers()
+	try {
+		const scenes = fixture()
+		scenes[0].beats[0].advance = { kind: 'auto' }
+		scenes[0].beats[1].advance = { kind: 'auto' }
+		const first = { ...position, sentenceId: '0001' }
+		const progress = new PlaybackProgress(() => 0, {
+			mainline: first,
+			read: [first],
+			saves: [],
+		})
+		const host = new Element() as unknown as HTMLElement
+		const abort = new AbortController()
+		const controls = minimalControlsController(
+			host,
+			'chapter',
+			scenes,
+			'main',
+			progress,
+			abort.signal,
+		)
+		const unread = Promise.withResolvers<void>()
+		vi.mocked(mountText).mockImplementation((_, content) => ({
+			finished: content.some(
+				(part) => part.type === 'text' && part.text === 'Second',
+			)
+				? unread.promise
+				: Promise.resolve(),
+			click: () => false,
+			dispose: vi.fn(),
+		}))
+		await mountMinimalPlayer(
+			host,
+			scenes,
+			resources,
+			abort.signal,
+			vi.fn(),
+			{},
+			controls.rendered,
+			{ chapterId: 'chapter', onSnapshot: (saved) => progress.record(saved) },
+		)
+		expect(controls.frame().read).toBe(true)
+		const animation = Promise.withResolvers<void>()
+		vi.spyOn(PixiStage.prototype, 'commit').mockReturnValueOnce(
+			animation.promise,
+		)
+		controls.advance(true)
+		await vi.advanceTimersByTimeAsync(0)
+		expect(controls.frame()).toMatchObject({
+			position,
+			read: false,
+			scripted: true,
+		})
+		const calls = vi.mocked(mountText).mock.calls.length
+		controls.advance(true)
+		expect(mountText).toHaveBeenCalledTimes(calls)
+		expect(mountText).toHaveBeenLastCalledWith(
+			expect.anything(),
+			expect.anything(),
+			expect.objectContaining({ auto: true, skip: false }),
+		)
+		animation.resolve()
+		unread.resolve()
+		abort.abort()
+	} finally {
+		vi.useRealTimers()
+	}
 })
 
 it('prefers restored position over start, replays saved state, and does not rerun the sentence move', async () => {
