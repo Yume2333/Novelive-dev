@@ -145,6 +145,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await page.getByRole('button', { name: '从当前句预览' }).click()
 		await expect(page.locator('.nl-player-text')).toHaveText(
 			'暮色中，一只纸船从桥下漂过。',
+			{ useInnerText: true },
 		)
 		await capture(page, '01-source-and-preview')
 		await page.getByRole('textbox', { name: '重写要求' }).fill(instruction)
