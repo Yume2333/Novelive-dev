@@ -269,6 +269,7 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 			readerKey,
 		)
 		assert(prior, 'Version 1 progress is missing')
+		await page.keyboard.press('Escape')
 		await page.getByRole('button', { name: '返回书库' }).click()
 		await expect(page.getByRole('heading', { name: '书库' })).toBeVisible()
 		const playerCache = join(readerDir, 'cache', 'player')
