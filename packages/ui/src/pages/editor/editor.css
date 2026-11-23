@@ -1,0 +1,141 @@
+.editor-workbench {
+	display: grid;
+	gap: var(--space-4);
+	color: var(--color-on-surface);
+}
+
+.editor-toolbar,
+.editor-banner {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--space-3);
+}
+
+.editor-workbench button,
+.editor-preview,
+.editor-workbench select,
+.editor-workbench input:not([type="checkbox"]) {
+	padding: var(--space-3);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-md);
+	background: var(--panel-75);
+	color: var(--color-on-surface);
+	font: inherit;
+}
+
+.editor-workbench :is(button, select, input):focus-visible {
+	outline: none;
+	background: var(--white-90);
+	box-shadow: var(--shadow-focus);
+}
+
+.editor-preview {
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+	box-shadow: var(--shadow-glass);
+}
+
+.editor-preview:focus-visible {
+	outline: none;
+	box-shadow: var(--shadow-focus);
+}
+
+.editor-workbench button:disabled {
+	opacity: 0.5;
+}
+
+.editor-banner {
+	padding: var(--space-4);
+	border-radius: var(--radius-lg);
+	background: var(--color-secondary-container);
+}
+
+.editor-stage {
+	position: relative;
+	width: min(100%, 720px);
+	aspect-ratio: 16 / 9;
+	overflow: hidden;
+	border-radius: var(--radius-lg);
+	background: var(--color-background);
+}
+
+.editor-columns {
+	display: flex;
+	gap: var(--space-4);
+	min-width: 0;
+}
+
+.editor-code {
+	position: relative;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	border-radius: var(--radius-lg);
+	background: var(--panel-75);
+}
+
+.editor-code .cm-editor {
+	height: 360px;
+	font-family: var(--font-body);
+}
+
+.editor-code .cm-scroller {
+	scrollbar-width: none;
+	font-family: var(--font-body);
+}
+
+.editor-code .cm-scroller::-webkit-scrollbar {
+	display: none;
+}
+
+.editor-code .cm-focused {
+	outline: none;
+	box-shadow: var(--shadow-focus);
+}
+
+.editor-code .cm-gutters {
+	background: var(--panel-75);
+	color: var(--color-on-surface-variant);
+	border: 0;
+}
+
+.editor-code .cm-cursor {
+	border-left-color: var(--color-primary);
+}
+
+.editor-source {
+	width: 30%;
+	height: 360px;
+}
+
+.editor-source button,
+.editor-diff label {
+	display: block;
+	width: 100%;
+	text-align: start;
+	min-height: 52px;
+}
+
+.editor-source button[aria-pressed="true"] {
+	background: var(--color-secondary-container);
+}
+
+.editor-diff {
+	max-height: 320px;
+}
+
+.editor-diff del,
+.editor-diff ins {
+	display: block;
+	white-space: pre-wrap;
+	padding: var(--space-3);
+}
+
+.editor-diff del {
+	color: var(--color-error);
+}
+
+.editor-diff ins {
+	color: var(--color-primary);
+}
