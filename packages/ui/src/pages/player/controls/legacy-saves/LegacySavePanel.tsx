@@ -105,6 +105,7 @@ export function LegacySavePanel({
 									) : (
 										<button
 											type="button"
+											className={styles.delete}
 											aria-label={`删除 v${version} ${name}`}
 											disabled={busy}
 											onClick={() => setConfirmation(key)}

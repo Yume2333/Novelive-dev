@@ -20,3 +20,12 @@
 	gap: var(--space-2);
 	padding-block: var(--space-2);
 }
+
+.delete {
+	opacity: 0;
+}
+
+.row:hover .delete,
+.row:focus-within .delete {
+	opacity: 1;
+}

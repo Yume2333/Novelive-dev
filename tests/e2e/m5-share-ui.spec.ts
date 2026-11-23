@@ -416,7 +416,15 @@ test('M5 share surfaces review export, approve updates and import as a project i
 			await page.addScriptTag({ content: fixture.code })
 			const legacy = page.getByRole('region', { name: '旧版本存档' })
 			await expect(legacy).toBeVisible()
-			await legacy.getByRole('button', { name: '删除 v1 槽位 1' }).click()
+			const deleteSave = legacy.getByRole('button', { name: '删除 v1 槽位 1' })
+			await legacy.getByRole('heading', { name: '旧版本存档' }).hover()
+			await expect(deleteSave).toHaveCSS('opacity', '0')
+			await deleteSave.hover()
+			await expect(deleteSave).toHaveCSS('opacity', '1')
+			await legacy.getByRole('heading', { name: '旧版本存档' }).hover()
+			await deleteSave.focus()
+			await expect(deleteSave).toHaveCSS('opacity', '1')
+			await deleteSave.press('Enter')
 			await legacy.getByRole('button', { name: '取消' }).click()
 			await expect(
 				legacy.getByRole('region', { name: '版本 v1' }),
