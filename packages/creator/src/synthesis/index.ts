@@ -66,19 +66,19 @@ const nextEvent = synthesisOutput(eventSchema)
 const selection = synthesisOutput(obj({ keep: arr(int({ minimum: 1 })) }))
 const selectionScope: Record<string, string> = {
 	character:
-		'Keep a named or identifiable participant whose choices or role affect the plot, or who needs recurring character continuity. A one-scene character qualifies only when consequential. Drop passing mentions, stock roles and alternate IDs for a person already kept; recognize names, aliases and titles.',
+		'Keep a named or identifiable participant whose choices or role affect the plot, or who needs recurring character continuity. A one-scene character qualifies only when consequential. Use later observations to recognize supporting roles established after the first appearance. Drop passing mentions, stock roles and alternate IDs for a person already kept; recognize names, aliases and titles.',
 	location:
-		'Keep a recurring playable setting or the setting of a consequential scene that needs a distinct backdrop. Drop places only mentioned in passing, route waypoints, and incidental subdivisions or alternate names of the same setting.',
+		'Keep a recurring playable setting or the setting of a consequential scene that needs a distinct backdrop. Prefer the actual playable setting over its broader region or an incidental subdivision. Drop passing mentions, route waypoints and alternate names of the same setting.',
 	relation:
 		'Keep durable relationships that explain consequential choices or conflicts, or establish character or family roles that the adaptation must keep consistent even if introduced once. Group both directions of the same pair, and keep one representative of the same standing relationship; descriptions in chapter-dated changes count as evidence. Drop co-presence, isolated interactions, and incidental kinship or titles.',
 	timeline:
-		'Keep only turning points that change the direction or outcome of a plot thread. Keep one representative of the whole event; omit scene beats, logistics, and retellings under another ID.',
+		'Keep only turning points that change the direction or outcome of a plot thread. Keep one representative of the whole event, not the separate approach, confrontation and aftermath unless each independently changes the plot. Omit scene beats, logistics and retellings under another ID.',
 	foreshadowing:
 		'Keep deliberate setups with a consequential later payoff or an unresolved thread that must be tracked. Drop momentary suspense, speculation, and restatements of the same thread.',
 	style:
 		'Keep reusable visual direction or narrator voice that should apply beyond the scene. Drop commentary on plot, a chapter summary, and the mood of an individual scene.',
 	glossary:
-		'Keep a distinctive named organization, object, technique, title, or cultural expression whose consistent wording or pronunciation matters, or whose meaning is needed to understand a consequential event. Drop ordinary objects, generic offices and roles, and definitions with no continuity need. Character and place names belong in the Bible, not the glossary.',
+		'Keep a distinctive named organization, object, technique, title, or cultural expression whose consistent wording or pronunciation matters, or whose meaning is needed to understand a consequential event. Prefer a representative with an exact source spelling and useful usage note over a vague gloss. Drop ordinary objects, generic offices and roles, and definitions with no continuity need. Character and place names belong in the Bible, not the glossary.',
 }
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
@@ -148,7 +148,7 @@ export interface SynthesisOptions {
 
 const minimumEventLimit = 128
 const packetFormat = 7
-const selectionVersion = 2
+const selectionVersion = 3
 const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -847,7 +847,8 @@ ${packets[packet]}`
 	async function choose(kind: string, candidates: readonly unknown[]) {
 		const prompt = `${instructions}
 ${selection.instructions}
-These ${kind} candidates were extracted packet by packet from this volume, so many are incidental, restated or split across IDs. Keep a candidate only when the evidence shows why future scenes, continuity, or recurring assets need it. Accuracy, a name, or repeated extraction is not enough. ${selectionScope[kind]} Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
+These ${kind} candidates were extracted packet by packet from this volume, so many are incidental, restated or split across IDs. Keep a candidate only when the evidence shows why the adaptation needs it for a consequential scene, continuity, or recurring assets. Observations are evidence about the same entry, not separate choices. Accuracy, a name, or repeated extraction is not enough. ${selectionScope[kind]} Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
+Respond with only the JSON object, with no commentary before or after it.
 Chapter progress:
 ${progress}
 `

@@ -146,6 +146,56 @@ test('selection compares alternate relation IDs and directions together without 
 	expect(result.biblePatch).toEqual([patch[0], patch[1], patch[3]])
 })
 
+test('selection decides once per ID with later evidence and preserves the complete kept proposal history', async () => {
+	const character = (id: string, identity: string): BiblePatch[number] => ({
+		kind: 'character',
+		op: 'add',
+		entry: { id, name: id, aliases: [], identity, status: 'candidate' },
+	})
+	const first = character('lin', 'An apprentice')
+	const restated = {
+		...character('lin', 'A novice mapmaker'),
+		observedChapter: 'c2',
+	}
+	const ongoing: BiblePatch[number] = {
+		kind: 'character',
+		op: 'update',
+		entry: {
+			id: 'lin',
+			name: 'lin',
+			status: 'candidate',
+			changes: [
+				{ chapterId: 'c9', field: 'identity', value: 'Leads the crossing' },
+			],
+		},
+	}
+	const dropped = character('crowd', 'A spectator')
+	const patch = [first, dropped, restated, { ...dropped }, ongoing]
+	const result = await selectAdditions(
+		patch,
+		[],
+		emptyBible,
+		async (kind, candidates) => {
+			expect(kind).toBe('character')
+			expect(candidates).toEqual([
+				{
+					...first.entry,
+					observations: [
+						{ chapterId: 'c2', fact: 'A novice mapmaker' },
+						{ chapterId: 'c9', fact: 'identity: Leads the crossing' },
+					],
+				},
+				{
+					...dropped.entry,
+					observations: [{ chapterId: undefined, fact: 'A spectator' }],
+				},
+			])
+			return new Set([0])
+		},
+	)
+	expect(result.biblePatch).toEqual([first, restated, ongoing])
+})
+
 test('selection deduplicates identical glossary spellings across new IDs without discarding existing updates or different translations', async () => {
 	const term = (
 		id: string,

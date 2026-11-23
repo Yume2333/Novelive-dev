@@ -343,9 +343,10 @@ test('consolidates repeated candidate additions across events and remaps referen
 		if (body.messages[0].content.includes('Candidates:\n')) {
 			selections++
 			expect(body.messages[0].content).toMatch(
-				/character candidates[\s\S]*\n1 \{"id":"guide"[\s\S]*\n2 \{"id":"guide"/,
+				/character candidates[\s\S]*\n1 \{"id":"guide"/,
 			)
-			return sse({ keep: [1, 2] })
+			expect(body.messages[0].content).not.toMatch(/\n2 \{/)
+			return sse({ keep: [1] })
 		}
 		expect(body.messages[0].content).toContain('Never restate a proposed entry')
 		const first = calls++ === 0
@@ -936,13 +937,13 @@ test.each(['current', 'previous', 'unversioned'] as const)(
 				packet: 1,
 				selections: [[1]],
 				ready: false,
-				selectionVersion: 2,
+				selectionVersion: 3,
 			})
 			if (version !== 'current') {
 				const { selectionVersion: _version, ...old } = checkpoint
 				await project.write(files.checkpoint, {
 					...old,
-					...(version === 'previous' ? { selectionVersion: 1 } : {}),
+					...(version === 'previous' ? { selectionVersion: 2 } : {}),
 					selections: [[2]],
 				})
 			}
@@ -1017,6 +1018,7 @@ test.each([false, true])(
 			})
 			expect(selectedPatch?.biblePatch.map(({ entry }) => entry.id)).toEqual([
 				'guide',
+				'guide',
 			])
 			expect(selectedPatch?.glossaryPatch.map(({ id }) => id)).toEqual(['seal'])
 			expect(await project.read(guide)).toMatchObject({
@@ -1038,7 +1040,10 @@ test.each([false, true])(
 		} else {
 			const result = await resume
 			expect(result).toMatchObject({ ...frozen, quarantined: true })
-			expect(result.conflicts.map(({ entry }) => entry.id)).toEqual(['guide'])
+			expect(result.conflicts.map(({ entry }) => entry.id)).toEqual([
+				'guide',
+				'guide',
+			])
 			expect(result.glossaryConflicts.map(({ id }) => id)).toEqual(['seal'])
 		}
 		expect(fetch).not.toHaveBeenCalled()

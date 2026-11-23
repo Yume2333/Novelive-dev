@@ -147,6 +147,70 @@ function groupRelationAdditions(additions: BiblePatch) {
 	return [...groups.values()].flat()
 }
 
+function selectionCandidates(proposals: BiblePatch, additions: BiblePatch) {
+	const first = new Map<string, BiblePatch[number]>()
+	for (const item of additions)
+		if (!first.has(item.entry.id)) first.set(item.entry.id, item)
+
+	const observations = new Map<
+		string,
+		Map<string, { chapterId?: string; fact: string }>
+	>()
+	for (const item of proposals) {
+		const { entry, observedChapter } = item
+		const initial = first.get(entry.id)
+		if (!initial || (item.op !== 'add' && item.op !== 'update')) continue
+		const evidence = observations.get(entry.id) ?? new Map()
+		const note = (fact?: string, chapterId?: string) => {
+			if (fact)
+				evidence.set(JSON.stringify([chapterId, fact]), { chapterId, fact })
+		}
+		if (item !== initial) {
+			const chapter = observedChapter ?? entry.firstSeenChapter
+			switch (item.kind) {
+				case 'character':
+					note(item.entry.identity, chapter)
+					break
+				case 'location':
+				case 'relation':
+				case 'style':
+					note(item.entry.description, chapter)
+					break
+				case 'timeline':
+					note(item.entry.event, item.entry.chapterId)
+					break
+				case 'foreshadowing':
+					note(item.entry.description, item.entry.plantedChapter)
+					break
+			}
+		}
+		if (item.kind === 'character')
+			for (const { chapterId, fact } of item.entry.knows ?? [])
+				note(fact, chapterId)
+		if (
+			item.kind === 'character' ||
+			item.kind === 'location' ||
+			item.kind === 'relation'
+		)
+			for (const { chapterId, field, value } of item.entry.changes ?? [])
+				note(`${field}: ${value}`, chapterId)
+		observations.set(entry.id, evidence)
+	}
+	return [...first.values()].map(({ entry, observedChapter }) => {
+		const notes = [...(observations.get(entry.id)?.values() ?? [])]
+		return {
+			...(notes.length && {
+				observations:
+					notes.length <= 4
+						? notes
+						: [...notes.slice(0, 2), ...notes.slice(-2)],
+			}),
+			...entry,
+			...(observedChapter && { observedChapter }),
+		}
+	})
+}
+
 export function deduplicateNewTerms(
 	glossary: GlossaryPatch,
 	existing: GlossaryPatch,
@@ -183,36 +247,22 @@ export async function selectAdditions(
 ) {
 	let selected = patch
 	for (const kind of selectionKinds) {
-		const proposed = selected.filter(
-			(item) => item.kind === kind && item.op === 'add',
-		)
-		const additions =
-			kind === 'relation' ? groupRelationAdditions(proposed) : proposed
+		const proposed = selected.filter((item) => item.kind === kind)
+		const additions = proposed.filter(({ op }) => op === 'add')
 		if (additions.length < 2) continue
-		const kept = await choose(
-			kind,
-			additions.map(({ entry, observedChapter }) =>
-				observedChapter ? { ...entry, observedChapter } : entry,
-			),
+		const candidates = selectionCandidates(
+			proposed,
+			kind === 'relation' ? groupRelationAdditions(additions) : additions,
 		)
-		const dropped = new Set(additions.filter((_, i) => !kept.has(i)))
-		const survivors = new Set(
-			[
-				...bible[kind].map(({ id }) => id),
-				...selected.flatMap((item) =>
-					item.kind === kind && item.op === 'add' && !dropped.has(item)
-						? [item.entry.id]
-						: [],
-				),
-			].filter(Boolean),
+		const kept = await choose(kind, candidates)
+		const dropped = new Set(
+			candidates.flatMap(({ id }, i) => (kept.has(i) ? [] : [id])),
 		)
-		const gone = new Set(
-			[...dropped]
-				.map(({ entry }) => entry.id)
-				.filter((id) => !survivors.has(id)),
-		)
+		const existing = new Set(bible[kind].map(({ id }) => id))
+		const gone = new Set([...dropped].filter((id) => !existing.has(id)))
 		selected = selected.flatMap((item): BiblePatch => {
-			if (dropped.has(item)) return []
+			if (item.kind === kind && item.op === 'add' && dropped.has(item.entry.id))
+				return []
 			if (item.kind === kind && gone.has(item.entry.id)) return []
 			if (kind !== 'character') return [item]
 			if (item.kind === 'relation')
