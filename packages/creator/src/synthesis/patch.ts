@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
@@ -27,6 +28,18 @@ type Bible = {
 }
 type Patch = BiblePatch[number]
 type Entry = Bible[keyof Bible][number]
+
+export function bibleEntryBases(bible: Bible) {
+	return (Object.keys(bible) as (keyof Bible)[]).flatMap((kind) =>
+		[...new Set(bible[kind].map(({ id }) => id))].map((id) => ({
+			kind,
+			id,
+			revision: createHash('sha256')
+				.update(JSON.stringify(bible[kind].filter((entry) => entry.id === id)))
+				.digest('hex'),
+		})),
+	)
+}
 type Collection<T> = { formatVersion: typeof formatVersion; entries: T[] }
 type Change = NonNullable<Character['changes']>[number]
 const scope = { level: 'series' } as const
@@ -472,6 +485,7 @@ export async function applyPatches(
 	glossary: GlossaryPatch,
 	chapters: ReadonlySet<string>,
 	seriesChapters = chapters,
+	onPublished?: (bible: Bible) => void,
 ): Promise<{
 	conflicts: BiblePatch
 	glossaryConflicts: GlossaryPatch
@@ -487,6 +501,7 @@ export async function applyPatches(
 	const removedCharacters = new Set<string>()
 	const accepted = new Set<Patch>()
 	const consolidatedAdds = new Map<Patch, Patch | null>()
+	const published = structuredClone(bible)
 	let survivingCharacters = bible.character
 	let survivingRelations = bible.relation
 	const write = async <T>(
@@ -612,6 +627,7 @@ export async function applyPatches(
 			for (const item of group.slice(1)) consolidatedAdds.set(item, null)
 		}
 		const survivors = [...entries.values()]
+		Object.assign(published, { [kind]: survivors })
 		if (kind === 'character') {
 			survivingCharacters = survivors as Character[]
 			for (const id of removedCharacters) {
@@ -717,6 +733,7 @@ export async function applyPatches(
 			glossary,
 			chapters,
 			seriesChapters,
+			onPublished,
 		)
 		return { ...result, conflicts: [...rejected, ...result.conflicts] }
 	}
@@ -735,5 +752,7 @@ export async function applyPatches(
 	for (const persist of pending) await persist()
 	for (const persist of characterDeletions) await persist()
 	if (changed) await write(projectFiles.glossary(scope), [...terms.values()])
+	published.glossary = [...terms.values()]
+	onPublished?.(published)
 	return { conflicts, glossaryConflicts, consolidatedAdds }
 }

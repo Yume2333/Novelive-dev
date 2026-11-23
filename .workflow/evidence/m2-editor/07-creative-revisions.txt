@@ -1,0 +1,21 @@
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-revisions.test.ts
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+
+$ NL_REPLAY=strict pnpm exec tsx tests/fixtures/cassettes/m2-revisions/run.ts "$HOME/novelive-revisions-smoke"
+{
+  "project": "~/novelive-revisions-smoke/run-ktE4Cv/Paper boat",
+  "hunks": 2,
+  "applied": [
+    "h2"
+  ],
+  "scene": "scene 纸船\nsource p0001-p0001\n\n@show ada/uniform/neutral center\n: 暮色中，一只纸船从桥下漂过。 #0001\n: 桥下很安静。 #0002\n: 远处传来笛声。 #ebc7\n",
+  "redraw": "applied",
+  "candidates": "candidates"
+}
+
+$ NL_REPLAY=strict pnpm check
+Found 1 info.
+ Test Files  29 passed (29)
+      Tests  390 passed (390)
+exit 0

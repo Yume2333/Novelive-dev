@@ -1,9 +1,15 @@
 import { createHash } from 'node:crypto'
-import { projectFiles, type Work } from '@novelive/format/model'
+import { formatVersion, projectFiles, type Work } from '@novelive/format/model'
 import { compileScript, formatScript } from '@novelive/format/script'
 import type { createConfigStore } from '../config'
 import { TextModelError } from '../models/text'
-import { type ArtJob, ArtProduction, directChapterArt } from '../pipeline/art'
+import {
+	type ArtBible,
+	type ArtJob,
+	ArtProduction,
+	directChapterArt,
+	planArt,
+} from '../pipeline/art'
 import type { CgReferences } from '../pipeline/art/director'
 import {
 	reviewChapter,
@@ -110,6 +116,9 @@ export function chapterWorker(
 	})
 	async function input(ctx: StepContext) {
 		const { chapterId, signal } = ctx
+		const { settings } = await project.read(
+			projectFiles.work(volumeId, work.workId),
+		)
 		const current = await project.read(projectFiles.chapter(ref(chapterId)))
 		const body = (await project.readFile(projectFiles.chapterText(chapterId)))
 			.toString('utf8')
@@ -148,7 +157,7 @@ export function chapterWorker(
 				id,
 				text: body.split('\n\n')[i],
 			})),
-			settings: work.settings,
+			settings,
 			preview: preview?.summary,
 			preset: [models.preset.style, models.preset.constraints]
 				.filter(Boolean)
@@ -174,7 +183,7 @@ export function chapterWorker(
 			script: {
 				assets: (await art(signal).registry()).entries,
 				speakers: bible.character.map(({ id }) => id),
-				customMarks: Object.keys(work.settings.customMarks),
+				customMarks: Object.keys(settings.customMarks),
 				makeId: (size) =>
 					createHash('sha256')
 						.update(`${chapterId}/${++i}`)
@@ -344,6 +353,19 @@ export function chapterWorker(
 			return art(signal).savePlaceholder(job.assetId, issue)
 		},
 	}
+	// Portraits picked at visual approval are registered without a drawing job.
+	async function confirmedPortrait(assetId: string, bible: ArtBible) {
+		const [characterId] = assetId.split('/')
+		const character = bible.characters.find(({ id }) => id === characterId)
+		if (!character) throw new Error(`No drawing record for ${assetId}`)
+		const [job] = planArt(
+			[{ id: assetId, kind: 'character', description: character.name }],
+			bible,
+			{ formatVersion, entries: [] },
+		).jobs
+		if (!job) throw new Error(`No drawing record for ${assetId}`)
+		return { job, cg: undefined }
+	}
 	async function drawingMetadata(
 		id: string,
 	): Promise<{ job: ArtJob; cg?: CgReferences }> {
@@ -352,6 +374,47 @@ export function chapterWorker(
 	return {
 		worker,
 		art,
+		rewriteScene: (
+			chapterId: string,
+			scene: { sourceIds: readonly string[]; nvs: string; instruction: string },
+			signal: AbortSignal,
+		) =>
+			step(async () => {
+				const { chapter, options } = await input({
+					workId: work.workId,
+					chapterId,
+					link: 'none',
+					desensitized: false,
+					signal,
+				})
+				const result = await writeChapter(
+					{
+						...chapter,
+						paragraphs: chapter.paragraphs.filter(({ id }) =>
+							scene.sourceIds.includes(id),
+						),
+						rewrite: { instruction: scene.instruction, current: scene.nvs },
+					},
+					options,
+				)
+				signal.throwIfAborted()
+				if (result.scenes.length !== 1)
+					throw new Error('A scene rewrite must return exactly one scene')
+				return result.scenes[0].scene
+			}),
+		async redraw(
+			assetId: string,
+			target: { path: string; instruction?: string },
+			signal: AbortSignal,
+		) {
+			const bible = (await productionBible(project)).art
+			const metadata =
+				(await existing(() => drawingMetadata(assetId))) ??
+				(await confirmedPortrait(assetId, bible))
+			return art(signal).redraw(metadata.job, bible, metadata.cg, target)
+		},
+		adoptImage: (assetId: string, source: string) =>
+			art().adopt(assetId, source),
 		setModels(next: typeof models) {
 			models = next
 		},

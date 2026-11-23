@@ -1,0 +1,207 @@
+M2/04 Bible and glossary management
+Base: 0bf76ad045f9180ed1683ab7a372974519b557e4
+Branch: m2-editor/04-bible-management
+
+$ pnpm typecheck
+$ tsc --noEmit
+Exit code: 0
+
+PR #35 review follow-up (baseline d1ea43a verified as HEAD ancestor)
+Post-patch review on 20cfefc:
+- 7172680: shared prepareBiblePatch applies the proposed replacement/deletion in memory, validates original operations, then invokes real validatePatch on every resulting entry/glossary term. Both projection and the writer invoke this same pure preparation; the writer's independent relation/address validator is removed. Batch tests delete a character and update a relation: keeping its reference returns restricted without writes and remains rejectable; removing its reference approves successfully.
+- 7be04da: all legacy fixtures strip baseVersion. Added marker-free versioned fixtures for a matching saved whole-Bible revision (sequential independent approvals work) and a newer edit (no bases, stale, no writes). The interrupted-checkpoint regression now starts with genuinely approvable legacy candidates rather than candidates already stale at creation.
+- Series context is collected once with work membership, then passed to every candidate preflight and the actual writer. A read-count regression asserts one series, volume and work read despite multiple proposals. No per-candidate metadata traversal or independent validator remains.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary|M2 chat panel'
+  4 passed (4.2s)
+$ NL_REPLAY=strict pnpm check
+Checked 234 files in 105ms. No fixes applied.
+Found 1 info.
+ Test Files  28 passed (28)
+      Tests  380 passed (380)
+Both exited 0; the final check includes the exact batch fixture schema and the context read-count assertion. The Electron pass remains applicable: only unit fixture data changed afterward. Logs: 04-pr35-postpatch-{e2e,check}.log. Scheduler untouched; no paid calls. PR remained open and mergeable; git_view_pr showed only the monitoring-control bot conversation comment, not inline review details. No PR comments were posted.
+
+Safety review on 0b44b9f (supersedes bridge-time legacy snapshots and hand-written reference restrictions below):
+- Quarantine overwrite: c5cf200. applyPatches now optionally exposes its in-memory merged result, derived solely from the validated read and its own merge. Normal synthesis hashes those entries without reading potentially newer on-disk entry snapshots. Quarantined output has no entry bases and an explicit quarantine marker; it cannot become approvable even if the old Bible later reappears. Legacy bases without the new provenance version are only reconstructed when their saved whole-Bible revision matches current contents exactly. Actual interrupted/ready checkpoint synthesis tests assert no quarantined bases; adapter regression asserts even a quarantined source containing newer hashes cannot overwrite the creator edit.
+- Backfill overwrite: c947782. Before fix, the concrete pending-character regression removed old bases, edited the confirmed duplicate while preserving the candidate, reopened, and incorrectly obtained a new targeted hash (expected undefined). Backfill now requires the existing saved expectedRevision, current whole-Bible revision and supplied provenance revision to match. Untrusted/missing metadata is never allowed to bypass a mismatching saved revision. Matching-revision enrichment and rejected-state preservation are tested.
+- Missing speakers: 3e4d0ee. Before fix, a proposal with addresses.speakerId = unpublished-speaker incorrectly projected canApprove: true. Reference checks now run real validatePatch as a dry-run, with exactly its error as the reason; this also covers relations, chapters, costumes, knowledge and future validator rules. No parallel hand-maintained dependency validator remains.
+- Chat hides rejection: restricted outcomes now travel through the contract, ChatService and adapter as {status: restricted, proposal, reason}; only real revision/source failures are stale. Chat displays the restriction, disables confirmation and keeps rejection; Bible uses the same actionability and retains rejection. Electron covers restricted approval followed by reasoned rejection and separately confirms true stale hides chat actions. Backend tests verify restricted proposals stay pending until rejected and never write confirmed content.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary|M2 chat panel'
+  4 passed (4.4s)
+$ NL_REPLAY=strict pnpm check
+Checked 233 files in 109ms. No fixes applied.
+Found 1 info.
+ Test Files  28 passed (28)
+      Tests  375 passed (375)
+Both exited 0. Existing info remains tests/fixtures/text-models/build-synthetic.ts:63. Logs: 04-pr35-safety-{e2e,check}.log; before-fix receipts: 04-pr35-{backfill,speaker}-before.log. Strict replay only, no paid model calls. Scheduler untouched; M2/07 handoff unchanged.
+
+Bridge review on c89626b (supersedes whole-Bible bridge checks and legacy checkpoint behavior below):
+1+3: 299467a. Concrete independent-conflict regression failed before fix with expected resolved/approved, received stale/pending. Synthesis now persists entry bases after its merge. Bridge rows freeze the bases of only their targeted entries; legacy results without publication bases snapshot targets once at first bridge, never from the pre-merge checkpoint. Reopen does not rebase pending entries or resurrect terminal ones. Chat proposals still use their original whole-Bible expectedRevision. Existing pending bridge rows lacking bases can be enriched without changing terminal states or their IDs.
+2: 133724e. Concrete observedChapter approval returned resolved before fix and would replace a global fact. The current approval writer does not implement chapter-specific mutations; these candidates are now rejection-only, with a visible reason naming the chapter. Backend direct approval is blocked too.
+4: b1c72bb. Concrete missing-character relation approval previously threw 'Unknown character reference: missing'. Such relations are now blocked with named dependencies; after publishing the missing character the same proposal can be approved without rebasing unrelated entries.
+Flag: getBible now exposes proposalActions (canApprove + optional reason), calculated by the same source/target/restriction checks used on approval. BiblePage uses this projection, not its own whole-Bible comparison. Before fix, real Electron could not find the superseded-source reason/disabled card. After fix it verifies source-superseded cards are disabled but rejectable, chapter-scoped candidates are disabled with reasons, missing-dependency relations are disabled with reasons, and the glossary remains approvable after accepting the independent character conflict.
+Legacy limitation: legacy files have no historical targeted-entry snapshot; per requested behavior, their current post-synthesis targets are frozen at first bridge. New publications retain bases even when discovery happens after subsequent target edits.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary|M2 chat panel'
+  3 passed (4.3s)
+$ NL_REPLAY=strict pnpm check
+Checked 233 files in 125ms. No fixes applied.
+Found 1 info.
+ Test Files  28 passed (28)
+      Tests  371 passed (371)
+Both commands exited 0; existing info remains tests/fixtures/text-models/build-synthetic.ts:63. No network/model calls outside strict replay. Scheduler remains untouched.
+Logs: 04-pr35-review-e2e.log, 04-pr35-review-check.log; before-fix receipts: 04-pr35-{entry-base,chapter,relation,action}-before.log.
+
+Finding 4 follow-up implementation (supersedes investigation-only status below):
+- Lazy bridge of persisted synthesis conflicts and pending Bible/glossary entries through ChatStore.recordStandaloneProposal. Deterministic source-bound IDs and INSERT OR IGNORE preserve approvals, rejections, reasons and original expectedRevision on reopen.
+- Provenance stays in existing proposal JSON (no table/contract migration). Resolution preserves it and checks the current source revision as well as the original Bible revision.
+- Synthesis now writes an optional publication Bible revision. Legacy synthesis can use its completed checkpoint basis; missing/incomplete provenance stays stale rather than using discovery-time confirmed content. Pending file candidates without a conflicting confirmed entry are stamped once on discovery; duplicate confirmed/candidate IDs never bypass revision safety.
+- New Electron case runs actual synthesizeVolume with the existing strict whole-volume cassette, starts with zero proposals, reaches visible conflict accept/reject controls, rejects glossary, approves the character, and reloads without resurrecting either proposal. No model network calls.
+- Nine unit cases cover deduplication, source persistence, imported-work FK initialization, unified approval/rejection, stale-before-first-discovery, changed/deleted sources, unversioned legacy safety, completed versus unfinished checkpoint provenance, candidate approval/rejection across reopen, empty and malformed sources.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary|M2 chat panel'
+  3 passed (4.1s)
+$ NL_REPLAY=strict pnpm check
+Checked 233 files in 110ms. No fixes applied.
+Found 1 info.
+ Test Files  28 passed (28)
+      Tests  368 passed (368)
+Both commands exited 0. Existing informational lint diagnostic is tests/fixtures/text-models/build-synthetic.ts:63.
+Logs: 04-pr35-source-e2e.log and 04-pr35-source-check.log.
+Finding 3 remains deferred to M2/07; scheduler code untouched. Progress records the agreed stale-base dependency/redraw handoff.
+
+Latest CI job 137432434548 failed in m0-dev-bridge startup polling, not canvas:
+AssertionError: expected 'starting' to be 'ready' // Object.is equality
+tests/unit/m0-dev-bridge.test.ts:88:6; Matcher did not succeed in time.
+The bridge worker imports entry.ts using tsImport; the new static ChatService path eagerly imported the model/Agent dependencies even for app-state-only commands. Moved the unchanged registerChat function into a lightweight module (still re-exported from chat/index.ts) and dynamically import the project chat adapter only on first chat/proposal access. No timeout change or test weakening.
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m0-dev-bridge.test.ts tests/unit/m2-chat.test.ts
+ Test Files  2 passed (2)
+      Tests  10 passed (10)
+$ NL_REPLAY=strict pnpm check
+ Test Files  27 passed (27)
+      Tests  359 passed (359)
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary|M2 chat panel'
+  2 passed (3.0s)
+Exit codes: 0. Combined grep runs both required Electron checks against one fresh build.
+
+Final integration rebase: origin/main 66e9dbe (M2/05 editor host retained). Resolved entry.ts import and adjacent host-block conflicts by retaining both editor and chat/Bible code, including both close handlers. Editor registrations are unchanged relative to main. Rebased SHAs: finding 1 9485210; finding 2 70151e4; desktop adapter a80a901; finding 5 5c08cf1 (style 6379572); finding 6 7d4e01b; scoped-watermark rework 43fdc98; navigation CI assertion b1ae048.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (3.1s)
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+$ NL_REPLAY=strict pnpm check
+Checked 230 files in 97ms. No fixes applied.
+Found 1 info.
+ Test Files  27 passed (27)
+      Tests  359 passed (359)
+Exit codes: 0. Chat panel e2e is now available from merged M2/06 and is additionally run on the same freshly built Electron app.
+$ NL_REPLAY=strict xvfb-run -a pnpm exec playwright test --grep 'M2 chat panel'
+  1 passed (1.8s)
+Exit code: 0. This chat UI test uses its existing projection driver; the Bible Electron test separately covers live chat host CRUD and real proposal approvals.
+
+Replay watermark follow-up: directly replaced the scalar droppedThrough with per-(scope,scopeId) watermarks. Trimming work A or dropping its oversized event does not signal a gap for work B or unopened works; app/work scopes with identical IDs remain separate. New regression tests cover all cases.
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (2.6s)
+$ NL_REPLAY=strict pnpm check
+Checked 220 files in 80ms. No fixes applied.
+Found 1 info.
+ Test Files  27 passed (27)
+      Tests  359 passed (359)
+Exit codes: 0. Earlier M2/03 seven-test Check remains valid (chat implementation inputs unchanged by this replay watermark change).
+
+Latest review fixes after integration 9b21dce:
+- Finding 5: 4aab74f bounds shared event replay at 256 envelopes / 1 MiB serialized bytes, drops oversized snapshots, and returns gap=true when history was discarded so consumers reload chat.get. Live delivery is unchanged. 928e963 removes the new non-null assertion. No session deletion callback exists in ChatOptions; bounded replay avoids coupling chat persistence to host retention. Tests exercise 1000 streamed snapshots, count/byte limits, empty/filter cases and oversized events.
+- Finding 6: ce46d80 makes projectChat locate imported work metadata and perform the same INSERT OR IGNORE as production (not exported there), preserving existing work/scheduler state. A concrete regression test deletes fixture task/work DB rows while keeping imported project files, verifies unadapted ChatService.create throws FOREIGN KEY constraint failed, then verifies projectChat can create the session and reopening preserves settings_rev=7/status=paused. Foreign works reject. Host closes its opened Project if adapter initialization fails.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (2.9s)
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+$ NL_REPLAY=strict pnpm check
+ Test Files  27 passed (27)
+      Tests  357 passed (357)
+All exit codes: 0. Existing fixture info unchanged; no paid calls/missing cassettes.
+
+Rebased onto origin/main 5ea3d49 after M2/02 and M2/03 merged, with no conflicts.
+Rebased finding commits: 91647a4 (finding 1), 43fd56a (finding 2).
+Desktop integration now uses registerChat(registry, getChat), one retained ChatService/Project per work, and waits for chat shutdown before closing its DB. The project adapter prepares versioned Bible/glossary proposals without writing and calls applyBibleProposal at approval. ChatStore owns all resolution persistence; the temporary resolver was deleted. Bible readers and fixtures now use ChatStore's {chapterIds,payload,rewrite?} DB envelope. Shared host event sequencing/replay now includes chat events without initializing production just to list chat events. No editor.* registration changed.
+M2/03 has no chat e2e Check: its archived task Check is the seven-test unit command below. Electron additionally verifies chat create/list/get/rename/delete through the desktop host, alongside all Bible approval/rejection/staleness checks. Other proposal domains intentionally return unsupported until their project adapters land; read tools and child agents remain unconfigured.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (2.8s)
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+$ NL_REPLAY=strict pnpm check
+Checked 218 files in 113ms. No fixes applied.
+Found 1 info.
+ Test Files  26 passed (26)
+      Tests  353 passed (353)
+All exit codes: 0. Existing fixture info unchanged. No paid calls or missing cassettes.
+
+- Finding 1: 9fe152d compares confirmed/candidate field-key union and labels omitted fields as removed; Electron asserts 性格：谨慎 → 移除.
+- Finding 2: ad19471 replaces native details with shared Collapse and accessible disclosure button.
+- CI job 137423707801 failed because the existing M1b navigation assertion expected three links after Bible navigation was added. b0b1aa6 updates that expectation only.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (3.3s)
+$ NL_REPLAY=strict xvfb-run -a pnpm exec playwright test --grep 'M1b creation surfaces'
+  2 passed (3.0s)
+$ NL_REPLAY=strict pnpm check
+Checked 199 files in 82ms. No fixes applied.
+Found 1 info.
+ Test Files  23 passed (23)
+      Tests  337 passed (337)
+All exit codes: 0. Existing info: tests/fixtures/text-models/build-synthetic.ts formatting suggestion.
+Before/after Electron screenshots inspected again; removed field preview is visible.
+
+Investigation only: findings 3/4 were not patched.
+3. Scheduler fixture, after a completed base is marked stale and chapter 2 requests a new variant:
+Stale base: [{"ref_id":"yard/day","task":"done","asset":"stale"},{"ref_id":"yard/night","task":"queued","asset":"pending"}] variant drawn: 0
+Control restoring drawn base: [{"ref_id":"yard/day","task":"done","asset":"drawn"},{"ref_id":"yard/night","task":"done","asset":"drawn"}] variant drawn: 1
+The fixture emulates apply's DB status update; Bible Electron coverage separately verifies real approval sets stale. Production stage returns base dependencies; ensureImageTask keeps the completed base task; dispatchImages excludes stale bases. docs/visuals.md section 5 says redraw/keep is the creator's choice. M2/07 owns explicit redraw, not M2/05. Minimal immediate fix: permit an existing usable stale base for variant scheduling without automatically redrawing or clearing its stale marker (scheduler/chapter/index.ts plus tests/unit/m1b-scheduler.test.ts). ArtProduction currently reads its separate file registry, which remains drawn under this apply path; synchronizing that registry would also require accepting a usable stale base in pipeline/art/index.ts. Explicit redraw must separately reset/replace tasks and preserve prior files through M2/07 editor/revisions.
+4. Real strict-replay synthesizeVolume with the existing m1a-synthesis whole-volume fixture:
+{"conflicts":1,"glossaryConflicts":1,"proposalRows":{"count":0}}
+getBible reads only proposal rows for actionable IDs and never reads synthesisFiles(volumeId).result; synthesis saves these conflicts separately. docs/bible.md lines 121-128 explicitly require conflicts in Bible awaiting creator handling. This is a real M2/04 integration gap, not something explicitly assigned to M2/03 chat. Minimal fix: Bible editing adapter materializes durable bible/glossary proposals from synthesis conflicts and stored candidate entries, using M2/03's shared proposal writer. Touch bible/editing/index.ts, tests/e2e/m2-bible.spec.ts, and coordinate a shared writer in chat if available. Must persist source identity/revision for dedupe across reopen, retain reject state, never rebase an old imported conflict silently onto newer confirmed content, and avoid synthesizing already-rejected candidates again. Prefer lazy adapter over changing synthesis because existing projects also need this bridge.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  ✓  1 tests/e2e/m2-bible.spec.ts:27:1 › M2 bible and glossary views, accepts, rejects and preserves confirmed content against stale proposals (2.2s)
+  1 passed (2.9s)
+Exit code: 0
+
+$ NL_REPLAY=strict pnpm check
+$ pnpm typecheck && pnpm lint && pnpm test
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 199 files in 144ms. No fixes applied.
+Found 1 info.
+ Test Files  23 passed (23)
+      Tests  337 passed (337)
+   Start at  00:54:59
+   Duration  13.95s (tests 92%, import 7%, transform 1%)
+Exit code: 0
+
+The informational useTemplate diagnostic is in unchanged tests/fixtures/text-models/build-synthetic.ts:63.
+
+Real path: deterministic project and existing SQLite tables, real Electron utility process and renderer. No model calls or cassette dependencies. All runs use NL_REPLAY=strict.
+Verified: empty Bible; missing volume/proposal errors; chapter/paragraph locations; confirmed conflicts; Bible approval; glossary approval; rejection feedback persistence; stale Bible and glossary results; reload persistence; exact stale asset set (character appearance, outfit description, location description); unaffected outfit, unrelated location and CG remain drawn; style hint; no native scrollbars.
+Visual receipts inspected: 04-bible-before.png, 04-bible-after.png (1440x1000).
+
+Integration: packages/creator/src/entry.ts:5-10 imports; :60-71 registers bible.get, proposal.get and proposal.resolve. M2/03 should keep the lifecycle owner and dispatch Bible/glossary approval to applyBibleProposal(project, proposal), returning 'applied' or 'stale'. This helper does not resolve/persist a proposal; resolveBibleProposal is the independently runnable Bible-only persistence adapter. Both use the same process-local per-project serialization. Other proposal kinds remain owned by M2/03.
+UI volume defaults to import's v0001 convention, with explicit volume ID field and ?volume= override. No volume-discovery contract was added.
+Review: skipped — no independent reviewer/subagent tool available; milestone closeout must review this task.
+
+PR #35 UI regressions
+- Volume input keeps a local draft; only Enter or 切换卷 commits the route. Electron asserts End/Backspace/2 produces v0002 without losing focus or changing the active volume, then exercises missing-volume error and restoration.
+- Approval notice inspects actual Bible field changes. Glossary-only approval says exactly 已接受候选。; image propagation text appears only for changed appearance/costume/location fields, and style text only for a style change.
+- AppShell.tsx workNavigation adds one Bible entry; Electron opens Bible through the visible 设定集 link.
+- Updated before/after screenshots inspected; sidebar entry and glossary-only success text are visible.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (2.5s)
+Exit code: 0
+$ NL_REPLAY=strict pnpm check
+ Test Files  23 passed (23)
+      Tests  337 passed (337)
+   Start at  01:00:14
+   Duration  10.94s (tests 94%, import 5%, transform 1%)
+Exit code: 0

@@ -10,6 +10,7 @@ import {
 } from '../../packages/creator/src/synthesis'
 import {
 	applyPatches,
+	bibleEntryBases,
 	readBible,
 	validatePatch,
 } from '../../packages/creator/src/synthesis/patch'
@@ -244,6 +245,7 @@ test('consolidates repeated candidate additions across events and remaps referen
 	expect(bible.relation).toContainEqual(
 		expect.objectContaining({ from: 'guide', to: 'ada' }),
 	)
+	expect(result.bibleBase).toEqual(bibleEntryBases(bible))
 	expect(await project.read(files.result)).toEqual(result)
 })
 
@@ -1766,6 +1768,8 @@ test.each([false, true])(
 				}),
 			)
 			expect(result.glossaryConflicts).toHaveLength(2)
+			expect(result.quarantined).toBe(true)
+			expect(result.bibleBase).toBeUndefined()
 		}
 	},
 )

@@ -174,17 +174,42 @@ export class ArtProduction {
 		return { status: 'placeholder', issue }
 	}
 
+	redraw(
+		job: ArtJob,
+		bible: ArtBible,
+		cg: CgReferences | undefined,
+		target: { path: string; instruction?: string },
+	) {
+		return this.drawRegistered(job, bible, cg, target)
+	}
+
+	adopt(id: string, source: string) {
+		return this.writeRegistry(async () => {
+			const registry = await this.registry()
+			const entry = registry.entries.find((item) => item.id === id)
+			if (!entry) throw new Error(`Unregistered asset: ${id}`)
+			await this.project.writeFile(
+				entry.path,
+				await this.project.readFile(source),
+			)
+			entry.status = 'drawn'
+			await this.project.write(this.registryFile, registry)
+			return entry.path
+		})
+	}
+
 	private async drawRegistered(
 		job: ArtJob,
 		bible: ArtBible,
 		cg?: CgReferences,
+		redraw?: { path: string; instruction?: string },
 	): Promise<ImageJobResult> {
 		const signal = this.options.signal
 		signal?.throwIfAborted()
 		const { entries } = await this.registry()
 		const entry = entries.find((item) => item.id === job.assetId)
 		if (!entry) throw new Error(`Unregistered asset: ${job.assetId}`)
-		if (await this.file(entry.path)) {
+		if (!redraw && (await this.file(entry.path))) {
 			if (entry.status === 'placeholder')
 				return { status: 'placeholder', issue: '需要处理：此前绘制失败。' }
 			if (entry.status === 'pending') await this.saveStatus(entry.id, 'drawn')
@@ -201,7 +226,9 @@ export class ArtProduction {
 				? await this.file(foundBase.path)
 				: undefined
 		if ('baseAssetId' in job && (!base || !foundBase))
-			return this.savePlaceholder(entry.id, '基准图未成功生成。')
+			return redraw
+				? { status: 'placeholder', issue: '基准图未成功生成。' }
+				: this.savePlaceholder(entry.id, '基准图未成功生成。')
 		const [entity, costume] = job.assetId.split('/')
 		const character = portrait
 			? bible.characters.find((item) => item.id === entity)
@@ -225,6 +252,7 @@ export class ArtProduction {
 				job.description,
 				character?.costumes?.find((item) => item.id === costume)?.description,
 				job.kind === 'location' ? location?.description : undefined,
+				redraw?.instruction,
 			]
 				.filter(Boolean)
 				.join('；'),
@@ -293,12 +321,15 @@ export class ArtProduction {
 			: this.outputSize(portrait)
 		const result = await this.paint(drawing, target, portrait, Boolean(base))
 		if ('issue' in result) {
-			return result.unsupported
-				? { status: 'unsupported', issue: result.issue }
+			return result.unsupported || redraw
+				? {
+						status: result.unsupported ? 'unsupported' : 'placeholder',
+						issue: result.issue,
+					}
 				: this.savePlaceholder(entry.id, result.issue)
 		}
-		await this.saveWebp(entry.path, result.png, output)
-		await this.saveStatus(entry.id, 'drawn')
+		await this.saveWebp(redraw?.path ?? entry.path, result.png, output)
+		if (!redraw) await this.saveStatus(entry.id, 'drawn')
 		return { status: 'drawn' }
 	}
 

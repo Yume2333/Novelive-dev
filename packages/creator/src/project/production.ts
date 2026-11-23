@@ -91,13 +91,8 @@ export function createProduction(
 			const settings = () =>
 				productionModels(config, work.settings.writerPresetId)
 			const models = await settings()
-			const { art, worker, setModels } = chapterWorker(
-				project,
-				volumeId,
-				work,
-				models,
-				replay,
-			)
+			const { art, worker, setModels, rewriteScene, redraw, adoptImage } =
+				chapterWorker(project, volumeId, work, models, replay)
 			const service = art()
 			const data = project.database
 			data
@@ -267,6 +262,14 @@ export function createProduction(
 					queue.retryChapter(workId, chapterId)
 					return snapshot()
 				},
+				async redo(chapterId: string) {
+					await refresh()
+					queue.redoChapter(workId, chapterId)
+					return snapshot()
+				},
+				rewriteScene,
+				redraw,
+				adoptImage,
 				async asset(id: string) {
 					const asset = (await service.registry()).entries.find(
 						(entry) => entry.id === id && entry.status !== 'pending',

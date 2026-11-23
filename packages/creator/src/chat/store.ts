@@ -34,8 +34,16 @@ type EntryRow = Row &
 				data: { summary: string; pendingProposalIds?: string[] }
 		  }
 	)
+export type ProposalSource = {
+	path: string
+	revision: string
+	entry?: { kind: string; id: string }
+	bases?: { kind: string; id: string; revision: string }[]
+	baseRevision?: string
+}
 type ProposalData = Pick<Proposal, 'chapterIds' | 'payload'> & {
 	rewrite?: RewriteProposal
+	source?: ProposalSource
 }
 type ProposalRow = Omit<Proposal, 'chapterIds' | 'payload' | 'feedback'> & {
 	data: string
@@ -249,6 +257,40 @@ export class ChatStore {
 		})
 	}
 
+	recordStandaloneProposal(
+		proposal: Proposal,
+		source: ProposalSource,
+		currentRevision: string,
+	) {
+		const { id, prompt, payload, chapterIds } = proposal
+		this.db
+			.prepare(`INSERT OR IGNORE INTO proposal (proposal_id, work_id, kind, prompt, payload, created_at)
+			VALUES (?, ?, ?, ?, ?, ?)`)
+			.run(
+				id,
+				this.workId,
+				payload.kind,
+				prompt,
+				JSON.stringify({ chapterIds, payload, source }),
+				Date.now(),
+			)
+		const existing = this.proposal(id)
+		if (
+			existing.proposal.status === 'pending' &&
+			'expectedRevision' in existing.proposal.payload &&
+			existing.proposal.payload.expectedRevision === currentRevision &&
+			source.baseRevision === currentRevision &&
+			(!existing.source?.bases ||
+				existing.source.baseRevision !== currentRevision) &&
+			source.bases
+		)
+			this.db
+				.prepare(`UPDATE proposal SET payload = json_set(payload, '$.source', json(?))
+			WHERE proposal_id = ? AND work_id = ? AND status = 'pending'`)
+				.run(JSON.stringify(source), id, this.workId)
+		return this.proposal(id)
+	}
+
 	proposal(id: string) {
 		const row = this.db
 			.prepare(
@@ -257,7 +299,9 @@ export class ChatStore {
 			.get(id, this.workId) as ProposalRow | undefined
 		if (!row) throw chatError('not_found', '提议不存在')
 		const { data, feedback, toolCallId, ...base } = row
-		const { payload, chapterIds, rewrite } = JSON.parse(data) as ProposalData
+		const { payload, chapterIds, rewrite, source } = JSON.parse(
+			data,
+		) as ProposalData
 		return {
 			proposal: {
 				...base,
@@ -266,6 +310,7 @@ export class ChatStore {
 				...(feedback === null ? {} : { feedback }),
 			},
 			rewrite,
+			source,
 			toolCallId,
 		}
 	}
@@ -277,13 +322,14 @@ export class ChatStore {
 		rewrite?: RewriteProposal,
 	) {
 		const { chapterIds, payload, id } = proposal
+		const { source } = this.proposal(id)
 		this.db
 			.prepare(`UPDATE proposal SET status = ?, feedback = ?, payload = ?, resolved_at = ?
 			WHERE proposal_id = ? AND work_id = ? AND status = 'pending'`)
 			.run(
 				status,
 				feedback ?? null,
-				JSON.stringify({ chapterIds, payload, rewrite }),
+				JSON.stringify({ chapterIds, payload, rewrite, source }),
 				Date.now(),
 				id,
 				this.workId,
