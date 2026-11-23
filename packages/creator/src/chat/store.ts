@@ -28,7 +28,10 @@ type EntryRow = Row &
 					position?: Position
 				}
 		  }
-		| { kind: 'compaction'; data: { summary: string } }
+		| {
+				kind: 'compaction'
+				data: { summary: string; pendingProposalIds?: string[] }
+		  }
 	)
 type ProposalData = Pick<Proposal, 'chapterIds' | 'payload'> & {
 	rewrite?: RewriteProposal
@@ -184,13 +187,18 @@ export class ChatStore {
 			)
 	}
 
-	compact(id: string, parentId: string, summary: string) {
+	compact(
+		id: string,
+		parentId: string,
+		summary: string,
+		pendingProposalIds: string[],
+	) {
 		this.insert(id, {
 			id: randomUUID(),
 			parentId,
 			at: Date.now(),
 			kind: 'compaction',
-			data: { summary },
+			data: { summary, pendingProposalIds },
 		})
 	}
 

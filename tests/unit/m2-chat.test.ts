@@ -231,6 +231,38 @@ test('only applies human-approved current proposals and returns rejection feedba
 	})
 })
 
+test('returns a late rejection to the model even when its proposal was compacted', async () => {
+	const chat = await openFixture()
+	const { session } = await chat.call('chat.create', { workId })
+	const { sessionId } = session
+	const proposalHead = await chat.send(sessionId, prompts.propose)
+	const event = await chat.done(proposalHead)
+	const card = event.message.parts.find((part) => part.type === 'proposal')
+	if (!card) throw new Error('No proposal in the replay')
+	const first = await chat.send(sessionId, prompts.long, proposalHead)
+	await chat.done(first)
+	const second = await chat.send(sessionId, prompts.plan, first)
+	await chat.done(second)
+	const third = await chat.send(sessionId, prompts.compact, second)
+	await chat.done(third)
+	await chat.reopen()
+	const snapshot = await chat.call('chat.get', { workId, sessionId })
+	expect(snapshot.entries).toContainEqual(
+		expect.objectContaining({ kind: 'compaction', parentId: first }),
+	)
+	await chat.call('proposal.resolve', {
+		workId,
+		proposalId: card.proposal.id,
+		decision: { kind: 'reject', reason: rejectedReason },
+	})
+	const next = await chat.send(sessionId, 'What did the creator decide?', third)
+	expect((await chat.done(next)).message.parts).toContainEqual({
+		type: 'text',
+		text: 'The creator wants to keep the original tense.',
+	})
+	expect(chat.work.writes).toBe(0)
+})
+
 test('delegates with fresh context and gives child agents no dispatch or proposal tools', async () => {
 	const chat = await openFixture()
 	const {

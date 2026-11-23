@@ -1,4 +1,5 @@
 import type { AssistantMessage, Message } from '@earendil-works/pi-ai'
+import type { Proposal } from '../contract'
 import type { ChatAttachments } from './attachments'
 import { estimate, summaryMessage, toolResult } from './model'
 import { type ChatStore, lineage, type Part, type Turn } from './store'
@@ -57,62 +58,95 @@ export async function conversation(
 				: best
 		}, undefined)
 	const start = summary ? (anchors.get(summary.parentId ?? '') ?? -1) + 1 : 0
+	const compressed = summary
+		? summaryContext(
+				store,
+				summary.data.summary,
+				summary.data.pendingProposalIds ?? [],
+				summary.at,
+			)
+		: { prefix: [], pendingProposalIds: [] }
 	const groups = await Promise.all(
-		path.slice(start).map(
-			async (
-				row,
-			): Promise<{
-				id: string
-				role: 'user' | 'assistant'
-				messages: Message[]
-			}> => ({
+		path.slice(start).map(async (row) => {
+			const turn =
+				row.data.role === 'user'
+					? {
+							messages: [
+								await userMessage(attachments, row.data.parts, row.at),
+							],
+							pendingProposalIds: [],
+						}
+					: resolvedTurn(store, row.data.turn ?? [], row.data.parts)
+			return {
 				id: row.id,
 				role: row.data.role,
-				messages:
-					row.data.role === 'user'
-						? [await userMessage(attachments, row.data.parts, row.at)]
-						: resolvedTurn(store, row.data.turn ?? [], row.data.parts),
-			}),
-		),
+				...turn,
+			}
+		}),
 	)
 	return {
-		prefix: summary ? [summaryMessage(summary.data.summary, summary.at)] : [],
+		...compressed,
 		groups,
 	}
 }
 
-export function resolvedTurn(
+function summaryContext(
 	store: ChatStore,
-	turn: Turn,
-	parts: Part[],
-): Turn {
+	summary: string,
+	ids: string[],
+	at: number,
+) {
+	const cards = ids.map((id) => store.proposal(id).proposal)
+	const updates = cards
+		.filter(({ status }) => status !== 'pending')
+		.map(
+			(card) => `Updated proposal (${card.prompt}): ${proposalOutcome(card)}`,
+		)
+	return {
+		prefix: [summaryMessage([summary, ...updates].join('\n'), at)],
+		pendingProposalIds: cards
+			.filter(({ status }) => status === 'pending')
+			.map(({ id }) => id),
+	}
+}
+
+function proposalOutcome(proposal: Proposal) {
+	if (proposal.status === 'pending')
+		return 'Still awaiting the creator’s decision. No change has been applied.'
+	if (proposal.status === 'rejected')
+		return `The creator rejected the proposal. No change was applied.${proposal.feedback ? ` Reason: ${proposal.feedback}` : ''}`
+	return proposal.payload.kind === 'rewriteScene'
+		? 'The creator approved generating a rewrite for review. No changes have been applied to the scene.'
+		: 'The creator approved the proposal and the requested action was initiated.'
+}
+
+function resolvedTurn(store: ChatStore, turn: Turn, parts: Part[]) {
+	const pendingProposalIds: string[] = []
 	const outcomes = new Map(
 		parts.flatMap((part) => {
 			if (part.type !== 'proposal') return []
 			const { proposal, toolCallId } = store.proposal(part.proposal.id)
+			if (proposal.status === 'pending') pendingProposalIds.push(proposal.id)
 			if (!toolCallId) return []
-			const text =
-				proposal.status === 'pending'
-					? 'Still awaiting the creator’s decision. No change has been applied.'
-					: proposal.status === 'approved'
-						? proposal.payload.kind === 'rewriteScene'
-							? 'The creator approved generating a rewrite for review. No changes have been applied to the scene.'
-							: 'The creator approved the proposal and the requested action was initiated.'
-						: `The creator rejected the proposal. No change was applied.${proposal.feedback ? ` Reason: ${proposal.feedback}` : ''}`
-			return [[toolCallId, text] as const]
+			return [[toolCallId, proposalOutcome(proposal)] as const]
 		}),
 	)
-	return turn.map((message) => {
+	const messages = turn.map((message) => {
 		if (message.role !== 'toolResult') return message
 		const outcome = outcomes.get(message.toolCallId)
 		return outcome ? { ...message, content: toolResult(outcome) } : message
 	})
+	return { messages, pendingProposalIds }
 }
 
 export async function compact(
 	store: ChatStore,
 	sessionId: string,
-	{ prefix, groups }: Awaited<ReturnType<typeof conversation>>,
+	{
+		prefix,
+		groups,
+		pendingProposalIds,
+	}: Awaited<ReturnType<typeof conversation>>,
 	budget: number,
 	next: Message | undefined,
 	summarize: (messages: Message[]) => Promise<string>,
@@ -135,9 +169,13 @@ export async function compact(
 		...prefix,
 		...older.flatMap((group) => group.messages),
 	])
-	store.compact(sessionId, anchor.id, summary)
+	const pendingCards = [
+		...pendingProposalIds,
+		...older.flatMap((group) => group.pendingProposalIds),
+	]
+	store.compact(sessionId, anchor.id, summary, pendingCards)
 	return [
-		summaryMessage(summary, Date.now()),
+		...summaryContext(store, summary, pendingCards, Date.now()).prefix,
 		...groups.slice(lastUser).flatMap((group) => group.messages),
 	]
 }
