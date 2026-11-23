@@ -326,9 +326,13 @@ test('consolidates repeated candidate additions across events and remaps referen
 		const request = new Request(input, init)
 		const body = await request.json()
 		expect(body.messages[0].content).toContain(
-			'qualifying new facts, not repeated background',
+			'Never restate an already proposed entry',
 		)
 		const first = calls++ === 0
+		if (!first)
+			expect(body.messages[0].content).toContain(
+				'Already proposed entries:\ncharacter guide Lin/Guide\n',
+			)
 		const candidate = first
 			? guide
 			: {

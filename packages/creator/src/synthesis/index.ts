@@ -124,8 +124,8 @@ export interface SynthesisOptions {
 }
 
 const minimumEventLimit = 128
-const packetFormat = 6
-const legacyPacketFormats = [1, 2, 3, 4, 5]
+const packetFormat = 7
+const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const bytes = (text: string) => Buffer.byteLength(text)
@@ -155,6 +155,44 @@ function recentEvents(events: Event[], historyBudget: number) {
 		remaining -= size
 	}
 	return JSON.stringify(summaries)
+}
+function proposedEntries(events: Event[], budget: number) {
+	const lines = new Map<string, string>()
+	const items = events.flatMap((event) => event.biblePatch)
+	for (const kind of [
+		'character',
+		'location',
+		'relation',
+		'timeline',
+		'foreshadowing',
+		'style',
+	])
+		for (const item of items) {
+			if (item.kind !== kind || item.op === 'delete') continue
+			const label =
+				item.kind === 'character'
+					? [item.entry.name, ...(item.entry.aliases ?? [])].join('/')
+					: item.kind === 'location'
+						? item.entry.name
+						: item.kind === 'relation'
+							? `${item.entry.from}>${item.entry.to}`
+							: item.kind === 'timeline'
+								? item.entry.chapterId
+								: item.kind === 'foreshadowing'
+									? item.entry.plantedChapter
+									: ''
+			lines.set(`${kind}:${item.entry.id}`, `${kind} ${item.entry.id} ${label}`)
+		}
+	for (const entry of events.flatMap((event) => event.glossaryPatch))
+		lines.set(`glossary:${entry.original}`, `glossary ${entry.original}`)
+	const kept: string[] = []
+	let remaining = budget
+	for (const line of lines.values()) {
+		remaining -= bytes(line) + 1
+		if (remaining < 0) break
+		kept.push(line)
+	}
+	return kept.join('\n')
 }
 function previewPackets(
 	previews: readonly string[],
@@ -392,6 +430,10 @@ export async function synthesizeVolume(
 		: bible
 	const outputLimit = outputTokenBudget(model)
 	const historyBudget = Math.min(1024, Math.floor(model.contextWindow / 16))
+	const registryBudget = Math.max(
+		0,
+		Math.min(2048, Math.floor(model.contextWindow / 8) - 512),
+	)
 	const packetOutputReserve = Math.min(
 		4096,
 		Math.floor(model.contextWindow / 4),
@@ -454,14 +496,18 @@ ${nextEvent.instructions}`
 				packetOutputReserve,
 				Math.max(
 					512,
-					model.contextWindow - bytes(eventPrompt) - historyBudget - 768,
+					model.contextWindow -
+						bytes(eventPrompt) -
+						historyBudget -
+						registryBudget -
+						768,
 				),
 			)
 		: packetOutputReserve
 	const budget = model.contextWindow - outputReserve
 	const packetBudget = eventPacketBudget(
 		model.contextWindow,
-		historyBudget,
+		historyBudget + registryBudget,
 		packetOutputReserve,
 		bytes(eventPrompt),
 	)
@@ -568,8 +614,10 @@ ${nextEvent.instructions}`
 		const packet = state.packet
 		const event = await request(
 			`${eventPrompt}
-Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and qualifying new facts, not repeated background. Set is_last when done.
+Extract only the next event in packet ${packet + 1}/${packets.length}. For its chapters, include progress and exhaustively extract every distinct Bible and glossary entry that meets the inclusion rules, as a whole-volume pass would. Never restate an already proposed entry: omit it, or use its ID with op update only for a new qualifying fact. Set is_last when the packet has no entry left to extract.
 Events already extracted: ${state.events.length}
+Already proposed entries:
+${proposedEntries(state.events, registryBudget)}
 Recent event summaries: ${recentEvents(state.events, historyBudget)}
 Chapter previews:
 ${packets[packet]}`,

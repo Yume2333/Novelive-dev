@@ -1,6 +1,9 @@
 import { expect, test } from 'vitest'
 import type { BiblePatch, GlossaryPatch } from '../../packages/format/src/model'
-import { scoreBiblePatches } from '../acceptance/bible-patch-score'
+import {
+	scoreAgainstConsensus,
+	scoreBiblePatches,
+} from '../acceptance/bible-patch-score'
 
 const patch = (biblePatch: BiblePatch, glossaryPatch: GlossaryPatch = []) => ({
 	biblePatch,
@@ -155,4 +158,21 @@ test('matches relations whose participants include an existing character absent 
 	expect(
 		scoreBiblePatches(patch([relation('wei-2')]), chunked, existing).shared,
 	).toBe(0)
+})
+
+test('consensus keeps entries two of three whole runs share and normalizes by leave-one-out agreement', () => {
+	const run = (...names: string[]) =>
+		patch(names.map((name) => location(name, name)))
+	const runs = [
+		run('甲', '乙', '丙'),
+		run('甲', '乙', '丁'),
+		run('甲', '丙', '戊'),
+	]
+	const score = scoreAgainstConsensus(runs, run('甲', '乙', '丙', '己'))
+	expect(score.reference).toBe(3)
+	expect(score.leaveOneOut).toEqual([2 / 4, 2 / 5, 2 / 5])
+	expect(score.baseline).toBeCloseTo(1.3 / 3)
+	expect(score.f1).toBeCloseTo(6 / 7)
+	expect(score.normalized).toBeCloseTo(6 / 7 / (1.3 / 3))
+	expect(() => scoreAgainstConsensus(runs.slice(0, 2), run('甲'))).toThrow()
 })

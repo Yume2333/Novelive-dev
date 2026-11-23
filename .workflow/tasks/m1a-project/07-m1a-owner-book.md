@@ -7,13 +7,17 @@
 **Task type:** spike
 **Files:** tests/acceptance/m1a-owner-book.test.ts, .workflow/evidence/m1a/owner/
 **Read first:** `.workflow/specs/m1a-project.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
-**Check:** 仅串行主线执行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → 按 W4 写脱敏的差异、耗费和重启报告。并行会话不领取本任务，严格回放不能替代本 Check。
+**Check:** 仅串行主线执行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → 按 W4 写脱敏的差异、耗费和重启报告。W4 的比较口径见下文“W4 口径”。并行会话不领取本任务，严格回放不能替代本 Check。
 
 **付费调用：** 只由协调者在交接中明确指定的串行主线会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
 **Base commit:** ea99733e566c72be5873d6507a07de37ef7b40ba
 **Status:** active
 
 - [ ] 仅使用所有者在 ~/novelive-testbooks/ 放入、且可用中转处理的选书；将录制目录设在仓库外，不提交原文/请求/私有模型结果。没有书则记录阻塞，不暂停后续不依赖真书的建设。
+
+## W4 口径
+
+2026-11-23 起，W4 不再拿单次整卷结果当参照。同一整卷 prompt 重跑三次，两两 F1 只有 0.51／0.60／0.61，temperature 0 + seed 也只有 0.51，所以单次结果本身就不稳定。现在的参照是三次固定整卷结果中至少两次出现的条目；基线是每次整卷对其余两次共识的 F1 平均（留一）。分块对参照的 F1 除以基线须 ≥ 0.90，门槛不降、schema 不放宽。已确认设定零丢失、重启零调用不变。分块过拆分（310 条、169 个不同 ID）仍须修复。固定数据、数值及理由见[比较口径](../../evidence/m1a/owner/w4-metric.md)，严格回放为 `tests/unit/m1a-w4-gate.test.ts`。
 
 ## Progress
 

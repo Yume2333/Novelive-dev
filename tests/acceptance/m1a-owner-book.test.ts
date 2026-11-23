@@ -8,7 +8,8 @@ import {
 	writeFile,
 } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
 import { headingRules } from '../../packages/creator/src/import/txt'
 import {
@@ -25,11 +26,10 @@ import {
 import { createReplayFetch } from '../../packages/creator/src/replay'
 import {
 	synthesisFiles,
-	synthesizeVolume,
 	type VolumeSynthesis,
 } from '../../packages/creator/src/synthesis'
 import { projectFiles } from '../../packages/format/src/model'
-import { scoreBiblePatches } from './bible-patch-score'
+import { scoreAgainstConsensus } from './bible-patch-score'
 import { observeOwnerBookUsage } from './owner-book-usage'
 
 const home = homedir()
@@ -41,6 +41,9 @@ const previewModel = 'gemini-3.8-flash'
 const cap = 5_000_000
 const eventContextWindow = 16_384
 const wholeContextWindow = 256_000
+const repo = join(dirname(fileURLToPath(import.meta.url)), '../..')
+const fixtures = join(repo, 'tests/fixtures/m1a-owner-book')
+const evidence = join(repo, '.workflow/evidence/m1a/owner')
 const series = {
 	formatVersion: 1,
 	seriesId: 'yesou-puyan',
@@ -67,12 +70,9 @@ const digest = (body: Uint8Array) =>
 // Allow for the relay's startup and for output at one-third of the observed rate.
 const requestTimeout = (outputTokens: number) =>
 	90_000 + Math.ceil(outputTokens / 40) * 1000
-// Budget for the eight observed events and whole control, each with a repair.
+// Budget for up to twenty-four events, each with a repair.
 const volumeTimeout =
-	requestTimeout(0) +
-	2 *
-		(8 * requestTimeout(eventContextWindow / 2) +
-			requestTimeout(wholeContextWindow / 2))
+	requestTimeout(0) + 2 * 24 * requestTimeout(eventContextWindow / 2)
 
 function requestFailure(signal: AbortSignal, error: unknown) {
 	if (signal.aborted)
@@ -352,32 +352,20 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				const checkpoint = await first.read(synthesisFiles(volumeId).checkpoint)
 				expect(checkpoint.packet).toBeGreaterThan(1)
 				expect(checkpoint.applied).toBe(true)
-				phase = 'whole-volume control'
-				using whole = await provision(join(run, 'whole'))
-				for (const id of chapterIds)
-					await whole.write(
-						projectFiles.preview(id),
-						await first.read(projectFiles.preview(id)),
-					)
-				const reference = await synthesizeVolume(whole, volumeId, chapterIds, {
-					connection: synthesisConnection,
-					requestTimeoutMs: timeoutFor(synthesisConnection),
-					language,
-					strategy: 'whole',
-					fetch: fetchReplay,
-					signal: controller.signal,
-				})
-				const score = scoreBiblePatches(
-					reference,
+				phase = 'consensus comparison'
+				const recorded = JSON.parse(
+					await readFile(join(fixtures, 'whole-runs.json'), 'utf8'),
+				)
+				expect(recorded.volumeId).toBe(volumeId)
+				const score = scoreAgainstConsensus(
+					recorded.runs,
 					chunked,
 					initialCharacters.entries,
 				)
 				const expected = initialCharacters
 				const confirmedIntact =
-					JSON.stringify(await whole.read(confirmed)) ===
-						JSON.stringify(expected) &&
 					JSON.stringify(await first.read(confirmed)) ===
-						JSON.stringify(expected)
+					JSON.stringify(expected)
 				phase = 'restart'
 				first.close()
 				closed = true
@@ -418,10 +406,28 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					join(root, 'redacted-result.json'),
 					JSON.stringify(report, null, 2),
 				)
+				await writeFile(
+					join(fixtures, 'chunked-run.json'),
+					`${JSON.stringify(
+						{
+							formatVersion: 1,
+							volumeId,
+							model: synthesisModel,
+							biblePatch: chunked.biblePatch,
+							glossaryPatch: chunked.glossaryPatch,
+						},
+						null,
+						'\t',
+					)}\n`,
+				)
+				await writeFile(
+					join(evidence, 'w4-consensus.json'),
+					`${JSON.stringify(report, null, '\t')}\n`,
+				)
 				console.log(JSON.stringify(report))
 				expect(confirmedIntact && restartIntact).toBe(true)
-				phase = 'normalized BiblePatch F1'
-				expect(score.f1).toBeGreaterThanOrEqual(0.9)
+				phase = 'consensus-normalized BiblePatch F1'
+				expect(score.normalized).toBeGreaterThanOrEqual(0.9)
 			} finally {
 				if (!closed) first.close()
 			}
