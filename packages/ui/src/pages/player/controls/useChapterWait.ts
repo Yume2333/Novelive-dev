@@ -26,7 +26,7 @@ export function useChapterWait({
 		chapterId: string,
 		mode: PlaybackMode,
 		waitForClick: boolean,
-	): Promise<void>
+	): Promise<unknown>
 	setChapters(update: (chapters: ControlChapter[]) => ControlChapter[]): void
 	onError(message: string): void
 }) {

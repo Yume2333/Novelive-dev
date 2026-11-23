@@ -10,7 +10,7 @@ import type {
 	PlaybackMode,
 	SaveSlot,
 } from '../../../../player/src/contract/progress'
-import { PlaybackProgress } from '../../../../player/src/progress'
+import { PlaybackProgress, slotKey } from '../../../../player/src/progress'
 import { playerEditorRoute } from '../../routes/player'
 import type { PlayerControlsController } from './controls/controller'
 import {
@@ -77,6 +77,7 @@ export function PlayerPage() {
 			mode: PlaybackMode = 'main',
 			waitForClick = false,
 			restore?: StageSnapshot,
+			onValidated?: () => void,
 		) => {
 			if (!id) return
 			setError('')
@@ -124,6 +125,9 @@ export function PlayerPage() {
 					)
 				if (!result.scenes.some((scene) => scene.beats.length))
 					throw new Error('本章还没有可播放的剧本')
+				if (restore && !containsSentence(result.scenes, restore.position))
+					throw new Error('存档中的句子已不存在')
+				onValidated?.()
 				compiledChapters.current.set(chapter.chapterId, result.scenes)
 				chapterOrder.current = chapters.map((chapter) => chapter.chapterId)
 				let rank = 0
@@ -166,6 +170,7 @@ export function PlayerPage() {
 					),
 					speakerNames,
 				})
+				return true
 			} catch (cause) {
 				if (
 					directory ||
@@ -176,6 +181,7 @@ export function PlayerPage() {
 					cause.code !== 'not_found'
 				)
 					setError(cause instanceof Error ? cause.message : '无法打开本地工程')
+				return false
 			} finally {
 				setLoading(false)
 			}
@@ -267,15 +273,28 @@ export function PlayerPage() {
 		await api.save(id, progress.current.data)
 		redraw((value) => value + 1)
 	}
-	async function restore(snapshot: StageSnapshot | null) {
-		if (snapshot)
-			await loadProject(
+	async function restore(
+		snapshot: StageSnapshot | null,
+		onValidated: () => void,
+	) {
+		if (snapshot) {
+			const loaded = await loadProject(
 				undefined,
 				snapshot.position.chapterId,
 				restoredChapterMode(progress.current.data, snapshot.position.chapterId),
 				false,
 				snapshot,
+				onValidated,
 			)
+			if (!loaded) throw new Error('无法读取存档')
+		}
+	}
+	function restoreHistory(index: number) {
+		const snapshot = progress.current.history.entries[index]
+		if (snapshot)
+			void restore(snapshot, () => {
+				progress.current.jump(index)
+			}).catch(() => setError('无法读取历史记录'))
 	}
 	const nextChapter = loaded
 		? chapters[
@@ -324,13 +343,21 @@ export function PlayerPage() {
 					history={progress.current.history}
 					workId={id ?? ''}
 					onSave={save}
-					onLoad={(slot) => restore(progress.current.loadSave(slot))}
-					onHistory={(index) => void restore(progress.current.jump(index))}
+					onLoad={(slot) =>
+						restore(
+							progress.current.data.saves.find(
+								(entry) => slotKey(entry.slot) === slotKey(slot),
+							)?.snapshot ?? null,
+							() => {
+								progress.current.loadSave(slot)
+							},
+						)
+					}
+					onHistory={restoreHistory}
 					onHistoryStep={(direction) =>
-						void restore(
-							direction === 'back'
-								? progress.current.rollback()
-								: progress.current.forward(),
+						restoreHistory(
+							(progress.current.history.cursor ?? -1) +
+								(direction === 'back' ? -1 : 1),
 						)
 					}
 					onChapter={(chapterId) =>

@@ -234,6 +234,47 @@ test.describe('M3 player controls', () => {
 			await app.close()
 			;({ app, page } = await open())
 			await expect(text()).toHaveText('第二章开始。')
+			await page.evaluate(async (id) => {
+				const api = window.novelive.host.progress
+				const saved = await api?.load(id)
+				if (!api || !saved) throw new Error('missing progress')
+				await api.save(id, {
+					...saved,
+					saves: saved.saves.map((entry) =>
+						entry.slot.kind === 'quick'
+							? {
+									...entry,
+									snapshot: {
+										...entry.snapshot,
+										position: {
+											...entry.snapshot.position,
+											sentenceId: 'removed',
+										},
+									},
+								}
+							: entry,
+					),
+				})
+			}, playerWorkId)
+			await app.close()
+			;({ app, page } = await open())
+			await expect(text()).toHaveText('第二章开始。')
+			await advance()
+			await expect(text()).toHaveText('我在想什么？')
+			await menu()
+			await page.getByRole('button', { name: '快速读档', exact: true }).click()
+			await expect(
+				page.getByText('存档中的句子已不存在', { exact: true }),
+			).toBeVisible()
+			await expect(text()).toHaveText('我在想什么？')
+			await menu()
+			await page.getByRole('button', { name: '历史记录', exact: true }).click()
+			await expect(
+				page.getByRole('button', { name: '1. 第二章开始。', exact: true }),
+			).toBeVisible()
+			await expect(
+				page.getByRole('button', { name: '2. 我在想什么？', exact: true }),
+			).toBeVisible()
 		} finally {
 			await app.close()
 			await rm(directory, { recursive: true, force: true })
