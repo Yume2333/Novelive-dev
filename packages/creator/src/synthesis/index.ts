@@ -380,7 +380,7 @@ ${packetText.join('\n')}`
 		)
 			throw new Error('Chapter progress must use distinct IDs from this volume')
 		validatePatch(
-			contextBible,
+			bible,
 			[...prior.flatMap((part) => part.biblePatch), ...output.biblePatch],
 			output.glossaryPatch,
 			chapterSet,

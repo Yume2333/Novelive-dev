@@ -433,7 +433,7 @@ test('art registration persists local entries without freezing inherited rows', 
 	).toBe('assets/updated.webp')
 })
 
-test('synthesis validates relation references against work-level characters', async () => {
+test('synthesis requests repair for work-only relation references before series publication', async () => {
 	using p = await project()
 	const joined = await joinSeries(p, book)
 	const scope = {
@@ -455,11 +455,15 @@ test('synthesis validates relation references against work-level characters', as
 		timelineNotes: [],
 		foreshadowingHints: [],
 	})
-	const fetch = vi.fn<typeof globalThis.fetch>(async () =>
-		sse({
+	const prompts: string[] = []
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const body = await new Request(input, init).json()
+		prompts.push(JSON.stringify(body.messages))
+		return sse({
 			overview: 'They meet.',
 			chapters: [{ chapterId, progress: 'Met' }],
 			biblePatch: [
+				...(prompts.length > 1 ? [character, { ...character, id: 'guest', name: 'Guest' }].map((entry) => ({ kind: 'character', op: 'add', entry: { ...entry, status: 'candidate' } })) : []),
 				{
 					kind: 'relation',
 					op: 'add',
@@ -473,8 +477,8 @@ test('synthesis validates relation references against work-level characters', as
 				},
 			],
 			glossaryPatch: [],
-		}),
-	)
+		})
+	})
 	const result = await synthesizeVolume(p, joined.volumeId, [chapterId], {
 		connection,
 		scope,
@@ -482,8 +486,10 @@ test('synthesis validates relation references against work-level characters', as
 		incremental: true,
 		fetch,
 	})
-	expect(fetch).toHaveBeenCalledTimes(1)
-	expect(result.biblePatch[0].entry.id).toBe('meeting')
+	expect(fetch).toHaveBeenCalledTimes(2)
+	expect(prompts[1]).toContain('Repair the JSON')
+	expect(result.biblePatch.some(({ entry }) => entry.id === 'meeting')).toBe(true)
+	expect(result.conflicts).toEqual([])
 })
 
 test('production updates the effective asset and style owners without hiding artwork from playback', async () => {
