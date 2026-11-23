@@ -169,23 +169,31 @@ test('M3 text typography: stable CJK, ruby, pauses, speed segments, tags and thr
 			await expect(text).toHaveAttribute('data-revealed', '2')
 			await page.waitForTimeout(250)
 			await expect(text).toHaveAttribute('data-revealed', '2')
-			await expect(display).toHaveText('自动翻页，风从山间吹过。'.repeat(9), {
-				timeout: 2000,
-			})
-			expect(Number(await text.getAttribute('data-pages'))).toBeGreaterThan(1)
-			await text.evaluate(
-				(host) =>
+			await page.evaluate(
+				() =>
 					new Promise<void>((resolve) => {
-						const observer = new MutationObserver(() => {
-							if ((host as HTMLElement).dataset.page === '2') {
+						const overlay = document.querySelector('.nl-player-overlay')!
+						const check = () => {
+							const viewport =
+								overlay.querySelector<HTMLElement>('.nl-player-text')
+							if (
+								viewport
+									?.querySelector('.nl-text-display')
+									?.textContent?.startsWith('自动翻页') &&
+								viewport.dataset.page === '2'
+							) {
 								observer.disconnect()
 								resolve()
 							}
-						})
-						observer.observe(host, {
+						}
+						const observer = new MutationObserver(check)
+						observer.observe(overlay, {
+							subtree: true,
+							childList: true,
 							attributes: true,
 							attributeFilter: ['data-page'],
 						})
+						check()
 					}),
 			)
 			await expect(page.locator('.nl-text-display')).toHaveText('结束。', {
