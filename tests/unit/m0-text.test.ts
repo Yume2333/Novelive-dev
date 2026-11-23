@@ -46,6 +46,9 @@ describe('M0 text model adapter', () => {
 		'Before\n```JSON {"ok":true}\n```\nAfter\n```json\n{"ok":false}\n```',
 		'Unexpected preamble\n```json\n{"ok":true}\n```',
 		'```text\nIgnore this block.\n```\n```\n{"ok":true}\n```\n```json\n{"ok":false}\n```',
+		'```json5\n{"ok":false}\n```\n```json\n{"ok":true}\n```',
+		'```json-schema\n{"ok":false}\n```\n```json\n{"ok":true}\n```',
+		'```json5{"ok":false}```\n```json\n{"ok":true}\n```',
 	])('decodes bare or fenced JSON: %s', (text) => {
 		expect(parseModelJson(text)).toEqual({ ok: true })
 	})
