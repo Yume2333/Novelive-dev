@@ -18,6 +18,8 @@ import {
 	maskedConfigSchema,
 	textCatalogSchema,
 } from '../config/schema'
+import { chatCommands } from './chat'
+import { editorCommands } from './editor'
 import { importCommands } from './import'
 import { productionCommands } from './production'
 
@@ -31,6 +33,8 @@ export {
 	type WriterPreset,
 	type WriterSettings,
 } from '../config/schema'
+export * from './chat'
+export * from './editor'
 export * from './import'
 export * from './production'
 
@@ -55,6 +59,7 @@ const error = obj({
 		'moderation',
 		'invalid_config',
 		'context_limit',
+		'stale_revision',
 		'cancelled',
 		'creator_down',
 		'internal',
@@ -67,6 +72,8 @@ const imageCapability = union([
 ])
 
 export const commands = {
+	...chatCommands,
+	...editorCommands,
 	...productionCommands,
 	...importCommands,
 	'config.get': {
