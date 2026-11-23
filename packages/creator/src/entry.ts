@@ -51,8 +51,16 @@ async function productionSession(workId: string) {
 }
 
 registry.register('config.get', () => config.get())
-registry.register('config.update', (patch) => config.update(patch))
-registry.register('config.reset', () => config.reset())
+registry.register('config.update', async (patch) => {
+	const value = await config.update(patch)
+	await (await production)?.refreshSettings()
+	return value
+})
+registry.register('config.reset', async () => {
+	const value = await config.reset()
+	await (await production)?.refreshSettings()
+	return value
+})
 registry.register('production.playerChapter', async ({ directory, workId }) =>
 	(await getProduction()).player(workId, directory),
 )

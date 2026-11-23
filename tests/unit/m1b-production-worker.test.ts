@@ -44,7 +44,8 @@ async function fixture() {
 }
 
 function completion(payload: unknown) {
-	const content = JSON.stringify(payload)
+	const content =
+		typeof payload === 'string' ? payload : JSON.stringify(payload)
 	const lines = [
 		{
 			choices: [
@@ -399,5 +400,71 @@ test('a reused pending variant queues its missing base before the variant', asyn
 		])
 	} finally {
 		queue.dispose()
+	}
+})
+
+test('a settings save changes the next step of an active production session', async () => {
+	const { projectDir, workId } = await fixture()
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	{
+		using project = await Project.open(projectDir)
+		project.tasks.registerWork({ workId, title: 'Paper boat' })
+		const worker = new ScriptedWorker()
+		worker.hold('write:ch0001')
+		const queue = new ChapterScheduler(project.database, worker)
+		try {
+			queue.start(workId, ['ch0001'])
+			queue.confirmVisual(workId)
+			queue.stop(workId)
+			await queue.idle()
+		} finally {
+			queue.dispose()
+		}
+	}
+	const writerStarted = Promise.withResolvers<void>()
+	const releaseWriter = Promise.withResolvers<void>()
+	const requests: string[] = []
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const { model } = await new Request(input, init).json()
+		requests.push(model)
+		if (requests.length === 1) {
+			writerStarted.resolve()
+			await releaseWriter.promise
+			return completion(
+				'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n',
+			)
+		}
+		return Response.json(
+			{ error: { message: 'Stop after observing review model' } },
+			{ status: 400 },
+		)
+	}
+	const production = createProduction(
+		directory,
+		config,
+		{ fetch },
+		() => {},
+		() => {},
+	)
+	try {
+		await production.remember(workId, projectDir)
+		const session = await production.get(workId)
+		await session.continue()
+		await writerStarted.promise
+		expect(session.snapshot().status).toBe('producing')
+		await config.update({
+			production: { roleModels: { 'reviewer-script': 'visual' } },
+		})
+		await production.refreshSettings()
+		releaseWriter.resolve()
+		await session.queue.idle()
+		expect(requests).toEqual([
+			configuration.models.writing.model,
+			'fixture-art-visual',
+		])
+	} finally {
+		releaseWriter.resolve()
+		await production.close()
 	}
 })

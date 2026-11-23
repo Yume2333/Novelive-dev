@@ -245,6 +245,7 @@ export function createProduction(
 				queue,
 				snapshot,
 				records,
+				refreshSettings: refresh,
 				async confirm(input: CommandInput<'production.confirmVisual'>) {
 					if (snapshot().phase !== 'confirm-visual' || !pool) return snapshot()
 					await refresh()
@@ -310,6 +311,9 @@ export function createProduction(
 	return {
 		remember,
 		get,
+		async refreshSettings() {
+			await state?.refreshSettings()
+		},
 		async player(workId: string, selected?: string) {
 			const linked = await existing(() => readFile(binding(workId), 'utf8'))
 			if (linked) {
