@@ -1,8 +1,8 @@
 $ NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-pdf.test.ts
  Test Files  1 passed (1)
-      Tests  8 passed (8)
-   Start at  03:04:20
-   Duration  348ms (tests 58%, import 33%, transform 8%, worker 1%)
+      Tests  11 passed (11)
+   Start at  03:09:14
+   Duration  395ms (tests 51%, import 27%, transform 20%, worker 1%)
 
 $ pnpm typecheck
 $ tsc --noEmit
@@ -10,7 +10,7 @@ exit 0
 
 $ pnpm lint
 $ biome check && stylelint 'packages/ui/src/**/*.css'
-Checked 245 files in 103ms. No fixes applied.
+Checked 245 files in 123ms. No fixes applied.
 Found 1 info.
 exit 0 (pre-existing useTemplate info in tests/fixtures/text-models/build-synthetic.ts)
 
@@ -28,3 +28,15 @@ Review fix: CJK/English soft wraps merge across pages; lowercase Latin hyphenati
 Sentence-final punctuation, heading boundaries, large vertical gaps and indentation preserve paragraphs.
 Edge page numbers are removed (bare, dashed and Chinese forms). Layout fixture exercises both
 large-gap and indentation boundaries without sentence punctuation.
+
+PR review fixes:
+8fff910 isolates TXT-detected note/watermark lines and separates paragraphs with blank lines.
+9a463b3 preserves numeric chapter titles; bare page numbers require offset layout and a consistent
+number minus page index on at least two pages. Explicit dashed/Chinese page numbers remain stripped.
+f19bd6a drops consecutive identical edge headers/footers, preserving a first top chapter heading.
+
+Outstanding contract conflict (D): TXT persists notes-only chapters, whereas the shared M4/01
+extractedBookSchema requires paragraphs minItems: 1. Direct parseTxt probe of copyright front
+matter followed by Chapter 1 produces a preface with paragraphs: [], notes: ["版权页"].
+Mapping this unchanged into importExtractionSchema gives: notes-only contract valid: false.
+No shared schema was changed; PDF's notes-only chapter filter remains pending a contract decision.
