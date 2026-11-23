@@ -6,6 +6,32 @@ $ pnpm typecheck
 $ tsc --noEmit
 Exit code: 0
 
+PR #35 review follow-up (baseline d1ea43a verified as HEAD ancestor)
+- Finding 1: 9fe152d compares confirmed/candidate field-key union and labels omitted fields as removed; Electron asserts 性格：谨慎 → 移除.
+- Finding 2: ad19471 replaces native details with shared Collapse and accessible disclosure button.
+- CI job 137423707801 failed because the existing M1b navigation assertion expected three links after Bible navigation was added. b0b1aa6 updates that expectation only.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (3.3s)
+$ NL_REPLAY=strict xvfb-run -a pnpm exec playwright test --grep 'M1b creation surfaces'
+  2 passed (3.0s)
+$ NL_REPLAY=strict pnpm check
+Checked 199 files in 82ms. No fixes applied.
+Found 1 info.
+ Test Files  23 passed (23)
+      Tests  337 passed (337)
+All exit codes: 0. Existing info: tests/fixtures/text-models/build-synthetic.ts formatting suggestion.
+Before/after Electron screenshots inspected again; removed field preview is visible.
+
+Investigation only: findings 3/4 were not patched.
+3. Scheduler fixture, after a completed base is marked stale and chapter 2 requests a new variant:
+Stale base: [{"ref_id":"yard/day","task":"done","asset":"stale"},{"ref_id":"yard/night","task":"queued","asset":"pending"}] variant drawn: 0
+Control restoring drawn base: [{"ref_id":"yard/day","task":"done","asset":"drawn"},{"ref_id":"yard/night","task":"done","asset":"drawn"}] variant drawn: 1
+The fixture emulates apply's DB status update; Bible Electron coverage separately verifies real approval sets stale. Production stage returns base dependencies; ensureImageTask keeps the completed base task; dispatchImages excludes stale bases. docs/visuals.md section 5 says redraw/keep is the creator's choice. M2/07 owns explicit redraw, not M2/05. Minimal immediate fix: permit an existing usable stale base for variant scheduling without automatically redrawing or clearing its stale marker (scheduler/chapter/index.ts plus tests/unit/m1b-scheduler.test.ts). ArtProduction currently reads its separate file registry, which remains drawn under this apply path; synchronizing that registry would also require accepting a usable stale base in pipeline/art/index.ts. Explicit redraw must separately reset/replace tasks and preserve prior files through M2/07 editor/revisions.
+4. Real strict-replay synthesizeVolume with the existing m1a-synthesis whole-volume fixture:
+{"conflicts":1,"glossaryConflicts":1,"proposalRows":{"count":0}}
+getBible reads only proposal rows for actionable IDs and never reads synthesisFiles(volumeId).result; synthesis saves these conflicts separately. docs/bible.md lines 121-128 explicitly require conflicts in Bible awaiting creator handling. This is a real M2/04 integration gap, not something explicitly assigned to M2/03 chat. Minimal fix: Bible editing adapter materializes durable bible/glossary proposals from synthesis conflicts and stored candidate entries, using M2/03's shared proposal writer. Touch bible/editing/index.ts, tests/e2e/m2-bible.spec.ts, and coordinate a shared writer in chat if available. Must persist source identity/revision for dedupe across reopen, retain reject state, never rebase an old imported conflict silently onto newer confirmed content, and avoid synthesizing already-rejected candidates again. Prefer lazy adapter over changing synthesis because existing projects also need this bridge.
+
 $ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
   ✓  1 tests/e2e/m2-bible.spec.ts:27:1 › M2 bible and glossary views, accepts, rejects and preserves confirmed content against stale proposals (2.2s)
   1 passed (2.9s)
