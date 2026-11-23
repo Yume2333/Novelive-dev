@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { arr, bool, obj, oneOf, str } from '@earendil-works/pi-schema'
 import {
 	type AssetRegistry,
@@ -555,6 +556,7 @@ export class ArtProduction {
 		firstVolumeChapters: readonly string[],
 		creatorMainVisual?: string,
 		supplemental: Candidate[] = [],
+		illustrations?: ReadonlyMap<string, Candidate>,
 	): Promise<VisualCandidates> {
 		const styleScope = await entryOwner(
 			this.project,
@@ -627,13 +629,21 @@ export class ArtProduction {
 				!firstVolumeChapters.includes(character.firstSeenChapter)
 			)
 				continue
+			const illustration = illustrations?.get(character.id)
+			const illustrationKey = illustration
+				? createHash('sha256')
+						.update(await this.project.readFile(illustration.cachePath))
+						.digest('hex')
+				: undefined
 			for (const costume of character.costumes ?? []) {
 				const candidates: Candidate[] = []
 				const references = this.styleReferences(bible.style)
 				const designReference = characterDesignReference(character)
 				if (designReference) references.push(designReference)
 				for (const i of [1, 2, 3]) {
-					const id = `costume-${i}`
+					const imported = i === 1 ? illustration : undefined
+					const id = imported ? 'costume-epub' : `costume-${i}`
+					const file = imported ? `${id}-${illustrationKey}` : id
 					candidates.push(
 						await candidate(
 							id,
@@ -641,12 +651,21 @@ export class ArtProduction {
 								kind: 'character',
 								description: `造型候选 ${i}：${costume.description}`,
 								style,
-								references,
+								references: imported
+									? [
+											...this.styleReferences(bible.style),
+											{
+												role: 'identity',
+												path: imported.cachePath,
+												label: `${character.id} EPUB character design reference`,
+											},
+										]
+									: references,
 								characters: [character],
 								keep: [],
 							},
 							cachePath(
-								`candidates/characters/${character.id}/${costume.id}/${id}.webp`,
+								`candidates/characters/${character.id}/${costume.id}/${file}.webp`,
 							),
 							true,
 						),

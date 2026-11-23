@@ -17,6 +17,7 @@
 - 本轮在角色设定 / 主视觉确认点接入 `classifyIllustrations`：优先保留手选，预选模型推荐；可展开未推荐项。筛选失败时完整展示所有插图并提示。沿用制作角色的模型槽映射；为低成本筛选，将 `EPUB 插图筛选` 角色指向使用 `gemini-3.5-flash-lite` 的槽。
 - Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-epub.test.ts` → `Test Files 1 passed (1)` / `Tests 45 passed | 1 skipped (46)`。新用例回放角色、场景、无关三类，并验证手选仍在候选中、缺档时不清空候选且不联网。
 - Electron 视觉确认路径：`NL_REPLAY=strict xvfb-run -a pnpm exec playwright test tests/e2e/m4-epub-screening.spec.ts` → `2 passed (2.4s)`。用合成制作快照验证推荐预选、展开未推荐项、手动覆盖及失败提示下的全量候选；实看[手动覆盖](../../evidence/m4-longform/02-epub-override.png)和[失败降级](../../evidence/m4-longform/02-epub-fallback.png)截图。
+- PR #71 审查跟进：成功的筛选结果按插图、设定及模型配置持久化，重新打开待确认项目无需再次调用模型。明确匹配第一卷主要角色的插图用于生成一个标注为 EPUB 参考的造型方案，另保留两个普通方案供人工选择。Electron 严格回放从合成 EPUB 实际导入，手动选择未推荐插图并确认，核对项目中持久化的主视觉与该插图一致（`tests/e2e/m4-gate.spec.ts`）。
 - 公版实书烟测：Gutenberg #28885（Rackham 插图版），`gemini-3.5-flash-lite` 实际分类返回 `character`，1 次调用、1473 输入 + 36 输出 = 1509 tokens、1 张输入图、0 张生成图。共享台账未挂载，按接手要求在[既有供应商回执](../../../tests/fixtures/source/epub/receipt.md)记录。
 - Review: skipped — 当前会话无可启动独立 reviewer 的工具；下列 PR #48 的审查记录仅覆盖先前实现。
 

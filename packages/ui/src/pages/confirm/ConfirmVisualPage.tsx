@@ -199,6 +199,11 @@ function VisualChoices({ visual }: { visual: Visual }) {
 												candidate={candidate}
 												index={index}
 												name={key}
+												label={
+													candidate.id === 'costume-epub'
+														? 'EPUB 参考方案'
+														: undefined
+												}
 												checked={characterIds[key] === candidate.id}
 												onChange={() =>
 													setCharacterIds((choices) => ({

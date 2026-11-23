@@ -266,6 +266,7 @@ export async function screenImportedIllustrations(
 	bible: string,
 	connection: () => Promise<TextConnection>,
 	options: ModelOptions,
+	characterIds: readonly string[] = [],
 ) {
 	const report = (await project.read(projectFiles.importReport)) as WizardReport
 	const candidates =
@@ -278,31 +279,42 @@ export async function screenImportedIllustrations(
 		const key = createHash('sha256')
 			.update(
 				JSON.stringify([
-					1,
+					2,
 					choices,
 					bible,
+					characterIds,
 					model.model,
 					model.baseUrl,
 					model.format,
 					model.compat,
 					model.contextWindow,
+					model.maxOutputTokens,
 				]),
 			)
 			.update(bytes)
 			.digest('hex')
-		const path = `source/imports/screening/${key}.txt`
+		const path = `source/imports/screening/${key}.json`
 		const cached = await existing(() => project.readFile(path))
-		const hits = cached?.toString()
-		const output = (recommended: readonly boolean[]) => ({
+		const output = (matches: readonly (string | null)[]) => ({
 			fallback: false,
 			candidates: choices.map((choice, index) => ({
 				...choice,
-				recommended: recommended[index],
+				recommended: matches[index] !== '',
+				...(matches[index] && { characterId: matches[index] }),
 			})),
 		})
 		options.signal?.throwIfAborted()
-		if (hits?.length === choices.length && /^[01]+$/.test(hits))
-			return output(Array.from(hits, (value) => value === '1'))
+		if (cached) {
+			const hits: unknown = JSON.parse(cached.toString())
+			if (
+				Array.isArray(hits) &&
+				hits.length === choices.length &&
+				hits.every(
+					(hit) => hit === null || hit === '' || characterIds.includes(hit),
+				)
+			)
+				return output(hits)
+		}
 		const extraction = await extractEpub(bytes)
 		const ids = new Set(candidates.map(({ id }) => id))
 		const illustrations = extraction.book.illustrations.filter((_, index) =>
@@ -315,15 +327,22 @@ export async function screenImportedIllustrations(
 			bible,
 			model,
 			options,
+			characterIds,
 		)
-		const recommended = results.map(({ label }) => label !== 'irrelevant')
-		await project.writeFile(path, recommended.map(Number).join(''))
-		return output(recommended)
+		const matches = results.map(({ label, characterId }) =>
+			label === 'irrelevant' ? '' : (characterId ?? null),
+		)
+		await project.writeFile(path, JSON.stringify(matches))
+		return output(matches)
 	} catch {
 		options.signal?.throwIfAborted()
 		return {
 			fallback: true,
-			candidates: choices.map((choice) => ({ ...choice, recommended: false })),
+			candidates: choices.map((choice) => ({
+				...choice,
+				recommended: false,
+				characterId: undefined,
+			})),
 		}
 	}
 }

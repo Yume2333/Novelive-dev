@@ -553,8 +553,25 @@ export function createProduction(
 							JSON.stringify(bible),
 							() => config.resolveRoleModel('illustration-screening'),
 							{ replay, signal: shutdown.signal },
+							bible.characters
+								.filter(
+									({ major, firstSeenChapter }) =>
+										major &&
+										firstSeenChapter &&
+										work.chapterIds.includes(firstSeenChapter),
+								)
+								.map(({ id }) => id),
 						),
 					)
+					const characterReferences = new Map<
+						string,
+						{ id: string; cachePath: string }
+					>()
+					for (const candidate of imported?.candidates ?? []) {
+						const { characterId } = candidate
+						if (characterId && !characterReferences.has(characterId))
+							characterReferences.set(characterId, candidate)
+					}
 					pool = await art(shutdown.signal).candidates(
 						bible,
 						work.chapterIds,
@@ -567,6 +584,7 @@ export function createProduction(
 										),
 								)
 							: references,
+						characterReferences,
 					)
 					const candidate = async ({
 						id,

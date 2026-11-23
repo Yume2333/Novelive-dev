@@ -672,6 +672,30 @@ test('classification errors propagate and never silently discard manual candidat
 	expect(illustrationCandidates(extraction)).toHaveLength(1)
 })
 
+test.each([
+	{ label: 'character', characterId: 'ada', expected: 'ada' },
+	{ label: 'character', characterId: 'unknown', expected: undefined },
+	{ label: 'scene', characterId: 'ada', expected: undefined },
+] as const)(
+	'accepts only known character IDs on character illustrations: $label $characterId',
+	async ({ label, characterId, expected }) => {
+		const extraction = await extractEpub(await epub())
+		vi.mocked(artJson).mockResolvedValueOnce({
+			label,
+			characterId,
+			reason: 'fixture',
+		})
+		const [candidate] = await classifyIllustrations(
+			extraction,
+			'Synthetic bible',
+			connection,
+			{},
+			['ada'],
+		)
+		expect(candidate.characterId).toBe(expected)
+	},
+)
+
 test.each(classificationCases)(
 	'imported EPUB illustration screening replays $label and falls back when its cassette is missing',
 	async (sample) => {
