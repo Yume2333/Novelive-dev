@@ -18,8 +18,12 @@ import { exportPackage, openPackage } from '@novelive/format/package/codec'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { type Entry, openPromise } from 'yauzl'
 import { ZipFile } from 'yazl'
+import { Project } from '../../packages/creator/src/project'
+import { loadPlayerStatus } from '../../packages/creator/src/project/player'
+import { InstalledPackages } from '../../packages/creator/src/share/installed'
 import {
 	exportProject,
+	importProject,
 	initializeExtractedProject,
 } from '../../packages/creator/src/share/project'
 import { migratePackageJson } from '../../packages/format/src/package/migrations'
@@ -92,6 +96,39 @@ async function invalidNameArchive(name: string) {
 }
 
 describe('M5 .novelive archive', () => {
+	it('keeps a chapter with staged scenes unpublished in both kinds of import', async () => {
+		await rm(join(projectRoot, 'project.db'))
+		initializeExtractedProject(projectRoot)
+		using project = await Project.open(projectRoot)
+		project.tasks.registerWork({ workId: workA, title: work.title })
+		project.database
+			.prepare(
+				"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, ?, 0, 'producing')",
+			)
+			.run(workA, work.chapterIds[0])
+		await exportProject({ projectRoot, destination, scope })
+		const installed = await InstalledPackages.open(directory, directory)
+		await installed.install(
+			destination,
+			[],
+			async (_, publish) => publish(),
+			async () => {},
+		)
+		expect(installed.list()).toMatchObject([{ chapters: 1, published: 0 }])
+		await expect(
+			installed.chapter(workA, 1, work.chapterIds[0]),
+		).rejects.toMatchObject({
+			code: 'not_found',
+		})
+		using archive = await openPackage(destination)
+		const fork = await importProject(archive, directory, directory)
+		expect(
+			await loadPlayerStatus(fork.projectRoot, fork.workIds[0]),
+		).toMatchObject({
+			chapters: [{ published: false }],
+		})
+	})
+
 	it('writes the host version only after a successful export', async () => {
 		await rm(join(projectRoot, 'project.db'))
 		initializeExtractedProject(projectRoot)

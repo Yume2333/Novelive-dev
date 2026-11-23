@@ -11,6 +11,7 @@ import {
 } from '@novelive/format/package/codec'
 import { Project } from '../project'
 import { openProjectDatabase } from '../project/database'
+import { chapterStates, isChapterPublished } from '../project/publication'
 import { optionalFile, scopeLevels } from '../project/series/resolve'
 
 export async function previewExport({
@@ -56,7 +57,18 @@ export async function previewExport({
 
 export async function exportProject(options: PackageExportOptions) {
 	using project = await Project.open(options.projectRoot)
-	const released = await exportPackage(options)
+	const states = new Map<string, ReturnType<typeof chapterStates>>()
+	const released = await exportPackage({
+		...options,
+		isPublished: ({ workId, chapterId }, hasScenes) => {
+			let chapters = states.get(workId)
+			if (!chapters) {
+				chapters = chapterStates(project, workId)
+				states.set(workId, chapters)
+			}
+			return hasScenes && isChapterPublished(chapters, chapterId, hasScenes)
+		},
+	})
 	for (const { volumeId, work } of released) {
 		const file = projectFiles.work(volumeId, work.workId)
 		const current = await project.read(file)
@@ -113,7 +125,7 @@ export async function importProject(
 				const chapter = await project.read(
 					projectFiles.chapter({ volumeId, workId, chapterId }),
 				)
-				const published = chapter.sceneIds.length > 0
+				const published = chapter.published ?? chapter.sceneIds.length > 0
 				project.database
 					.prepare(
 						'INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, ?, ?, ?)',

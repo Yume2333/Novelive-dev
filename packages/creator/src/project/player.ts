@@ -38,7 +38,7 @@ async function playerChapters(
 				published: isChapterPublished(
 					states,
 					chapterId,
-					document.sceneIds.length > 0,
+					document.published ?? document.sceneIds.length > 0,
 				),
 				progress:
 					state === 'producing'

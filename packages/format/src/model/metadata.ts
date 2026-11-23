@@ -86,6 +86,7 @@ export const chapterSchema = obj(
 		chapterId: entityId,
 		...heading,
 		sceneIds: arr(sceneId, { uniqueItems: true }),
+		published: opt(bool()),
 		paragraphIds: arr(paragraphId, { uniqueItems: true }),
 		cg: arr(obj({ id: entityId, description: str() }, open)),
 	},
