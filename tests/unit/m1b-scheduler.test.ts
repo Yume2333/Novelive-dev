@@ -258,6 +258,27 @@ test('a failed chapter pauses the work until it is retried and resumes from the 
 	expect(worker.count('review:ch3')).toBe(2)
 })
 
+test('a placeholder after retry does not surface the resolved chapter failure', async () => {
+	const worker = new ScriptedWorker({ ch2: [cg('cg-retry')] })
+	const target = open(worker)
+	worker.script('write:ch2', new ProductionTaskError('final', '写作请求失败'))
+	worker.script('draw:cg-retry', { status: 'placeholder', issue: '素材损坏' })
+	target.start(workId, ['ch1', 'ch2'])
+	await throughConfirmations(target)
+	await target.idle()
+	expect(snapshot().chapters[1]?.issue).toBe('写作请求失败')
+
+	target.retryChapter(workId, 'ch2')
+	await target.idle()
+	expect(snapshot().chapters[1]).toMatchObject({
+		status: 'published',
+		issue: '1 张图用了占位图',
+	})
+	expect(target.runLog(workId)).toContainEqual(
+		expect.objectContaining({ ref: 'ch2', status: 'needs_attention' }),
+	)
+})
+
 test('image failures fall back to placeholders but unsupported capabilities pause the work', async () => {
 	const worker = new ScriptedWorker({
 		ch1: [
@@ -296,6 +317,8 @@ test('image failures fall back to placeholders but unsupported capabilities paus
 		],
 	})
 	expect(worker.count('draw:hero/default/smile')).toBe(0)
+	expect(worker.count('placeholder:hero/default/smile')).toBe(1)
+	expect(worker.count('placeholder:cg-a')).toBe(1)
 	expect(worker.count('draw:cg-a')).toBe(3)
 	expect(worker.desensitized).toEqual(['draw:cg-b'])
 

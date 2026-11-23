@@ -70,6 +70,33 @@ async function projectTest(run: (project: Project) => Promise<void>) {
 	}
 }
 
+test('parallel jobs serialize registry updates across art service instances', async () => {
+	await projectTest(async (project) => {
+		const art = service(project, replay)
+		const [day] = await art.register(
+			[{ id: 'room/day', kind: 'location', description: 'Sunny' }],
+			bible,
+		)
+		const [cg] = await art.register(
+			[{ id: 'cg-window', kind: 'cg', description: 'A window' }],
+			bible,
+		)
+		const { entries } = await art.registry()
+		await Promise.all(
+			entries.map(({ path }) =>
+				project.writeFile(path, Buffer.from('existing image')),
+			),
+		)
+		await Promise.all(
+			[day, cg].map((job) => service(project, replay).draw(job, bible)),
+		)
+		expect((await art.registry()).entries.map(({ status }) => status)).toEqual([
+			'drawn',
+			'drawn',
+		])
+	})
+})
+
 test('confirms three main visuals and costumes, stages the chapter and draws canonical assets in strict replay', async () => {
 	await projectTest(async (project) => {
 		const { art, pool, style, manifest, jobs, results, confirmed, chapter } =

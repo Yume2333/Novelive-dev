@@ -35,6 +35,7 @@ type VisualCandidates = {
 type Options = ModelOptions & {
 	image: ImageConfig
 	main: TextConnection
+	portrait?: TextConnection
 	fast: TextConnection
 	visual: TextConnection
 	scope?: ProjectScope
@@ -55,6 +56,7 @@ const isMissing = (error: unknown) =>
 	error instanceof Error && 'code' in error && error.code === 'ENOENT'
 const moderationHint = '上一次生成被内容审核拒绝，请收敛描写'
 const baseKeep = ['脸型', '发型', '瞳色', '服装', '姿势', '取景', '画风']
+const registryWrites = new Map<string, Promise<unknown>>()
 
 export class ArtProduction {
 	private readonly render
@@ -88,6 +90,7 @@ export class ArtProduction {
 		bible: ArtBible,
 		merges?: Readonly<Record<string, string>>,
 		chapter?: ChapterRef,
+		beforeCommit?: (plan: ReturnType<typeof planArt>) => Promise<void>,
 	) {
 		return this.writeRegistry(async () => {
 			const previous = await this.registry()
@@ -95,6 +98,7 @@ export class ArtProduction {
 			const existing = new Set(previous.entries.map((entry) => entry.id))
 			for (const entry of plan.registry.entries)
 				if (!existing.has(entry.id)) entry.path = this.scoped(entry.path)
+			await beforeCommit?.(plan)
 			await this.project.write(this.registryFile, plan.registry)
 			if (chapter) {
 				const file = projectFiles.chapter(chapter)
@@ -138,19 +142,36 @@ export class ArtProduction {
 		return task
 	}
 
-	private registryWrite: Promise<void> = Promise.resolve()
-
 	private saveStatus(id: string, status: RegistryEntry['status']) {
 		return this.writeRegistry(() => this.update(id, status))
 	}
 
 	private writeRegistry<T>(operation: () => Promise<T>) {
-		const task = this.registryWrite.then(operation)
-		this.registryWrite = task.then(
-			() => {},
-			() => {},
-		)
+		const key = `${this.project.root}/${this.registryFile.path}`
+		const previous = registryWrites.get(key)
+		const task = previous ? previous.then(operation, operation) : operation()
+		registryWrites.set(key, task)
+		const clear = () => {
+			if (registryWrites.get(key) === task) registryWrites.delete(key)
+		}
+		void task.then(clear, clear)
 		return task
+	}
+
+	async savePlaceholder(id: string, issue: string): Promise<ImageJobResult> {
+		const entry = (await this.registry()).entries.find((item) => item.id === id)
+		if (!entry) throw new Error(`Unregistered asset: ${id}`)
+		const family =
+			entry.type === 'character' || entry.type === 'expression'
+				? 'character'
+				: entry.type === 'cg'
+					? 'cg'
+					: 'location'
+		const bytes = await placeholder(family)
+		this.options.signal?.throwIfAborted()
+		await this.project.writeFile(entry.path, bytes)
+		await this.saveStatus(entry.id, 'placeholder')
+		return { status: 'placeholder', issue }
 	}
 
 	private async drawRegistered(
@@ -170,11 +191,6 @@ export class ArtProduction {
 			return { status: 'drawn' }
 		}
 		const portrait = job.kind === 'character' || job.kind === 'expression'
-		const family = portrait
-			? 'character'
-			: job.kind === 'cg'
-				? 'cg'
-				: 'location'
 		const target = this.nativeSize(portrait)
 		const foundBase =
 			'baseAssetId' in job
@@ -184,15 +200,8 @@ export class ArtProduction {
 			foundBase?.status === 'drawn'
 				? await this.file(foundBase.path)
 				: undefined
-		const fallback = async (issue: string): Promise<ImageJobResult> => {
-			const bytes = await placeholder(family)
-			signal?.throwIfAborted()
-			await this.project.writeFile(entry.path, bytes)
-			await this.saveStatus(entry.id, 'placeholder')
-			return { status: 'placeholder', issue }
-		}
 		if ('baseAssetId' in job && (!base || !foundBase))
-			return fallback('基准图未成功生成。')
+			return this.savePlaceholder(entry.id, '基准图未成功生成。')
 		const [entity, costume] = job.assetId.split('/')
 		const character = portrait
 			? bible.characters.find((item) => item.id === entity)
@@ -286,7 +295,7 @@ export class ArtProduction {
 		if ('issue' in result) {
 			return result.unsupported
 				? { status: 'unsupported', issue: result.issue }
-				: fallback(result.issue)
+				: this.savePlaceholder(entry.id, result.issue)
 		}
 		await this.saveWebp(entry.path, result.png, output)
 		await this.saveStatus(entry.id, 'drawn')
@@ -344,7 +353,11 @@ export class ArtProduction {
 			...drawing,
 			references: drawing.references.slice(0, refs.length),
 		}
-		const painter = derived ? this.options.fast : this.options.main
+		const painter = derived
+			? this.options.fast
+			: transparent
+				? (this.options.portrait ?? this.options.main)
+				: this.options.main
 		let issue = '没有生成可用图片。'
 		let feedback = ''
 		let moderated = false
@@ -560,27 +573,29 @@ export class ArtProduction {
 				description: i === 0 ? '主视觉' : '补充画风参考',
 			})
 		}
-		const registry = await this.registry()
-		for (const { id, path } of costumes) {
-			const existing = registry.entries.find((entry) => entry.id === id)
-			const destination =
-				existing?.path ?? this.scoped(`assets/characters/${id}.webp`)
-			await this.saveWebp(
-				destination,
-				await this.project.readFile(path),
-				this.outputSize(true),
-			)
-			if (existing) existing.status = 'drawn'
-			else
-				registry.entries.push({
-					id,
-					path: destination,
-					type: 'character',
-					status: 'drawn',
-					aliases: [],
-				})
-		}
-		await this.project.write(this.registryFile, registry)
+		await this.writeRegistry(async () => {
+			const registry = await this.registry()
+			for (const { id, path } of costumes) {
+				const existing = registry.entries.find((entry) => entry.id === id)
+				const destination =
+					existing?.path ?? this.scoped(`assets/characters/${id}.webp`)
+				await this.saveWebp(
+					destination,
+					await this.project.readFile(path),
+					this.outputSize(true),
+				)
+				if (existing) existing.status = 'drawn'
+				else
+					registry.entries.push({
+						id,
+						path: destination,
+						type: 'character',
+						status: 'drawn',
+						aliases: [],
+					})
+			}
+			await this.project.write(this.registryFile, registry)
+		})
 		const chosen: Style = { ...style, status: 'confirmed', references }
 		const file = projectFiles.style(this.scope)
 		let entries: Style[] = []

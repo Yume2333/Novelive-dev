@@ -7,6 +7,7 @@ import {
 	dialog,
 	ipcMain,
 	MessageChannelMain,
+	powerSaveBlocker,
 	protocol,
 	shell,
 	utilityProcess,
@@ -18,6 +19,7 @@ let generation = 0
 let state: HostState['creator'] = 'down'
 let library: BrowserWindow | undefined
 let failures = 0
+let blocker: number | undefined
 const failureLimit = 3
 const handshakeTimeoutMs = 10_000
 
@@ -45,7 +47,17 @@ function appState(): HostState {
 	}
 }
 
+function keepAwake(active: boolean) {
+	if (active && blocker === undefined)
+		blocker = powerSaveBlocker.start('prevent-app-suspension')
+	else if (!active && blocker !== undefined) {
+		powerSaveBlocker.stop(blocker)
+		blocker = undefined
+	}
+}
+
 function stopCreator() {
+	keepAwake(false)
 	const worker = creator
 	creator = undefined
 	worker?.kill()
@@ -83,6 +95,7 @@ function startCreator(window: BrowserWindow) {
 	function down() {
 		clearTimeout(handshake)
 		if (worker !== creator) return
+		keepAwake(false)
 		creator = undefined
 		if (!ready) failures += 1
 		state = ready ? 'down' : 'failed'
@@ -92,13 +105,16 @@ function startCreator(window: BrowserWindow) {
 	}
 
 	worker.on('message', (message) => {
+		if (worker !== creator || message?.generation !== current) return
 		if (
-			worker !== creator ||
-			ready ||
-			message?.type !== 'ready' ||
-			message.generation !== current
-		)
+			ready &&
+			message.type === 'production.active' &&
+			typeof message.active === 'boolean'
+		) {
+			keepAwake(message.active)
 			return
+		}
+		if (ready || message.type !== 'ready') return
 		clearTimeout(handshake)
 		ready = true
 		failures = 0

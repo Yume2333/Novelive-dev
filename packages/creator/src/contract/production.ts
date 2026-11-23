@@ -69,7 +69,7 @@ export const productionSnapshotSchema = obj({
 
 export const productionCommands = {
 	'production.playerChapter': {
-		input: obj({ ...work, directory: str({ minLength: 1 }) }),
+		input: obj({ ...work, directory: opt(str({ minLength: 1 })) }),
 		output: obj({
 			script: str(),
 			chapter: chapterSchema,
@@ -120,7 +120,7 @@ export const productionChapterRecordEvent = compile(
 		payload: obj({
 			...chapter,
 			step: chapterStepSchema,
-			status: oneOf(['running', 'done', 'failed']),
+			status: oneOf(['running', 'done', 'failed', 'cancelled']),
 			message: str(),
 			detail: opt(str()),
 		}),

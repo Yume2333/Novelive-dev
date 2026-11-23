@@ -10,10 +10,13 @@ import { createReplayFetch, type ReplayOptions } from './replay'
 const parent = process.parentPort
 const generation = Number(process.env.NL_CREATOR_GENERATION)
 const registry = createRegistry()
-const dataDir = process.env.NL_CREATOR_DATA_DIR
-assert(dataDir, 'Creator data directory is required')
+const configuredDataDir = process.env.NL_CREATOR_DATA_DIR
+assert(configuredDataDir, 'Creator data directory is required')
+const dataDir = configuredDataDir
 const config = createConfigStore(dataDir)
 const cacheDir = join(dataDir, 'cache')
+let sendEvent: ((frame: CreatorFrame) => void) | undefined
+let production: ReturnType<typeof loadProduction> | undefined
 
 function strictReplayOptions(): ReplayOptions | undefined {
 	if (process.env.NL_REPLAY !== 'strict') return undefined
@@ -25,13 +28,68 @@ function strictReplayOptions(): ReplayOptions | undefined {
 	}
 }
 
+function loadProduction() {
+	return import('./project/production').then(({ createProduction }) =>
+		createProduction(
+			dataDir,
+			config,
+			strictReplayOptions(),
+			(envelope) => sendEvent?.({ type: 'event', generation, envelope }),
+			(active) =>
+				parent.postMessage({ type: 'production.active', generation, active }),
+		),
+	)
+}
+
+function getProduction() {
+	production ??= loadProduction()
+	return production
+}
+
+async function productionSession(workId: string) {
+	return (await getProduction()).get(workId)
+}
+
 registry.register('config.get', () => config.get())
-registry.register('config.update', (patch) => config.update(patch))
-registry.register('config.reset', () => config.reset())
-registry.register('production.playerChapter', async ({ directory, workId }) => {
-	const { loadPlayerChapter } = await import('./project/player')
-	return loadPlayerChapter(directory, workId, cacheDir)
+registry.register('config.update', async (patch) => {
+	const value = await config.update(patch)
+	await (await production)?.refreshSettings()
+	return value
 })
+registry.register('config.reset', async () => {
+	const value = await config.reset()
+	await (await production)?.refreshSettings()
+	return value
+})
+registry.register('production.playerChapter', async ({ directory, workId }) =>
+	(await getProduction()).player(workId, directory),
+)
+registry.register('production.get', async ({ workId }) =>
+	(await productionSession(workId)).snapshot(),
+)
+registry.register('production.resolveAsset', async ({ workId, assetId }) =>
+	(await productionSession(workId)).asset(assetId),
+)
+registry.register('production.confirmVisual', async (input) =>
+	(await productionSession(input.workId)).confirm(input),
+)
+registry.register('production.continue', async ({ workId }) =>
+	(await productionSession(workId)).continue(),
+)
+registry.register('production.stop', async ({ workId }) =>
+	(await productionSession(workId)).queue.stop(workId),
+)
+registry.register(
+	'production.prioritizeChapter',
+	async ({ workId, chapterId }) => {
+		const session = await productionSession(workId)
+		session.queue.prioritizeChapter(workId, chapterId)
+		return session.snapshot()
+	},
+)
+registry.register('production.retryChapter', async ({ workId, chapterId }) =>
+	(await productionSession(workId)).retry(chapterId),
+)
 registry.register('model.suggestContextWindow', async (model) => {
 	const { suggestContextWindow } = await import('./models/text')
 	return suggestContextWindow(model)
@@ -65,15 +123,25 @@ registry.register('model.testImage', async (_payload, signal) => {
 
 registry.register('import.txt', async (payload) => {
 	const { importTxtProject } = await import('./project-pipeline')
-	return importTxtProject(payload)
+	const result = await importTxtProject(payload)
+	if (result.status === 'ready')
+		await (await getProduction()).remember(result.workId, result.projectDir)
+	return result
 })
 registry.register('import.revise', async ({ projectDir, layout }) => {
 	const { reviseTxtProject } = await import('./project-pipeline')
-	return reviseTxtProject(projectDir, layout)
+	const result = await reviseTxtProject(projectDir, layout)
+	await (await getProduction()).remember(result.workId, result.projectDir)
+	return result
 })
 
-registry.register('events.list', ({ scope }) => ({
-	events: [],
+registry.register('events.list', async ({ scope, scopeId, afterSeq }) => ({
+	events:
+		scope === 'work'
+			? (await productionSession(scopeId)).records.filter(
+					({ seq }) => seq > afterSeq,
+				)
+			: [],
 	gap: false,
 	snapshot: scope === 'app' ? { ready: true, generation } : null,
 }))
@@ -113,6 +181,7 @@ if (process.env.NL_E2E === '1') {
 
 parent.once('message', ({ ports }) => {
 	const [port] = ports
+	sendEvent = (frame) => port.postMessage(frame)
 	const pending = new Map<number, AbortController>()
 
 	port.on('message', async ({ data }) => {
@@ -152,8 +221,10 @@ parent.once('message', ({ ports }) => {
 		}
 	})
 	port.once('close', () => {
+		sendEvent = undefined
 		for (const controller of pending.values()) controller.abort()
 		pending.clear()
+		void production?.then((session) => session.close())
 	})
 	port.start()
 	parent.postMessage({ type: 'ready', generation })

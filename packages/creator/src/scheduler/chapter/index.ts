@@ -36,6 +36,11 @@ export interface ProductionWorker {
 	stage(context: StepContext): Promise<ImageQueueItem[]>
 	isDrawn(workId: string, job: DrawJob): Promise<boolean>
 	draw(job: DrawJob, context: DrawContext): Promise<ImageJobResult>
+	placeholder(
+		job: DrawJob,
+		issue: string,
+		signal: AbortSignal,
+	): Promise<ImageJobResult>
 }
 
 export class ProductionTaskError extends Error {
@@ -50,6 +55,7 @@ export class ProductionTaskError extends Error {
 export type SchedulerOptions = {
 	imageConcurrency?: number
 	now?: () => number
+	onChange?: () => void
 }
 
 export type RunLogEntry = {
@@ -118,8 +124,9 @@ const assetKind = {
 export class ChapterScheduler {
 	private readonly inflight = new Map<string, Inflight>()
 	private readonly running = new Set<Promise<void>>()
-	private readonly imageConcurrency: number
+	private imageConcurrency: number
 	private readonly now: () => number
+	private readonly onChange?: () => void
 	private disposed = false
 
 	constructor(
@@ -129,7 +136,12 @@ export class ChapterScheduler {
 	) {
 		this.imageConcurrency = options.imageConcurrency ?? defaultImageConcurrency
 		this.now = options.now ?? Date.now
+		this.onChange = options.onChange
 		this.recover()
+	}
+
+	setImageConcurrency(limit: number) {
+		this.imageConcurrency = limit
 	}
 
 	start(
@@ -399,6 +411,7 @@ export class ChapterScheduler {
 				this.launch(next.task, () => this.runChapter(next.task, next.link))
 		}
 		this.dispatchImages()
+		this.onChange?.()
 	}
 
 	private acquireSlot() {
@@ -468,24 +481,15 @@ export class ChapterScheduler {
 			JOIN asset a ON a.work_id = t.work_id AND a.asset_key = t.ref_id
 			LEFT JOIN asset b ON b.work_id = a.work_id AND b.asset_key = a.base_key
 			WHERE t.kind = 'image' AND t.status = 'queued' AND w.status IN ('active', 'awaiting_confirm')
+				AND (a.base_key IS NULL OR b.status IN ('drawn', 'placeholder'))
 			ORDER BY t.priority DESC, t.seq`,
 		)
 		for (const task of queued) {
-			if (task.base_status === 'placeholder' || task.base_status === 'failed') {
-				this.transaction(() =>
-					this.settleImage(
-						task,
-						null,
-						'placeholder',
-						'基准图没画成，差分改用占位图',
-					),
-				)
-				continue
-			}
-			if (task.base_status !== null && task.base_status !== 'drawn') continue
 			if (slots <= 0) break
 			slots--
-			this.launch(task, () => this.runImage(task))
+			this.launch(task, () =>
+				this.runImage(task, task.base_status === 'placeholder'),
+			)
 		}
 	}
 
@@ -596,6 +600,7 @@ export class ChapterScheduler {
 				task.task_id,
 			)
 			task.phase = name
+			this.onChange?.()
 			const result = await this.attempt(task, name, (desensitized, signal) => {
 				const context = {
 					workId: task.work_id,
@@ -650,7 +655,7 @@ export class ChapterScheduler {
 		}
 	}
 
-	private async runImage(task: TaskRow) {
+	private async runImage(task: TaskRow, basePlaceholder: boolean) {
 		const asset = this.get<{ kind: DrawJob['kind']; base_key: string | null }>(
 			'SELECT kind, base_key FROM asset WHERE work_id = ? AND asset_key = ?',
 			task.work_id,
@@ -666,35 +671,48 @@ export class ChapterScheduler {
 			task,
 			'draw',
 			async (desensitized, signal) =>
-				(await this.worker.isDrawn(task.work_id, job))
-					? ({ status: 'drawn' } as const)
-					: this.worker.draw(job, {
-							workId: task.work_id,
-							desensitized,
-							signal,
-						}),
+				basePlaceholder
+					? this.worker.placeholder(job, '基准图没画成，差分改用占位图', signal)
+					: (await this.worker.isDrawn(task.work_id, job))
+						? ({ status: 'drawn' } as const)
+						: this.worker.draw(job, {
+								workId: task.work_id,
+								desensitized,
+								signal,
+							}),
 		)
 		if (!result) return
-		this.transaction(() => {
-			if (!result.ok) {
-				this.settleImage(task, task.run_id, 'placeholder', result.error.message)
-			} else if (result.value.status === 'drawn') {
-				this.settleImage(task, task.run_id, 'drawn')
-			} else {
-				this.settleImage(
-					task,
-					task.run_id,
-					result.value.status,
-					result.value.issue,
+		let outcome: ImageJobResult
+		if (result.ok) outcome = result.value
+		else {
+			const signal = this.inflight.get(task.task_id)?.controller.signal
+			if (!signal) return
+			try {
+				outcome = await this.worker.placeholder(
+					job,
+					result.error.message,
+					signal,
 				)
+			} catch (error) {
+				outcome = {
+					status: 'unsupported',
+					issue: error instanceof Error ? error.message : String(error),
+				}
 			}
+			if (!this.current(task)) return
+		}
+		this.transaction(() => {
+			this.settleImage(
+				task,
+				outcome.status,
+				'issue' in outcome ? outcome.issue : undefined,
+			)
 			this.inflight.delete(task.task_id)
 		})
 	}
 
 	private settleImage(
 		task: TaskRow,
-		runId: string | null,
 		outcome: ImageJobResult['status'],
 		issue?: string,
 	) {
@@ -716,28 +734,12 @@ export class ChapterScheduler {
 			outcome === 'unsupported' ? 'needs_attention' : 'done',
 			task.task_id,
 		)
-		if (runId) {
-			task.run_id = runId
-			this.endRun(
-				task,
-				outcome === 'unsupported' ? 'needs_attention' : 'done',
-				outcome === 'drawn' ? undefined : outcome,
-				issue,
-			)
-		} else {
-			this.exec(
-				`INSERT INTO run (run_id, work_id, kind, ref, status, started_at, ended_at, error_type, error_message, meta)
-				VALUES (?, ?, 'image', ?, 'done', ?, ?, ?, ?, ?)`,
-				randomUUID(),
-				task.work_id,
-				task.ref_id,
-				this.now(),
-				this.now(),
-				outcome,
-				issue ?? null,
-				JSON.stringify({ taskId: task.task_id }),
-			)
-		}
+		this.endRun(
+			task,
+			outcome === 'unsupported' ? 'needs_attention' : 'done',
+			outcome === 'drawn' ? undefined : outcome,
+			issue,
+		)
 		const dependents = this.all<{ task_id: string }>(
 			"SELECT d.task_id FROM task_dep d JOIN task t ON t.task_id = d.task_id WHERE d.depends_on = ? AND t.kind = 'chapter'",
 			task.task_id,
@@ -1044,9 +1046,9 @@ export class ChapterScheduler {
 	private chapterIssue(row: { task_id: string; placeholder: number }) {
 		const failure = this.get<{ error_message: string | null }>(
 			`SELECT r.error_message FROM run r
-			WHERE r.status = 'needs_attention' AND json_extract(r.meta, '$.taskId') IN (
-				SELECT ? UNION SELECT d.depends_on FROM task_dep d JOIN task t ON t.task_id = d.depends_on
-				WHERE d.task_id = ? AND t.status = 'needs_attention')
+			JOIN task t ON t.task_id = json_extract(r.meta, '$.taskId')
+			WHERE r.status = 'needs_attention' AND t.status = 'needs_attention'
+				AND (t.task_id = ? OR t.task_id IN (SELECT depends_on FROM task_dep WHERE task_id = ?))
 			ORDER BY r.started_at DESC, r.rowid DESC LIMIT 1`,
 			row.task_id,
 			row.task_id,

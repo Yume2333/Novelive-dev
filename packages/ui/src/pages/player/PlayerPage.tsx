@@ -1,6 +1,6 @@
 import { type CompiledScene, compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import './player.css'
 
@@ -14,40 +14,64 @@ export function PlayerPage() {
 	}>()
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
-	async function openProject() {
-		const directory = await window.novelive.pickFolder()
-		if (!directory || !id) return
-		setError('')
-		setLoading(true)
-		try {
-			const { script, chapter, registry, speakers, speakerNames, customMarks } =
-				await window.novelive.call('production.playerChapter', {
-					directory,
+	const loadProject = useCallback(
+		async (directory?: string) => {
+			if (!id) return
+			setError('')
+			setLoading(true)
+			try {
+				const {
+					script,
+					chapter,
+					registry,
+					speakers,
+					speakerNames,
+					customMarks,
+				} = await window.novelive.call('production.playerChapter', {
+					...(directory ? { directory } : {}),
 					workId: id,
 				}).promise
-			const result = compileScript(script, {
-				paragraphIds: chapter.paragraphIds,
-				sceneIds: chapter.sceneIds,
-				assets: registry.entries,
-				speakers,
-				customMarks,
-			})
-			if (!result.ok)
-				throw new Error(
-					result.diagnostics.map((item) => item.message).join('\n'),
+				const result = compileScript(script, {
+					paragraphIds: chapter.paragraphIds,
+					sceneIds: chapter.sceneIds,
+					assets: registry.entries,
+					speakers,
+					customMarks,
+				})
+				if (!result.ok)
+					throw new Error(
+						result.diagnostics.map((item) => item.message).join('\n'),
+					)
+				if (!result.scenes.some((scene) => scene.beats.length))
+					throw new Error('本章还没有可播放的剧本')
+				setLoaded({
+					scenes: result.scenes,
+					paths: new Map(
+						registry.entries.map((entry) => [entry.id, entry.path]),
+					),
+					speakerNames,
+				})
+			} catch (cause) {
+				if (
+					directory ||
+					!cause ||
+					typeof cause !== 'object' ||
+					!('code' in cause) ||
+					cause.code !== 'not_found'
 				)
-			if (!result.scenes.some((scene) => scene.beats.length))
-				throw new Error('本章还没有可播放的剧本')
-			setLoaded({
-				scenes: result.scenes,
-				paths: new Map(registry.entries.map((entry) => [entry.id, entry.path])),
-				speakerNames,
-			})
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : '无法打开本地工程')
-		} finally {
-			setLoading(false)
-		}
+					setError(cause instanceof Error ? cause.message : '无法打开本地工程')
+			} finally {
+				setLoading(false)
+			}
+		},
+		[id],
+	)
+	useEffect(() => {
+		void loadProject()
+	}, [loadProject])
+	async function openProject() {
+		const directory = await window.novelive.pickFolder()
+		if (directory) await loadProject(directory)
 	}
 	useEffect(() => {
 		if (!loaded || !host.current) return
