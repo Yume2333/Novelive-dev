@@ -65,7 +65,8 @@ function flowDepth(line: string) {
 }
 
 // A leading `---` block is YAML front matter only when every line reads as
-// YAML; otherwise it is a thematic break and the text stays in the body.
+// YAML; otherwise it is a thematic break and the text stays in the body. A
+// flow collection opens only where a value starts with `[` or `{`.
 function frontMatter(text: string) {
 	const metadata: MarkdownBook['metadata'] = {}
 	const block = text.match(
@@ -76,13 +77,16 @@ function frontMatter(text: string) {
 	let keys = 0
 	for (const line of lines) {
 		if (!line.trim()) continue
-		if (
-			!(open && /^[\]}][\]},\s]*(?:#.*)?$/.test(line)) &&
-			!yamlLine.test(line)
-		)
-			return { body: text, metadata }
-		if (yamlKey.test(line)) keys++
-		open += flowDepth(line)
+		if (open) {
+			if (!/^\s/.test(line) && !/^[\]}][\]},\s]*(?:#.*)?$/.test(line))
+				return { body: text, metadata }
+			open += flowDepth(line)
+		} else if (!yamlLine.test(line)) return { body: text, metadata }
+		else if (yamlKey.test(line)) {
+			keys++
+			const value = line.slice(line.indexOf(':') + 1).trim()
+			if (/^[[{]/.test(value)) open = flowDepth(value)
+		}
 		if (open < 0) return { body: text, metadata }
 	}
 	if (!block || !keys) return { body: text, metadata }
