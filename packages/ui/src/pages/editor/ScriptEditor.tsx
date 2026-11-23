@@ -76,11 +76,12 @@ export function ScriptEditor({
 	}, [readOnly])
 	useEffect(() => {
 		const editor = view.current
-		if (editor && editor.state.doc.toString() !== value)
+		const normalized = value.replace(/\r\n?/g, '\n')
+		if (editor && editor.state.doc.toString() !== normalized)
 			editor.dispatch({
-				changes: { from: 0, to: editor.state.doc.length, insert: value },
+				changes: { from: 0, to: editor.state.doc.length, insert: normalized },
 				selection: {
-					anchor: Math.min(editor.state.selection.main.head, value.length),
+					anchor: Math.min(editor.state.selection.main.head, normalized.length),
 				},
 			})
 	}, [value])
