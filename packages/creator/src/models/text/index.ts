@@ -43,6 +43,33 @@ const relayReasoningModels = new Set(['devin-swe-2'])
 const watchdogMs = 90_000
 const cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
 const noUsage: Usage = { ...cost, totalTokens: 0, cost: { ...cost, total: 0 } }
+
+function sumUsage(first: Usage, last: Usage): Usage {
+	return {
+		input: first.input + last.input,
+		output: first.output + last.output,
+		cacheRead: first.cacheRead + last.cacheRead,
+		cacheWrite: first.cacheWrite + last.cacheWrite,
+		...(first.cacheWrite1h !== undefined || last.cacheWrite1h !== undefined
+			? { cacheWrite1h: (first.cacheWrite1h ?? 0) + (last.cacheWrite1h ?? 0) }
+			: {}),
+		...(first.reasoning !== undefined || last.reasoning !== undefined
+			? { reasoning: (first.reasoning ?? 0) + (last.reasoning ?? 0) }
+			: {}),
+		totalTokens: first.totalTokens + last.totalTokens,
+		cost: {
+			input: first.cost.input + last.cost.input,
+			output: first.cost.output + last.cost.output,
+			cacheRead: first.cost.cacheRead + last.cost.cacheRead,
+			cacheWrite: first.cost.cacheWrite + last.cost.cacheWrite,
+			total: first.cost.total + last.cost.total,
+			totalFromProvider:
+				first.cost.totalFromProvider === true &&
+				last.cost.totalFromProvider === true,
+		},
+	}
+}
+
 export const textConnectionImage: ImageContent = {
 	type: 'image',
 	mimeType: 'image/png',
@@ -305,9 +332,10 @@ export function createTextStream(
 					? Math.max(1, Math.floor(outputLimit * 0.75))
 					: outputLimit),
 		)
-		let reasoningRetried = false
+		let retryUsage: Usage | undefined
 		const fail = (code: Code, detail?: string, previous?: AssistantMessage) => {
 			const error = failed(model, code, detail, previous)
+			if (retryUsage) error.usage = sumUsage(retryUsage, error.usage)
 			output.push({
 				type: 'error',
 				reason: code === 'cancelled' ? 'aborted' : 'error',
@@ -424,8 +452,8 @@ export function createTextStream(
 						? raised > maxTokens
 						: clampMaxTokensToContext(model, context, raised) >
 							clampMaxTokensToContext(model, context, maxTokens)
-					if (!reasoningRetried && !live && canRaise) {
-						reasoningRetried = true
+					if (!retryUsage && !live && canRaise) {
+						retryUsage = result.usage
 						maxTokens = raised
 						continue
 					}
@@ -438,13 +466,16 @@ export function createTextStream(
 					result.stopReason !== 'aborted' &&
 					result.stopReason !== 'pending'
 				) {
+					const message = retryUsage
+						? { ...result, usage: sumUsage(retryUsage, result.usage) }
+						: result
 					for (const event of buffered) output.push(event)
 					output.push({
 						type: 'done',
 						reason: result.stopReason,
-						message: result,
+						message,
 					})
-					return output.end(result)
+					return output.end(message)
 				}
 				const code =
 					watchdog || empty ? 'network' : classify(result, status, fields)

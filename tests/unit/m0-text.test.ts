@@ -88,6 +88,16 @@ describe('M0 text model adapter', () => {
 							{ index: 0, delta: {}, finish_reason: answer ? 'stop' : finish },
 						],
 					},
+					{
+						choices: [],
+						usage: {
+							prompt_tokens: budgets.length === 1 ? 7 : 11,
+							completion_tokens: budgets.length === 1 ? 5 : 3,
+							completion_tokens_details: {
+								reasoning_tokens: answer ? 0 : budgets.length === 1 ? 5 : 3,
+							},
+						},
+					},
 				]
 				return new Response(
 					`${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
@@ -108,6 +118,12 @@ describe('M0 text model adapter', () => {
 				contextWindow === 4096 ? [1536, 2048] : [12_000, 16_000],
 			)
 			expect(events).not.toContain('thinking_delta')
+			expect(result.usage).toMatchObject({
+				input: 18,
+				output: 8,
+				totalTokens: 26,
+				reasoning: succeeds ? 5 : 8,
+			})
 			if (succeeds) {
 				expect(events).toContain('text_delta')
 				expect(result).toMatchObject({
