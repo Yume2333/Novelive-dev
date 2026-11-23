@@ -461,9 +461,16 @@ test('removes an opaque sprite background before validating and auditing the res
 				[{ id: 'ada/uniform/neutral', kind: 'character', description: 'Ada' }],
 				bible,
 			)
+			vi.stubEnv('NL_MATTING_DIR', join(project.root, 'missing-matting'))
+			await expect(art.draw(sprite, bible)).resolves.toEqual({
+				status: 'unsupported',
+				issue: '本地去背景不可用；请使用可返回透明底的图片模型。',
+			})
+			vi.unstubAllEnvs()
 			expect(await art.draw(sprite, bible)).toEqual({ status: 'drawn' })
 		})
 	} finally {
+		vi.unstubAllEnvs()
 		renderer.mockRestore()
 		model.mockRestore()
 	}
