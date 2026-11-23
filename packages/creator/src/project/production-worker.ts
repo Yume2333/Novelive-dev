@@ -29,9 +29,11 @@ export async function productionModels(
 	const [
 		organizer,
 		director,
+		artist,
 		writer,
 		reviewer,
 		main,
+		portrait,
 		fast,
 		visual,
 		image,
@@ -39,9 +41,11 @@ export async function productionModels(
 	] = await Promise.all([
 		config.resolveRoleModel('organizer'),
 		config.resolveRoleModel('director'),
+		config.resolveRoleModel('artist'),
 		config.resolveRoleModel('writer'),
 		config.resolveRoleModel('reviewer-script'),
 		config.resolveRoleModel('painter-scene'),
+		config.resolveRoleModel('painter-portrait'),
 		config.resolveRoleModel('painter-variant'),
 		config.resolveRoleModel('reviewer-visual'),
 		config.resolveImageModel(),
@@ -50,9 +54,11 @@ export async function productionModels(
 	return {
 		organizer,
 		director,
+		artist,
 		writer,
 		reviewer,
 		main,
+		portrait,
 		fast,
 		visual,
 		image,
@@ -88,6 +94,7 @@ export function chapterWorker(
 	const art = (signal?: AbortSignal) =>
 		new ArtProduction(project, {
 			main: models.main,
+			portrait: models.portrait,
 			fast: models.fast,
 			visual: models.visual,
 			image: models.image,
@@ -243,7 +250,7 @@ export function chapterWorker(
 					bible,
 					await service.registry(),
 					{
-						main: models.director,
+						main: models.artist,
 						replay,
 						customMarks: options.script.customMarks,
 						signal: ctx.signal,

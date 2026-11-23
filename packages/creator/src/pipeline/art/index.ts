@@ -35,6 +35,7 @@ type VisualCandidates = {
 type Options = ModelOptions & {
 	image: ImageConfig
 	main: TextConnection
+	portrait?: TextConnection
 	fast: TextConnection
 	visual: TextConnection
 	scope?: ProjectScope
@@ -344,7 +345,11 @@ export class ArtProduction {
 			...drawing,
 			references: drawing.references.slice(0, refs.length),
 		}
-		const painter = derived ? this.options.fast : this.options.main
+		const painter = derived
+			? this.options.fast
+			: transparent
+				? (this.options.portrait ?? this.options.main)
+				: this.options.main
 		let issue = '没有生成可用图片。'
 		let feedback = ''
 		let moderated = false
