@@ -74,6 +74,17 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 				page.getByRole('navigation', { name: '作品导航' }).getByRole('link'),
 			).toHaveText(['概览', '游玩', '制作', '编辑', '设定集'])
 			await page.getByRole('link', { name: '选择主视觉' }).click()
+			const matting = page
+				.getByRole('status')
+				.filter({ hasText: '本地去背景不可用' })
+			await expect(matting).toBeVisible()
+			const dismissMatting = page.getByRole('button', { name: '关闭提示' })
+			await expect(dismissMatting.locator('svg')).toHaveAttribute(
+				'stroke-width',
+				'1.8',
+			)
+			await page.getByRole('button', { name: '关闭提示' }).click()
+			await expect(matting).toHaveCount(0)
 			const main = page.getByRole('group', { name: '主视觉', exact: true })
 			await expect(main.getByRole('radio')).toHaveCount(3)
 			await expect

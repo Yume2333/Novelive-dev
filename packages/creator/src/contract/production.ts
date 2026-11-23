@@ -47,6 +47,9 @@ const visualChoices = {
 
 export const productionSnapshotSchema = obj({
 	...work,
+	exportTarget: opt(
+		obj({ projectRoot: str({ minLength: 1 }), volumeId: entityId }),
+	),
 	title: opt(str()),
 	summary: opt(str()),
 	chapterTitles: opt(map(str())),
@@ -57,6 +60,7 @@ export const productionSnapshotSchema = obj({
 	visual: nullable(
 		obj({
 			mainVisuals: arr(candidateSchema, { minItems: 3, maxItems: 3 }),
+			mattingUnavailable: opt(lit(true)),
 			characters: arr(
 				obj({
 					characterId: entityId,

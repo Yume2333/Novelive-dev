@@ -183,6 +183,62 @@ test('a painter exception materializes both base and variant placeholders before
 	}
 })
 
+test('a later volume publishes with the reason from a reused series placeholder', async () => {
+	const { projectDir, workId } = await fixture()
+	using project = await Project.open(projectDir)
+	const work = await project.read(projectFiles.work('v0001', workId))
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const models = await productionModels(config)
+	const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+		throw new Error('Reusing a placeholder must not call a model')
+	})
+	const first = chapterWorker(project, 'v0001', work, models, { fetch })
+	const issue = '本地去背景不可用；请使用可返回透明底的图片模型。'
+	const [job] = await first
+		.art()
+		.register(
+			[{ id: 'ada/uniform/neutral', kind: 'character', description: 'Ada' }],
+			bible,
+		)
+	await first.art().savePlaceholder(job.assetId, issue, 'matting_unavailable')
+	await project.writeFile(
+		`source/production/art/${job.assetId}.json`,
+		JSON.stringify({ job }),
+	)
+	const laterWork = {
+		...work,
+		workId: '7a49d711-b6f5-442f-8234-58b43df92da0',
+	}
+	await project.write(projectFiles.work('v0002', laterWork.workId), laterWork)
+	project.tasks.registerWork({
+		workId: laterWork.workId,
+		title: laterWork.title,
+	})
+	const { worker } = chapterWorker(project, 'v0002', laterWork, models, {
+		fetch,
+	})
+	const queue = new ChapterScheduler(project.database, {
+		...worker,
+		async write() {},
+		async review() {},
+		async stage() {
+			return [job]
+		},
+	})
+	try {
+		queue.start(laterWork.workId, [laterWork.chapterIds[0]])
+		queue.confirmVisual(laterWork.workId)
+		await queue.idle()
+		expect(queue.snapshot(laterWork.workId).chapters).toMatchObject([
+			{ status: 'published', issue: `1 张图用了占位图；${issue}` },
+		])
+		expect(fetch).not.toHaveBeenCalled()
+	} finally {
+		queue.dispose()
+	}
+})
+
 test('staging depends on a reused pending image absent from the new manifest', async () => {
 	const { projectDir, workId } = await fixture()
 	using project = await Project.open(projectDir)

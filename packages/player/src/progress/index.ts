@@ -12,7 +12,7 @@ import {
 	type WorkProgress,
 } from '../contract'
 
-const key = ({ chapterId, sceneId, sentenceId }: SentenceRef) =>
+export const sentenceKey = ({ chapterId, sceneId, sentenceId }: SentenceRef) =>
 	JSON.stringify([chapterId, sceneId, sentenceId])
 
 export function captureSnapshot(
@@ -78,7 +78,9 @@ export class PlaybackProgress {
 	}
 
 	isRead(position: SentenceRef): boolean {
-		return this.progress.read.some((entry) => key(entry) === key(position))
+		return this.progress.read.some(
+			(entry) => sentenceKey(entry) === sentenceKey(position),
+		)
 	}
 
 	private markRead(position: SentenceRef) {

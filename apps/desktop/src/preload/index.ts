@@ -129,7 +129,14 @@ const api: Novelive = {
 		`novelive://cache/${path.split('/').map(encodeURIComponent).join('/')}`,
 	pickFolder: () => ipcRenderer.invoke('novelive:pick-folder'),
 	pickFiles: (kind) => ipcRenderer.invoke('novelive:pick-files', kind),
+	pickPackageDestination: () =>
+		ipcRenderer.invoke('novelive:pick-package-destination'),
 	host: {
+		about: {
+			info: () => ipcRenderer.invoke('novelive:about'),
+			open: (kind) => ipcRenderer.invoke('novelive:about-open', kind),
+			checkUpdates: () => ipcRenderer.invoke('novelive:check-updates'),
+		},
 		progress: {
 			load: (workId) =>
 				ipcRenderer.invoke('novelive:progress', { operation: 'load', workId }),

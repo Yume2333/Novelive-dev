@@ -1,5 +1,6 @@
 import en_agent from './en/agent.json'
 import en_bible from './en/bible.json'
+import en_components from './en/components.json'
 import en_confirm from './en/confirm.json'
 import en_editor from './en/editor.json'
 import en_import from './en/import.json'
@@ -13,6 +14,7 @@ import en_usage from './en/usage.json'
 import en_work from './en/work.json'
 import ja_agent from './ja/agent.json'
 import ja_bible from './ja/bible.json'
+import ja_components from './ja/components.json'
 import ja_confirm from './ja/confirm.json'
 import ja_editor from './ja/editor.json'
 import ja_import from './ja/import.json'
@@ -26,6 +28,7 @@ import ja_usage from './ja/usage.json'
 import ja_work from './ja/work.json'
 import zhCN_agent from './zh-CN/agent.json'
 import zhCN_bible from './zh-CN/bible.json'
+import zhCN_components from './zh-CN/components.json'
 import zhCN_confirm from './zh-CN/confirm.json'
 import zhCN_editor from './zh-CN/editor.json'
 import zhCN_import from './zh-CN/import.json'
@@ -39,6 +42,7 @@ import zhCN_usage from './zh-CN/usage.json'
 import zhCN_work from './zh-CN/work.json'
 import zhTW_agent from './zh-TW/agent.json'
 import zhTW_bible from './zh-TW/bible.json'
+import zhTW_components from './zh-TW/components.json'
 import zhTW_confirm from './zh-TW/confirm.json'
 import zhTW_editor from './zh-TW/editor.json'
 import zhTW_import from './zh-TW/import.json'
@@ -56,6 +60,7 @@ export type Locale = (typeof locales)[number]
 export const namespaces = [
 	'agent',
 	'bible',
+	'components',
 	'confirm',
 	'editor',
 	'import',
@@ -73,6 +78,7 @@ export const resources = {
 	'zh-CN': {
 		agent: zhCN_agent,
 		bible: zhCN_bible,
+		components: zhCN_components,
 		confirm: zhCN_confirm,
 		editor: zhCN_editor,
 		import: zhCN_import,
@@ -88,6 +94,7 @@ export const resources = {
 	'zh-TW': {
 		agent: zhTW_agent,
 		bible: zhTW_bible,
+		components: zhTW_components,
 		confirm: zhTW_confirm,
 		editor: zhTW_editor,
 		import: zhTW_import,
@@ -103,6 +110,7 @@ export const resources = {
 	en: {
 		agent: en_agent,
 		bible: en_bible,
+		components: en_components,
 		confirm: en_confirm,
 		editor: en_editor,
 		import: en_import,
@@ -118,6 +126,7 @@ export const resources = {
 	ja: {
 		agent: ja_agent,
 		bible: ja_bible,
+		components: ja_components,
 		confirm: ja_confirm,
 		editor: ja_editor,
 		import: ja_import,

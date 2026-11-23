@@ -6,6 +6,7 @@ import { Page } from '../../components/Page'
 import { scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import styles from '../production/Production.module.css'
+import { ProductionNotice } from '../production/ProductionNotice'
 import { useWorkProduction } from '../work/WorkProduction'
 
 const t = scoped('confirm')
@@ -136,6 +137,15 @@ function VisualChoices({ visual }: { visual: Visual }) {
 			<p className={styles.lead}>
 				{t('确认点 1 / 2 · 选择首卷主要角色的设定和全作统一的主视觉。')}
 			</p>
+			{visual.mattingUnavailable && (
+				<ProductionNotice>
+					<span role="status">
+						{t(
+							'本地去背景不可用；无法生成透明底的角色可以使用占位图继续制作。',
+						)}
+					</span>
+				</ProductionNotice>
+			)}
 			{imported?.fallback ? (
 				<p className={styles.notice} role="status">
 					{t('未能筛选 EPUB 插图，已显示全部插图，可手动选择。')}

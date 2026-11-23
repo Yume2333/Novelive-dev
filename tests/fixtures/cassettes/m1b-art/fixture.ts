@@ -88,6 +88,7 @@ export function service(
 		mode: 'off',
 		tier: 'anime',
 	},
+	retries = 1,
 ) {
 	return new ArtProduction(project, {
 		replay,
@@ -100,7 +101,7 @@ export function service(
 			model: imageModel,
 			nativeMaxEdge: 1536,
 			concurrency: 2,
-			retries: 1,
+			retries,
 			quality: 'medium',
 			postProcess: profile.mode,
 			upscaleTier: profile.tier,

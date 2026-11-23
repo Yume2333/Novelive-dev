@@ -7,6 +7,7 @@
 	"方案 {{value}}": "Option {{value}}",
 	"显示全部 EPUB 插图": "Show all EPUB illustrations",
 	"未能筛选 EPUB 插图，已显示全部插图，可手动选择。": "Unable to filter EPUB illustrations. All illustrations are shown; select manually.",
+	"本地去背景不可用；无法生成透明底的角色可以使用占位图继续制作。": "Local background removal is unavailable; characters that can't get a transparent background can use placeholder images to continue production.",
 	"查看制作": "View production",
 	"目前没有待确认的主视觉。": "No key visuals are pending confirmation.",
 	"目前没有待确认的第一章。": "No chapter 1 is pending confirmation.",

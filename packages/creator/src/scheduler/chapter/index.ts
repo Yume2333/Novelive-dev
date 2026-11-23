@@ -839,6 +839,7 @@ export class ChapterScheduler {
 				task,
 				outcome.status,
 				'issue' in outcome ? outcome.issue : undefined,
+				outcome.status === 'placeholder' ? outcome.reason : undefined,
 			)
 			this.inflight.delete(task.task_id)
 		})
@@ -848,6 +849,7 @@ export class ChapterScheduler {
 		task: TaskRow,
 		outcome: ImageJobResult['status'],
 		issue?: string,
+		reason?: 'matting_unavailable',
 	) {
 		const assetStatus = outcome === 'unsupported' ? 'failed' : outcome
 		this.exec(
@@ -870,7 +872,7 @@ export class ChapterScheduler {
 		this.endRun(
 			task,
 			outcome === 'unsupported' ? 'needs_attention' : 'done',
-			outcome === 'drawn' ? undefined : outcome,
+			outcome === 'drawn' ? undefined : (reason ?? outcome),
 			issue,
 		)
 		const dependents = this.all<{ task_id: string }>(
@@ -1169,7 +1171,15 @@ export class ChapterScheduler {
 				WHERE d.task_id = ? AND a.status = 'placeholder'`,
 				row.task_id,
 			)?.n
-			return `${count} 张图用了占位图`
+			const matting = this.get<{ error_message: string }>(
+				`SELECT r.error_message FROM task_dep d JOIN task t ON t.task_id = d.depends_on
+				JOIN asset a ON a.work_id = t.work_id AND a.asset_key = t.ref_id
+				JOIN run r ON r.run_id = t.run_id
+				WHERE d.task_id = ? AND a.status = 'placeholder' AND r.error_type = 'matting_unavailable'
+				LIMIT 1`,
+				row.task_id,
+			)
+			return `${count} 张图用了占位图${matting ? `；${matting.error_message}` : ''}`
 		}
 		return undefined
 	}

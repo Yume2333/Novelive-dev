@@ -1,0 +1,31 @@
+.panel {
+	display: grid;
+	gap: var(--space-3);
+	padding-block-end: var(--space-3);
+}
+
+.panel :is(h3, h4, p, ul) {
+	margin: 0;
+}
+
+.panel ul {
+	padding: 0;
+	list-style: none;
+}
+
+.row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2);
+	padding-block: var(--space-2);
+}
+
+.delete {
+	opacity: 0;
+}
+
+.row:hover .delete,
+.row:focus-within .delete {
+	opacity: 1;
+}

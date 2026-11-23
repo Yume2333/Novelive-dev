@@ -1,5 +1,5 @@
-import { mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { lstat, mkdir } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import type { HostState } from '@novelive/creator/contract'
 import {
 	app,
@@ -17,6 +17,7 @@ import { installProgressIpc } from '../progress-ipc'
 import { t } from './i18n'
 import { installNotifications } from './notifications'
 import { installLifecycle } from './tray'
+import { installUpdates } from './update'
 
 let creator: Electron.UtilityProcess | undefined
 let creatorDraining = false
@@ -195,6 +196,30 @@ app.whenReady().then(async () => {
 		},
 	})
 	closeNotifications = installNotifications(() => library, lifecycle.show)
+	const checkUpdates = installUpdates({
+		window: () => library,
+		quit: lifecycle.quit,
+	})
+	ipcMain.handle('novelive:about', () => ({
+		version: app.getVersion(),
+		packaged: app.isPackaged,
+	}))
+	ipcMain.handle('novelive:about-open', async (_event, kind: unknown) => {
+		if (kind === 'source')
+			return shell.openExternal('https://github.com/Yume2333/Novelive-dev')
+		if (kind !== 'license' && kind !== 'notices') return
+		if (kind === 'notices' && !app.isPackaged) return
+		const file = app.isPackaged
+			? join(
+					process.resourcesPath,
+					'licenses',
+					kind === 'license' ? 'LICENSE.txt' : 'THIRD_PARTY_NOTICES.txt',
+				)
+			: join(app.getAppPath(), '../../LICENSE')
+		const error = await shell.openPath(file)
+		if (error) throw new Error(error)
+	})
+	ipcMain.handle('novelive:check-updates', () => checkUpdates(true))
 	const rendererOrigin = rendererUrl ? new URL(rendererUrl).origin : 'null'
 	protocol.handle('novelive', async (request) => {
 		const response = await cacheResponse(
@@ -214,6 +239,13 @@ app.whenReady().then(async () => {
 		return result.filePaths[0] ?? null
 	})
 	ipcMain.handle('novelive:pick-files', async (_event, kind: unknown) => {
+		if (kind === 'package') {
+			const result = await dialog.showOpenDialog({
+				properties: ['openFile'],
+				filters: [{ name: t('Novelive 作品包'), extensions: ['novelive'] }],
+			})
+			return result.filePaths
+		}
 		if (kind !== 'source' && kind !== 'txt' && kind !== 'image') return []
 		const result = await dialog.showOpenDialog({
 			properties:
@@ -230,6 +262,34 @@ app.whenReady().then(async () => {
 		})
 		return result.filePaths
 	})
+	ipcMain.handle('novelive:pick-package-destination', async () => {
+		const result = await dialog.showSaveDialog({
+			defaultPath: t('作品.novelive'),
+			filters: [{ name: t('Novelive 作品包'), extensions: ['novelive'] }],
+		})
+		if (result.canceled || !result.filePath) return null
+		if (/\.novelive$/i.test(result.filePath)) return result.filePath
+		const destination = `${result.filePath}.novelive`
+		try {
+			await lstat(destination)
+		} catch (error) {
+			if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+				return destination
+			throw error
+		}
+		const { response } = await dialog.showMessageBox({
+			type: 'warning',
+			title: t('替换作品包'),
+			message: t('「{{name}}」已存在，是否替换？', {
+				name: basename(destination),
+			}),
+			buttons: [t('取消'), t('替换')],
+			defaultId: 0,
+			cancelId: 0,
+			noLink: true,
+		})
+		return response === 1 ? destination : null
+	})
 	ipcMain.handle('novelive:open-log-dir', async () => {
 		await mkdir(logDir(), { recursive: true })
 		const error = await shell.openPath(logDir())
@@ -241,6 +301,7 @@ app.whenReady().then(async () => {
 	})
 
 	openLibrary()
+	void checkUpdates(false)
 	app.on('activate', () => {
 		if (!library) openLibrary()
 		else lifecycle.show()

@@ -5,13 +5,16 @@ import { workRoute } from '../../routes/production'
 import { ChapterState } from '../production/ChapterState'
 import styles from '../production/Production.module.css'
 import { ProductionNotice } from '../production/ProductionNotice'
+import { ExportPackage } from './share/ExportPackage'
 import { chapterTitle, useWorkProduction } from './WorkProduction'
 
 const t = scoped('work')
 
 export function WorkPage() {
 	const { snapshot } = useWorkProduction()
-	const { workId, phase, summary, chapters } = snapshot
+	const { workId, phase, summary, chapters, exportTarget } = snapshot
+	const share = window.novelive.host.share
+	const pickDestination = window.novelive.pickPackageDestination
 	const firstPublished = chapters.find(
 		(chapter) => chapter.status === 'published',
 	)
@@ -28,6 +31,14 @@ export function WorkPage() {
 					<Link className={styles.button} to={workRoute('production', workId)}>
 						{t('查看制作')}
 					</Link>
+					{share && pickDestination && exportTarget && (
+						<ExportPackage
+							api={share}
+							pickDestination={pickDestination}
+							workId={workId}
+							{...exportTarget}
+						/>
+					)}
 				</div>
 				{phase === 'confirm-visual' && (
 					<ProductionNotice>

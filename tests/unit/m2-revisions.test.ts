@@ -6,8 +6,10 @@ import { parseScript } from '@novelive/format/script'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { listHistory } from '../../packages/creator/src/editor/history/storage'
 import { CreativeRevisions } from '../../packages/creator/src/editor/revisions'
+import * as artModels from '../../packages/creator/src/pipeline/art/models'
 import { Project } from '../../packages/creator/src/project'
 import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
+import { picture } from '../fixtures/cassettes/m1b-art/fixture'
 import {
 	assetId,
 	directory as cassettes,
@@ -143,6 +145,45 @@ test('both entries rewrite one scene through the writer, apply only checked hunk
 		expect(chapter.chapterId).toBe(chapterId)
 	} finally {
 		project.close()
+	}
+})
+
+test('regeneration reports unavailable matting without replacing the original image', async () => {
+	vi.stubEnv('NL_MATTING_DIR', join(directory, 'missing-matting'))
+	const opaque = await picture(64, 96, false)
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async () => ({ bytes: opaque }))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockResolvedValue({ content: 'Ada' })
+	try {
+		const { project, revisions, workId, path } = await revisionProject(
+			directory,
+			{
+				directory: cassettes,
+				mode: 'strict',
+			},
+		)
+		using opened = project
+		const original = await opened.readFile(path)
+		const expectedRevision = await revisions.imageRevision(assetId)
+		await expect(
+			revisions.regenerateImage({
+				workId,
+				assetId,
+				expectedRevision,
+				count: 1,
+			}),
+		).rejects.toMatchObject({
+			code: 'unsupported',
+			message: '本地去背景不可用；请使用可返回透明底的图片模型。',
+		})
+		expect(await opened.readFile(path)).toEqual(original)
+		expect(await revisions.imageRevision(assetId)).toBe(expectedRevision)
+	} finally {
+		renderer.mockRestore()
+		model.mockRestore()
 	}
 })
 
