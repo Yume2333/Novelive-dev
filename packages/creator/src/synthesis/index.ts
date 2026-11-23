@@ -33,6 +33,7 @@ import {
 	parseModelJson,
 	type TextConnection,
 	textResultError,
+	UnknownTextOutcomeError,
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
@@ -88,6 +89,7 @@ const checkpointSchema = obj({
 	...version,
 	fingerprint: str(),
 	inputFingerprint: opt(str()),
+	requestFailure: opt(str()),
 	basis: str(),
 	packet: int({ minimum: 0 }),
 	events: arr(eventSchema),
@@ -469,7 +471,10 @@ export async function synthesizeVolume(
 	const selector = options.selectionConnection
 		? buildTextModel(options.selectionConnection)
 		: model
-	const stream = createTextStream({ fetch: options.fetch })
+	const stream = createTextStream({
+		fetch: options.fetch,
+		stopOnUnknownOutcome: true,
+	})
 	if (
 		options.maxEvents !== undefined &&
 		(!Number.isSafeInteger(options.maxEvents) || options.maxEvents < 1)
@@ -587,6 +592,8 @@ ${packetText.join('\n')}`
 	const inputFingerprint = hash(inputs)
 	const fingerprint = hash({ packetFormat, ...inputs })
 	const matching = saved?.fingerprint === fingerprint ? saved : legacyState
+	if (matching?.requestFailure)
+		throw new UnknownTextOutcomeError(matching.requestFailure)
 	let quarantineReason =
 		matching?.ready && matching.basis !== basis
 			? 'Bible changed before synthesis publication'
@@ -683,6 +690,11 @@ ${nextEvent.instructions}`
 					response,
 					`Synthesis stopped: ${response.stopReason}`,
 				)
+				if (error instanceof UnknownTextOutcomeError) {
+					state.requestFailure = error.message
+					await project.write(files.checkpoint, state)
+					throw error
+				}
 				if (focusedPrompt && error.code === 'reasoning_limit')
 					return request(focusedPrompt, contract, check)
 				throw error

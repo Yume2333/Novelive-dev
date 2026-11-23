@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { obj } from '@earendil-works/pi-schema'
 import { afterEach, expect, test, vi } from 'vitest'
+import { testTextConnection } from '../../packages/creator/src/models/text'
 import {
 	artJson,
 	imageRenderer,
@@ -192,6 +193,127 @@ test('each dispatch reserves again, failed attempts stay reserved, and terminal 
 			.all(),
 	).toEqual([{ actual_tokens: 50 }, { actual_tokens: null }])
 })
+
+test.each([
+	{ fault: 'no headers', status: undefined, reason: 'request timeout' },
+	{ fault: 'upstream error', status: 503, reason: 'provider did not return' },
+	{ fault: 'watchdog', status: 200, reason: 'stream idle timeout' },
+	{
+		fault: 'cut after usage',
+		status: 200,
+		reason: 'connection or stream interrupted',
+		tokens: 27,
+	},
+	{
+		fault: 'missing usage',
+		status: 200,
+		reason: 'successful response did not report billable usage',
+	},
+	{ fault: 'complete', status: 200, tokens: 27 },
+])(
+	'guarded recording does not redispatch after $fault',
+	async ({ fault, status, reason, tokens }) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '10000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		vi.stubEnv('NL_USAGE_CSV', '')
+		const directory = await mkdtemp(join(tmpdir(), 'novelive-spend-'))
+		try {
+			using database = new DatabaseSync(':memory:')
+			const frame = (data: unknown) =>
+				new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`)
+			const usage = {
+				prompt_tokens: 20,
+				completion_tokens: 7,
+				total_tokens: 27,
+			}
+			const send = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+				if (fault === 'no headers') throw new Error('Request timed out')
+				if (fault === 'upstream error') return Response.json({}, { status })
+				const { signal } = new Request(input, init)
+				let first = true
+				return new Response(
+					new ReadableStream<Uint8Array>(
+						{
+							pull(controller) {
+								if (!first) {
+									if (fault === 'cut after usage')
+										controller.error(new TypeError('Connection terminated'))
+									return
+								}
+								first = false
+								if (fault === 'watchdog') {
+									controller.enqueue(
+										frame({
+											choices: [{ delta: { reasoning_content: 'thinking' } }],
+										}),
+									)
+									return new Promise<void>((resolve) => {
+										signal.addEventListener(
+											'abort',
+											() => {
+												controller.error(signal.reason)
+												resolve()
+											},
+											{ once: true },
+										)
+									})
+								}
+								if (fault === 'cut after usage') {
+									controller.enqueue(frame({ choices: [], usage }))
+									return
+								}
+								controller.enqueue(
+									frame({
+										choices: [
+											{ delta: { content: 'OK' }, finish_reason: 'stop' },
+										],
+										...(tokens && { usage }),
+									}),
+								)
+								controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'))
+								controller.close()
+							},
+						},
+						{ highWaterMark: 0 },
+					),
+					{ headers: { 'content-type': 'text/event-stream' } },
+				)
+			})
+			const fetch = createReplayFetch({
+				mode: 'record',
+				directory,
+				fetch: send,
+				spend: projectSpend(database),
+			})
+			const result = testTextConnection(
+				{ ...configuration.models.main, model: 'devin-swe-2' },
+				{
+					fetch,
+					stopOnUnknownOutcome: true,
+					...(fault === 'watchdog' && { idleMs: 25 }),
+				},
+			)
+			if (reason) {
+				await expect(result).rejects.toMatchObject({
+					code: 'internal',
+					message: expect.stringContaining(
+						`not retried automatically (${status === undefined ? 'no HTTP status' : `HTTP ${status}`}: ${reason}`,
+					),
+				})
+			} else {
+				await expect(result).resolves.toMatchObject({
+					usage: { totalTokens: 27 },
+				})
+			}
+			expect(send).toHaveBeenCalledOnce()
+			expect(
+				database.prepare('SELECT actual_tokens FROM spend_reservation').all(),
+			).toEqual([{ actual_tokens: tokens ?? null }])
+		} finally {
+			await rm(directory, { recursive: true, force: true })
+		}
+	},
+)
 
 test('exhausted image and token caps block image edits, generation, and visual review', async () => {
 	vi.stubEnv('NL_REPLAY', '')

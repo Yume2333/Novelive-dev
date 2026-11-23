@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 import { arr, compile, int, obj, opt, str } from '@earendil-works/pi-schema'
 import {
+	inheritTextSettlement,
 	type projectSpend,
 	quoteSpend,
 	requestedOutputTokens,
@@ -31,6 +32,12 @@ export interface ReplayOptions {
 	reportMissing?: boolean
 	ignoreRecordedFailures?: boolean
 	spend?: ReturnType<typeof projectSpend>
+}
+
+const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
+
+export function isSpendGuardedFetch(fetch: typeof globalThis.fetch) {
+	return spendGuardedFetches.has(fetch)
 }
 
 const bodyLimit = 256 * 1024
@@ -286,6 +293,7 @@ export function createReplayFetch(
 		? (input, init) =>
 				spend(new Request(input, init), (admitted) => send(admitted))
 		: send
+	if (spend && mode !== 'strict') spendGuardedFetches.add(upstream)
 	if (!mode) return upstream
 	const directory =
 		options.directory ??
@@ -364,7 +372,7 @@ export function createReplayFetch(
 		await write
 	}
 
-	return async (input, init) => {
+	const dispatch: typeof fetch = async (input, init) => {
 		const request = new Request(input, init)
 		const rebindIds =
 			options.rebindIds ?? process.env.NL_REPLAY_REBIND_IDS === '1'
@@ -464,10 +472,13 @@ export function createReplayFetch(
 				},
 				{ highWaterMark: 0 },
 			)
-			return new Response(stream, {
-				status: response.status,
-				headers: response.headers,
-			})
+			return inheritTextSettlement(
+				response,
+				new Response(stream, {
+					status: response.status,
+					headers: response.headers,
+				}),
+			)
 		}
 		let text = ''
 		try {
@@ -535,4 +546,6 @@ export function createReplayFetch(
 				: replayBody(bytes, request.signal, options.fault, options.delayMs)
 		return new Response(stream, { status: row.status, headers: row.headers })
 	}
+	if (spend && mode !== 'strict') spendGuardedFetches.add(dispatch)
+	return dispatch
 }
