@@ -125,6 +125,23 @@ test('projects the compiled chapter without losing direction order, resolved ass
 	})
 })
 
+test('a bare wait cue retains its compiler-assigned line ID', () => {
+	const compiled = compileScript('scene 夜\nsource p0001\n@wait', {
+		...context,
+		paragraphIds: ['p0001'],
+		sceneIds: [sceneIds[0]],
+		makeId: () => '1a2b',
+	})
+	if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics))
+	expect(toPlaybackBeats(chapterId, compiled.scenes, {})).toMatchObject([
+		{
+			sceneId: sceneIds[0],
+			cue: { kind: 'wait', lineId: '1a2b' },
+			advance: { kind: 'click' },
+		},
+	])
+})
+
 test('speaker IDs fall back to text when a name exists only on the map prototype', () => {
 	const compiled = compileScript(
 		'scene 夜\nsource p0001\nconstructor: 谁？ #0001',
