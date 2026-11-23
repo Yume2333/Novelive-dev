@@ -6,6 +6,24 @@ import { AssetWindow, lookahead } from './assets'
 afterEach(() => vi.restoreAllMocks())
 
 describe('asset reference window', () => {
+	it('does not block a ready stage on unresolved lookahead decoding', async () => {
+		let resolve!: (value: unknown) => void
+		const future = new Promise((value) => {
+			resolve = value
+		})
+		vi.spyOn(Assets, 'load').mockImplementation(
+			({ src }: { src: string }) =>
+				(src === 'future'
+					? future
+					: Promise.resolve({ destroyed: true })) as never,
+		)
+		vi.spyOn(Assets, 'unload').mockResolvedValue(undefined)
+		const window = new AssetWindow({ resolveAsset: (id) => id })
+		await window.sync(['current'], ['future'])
+		expect(window.get('current')).toBeDefined()
+		resolve({ destroyed: true })
+		await window.destroy()
+	})
 	it('handles an empty window and reports missing asset requests', async () => {
 		const window = new AssetWindow({
 			resolveAsset: () => {

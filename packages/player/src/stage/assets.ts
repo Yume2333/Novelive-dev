@@ -55,6 +55,8 @@ export class AssetWindow {
 		{ url: string; texture: Texture; references: number }
 	>()
 	private disposed = false
+	private pending = new Map<string, Promise<void>>()
+	private wanted = new Map<string, number>()
 	constructor(private resources: PlayerResources) {}
 
 	async sync(stage: readonly string[], upcoming: readonly string[]) {
@@ -62,33 +64,44 @@ export class AssetWindow {
 		const counts = new Map<string, number>()
 		for (const id of [...stage, ...upcoming])
 			counts.set(id, (counts.get(id) ?? 0) + 1)
-		const results = await Promise.allSettled(
-			[...counts].map(async ([id, references]) => {
+		this.wanted = counts
+		const load = (id: string): Promise<void> => {
+			const pending = this.pending.get(id)
+			if (pending) return pending
+			const request = (async () => {
 				const entry = this.entries.get(id)
 				if (entry) {
-					entry.references = references
+					entry.references = counts.get(id) ?? 0
 					return
 				}
 				try {
 					const url = await this.resources.resolveAsset(id)
 					const texture = await acquire(url)
-					if (this.disposed) {
+					if (this.disposed || !this.wanted.has(id)) {
 						await release(url)
 						return
 					}
-					this.entries.set(id, { url, texture, references })
-				} catch (error) {
-					if (stage.includes(id)) throw error
+					this.entries.set(id, {
+						url,
+						texture,
+						references: this.wanted.get(id) ?? 0,
+					})
+				} finally {
+					this.pending.delete(id)
 				}
-			}),
-		)
-		const failure = results.find((result) => result.status === 'rejected')
-		if (failure?.status === 'rejected') throw failure.reason
+			})()
+			if (!this.entries.has(id)) this.pending.set(id, request)
+			void request.catch(() => {})
+			return request
+		}
+		const current = stage.map(load)
+		for (const id of upcoming) void load(id)
 		for (const [id, entry] of this.entries)
 			if (!counts.has(id)) {
 				this.entries.delete(id)
 				await release(entry.url)
 			}
+		await Promise.all(current)
 	}
 
 	get(id: string) {
@@ -99,6 +112,7 @@ export class AssetWindow {
 
 	async destroy() {
 		this.disposed = true
+		await Promise.allSettled(this.pending.values())
 		const entries = [...this.entries.values()]
 		this.entries.clear()
 		await Promise.all(entries.map((entry) => release(entry.url)))
