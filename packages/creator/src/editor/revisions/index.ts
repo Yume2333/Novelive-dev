@@ -5,7 +5,6 @@ import {
 	projectFiles,
 } from '@novelive/format/model'
 import { formatScene, type Scene } from '@novelive/format/script'
-import { compileEditorScript } from '../../../../format/src/script/editing'
 import type { CommandInput, CommandOutput } from '../../contract'
 import type { RewriteProposal, RewriteRequest } from '../../contract/editor'
 import type { Project } from '../../project'
@@ -232,17 +231,10 @@ export class CreativeRevisions {
 	}
 
 	private async currentScene(request: RewriteRequest) {
-		const snapshot = await this.currentChapter(request)
-		const scene = snapshot.scenes.find(
-			({ sceneId }) => sceneId === request.sceneId,
-		)
-		if (!scene) throw { code: 'not_found', message: '找不到场景。' }
-		const [compiled] = compileEditorScript([scene], {
-			assets: [],
-			speakers: [],
-			paragraphIds: snapshot.paragraphs.map(({ id }) => id),
-		})
-		return { scene, compiled: compiled.scene }
+		const current = await this.editor.compiledScene(request, request.sceneId)
+		if (current.snapshot.revision !== request.expectedRevision)
+			throw stale('章节已改变，请刷新后重试。')
+		return current
 	}
 
 	private async checkImage(
