@@ -143,6 +143,9 @@ test('stops without a staging repair when the malformed reply did not settle', a
 			headers: { 'content-type': 'text/event-stream' },
 		})
 	})
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+	vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '1')
 	try {
 		await expect(
 			directChapterArt(script, bible, empty, {
@@ -157,6 +160,7 @@ test('stops without a staging repair when the malformed reply did not settle', a
 			db.prepare('SELECT actual_tokens FROM spend_reservation').all(),
 		).toEqual([{ actual_tokens: null }])
 	} finally {
+		vi.unstubAllEnvs()
 		await rm(directory, { recursive: true, force: true })
 	}
 })

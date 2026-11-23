@@ -160,6 +160,9 @@ test('stops without a style repair when the malformed reply did not settle', asy
 		fetch: provider.fetch,
 		spend: projectSpend(db),
 	})
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+	vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '1')
 	try {
 		await expect(
 			reviewStyle(writingModel(provider.options.writer, { fetch }), scene),
@@ -171,6 +174,7 @@ test('stops without a style repair when the malformed reply did not settle', asy
 			db.prepare('SELECT actual_tokens FROM spend_reservation').all(),
 		).toEqual([{ actual_tokens: null }])
 	} finally {
+		vi.unstubAllEnvs()
 		await rm(directory, { recursive: true, force: true })
 	}
 })

@@ -70,6 +70,7 @@ function completion(payload: unknown) {
 			],
 		},
 		{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+		{ choices: [], usage: { prompt_tokens: 10, completion_tokens: 5 } },
 	]
 	return new Response(
 		`${lines.map((line) => `data: ${JSON.stringify(line)}\n\n`).join('')}data: [DONE]\n\n`,
