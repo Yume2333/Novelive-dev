@@ -1,0 +1,11 @@
+Command: NL_REPLAY=strict pnpm exec vitest run tests/integration/m5-archive.test.ts
+Input: synthetic project on disk; real ZIP files written, inspected, streamed and extracted.
+Model usage: 0 images and 0 tokens. Desktop share acceptance is M5/07.
+
+ RUN  v5.1.1
+
+
+ Test Files  1 passed (1)
+      Tests  36 passed (36)
+   Start at  10:00:15
+   Duration  566ms (tests 84%, transform 8%, import 7%, worker 1%)
