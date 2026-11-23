@@ -19,6 +19,7 @@ import { Project } from '../../packages/creator/src/project'
 import { createProduction } from '../../packages/creator/src/project/production'
 import {
 	chapterWorker,
+	productionBible,
 	productionModels,
 } from '../../packages/creator/src/project/production-worker'
 import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
@@ -77,6 +78,26 @@ function completion(payload: unknown) {
 		},
 	)
 }
+
+test('reopening a saved synthesis candidate omits invalid style images from the art Bible', async () => {
+	const { projectDir, workId } = await fixture()
+	using project = await Project.open(projectDir)
+	const file = projectFiles.style({ level: 'series' })
+	const style = {
+		...bible.style,
+		status: 'candidate' as const,
+		references: [{ path: 'ch0001', description: 'Chapter, not an image' }],
+	}
+	await project.write(file, { formatVersion, entries: [style] })
+	const saved = await project.read(file)
+	const { art } = await productionBible(project, 'v0001', workId)
+	expect(art.style).toMatchObject({
+		id: style.id,
+		description: style.description,
+	})
+	expect(art.style.references).toBeUndefined()
+	expect(await project.read(file)).toEqual(saved)
+})
 
 test('staging and portrait painting dispatch to their configured role models', async () => {
 	const { projectDir, workId } = await fixture()

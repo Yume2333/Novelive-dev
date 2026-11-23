@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { arr, bool, obj, str } from '@earendil-works/pi-schema'
+import sharp from 'sharp'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { Project } from '../../packages/creator/src/project'
 import { createReplayFetch } from '../../packages/creator/src/replay'
@@ -1456,6 +1457,75 @@ test('deduplication retains the first addition and the first competing identity 
 		]),
 	)
 })
+
+test.each(['whole', 'events'] as const)(
+	'%s synthesis publishes only style references to actual project images',
+	async (strategy) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const reference = { path: 'assets/style.png', description: 'Style image' }
+		await project.writeFile(
+			reference.path,
+			await sharp({
+				create: { width: 2, height: 2, channels: 3, background: 'blue' },
+			})
+				.png()
+				.toBuffer(),
+		)
+		await project.writeFile('assets/not-an-image.png', 'Not an image')
+		const style = {
+			id: 'layout',
+			status: 'candidate',
+			description: 'Plain layout',
+			references: [
+				{ path: 'ch0001', description: 'Chapter, not an image' },
+				reference,
+				{ path: 'assets/not-an-image.png', description: 'Non-image file' },
+			],
+		} as const
+		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+			const { messages } = await new Request(input, init).json()
+			const positions = candidatePositions(messages[0].content)
+			if (positions) return stream({ keep: positions })
+			return stream({
+				overview: 'A minimal fixture.',
+				chapters: chapters.map((chapterId) => ({ chapterId, progress: 'End' })),
+				biblePatch: [{ kind: 'style', op: 'add', entry: style }],
+				glossaryPatch: [],
+				...(strategy === 'events' && { event: 'One event', is_last: true }),
+			})
+		})
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+		try {
+			const args = { ...options, strategy, fetch }
+			const result = await synthesizeVolume(project, 'v1', chapters, args)
+			const accepted = { ...style, references: [reference] }
+			expect(result.biblePatch).toMatchObject([{ entry: accepted }])
+			expect((await readBible(project)).style).toContainEqual(accepted)
+			expect(warn).toHaveBeenCalledWith(
+				'Dropped invalid style image reference',
+				{
+					index: 0,
+					reason: 'not an existing project file',
+				},
+			)
+			expect(warn).toHaveBeenCalledWith(
+				'Dropped invalid style image reference',
+				{
+					index: 2,
+					reason: 'not a readable image',
+				},
+			)
+			fetch.mockClear()
+			expect(await synthesizeVolume(project, 'v1', chapters, args)).toEqual(
+				result,
+			)
+			expect(fetch).not.toHaveBeenCalled()
+		} finally {
+			warn.mockRestore()
+		}
+	},
+)
 
 test('consolidated style references prioritize the latest repeat before applying the image cap', async () => {
 	await seed(root)
