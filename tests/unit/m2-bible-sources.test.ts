@@ -406,3 +406,42 @@ test('independent conflicts from one synthesis can both be approved sequentially
 		await service.close()
 	}
 })
+
+test('chapter-scoped synthesis conflicts cannot replace global facts but can be rejected', async () => {
+	const result = await publish()
+	result.conflicts[0].observedChapter = ref.chapterId
+	await project.write(file, result)
+	const first = await getBible(project, input)
+	const proposal = first.proposalIds
+		.map(
+			(id) => new ChatStore(project.database, ref.workId).proposal(id).proposal,
+		)
+		.find(({ payload }) => payload.kind === 'bible')
+	if (!proposal) throw new Error('Missing chapter-scoped conflict')
+	const before = await readBible(project)
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'stale' })
+		expect(await readBible(project)).toEqual(before)
+		expect(
+			await service.resolve(
+				{
+					...input,
+					proposalId: proposal.id,
+					decision: {
+						kind: 'reject',
+						reason: 'Do not change earlier chapters',
+					},
+				},
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'resolved', proposal: { status: 'rejected' } })
+	} finally {
+		await service.close()
+	}
+})

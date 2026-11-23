@@ -19,6 +19,16 @@ export function sourceRevision(value: unknown) {
 	return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
+export function proposalRestriction(payload: Payload): string | undefined {
+	if (payload.kind === 'bible') {
+		const scoped = payload.changes.find(
+			(change) => change.op !== 'none' && change.observedChapter,
+		)
+		if (scoped)
+			return `此候选限定于章节 ${scoped.observedChapter}，暂不支持按章应用；仅可拒绝，不能覆盖全局设定。`
+	}
+}
+
 export function fileFor(kind: Kind, id: string) {
 	switch (kind) {
 		case 'character':
