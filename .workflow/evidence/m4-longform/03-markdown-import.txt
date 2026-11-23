@@ -1,0 +1,32 @@
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-markdown.test.ts
+
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev
+
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  03:07:14
+   Duration  204ms (import 46%, tests 28%, transform 24%, worker 2%)
+
+$ pnpm exec tsx tests/fixtures/source/markdown/extract.ts tests/fixtures/source/markdown/multivolume.md
+风起之城 [zh-Hans]
+第一卷 风起
+  序章: 1 paragraphs, 3 notes
+  第一章 门: 5 paragraphs, 2 notes
+  第二章 路: 1 paragraphs, 0 notes
+第二卷 远行
+  第三章 海: 1 paragraphs, 1 notes
+  第四章 城: 1 paragraphs, 0 notes
+后记
+  后记: 1 paragraphs, 0 notes
+$ pnpm exec tsx tests/fixtures/source/markdown/extract.ts tests/fixtures/source/markdown/multivolume.atx.md
+风起之城 [zh-Hans]
+第一卷 风起
+  序章: 1 paragraphs, 3 notes
+  第一章 门: 5 paragraphs, 2 notes
+  第二章 路: 1 paragraphs, 0 notes
+第二卷 远行
+  第三章 海: 1 paragraphs, 1 notes
+  第四章 城: 1 paragraphs, 0 notes
+后记
+  后记: 1 paragraphs, 0 notes
