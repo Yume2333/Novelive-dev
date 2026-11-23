@@ -2,12 +2,12 @@ M4/10 handoff verification — PR #66
 
 Node 24.22.3, pnpm 12.21.0, Electron 45.4.1, Xvfb, Mesa software Vulkan (lavapipe).
 Strict replay in Electron; model transport synthetic or replayed. No paid requests.
-Verified code head: a7ce916.
+Verified production code through af1305c.
 
 $ VK_ICD_FILENAMES=…/lvp_icd.json NL_REPLAY=strict pnpm check
-Checked 350 files in 167ms. No fixes applied.
- Test Files  50 passed (50)
-      Tests  667 passed | 1 skipped (668)
+Checked 351 files in 162ms. No fixes applied.
+ Test Files  51 passed (51)
+      Tests  669 passed | 1 skipped (670)
 
 $ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 longform and queue'
   4 passed (1.6m)
@@ -23,5 +23,6 @@ The full suite reused the same Electron build as the gate.
 - W3: native quit with an active task posts shutdown and observes the real creator exit before Electron quits, without calling kill. A repeated quit request does not bypass this ordering. Reopening the same profile recovers the stopped work, clears the active task state, and lets an explicit continue publish chapter one.
 - Review regressions: crash-paused sequels require explicit continuation; automatic visual selection retains all selected references; a failed series append publishes no volumes and retries without duplicates; the import review preserves the displayed EPUB language, later DOCX covers remain selectable, and the legacy import command still uses TXT parsing.
 - Review follow-ups: cancellation at new-project registration rolls back the project and allows retry; an image-only DOCX title page retains its cover; resuming the first volume makes no sequel preparation requests until the sequel is explicitly resumed.
+- A crash-paused prerequisite without a digest blocks later-volume synthesis. Continuing the prerequisite supplies its digest to the later volume. A worker-command test verifies that failure of the second binding removes both the new project and the existing first binding.
 
 As before, the headless gate does not visually verify OS notification bubbles or a physical tray, or evaluate real model quality.

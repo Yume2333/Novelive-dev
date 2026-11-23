@@ -25,7 +25,7 @@ vi.mock(
 						if (registration.attempted.length === 2) {
 							const first = join(args[0], 'projects', registration.attempted[0])
 							expect(await readFile(first, 'utf8')).toBe(projectDir)
-						throw { code: 'invalid_config', message: 'Registration failed' }
+							throw { code: 'invalid_config', message: 'Registration failed' }
 						}
 						await service.remember(workId, projectDir)
 					},
