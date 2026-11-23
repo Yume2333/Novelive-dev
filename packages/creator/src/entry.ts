@@ -4,6 +4,12 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, extname, join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
+import {
+	getBible,
+	getBibleProposal,
+	openBibleProject,
+	resolveBibleProposal,
+} from './bible/editing'
 import { createConfigStore } from './config'
 import { type CreatorFrame, clientFrame, creatorCommandError } from './contract'
 import { createRegistry } from './registry'
@@ -156,6 +162,18 @@ async function productionSession(workId: string) {
 }
 
 registry.register('config.get', () => config.get())
+registry.register('bible.get', async (input) => {
+	using project = await openBibleProject(dataDir, input.workId)
+	return await getBible(project, input)
+})
+registry.register('proposal.get', async ({ workId, proposalId }) => {
+	using project = await openBibleProject(dataDir, workId)
+	return getBibleProposal(project, workId, proposalId)
+})
+registry.register('proposal.resolve', async (input) => {
+	using project = await openBibleProject(dataDir, input.workId)
+	return await resolveBibleProposal(project, input)
+})
 registry.register('config.update', async (patch) => {
 	const value = await config.update(patch)
 	await (await production)?.refreshSettings()

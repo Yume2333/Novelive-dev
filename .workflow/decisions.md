@@ -905,3 +905,10 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Instead of:** 按行号覆盖或提交整章，把同意重写当作应用全文，推送无序的增量字符串，或另建存储。
 - **Because:** 保留原文和脚本定位，阻止过期更改覆盖新稿，并让后端、编辑器与 Agent 面板各自按同一接口实现。
 - **Decided by:** agent (m2-editor/01)
+
+## 2026-11-23 - 设定候选复用提议表与内容修订
+
+- **Decided:** M2 设定与术语共用系列设定内容的 SHA-256 修订；批准前比对，过期提议保持 pending 且不写入，仍可带理由拒绝。复用 proposal 与 asset 表，按工程串行处理设定提议。`bible.get` 的开放条目增加派生的 `occurrences`（章节 ID、原文段落 ID、引文），不写回设定文件。
+- **Instead of:** 新增设定候选表、独立修订表，或直接调用综合阶段的自动合并（会保留已确认冲突而不执行创作者的明确批准）。
+- **Because:** 不迁移 M2/01 数据库，保持现有文件为内容真源；跨设定集的保守失效比漏检新内容安全。M2/03 可调用 `applyBibleProposal`，由会话层保留 proposal 生命周期所有权；独立设定页面同时提供现有表的 resolve 入口。
+- **Decided by:** agent (m2-editor/04)
