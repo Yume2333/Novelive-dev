@@ -1,0 +1,26 @@
+M4 paid Electron smoke — 2026-11-23
+===================================
+App build: cb32053, merged main. Source: "The Fox and the Grapes",
+one fable from Aesop's Fables, translated by George Fyler Townsend,
+Project Gutenberg eBook #21. The harness imported it as one chapter.
+
+The real Electron app imported the book, produced live visual candidates,
+and accepted the selection through its visual confirmation screen. The
+local budget gate rejected a later request before it reached the relay:
+its conservative token reservation would have exceeded the 5M cap.
+Production used its normal placeholder fallback. SQLite recorded exactly
+one published chapter, ch0001, with placeholder=1. In a second Electron
+launch in strict replay mode without credentials, the confirmation page
+showed the chapter as published and the player rendered text and a canvas.
+This verifies publication and playback, not complete production artwork.
+
+Provider-measured usage, with no unmetered requests from this smoke:
+model                     calls   input   output   tokens   generated images
+deepseek-v4.1-flash           2     428     1996     2424                  0
+devin-swe-2                  18   24333    20661    44994                  0
+gpt-image-2.6-sunburst        4    4050     1692     5742                  4
+total                        24   28811    24349    53160                  4
+
+The shared ledger retains the prior 131,072-token W4 reservation unchanged.
+No book content, credentials, relay address, prompts, provider responses,
+or generated assets are included in this receipt.

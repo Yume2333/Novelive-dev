@@ -1,0 +1,9 @@
+date,model,calls,tokens,images,purpose
+2026-11-23,gemini-3.8-flash,8,85634,0,W4 preview usage measured from relay responses
+2026-11-23,devin-swe-2,26,237808,0,W4 synthesis usage measured from relay responses
+2026-11-23,gemini-3.8-flash,2,0,0,HTTP 401 before inference; released 150034 reserved tokens
+2026-11-23,devin-swe-2,0,0,0,Three local pilot cutoffs before relay dispatch; released 52158 reserved tokens
+2026-11-23,devin-swe-2,0,131072,0,Reservation only for one possibly interrupted request; relay usage unverified
+2026-11-23,deepseek-v4.1-flash,2,2424,0,M4 Electron smoke organizer and other fast work; input 428 output 1996
+2026-11-23,devin-swe-2,18,44994,0,M4 Electron smoke main writing and visual review; input 24333 output 20661
+2026-11-23,gpt-image-2.6-sunburst,4,5742,4,M4 Electron smoke generated images; input 4050 output 1692
