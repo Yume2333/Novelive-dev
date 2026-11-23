@@ -191,6 +191,7 @@ export const editorCommands = {
 			styles: arr(styleSchema),
 			glossary: arr(glossaryEntrySchema),
 			proposalIds: arr(text, { uniqueItems: true }),
+			proposalActions: map(obj({ canApprove: bool(), reason: opt(text) })),
 		}),
 	},
 } as const

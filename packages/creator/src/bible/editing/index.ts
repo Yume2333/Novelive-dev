@@ -2,16 +2,14 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { formatVersion, projectFiles } from '@novelive/format/model'
-import { ChatStore } from '../../chat/store'
+import { ChatStore, type ProposalSource } from '../../chat/store'
 import type { CommandInput, CommandOutput, Proposal } from '../../contract'
 import { Project } from '../../project'
 import { existing, readBible, validatePatch } from '../../synthesis/patch'
 import {
-	basesAreCurrent,
 	bridgeBibleSources,
 	fileFor,
-	proposalRestriction,
-	sourceIsCurrent,
+	proposalActionability,
 	sourceRevision,
 } from './sources'
 
@@ -135,6 +133,18 @@ export async function getBible(
 				? [proposal.id]
 				: []
 		})
+	const store = new ChatStore(project.database, input.workId)
+	const proposalActions = Object.fromEntries(
+		await Promise.all(
+			proposalIds.map(async (id) => {
+				const { proposal, source } = store.proposal(id)
+				return [
+					id,
+					await proposalActionability(project, proposal, bible, source),
+				]
+			}),
+		),
+	)
 	return {
 		revision: bibleRevision(bible),
 		characters: bible.character.map(locate),
@@ -145,6 +155,7 @@ export async function getBible(
 		styles: bible.style.map(locate),
 		glossary: bible.glossary.map(locate),
 		proposalIds,
+		proposalActions,
 	}
 }
 
@@ -175,18 +186,16 @@ function stalePrefixes(before: Bible, after: Bible) {
 
 async function apply(
 	project: Project,
-	workId: string,
+	proposal: Proposal,
 	payload: Payload,
-	bases?: { kind: string; id: string; revision: string }[],
+	source?: ProposalSource,
 ) {
 	const before = await readBible(project)
-	if (proposalRestriction(payload, before)) return false
 	if (
-		bases
-			? !basesAreCurrent(before, bases)
-			: bibleRevision(before) !== payload.expectedRevision
+		!(await proposalActionability(project, proposal, before, source)).canApprove
 	)
 		return false
+	const workId = proposal.workId
 	await workContext(project, workId, payload.volumeId)
 	const chapters = new Set<string>()
 	const series = await project.read(projectFiles.series)
@@ -281,8 +290,7 @@ export async function applyBibleProposal(
 			project.database,
 			proposal.workId,
 		).proposal(proposal.id)
-		if (source && !(await sourceIsCurrent(project, source))) return 'stale'
-		return (await apply(project, proposal.workId, payload, source?.bases))
+		return (await apply(project, proposal, payload, source))
 			? 'applied'
 			: 'stale'
 	})

@@ -343,6 +343,27 @@ test('legacy synthesis uses post-merge targeted bases instead of its pre-merge c
 		expect(
 			new ChatStore(project.database, ref.workId).proposal(id).proposal.payload,
 		).toMatchObject({ expectedRevision: first.revision })
+	const service = chat()
+	try {
+		for (const id of first.proposalIds) {
+			const { proposal } = new ChatStore(project.database, ref.workId).proposal(
+				id,
+			)
+			if (
+				proposal.payload.kind === 'bible' &&
+				proposal.payload.changes.some(({ kind }) => kind === 'style')
+			)
+				continue
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject({ status: 'resolved', proposal: { status: 'approved' } })
+		}
+	} finally {
+		await service.close()
+	}
 })
 
 test('an unfinished replacement checkpoint cannot rebase previously bridged target snapshots', async () => {
@@ -418,6 +439,10 @@ test('chapter-scoped synthesis conflicts cannot replace global facts but can be 
 		)
 		.find(({ payload }) => payload.kind === 'bible')
 	if (!proposal) throw new Error('Missing chapter-scoped conflict')
+	expect(first.proposalActions[proposal.id]).toMatchObject({
+		canApprove: false,
+		reason: expect.stringContaining('暂不支持按章应用'),
+	})
 	const before = await readBible(project)
 	const service = chat()
 	try {
@@ -474,6 +499,10 @@ test('relation conflicts with unpublished character dependencies cannot be appro
 				payload.changes.some(({ kind }) => kind === 'relation'),
 		)
 	if (!proposal) throw new Error('Missing relation conflict')
+	expect(first.proposalActions[proposal.id]).toMatchObject({
+		canApprove: false,
+		reason: expect.stringContaining('依赖角色尚未登记'),
+	})
 	const before = await readBible(project)
 	const service = chat()
 	try {

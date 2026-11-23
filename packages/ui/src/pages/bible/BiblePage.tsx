@@ -224,11 +224,12 @@ function Candidate({
 					op: 'update' as const,
 					entry,
 				}))
-	const stale = payload.expectedRevision !== bible.revision
+	const action = bible.proposalActions[proposal.id]
+	const stale = !action.canApprove
 	return (
 		<article className={styles.card} aria-label={proposal.prompt}>
 			<h3>{proposal.prompt}</h3>
-			<p>{stale ? '候选已过期，请重新提出；已确认内容保持不变。' : '待确认'}</p>
+			<p>{action.reason ?? '待确认'}</p>
 			{changes.map(({ kind, op, entry }) => {
 				const confirmed = (bible[collection[kind]] as Entry[]).find(
 					({ id }) => id === entry.id,

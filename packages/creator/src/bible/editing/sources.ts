@@ -98,6 +98,33 @@ export function basesAreCurrent(
 	)
 }
 
+export async function proposalActionability(
+	project: Project,
+	proposal: Proposal,
+	bible: Bible,
+	source?: ProposalSource,
+): Promise<{ canApprove: boolean; reason?: string }> {
+	const payload = proposal.payload
+	if (payload.kind !== 'bible' && payload.kind !== 'glossary')
+		return { canApprove: false, reason: '不是设定或术语候选。' }
+	if (source && !(await sourceIsCurrent(project, source)))
+		return {
+			canApprove: false,
+			reason: '候选来源已被替换或移除，请查看新的综合候选；仍可拒绝此候选。',
+		}
+	if (
+		source?.bases
+			? !basesAreCurrent(bible, source.bases)
+			: sourceRevision(bible) !== payload.expectedRevision
+	)
+		return {
+			canApprove: false,
+			reason: '候选已过期：目标条目已变更，请重新提出；已确认内容保持不变。',
+		}
+	const reason = proposalRestriction(payload, bible)
+	return reason ? { canApprove: false, reason } : { canApprove: true }
+}
+
 export async function bridgeBibleSources(
 	project: Project,
 	input: CommandInput<'bible.get'>,
