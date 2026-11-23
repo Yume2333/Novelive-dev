@@ -143,11 +143,18 @@ export class ArtProduction {
 		}
 	}
 
-	private async update(id: string, status: RegistryEntry['status']) {
+	private async update(
+		id: string,
+		status: RegistryEntry['status'],
+		mattingUnavailableIssue?: string,
+	) {
 		const registry = await this.registry()
 		const entry = registry.entries.find((item) => item.id === id)
 		if (!entry) throw new Error(`Unregistered asset: ${id}`)
 		entry.status = status
+		if (mattingUnavailableIssue)
+			entry.mattingUnavailableIssue = mattingUnavailableIssue
+		else delete entry.mattingUnavailableIssue
 		await this.persistRegistry(registry)
 	}
 
@@ -186,6 +193,7 @@ export class ArtProduction {
 	async savePlaceholder(
 		id: string,
 		issue: string,
+		reason?: 'matting_unavailable',
 	): Promise<Extract<ImageJobResult, { status: 'placeholder' }>> {
 		const entry = (await this.registry()).entries.find((item) => item.id === id)
 		if (!entry) throw new Error(`Unregistered asset: ${id}`)
@@ -198,8 +206,10 @@ export class ArtProduction {
 		const bytes = await placeholder(family)
 		this.options.signal?.throwIfAborted()
 		await this.project.writeFile(entry.path, bytes)
-		await this.saveStatus(entry.id, 'placeholder')
-		return { status: 'placeholder', issue }
+		await this.writeRegistry(() =>
+			this.update(entry.id, 'placeholder', reason ? issue : undefined),
+		)
+		return { status: 'placeholder', issue, ...(reason ? { reason } : {}) }
 	}
 
 	redraw(
@@ -229,6 +239,7 @@ export class ArtProduction {
 			)
 			await recordProfile(this.project, entry.path, profile)
 			entry.status = 'drawn'
+			delete entry.mattingUnavailableIssue
 			await this.persistRegistry(registry)
 			return entry.path
 		})
@@ -247,7 +258,13 @@ export class ArtProduction {
 		if (!entry) throw new Error(`Unregistered asset: ${job.assetId}`)
 		if (!redraw && (await this.file(entry.path))) {
 			if (entry.status === 'placeholder')
-				return { status: 'placeholder', issue: '需要处理：此前绘制失败。' }
+				return entry.mattingUnavailableIssue
+					? {
+							status: 'placeholder',
+							issue: entry.mattingUnavailableIssue,
+							reason: 'matting_unavailable',
+						}
+					: { status: 'placeholder', issue: '需要处理：此前绘制失败。' }
 			if (entry.status === 'pending') await this.saveStatus(entry.id, 'drawn')
 			return { status: 'drawn' }
 		}
@@ -366,10 +383,13 @@ export class ArtProduction {
 		})
 		if ('issue' in result) {
 			if ('reason' in result) {
-				const fallback = redraw
-					? ({ status: 'placeholder', issue: result.issue } as const)
-					: await this.savePlaceholder(entry.id, result.issue)
-				return { ...fallback, reason: result.reason }
+				return redraw
+					? {
+							status: 'placeholder',
+							issue: result.issue,
+							reason: result.reason,
+						}
+					: this.savePlaceholder(entry.id, result.issue, result.reason)
 			}
 			return result.unsupported || redraw
 				? {
@@ -853,8 +873,10 @@ export class ArtProduction {
 					destination,
 					profiles[path]?.profile ?? this.resizeProfile(),
 				)
-				if (existing) existing.status = 'drawn'
-				else
+				if (existing) {
+					existing.status = 'drawn'
+					delete existing.mattingUnavailableIssue
+				} else
 					registry.entries.push({
 						id,
 						path: destination,
