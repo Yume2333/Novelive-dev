@@ -20,8 +20,6 @@ const textProperties = new Set([
 	'text-emphasis-color',
 	'text-emphasis-style',
 	'text-shadow',
-	'transform',
-	'transform-origin',
 	'word-spacing',
 ])
 const ruleSyntax = /[{}@\\<>]|\/\*/
@@ -36,8 +34,6 @@ export const glyphProperties = new Set([
 	'text-decoration-line',
 	'text-decoration-style',
 	'text-decoration-thickness',
-	'transform',
-	'transform-origin',
 ])
 
 type Declaration = [property: string, value: string, priority: string]

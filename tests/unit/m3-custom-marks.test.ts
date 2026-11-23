@@ -5,13 +5,12 @@ test('custom mark declarations preserve text styles and CSS priority', () => {
 	expect(
 		markDeclarations(
 			'glow',
-			'COLOR: #ffa !important; color: red; text-shadow: 0 0 4px #99f; transform: translateY(-0.1em); background: gold;',
+			'COLOR: #ffa !important; color: red; text-shadow: 0 0 4px #99f; background: gold;',
 		),
 	).toEqual([
 		['color', '#ffa', 'important'],
 		['color', 'red', ''],
 		['text-shadow', '0 0 4px #99f', ''],
-		['transform', 'translateY(-0.1em)', ''],
 		['background-color', 'gold', ''],
 	])
 })
@@ -29,7 +28,7 @@ test('custom marks cannot set layout, reveal, resources, or variable references'
 	expect(
 		markDeclarations(
 			'unsafe',
-			'position: fixed; visibility: visible !important; --url: red; color: var(--url); background: URL(https://invalid.test/); font-family: attr(data-mark); background-image: image-set("https://invalid.test/" 1x); opacity: 0.7;',
+			'position: fixed; transform: translateY(500px); transform-origin: center; visibility: visible !important; --url: red; color: var(--url); background: URL(https://invalid.test/); font-family: attr(data-mark); background-image: image-set("https://invalid.test/" 1x); opacity: 0.7;',
 		),
 	).toEqual([['opacity', '0.7', '']])
 })
