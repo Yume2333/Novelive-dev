@@ -602,3 +602,68 @@ test('production updates the effective asset and style owners without hiding art
 		`volumes/${joined.volumeId}/works/${joined.workId}/`,
 	)
 })
+
+test('visual candidate caches follow style ownership and remain shared for series styles', async () => {
+	using p = await project()
+	const works = [await joinSeries(p, book)]
+	works.push(await joinSeries(p, book), await joinSeries(p, book))
+	const workScope = (work: (typeof works)[number]) =>
+		({ level: 'work', volumeId: work.volumeId, workId: work.workId }) as const
+	const style = {
+		id: 's',
+		status: 'confirmed' as const,
+		description: 'Series style',
+	}
+	await p.write(projectFiles.style(series), {
+		formatVersion: 1,
+		entries: [style],
+	})
+	await p.write(projectFiles.style(workScope(works[0])), {
+		formatVersion: 1,
+		entries: [{ ...style, description: 'Work A style' }],
+	})
+	const prefix = projectFiles
+		.style(workScope(works[0]))
+		.path.replace('bible/style.json', '')
+	for (const i of [1, 2, 3]) {
+		await p.writeFile(
+			`candidates/style/visual-${i}.webp`,
+			Buffer.from('series candidate'),
+		)
+		await p.writeFile(
+			`${prefix}candidates/style/visual-${i}.webp`,
+			Buffer.from('work A candidate'),
+		)
+	}
+	const pools = []
+	for (const work of works) {
+		const { art } = await productionBible(p, work.volumeId, work.workId)
+		const service = new ArtProduction(p, {
+			readScope: workScope(work),
+			resolution: '2K',
+			main: connection,
+			fast: connection,
+			visual: connection,
+			image: {
+				baseUrl: 'https://relay.invalid/v1',
+				apiKey: 'offline',
+				model: 'fixture-image',
+				concurrency: 1,
+				retries: 0,
+				quality: 'low',
+				nativeMaxEdge: 1536,
+				postProcess: 'off',
+				upscaleTier: 'anime',
+			},
+		})
+		pools.push(await service.candidates(art, work.chapterIds))
+	}
+	expect(pools[0].mainVisuals.map(({ cachePath }) => cachePath)).toEqual(
+		[1, 2, 3].map((i) => `${prefix}candidates/style/visual-${i}.webp`),
+	)
+	expect(pools[1].mainVisuals).toEqual(pools[2].mainVisuals)
+	for (const { cachePath } of pools[0].mainVisuals)
+		expect((await p.readFile(cachePath)).toString()).toBe('work A candidate')
+	for (const { cachePath } of pools[1].mainVisuals)
+		expect((await p.readFile(cachePath)).toString()).toBe('series candidate')
+})

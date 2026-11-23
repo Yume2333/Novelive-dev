@@ -21,4 +21,5 @@ Check after: `NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.
 Review: skipped — 当前宿主未提供可创建独立审查 subagent 的工具；需协调者安排新上下文审查。
 后续接线：02–05 导入协调者将提取章节交给 joinSeries；保留新的 `source/imports/<volumeId>/original.*`，不调用旧的空工程导入布局。向导接线按本次范围明确不做。
 后续接线：07 在队列服务接入 prepareSeries 的 onReady，将当前卷立即交付制作；本任务不改 production.ts、scheduler/ 或导入器。目标语言沿用 work.language。
-审查修正：综合验证与提示词使用同一 scoped Bible；joinSeries 不接受设定补丁，补丁由后续增量综合产生。播放器响应契约无 CSS 字段，已去掉播放加载路径的无用 CSS 读取，CSS 解析 API 仍可供后续接线使用。
+审查修正：综合提示词使用 scoped Bible，验证使用发布目标的系列 Bible 加当前补丁；仅作品可见的引用触发修复，提示词明确要求先加入补丁。joinSeries 不接受设定补丁，补丁由后续增量综合产生。播放器响应契约无 CSS 字段，已去掉播放加载路径的无用 CSS 读取，CSS 解析 API 仍可供后续接线使用。
+后续审查验证：作品覆盖的素材与风格更新写回有效条目的所属层级；生产入口读取作品有效风格进行确认（production.ts 仅两处 Bible 读取接线，无队列修改）。候选图缓存按有效风格所属层级隔离，系列风格仍共享缓存。最新任务集成及 art、production-worker、production-contract、player 共 5 files / 37 tests 通过；前轮含 synthesis/writer/revisions 等共 9 files / 118 tests 通过；typecheck、lint 成功。

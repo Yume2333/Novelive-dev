@@ -470,6 +470,15 @@ export class ArtProduction {
 		creatorMainVisual?: string,
 		supplemental: Candidate[] = [],
 	): Promise<VisualCandidates> {
+		const styleScope = await entryOwner(
+			this.project,
+			this.options.readScope ?? this.scope,
+			this.scope,
+			projectFiles.style,
+			bible.style.id,
+		)
+		const cachePath = (path: string) =>
+			projectFiles.style(styleScope).path.replace('bible/style.json', path)
 		const candidate = async (
 			id: string,
 			drawing: Drawing,
@@ -504,7 +513,7 @@ export class ArtProduction {
 								characters: [],
 								keep: [],
 							},
-							this.scoped(`candidates/style/${id}.webp`),
+							cachePath(`candidates/style/${id}.webp`),
 						),
 			)
 		}
@@ -534,7 +543,7 @@ export class ArtProduction {
 								characters: [character],
 								keep: [],
 							},
-							this.scoped(
+							cachePath(
 								`candidates/characters/${character.id}/${costume.id}/${id}.webp`,
 							),
 							true,
