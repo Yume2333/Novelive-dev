@@ -180,10 +180,23 @@ export async function extractDocx(
 		let archived: string[] = []
 		let pendingNotes: string[] = []
 		const flush = () => {
-			const parsed = parseTxt(lines.join('\n\n'), { rules: [] }).volumes[0]
+			const protectedLines = new Map<string, string>()
+			const input = lines.map((line, index) => {
+				if (
+					!/(?:https?:\/\/|www\.)\S+/i.test(line) ||
+					/^(?:https?:\/\/|www\.)\S+$/i.test(line)
+				)
+					return line
+				const token = `DOCXURLPARAGRAPH${index}`
+				protectedLines.set(token, line)
+				return token
+			})
+			const parsed = parseTxt(input.join('\n\n'), { rules: [] }).volumes[0]
 				.chapters
 			for (const [index, chapter] of parsed.entries()) {
-				const paragraphs = chapter.paragraphs.map((p) => p.text)
+				const paragraphs = chapter.paragraphs.map(
+					(p) => protectedLines.get(p.text) ?? p.text,
+				)
 				const notes = [...chapter.notes, ...(index === 0 ? archived : [])]
 				if (!paragraphs.length) {
 					pendingNotes.push(...notes)

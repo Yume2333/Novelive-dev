@@ -29,6 +29,12 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 }
 
 describe('DOCX extraction', () => {
+	test('retains dialogue containing a URL', async () => {
+		const text = '他说：“打开 https://example.com 看看。”'
+		const book = await extract(p(text))
+		expect(book.volumes[0].chapters[0].paragraphs).toEqual([text])
+		expect(book.volumes[0].chapters[0].notes).toEqual([])
+	})
 	test('maps heading levels to volumes/chapters and retains ordered run/table text', async () => {
 		const book = await extract(
 			p('引言。') +
