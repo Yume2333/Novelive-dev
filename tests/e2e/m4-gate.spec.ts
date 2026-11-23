@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import {
 	mkdir,
 	mkdtemp,
@@ -121,6 +122,112 @@ async function launch(root: string, production = false) {
 }
 
 test.describe('M4 longform and queue', () => {
+	test('W3 native quit drains the real creator with an active production job', async () => {
+		test.setTimeout(60_000)
+		const root = await mkdtemp(join(homedir(), '.m4-gate-quit-'))
+		const receipt = join(root, 'shutdown.log')
+		const projects = join(root, 'projects')
+		await mkdir(projects)
+		await writeFile(join(root, '纸船.txt'), first)
+		const { app, page } = await launch(root, true)
+		const desktopProcess = app.process()
+		try {
+			await app.evaluate(({ app, utilityProcess }, path) => {
+				const fs = process.getBuiltinModule('fs')
+				const record = (value: string) => fs.appendFileSync(path, `${value}\n`)
+				const fork = utilityProcess.fork
+				utilityProcess.fork = (...args) => {
+					const worker = fork(...args)
+					const send = worker.postMessage.bind(worker)
+					worker.postMessage = (message, ports) => {
+						if (message?.type === 'shutdown') {
+							record('shutdown')
+							app.quit()
+						}
+						return send(message, ports)
+					}
+					const kill = worker.kill.bind(worker)
+					worker.kill = () => {
+						record('kill')
+						return kill()
+					}
+					worker.once('exit', (code) => record(`worker-exit:${code}`))
+					return worker
+				}
+				app.on('will-quit', () => record('app-quit'))
+			}, receipt)
+			const before = await page.evaluate(() => window.novelive.host.appState())
+			await page.evaluate(() => window.novelive.host.restartCreator())
+			await expect
+				.poll(
+					async () =>
+						(await page.evaluate(() => window.novelive.host.appState()))
+							.generation,
+				)
+				.toBeGreaterThan(before.generation)
+			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await call(page, 'config.update', configuration)
+			await importBook(app, page, join(root, '纸船.txt'), projects)
+			await page.getByRole('button', { name: '跳过核对' }).click()
+			const project = join(projects, '纸船')
+			const {
+				workIds: [workId],
+			} = await json(join(project, 'volumes/v0001/volume.json'))
+			await page.evaluate((id) => {
+				location.hash = `/work/${id}/confirm/visual`
+			}, workId)
+			const choices = page
+				.getByRole('group', { name: '主视觉', exact: true })
+				.getByRole('radio')
+			await expect(choices).toHaveCount(3, { timeout: 30_000 })
+			await app.evaluate(({ dialog }, path) => {
+				dialog.showMessageBox = async (
+					first: Electron.BaseWindow | Electron.MessageBoxOptions,
+					second?: Electron.MessageBoxOptions,
+				) => {
+					const options = 'message' in first ? first : second
+					process
+						.getBuiltinModule('fs')
+						.appendFileSync(
+							path,
+							`${options?.buttons?.[1] ?? 'unexpected-prompt'}\n`,
+						)
+					return { response: 1, checkboxChecked: false }
+				}
+			}, receipt)
+			await choices.first().check()
+			await page.getByRole('button', { name: '确认并制作第一章' }).click()
+			using db = new DatabaseSync(join(project, 'project.db'), {
+				readOnly: true,
+			})
+			await expect
+				.poll(
+					() =>
+						db
+							.prepare(
+								"SELECT count(*) AS n FROM task WHERE status = 'running'",
+							)
+							.get()?.n,
+				)
+				.toBeGreaterThan(0)
+			const exited = once(desktopProcess, 'exit')
+			await app.evaluate(({ app }) => {
+				setImmediate(() => app.quit())
+			})
+			expect(await exited).toEqual([0, null])
+			expect(await readFile(receipt, 'utf8')).toBe(
+				'停止并退出\nshutdown\nworker-exit:0\napp-quit\n',
+			)
+		} finally {
+			if (
+				desktopProcess.exitCode === null &&
+				desktopProcess.signalCode === null
+			)
+				await app.close()
+			await rm(root, { recursive: true, force: true })
+		}
+	})
+
 	test('W1 five formats, EPUB fallback, notes, manual illustrations and scanned PDF', async () => {
 		test.setTimeout(90_000)
 		const root = await mkdtemp(join(homedir(), '.m4-gate-formats-'))

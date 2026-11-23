@@ -18,6 +18,7 @@ import { installNotifications } from './notifications'
 import { installLifecycle } from './tray'
 
 let creator: Electron.UtilityProcess | undefined
+let creatorDraining = false
 let generation = 0
 let state: HostState['creator'] = 'down'
 let library: BrowserWindow | undefined
@@ -71,8 +72,21 @@ function stopCreator() {
 	worker?.kill()
 }
 
+async function drainCreator() {
+	creatorDraining = true
+	const worker = creator
+	creator = undefined
+	if (!worker) return
+	await new Promise<void>((resolve) => {
+		worker.once('exit', () => resolve())
+		worker.postMessage({ type: 'shutdown', generation })
+	})
+	keepAwake(false)
+}
+
 function startCreator(window: BrowserWindow) {
-	if (failures >= failureLimit || window.isDestroyed()) return
+	if (creatorDraining || failures >= failureLimit || window.isDestroyed())
+		return
 	stopCreator()
 	generation += 1
 	state = 'starting'
@@ -168,9 +182,9 @@ app.whenReady().then(async () => {
 	lifecycle = installLifecycle({
 		window: () => library,
 		active: () => blocker !== undefined,
-		cleanup: () => {
+		cleanup: async () => {
 			closeNotifications?.()
-			stopCreator()
+			await drainCreator()
 		},
 	})
 	closeNotifications = installNotifications(() => library, lifecycle.show)

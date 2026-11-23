@@ -192,7 +192,7 @@ const events = new EventReplay()
 // persisted chapter records with new seqs; clients must reset afterSeq when the
 // creator generation changes.
 let eventSeq = 0
-let closingChat = false
+let closing = false
 
 function publish(envelope: EventEnvelope) {
 	envelope.seq = ++eventSeq
@@ -236,7 +236,7 @@ async function openChat(workId: string) {
 }
 
 async function getChat(workId: string) {
-	if (closingChat) throw { code: 'cancelled', message: '创作端正在关闭' }
+	if (closing) throw { code: 'cancelled', message: '创作端正在关闭' }
 	let opening = chats.get(workId)
 	if (!opening) {
 		opening = openChat(workId)
@@ -278,6 +278,7 @@ function loadProduction() {
 }
 
 function getProduction() {
+	if (closing) throw { code: 'cancelled', message: '创作端正在关闭' }
 	production ??= loadProduction()
 	return production
 }
@@ -457,8 +458,10 @@ parent.once('message', ({ ports }) => {
 	const [port] = ports
 	sendEvent = (frame) => port.postMessage(frame)
 	const pending = new Map<number, AbortController>()
+	const requests = new Set<Promise<void>>()
+	let draining: Promise<void> | undefined
 
-	port.on('message', async ({ data }) => {
+	async function handle(data: unknown) {
 		if (!clientFrame.check(data)) {
 			console.error('Invalid creator command frame')
 			return
@@ -493,29 +496,44 @@ parent.once('message', ({ ports }) => {
 			pending.delete(requestId)
 			port.postMessage(response)
 		}
+	}
+
+	port.on('message', ({ data }) => {
+		if (draining) return
+		const request = handle(data).finally(() => requests.delete(request))
+		requests.add(request)
 	})
-	port.once('close', () => {
+	function drain() {
+		draining ??= shutdown()
+		return draining
+	}
+	async function shutdown() {
 		sendEvent = undefined
-		closingChat = true
-		for (const opening of chats.values())
-			void opening
-				.then(async ({ chat, project }) => {
-					await chat.close()
-					project.close()
-				})
-				.catch(() => {})
+		closing = true
 		for (const controller of pending.values()) controller.abort()
 		pending.clear()
-		void production?.then((session) => session.close())
-		for (const session of editorWorks.values()) {
-			void session
-				.then(async ({ project }) => {
-					const { withProjectEdits } = await import('./editor/history')
-					await withProjectEdits(project, async () => project.close())
-				})
-				.catch(() => {})
-		}
+		await Promise.allSettled([
+			...requests,
+			production?.then((session) => session.close()),
+			...[...chats.values()].map(async (opening) => {
+				const { chat, project } = await opening
+				await chat.close()
+				project.close()
+			}),
+		])
+		await Promise.allSettled(
+			[...editorWorks.values()].map(async (session) => {
+				const { project } = await session
+				const { withProjectEdits } = await import('./editor/history')
+				await withProjectEdits(project, async () => project.close())
+			}),
+		)
 		editorWorks.clear()
+	}
+	port.once('close', () => void drain())
+	parent.on('message', ({ data }) => {
+		if (data?.type !== 'shutdown' || data.generation !== generation) return
+		void drain().then(() => process.exit(0))
 	})
 	port.start()
 	parent.postMessage({ type: 'ready', generation })

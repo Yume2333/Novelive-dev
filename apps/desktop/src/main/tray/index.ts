@@ -38,7 +38,7 @@ async function linuxTrayAvailable() {
 export function installLifecycle(options: {
 	window(): BrowserWindow | undefined
 	active(): boolean
-	cleanup(): void
+	cleanup(): void | Promise<void>
 }) {
 	let quitting = false
 	let prompting = false
@@ -66,8 +66,8 @@ export function installLifecycle(options: {
 				})
 				if (response !== 1) return
 			}
+			await options.cleanup()
 			quitting = true
-			options.cleanup()
 			tray?.destroy()
 			app.quit()
 		} finally {
