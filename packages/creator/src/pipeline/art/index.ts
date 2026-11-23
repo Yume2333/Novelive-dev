@@ -83,11 +83,12 @@ const auditSchema = obj({
 })
 const contentSchema = obj({ content: str({ minLength: 1 }) })
 
-function omitStyleFromGeneration(drawing: Drawing) {
-	return (
-		drawing.kind === 'character' &&
-		!drawing.references.some(({ role }) => role === 'identity')
-	)
+function generationReferenceFilter(drawing: Drawing) {
+	const useStyle =
+		drawing.kind !== 'character' ||
+		drawing.references.some(({ role }) => role === 'identity')
+	return ({ role }: Drawing['references'][number]) =>
+		useStyle || role !== 'style'
 }
 
 async function auditPreview(png: Buffer) {
@@ -544,16 +545,14 @@ export class ArtProduction {
 			}),
 		)
 		const auditDrawing = { ...drawing, references }
-		const omitStyle = omitStyleFromGeneration(auditDrawing)
-		const refs = omitStyle
-			? auditRefs.filter((_, index) => references[index].role !== 'style')
-			: auditRefs
-		const promptDrawing = omitStyle
-			? {
-					...drawing,
-					references: references.filter(({ role }) => role !== 'style'),
-				}
-			: auditDrawing
+		const forGeneration = generationReferenceFilter(auditDrawing)
+		const refs = auditRefs.filter((_, index) =>
+			forGeneration(references[index]),
+		)
+		const promptDrawing = {
+			...drawing,
+			references: references.filter(forGeneration),
+		}
 		const painter = derived
 			? this.options.fast
 			: transparent
@@ -815,7 +814,10 @@ export class ArtProduction {
 						fallback ??= { id, cachePath: fallbackPath }
 						return false
 					}
-					const mode = drawing.references.length ? budget.edit : budget.generate
+					const usesEdit = drawing.references.some(
+						generationReferenceFilter(drawing),
+					)
+					const mode = usesEdit ? budget.edit : budget.generate
 					if (mode.matting.error && mode.opaqueStreak >= opaqueCandidateLimit)
 						return false
 					const result = await this.paint(

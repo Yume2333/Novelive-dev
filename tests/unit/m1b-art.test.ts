@@ -801,6 +801,87 @@ test('skips an isolated opaque RGBA candidate when matting is unavailable and re
 	}
 })
 
+test('style-only sprite candidates do not share the opaque-edit cutoff', async () => {
+	const opaque = await picture(320, 480, false)
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const portraitReferences: number[] = []
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, refs, _size, transparent) => {
+			if (!transparent) return { bytes: landscape }
+			portraitReferences.push(refs.length)
+			return {
+				bytes:
+					refs.length || portraitReferences.length === 2 ? opaque : portrait,
+			}
+		})
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: 'Ada' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay, undefined, undefined, undefined, 0)
+			const path = 'assets/style.png'
+			const illustration = 'source/references/illustration.png'
+			await project.writeFile(path, landscape)
+			await project.writeFile(illustration, landscape)
+			const [ada] = bible.characters
+			const pool = await art.candidates(
+				{
+					...bible,
+					style: {
+						...bible.style,
+						references: [{ path, description: 'Style' }],
+					},
+					characters: [
+						{
+							...ada,
+							costumes: [
+								...(ada.costumes ?? []),
+								{ id: 'coat', description: 'Coat' },
+							],
+						},
+					],
+				},
+				['c1'],
+				'assets/main.webp',
+				[],
+				new Map([['ada', { id: 'illustration', cachePath: illustration }]]),
+			)
+			expect(portraitReferences).toEqual([2, 0, 0, 0, 2, 0, 0, 0])
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [
+					{
+						costumeId: 'uniform',
+						candidates: [{ id: 'costume-2' }, { id: 'costume-3' }],
+					},
+					{
+						costumeId: 'coat',
+						candidates: [
+							{ id: 'costume-1' },
+							{ id: 'costume-2' },
+							{ id: 'costume-3' },
+						],
+					},
+				],
+			})
+		})
+	} finally {
+		renderer.mockRestore()
+		matte.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('keeps a reviewed transparent fallback when later opaque responses exhaust the budget', async () => {
 	const rgb = await picture(320, 480, false)
 	const rgba = await sharp(rgb).ensureAlpha().png().toBuffer()
