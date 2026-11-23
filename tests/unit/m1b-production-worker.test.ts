@@ -22,7 +22,10 @@ import {
 	productionModels,
 } from '../../packages/creator/src/project/production-worker'
 import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
-import { SpendBudgetError } from '../../packages/creator/src/usage/spend'
+import {
+	quoteSpend,
+	SpendBudgetError,
+} from '../../packages/creator/src/usage/spend'
 import { bible } from '../fixtures/cassettes/m1b-art/fixture'
 import { configuration, original } from '../fixtures/cassettes/m1b-gate/fixture'
 import { ScriptedWorker } from '../fixtures/scheduler/m1b/worker'
@@ -557,7 +560,7 @@ test('recording resumes an image budget pause at visual review after reopening t
 					!allowReview
 				)
 					throw new SpendBudgetError('超出工程预算')
-				return send(request)
+				return send(request, await quoteSpend(request))
 			},
 			async fetch(input, init) {
 				const request = new Request(input, init)
@@ -673,52 +676,62 @@ test('recording dispatches identical image requests for distinct editor candidat
 				width: 64,
 				height: 36,
 				channels: 3,
-				background: images.length === 1 ? 'red' : 'blue',
+				background: ['red', 'blue', 'green', 'yellow'][images.length - 1],
 			},
 		})
 			.png()
 			.toBuffer()
 		return Response.json({ data: [{ b64_json: png.toString('base64') }] })
 	}
-	const production = createProduction(
-		directory,
-		config,
-		{
-			mode: 'record',
-			directory: join(directory, 'cassettes'),
-			reuseRecorded: true,
-			fetch,
-		},
-		() => {},
-		() => {},
-	)
-	try {
-		await production.remember(workId, projectDir)
-		const session = await production.get(workId)
-		const revisions = new CreativeRevisions(
-			session.project,
-			workId,
-			new ProjectEditor(session.project, 'v0001', workId),
-			session,
+	const recorded = join(directory, 'cassettes')
+	const regenerate = async (target: string, fallbackDirectory?: string) => {
+		const production = createProduction(
+			directory,
+			config,
+			{
+				mode: 'record',
+				directory: target,
+				fallbackDirectory,
+				reuseRecorded: true,
+				fetch,
+			},
+			() => {},
+			() => {},
 		)
-		const result = await revisions.regenerateImage({
-			workId,
-			assetId,
-			expectedRevision: await revisions.imageRevision(assetId),
-			count: 2,
-		})
-		if (result.status !== 'candidates') throw new Error('Expected candidates')
-		expect(images).toHaveLength(2)
-		expect(images[1]).toEqual(images[0])
-		const [first, second] = await Promise.all(
-			result.candidates.map(({ cachePath }) =>
-				session.project.readFile(cachePath),
-			),
-		)
-		expect(first.equals(second)).toBe(false)
-	} finally {
-		await production.close()
+		try {
+			await production.remember(workId, projectDir)
+			const session = await production.get(workId)
+			const revisions = new CreativeRevisions(
+				session.project,
+				workId,
+				new ProjectEditor(session.project, 'v0001', workId),
+				session,
+			)
+			const result = await revisions.regenerateImage({
+				workId,
+				assetId,
+				expectedRevision: await revisions.imageRevision(assetId),
+				count: 2,
+			})
+			if (result.status !== 'candidates') throw new Error('Expected candidates')
+			return await Promise.all(
+				result.candidates.map(({ cachePath }) =>
+					session.project.readFile(cachePath),
+				),
+			)
+		} finally {
+			await production.close()
+		}
 	}
+	const [first, second] = await regenerate(recorded)
+	expect(images).toHaveLength(2)
+	expect(images[1]).toEqual(images[0])
+	expect(first.equals(second)).toBe(false)
+	const [third, fourth] = await regenerate(join(directory, 'fresh'), recorded)
+	expect(images).toHaveLength(4)
+	expect(images.slice(2)).toEqual(images.slice(0, 2))
+	expect(third.equals(first)).toBe(false)
+	expect(third.equals(fourth)).toBe(false)
 })
 
 test('production records to NL_CASSETTE_DIR when no production directory is set', async () => {

@@ -129,7 +129,7 @@ export function chapterWorker(
 	replay?: ReplayOptions,
 ) {
 	const fetch = createReplayFetch(replay)
-	const art = (signal?: AbortSignal) =>
+	const art = (signal?: AbortSignal, artReplay = replay) =>
 		usageMethods(
 			new ArtProduction(project, {
 				main: models.main,
@@ -137,7 +137,7 @@ export function chapterWorker(
 				fast: models.fast,
 				visual: models.visual,
 				image: models.image,
-				replay,
+				replay: artReplay,
 				signal,
 				resolution: work.settings.outputResolution,
 				readScope: { level: 'work', volumeId, workId: work.workId },
@@ -497,7 +497,16 @@ export function chapterWorker(
 			const metadata =
 				(await existing(() => drawingMetadata(assetId))) ??
 				(await confirmedPortrait(assetId, bible))
-			return art(signal).redraw(metadata.job, bible, metadata.cg, target)
+			const redrawReplay =
+				(replay?.mode ?? process.env.NL_REPLAY) === 'record'
+					? { ...replay, fallbackDirectory: undefined, reuseRecorded: false }
+					: replay
+			return art(signal, redrawReplay).redraw(
+				metadata.job,
+				bible,
+				metadata.cg,
+				target,
+			)
 		},
 		adoptImage: (assetId: string, source: string) =>
 			art().adopt(assetId, source),
