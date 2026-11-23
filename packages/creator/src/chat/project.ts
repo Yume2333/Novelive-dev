@@ -1,18 +1,70 @@
 import { projectFiles } from '@novelive/format/model'
 import { applyBibleProposal, bibleRevision } from '../bible/editing'
 import type { createConfigStore } from '../config'
+import type { CreativeRevisions } from '../editor/revisions'
 import type { Project } from '../project'
 import type { ReplayOptions } from '../replay'
 import { readBible, validatePatch } from '../synthesis/patch'
 import { type ChatEvent, ChatService, type ProposalActions } from './index'
 
+const isStale = (error: unknown) =>
+	!!error &&
+	typeof error === 'object' &&
+	'code' in error &&
+	error.code === 'stale_revision'
+
 export function projectProposals(
 	project: Project,
 	workId: string,
+	revisions?: CreativeRevisions,
 ): ProposalActions {
 	return {
 		async prepare(intent, signal) {
 			signal.throwIfAborted()
+			if (
+				revisions &&
+				(intent.kind === 'rewriteScene' ||
+					intent.kind === 'redrawImage' ||
+					intent.kind === 'redoChapter')
+			) {
+				if (intent.kind === 'redrawImage')
+					return {
+						prompt: intent.reason,
+						chapterIds: [],
+						payload: {
+							kind: 'redrawImage',
+							assetId: intent.assetId,
+							expectedRevision: await revisions.imageRevision(intent.assetId),
+							...(intent.instruction
+								? { instruction: intent.instruction }
+								: {}),
+						},
+					}
+				const expectedRevision = await revisions.chapterRevision(
+					intent.chapterId,
+				)
+				return {
+					prompt: intent.reason,
+					chapterIds: [intent.chapterId],
+					payload:
+						intent.kind === 'redoChapter'
+							? {
+									kind: 'redoChapter',
+									chapterId: intent.chapterId,
+									expectedRevision,
+								}
+							: {
+									kind: 'rewriteScene',
+									request: {
+										workId,
+										chapterId: intent.chapterId,
+										sceneId: intent.sceneId,
+										instruction: intent.instruction,
+										expectedRevision,
+									},
+								},
+				}
+			}
 			if (intent.kind !== 'bible' && intent.kind !== 'glossary')
 				throw { code: 'unsupported', message: '此类提议的工程执行器尚未接通' }
 			const volume = await project.read(projectFiles.volume(intent.volumeId))
@@ -53,6 +105,44 @@ export function projectProposals(
 			signal.throwIfAborted()
 			if (proposal.workId !== workId)
 				throw { code: 'not_found', message: '提议不属于当前作品' }
+			const { payload } = proposal
+			if (
+				revisions &&
+				(payload.kind === 'rewriteScene' ||
+					payload.kind === 'redrawImage' ||
+					payload.kind === 'redoChapter')
+			) {
+				try {
+					if (payload.kind === 'rewriteScene')
+						return {
+							status: 'applied',
+							rewrite: await revisions.rewriteScene(payload.request, signal),
+						}
+					if (payload.kind === 'redrawImage')
+						await revisions.regenerateImage(
+							{
+								workId,
+								assetId: payload.assetId,
+								expectedRevision: payload.expectedRevision,
+								count: 1,
+								...(payload.instruction
+									? { instruction: payload.instruction }
+									: {}),
+							},
+							signal,
+						)
+					else
+						await revisions.redoChapter({
+							workId,
+							chapterId: payload.chapterId,
+							expectedRevision: payload.expectedRevision,
+						})
+					return { status: 'applied' }
+				} catch (error) {
+					if (isStale(error)) return { status: 'stale' }
+					throw error
+				}
+			}
 			if (
 				proposal.payload.kind !== 'bible' &&
 				proposal.payload.kind !== 'glossary'
@@ -70,6 +160,7 @@ export async function projectChat(
 	cacheDir: string,
 	replay: ReplayOptions | undefined,
 	emit: (event: ChatEvent) => void,
+	revisions?: CreativeRevisions,
 ) {
 	const series = await project.read(projectFiles.series)
 	let title: string | undefined
@@ -92,7 +183,7 @@ export async function projectChat(
 		cacheDir,
 		mainModel: () => config.resolveTextModel('main'),
 		summaryModel: () => config.resolveTextModel('fast'),
-		proposals: projectProposals(project, workId),
+		proposals: projectProposals(project, workId, revisions),
 		replay,
 		emit,
 	})

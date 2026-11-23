@@ -92,6 +92,35 @@ export class ProjectEditor {
 		})
 	}
 
+	/** Runs `run` under the edit lock only while the chapter still has `expectedRevision`. */
+	whileCurrent<T>(
+		input: { workId: string; chapterId: string; expectedRevision: string },
+		run: () => Promise<T>,
+	): Promise<T> {
+		return withProjectEdits(this.project, async () => {
+			this.checkWork(input.workId)
+			const model = await this.loadChapter(input.chapterId)
+			this.checkRevision(model.snapshot, input.expectedRevision)
+			return run()
+		})
+	}
+
+	/** The chapter snapshot with one scene compiled against the project's assets. */
+	compiledScene(input: CommandInput<'editor.open'>, sceneId: string) {
+		return withProjectEdits(this.project, async () => {
+			this.checkWork(input.workId)
+			const model = await this.loadChapter(input.chapterId)
+			const index = model.scripts.findIndex((s) => s.sceneId === sceneId)
+			if (index < 0) throw { code: 'not_found', message: '找不到场景。' }
+			const compiled = compileEditorScript(model.scripts, model.options)
+			return {
+				snapshot: model.snapshot,
+				scene: model.snapshot.scenes[index],
+				compiled: compiled[index].scene,
+			}
+		})
+	}
+
 	editLine(input: CommandInput<'editor.editLine'>): Promise<Snapshot> {
 		return withProjectEdits(this.project, async () => {
 			const editor = this.openEditor(input)
@@ -159,6 +188,46 @@ export class ProjectEditor {
 			editor.undo.pop()
 			editor.revision = snapshot.revision
 			return snapshot
+		})
+	}
+
+	replaceScene(
+		input: CommandInput<'editor.rewriteScene'>,
+		kind: string,
+		change: (nvs: string) => string,
+	): Promise<Snapshot> {
+		return withProjectEdits(this.project, async () => {
+			this.checkWork(input.workId)
+			const model = await this.loadChapter(input.chapterId)
+			this.checkRevision(model.snapshot, input.expectedRevision)
+			const scene = model.scripts.find(
+				({ sceneId }) => sceneId === input.sceneId,
+			)
+			if (!scene) throw { code: 'not_found', message: '找不到场景。' }
+			const nvs = change(scene.nvs)
+			compileEditorScript(
+				model.scripts.map((item) =>
+					item === scene ? { ...scene, nvs } : item,
+				),
+				model.options,
+			)
+			const { chapterId, sceneId } = input
+			await writeAuditedFile(
+				this.project,
+				projectFiles.scene(this.chapterRef(chapterId), sceneId),
+				scene.nvs,
+				nvs,
+				() =>
+					recordHistory(this.project, this.workId, {
+						origin: 'agent',
+						kind,
+						chapterId,
+						sceneId,
+						previous: scene.nvs,
+						next: nvs,
+					}),
+			)
+			return (await this.loadChapter(chapterId)).snapshot
 		})
 	}
 

@@ -284,6 +284,45 @@ export class ChapterScheduler {
 		return this.snapshot(workId)
 	}
 
+	redoChapter(workId: string, chapterId: string): ProductionSnapshot {
+		const task = this.get<TaskRow>(
+			"SELECT * FROM task WHERE work_id = ? AND kind = 'chapter' AND ref_id = ?",
+			workId,
+			chapterId,
+		)
+		if (!task) throw { code: 'not_found', message: '制作队列中找不到这一章' }
+		if (task.status === 'running')
+			throw { code: 'stale_revision', message: '这一章正在制作，请稍后重做' }
+		if (this.work(workId).status === 'awaiting_confirm')
+			throw { code: 'invalid_config', message: '请先处理确认点，再重做章节' }
+		this.transaction(() => {
+			this.exec(
+				`UPDATE task SET status = 'queued', phase = 'queued', attempts = 0, desensitized = 0,
+				error_type = NULL, priority = (SELECT MAX(priority) + 1 FROM task WHERE work_id = ? AND kind = 'chapter')
+				WHERE task_id = ?`,
+				workId,
+				task.task_id,
+			)
+			this.exec(
+				"UPDATE chapter SET flagged = 0, user_state = 'waiting' WHERE work_id = ? AND chapter_id = ?",
+				workId,
+				chapterId,
+			)
+			const work = this.work(workId)
+			if (work.status === 'done') this.requeueWork(workId)
+			else if (
+				work.reason === 'chapter_failed' &&
+				!this.get(
+					"SELECT 1 FROM task WHERE work_id = ? AND kind = 'chapter' AND status = 'needs_attention'",
+					workId,
+				)
+			)
+				this.resumeWork(workId)
+		})
+		this.pump()
+		return this.snapshot(workId)
+	}
+
 	snapshot(workId: string): ProductionSnapshot {
 		const work = this.work(workId)
 		const rows = this.all<{
@@ -481,7 +520,7 @@ export class ChapterScheduler {
 			JOIN asset a ON a.work_id = t.work_id AND a.asset_key = t.ref_id
 			LEFT JOIN asset b ON b.work_id = a.work_id AND b.asset_key = a.base_key
 			WHERE t.kind = 'image' AND t.status = 'queued' AND w.status IN ('active', 'awaiting_confirm')
-				AND (a.base_key IS NULL OR b.status IN ('drawn', 'placeholder'))
+				AND (a.base_key IS NULL OR b.status IN ('drawn', 'stale', 'placeholder'))
 			ORDER BY t.priority DESC, t.seq`,
 		)
 		for (const task of queued) {
