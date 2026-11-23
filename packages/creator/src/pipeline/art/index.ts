@@ -384,11 +384,7 @@ export class ArtProduction {
 		if ('issue' in result) {
 			if ('reason' in result) {
 				return redraw
-					? {
-							status: 'placeholder',
-							issue: result.issue,
-							reason: result.reason,
-						}
+					? { status: 'unsupported', issue: result.issue }
 					: this.savePlaceholder(entry.id, result.issue, result.reason)
 			}
 			return result.unsupported || redraw
