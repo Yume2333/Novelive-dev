@@ -52,7 +52,11 @@ function playbackCue(
 	if (line.id === undefined) throw new Error('编译后的台词或等待缺少 ID')
 	if (line.type === 'wait') return { kind: 'wait', lineId: line.id }
 	const { kind, speaker, alias, content } = line
-	const displayName = alias ?? (speaker && (speakerNames[speaker] ?? speaker))
+	const displayName =
+		alias ??
+		(speaker !== undefined && Object.hasOwn(speakerNames, speaker)
+			? speakerNames[speaker]
+			: speaker)
 	return {
 		kind: 'text',
 		position: { chapterId, sceneId, sentenceId: line.id },

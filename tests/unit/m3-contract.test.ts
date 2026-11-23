@@ -125,6 +125,26 @@ test('projects the compiled chapter without losing direction order, resolved ass
 	})
 })
 
+test('speaker IDs fall back to text when a name exists only on the map prototype', () => {
+	const compiled = compileScript(
+		'scene 夜\nsource p0001\nconstructor: 谁？ #0001',
+		{
+			paragraphIds: ['p0001'],
+			sceneIds: [sceneIds[0]],
+			assets: [],
+			speakers: ['constructor'],
+		},
+	)
+	if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics))
+	expect(toPlaybackBeats(chapterId, compiled.scenes, {})[0].cue).toMatchObject({
+		kind: 'text',
+		text: { speaker: 'constructor', displayName: 'constructor' },
+	})
+	expect(
+		toPlaybackBeats(chapterId, compiled.scenes, { constructor: '来客' })[0].cue,
+	).toMatchObject({ kind: 'text', text: { displayName: '来客' } })
+})
+
 test('save and cross-chapter history use sentence-addressed JSON snapshots with explicit restore strategies', () => {
 	const [{ actions, cue }] = chapterBeats()
 	if (cue.kind !== 'text') throw new Error('Expected dialogue cue')
