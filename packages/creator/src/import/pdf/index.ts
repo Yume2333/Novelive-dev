@@ -101,20 +101,20 @@ function mergeLines(lines: Line[]) {
 }
 
 function stripPageNumbers(lines: Line[]) {
-	const edges = lines.filter((line) => line.zone)
+	const sequences = new Map<string, Set<number>>()
+	const key = (line: Line) => `${line.zone}:${Number(line.text) - line.page}`
+	for (const line of lines) {
+		if (!line.zone || !/^\d+$/u.test(line.text)) continue
+		const sequence = sequences.get(key(line)) ?? new Set<number>()
+		sequence.add(line.page)
+		sequences.set(key(line), sequence)
+	}
 	return lines.filter((line) => {
-		if (!edges.includes(line)) return true
+		if (!line.zone) return true
 		if (/^(?:[-–—]\s*\d+\s*[-–—]|第\s*\d+\s*[页頁])$/u.test(line.text))
 			return false
 		if (!/^\d+$/u.test(line.text)) return true
-		return (
-			edges.filter(
-				(other) =>
-					/^\d+$/u.test(other.text) &&
-					other.zone === line.zone &&
-					Number(other.text) - other.page === Number(line.text) - line.page,
-			).length < 3
-		)
+		return (sequences.get(key(line))?.size ?? 0) < 3
 	})
 }
 

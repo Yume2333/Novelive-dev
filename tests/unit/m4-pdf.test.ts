@@ -8,6 +8,13 @@ import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
 
+test('handles a long sequence of zone folios without losing repeated body lines', async () => {
+	const result = await extractPdf(await fixture('many-folios'))
+	if (result.status !== 'ready') throw new Error('Expected text PDF')
+	expect(result.book.volumes[0].chapters).toHaveLength(1)
+	expect(result.book.volumes[0].chapters[0].paragraphs).toHaveLength(119)
+})
+
 test('keeps soft-wrapped note text together but closes the note at a page change', async () => {
 	const result = await extractPdf(await fixture('wrapped-notes'))
 	if (result.status !== 'ready') throw new Error('Expected text PDF')

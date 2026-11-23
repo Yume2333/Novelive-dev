@@ -49,6 +49,16 @@ function pdf(pages, image = false, cjk = false) {
 
 for (const [name, pages, image, cjk] of [
 	[
+		'many-folios',
+		Array.from({ length: 40 }, (_, i) => [
+			{ text: String(i + 10), y: 380 },
+			{ text: i === 0 ? 'Chapter 1' : 'A body sentence.', y: 326 },
+			{ text: 'More body prose.', y: 308 },
+			{ text: 'An ending.', y: 290 },
+		]),
+		false,
+	],
+	[
 		'wrapped-notes',
 		[
 			['Chapter 1', 'Body sentence.', '[1] A note begins', 'and continues'],
