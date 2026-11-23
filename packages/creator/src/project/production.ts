@@ -51,7 +51,9 @@ export function createProduction(
 		return {
 			...(mode === 'record' && !replay?.directory
 				? {
-						directory: join(project.root, '.novelive', 'production-cassettes'),
+						directory:
+							process.env.NL_CASSETTE_DIR ||
+							join(project.root, '.novelive', 'production-cassettes'),
 					}
 				: {}),
 			...replay,

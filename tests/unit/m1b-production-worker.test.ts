@@ -633,6 +633,45 @@ test('recording dispatches identical image requests for distinct editor candidat
 	}
 })
 
+test('production records to NL_CASSETTE_DIR when no production directory is set', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	const cassette = join(directory, 'general-cassette')
+	vi.stubEnv('NL_CASSETTE_DIR', cassette)
+	const { projectDir, workId } = await fixture()
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const fetch = vi
+		.fn<typeof globalThis.fetch>()
+		.mockImplementation(async () =>
+			Response.json(
+				{ error: { message: 'Fixture request rejected' } },
+				{ status: 400 },
+			),
+		)
+	const production = createProduction(
+		directory,
+		config,
+		{ mode: 'record', fetch },
+		() => {},
+		() => {},
+	)
+	try {
+		await production.remember(workId, projectDir)
+		await expect(production.get(workId)).rejects.toMatchObject({
+			code: 'invalid_config',
+		})
+		expect(fetch).toHaveBeenCalled()
+		const rows = (await readFile(join(cassette, 'cassette.jsonl'), 'utf8'))
+			.trim()
+			.split('\n')
+			.map((line) => JSON.parse(line))
+		expect(rows).toMatchObject([{ status: 400, path: '/v1/chat/completions' }])
+	} finally {
+		await production.close()
+	}
+})
+
 test('production refuses over-cap background preparation before the provider fetch', async () => {
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '0')
 	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
