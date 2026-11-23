@@ -127,30 +127,8 @@ function sameAction(a: string, b: string) {
 	return overlap >= 8 && (2 * overlap) / (left.size + right.size) >= 0.78
 }
 
-const mannerModifiers =
-	/(?<![\p{Script=Latin}\p{N}])(?:carefully|gently|quietly|silently|slowly|softly)(?![\p{Script=Latin}\p{N}])|小心地|輕輕地?|轻轻地?|悄悄地?|緩緩地?|缓缓地?|慢慢地?/gu
-
-function sameTimelineAction(a: string, b: string) {
-	const left = key(a)
-	const right = key(b)
-	if (
-		(left.startsWith(right) || right.startsWith(left)) &&
-		sameAction(left, right)
-	)
-		return true
-	const longer = (left.length > right.length ? a : b)
-		.normalize('NFKC')
-		.toLowerCase()
-	const shorter = left.length > right.length ? right : left
-	return (
-		!!shorter &&
-		[...longer.matchAll(mannerModifiers)].some(
-			({ 0: modifier, index }) =>
-				key(longer.slice(0, index) + longer.slice(index + modifier.length)) ===
-				shorter,
-		)
-	)
-}
+const timelineWording = (event: string) =>
+	event.normalize('NFKC').trim().replace(/\s+/gu, ' ')
 
 function normalizeNames(patch: BiblePatch, bible: Bible): BiblePatch {
 	const existingCharacters = names(bible.character)
@@ -415,9 +393,9 @@ export function canonicalizeAdditions(
 		const text =
 			item.kind === 'timeline' ? item.entry.event : item.entry.description
 		const participants = new Set<string>()
-		const action = characters.text(text, ({ id }) => {
+		const action = characters.text(text, ({ id, name }) => {
 			participants.add(id)
-			return ' '
+			return item.kind === 'timeline' ? name : ' '
 		})
 		const groupKey = JSON.stringify(
 			item.kind === 'relation'
@@ -438,9 +416,7 @@ export function canonicalizeAdditions(
 						(!prior.entry.storyTime ||
 							!item.entry.storyTime ||
 							prior.entry.storyTime === item.entry.storyTime) &&
-						(participants.size
-							? sameTimelineAction(action, previous)
-							: !!key(action) && key(action) === key(previous))) ||
+						timelineWording(action) === timelineWording(previous)) ||
 					(prior.kind === 'foreshadowing' &&
 						item.kind === 'foreshadowing' &&
 						(!prior.entry.resolvedChapter ||

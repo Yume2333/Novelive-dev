@@ -243,6 +243,7 @@ test('groups beats only within a chapter and preserves conflicting payoff or tim
 	const patch: BiblePatch = [
 		timeline('crossing', event, 'c1'),
 		timeline('echo', echo, 'c1', 'dawn'),
+		timeline('alias', event.replace('Ada Lin', 'Captain Lin'), 'c1', 'dawn'),
 		timeline('night', echo, 'c1', 'night'),
 		timeline('another-chapter', echo, 'c2'),
 		timeline(
@@ -266,6 +267,7 @@ test('groups beats only within a chapter and preserves conflicting payoff or tim
 	const result = canonicalizeAdditions(patch, bible, ['c1', 'c2', 'c3'])
 	expect(result.map(({ entry }) => entry.id)).toEqual([
 		'crossing',
+		'echo',
 		'night',
 		'another-chapter',
 		'reversed-roles',
@@ -274,9 +276,9 @@ test('groups beats only within a chapter and preserves conflicting payoff or tim
 		'later-payoff',
 	])
 	expect(result[0]).toMatchObject({
-		entry: { event: `${event} arrives`, chapterId: 'c1', storyTime: 'dawn' },
+		entry: { event, chapterId: 'c1', storyTime: 'dawn' },
 	})
-	expect(result[5]).toMatchObject({
+	expect(result[6]).toMatchObject({
 		entry: {
 			description: setup.replace('Captain Lin', 'Ada Lin'),
 			plantedChapter: 'c1',
@@ -296,8 +298,15 @@ test.each([
 		'文素臣輕輕扶田氏登舟渡河',
 		'文素臣不扶田氏登舟渡河',
 	],
+	['文素臣命田氏禁止发言', '文素臣命田氏禁止轻声发言', '文素臣命田氏发言'],
+	['文素臣命田氏禁止敲門', '文素臣命田氏禁止輕輕敲門', '文素臣命田氏敲門'],
+	[
+		'Ada Lin tells Mei Chen not to speak',
+		'Ada Lin tells Mei Chen not to speak quietly',
+		'Ada Lin tells Mei Chen to speak',
+	],
 ])(
-	'merges a manner modifier but not a changed outcome: %s',
+	'keeps distinct timeline wording, including differing qualifiers: %s',
 	(base, elaborated, changed) => {
 		const bible = {
 			...emptyBible,
@@ -324,7 +333,7 @@ test.each([
 		)
 		expect(
 			canonicalizeAdditions(patch, bible, ['c1']).map(({ entry }) => entry.id),
-		).toEqual(['beat-0', 'beat-2'])
+		).toEqual(['beat-0', 'beat-1', 'beat-2'])
 	},
 )
 
