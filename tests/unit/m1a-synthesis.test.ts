@@ -30,9 +30,17 @@ import {
 
 let directory: string
 let root: string
+const stream = (result: unknown) =>
+	new Response(
+		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+		{ headers: { 'content-type': 'text/event-stream' } },
+	)
 const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 	const body = await new Request(input, init).json()
 	const prompt: string = body.messages[0].content
+	const candidates = prompt.split('Candidates:\n')[1]
+	if (candidates !== undefined)
+		return stream({ keep: candidates.split('\n').map((_, i) => i + 1) })
 	const packet = /Extract only the next event in packet (\d+)\/(\d+)/.exec(
 		prompt,
 	)
@@ -338,9 +346,7 @@ test('consolidates repeated candidate additions across events and remaps referen
 			)
 			return sse({ keep: [1, 2] })
 		}
-		expect(body.messages[0].content).toContain(
-			'Never restate an already proposed entry',
-		)
+		expect(body.messages[0].content).toContain('Never restate a proposed entry')
 		const first = calls++ === 0
 		if (!first)
 			expect(body.messages[0].content).toContain(
@@ -2178,7 +2184,7 @@ test.each(['shifted', 'missing'])(
 		const expanded = ids.map((chapterId, index) => ({
 			...previews[0],
 			chapterId,
-			summary: 'A'.repeat(index < 2 ? 650 : 2120),
+			summary: 'A'.repeat(index < 2 ? 650 : 1700),
 		}))
 		await Promise.all(
 			expanded.map((preview) =>
@@ -2235,13 +2241,19 @@ test.each(['shifted', 'missing'])(
 			strategy: 'events',
 			fetch: packetFetch,
 		})
-		expect(packetFetch).toHaveBeenCalledTimes(2)
-		const prompts = await Promise.all(
+		const contents = await Promise.all(
 			packetFetch.mock.calls.map(async ([input, init]) => {
 				const { messages } = await new Request(input, init).json()
-				const packet = String(messages[0].content).split(
-					'Chapter previews:\n',
-				)[1]
+				return String(messages[0].content)
+			}),
+		)
+		const extractions = contents.filter((content) =>
+			content.includes('Chapter previews:\n'),
+		)
+		expect(extractions).toHaveLength(2)
+		const prompts = await Promise.all(
+			extractions.map(async (content) => {
+				const packet = content.split('Chapter previews:\n')[1]
 				return Array.from(
 					new Set(
 						Array.from(

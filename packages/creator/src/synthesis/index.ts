@@ -628,7 +628,7 @@ ${nextEvent.instructions}`
 		const packet = state.packet
 		const event = await request(
 			`${eventPrompt}
-Extract only the next event in packet ${packet + 1}/${packets.length}. For its chapters, include progress and exhaustively extract every distinct Bible and glossary entry that meets the inclusion rules, as a whole-volume pass would. Never restate an already proposed entry: omit it, or use its ID with op update only for a new qualifying fact. Set is_last when the packet has no entry left to extract.
+Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Set is_last when done.
 Events already extracted: ${state.events.length}
 Already proposed entries:
 ${proposedEntries(state.events, registryBudget)}

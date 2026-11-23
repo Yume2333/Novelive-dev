@@ -192,7 +192,7 @@ export async function selectAdditions(
 								({ speakerId }) => !gone.has(speakerId),
 							),
 						},
-					},
+					} as typeof item,
 				]
 			return [item]
 		})
