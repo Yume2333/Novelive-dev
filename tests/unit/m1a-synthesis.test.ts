@@ -570,7 +570,7 @@ test.each([
 	},
 )
 
-test.each([200, 429, 'replay miss'])(
+test.each([200, 429, 'replay miss'] as const)(
 	'synthesis %s without usage only blocks reopening if ambiguous',
 	async (status) => {
 		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
