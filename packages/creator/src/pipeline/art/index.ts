@@ -49,14 +49,13 @@ type ReviewCheckpoint = {
 	path: string
 	resume: boolean
 }
-type PendingReview = {
+type PendingPaint = {
 	settingsVersion: string
 	png: string
-	prompt: string
 	attempt: number
 	baseOnly: boolean
 	moderated: boolean
-}
+} & ({ prompt: string } | { feedback: string; rewritten?: string })
 const opaqueCandidateLimit = 2
 type PaintStop =
 	| 'retries'
@@ -646,6 +645,7 @@ export class ArtProduction {
 		let moderated = false
 		let attempt = 0
 		let baseOnly = false
+		let rewritten: string | undefined
 		const settingsVersion = checkpoint
 			? createHash('sha256')
 					.update(
@@ -665,6 +665,21 @@ export class ArtProduction {
 			if (checkpoint)
 				await rm(join(this.project.root, checkpoint.path), { force: true })
 		}
+		const savePaint = async (
+			png: Buffer,
+			next: { prompt: string } | { feedback: string; rewritten?: string },
+		) => {
+			if (!checkpoint) return
+			const pending: PendingPaint = {
+				settingsVersion,
+				png: png.toString('base64'),
+				attempt,
+				baseOnly,
+				moderated,
+				...next,
+			}
+			await this.project.writeFile(checkpoint.path, JSON.stringify(pending))
+		}
 		const audit = async (
 			png: Buffer,
 			prompt: string,
@@ -678,36 +693,34 @@ export class ArtProduction {
 					this.options,
 					[preview.png, ...(baseOnly ? refs.slice(0, 1) : auditRefs)],
 				)
-				await clearReview()
-				if (judge.pass && judge.failedChecks.length === 0) return true
+				if (judge.pass && judge.failedChecks.length === 0) {
+					await clearReview()
+					return true
+				}
 				issue = feedback =
 					judge.feedback || `视觉审核未通过：${judge.failedChecks.join('、')}`
+				if (attempt <= this.options.image.retries)
+					await savePaint(png, { feedback })
+				else await clearReview()
 				return false
 			} catch (error) {
-				if (error instanceof SpendBudgetError && checkpoint) {
-					const pending: PendingReview = {
-						settingsVersion,
-						png: png.toString('base64'),
-						prompt,
-						attempt,
-						baseOnly,
-						moderated,
-					}
-					await this.project.writeFile(checkpoint.path, JSON.stringify(pending))
-				}
+				if (error instanceof SpendBudgetError) await savePaint(png, { prompt })
 				throw error
 			}
 		}
 		if (checkpoint?.resume) {
 			const saved = await this.file(checkpoint.path)
 			if (saved) {
-				const pending: PendingReview = JSON.parse(saved.toString())
+				const pending: PendingPaint = JSON.parse(saved.toString())
 				if (pending.settingsVersion === settingsVersion) {
 					attempt = pending.attempt
 					baseOnly = pending.baseOnly
 					moderated = pending.moderated
 					reviewed = Buffer.from(pending.png, 'base64')
-					if (
+					if ('feedback' in pending) {
+						issue = feedback = pending.feedback
+						rewritten = pending.rewritten
+					} else if (
 						await audit(reviewed, pending.prompt, await auditPreview(reviewed))
 					)
 						return { png: reviewed }
@@ -719,18 +732,26 @@ export class ArtProduction {
 			await clearReview()
 		}
 		while (attempt <= this.options.image.retries) {
-			const content = await artJson(
-				painter,
-				[
-					'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
-					`${drawing.kind}: ${brief}`,
-					feedback,
-				]
-					.filter(Boolean)
-					.join('\n'),
-				contentSchema,
-				this.options,
-			)
+			const content =
+				rewritten ??
+				(await artJson(
+					painter,
+					[
+						'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
+						`${drawing.kind}: ${brief}`,
+						feedback,
+					]
+						.filter(Boolean)
+						.join('\n'),
+					contentSchema,
+					this.options,
+				)
+					.then(({ content }) => content)
+					.catch(async (error: unknown) => {
+						if (error instanceof SpendBudgetError && reviewed)
+							await savePaint(reviewed, { feedback })
+						throw error
+					}))
 			const editReferences = baseOnly ? refs.slice(0, 1) : refs
 			const describe = (
 				firstReference: number,
@@ -738,14 +759,19 @@ export class ArtProduction {
 				input = promptDrawing,
 			) =>
 				baseOnly
-					? `Edit only the brows, eyes and mouth of Image ${firstReference}: ${content.content} ${issue} Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face.`
-					: drawingPrompt(input, content.content, issue, firstReference)
+					? `Edit only the brows, eyes and mouth of Image ${firstReference}: ${content} ${issue} Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face.`
+					: drawingPrompt(input, content, issue, firstReference)
 			const result = await render(
 				describe(1, feedback),
 				editReferences,
 				target,
 				transparent,
-			)
+			).catch(async (error: unknown) => {
+				if (error instanceof SpendBudgetError && reviewed)
+					await savePaint(reviewed, { feedback, rewritten: content })
+				throw error
+			})
+			rewritten = undefined
 			feedback = ''
 			if ('error' in result) {
 				this.options.signal?.throwIfAborted()

@@ -540,19 +540,24 @@ test('a settings save changes the next step of an active production session', as
 })
 
 test.each([
-	{ setting: 'unchanged', redraw: false },
-	{ setting: 'changed', redraw: true },
+	{ setting: 'unchanged', redraw: false, reject: false },
+	{ setting: 'changed', redraw: true, reject: false },
+	{ setting: 'review rejected', redraw: false, reject: true },
 ])(
 	'recording resumes an image budget pause with $setting approved setting',
-	async ({ redraw }) => {
+	async ({ redraw, reject }) => {
 		const { projectDir, workId } = await fixture()
 		const config = createConfigStore(directory)
 		await config.update(configuration)
 		const models = await productionModels(config)
+		if (reject) models.image = { ...models.image, retries: 1 }
 		const assetId = 'room/day'
 		const requests: string[] = []
 		const painterPrompts: string[] = []
+		const imagePrompts: string[] = []
 		let allowReview = false
+		let rejectReview = reject
+		let blockImage = false
 		const open = async () => {
 			const project = await Project.open(projectDir)
 			const work = await project.read(projectFiles.work('v0001', workId))
@@ -560,6 +565,8 @@ test.each([
 				mode: 'record',
 				directory: join(directory, 'cassettes'),
 				async spend(request, send) {
+					if (blockImage && request.url.endsWith('/images/generations'))
+						throw new SpendBudgetError('超出工程预算')
 					if (
 						request.url.endsWith('/chat/completions') &&
 						(await request.clone().json()).model === models.visual.model &&
@@ -575,6 +582,7 @@ test.each([
 					if (body.model === models.main.model)
 						painterPrompts.push(JSON.stringify(body.messages))
 					if (request.url.endsWith('/images/generations')) {
+						imagePrompts.push(body.prompt)
 						const png = await sharp({
 							create: { width: 64, height: 36, channels: 3, background: 'red' },
 						})
@@ -582,6 +590,15 @@ test.each([
 							.toBuffer()
 						return Response.json({
 							data: [{ b64_json: png.toString('base64') }],
+						})
+					}
+					if (body.model === models.visual.model && rejectReview) {
+						rejectReview = false
+						blockImage = true
+						return completion({
+							pass: false,
+							failedChecks: ['description'],
+							feedback: 'Move the window to the center.',
 						})
 					}
 					return body.model === models.visual.model
@@ -632,6 +649,27 @@ test.each([
 			}
 		}
 		allowReview = true
+		if (reject) {
+			const { project, queue } = await open()
+			try {
+				queue.continue(workId)
+				await queue.idle()
+				expect(queue.snapshot(workId).chapters[0].issue).toMatch(/超出工程预算/)
+				expect(requests).toEqual([
+					models.main.model,
+					models.image.model,
+					models.visual.model,
+					models.main.model,
+				])
+				expect(painterPrompts.at(-1)).toContain(
+					'Move the window to the center.',
+				)
+			} finally {
+				queue.dispose()
+				project.close()
+			}
+			blockImage = false
+		}
 		const { project, queue } = await open()
 		try {
 			queue.continue(workId)
@@ -640,10 +678,15 @@ test.each([
 				models.main.model,
 				models.image.model,
 				...(redraw ? [models.main.model, models.image.model] : []),
+				...(reject
+					? [models.visual.model, models.main.model, models.image.model]
+					: []),
 				models.visual.model,
 			])
 			if (redraw)
 				expect(painterPrompts.at(-1)).toContain('A moonlit observatory')
+			if (reject)
+				expect(imagePrompts.at(-1)).toContain('Move the window to the center.')
 			expect(queue.snapshot(workId).chapters[0].status).toBe('published')
 		} finally {
 			queue.dispose()
