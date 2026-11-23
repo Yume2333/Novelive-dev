@@ -24,7 +24,23 @@ export type JoinBook = {
 	settings?: WorkSettings
 }
 
+const pendingJoins = new Map<string, Promise<unknown>>()
+
 export async function joinSeries(project: Project, book: JoinBook) {
+	const previous = pendingJoins.get(project.root) ?? Promise.resolve()
+	const running = previous
+		.catch(() => {})
+		.then(() => appendVolume(project, book))
+	pendingJoins.set(project.root, running)
+	try {
+		return await running
+	} finally {
+		if (pendingJoins.get(project.root) === running)
+			pendingJoins.delete(project.root)
+	}
+}
+
+async function appendVolume(project: Project, book: JoinBook) {
 	if (
 		!book.title.trim() ||
 		!book.language.trim() ||

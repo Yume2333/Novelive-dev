@@ -186,6 +186,38 @@ test('join appends collision-free sources without modifying shared entries or or
 	expect((await p.read(projectFiles.series)).volumeIds).toHaveLength(2)
 })
 
+test('overlapping joins across project handles preserve both volumes and a rejected join does not block the next', async () => {
+	using p = await project()
+	using other = await Project.open(p.root)
+	const results = await Promise.allSettled([
+		joinSeries(p, { ...book, title: 'First' }),
+		joinSeries(other, { ...book, chapters: [] }),
+		joinSeries(other, { ...book, title: 'Second' }),
+	])
+	const [first, rejected, second] = results
+	expect(rejected.status).toBe('rejected')
+	if (first.status !== 'fulfilled' || second.status !== 'fulfilled')
+		throw new Error('Valid joins failed')
+	expect((await p.read(projectFiles.series)).volumeIds).toEqual([
+		first.value.volumeId,
+		second.value.volumeId,
+	])
+	for (const result of [first.value, second.value]) {
+		expect(
+			(await p.read(projectFiles.volume(result.volumeId))).workIds,
+		).toEqual([result.workId])
+		expect(
+			(await p.read(projectFiles.work(result.volumeId, result.workId)))
+				.chapterIds,
+		).toEqual(result.chapterIds)
+		expect(
+			(
+				await p.readFile(projectFiles.chapterText(result.chapterIds[0]))
+			).toString(),
+		).toContain(book.chapters[0].paragraphs[0])
+	}
+})
+
 test('volume two art reuses a drawn series character and writer uses target language and canonical names', async () => {
 	using p = await project()
 	const first = await joinSeries(p, book)
