@@ -1,5 +1,6 @@
 import {
 	type CommandOutput,
+	commandError,
 	productionQueueEvent,
 } from '@novelive/creator/contract'
 import { Workflow, X } from 'lucide-react'
@@ -69,8 +70,12 @@ export function GlobalProductionQueue() {
 		try {
 			await action()
 			setReload((value) => value + 1)
-		} catch {
-			setError('队列操作失败，请重试')
+		} catch (failure) {
+			setError(
+				commandError.check(failure) && failure.code === 'invalid_config'
+					? failure.message
+					: '队列操作失败，请重试',
+			)
 		} finally {
 			setBusy(false)
 		}
