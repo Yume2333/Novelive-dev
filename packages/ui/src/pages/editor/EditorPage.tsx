@@ -12,6 +12,7 @@ import { ScrollArea } from '../../components/ScrollArea'
 import { JumpPoints } from './JumpPoints'
 import { SceneImages } from './SceneImages'
 import { ScriptEditor } from './ScriptEditor'
+import { sceneAssets } from './scene-assets'
 import '../player/player.css'
 import './editor.css'
 
@@ -410,10 +411,16 @@ export function EditorPage() {
 								<SceneImages
 									key={scene.sceneId}
 									workId={id}
-									assets={opening.registry.entries.filter(
-										(asset) =>
-											scene.nvs.includes(asset.id) &&
-											asset.status !== 'pending',
+									assets={sceneAssets(
+										chapter.scenes.map((item) => item.nvs).join('\n\n'),
+										{
+											paragraphIds: chapter.paragraphs.map((p) => p.id),
+											sceneIds: chapter.scenes.map((s) => s.sceneId),
+											assets: opening.registry.entries,
+											speakers: Object.keys(opening.speakerNames),
+											customMarks: Object.keys(opening.settings.customMarks),
+										},
+										sceneIndex,
 									)}
 									disabled={busy || dirty}
 									run={run}
