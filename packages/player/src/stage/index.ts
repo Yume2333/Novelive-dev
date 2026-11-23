@@ -1,10 +1,17 @@
-import type { CompiledScene } from '@novelive/format/script'
+import type { CompiledAction, CompiledScene } from '@novelive/format/script'
 import { toPlaybackBeats } from '../contract/playback'
 import type {
+	ActivePerformance,
 	PlayerResources,
 	StageSnapshot,
 	StageState,
 } from '../contract/stage'
+import {
+	captureSnapshot,
+	PlaybackProgress,
+	restoreSnapshot,
+	type SnapshotRenderer,
+} from '../progress'
 import { AssetWindow, lookahead } from './assets'
 import { PixiStage } from './renderer'
 import { direct, emptyStage, stageAssets } from './state'
@@ -13,16 +20,28 @@ export { AssetWindow, lookahead } from './assets'
 export { PixiStage } from './renderer'
 export { direct, emptyStage, stageAssets } from './state'
 
+function samePosition(
+	a: StageSnapshot['position'],
+	b: StageSnapshot['position'],
+) {
+	return (
+		a.chapterId === b.chapterId &&
+		a.sceneId === b.sceneId &&
+		a.sentenceId === b.sentenceId
+	)
+}
+
 export async function mountStage(
 	host: HTMLElement,
 	resources: PlayerResources,
+	restartText: SnapshotRenderer['restartText'] = () => {},
 ) {
 	const renderer = new PixiStage()
 	const assets = new AssetWindow(resources)
 	await renderer.mount(host)
 	let state = emptyStage()
 	let disposed = false
-	return {
+	const controller = {
 		get state() {
 			return structuredClone(state)
 		},
@@ -39,17 +58,25 @@ export async function mountStage(
 			state = structuredClone(next)
 			await assets.sync(stageAssets(state), upcoming)
 		},
-		async restore(snapshot: StageSnapshot, upcoming: readonly string[] = []) {
-			let next: StageState = structuredClone(snapshot.stage)
-			for (const active of snapshot.active)
-				if (active.restore === 'replay-state')
-					next = direct(next, active.action)
-			renderer.complete()
-			await assets.sync(stageAssets(next), upcoming)
-			if (disposed) return
-			await renderer.commit(next, assets, [], true)
-			state = next
+		async restore(
+			snapshot: StageSnapshot,
+			upcoming: readonly string[] = [],
+		): Promise<void> {
+			await restoreSnapshot(snapshot, {
+				setState: (next) => controller.commit(next, upcoming, [], true),
+				replayState: (action) =>
+					controller.commit(direct(state, action), upcoming, [action]),
+				restartText,
+			})
 		},
+		async setState(next: StageState): Promise<void> {
+			await controller.commit(next, [], [], true)
+		},
+		async replayState(action: CompiledAction): Promise<void> {
+			await controller.commit(direct(state, action), [], [action])
+		},
+		restartText,
+		thumbnail: (visibleHeight = 1) => renderer.thumbnail(visibleHeight),
 		complete: () => renderer.complete(),
 		async destroy() {
 			disposed = true
@@ -57,6 +84,7 @@ export async function mountStage(
 			await assets.destroy()
 		},
 	}
+	return controller
 }
 
 export async function mountMinimalPlayer(
@@ -66,6 +94,7 @@ export async function mountMinimalPlayer(
 	signal: AbortSignal,
 	onError: (error: unknown) => void,
 	speakerNames: Readonly<Record<string, string>> = {},
+	options: { chapterId?: string; progress?: PlaybackProgress } = {},
 ) {
 	const element = document.createElement('div')
 	element.className = 'nl-player-stage'
@@ -77,7 +106,7 @@ export async function mountMinimalPlayer(
 		overflow: 'hidden',
 	})
 	element.append(viewport)
-	const stage = await mountStage(viewport, resources)
+	const stage = await mountStage(viewport, resources, renderText)
 	if (signal.aborted) {
 		element.remove()
 		await stage.destroy()
@@ -106,10 +135,46 @@ export async function mountMinimalPlayer(
 		if (box) resizeObserver.observe(box)
 		clipViewport()
 	}
-	const beats = toPlaybackBeats('local', scenes, speakerNames)
+	const beats = toPlaybackBeats(
+		options.chapterId ?? 'local',
+		scenes,
+		speakerNames,
+	)
+	const positions = beats.flatMap((beat) =>
+		beat.cue.kind === 'text' ? [beat.cue.position] : [],
+	)
+	const order = (position: StageSnapshot['position']) =>
+		positions.findIndex((entry) => samePosition(entry, position))
+	const progress =
+		options.progress ?? new PlaybackProgress((a, b) => order(a) - order(b))
+	progress.openChapter(options.chapterId ?? 'local')
+	let snapshot: StageSnapshot | null = null
 	let index = -1
 	let busy = false
 	let timer: ReturnType<typeof setTimeout> | undefined
+	function renderText(text: StageState['text']) {
+		overlay.replaceChildren()
+		if (text) {
+			const box = document.createElement('div')
+			box.className =
+				text.kind === 'caption' ? 'nl-player-caption' : 'nl-player-textbox'
+			box.dataset.kind = text.kind
+			if (text.kind === 'dialogue' || text.kind === 'inner') {
+				const name = document.createElement('div')
+				name.className = 'nl-player-name'
+				name.textContent = text.displayName ?? ''
+				box.append(name)
+			}
+			const content = document.createElement('div')
+			content.className = 'nl-player-text'
+			content.textContent = text.content
+				.map((part) => (part.type === 'text' ? part.text : ''))
+				.join('')
+			box.append(content)
+			overlay.append(box)
+		}
+		observeOverlay()
+	}
 	async function advance() {
 		if (busy || signal.aborted) return
 		busy = true
@@ -123,30 +188,29 @@ export async function mountMinimalPlayer(
 			let state = stage.state
 			for (const action of beat.actions) state = direct(state, action)
 			state.text = beat.cue.kind === 'text' ? beat.cue.text : null
+			if (beat.cue.kind === 'text') {
+				const active: ActivePerformance[] = beat.actions.map((action) =>
+					['move', 'shake'].includes(action.name)
+						? { restore: 'skip-relative' }
+						: { restore: 'replay-state', action },
+				)
+				snapshot = captureSnapshot(
+					beat.cue.position,
+					{ ...state, text: beat.cue.text },
+					[...active, { restore: 'restart-text' }],
+				)
+			}
 			await stage.commit(state, lookahead(beats, index + 1), beat.actions)
 			if (signal.aborted) return
-			overlay.replaceChildren()
-			if (state.text) {
-				const text = state.text
-				const box = document.createElement('div')
-				box.className =
-					text.kind === 'caption' ? 'nl-player-caption' : 'nl-player-textbox'
-				box.dataset.kind = text.kind
-				if (text.kind === 'dialogue' || text.kind === 'inner') {
-					const name = document.createElement('div')
-					name.className = 'nl-player-name'
-					name.textContent = text.displayName ?? ''
-					box.append(name)
-				}
-				const content = document.createElement('div')
-				content.className = 'nl-player-text'
-				content.textContent = text.content
-					.map((part) => (part.type === 'text' ? part.text : ''))
-					.join('')
-				box.append(content)
-				overlay.append(box)
+			if (beat.cue.kind === 'text') {
+				snapshot = captureSnapshot(
+					beat.cue.position,
+					{ ...stage.state, text: beat.cue.text },
+					[{ restore: 'restart-text' }],
+				)
+				progress.record(snapshot)
 			}
-			observeOverlay()
+			renderText(state.text)
 			if (beat.advance.kind !== 'click')
 				timer = setTimeout(
 					() => void advance(),
@@ -179,4 +243,47 @@ export async function mountMinimalPlayer(
 		{ once: true },
 	)
 	await advance()
+	return {
+		progress,
+		get state() {
+			return stage.state
+		},
+		get snapshot() {
+			return structuredClone(snapshot)
+		},
+		thumbnail() {
+			const box = overlay.querySelector<HTMLElement>('.nl-player-textbox')
+			const bounds = viewport.getBoundingClientRect()
+			return stage.thumbnail(
+				box
+					? Math.max(
+							0,
+							(box.getBoundingClientRect().top - bounds.top) / bounds.height,
+						)
+					: 1,
+			)
+		},
+		async restore(saved: StageSnapshot) {
+			const restoredIndex = beats.findIndex(
+				(beat) =>
+					beat.cue.kind === 'text' &&
+					samePosition(beat.cue.position, saved.position),
+			)
+			if (restoredIndex < 0) throw new Error('存档句子不在当前章节')
+			if (busy) throw new Error('舞台正在切换')
+			busy = true
+			clearTimeout(timer)
+			try {
+				await stage.restore(saved, lookahead(beats, restoredIndex + 1))
+				index = restoredIndex
+				snapshot = captureSnapshot(
+					saved.position,
+					{ ...stage.state, text: saved.stage.text },
+					[{ restore: 'restart-text' }],
+				)
+			} finally {
+				busy = false
+			}
+		},
+	}
 }

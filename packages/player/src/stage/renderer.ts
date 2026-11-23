@@ -14,6 +14,7 @@ import { AdjustmentFilter, GlitchFilter } from 'pixi-filters'
 import type { StageState } from '../contract/stage'
 import type { AssetWindow } from './assets'
 import { slotX } from './state'
+import { captureThumbnail } from './thumbnail'
 
 type Tween = {
 	elapsed: number
@@ -97,6 +98,11 @@ export class PixiStage {
 			tween.finish()
 		}
 		this.tweens = []
+	}
+
+	thumbnail(visibleHeight = 1) {
+		this.app.render()
+		return captureThumbnail(this.app.canvas, visibleHeight)
 	}
 
 	commit(

@@ -1,20 +1,197 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { _electron as electron, expect, test } from '@playwright/test'
 import sharp from 'sharp'
 import { Project } from '../../packages/creator/src/project'
 import { projectFiles } from '../../packages/format/src/model'
+import { compileScript } from '../../packages/format/src/script'
+import type { StageSnapshot } from '../../packages/player/src/contract'
 import {
 	playerRef,
 	playerWorkId,
 	seedPlayerProject,
 } from '../fixtures/minimal-player'
+import { context } from '../fixtures/script/context'
 
 const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
 )
+
+type StageHarness = {
+	StageTest: typeof import('../../packages/player/src/stage')
+	player: NonNullable<
+		Awaited<
+			ReturnType<
+				typeof import('../../packages/player/src/stage').mountMinimalPlayer
+			>
+		>
+	>
+	saved: StageSnapshot
+	abort: AbortController
+}
+
+test('M3 save stage renders WebP thumbnails and restores state, replay actions and text', async () => {
+	test.setTimeout(120_000)
+	const { build } = await import(require.resolve('vite'))
+	const bundle = await build({
+		configFile: false,
+		logLevel: 'error',
+		build: {
+			write: false,
+			lib: {
+				entry: resolve('packages/player/src/stage/index.ts'),
+				name: 'StageTest',
+				formats: ['iife'],
+			},
+			rollupOptions: { output: { inlineDynamicImports: true } },
+		},
+	})
+	const compiled = compileScript(
+		'scene 夜\nsource p0001\n@bg room/dusk transition none\n@show traveler/coat/calm center\n: First #0001\n@move center left duration 0.01\n: Second #0002',
+		{ ...context, paragraphIds: ['p0001'], sceneIds: ['aaaabbbb'] },
+	)
+	if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics))
+	const background = (
+		await sharp({
+			create: { width: 960, height: 540, channels: 3, background: '#203060' },
+		})
+			.png()
+			.toBuffer()
+	).toString('base64')
+	const portrait = (
+		await sharp({
+			create: { width: 160, height: 540, channels: 3, background: '#e06030' },
+		})
+			.png()
+			.toBuffer()
+	).toString('base64')
+	const app = await electron.launch({
+		executablePath: require('electron'),
+		args: [
+			'apps/desktop',
+			'--enable-unsafe-swiftshader',
+			'--use-gl=angle',
+			'--use-angle=swiftshader',
+		],
+		env: { ...process.env, NL_REPLAY: 'strict', ELECTRON_RENDERER_URL: '' },
+	})
+	try {
+		const page = await app.firstWindow()
+		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await page.evaluate(
+			(Array.isArray(bundle) ? bundle[0] : bundle).output[0].code,
+		)
+		await page.evaluate(
+			async ({ scenes, background, portrait }) => {
+				const runtime = globalThis as unknown as StageHarness
+				const host = document.createElement('div')
+				host.className = 'nl-player'
+				document.body.replaceChildren(host)
+				runtime.abort = new AbortController()
+				const player = await runtime.StageTest.mountMinimalPlayer(
+					host,
+					scenes,
+					{
+						resolveAsset: (id) =>
+							`data:image/png;base64,${id === 'room/dusk' ? background : portrait}`,
+					},
+					runtime.abort.signal,
+					(error) => {
+						throw error
+					},
+					{},
+					{ chapterId: 'chapter' },
+				)
+				if (!player?.snapshot) throw new Error('Missing stage snapshot')
+				runtime.player = player
+				runtime.saved = player.snapshot
+			},
+			{ scenes: compiled.scenes, background, portrait },
+		)
+		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		const capture = async () =>
+			Buffer.from(
+				await page.evaluate(async () =>
+					Array.from(
+						await (globalThis as unknown as StageHarness).player.thumbnail(),
+					),
+				),
+			)
+		const before = await capture()
+		expect(await sharp(before).metadata()).toMatchObject({
+			format: 'webp',
+			width: 480,
+			height: 270,
+		})
+		const portraitPixel = await sharp(before)
+			.extract({ left: 240, top: 135, width: 1, height: 1 })
+			.removeAlpha()
+			.raw()
+			.toBuffer()
+		for (const [channel, expected] of [224, 96, 48].entries())
+			expect(Math.abs(portraitPixel[channel] - expected)).toBeLessThanOrEqual(4)
+		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
+		await expect(page.locator('.nl-player-text')).toHaveText('Second')
+		expect(
+			await page.evaluate(
+				() =>
+					(globalThis as unknown as StageHarness).player.progress.history
+						.entries.length,
+			),
+		).toBe(2)
+		await page.evaluate(async () => {
+			const { player, saved } = globalThis as unknown as StageHarness
+			await player.restore(saved)
+		})
+		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		expect(
+			await page.evaluate(() => {
+				const { player, saved } = globalThis as unknown as StageHarness
+				return JSON.stringify(player.state) === JSON.stringify(saved.stage)
+			}),
+		).toBe(true)
+		expect(
+			(
+				await sharp(await capture())
+					.raw()
+					.toBuffer()
+			).equals(await sharp(before).raw().toBuffer()),
+		).toBe(true)
+		await page.evaluate(async () => {
+			const { player, saved } = globalThis as unknown as StageHarness
+			const snapshot = structuredClone(saved)
+			snapshot.active = [
+				{ restore: 'skip-relative' },
+				{ restore: 'restart-text' },
+				{
+					restore: 'replay-state',
+					action: {
+						type: 'action',
+						line: 1,
+						col: 1,
+						name: 'filter',
+						args: { effect: 'brightness', value: 0.5 },
+						assets: [],
+					},
+				},
+			]
+			await player.restore(snapshot)
+		})
+		expect(
+			await page.evaluate(
+				() => (globalThis as unknown as StageHarness).player.state.filter,
+			),
+		).toEqual({ effect: 'brightness', value: 0.5 })
+		await expect(page.locator('.nl-player-text')).toHaveText('First')
+		await page.evaluate(() =>
+			(globalThis as unknown as StageHarness).abort.abort(),
+		)
+	} finally {
+		await app.close()
+	}
+})
 
 test('M3 stage directions render the direction set and four landscape fill crops in Electron', async () => {
 	test.setTimeout(120_000)
