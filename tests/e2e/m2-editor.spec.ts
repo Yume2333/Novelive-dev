@@ -34,6 +34,17 @@ async function editAndPreview(page: Page, secondLine = 4) {
 	await expect(page.getByRole('textbox', { name: 'NVS 剧本' })).toContainText(
 		'第一句。',
 	)
+	const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
+	await page
+		.getByLabel('快捷位置', { exact: true })
+		.selectOption(String(secondLine))
+	await editor.press('End')
+	await page.keyboard.insertText(' ')
+	await page.getByRole('button', { name: '保存当前句' }).click()
+	await expect(page.getByRole('button', { name: '保存当前句' })).toBeDisabled()
+	await expect(
+		page.getByRole('button', { name: '撤销', exact: true }),
+	).toBeDisabled()
 	await page.getByRole('button', { name: '原文对照' }).click()
 	const source = page.getByRole('button', { name: 'p0002 · 门外原文。' })
 	await source.click()
@@ -51,7 +62,6 @@ async function editAndPreview(page: Page, secondLine = 4) {
 	await expect(
 		page.getByText(`当前行 ${secondLine}`, { exact: true }),
 	).toBeVisible()
-	const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
 	await editor.press('Home')
 	await editor.press('ArrowRight')
 	await editor.press('ArrowRight')
@@ -280,7 +290,7 @@ test.describe('contract-render', () => {
 				let result;
 				if (command === 'editor.open') { history=[]; result={editorId:'opening1',chapter,registry:{formatVersion:1,entries:[]},speakerNames:{},settings:defaultWorkSettings(),settingsRevision:'s1'}; }
 				else if (command === 'editor.close') result={closed:true};
-				else if (command === 'editor.editLine') { history.push(structuredClone(chapter)); chapter=structuredClone(chapter); chapter.scenes.find(s=>s.sceneId===input.sceneId).nvs=chapter.scenes.find(s=>s.sceneId===input.sceneId).nvs.replace(input.edit.previous,input.edit.next); chapter.revision='r'+(++revision); result=chapter; }
+				else if (command === 'editor.editLine') { if (input.edit.previous.trim() !== input.edit.next.trim()) { history.push(structuredClone(chapter)); chapter=structuredClone(chapter); chapter.scenes.find(s=>s.sceneId===input.sceneId).nvs=chapter.scenes.find(s=>s.sceneId===input.sceneId).nvs.replace(input.edit.previous,input.edit.next); chapter.revision='r'+(++revision); } result=chapter; }
 				else if (command === 'editor.undo') { chapter=history.pop(); chapter.revision='r'+(++revision); result=chapter; }
 				else if (command === 'editor.resolveMark') { chapter={...chapter,revision:'r'+(++revision),markSuggestions:chapter.markSuggestions.filter(mark=>mark.id!==input.suggestionId)}; result=chapter; }
 				else if (command === 'editor.rewriteScene') result={workId,chapterId:'ch1',sceneId:input.sceneId,expectedRevision:input.expectedRevision,proposalId:'rewrite1',hunks:[{id:'h1',afterLineId:null,before:[': 第一句。 #0001'],after:[': 重写第一句。 #0001']},{id:'h2',afterLineId:'0001',before:[': 第二句。 #0002'],after:[': 重写第二句。 #0002']}]};

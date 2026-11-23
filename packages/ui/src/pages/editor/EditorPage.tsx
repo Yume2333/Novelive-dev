@@ -149,19 +149,19 @@ export function EditorPage() {
 			next[index]?.match(/ #([0-9a-f]{4})\s*$/)?.[1] !== lineId
 		)
 			throw new Error('请选择带句子 ID 的文本行，保留末尾 ID')
-		accept(
-			await window.novelive.call('editor.editLine', {
-				...target,
-				sceneId: scene.sceneId,
-				edit: {
-					kind: 'text',
-					lineId,
-					previous: previous[index] as string,
-					next: next[index] as string,
-				},
-			}).promise,
-		)
-		setUndoCount((count) => count + 1)
+		const saved = await window.novelive.call('editor.editLine', {
+			...target,
+			sceneId: scene.sceneId,
+			edit: {
+				kind: 'text',
+				lineId,
+				previous: previous[index] as string,
+				next: next[index] as string,
+			},
+		}).promise
+		accept(saved)
+		if (saved.revision !== target.expectedRevision)
+			setUndoCount((count) => count + 1)
 	}
 	function undo() {
 		if (dirty && scene) {
