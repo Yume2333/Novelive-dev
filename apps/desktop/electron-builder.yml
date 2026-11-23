@@ -4,6 +4,9 @@ files:
   - out/**
 asar: false
 npmRebuild: false
+extraResources:
+  - from: ../../bin/matting
+    to: matting
 linux:
   target: AppImage
   executableName: novelive

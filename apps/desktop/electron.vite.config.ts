@@ -13,7 +13,7 @@ export default defineConfig({
 					index: 'src/main/index.ts',
 					creator: '../../packages/creator/src/entry.ts',
 				},
-				external: ['sharp'],
+				external: ['onnxruntime-node', 'sharp'],
 			},
 		},
 	},

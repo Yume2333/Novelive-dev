@@ -20,6 +20,7 @@ import {
 	readProfiles,
 	recordProfile,
 } from '../postprocess'
+import { MattingUnavailableError, removeBackground } from './background'
 import { checkImage, type Dimensions, placeholder } from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
@@ -506,11 +507,24 @@ export class ArtProduction {
 				continue
 			}
 			attempt++
-			const checked = await checkImage(result.bytes, target, {
+			const checks = {
 				transparent,
 				base: derived ? refs[0] : undefined,
 				variant: drawing.kind === 'variant',
-			})
+			}
+			let checked = await checkImage(result.bytes, target, checks)
+			if ('issue' in checked && checked.unsupported) {
+				let recovered: Buffer
+				try {
+					recovered = await removeBackground(result.bytes, this.options.signal)
+				} catch (error) {
+					this.options.signal?.throwIfAborted()
+					if (error instanceof MattingUnavailableError)
+						return { issue: error.message, unsupported: true } as const
+					return checked
+				}
+				checked = await checkImage(recovered, target, checks)
+			}
 			if ('issue' in checked) {
 				if (checked.unsupported) return checked
 				issue = feedback = checked.issue
