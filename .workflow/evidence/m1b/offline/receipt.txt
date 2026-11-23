@@ -3,10 +3,10 @@ Base e297472b1cc3e4460b159c6637863efbfb8d1798
 
 Checks (Node 24, pnpm 12, Electron 45; Electron under Xvfb):
   NL_REPLAY=strict pnpm test:e2e --grep 'M1b make and play'
-    1 passed (20.7s)
+    1 passed (20.3s)
   NL_REPLAY=strict pnpm check
-    Test Files  21 passed (21)
-         Tests  324 passed (324)
+    Test Files  22 passed (22)
+         Tests  329 passed (329)
   NL_REPLAY=strict pnpm exec playwright test tests/e2e/m1b-wizard.spec.ts tests/e2e/m1b-creation-ui.spec.ts tests/e2e/m1b-player.spec.ts tests/e2e/m1b-production-contract.spec.ts
     7 passed (3.9s)
 
@@ -18,14 +18,22 @@ Real path:
   The production screen stopped and resumed the real scheduler.
   At confirmation point two, SQLite showed only chapter one published.
   The player rendered a background, sprite, canvas and the adapted narration.
-  After manual continue, chapter two hit a cassette-controlled writer failure.
-  Retry passed the writing step; a corrupt image produced a real placeholder.
+  After saving a rejected writer model, manual Continue used the new setting
+  and chapter two hit the cassette-controlled writer failure. Saving a
+  replacement and retrying used the replacement; a corrupt image produced a
+  real placeholder.
   The production screen showed both chapters published. The writer failure
   remained in run history, not the current issue; the current issue explains
   the one placeholder image, and the banner counts one affected chapter.
   SQLite and the asset registry independently agreed.
   Image edit transport used OpenAI's matching Response constructor, keeping its
   local multipart capability probe out of strict provider replay.
+
+Production regressions:
+  Local fixtures verify separate art-direction and portrait models, parallel
+  registry updates, on-disk WebP placeholders for failed base and variant
+  images, a reused pending image added to the next chapter's dependencies, and
+  manually interrupted chapter records emitted as cancelled after reopen.
 
 Full viewport visual evidence (1280 x 800; set NL_M1B_GATE_EVIDENCE to regenerate):
   01-import.png
