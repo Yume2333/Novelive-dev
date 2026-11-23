@@ -104,6 +104,39 @@ test('strict replay covers all chapters, segments and per-volume facts on disk',
 	expect(network).not.toHaveBeenCalled()
 })
 
+test('reserves reasoning output capacity and propagates a typed exhaustion error', async () => {
+	using project = await Project.open(root)
+	const payloads: Record<string, unknown>[] = []
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		payloads.push(await new Request(input, init).json())
+		const chunks = [
+			{ choices: [{ index: 0, delta: { reasoning_content: 'Thinking' } }] },
+			{ choices: [{ index: 0, delta: {}, finish_reason: 'length' }] },
+		]
+		return new Response(
+			`${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
+			{ headers: { 'content-type': 'text/event-stream' } },
+		)
+	})
+	await expect(
+		previewBook(project, chapters.slice(0, 1), {
+			connection: {
+				...connection,
+				model: 'gemini-3.8-flash',
+				contextWindow: 65536,
+			},
+			language: 'en',
+			fetch,
+		}),
+	).rejects.toMatchObject({ code: 'reasoning_limit' })
+	expect(fetch).toHaveBeenCalledTimes(2)
+	expect(
+		payloads.map(
+			(request) => request.max_tokens ?? request.max_completion_tokens,
+		),
+	).toEqual([24_576, 32_768])
+})
+
 test('restart reuses completed chapter files and volume digests without model calls', async () => {
 	let project = await Project.open(root)
 	const strict = replay()

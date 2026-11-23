@@ -19,6 +19,7 @@ export interface ReplayOptions {
 	tags?: readonly string[]
 	fault?: ReplayFault
 	delayMs?: number
+	ignoreRecordedFailures?: boolean
 }
 
 const bodyLimit = 256 * 1024
@@ -373,7 +374,13 @@ export function createReplayFetch(
 				}
 				return row
 			})
-			.filter((row) => row.key === identity.key)
+			.filter(
+				(row) =>
+					row.key === identity.key &&
+					(mode !== 'replay' ||
+						!options.ignoreRecordedFailures ||
+						(row.status >= 200 && row.status < 300)),
+			)
 		if (rows.length === 0) {
 			if (mode === 'strict')
 				throw new Error(

@@ -1,0 +1,50 @@
+.nl-text-viewport {
+	position: relative;
+	overflow: hidden;
+	font-family: var(--font-body);
+	font-size: 30px;
+	line-height: 1.8;
+	width: 78%;
+	margin-inline: auto;
+	line-break: strict;
+	word-break: break-word;
+	text-spacing-trim: space-first;
+	text-autospace: normal;
+	white-space: pre-wrap;
+}
+
+.nl-text-layout {
+	visibility: hidden;
+}
+.nl-text-display {
+	position: absolute;
+	inset: 0 0 auto;
+}
+.nl-text-window {
+	position: absolute;
+	inset: 0 0 auto;
+	overflow: hidden;
+}
+.nl-text-viewport [data-mark="em"] {
+	font-style: italic;
+}
+.nl-text-viewport [data-mark="b"] {
+	font-weight: 700;
+}
+.nl-text-viewport [data-mark="dim"] {
+	opacity: 0.6;
+}
+.nl-text-viewport [data-mark="whisper"] {
+	font-size: 0.85em;
+	line-height: 0;
+}
+.nl-text-viewport [data-mark="shout"] {
+	font-size: 1.15em;
+	line-height: 0;
+}
+.nl-text-viewport [data-mark="glitch"] {
+	text-shadow: 0.04em 0 var(--color-primary);
+}
+.nl-text-viewport [data-mark="hl"] {
+	background: var(--color-primary-container);
+}

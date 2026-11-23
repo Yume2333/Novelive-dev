@@ -22,6 +22,8 @@ import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import type { MaskedConfig } from '../../config/index.js'
 import type { CommandError } from '../../contract/index.js'
 import { createReplayFetch } from '../../replay/index.js'
+import { recordTextUsage } from '../../usage'
+import { textUsageSlots } from '../../usage/text-slots'
 
 type Settings = MaskedConfig['models']['fast']
 type Format = Settings['format']
@@ -170,7 +172,7 @@ export function buildTextModel(
 					maxTokensField: 'max_tokens' as const,
 				}
 			: undefined
-	return {
+	const model: Model<Format> = {
 		id: config.model,
 		name: entry?.name ?? config.model,
 		api: config.format,
@@ -194,6 +196,9 @@ export function buildTextModel(
 		),
 		compat: nativeCompat ?? qwenCompat,
 	}
+	const slot = textUsageSlots.get(config)
+	if (slot) textUsageSlots.set(model, slot)
+	return model
 }
 
 export function outputTokenBudget(
@@ -203,6 +208,11 @@ export function outputTokenBudget(
 		model.maxTokens,
 		Math.floor(model.contextWindow / (model.reasoning ? 2 : 4)),
 	)
+}
+
+export function parseModelJson(text: string): unknown {
+	const fenced = /^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(text.trim())
+	return JSON.parse(fenced?.[1] ?? text)
 }
 
 const descriptions: Partial<Record<Code, string>> = {
@@ -431,6 +441,7 @@ export function createTextStream(
 				} finally {
 					clearTimeout(timer)
 				}
+				recordTextUsage(model.id, result.usage, textUsageSlots.get(model))
 				usage = usage ? sumUsage(usage, result.usage) : result.usage
 				if (options?.signal?.aborted)
 					return fail('cancelled', undefined, result)

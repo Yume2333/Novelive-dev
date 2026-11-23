@@ -24,7 +24,9 @@ import {
 	type StepContext,
 } from '../scheduler/chapter'
 import { existing, readBible } from '../synthesis/patch'
+import { usageMethods, withUsage } from '../usage'
 import type { Project } from './index'
+import { resolveBible } from './series/resolve'
 
 const draft = (id: string) => `source/production/${id}/draft.nvs`
 const drawing = (id: string) => `source/production/art/${id}.json`
@@ -73,8 +75,15 @@ export async function productionModels(
 	}
 }
 
-export async function productionBible(project: Project) {
-	const bible = await readBible(project)
+export async function productionBible(
+	project: Project,
+	volumeId?: string,
+	workId?: string,
+) {
+	const bible =
+		volumeId && workId
+			? await resolveBible(project, { level: 'work', volumeId, workId })
+			: await readBible(project)
 	return {
 		bible,
 		art: {
@@ -99,16 +108,22 @@ export function chapterWorker(
 ) {
 	const fetch = createReplayFetch(replay)
 	const art = (signal?: AbortSignal) =>
-		new ArtProduction(project, {
-			main: models.main,
-			portrait: models.portrait,
-			fast: models.fast,
-			visual: models.visual,
-			image: models.image,
-			replay,
-			signal,
-			resolution: work.settings.outputResolution,
-		})
+		usageMethods(
+			new ArtProduction(project, {
+				main: models.main,
+				portrait: models.portrait,
+				fast: models.fast,
+				visual: models.visual,
+				image: models.image,
+				replay,
+				signal,
+				resolution: work.settings.outputResolution,
+				readScope: { level: 'work', volumeId, workId: work.workId },
+			}),
+			project,
+			work.workId,
+			'draw',
+		)
 	const ref = (chapterId: string) => ({
 		volumeId,
 		workId: work.workId,
@@ -123,7 +138,7 @@ export function chapterWorker(
 		const body = (await project.readFile(projectFiles.chapterText(chapterId)))
 			.toString('utf8')
 			.trimEnd()
-		const { bible } = await productionBible(project)
+		const { bible } = await productionBible(project, volumeId, work.workId)
 		const preview = await existing(() =>
 			project.read(projectFiles.preview(chapterId)),
 		)
@@ -166,6 +181,16 @@ export function chapterWorker(
 				bible.glossary.map(({ original, written }) => [original, written]),
 			),
 			bible: JSON.stringify(bible),
+			...(bible.character.length ||
+			bible.location.length ||
+			bible.glossary.length
+				? {
+						canonicalNames: {
+							characters: bible.character,
+							locations: bible.location,
+						},
+					}
+				: {}),
 			...(ctx.desensitized
 				? {
 						redLines: [
@@ -252,7 +277,8 @@ export function chapterWorker(
 		stage: (ctx) =>
 			step(async () => {
 				const { current, chapter, options } = await input(ctx)
-				const bible = (await productionBible(project)).art
+				const bible = (await productionBible(project, volumeId, work.workId))
+					.art
 				const service = art(ctx.signal)
 				const script = (await project.readFile(draft(ctx.chapterId))).toString()
 				const staged = await directChapterArt(
@@ -345,7 +371,7 @@ export function chapterWorker(
 			const metadata = await drawingMetadata(job.assetId)
 			return art(ctx.signal).draw(
 				metadata.job,
-				(await productionBible(project)).art,
+				(await productionBible(project, volumeId, work.workId)).art,
 				metadata.cg,
 			)
 		},
@@ -372,42 +398,44 @@ export function chapterWorker(
 		return JSON.parse((await project.readFile(drawing(id))).toString())
 	}
 	return {
-		worker,
+		worker: usageMethods(worker, project, work.workId, 'write'),
 		art,
 		rewriteScene: (
 			chapterId: string,
 			scene: { sourceIds: readonly string[]; nvs: string; instruction: string },
 			signal: AbortSignal,
 		) =>
-			step(async () => {
-				const { chapter, options } = await input({
-					workId: work.workId,
-					chapterId,
-					link: 'none',
-					desensitized: false,
-					signal,
-				})
-				const result = await writeChapter(
-					{
-						...chapter,
-						paragraphs: chapter.paragraphs.filter(({ id }) =>
-							scene.sourceIds.includes(id),
-						),
-						rewrite: { instruction: scene.instruction, current: scene.nvs },
-					},
-					options,
-				)
-				signal.throwIfAborted()
-				if (result.scenes.length !== 1)
-					throw new Error('A scene rewrite must return exactly one scene')
-				return result.scenes[0].scene
-			}),
+			withUsage(project, work.workId, 'write', () =>
+				step(async () => {
+					const { chapter, options } = await input({
+						workId: work.workId,
+						chapterId,
+						link: 'none',
+						desensitized: false,
+						signal,
+					})
+					const result = await writeChapter(
+						{
+							...chapter,
+							paragraphs: chapter.paragraphs.filter(({ id }) =>
+								scene.sourceIds.includes(id),
+							),
+							rewrite: { instruction: scene.instruction, current: scene.nvs },
+						},
+						options,
+					)
+					signal.throwIfAborted()
+					if (result.scenes.length !== 1)
+						throw new Error('A scene rewrite must return exactly one scene')
+					return result.scenes[0].scene
+				}),
+			),
 		async redraw(
 			assetId: string,
 			target: { path: string; instruction?: string },
 			signal: AbortSignal,
 		) {
-			const bible = (await productionBible(project)).art
+			const bible = (await productionBible(project, volumeId, work.workId)).art
 			const metadata =
 				(await existing(() => drawingMetadata(assetId))) ??
 				(await confirmedPortrait(assetId, bible))
