@@ -72,7 +72,7 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			).toBeVisible()
 			await expect(
 				page.getByRole('navigation', { name: '作品导航' }).getByRole('link'),
-			).toHaveText(['概览', '游玩', '制作'])
+			).toHaveText(['概览', '游玩', '制作', '设定集'])
 			await page.getByRole('link', { name: '选择主视觉' }).click()
 			const main = page.getByRole('group', { name: '主视觉', exact: true })
 			await expect(main.getByRole('radio')).toHaveCount(3)
