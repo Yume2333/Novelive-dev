@@ -30,6 +30,10 @@ const manifestIdGuidance = Object.entries(manifestIdShapes)
 	.map(([kind, shape]) => `${kind}: ${shape}`)
 	.join('; ')
 
+function rejectedReply(reply: unknown) {
+	return `Edit the rejected response, preserving unchanged items and stage directions:\n${JSON.stringify(reply)}`
+}
+
 export type CgReferences = { costumes: readonly string[]; location?: string }
 type ScriptOptions = NonNullable<Parameters<typeof parseScript>[1]>
 
@@ -192,18 +196,20 @@ export async function directChapterArt(
 				: []),
 			numbered,
 		].join('\n')
-		let stagingRepair: string | undefined
-		let schemaRepair: string | undefined
+		let repair: string | undefined
+		let triedStagingRepair = false
+		let triedSchemaRepair = false
 		for (;;) {
 			const result = await artJson(
 				options.main,
-				[brief, stagingRepair, schemaRepair].filter(Boolean).join('\n'),
+				repair ? `${brief}\n${repair}` : brief,
 				responseSchema,
 				options,
 			).catch((error: unknown) => {
-				if (!(error instanceof ArtResponseSchemaError) || schemaRepair)
+				if (!(error instanceof ArtResponseSchemaError) || triedSchemaRepair)
 					throw error
-				schemaRepair = `Repair the JSON manifest: ${error.message}. Use lowercase ASCII asset IDs with digits, underscores or hyphens. Required ID shapes by kind: ${manifestIdGuidance}. Do not use a bare place ID; make manifest IDs and patch references agree. Edit the rejected response, preserving unchanged items and stage directions:\n${JSON.stringify(error.rejected)}`
+				triedSchemaRepair = true
+				repair = `Repair the JSON manifest: ${error.message}. Use lowercase ASCII asset IDs with digits, underscores or hyphens. Required ID shapes by kind: ${manifestIdGuidance}. Do not use a bare place ID; make manifest IDs and patch references agree. ${rejectedReply(error.rejected)}`
 			})
 			if (!result) continue
 			try {
@@ -233,8 +239,9 @@ export async function directChapterArt(
 				Object.assign(merges, result.merges)
 				break
 			} catch (error) {
-				if (stagingRepair) throw error
-				stagingRepair = `Repair the staging patch and manifest: ${String(error)}`
+				if (triedStagingRepair) throw error
+				triedStagingRepair = true
+				repair = `Repair the staging patch and manifest: ${String(error)}\n${rejectedReply(result)}`
 			}
 		}
 	}
