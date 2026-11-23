@@ -140,6 +140,36 @@ test('both entries rewrite one scene through the writer, apply only checked hunk
 	}
 })
 
+test('redoing the first chapter at its checkpoint keeps later chapters gated', async () => {
+	const project = await Project.create(join(directory, 'checkpoint'), series)
+	project.tasks.registerWork({ workId: ref.workId, title: series.title })
+	const worker = new ScriptedWorker({ ch1: [], ch2: [] })
+	const scheduler = new ChapterScheduler(project.database, worker)
+	try {
+		scheduler.start(ref.workId, ['ch1', 'ch2'])
+		scheduler.confirmVisual(ref.workId)
+		await scheduler.idle()
+		expect(scheduler.snapshot(ref.workId).phase).toBe('confirm-first')
+		expect(() => scheduler.redoChapter(ref.workId, 'ch2')).toThrow()
+		const before = worker.calls.length
+		scheduler.redoChapter(ref.workId, 'ch1')
+		await scheduler.idle()
+		expect(worker.calls.slice(before)).toEqual([
+			'write:ch1',
+			'review:ch1',
+			'stage:ch1',
+		])
+		expect(scheduler.snapshot(ref.workId).phase).toBe('confirm-first')
+		expect(worker.count('write:ch2')).toBe(0)
+		scheduler.continue(ref.workId)
+		await scheduler.idle()
+		expect(scheduler.snapshot(ref.workId).phase).toBe('done')
+	} finally {
+		scheduler.dispose()
+		project.close()
+	}
+})
+
 test('stale bases with an old image stay usable and a redo reruns only that chapter, reusing drawn images', async () => {
 	const root = join(directory, 'project')
 	const project = await Project.create(root, series)
