@@ -16,6 +16,34 @@ import { drawing, imageRelationships } from '../../source/illustrations'
 
 const body = ['Unfinished prose', 'Body continues.', 'Last body sentence.']
 
+export async function writeScreeningEpub(root: string) {
+	const zip = new ZipWriter(new Uint8ArrayWriter())
+	const sources = {
+		'META-INF/container.xml':
+			'<container><rootfiles><rootfile full-path="book.opf"/></rootfiles></container>',
+		'book.opf':
+			'<package><manifest><item id="body" href="body.xhtml" media-type="application/xhtml+xml"/><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="scene" href="scene.png" media-type="image/png"/><item id="other" href="irrelevant.png" media-type="image/png"/></manifest><spine><itemref idref="body"/></spine></package>',
+		'nav.xhtml':
+			'<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="body.xhtml#one">Chapter 1</a></li></ol></nav></body></html>',
+		'body.xhtml':
+			'<html><body><p id="one">A paper boat drifted beneath the bridge.</p><img src="scene.png"/><p>The lamp lit the river.</p><img src="irrelevant.png"/></body></html>',
+	}
+	for (const [path, source] of Object.entries(sources))
+		await zip.add(path, new TextReader(source))
+	for (const file of ['scene.png', 'irrelevant.png'])
+		await zip.add(
+			file,
+			new Uint8ArrayReader(
+				await readFile(
+					new URL(`../../source/epub/synthetic/${file}`, import.meta.url),
+				),
+			),
+		)
+	const path = join(root, 'epub-screening.epub')
+	await writeFile(path, await zip.close())
+	return path
+}
+
 export async function writeFormatBooks(root: string) {
 	const png = await sharp({
 		create: { width: 24, height: 32, channels: 3, background: '#567890' },

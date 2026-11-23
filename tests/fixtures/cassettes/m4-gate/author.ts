@@ -7,6 +7,7 @@ import { importFileProject } from '../../../../packages/creator/src/import/wizar
 import { createProduction } from '../../../../packages/creator/src/project/production'
 import { createReplayFetch } from '../../../../packages/creator/src/replay'
 import { picture } from '../m1b-art/fixture'
+import { writeScreeningEpub } from './books'
 import {
 	completion,
 	configuration,
@@ -14,9 +15,13 @@ import {
 	first,
 	joined,
 	other,
+	screeningDirectory,
 } from './fixture'
 
 process.env.NL_REPLAY = ''
+const screening = process.argv.includes('--epub')
+const target = screening ? screeningDirectory : directory
+let classified = 0
 
 // Authored synthetic responses only: this fetch never delegates to a network.
 const synthetic: typeof globalThis.fetch = async (input, init) => {
@@ -40,6 +45,11 @@ const synthetic: typeof globalThis.fetch = async (input, init) => {
 	}
 	const last = body.messages.at(-1).content
 	const prompt: string = typeof last === 'string' ? last : last[0].text
+	if (prompt.startsWith('Classify this EPUB illustration'))
+		return completion({
+			label: classified++ === 0 ? 'scene' : 'irrelevant',
+			reason: 'Synthetic screening result.',
+		})
 	if (
 		body.tools?.some(
 			(tool: { function: { name: string } }) =>
@@ -125,10 +135,10 @@ const root = await mkdtemp(join(homedir(), '.m4-gate-author-'))
 try {
 	const config = createConfigStore(root)
 	await config.update(configuration)
-	await rm(join(directory, 'cassette.jsonl'), { force: true })
+	await rm(join(target, 'cassette.jsonl'), { force: true })
 	const record = createReplayFetch({
 		mode: 'record',
-		directory,
+		directory: target,
 		normalizeIds: true,
 		rebindIds: true,
 		reuseRecorded: true,
@@ -144,10 +154,35 @@ try {
 		() => {},
 	)
 	try {
-		for (const [title, text] of [
-			['纸船', first],
-			['山路', other],
-		]) {
+		if (screening) {
+			const sourcePath = await writeScreeningEpub(root)
+			const imported = await importFileProject({
+				sourcePath,
+				title: 'epub-screening',
+				folder: root,
+				references: [],
+			})
+			assert.equal(imported.status, 'ready')
+			await production.remember(imported.workId, imported.projectDir)
+			const session = await production.get(imported.workId)
+			const visual = session.snapshot().visual?.importedIllustrations
+			assert.deepEqual(visual?.recommended, ['illustration-1'])
+			assert.equal(visual?.candidates.length, 2)
+			await session.confirm({
+				workId: imported.workId,
+				mainVisualId: 'illustration-2',
+				supplementalIds: [],
+				characters: [],
+			})
+			await session.queue.idle()
+			assert.notEqual(session.snapshot().phase, 'confirm-visual')
+		}
+		for (const [title, text] of screening
+			? []
+			: [
+					['纸船', first],
+					['山路', other],
+				]) {
 			const sourcePath = join(root, `${title}.txt`)
 			await writeFile(sourcePath, text)
 			const imported = await importFileProject({

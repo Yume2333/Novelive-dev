@@ -2,6 +2,7 @@ import type { CommandInput } from '../../../../packages/creator/src/contract'
 import { configuration as base } from '../m1b-gate/fixture'
 
 export const directory = import.meta.dirname
+export const screeningDirectory = `${directory}/epub-screening`
 export const first =
 	'Chapter 1 Boat\nA paper boat drifted beneath the bridge.\nChapter 2 Light\nThe lamp lit the river and the boat sailed on.\n'
 export const joined =
