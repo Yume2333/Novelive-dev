@@ -6,6 +6,7 @@ import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
 import sharp from 'sharp'
 import { expect, test, vi } from 'vitest'
+import { ArtProduction } from '../../packages/creator/src/pipeline/art'
 import * as background from '../../packages/creator/src/pipeline/art/background'
 import { checkImage } from '../../packages/creator/src/pipeline/art/check'
 import {
@@ -188,6 +189,77 @@ test('confirms three main visuals and costumes, stages the chapter and draws can
 			})
 	})
 }, 45_000)
+
+test('bounds review images without shrinking generation references', async () => {
+	const render = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, refs, size) => {
+			expect(await sharp(refs[0]).metadata()).toMatchObject({
+				width: 2048,
+				height: 1024,
+			})
+			return { bytes: await picture(size.width, size.height, false) }
+		})
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(
+			async (_connection, prompt, _schema, _options, images) => {
+				if (!prompt.startsWith('Visually audit')) return { content: '窗光' }
+				expect(await sharp(images?.[0]).metadata()).toMatchObject({
+					width: 1536,
+					height: 864,
+				})
+				expect(await sharp(images?.[1]).metadata()).toMatchObject({
+					width: 2048,
+					height: 1024,
+				})
+				return { pass: true, failedChecks: [], feedback: '' }
+			},
+		)
+	try {
+		await projectTest(async (project) => {
+			const path = 'assets/style/reference.png'
+			await project.writeFile(path, await picture(2048, 1024, false))
+			const art = new ArtProduction(project, {
+				replay,
+				main,
+				fast: main,
+				visual: main,
+				image: {
+					baseUrl: main.baseUrl,
+					apiKey: main.apiKey,
+					model: 'fixture-art-image',
+					nativeMaxEdge: 2048,
+					concurrency: 1,
+					retries: 0,
+					quality: 'medium',
+					postProcess: 'off',
+					upscaleTier: 'anime',
+				},
+			})
+			const pool = await art.candidates(
+				{
+					...bible,
+					characters: [],
+					style: {
+						...bible.style,
+						references: [{ path, description: 'Style' }],
+					},
+				},
+				[],
+			)
+			expect(pool.mainVisuals).toHaveLength(3)
+			expect(
+				model.mock.calls.filter(([, prompt]) =>
+					prompt.startsWith('Visually audit'),
+				),
+			).toHaveLength(3)
+		})
+	} finally {
+		render.mockRestore()
+		model.mockRestore()
+	}
+}, 30_000)
 
 test('preserves audited art when the local upscaler is unavailable', async () => {
 	const render = vi

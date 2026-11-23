@@ -133,8 +133,20 @@ function characterBriefFallback(
 }
 
 async function auditPreview(png: Buffer) {
-	const { hasAlpha, width, height } = await sharp(png).metadata()
-	if (!hasAlpha) return { png }
+	const image = sharp(png)
+	const metadata = await image.metadata()
+	let { width, height } = metadata
+	const edge = 1536
+	if (width > edge || height > edge) {
+		const { data, info } = await image
+			.resize({ width: edge, height: edge, fit: 'inside' })
+			.png()
+			.toBuffer({ resolveWithObject: true })
+		png = data
+		width = info.width
+		height = info.height
+	}
+	if (!metadata.hasAlpha) return { png }
 	const tile = Math.max(1, Math.round(Math.min(width, height) / 24))
 	const checkerboard = Buffer.from(
 		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><pattern id="checker" width="${tile * 2}" height="${tile * 2}" patternUnits="userSpaceOnUse"><rect width="${tile * 2}" height="${tile * 2}" fill="#ddd"/><path d="M0 0h${tile}v${tile}H0z M${tile} ${tile}h${tile}v${tile}h-${tile}z" fill="#aaa"/></pattern></defs><rect width="100%" height="100%" fill="url(#checker)"/></svg>`,

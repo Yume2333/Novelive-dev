@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { obj } from '@earendil-works/pi-schema'
+import sharp from 'sharp'
 import { afterEach, expect, test, vi } from 'vitest'
 import { testTextConnection } from '../../packages/creator/src/models/text'
 import {
@@ -17,6 +18,147 @@ import {
 import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
 
 afterEach(() => vi.unstubAllEnvs())
+
+test('admits the recorded-size vision payload and exposes a settled 2× overshoot', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '0.8')
+	const pixels = Buffer.alloc(1536 * 864 * 3)
+	let seed = 42
+	for (let i = 0; i < Math.floor(1536 * 864 * 0.64); i++) {
+		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+		pixels[i * 3] = seed >>> 24
+		pixels[i * 3 + 1] = seed >>> 16
+	}
+	const png = await sharp(pixels, {
+		raw: { width: 1536, height: 864, channels: 3 },
+	})
+		.png()
+		.toBuffer()
+	const url = `data:image/png;base64,${png.toString('base64')}`
+	expect(url.length).toBeGreaterThan(2_600_000)
+	expect(url.length).toBeLessThan(2_800_000)
+	const request = (image: boolean, maxTokens = 64000) =>
+		new Request('https://example.invalid/v1/chat/completions', {
+			method: 'POST',
+			body: JSON.stringify({
+				model: 'gemini-3.8-flash',
+				max_tokens: maxTokens,
+				messages: [
+					{
+						role: 'user',
+						content: [
+							{ type: 'text', text: 'Audit this image.' },
+							...(image ? [{ type: 'image_url', image_url: { url } }] : []),
+						],
+					},
+				],
+			}),
+		})
+	const quote = await quoteSpend(request(true))
+	expect(quote.tokens - (await quoteSpend(request(false))).tokens).toBe(53248)
+	expect(quote.tokens).toBeLessThan(120_000)
+	using database = new DatabaseSync(':memory:')
+	const spend = projectSpend(database)
+	await spend(request(false, 100_000), async () =>
+		Response.json({ usage: { total_tokens: 161247 } }),
+	)
+	const settled = 2 * quote.tokens + 1
+	const send = vi.fn(async () =>
+		Response.json({ usage: { total_tokens: settled } }),
+	)
+	await spend(request(true), send)
+	expect(send).toHaveBeenCalledOnce()
+	expect(
+		database
+			.prepare(
+				'SELECT tokens, actual_tokens FROM spend_reservation WHERE actual_tokens > 2 * tokens',
+			)
+			.all(),
+	).toEqual([{ tokens: quote.tokens, actual_tokens: settled }])
+})
+
+test.each([
+	['responses', { type: 'input_image' }],
+	['messages', { type: 'image' }],
+] as const)('quotes inline vision parts on /%s', async (route, part) => {
+	const data = (
+		await sharp({
+			create: { width: 1025, height: 12, channels: 3, background: '#fff' },
+		})
+			.png()
+			.toBuffer()
+	).toString('base64')
+	const build = (withImage: boolean) => {
+		const image =
+			part.type === 'input_image'
+				? { ...part, image_url: `data:image/png;base64,${data}` }
+				: { ...part, source: { type: 'base64', media_type: 'image/png', data } }
+		const messages = [
+			{ role: 'user', content: withImage ? [image, image] : [] },
+		]
+		return new Request(`https://example.invalid/v1/${route}`, {
+			method: 'POST',
+			body: JSON.stringify(
+				route === 'responses'
+					? { input: messages, max_output_tokens: 32 }
+					: { messages, max_tokens: 32 },
+			),
+		})
+	}
+	expect(
+		(await quoteSpend(build(true))).tokens -
+			(await quoteSpend(build(false))).tokens,
+	).toBe(2 * 53248)
+})
+
+test('retains the byte quote for text including large fields and non-input metadata', async () => {
+	const text = '字'.repeat(16_385)
+	const body = {
+		model: 'fixture',
+		max_tokens: 32,
+		messages: [{ role: 'user', content: text }],
+		metadata: { content: [{ type: 'image_url', image_url: 'text' }] },
+	}
+	const quote = await quoteSpend(
+		new Request('https://example.invalid/v1/chat/completions', {
+			method: 'POST',
+			body: JSON.stringify(body),
+		}),
+	)
+	expect(quote).toEqual({
+		tokens:
+			1024 +
+			32 +
+			Buffer.byteLength(text) +
+			Buffer.byteLength(
+				'modelfixturemax_tokens32messagesroleusercontentmetadatacontenttypeimage_urlimage_urltext',
+			),
+		images: 0,
+	})
+})
+
+test.each([
+	'https://example.invalid/image.png',
+	'data:image/png;base64,broken',
+])('rejects a vision input with unknown dimensions: %s', async (url) => {
+	await expect(
+		quoteSpend(
+			new Request('https://example.invalid/v1/chat/completions', {
+				method: 'POST',
+				body: JSON.stringify({
+					max_tokens: 32,
+					messages: [
+						{
+							role: 'user',
+							content: [{ type: 'image_url', image_url: { url } }],
+						},
+					],
+				}),
+			}),
+		),
+	).rejects.toThrow('无法核算此模型请求的预算')
+})
 
 test('overshoot factors change the reserved output but not dispatch or actual settlement', async () => {
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '10000')
@@ -339,9 +481,14 @@ test('exhausted image and token caps block image edits, generation, and visual r
 	await expect(
 		image('edit', [Buffer.from('fixture')], size, false),
 	).rejects.toThrow('超出工程预算')
+	const review = await sharp({
+		create: { width: 32, height: 32, channels: 3, background: '#fff' },
+	})
+		.png()
+		.toBuffer()
 	await expect(
 		artJson(configuration.models.visual, 'review', obj({}), { replay }, [
-			Buffer.from('fixture'),
+			review,
 		]),
 	).rejects.toThrow('超出工程预算')
 	expect(fetch).not.toHaveBeenCalled()
