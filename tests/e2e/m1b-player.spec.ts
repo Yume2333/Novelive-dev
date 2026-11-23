@@ -59,7 +59,9 @@ for (const missingAsset of [false, true]) {
 				const text = page.locator('.nl-player-textbox')
 				await expect(text).toHaveAttribute('data-kind', 'dialogue')
 				await expect(text.locator('.nl-player-name')).toHaveText('旅人')
-				await expect(text.locator('.nl-player-text')).toHaveText('你好，世界。')
+				await expect(text.locator('.nl-text-display')).toHaveText(
+					'你好，世界。',
+				)
 				await expect(page.locator('aside')).toHaveCount(0)
 				async function at(x: number, y: number) {
 					const pixels = await sharp(await canvas.screenshot())
@@ -77,23 +79,38 @@ for (const missingAsset of [false, true]) {
 				await mkdir(evidence, { recursive: true })
 				if (!missingAsset)
 					await page.screenshot({ path: `${evidence}/05-minimal-player.png` })
-				const advance = () => canvas.click({ position: { x: 20, y: 20 } })
+				const advance = async () => {
+					const viewport = page.locator('.nl-player-text')
+					await expect(viewport).toHaveAttribute(
+						'data-revealed',
+						String(
+							await viewport.locator('.nl-text-display [data-glyph]').count(),
+						),
+					)
+					await canvas.click({ position: { x: 20, y: 20 } })
+				}
 				await advance()
 				await expect(text).toHaveAttribute('data-kind', 'inner')
 				await expect(text.locator('.nl-player-name')).toHaveText('听者')
-				await expect(text.locator('.nl-player-text')).toHaveText('我在想什么？')
+				await expect(text.locator('.nl-text-display')).toHaveText(
+					'我在想什么？',
+				)
 				await expect(text).toHaveCSS('font-style', 'italic')
 				await advance()
 				await expect(text).toHaveAttribute('data-kind', 'narration')
 				await expect(text.locator('.nl-player-name')).toHaveCount(0)
-				await expect(text).toHaveText('风从窗边吹过。')
+				await expect(text.locator('.nl-text-display')).toHaveText(
+					'风从窗边吹过。',
+				)
 				await advance()
 				await expect(text).toHaveCount(0)
 				await expect(
-					page.locator('.nl-player-caption[data-kind="caption"]'),
+					page.locator(
+						'.nl-player-caption[data-kind="caption"] .nl-text-display',
+					),
 				).toHaveText('黄昏时分')
 				await advance()
-				await expect(text.locator('.nl-player-text')).toHaveText('屋子静了。')
+				await expect(text.locator('.nl-text-display')).toHaveText('屋子静了。')
 				await expect(text.locator('.nl-player-name')).toHaveText('来客')
 				await expect.poll(() => at(0.5, 0.4)).toEqual([32, 48, 96])
 				await expect.poll(() => at(0.25, 0.4)).toEqual([224, 96, 48])
