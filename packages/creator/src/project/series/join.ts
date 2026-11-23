@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
-	type BiblePatch,
 	defaultWorkSettings,
 	formatVersion,
 	projectFiles,
@@ -23,12 +22,9 @@ export type JoinBook = {
 		bytes: Uint8Array
 	}
 	settings?: WorkSettings
-	biblePatch?: BiblePatch
 }
 
 export async function joinSeries(project: Project, book: JoinBook) {
-	if (book.biblePatch?.some(({ op }) => op === 'delete'))
-		throw new Error('Joining a series cannot delete existing entries')
 	if (
 		!book.title.trim() ||
 		!book.language.trim() ||

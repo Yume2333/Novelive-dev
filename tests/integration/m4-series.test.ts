@@ -136,7 +136,7 @@ test('whole-entry overlays and CSS follow series, volume, work order, including 
 	await expect(resolveSeries(p, scopes[2])).rejects.toThrow('invalid JSON')
 })
 
-test('join appends collision-free sources without modifying shared entries or originals and rejects deletion', async () => {
+test('join appends collision-free sources without modifying shared entries or originals', async () => {
 	using p = await project()
 	await p.writeFile('source/original.txt', 'old original')
 	await p.writeFile('source/chapters/ch1.txt', 'old chapter')
@@ -177,12 +177,6 @@ test('join appends collision-free sources without modifying shared entries or or
 	expect(await Promise.all(files.map((file) => p.readFile(file)))).toEqual(
 		before,
 	)
-	await expect(
-		joinSeries(p, {
-			...book,
-			biblePatch: [{ kind: 'character', op: 'delete', entry: character }],
-		}),
-	).rejects.toThrow('cannot delete')
 	await expect(joinSeries(p, { ...book, chapters: [] })).rejects.toThrow(
 		'nonempty chapters',
 	)
