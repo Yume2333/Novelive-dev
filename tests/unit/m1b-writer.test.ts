@@ -9,6 +9,7 @@ import {
 	ContextLimitError,
 	reviewChapter,
 	ScriptDiagnosticsError,
+	type WritingProgress,
 	writeChapter,
 } from '../../packages/creator/src/pipeline/writing'
 import { promptFits } from '../../packages/creator/src/pipeline/writing/budget'
@@ -372,7 +373,7 @@ describe('M1b writer', () => {
 		])
 	})
 
-	test('recording reuses a completed writing batch after the run budget pauses the next batch', async () => {
+	test('resumes completed writing batches from saved progress without replaying a cassette', async () => {
 		const directory = await mkdtemp(join(tmpdir(), 'novelive-writing-resume-'))
 		using db = new DatabaseSync(':memory:')
 		const second = 'scene Shore\nsource p0002\n: The boat reached the shore.'
@@ -390,7 +391,6 @@ describe('M1b writer', () => {
 			createReplayFetch({
 				mode: 'record',
 				directory,
-				reuseRecorded: true,
 				fetch: provider.fetch,
 				spend: (request, send) =>
 					projectSpend(db)(request, async (admitted, quote) => {
@@ -409,13 +409,18 @@ describe('M1b writer', () => {
 		vi.stubEnv('NL_RUN_TOKEN_CAP', '100000')
 		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
 		vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '1')
+		const progress: WritingProgress = []
 		try {
-			await expect(writeChapter(input, options())).rejects.toThrow(
+			await expect(writeChapter(input, options(), progress)).rejects.toThrow(
 				'超出工程预算',
 			)
 			expect(provider.requests).toHaveLength(1)
 			vi.stubEnv('NL_RUN_TOKEN_CAP', '100000')
-			const { scenes } = await writeChapter(input, options())
+			const { scenes } = await writeChapter(
+				input,
+				options(),
+				JSON.parse(JSON.stringify(progress)),
+			)
 			expect(scenes.map(({ scene }) => scene.source.from)).toEqual([
 				'p0001',
 				'p0002',

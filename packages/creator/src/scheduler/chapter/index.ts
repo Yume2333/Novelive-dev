@@ -19,6 +19,7 @@ export type StepContext = {
 	chapterId: string
 	link: ChapterLink
 	desensitized: boolean
+	resumingBudget?: boolean
 	signal: AbortSignal
 }
 export type DrawJob = {
@@ -88,6 +89,7 @@ type TaskRow = {
 	phase: string
 	attempts: number
 	desensitized: number
+	error_type: string | null
 	run_id: string | null
 }
 type Inflight = { runId: string; controller: AbortController }
@@ -274,7 +276,7 @@ export class ChapterScheduler {
 					workId,
 				)
 				this.exec(
-					`UPDATE task SET status = 'queued', error_type = NULL
+					`UPDATE task SET status = 'queued'
 					WHERE work_id = ? AND kind = 'chapter' AND status = 'needs_attention' AND error_type = 'budget_paused'`,
 					workId,
 				)
@@ -760,6 +762,7 @@ export class ChapterScheduler {
 					chapterId: task.ref_id,
 					link,
 					desensitized,
+					resumingBudget: task.error_type === 'budget_paused',
 					signal,
 				}
 				return name === 'stage'
@@ -773,8 +776,9 @@ export class ChapterScheduler {
 			}
 			this.transaction(() => {
 				task.attempts = 0
+				task.error_type = null
 				this.exec(
-					'UPDATE task SET phase = ?, attempts = 0 WHERE task_id = ?',
+					'UPDATE task SET phase = ?, attempts = 0, error_type = NULL WHERE task_id = ?',
 					nextPhase[name],
 					task.task_id,
 				)

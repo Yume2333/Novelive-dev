@@ -333,10 +333,12 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 	test.setTimeout(75_000)
 	const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-soft-stop-'))
 	const cassette = join(root, 'cassette')
+	const fallback = join(root, 'fallback')
 	const projects = join(root, 'projects')
 	const source = join(root, '纸船与灯火.txt')
 	const project = join(projects, '纸船与灯火')
 	const writer = 'loopback-writing-budget'
+	const malformedAttempts = 3
 	const script = 'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。'
 	const calls: unknown[] = []
 	const unexpected: string[] = []
@@ -355,7 +357,11 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 			return
 		}
 		calls.push(body.messages)
-		const initial = calls.length === 1
+		if (calls.length <= malformedAttempts) {
+			response.writeHead(200, { 'content-type': 'application/json' }).end('{')
+			return
+		}
+		const initial = calls.length === malformedAttempts + 1
 		const events = [
 			{
 				choices: [
@@ -389,9 +395,10 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 		await Promise.all([
 			mkdir(projects),
 			mkdir(cassette),
+			mkdir(fallback),
 			writeFile(source, original),
 		])
-		await combineCassettes(cassette)
+		await combineCassettes(fallback)
 		await new Promise<void>((resolve, reject) => {
 			provider.once('error', reject)
 			provider.listen(0, '127.0.0.1', resolve)
@@ -409,7 +416,7 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 					ELECTRON_RENDERER_URL: '',
 					NL_REPLAY: 'record',
 					NL_PRODUCTION_CASSETTE_DIR: cassette,
-					NL_PRODUCTION_FALLBACK_DIR: '',
+					NL_PRODUCTION_FALLBACK_DIR: fallback,
 					NL_IMAGE_BASE_URL: baseUrl,
 					NL_IMAGE_API_KEY: 'offline-placeholder',
 					NL_RUN_TOKEN_CAP: cap,
@@ -421,6 +428,15 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 		const openQueue = async (page: Page) => {
 			await page.getByRole('button', { name: /^全局制作状态：/ }).click()
 			return page.getByRole('dialog', { name: '制作队列' })
+		}
+		const close = async (app: Awaited<ReturnType<typeof launch>>) => {
+			await app.evaluate(({ dialog }) => {
+				dialog.showMessageBox = async () => ({
+					response: 1,
+					checkboxChecked: false,
+				})
+			})
+			await app.close()
 		}
 		const app = await launch('100000')
 		try {
@@ -471,6 +487,10 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 				.first()
 				.check()
 			await page.getByRole('button', { name: '确认并制作第一章' }).click()
+			const retry = page.getByRole('button', { name: '重试' })
+			await expect(retry).toBeVisible()
+			expect(calls).toHaveLength(malformedAttempts)
+			await retry.click()
 			await expect(page.getByText(/软停止线 80000 tokens/)).toBeVisible()
 			const queue = await openQueue(page)
 			await expect(queue.getByText('已暂停：模型预算不足')).toBeVisible()
@@ -478,11 +498,12 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 				.getByRole('listitem')
 				.filter({ hasText: '已暂停：模型预算不足' })
 				.hover()
-			expect(calls).toHaveLength(1)
+			expect(calls).toHaveLength(malformedAttempts + 1)
+			expect(calls[malformedAttempts]).toEqual(calls[0])
 			expect(unexpected).toEqual([])
 			await capture(page, '08-writing-budget-paused')
 		} finally {
-			await app.close()
+			await close(app)
 		}
 		const resumed = await launch('200000')
 		try {
@@ -504,13 +525,13 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 				)
 				.toContain('暮色中，一只纸船从桥下漂过。')
 			await expect(queue.getByText('已暂停：模型预算不足')).toHaveCount(0)
-			expect(calls).toHaveLength(2)
-			expect(JSON.stringify(calls[1])).toContain(
+			expect(calls).toHaveLength(malformedAttempts + 2)
+			expect(JSON.stringify(calls.at(-1))).toContain(
 				'Repair only the supplied scene',
 			)
 			await capture(page, '09-writing-budget-resumed')
 		} finally {
-			await resumed.close()
+			await close(resumed)
 		}
 	} finally {
 		if (provider.listening)

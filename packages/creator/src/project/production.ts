@@ -52,10 +52,10 @@ export function createProduction(
 			...(mode === 'record' && !replay?.directory
 				? {
 						directory: join(project.root, '.novelive', 'production-cassettes'),
-						reuseRecorded: true,
 					}
 				: {}),
 			...replay,
+			reuseRecorded: mode !== 'record' && replay?.reuseRecorded,
 			spend: projectSpend(project.database),
 		}
 	}
