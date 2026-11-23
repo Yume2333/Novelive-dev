@@ -49,7 +49,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 		},
 	})
 	const compiled = compileScript(
-		'scene 夜\nsource p0001\n@bg room/dusk transition none\n@show traveler/coat/calm center\n: First #0001\n@camera sway duration 0.4\n@wait 0.01 #0005\n@move center left duration 0.01\n: Second #0002\n@camera reset duration 0.4\n@filter brightness value 0.5\n: Dim #0003\n: Auto #0004',
+		'scene 夜\nsource p0001\n@bg room/dusk transition none\n@show traveler/coat/calm center\n: First #0001\n@camera sway duration 0.4\n@wait 0.01 #0005\n@hide center transition none\n@show traveler/coat/calm center transition none\n@move center left duration 0.2\n: Second #0002\n@camera reset duration 0.4\n@filter brightness value 0.5\n: Dim #0003\n: Auto #0004',
 		{ ...context, paragraphIds: ['p0001'], sceneIds: ['aaaabbbb'] },
 	)
 	if (!compiled.ok) throw new Error(JSON.stringify(compiled.diagnostics))
@@ -164,6 +164,23 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 		await page.locator('canvas').click({ position: { x: 20, y: 100 } })
 		await expect(page.locator('.nl-player-text')).toHaveCount(0)
 		await expect(page.locator('.nl-player-text')).toHaveText('Second')
+		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+			'aria-busy',
+			'false',
+		)
+		await page.evaluate(async () => {
+			const { player } = globalThis as unknown as StageHarness
+			const settled = player.progress.history.entries.at(-1)
+			if (!settled) throw new Error('Missing settled sentence history')
+			await player.restore(settled)
+		})
+		expect(
+			await page.evaluate(
+				() =>
+					(globalThis as unknown as StageHarness).player.state.sprites.center
+						?.transform.x,
+			),
+		).toBe(240)
 		expect(
 			await page.evaluate(
 				() =>

@@ -234,7 +234,6 @@ export async function mountMinimalPlayer(
 				false,
 				() => {
 					snapshot = incoming
-					if (snapshot) progress.record(snapshot)
 					renderText(state.text)
 				},
 			)
@@ -245,6 +244,7 @@ export async function mountMinimalPlayer(
 					{ ...stage.state, text: beat.cue.text },
 					[{ restore: 'restart-text' }],
 				)
+				progress.record(snapshot)
 			}
 			schedule(beat)
 		} catch (error) {
