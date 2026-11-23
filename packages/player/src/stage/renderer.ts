@@ -138,6 +138,33 @@ export class PixiStage {
 			sprite.scale.x *= item.transform.scaleX
 			sprite.scale.y *= item.transform.scaleY
 			sprite.rotation = item.transform.rotation
+			const prior = previous?.sprites[slot as keyof typeof slotX]
+			const portraitChange = actions.find(
+				(action) =>
+					['face', 'costume'].includes(action.name) &&
+					action.assets.some((asset) => asset.id === item.assetId),
+			)
+			if (
+				prior &&
+				prior.assetId !== item.assetId &&
+				portraitChange &&
+				!instant
+			) {
+				const outgoing = image(prior.assetId, pictures, true)
+				outgoing.position.copyFrom(sprite.position)
+				outgoing.scale.x *= prior.transform.scaleX
+				outgoing.scale.y *= prior.transform.scaleY
+				outgoing.rotation = prior.transform.rotation
+				pictures.setChildIndex(outgoing, pictures.getChildIndex(sprite))
+				this.animate(
+					Number(portraitChange.args.duration),
+					(p) => {
+						sprite.alpha = p
+						outgoing.alpha = 1 - p
+					},
+					() => outgoing.destroy(),
+				)
+			}
 			const move = actions.find(
 				(action) => action.name === 'move' && action.args.slot === slot,
 			)
@@ -156,10 +183,8 @@ export class PixiStage {
 		if (state.foreground) image(state.foreground, pictures)
 		const change = actions.find(
 			(action) =>
-				['bg', 'show', 'face', 'costume', 'hide'].includes(action.name) &&
-				(action.name === 'face' ||
-					action.name === 'costume' ||
-					action.args.transition !== 'none'),
+				['bg', 'show', 'hide'].includes(action.name) &&
+				action.args.transition !== 'none',
 		)
 		if (change && !instant && previous) {
 			const duration = Number(change.args.duration)
