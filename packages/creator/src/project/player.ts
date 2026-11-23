@@ -29,7 +29,8 @@ export async function loadPlayerChapter(
 		)
 		const scope = { level: 'work', volumeId, workId } as const
 		const [bible, registry] = await Promise.all([
-			resolveBible(project, scope), resolveRegistry(project, scope),
+			resolveBible(project, scope),
+			resolveRegistry(project, scope),
 		])
 		const speakers = new Map(
 			bible.character.map((entry) => [entry.id, entry.name]),

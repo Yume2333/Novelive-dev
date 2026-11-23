@@ -16,8 +16,9 @@
 ## Progress
 
 Check after: `NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.test.ts` → 1 file / 4 tests passed；最终含该文件及 art、production-worker 的受影响回归 → 3 files / 23 tests passed。证据：`.workflow/evidence/m4-longform/06-series-pipeline.txt`。
-验证：既有 synthesis、writer、player、工程集成通过；art 旧断言的回归已修正为仅在下级 scope 跳过已绘制任务，art 与 production-worker 复验通过；`pnpm typecheck`、`pnpm lint` 成功。
+验证：PR #50 审查修正后，任务集成及 synthesis、writer、art、production-worker、player、revisions、dev-bridge 共 8 files / 113 tests 通过；`pnpm typecheck`、`pnpm lint` 成功。生产美术写系列、读作品覆盖；保留绘制任务和暂存元数据，已有图片由 draw 复用；登记表只写本级变更。
 真实服务路径：离线集成从磁盘工程调用 joinSeries、prepareSeries、productionBible、ArtProduction.register 与 writeChapter；没有使用付费接口，没有新增 cassette。Electron W2 整体验收尚未运行。
 Review: skipped — 当前宿主未提供可创建独立审查 subagent 的工具；需协调者安排新上下文审查。
 后续接线：02–05 导入协调者将提取章节交给 joinSeries；保留新的 `source/imports/<volumeId>/original.*`，不调用旧的空工程导入布局。向导接线按本次范围明确不做。
 后续接线：07 在队列服务接入 prepareSeries 的 onReady，将当前卷立即交付制作；本任务不改 production.ts、scheduler/ 或导入器。目标语言沿用 work.language。
+审查修正：综合验证与提示词使用同一 scoped Bible；joinSeries 不接受设定补丁，补丁由后续增量综合产生。播放器响应契约无 CSS 字段，已去掉播放加载路径的无用 CSS 读取，CSS 解析 API 仍可供后续接线使用。

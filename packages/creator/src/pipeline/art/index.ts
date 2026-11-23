@@ -4,8 +4,8 @@ import {
 	type AssetRegistry,
 	type ChapterRef,
 	formatVersion,
-	overlayEntries,
 	type ImageJobResult,
+	overlayEntries,
 	type ProjectScope,
 	projectFiles,
 	type Style,
@@ -87,9 +87,13 @@ export class ArtProduction {
 	private async persistRegistry(registry: AssetRegistry) {
 		const local = await optionalFile(() => this.project.read(this.registryFile))
 		const resolved = await this.registry()
-		const changed = registry.entries.filter((entry) => !isDeepStrictEqual(
-			entry, resolved.entries.find((existing) => existing.id === entry.id),
-		))
+		const changed = registry.entries.filter(
+			(entry) =>
+				!isDeepStrictEqual(
+					entry,
+					resolved.entries.find((existing) => existing.id === entry.id),
+				),
+		)
 		await this.project.write(this.registryFile, {
 			formatVersion,
 			entries: overlayEntries(local?.entries ?? [], changed),

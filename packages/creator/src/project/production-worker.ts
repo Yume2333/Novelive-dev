@@ -175,8 +175,15 @@ export function chapterWorker(
 				bible.glossary.map(({ original, written }) => [original, written]),
 			),
 			bible: JSON.stringify(bible),
-			...(bible.character.length || bible.location.length || bible.glossary.length
-				? { canonicalNames: { characters: bible.character, locations: bible.location } }
+			...(bible.character.length ||
+			bible.location.length ||
+			bible.glossary.length
+				? {
+						canonicalNames: {
+							characters: bible.character,
+							locations: bible.location,
+						},
+					}
 				: {}),
 			...(ctx.desensitized
 				? {

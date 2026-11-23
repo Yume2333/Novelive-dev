@@ -10,6 +10,7 @@ import {
 	joinSeries,
 	resolveSeries,
 } from '../../packages/creator/src/project/series'
+import { synthesizeVolume } from '../../packages/creator/src/synthesis'
 import { prepareSeries } from '../../packages/creator/src/synthesis/incremental'
 import {
 	concatenateStyles,
@@ -229,23 +230,40 @@ test('volume two art reuses a drawn series character and writer uses target lang
 	}
 	const firstService = new ArtProduction(p, {
 		...artOptions,
-		readScope: { level: 'work', volumeId: first.volumeId, workId: first.workId },
+		readScope: {
+			level: 'work',
+			volumeId: first.volumeId,
+			workId: first.workId,
+		},
 	})
-	await firstService.register([{ id: asset.id, kind: 'character', description: 'Lin' }], art)
-	await p.writeFile('source/portrait.webp', Buffer.from('existing character pixels'))
+	await firstService.register(
+		[{ id: asset.id, kind: 'character', description: 'Lin' }],
+		art,
+	)
+	await p.writeFile(
+		'source/portrait.webp',
+		Buffer.from('existing character pixels'),
+	)
 	await firstService.adopt(asset.id, 'source/portrait.webp')
 	const service = new ArtProduction(p, {
 		...artOptions,
-		readScope: { level: 'work', volumeId: second.volumeId, workId: second.workId },
+		readScope: {
+			level: 'work',
+			volumeId: second.volumeId,
+			workId: second.workId,
+		},
 	})
 	const jobs = await service.register(
 		[{ id: asset.id, kind: 'character', description: 'Lin' }],
 		art,
 		undefined,
 		undefined,
-		async ({ jobs }) => { expect(jobs.map((job) => job.assetId)).toEqual([asset.id]) },
+		async ({ jobs }) => {
+			expect(jobs.map((job) => job.assetId)).toEqual([asset.id])
+		},
 	)
-	for (const job of jobs) expect(await service.draw(job, art)).toEqual({ status: 'drawn' })
+	for (const job of jobs)
+		expect(await service.draw(job, art)).toEqual({ status: 'drawn' })
 	expect((await service.registry()).entries[0].status).toBe('drawn')
 	expect(imageFetch).not.toHaveBeenCalled()
 	const requests: string[] = []
@@ -351,12 +369,117 @@ test('incremental preparation reports volume one before later work, passes diges
 test('art registration persists local entries without freezing inherited rows', async () => {
 	using p = await project()
 	const joined = await joinSeries(p, book)
-	const scope = { level: 'work', volumeId: joined.volumeId, workId: joined.workId } as const
-	await p.write(projectFiles.assetRegistry(series), { formatVersion: 1, entries: [{ id: 'room/day', type: 'location', path: 'assets/room.webp', status: 'drawn', aliases: [] }] })
+	const scope = {
+		level: 'work',
+		volumeId: joined.volumeId,
+		workId: joined.workId,
+	} as const
+	await p.write(projectFiles.assetRegistry(series), {
+		formatVersion: 1,
+		entries: [
+			{
+				id: 'room/day',
+				type: 'location',
+				path: 'assets/room.webp',
+				status: 'drawn',
+				aliases: [],
+			},
+		],
+	})
 	const { art } = await productionBible(p, joined.volumeId, joined.workId)
-	const service = new ArtProduction(p, { scope, main: connection, fast: connection, visual: connection, image: { baseUrl: 'https://relay.invalid/v1', apiKey: 'offline', model: 'fixture-image', concurrency: 1, retries: 0, quality: 'low', nativeMaxEdge: 1536, postProcess: 'off', upscaleTier: 'anime' } })
-	await service.register([{ id: 'cg-local', kind: 'cg', description: 'Local scene' }], art)
-	expect((await p.read(projectFiles.assetRegistry(scope))).entries.map(({ id }) => id)).toEqual(['cg-local'])
-	await p.write(projectFiles.assetRegistry(series), { formatVersion: 1, entries: [{ id: 'room/day', type: 'location', path: 'assets/updated.webp', status: 'drawn', aliases: [] }] })
-	expect((await service.registry()).entries.find(({ id }) => id === 'room/day')?.path).toBe('assets/updated.webp')
+	const service = new ArtProduction(p, {
+		scope,
+		main: connection,
+		fast: connection,
+		visual: connection,
+		image: {
+			baseUrl: 'https://relay.invalid/v1',
+			apiKey: 'offline',
+			model: 'fixture-image',
+			concurrency: 1,
+			retries: 0,
+			quality: 'low',
+			nativeMaxEdge: 1536,
+			postProcess: 'off',
+			upscaleTier: 'anime',
+		},
+	})
+	await service.register(
+		[{ id: 'cg-local', kind: 'cg', description: 'Local scene' }],
+		art,
+	)
+	expect(
+		(await p.read(projectFiles.assetRegistry(scope))).entries.map(
+			({ id }) => id,
+		),
+	).toEqual(['cg-local'])
+	await p.write(projectFiles.assetRegistry(series), {
+		formatVersion: 1,
+		entries: [
+			{
+				id: 'room/day',
+				type: 'location',
+				path: 'assets/updated.webp',
+				status: 'drawn',
+				aliases: [],
+			},
+		],
+	})
+	expect(
+		(await service.registry()).entries.find(({ id }) => id === 'room/day')
+			?.path,
+	).toBe('assets/updated.webp')
+})
+
+test('synthesis validates relation references against work-level characters', async () => {
+	using p = await project()
+	const joined = await joinSeries(p, book)
+	const scope = {
+		level: 'work',
+		volumeId: joined.volumeId,
+		workId: joined.workId,
+	} as const
+	await p.write(projectFiles.character(scope, 'lin'), {
+		formatVersion: 1,
+		entries: [character, { ...character, id: 'guest', name: 'Guest' }],
+	})
+	const chapterId = joined.chapterIds[0]
+	await p.write(projectFiles.preview(chapterId), {
+		formatVersion: 1,
+		chapterId,
+		summary: 'They meet.',
+		characters: [],
+		locations: [],
+		timelineNotes: [],
+		foreshadowingHints: [],
+	})
+	const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+		sse({
+			overview: 'They meet.',
+			chapters: [{ chapterId, progress: 'Met' }],
+			biblePatch: [
+				{
+					kind: 'relation',
+					op: 'add',
+					entry: {
+						id: 'meeting',
+						status: 'candidate',
+						from: 'lin',
+						to: 'guest',
+						description: 'Friends',
+					},
+				},
+			],
+			glossaryPatch: [],
+		}),
+	)
+	const result = await synthesizeVolume(p, joined.volumeId, [chapterId], {
+		connection,
+		scope,
+		language: 'en',
+		incremental: true,
+		fetch,
+	})
+	expect(fetch).toHaveBeenCalledTimes(1)
+	expect(result.biblePatch[0].entry.id).toBe('meeting')
 })

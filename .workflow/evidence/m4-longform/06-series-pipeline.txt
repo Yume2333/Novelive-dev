@@ -52,3 +52,27 @@ Real service entry points exercised with on-disk Project and injected synthetic 
 No new cassettes or paid calls. No Electron/visual W2 verification.
 Review: skipped — no independent reviewer/subagent creation tool exposed in this host.
 Follow-ups intentionally outside this task: importer/wizard joinSeries call-site; task 07 queue-service prepareSeries/onReady wiring. No scheduling, importer or shared contract/schema files changed.
+
+PR #50 review corrections (supersedes initial job-filter and join-patch descriptions above):
+- Art writes series scope in production, reads resolved work overlay; keeps all planArt jobs so staging records approved-portrait dependencies. draw reuses the existing image without an image request.
+- Registry persistence merges only changed entries into the write-scope's local file; inherited rows remain live rather than copied down.
+- Synthesis validates model references against contextBible, including work-only characters.
+- Playback response has no CSS field (contract/production.ts production.playerChapter); removed unused CSS resolution, without expanding the contract.
+- JoinBook no longer accepts biblePatch; only subsequent incremental synthesis publishes patches.
+- Empty canonical name collections leave legacy writing prompts unchanged, fixing the m2-revisions strict replay miss from CI.
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.test.ts tests/unit/m1a-synthesis.test.ts tests/unit/m1b-writer.test.ts tests/unit/m1b-art.test.ts tests/unit/m1b-production-worker.test.ts tests/unit/m1b-player.test.ts tests/unit/m2-revisions.test.ts tests/unit/m0-dev-bridge.test.ts
+ Test Files  8 passed (8)
+      Tests  113 passed (113)
+   Start at  03:13:22
+   Duration  10.99s (tests 87%, import 8%, transform 5%)
+Exit code: 0
+New coverage: volume-one art service registers/adopts a portrait into series storage and volume two reuses it; local registry writes do not freeze inherited assets; relation references to work-only characters validate without repair requests.
+
+$ pnpm typecheck && pnpm lint
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 249 files in 103ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+The same existing useTemplate informational diagnostic remains.
