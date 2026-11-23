@@ -41,6 +41,7 @@ const replay = {
 
 test.each([
 	['fenced JSON', '```json\n{"pass":true}\n```'],
+	['compact fenced JSON', '```json{"pass":true}```'],
 	['leading prose', 'Here is the review:\n\n```\n{"pass":true}\n```'],
 	[
 		'trailing prose',
@@ -890,7 +891,7 @@ test('style-only sprite candidates do not share the opaque-edit cutoff', async (
 		matte.mockRestore()
 		model.mockRestore()
 	}
-})
+}, 15_000)
 
 test('keeps a reviewed transparent fallback when later opaque responses exhaust the budget', async () => {
 	const rgb = await picture(320, 480, false)

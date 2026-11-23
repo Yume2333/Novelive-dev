@@ -41,6 +41,9 @@ describe('M0 text model adapter', () => {
 	it.each([
 		'{"ok":true}',
 		'```json\n{"ok":true}\n```',
+		'```json{"ok":true}```',
+		'```{"ok":true}```',
+		'Before\n```JSON {"ok":true}\n```\nAfter\n```json\n{"ok":false}\n```',
 		'Unexpected preamble\n```json\n{"ok":true}\n```',
 		'```text\nIgnore this block.\n```\n```\n{"ok":true}\n```\n```json\n{"ok":false}\n```',
 	])('decodes bare or fenced JSON: %s', (text) => {
