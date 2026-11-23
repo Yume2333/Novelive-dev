@@ -1,5 +1,12 @@
 # M2 gate replay
 
+PR #57 round 2 replaced the Agent proposal and continuation after authorizing
+minimal current-position instructions. The user prompt no longer supplies IDs.
+One recording run passed with two paid requests: proposal 1206 input / 566
+output, continuation 1805 input / 65 output (3642 total tokens). The unchanged
+writer response was reused, not purchased again. Both private ledgers record
+the actual usage. The three committed responses were re-audited as below.
+
 The approved cassette contains three real `gemini-3.8-flash` responses: the Agent
 `propose_rewrite_scene` call with a Chinese code block, the confirmed scene rewrite,
 and the Agent continuation. The provider reports `gemini-3.8-flash-n` in SSE

@@ -14,7 +14,6 @@ import {
 	directory,
 	instruction,
 	revisionProject,
-	sceneId,
 } from '../fixtures/cassettes/m2-revisions/fixture'
 
 const require = createRequire(
@@ -191,7 +190,8 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(agent.getByText('无法读取会话')).toHaveCount(0)
 		await expect(composer).toBeEnabled()
 		await capture(page, '03-agent-loaded')
-		const prompt = `先输出 text 代码块，内容仅为「纸船与灯火」。调用 propose_rewrite_scene 一次：chapterId=${chapterId}, sceneId=${sceneId}, instruction=将第一句改为「暮色里，一只纸船缓缓漂过。」并在结尾增加「远处传来笛声。」保留第二句及所有演出指令, reason=增加声音。确认后只回复「已生成，请勾选差异」。`
+		const prompt =
+			'先输出 text 代码块，内容仅为「纸船与灯火」。对当前位置调用 propose_rewrite_scene 一次：instruction=将第一句改为「暮色里，一只纸船缓缓漂过。」并在结尾增加「远处传来笛声。」保留第二句及所有演出指令, reason=增加声音。确认后只回复「已生成，请勾选差异」。'
 		await composer.fill(prompt)
 		await agent.getByRole('button', { name: '发送', exact: true }).click()
 		const card = agent.getByRole('region', { name: '确认卡' })
