@@ -48,7 +48,7 @@ export async function removeBackground(bytes: Buffer, signal?: AbortSignal) {
 	const matte = await sharp(alpha, {
 		raw: { width: size, height: size, channels: 1 },
 	})
-		.resize(width, height)
+		.resize(width, height, { fit: 'fill' })
 		.toColourspace('b-w')
 		.raw()
 		.toBuffer()
