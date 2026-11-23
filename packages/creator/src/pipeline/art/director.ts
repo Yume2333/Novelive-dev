@@ -178,7 +178,7 @@ export async function directChapterArt(
 		'Each segment starts with a lowercase ASCII letter or digit; the rest may also include underscores and hyphens. Slashes separate segments. Bare character and place IDs are not asset IDs.',
 		'For kind "character" (a costume base) use all three segments, ending in neutral for a new default base (e.g. ada/uniform/neutral), never ada or ada/uniform. An expression uses the same character/costume prefix with its own expression ID.',
 		'For kind "location" (a place base) use both segments, ending in day for a new default base (e.g. room/day), never room. A variant uses the same place prefix with its own variant ID.',
-		'Copy IDs verbatim from the bible and registry below. Reuse registry.entries IDs rather than naming the same asset again. For an asset that needs a new ID, follow the same rules. Keep patch and merge references consistent with the registered or declared asset IDs.',
+		'Build new asset IDs in the per-kind shape above using single-segment IDs from the bible. Reuse a full ID verbatim only from registry.entries. Keep patch and merge references consistent with the registered or declared asset IDs.',
 	].join('\n')
 	const scenes = parsed.scenes.map(formatScene)
 	const budget =

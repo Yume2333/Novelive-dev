@@ -1910,6 +1910,10 @@ test('repairs a bare place ID and then reports every incomplete character asset 
 	for (const prompt of prompts) {
 		expect(prompt).toContain('character: character/costume/expression')
 		expect(prompt).toContain('never ada or ada/uniform')
+		expect(prompt).toContain('using single-segment IDs from the bible')
+		expect(prompt).toContain(
+			'Reuse a full ID verbatim only from registry.entries.',
+		)
 		const [brief] = prompt.split('\nRepair the ', 1)
 		expect(brief).toContain(
 			`Bible and registered assets: ${JSON.stringify({ bible, registry })}`,
