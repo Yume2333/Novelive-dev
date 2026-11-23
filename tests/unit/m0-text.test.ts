@@ -358,6 +358,99 @@ describe('M0 text model adapter', () => {
 		},
 	)
 
+	it.each([
+		{ maxTokens: 32, delayMs: 120_000, stops: false },
+		{ maxTokens: 16_000, delayMs: 120_000, stops: true },
+		{ maxTokens: 32_000, delayMs: 601_000, stops: false },
+		{
+			maxTokens: 16_000,
+			delayMs: 136_001,
+			stops: false,
+			content: 'A'.repeat(196_000),
+			effectiveCap: 5_440,
+			abortMs: 136_000,
+		},
+	])(
+		'waits for delayed headers within the deadline for $maxTokens output tokens',
+		async ({ maxTokens, delayMs, stops, content, effectiveCap, abortMs }) => {
+			vi.useFakeTimers()
+			try {
+				const { promise: started, resolve: start } =
+					Promise.withResolvers<void>()
+				const chunk = {
+					choices: [{ delta: { content: 'OK' }, finish_reason: 'stop' }],
+				}
+				let sentCap: number | undefined
+				let abortedAfter: number | undefined
+				const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+					const request = new Request(input, init)
+					const { signal } = request
+					const now = Date.now()
+					const body = await request.json()
+					sentCap = body.max_completion_tokens ?? body.max_tokens
+					return new Promise((resolve, reject) => {
+						const timer = setTimeout(() => {
+							resolve(
+								new Response(
+									`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
+									{ headers: { 'content-type': 'text/event-stream' } },
+								),
+							)
+						}, delayMs)
+						signal.addEventListener(
+							'abort',
+							() => {
+								abortedAfter = Date.now() - now
+								clearTimeout(timer)
+								reject(signal.reason)
+							},
+							{ once: true },
+						)
+						start()
+					})
+				})
+				const model = buildTextModel({
+					...configured,
+					model: 'fixture-header-deadline',
+					contextWindow: 65_536,
+					maxOutputTokens: 32_000,
+				})
+				const result = createTextStream({ fetch, requestRetries: 0 })(
+					model,
+					normalizeContext({
+						messages: [
+							{
+								role: 'user',
+								content: content ?? 'Reply with OK.',
+								timestamp: 0,
+							},
+						],
+					}),
+					{ apiKey: configured.apiKey, maxTokens },
+				).result()
+				await started
+				await vi.advanceTimersByTimeAsync(delayMs)
+				if (stops)
+					expect(await result).toMatchObject({
+						stopReason: 'stop',
+						content: [{ type: 'text', text: 'OK' }],
+					})
+				else
+					expect(await result).toMatchObject({
+						stopReason: 'error',
+						errorMessage: expect.stringMatching(/^\[network\]/),
+					})
+				expect(fetch).toHaveBeenCalledOnce()
+				if (effectiveCap !== undefined) {
+					expect(sentCap).toBe(effectiveCap)
+					expect(abortedAfter).toBe(abortMs)
+				}
+			} finally {
+				vi.useRealTimers()
+			}
+		},
+	)
+
 	it('reports exhausted disconnects as network errors after two retries', async () => {
 		const fetch = vi.fn(format({ fault: 'disconnect' }))
 		await expect(
