@@ -21,7 +21,7 @@
 	border: 1px solid var(--glass-border);
 	border-radius: var(--radius-md);
 	background: var(--panel-70);
-	color: var(--text-primary);
+	color: var(--color-on-surface);
 	font: inherit;
 	cursor: pointer;
 }
