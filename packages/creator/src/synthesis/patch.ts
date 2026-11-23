@@ -485,6 +485,7 @@ export async function applyPatches(
 	glossary: GlossaryPatch,
 	chapters: ReadonlySet<string>,
 	seriesChapters = chapters,
+	onPublished?: (bible: Bible) => void,
 ): Promise<{ conflicts: BiblePatch; glossaryConflicts: GlossaryPatch }> {
 	const chapterOrder = new Map(
 		Array.from(seriesChapters, (id, index) => [id, index]),
@@ -495,6 +496,7 @@ export async function applyPatches(
 	const characterDeletions: (() => Promise<void>)[] = []
 	const removedCharacters = new Set<string>()
 	const accepted = new Set<Patch>()
+	const published = structuredClone(bible)
 	let survivingCharacters = bible.character
 	let survivingRelations = bible.relation
 	const write = async <T>(
@@ -593,6 +595,7 @@ export async function applyPatches(
 			}
 		}
 		const survivors = [...entries.values()]
+		Object.assign(published, { [kind]: survivors })
 		if (kind === 'character') {
 			survivingCharacters = survivors as Character[]
 			for (const id of removedCharacters) {
@@ -698,6 +701,7 @@ export async function applyPatches(
 			glossary,
 			chapters,
 			seriesChapters,
+			onPublished,
 		)
 		return { ...result, conflicts: [...rejected, ...result.conflicts] }
 	}
@@ -716,5 +720,7 @@ export async function applyPatches(
 	for (const persist of pending) await persist()
 	for (const persist of characterDeletions) await persist()
 	if (changed) await write(projectFiles.glossary(scope), [...terms.values()])
+	published.glossary = [...terms.values()]
+	onPublished?.(published)
 	return { conflicts, glossaryConflicts }
 }

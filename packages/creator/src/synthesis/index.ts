@@ -5,6 +5,7 @@ import {
 	bool,
 	compile,
 	int,
+	lit,
 	nullable,
 	obj,
 	opt,
@@ -70,6 +71,8 @@ const resultSchema = obj({
 	glossaryConflicts: glossaryPatchSchema,
 	bibleRevision: opt(str()),
 	bibleBase: opt(arr(obj({ kind: str(), id: str(), revision: str() }))),
+	quarantined: opt(bool()),
+	baseVersion: opt(lit(1)),
 })
 export type VolumeSynthesis = Static<typeof resultSchema>
 
@@ -468,33 +471,37 @@ ${packets[packet]}`,
 		await project.write(files.checkpoint, state)
 		latest = await readBible(project)
 	}
-	const { conflicts, glossaryConflicts } =
-		!quarantined && hash(latest) === state.basis
-			? await applyPatches(
-					project,
-					latest,
-					biblePatch,
-					glossaryPatch,
-					chapterSet,
-					provenance,
-				)
-			: {
-					conflicts: biblePatch
-						.filter(({ op }) => op !== 'none')
-						.map((item) => ({
-							...item,
-							entry: {
-								...item.entry,
-								status: 'candidate',
-								conflict: 'Bible changed before synthesis publication',
-							},
-						})) as typeof biblePatch,
-					glossaryConflicts: glossaryPatch.map((entry) => ({
-						...entry,
-						status: 'candidate' as const,
-						conflict: 'Bible changed before synthesis publication',
-					})),
-				}
+	const canPublish = !quarantined && hash(latest) === state.basis
+	let publicationBase: ReturnType<typeof bibleEntryBases> | undefined
+	const { conflicts, glossaryConflicts } = canPublish
+		? await applyPatches(
+				project,
+				latest,
+				biblePatch,
+				glossaryPatch,
+				chapterSet,
+				provenance,
+				(merged) => {
+					publicationBase = bibleEntryBases(merged)
+				},
+			)
+		: {
+				conflicts: biblePatch
+					.filter(({ op }) => op !== 'none')
+					.map((item) => ({
+						...item,
+						entry: {
+							...item.entry,
+							status: 'candidate',
+							conflict: 'Bible changed before synthesis publication',
+						},
+					})) as typeof biblePatch,
+				glossaryConflicts: glossaryPatch.map((entry) => ({
+					...entry,
+					status: 'candidate' as const,
+					conflict: 'Bible changed before synthesis publication',
+				})),
+			}
 	const publishedBible = await readBible(project)
 	const result: VolumeSynthesis = {
 		...skeleton,
@@ -506,7 +513,9 @@ ${packets[packet]}`,
 			!quarantined && hash(latest) === state.basis
 				? hash(publishedBible)
 				: state.basis,
-		bibleBase: bibleEntryBases(publishedBible),
+		bibleBase: publicationBase,
+		quarantined: !canPublish,
+		baseVersion: canPublish ? 1 : undefined,
 	}
 	await project.write(projectFiles.skeleton(volumeId), skeleton)
 	await project.write(files.result, result)

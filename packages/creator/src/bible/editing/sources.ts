@@ -112,6 +112,11 @@ export async function proposalActionability(
 			canApprove: false,
 			reason: '候选来源已被替换或移除，请查看新的综合候选；仍可拒绝此候选。',
 		}
+	if (source && !source.bases)
+		return {
+			canApprove: false,
+			reason: '候选已过期：缺少可信的原始条目快照，请重新提出。',
+		}
 	if (
 		source?.bases
 			? !basesAreCurrent(bible, source.bases)
@@ -140,21 +145,23 @@ export async function bridgeBibleSources(
 		source: ProposalSource,
 		key: string,
 		payload: Payload,
-		baseline: NonNullable<ProposalSource['bases']> = currentBases,
+		baseline: ProposalSource['bases'],
 	) {
 		const id = `bible-source:${sourceRevision([input.workId, input.volumeId, source, key])}`
 		const targets =
 			payload.kind === 'bible'
 				? payload.changes.map(({ kind, entry }) => ({ kind, id: entry.id }))
 				: payload.changes.map(({ id }) => ({ kind: 'glossary', id }))
-		const bases = targets.map(
-			({ kind, id }) =>
-				baseline.find((base) => base.kind === kind && base.id === id) ?? {
-					kind,
-					id,
-					revision: sourceRevision([]),
-				},
-		)
+		const bases = baseline
+			? targets.map(
+					({ kind, id }) =>
+						baseline.find((base) => base.kind === kind && base.id === id) ?? {
+							kind,
+							id,
+							revision: sourceRevision([]),
+						},
+				)
+			: undefined
 		store.recordStandaloneProposal(
 			{
 				id,
@@ -170,7 +177,14 @@ export async function bridgeBibleSources(
 	}
 	const conflicts = new Set<string>()
 	if (result) {
-		const expectedRevision = result.bibleRevision ?? sourceRevision(bible)
+		const expectedRevision = result.bibleRevision ?? 'unversioned-synthesis'
+		const baseline = result.quarantined
+			? undefined
+			: result.baseVersion === 1
+				? result.bibleBase
+				: result.bibleRevision === sourceRevision(bible)
+					? currentBases
+					: undefined
 		const source = { path: files.result.path, revision: sourceRevision(result) }
 		for (const change of result.conflicts) {
 			if (change.op === 'none') continue
@@ -185,7 +199,7 @@ export async function bridgeBibleSources(
 					expectedRevision,
 					changes: [change],
 				},
-				result.bibleBase ?? currentBases,
+				baseline,
 			)
 		}
 		for (const entry of result.glossaryConflicts) {
@@ -200,7 +214,7 @@ export async function bridgeBibleSources(
 					expectedRevision,
 					changes: [entry],
 				},
-				result.bibleBase ?? currentBases,
+				baseline,
 			)
 		}
 	}
@@ -214,16 +228,24 @@ export async function bridgeBibleSources(
 				entry: { kind, id: entry.id },
 			}
 			const expectedRevision = sourceRevision(bible)
-			record(source, `${kind}/${entry.id}`, {
-				volumeId: input.volumeId,
-				expectedRevision,
-				...(kind === 'glossary'
-					? { kind: 'glossary', changes: [entry as Bible['glossary'][number]] }
-					: {
-							kind: 'bible',
-							changes: [{ kind, op: 'update', entry } as BiblePatch[number]],
-						}),
-			})
+			record(
+				source,
+				`${kind}/${entry.id}`,
+				{
+					volumeId: input.volumeId,
+					expectedRevision,
+					...(kind === 'glossary'
+						? {
+								kind: 'glossary',
+								changes: [entry as Bible['glossary'][number]],
+							}
+						: {
+								kind: 'bible',
+								changes: [{ kind, op: 'update', entry } as BiblePatch[number]],
+							}),
+				},
+				currentBases,
+			)
 		}
 	}
 }
