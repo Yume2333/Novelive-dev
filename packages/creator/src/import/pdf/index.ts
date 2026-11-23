@@ -61,6 +61,27 @@ function mergeLines(lines: Line[]) {
 	return paragraphs.join('\n\n')
 }
 
+function stripPageNumbers(lines: Line[]) {
+	const edges = lines.filter(
+		(line, i) =>
+			lines[i - 1]?.page !== line.page || lines[i + 1]?.page !== line.page,
+	)
+	return lines.filter((line) => {
+		if (!edges.includes(line)) return true
+		if (/^(?:[-–—]\s*\d+\s*[-–—]|第\s*\d+\s*[页頁])$/u.test(line.text))
+			return false
+		if (!/^\d+$/u.test(line.text) || line.x - line.left <= line.height * 2)
+			return true
+		return !edges.some(
+			(other) =>
+				other.page !== line.page &&
+				/^\d+$/u.test(other.text) &&
+				other.x - other.left > other.height * 2 &&
+				Number(other.text) - other.page === Number(line.text) - line.page,
+		)
+	})
+}
+
 export async function extractPdf(bytes: Uint8Array): Promise<ImportExtraction> {
 	const task = getDocument({
 		data: Uint8Array.from(bytes),
@@ -101,13 +122,7 @@ export async function extractPdf(bytes: Uint8Array): Promise<ImportExtraction> {
 					line.text = line.text.trim()
 					return line.text.length
 				})
-				const body = nonempty.filter(
-					(line, i) =>
-						!(
-							(i === 0 || i === nonempty.length - 1) &&
-							/^(?:[-–—]?\s*\d+\s*[-–—]?|第\s*\d+\s*[页頁])$/u.test(line.text)
-						),
-				)
+				const body = nonempty
 				const gaps = body
 					.slice(1)
 					.map((line, i) => Math.abs(line.y - body[i].y))
@@ -126,7 +141,7 @@ export async function extractPdf(bytes: Uint8Array): Promise<ImportExtraction> {
 				page.cleanup()
 			}
 		}
-		const text = mergeLines(lines)
+		const text = mergeLines(stripPageNumbers(lines))
 		if (!text.trim())
 			return {
 				status: 'unsupported',

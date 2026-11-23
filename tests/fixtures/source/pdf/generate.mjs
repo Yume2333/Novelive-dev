@@ -86,7 +86,7 @@ for (const [name, pages, image, cjk] of [
 		'english-wrap',
 		[
 			[
-				'1',
+				'- 1 -',
 				'Chapter 1',
 				'The traveler followed the inter-',
 				'national road toward the',
@@ -107,6 +107,27 @@ for (const [name, pages, image, cjk] of [
 				{ text: 'Indented start', x: 44, y: 242 },
 				{ text: 'ends here.', y: 224 },
 			],
+		],
+		false,
+	],
+	[
+		'numbered-chapters',
+		[
+			['1', 'First chapter.'],
+			['2', 'Second chapter.'],
+			['3', 'Third chapter.'],
+		],
+		false,
+	],
+	[
+		'bare-page-numbers',
+		[
+			[
+				{ text: 'Chapter 1' },
+				{ text: 'The story goes on' },
+				{ text: '10', x: 180 },
+			],
+			[{ text: 'across the page.' }, { text: '11', x: 180 }],
 		],
 		false,
 	],

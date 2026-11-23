@@ -8,6 +8,21 @@ import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
 
+test('preserves bare-number chapter headings but removes sequenced offset page numbers', async () => {
+	const chapters = await extractPdf(await fixture('numbered-chapters'))
+	if (chapters.status !== 'ready') throw new Error('Expected text PDF')
+	expect(chapters.book.volumes[0].chapters.map(({ title }) => title)).toEqual([
+		'1',
+		'2',
+		'3',
+	])
+	const pages = await extractPdf(await fixture('bare-page-numbers'))
+	if (pages.status !== 'ready') throw new Error('Expected text PDF')
+	expect(pages.book.volumes[0].chapters[0].paragraphs).toEqual([
+		'The story goes on across the page.',
+	])
+})
+
 test('isolates note starts and watermarks without swallowing adjacent prose', async () => {
 	const result = await extractPdf(await fixture('notes'))
 	if (result.status !== 'ready') throw new Error('Expected text PDF')
