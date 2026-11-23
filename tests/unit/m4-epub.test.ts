@@ -236,6 +236,23 @@ test('heading fallback does not merge a spine document with an unmatched title',
 	])
 })
 
+test('retains notes before the first TOC chapter', async () => {
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/chapter.xhtml': xhtml(
+				`<section epub:type="copyright-page"><p>Synthetic copyright note.</p></section>${body}`,
+			),
+		}),
+	)
+	expect(book.volumes[0].chapters[0].notes).toEqual([
+		'Synthetic copyright note.',
+		'Not body',
+	])
+	expect(book.volumes[0].chapters[0].paragraphs).not.toContain(
+		'Synthetic copyright note.',
+	)
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)

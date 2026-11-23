@@ -362,6 +362,7 @@ export async function extractEpub(
 	if (title && text(title)) book.metadata.title = text(title)
 	if (language && text(language)) book.metadata.language = text(language)
 	const images = new Map<string, Uint8Array>()
+	const leadingNotes: string[] = []
 	for (const [index, marker] of markers.entries()) {
 		const next = markers[index + 1]
 		const blocks = docs.flatMap((doc, docIndex) =>
@@ -390,9 +391,12 @@ export async function extractEpub(
 				images.set(block.image, data)
 				book.illustrations.push({ archivePath: block.image, volume, chapter })
 			}
-			book.volumes[volume]?.chapters[chapter]?.notes.push(
-				...blocks.filter((block) => block.note).map((block) => block.text),
-			)
+			const notes = blocks
+				.filter((block) => block.note)
+				.map((block) => block.text)
+			const target = book.volumes[volume]?.chapters[chapter]
+			if (target) target.notes.push(...notes)
+			else leadingNotes.push(...notes)
 			continue
 		}
 		const volumeTitle = marker.volume ?? '正文'
@@ -403,7 +407,10 @@ export async function extractEpub(
 		book.volumes[volume].chapters.push({
 			title: marker.title,
 			paragraphs,
-			notes: blocks.filter((block) => block.note).map((block) => block.text),
+			notes: [
+				...leadingNotes.splice(0),
+				...blocks.filter((block) => block.note).map((block) => block.text),
+			],
 		})
 		let paragraph = -1
 		for (const block of blocks) {
