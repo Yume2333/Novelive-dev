@@ -13,7 +13,7 @@ import {
 } from '../../packages/creator/src/pipeline/art/director'
 import * as artModels from '../../packages/creator/src/pipeline/art/models'
 import { planArt } from '../../packages/creator/src/pipeline/art/plan'
-import { readProfiles } from '../../packages/creator/src/pipeline/postprocess'
+import * as upscale from '../../packages/creator/src/pipeline/postprocess'
 import { Project } from '../../packages/creator/src/project'
 import {
 	bible,
@@ -27,6 +27,8 @@ import {
 	script,
 	service,
 } from '../fixtures/cassettes/m1b-art/fixture'
+
+const { readProfiles } = upscale
 
 const replay = {
 	directory,
@@ -176,6 +178,151 @@ test('confirms three main visuals and costumes, stages the chapter and draws can
 				status: 'drawn',
 			})
 	})
+}, 45_000)
+
+test('preserves audited art when the local upscaler is unavailable', async () => {
+	const render = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, _refs, size, alpha) => ({
+			bytes: await picture(size.width, size.height, alpha),
+		}))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: '窗光' },
+		)
+	try {
+		await projectTest(async (project) => {
+			vi.stubEnv('NL_UPSCALE_DIR', join(project.root, 'missing-upscaler'))
+			const art = service(project, replay, undefined, undefined, {
+				mode: 'single',
+				tier: 'fast',
+			})
+			const jobs = await art.register(
+				[
+					{ id: 'room/day', kind: 'location', description: 'Sunny' },
+					{ id: 'room/rain', kind: 'variant', description: 'Rainy' },
+				],
+				bible,
+			)
+			for (const job of jobs)
+				expect(await art.draw(job, bible)).toEqual({ status: 'drawn' })
+			const profiles = await readProfiles(project)
+			for (const entry of (await art.registry()).entries) {
+				expect(entry.status).toBe('drawn')
+				expect(profiles[entry.path]?.profile).toEqual({
+					mode: 'off',
+					tier: 'fast',
+				})
+			}
+		})
+	} finally {
+		vi.unstubAllEnvs()
+		render.mockRestore()
+		model.mockRestore()
+	}
+})
+
+test('candidates retain their applied profile and base redraws keep existing variants compatible', async () => {
+	const render = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, _refs, size, alpha) => ({
+			bytes: await picture(size.width, size.height, alpha),
+		}))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: '窗光' },
+		)
+	const postprocess = vi
+		.spyOn(upscale, 'postprocess')
+		.mockImplementation(async (image, { target, fit }) =>
+			sharp(image)
+				.resize({ ...target, fit })
+				.png()
+				.toBuffer(),
+		)
+	try {
+		await projectTest(async (project) => {
+			const profile = { mode: 'single', tier: 'fast' } as const
+			const art = service(project, replay, undefined, undefined, profile)
+			const imported = 'assets/imported.png'
+			await project.writeFile(imported, await picture(32, 24, false))
+			const pool = await art.candidates(bible, ['c1'], imported, [
+				{ id: 'imported', cachePath: imported },
+			])
+			expect(postprocess).toHaveBeenCalledTimes(5)
+			const portrait = pool.characters[0].candidates[0]
+			const records = await readProfiles(project)
+			expect(records[portrait.cachePath]?.profile).toEqual(profile)
+			expect(records[pool.mainVisuals[1].cachePath]?.profile).toEqual(profile)
+			expect(records[imported]).toBeUndefined()
+
+			const changed = service(project, replay, undefined, undefined, {
+				mode: 'double',
+				tier: 'detail',
+			})
+			const style = await changed.confirmVisual(bible.style, pool, {
+				mainVisualId: pool.mainVisuals[1].id,
+				supplementalIds: ['imported'],
+				characters: [
+					{
+						characterId: 'ada',
+						costumeId: 'uniform',
+						candidateId: portrait.id,
+					},
+				],
+			})
+			expect(postprocess).toHaveBeenCalledTimes(5)
+			const baseId = 'ada/uniform/neutral'
+			const profiles = await readProfiles(project)
+			expect(profiles[style.references?.[0].path ?? '']?.profile).toEqual(
+				profile,
+			)
+			expect(profiles[style.references?.[1].path ?? '']?.profile).toEqual({
+				mode: 'off',
+				tier: 'detail',
+			})
+			const [base, variant] = await changed.register(
+				[
+					{
+						id: 'ada/uniform/angry',
+						kind: 'expression',
+						description: '眉毛压低',
+					},
+				],
+				bible,
+			)
+			expect(base.assetId).toBe(baseId)
+			expect(await changed.draw(variant, bible)).toEqual({ status: 'drawn' })
+			const path = 'candidates/redraw.webp'
+			expect(await changed.redraw(base, bible, undefined, { path })).toEqual({
+				status: 'drawn',
+			})
+			const adopted = await changed.adopt(baseId, path)
+			const after = await readProfiles(project)
+			expect(after[adopted]?.profile).toEqual(profile)
+			const variantPath =
+				(await changed.registry()).entries.find(
+					({ id }) => id === variant.assetId,
+				)?.path ?? ''
+			expect(after[variantPath]?.profile).toEqual(profile)
+			expect(postprocess).toHaveBeenCalledTimes(7)
+			for (const [, options] of postprocess.mock.calls)
+				expect(options).toMatchObject(profile)
+			await expect(changed.adopt(baseId, imported)).rejects.toThrow(
+				'差分后处理档位与基准不一致',
+			)
+		})
+	} finally {
+		postprocess.mockRestore()
+		render.mockRestore()
+		model.mockRestore()
+	}
 }, 45_000)
 
 test('uses three WebP placeholder families, but preserves pending status for unsupported capabilities', async () => {

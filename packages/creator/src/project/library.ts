@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
 import { existing } from '../synthesis/patch'
 import { Project } from './index'
+import { chapterStates, isChapterPublished } from './publication'
 
 export async function listLibrary(dataDir: string) {
 	const bindings = join(dataDir, 'projects')
@@ -21,14 +22,18 @@ export async function listLibrary(dataDir: string) {
 					const volume = await project.read(projectFiles.volume(volumeId))
 					if (!volume.workIds.includes(workId)) continue
 					const work = await project.read(projectFiles.work(volumeId, workId))
-					const published = project.database
-						.prepare(
-							"SELECT chapter_id FROM chapter WHERE work_id = ? AND user_state = 'published'",
-						)
-						.all(workId)
-						.filter((row) =>
-							work.chapterIds.includes(String(row.chapter_id)),
-						).length
+					const states = chapterStates(project, workId)
+					let published = 0
+					for (const chapterId of work.chapterIds) {
+						const hasScenes =
+							states.size === 0 &&
+							(
+								await project.read(
+									projectFiles.chapter({ volumeId, workId, chapterId }),
+								)
+							).sceneIds.length > 0
+						if (isChapterPublished(states, chapterId, hasScenes)) published++
+					}
 					return {
 						workId,
 						title: work.title,

@@ -1,9 +1,10 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
 import { playerProgressRequest } from '../../packages/creator/src/contract/player-progress'
 import { Project } from '../../packages/creator/src/project'
+import { listLibrary } from '../../packages/creator/src/project/library'
 import {
 	loadPlayerChapter,
 	loadPlayerStatus,
@@ -145,6 +146,64 @@ test('desktop progress IPC validates empty progress, slots, snapshots and captur
 		},
 	])
 		expect(playerProgressRequest.check(input)).toBe(false)
+})
+
+test('library counts the same published chapters as the player with and without scheduler rows', async () => {
+	const directory = await mkdtemp(
+		join(tmpdir(), 'novelive-library-publication-'),
+	)
+	directories.push(directory)
+	const root = join(directory, 'project')
+	await seedPlayerProject(
+		root,
+		Buffer.from('background'),
+		Buffer.from('portrait'),
+	)
+	await mkdir(join(directory, 'projects'))
+	await writeFile(join(directory, 'projects', playerWorkId), root)
+	using project = await Project.open(root)
+	const chapter = await project.read(projectFiles.chapter(playerRef))
+	const work = projectFiles.work('v1', playerWorkId)
+	await project.write(work, {
+		...(await project.read(work)),
+		chapterIds: ['ch1', 'ch2', 'ch3'],
+	})
+	for (const [chapterId, sceneIds] of [
+		['ch2', chapter.sceneIds],
+		['ch3', []],
+	] as const)
+		await project.write(projectFiles.chapter({ ...playerRef, chapterId }), {
+			...chapter,
+			chapterId,
+			sceneIds: [...sceneIds],
+		})
+	async function expectPublication(expected: boolean[]) {
+		const player = await loadPlayerStatus(root, playerWorkId)
+		expect(player.chapters.map(({ published }) => published)).toEqual(expected)
+		expect(await listLibrary(directory)).toEqual({
+			works: [
+				{
+					workId: playerWorkId,
+					title: '黄昏',
+					published: expected.filter(Boolean).length,
+					chapters: 3,
+				},
+			],
+			unreadableCount: 0,
+		})
+	}
+	await expectPublication([true, true, false])
+	project.database
+		.prepare(
+			"INSERT INTO work (work_id, title, queue_pos, created_at) VALUES (?, '测试', 0, 0)",
+		)
+		.run(playerWorkId)
+	project.database
+		.prepare(
+			"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, 'ch1', 1, 'waiting'), (?, 'ch3', 3, 'published')",
+		)
+		.run(playerWorkId, playerWorkId)
+	await expectPublication([false, false, true])
 })
 
 test('player chapter selection defaults to first and only admits published production chapters', async () => {
