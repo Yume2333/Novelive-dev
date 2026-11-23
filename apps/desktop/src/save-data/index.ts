@@ -1,5 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import {
+	access,
+	mkdir,
+	readdir,
+	readFile,
+	rename,
+	unlink,
+	writeFile,
+} from 'node:fs/promises'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import {
@@ -102,6 +110,13 @@ export class FileProgressStore implements ProgressStore {
 				entry,
 			]
 			await this.write(workId, progress)
+			const referenced = new Set(
+				progress.saves.map((save) => save.thumbnailRef),
+			)
+			for (const file of await readdir(this.directory(workId))) {
+				if (file.endsWith('.webp') && !referenced.has(file))
+					await unlink(join(this.directory(workId), file))
+			}
 			return entry
 		})
 	}

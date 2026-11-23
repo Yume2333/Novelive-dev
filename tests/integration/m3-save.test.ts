@@ -1,5 +1,6 @@
 import {
 	mkdtemp,
+	readdir,
 	readFile,
 	rm,
 	stat,
@@ -127,6 +128,52 @@ test('reusing a content-hashed thumbnail leaves the existing file untouched', as
 	expect(after.mtimeMs).toBe(before.mtimeMs)
 	expect(after.ino).toBe(before.ino)
 	expect(await readFile(path)).toEqual(original)
+})
+
+test('slot replacement collects only thumbnails no remaining save references', async () => {
+	const { directory, saves } = await store()
+	const image = (background: string) =>
+		sharp({
+			create: { width: 480, height: 270, channels: 4, background },
+		})
+			.png()
+			.toBuffer()
+	const original = await image('#123456')
+	const replacement = await image('#abcdef')
+	const manual = await saves.saveSlot(
+		'work',
+		{ kind: 'manual', slot: 1 },
+		snapshot(1),
+		original,
+	)
+	await saves.saveSlot('work', { kind: 'quick' }, snapshot(2), original)
+	const quick = await saves.saveSlot(
+		'work',
+		{ kind: 'quick' },
+		snapshot(3),
+		replacement,
+	)
+	expect(quick.thumbnailRef).not.toBe(manual.thumbnailRef)
+	expect(await saves.thumbnail('work', manual)).toBeInstanceOf(Buffer)
+	await saves.saveSlot(
+		'work',
+		{ kind: 'manual', slot: 1 },
+		snapshot(4),
+		replacement,
+	)
+	await expect(saves.thumbnail('work', manual)).rejects.toMatchObject({
+		code: 'ENOENT',
+	})
+	expect(await saves.thumbnail('work', quick)).toBeInstanceOf(Buffer)
+	const { createHash } = await import('node:crypto')
+	const workDirectory = join(
+		directory,
+		'player-progress',
+		createHash('sha256').update('work').digest('hex'),
+	)
+	expect((await readdir(workDirectory)).sort()).toEqual(
+		['progress.json', quick.thumbnailRef].sort(),
+	)
 })
 
 test('empty history and slots are empty, invalid moves and slots are rejected', async () => {
