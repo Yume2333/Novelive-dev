@@ -22,16 +22,19 @@ import { ProjectError } from './error'
 
 export { ProjectError } from './error'
 
-function projectPath(root: string, relative: string) {
-	const segments = relative.split('/')
-	if (
-		segments.some(
-			(part) => !part || part === '.' || part === '..' || /[\\:\0]/.test(part),
+export function isProjectRelativePath(relative: string) {
+	return relative
+		.split('/')
+		.every(
+			(part) => part && part !== '.' && part !== '..' && !/[\\:\0]/.test(part),
 		)
-	) {
+}
+
+function projectPath(root: string, relative: string) {
+	if (!isProjectRelativePath(relative)) {
 		throw new Error(`Invalid relative project path: ${relative}`)
 	}
-	return join(root, ...segments)
+	return join(root, ...relative.split('/'))
 }
 
 function decode<T>(file: ProjectDocument<T>, input: unknown): T {

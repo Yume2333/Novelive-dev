@@ -1729,59 +1729,6 @@ test.each(['audit rejection', 'undecodable redraw'] as const)(
 	30_000,
 )
 
-test('first visual candidates skip missing style references but use an existing image', async () => {
-	const render = vi
-		.fn<ReturnType<typeof artModels.imageRenderer>>()
-		.mockImplementation(async (_prompt, _refs, size) => ({
-			bytes: await picture(size.width, size.height, false),
-		}))
-	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
-	const model = vi
-		.spyOn(artModels, 'artJson')
-		.mockImplementation(async (_connection, prompt) =>
-			prompt.startsWith('Visually audit')
-				? { pass: true, failedChecks: [], feedback: '' }
-				: { content: 'A plain backdrop.' },
-		)
-	try {
-		await projectTest(async (project) => {
-			const path = 'assets/style.png'
-			const reference = await picture(64, 36, false)
-			await project.writeFile(path, reference)
-			const pool = await service(project, replay).candidates(
-				{
-					...bible,
-					characters: [],
-					style: {
-						...bible.style,
-						status: 'candidate',
-						references: [
-							{ path: 'ch0001', description: 'Not an image' },
-							{ path, description: 'Local style image' },
-						],
-					},
-				},
-				['c1'],
-			)
-			expect(pool.mainVisuals).toHaveLength(3)
-			for (const [, refs] of render.mock.calls)
-				expect(refs).toEqual([reference])
-			const audits = model.mock.calls.filter(([, prompt]) =>
-				prompt.startsWith('Visually audit'),
-			)
-			expect(audits).toHaveLength(3)
-			for (const [, prompt, , , images] of audits) {
-				expect(prompt).toContain('Image 2 is a style reference only')
-				expect(prompt).not.toContain('Image 3 is a style reference only')
-				expect(images?.slice(1)).toEqual([reference])
-			}
-		})
-	} finally {
-		renderer.mockRestore()
-		model.mockRestore()
-	}
-})
-
 test('uses a supplied character design in both costume candidate rendering and auditing', async () => {
 	const render = vi
 		.fn<ReturnType<typeof artModels.imageRenderer>>()

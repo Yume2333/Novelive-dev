@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { formatVersion, projectFiles, type Work } from '@novelive/format/model'
+import {
+	formatVersion,
+	projectFiles,
+	type Style,
+	type Work,
+} from '@novelive/format/model'
 import { compileScript, formatScript } from '@novelive/format/script'
 import type { createConfigStore } from '../config'
 import { withProjectEdits } from '../editor/history/storage'
@@ -29,6 +34,7 @@ import {
 	type StepContext,
 } from '../scheduler/chapter'
 import { existing, readBible } from '../synthesis/patch'
+import { validateStyleReferences } from '../synthesis/style-references'
 import { usageMethods, withUsage } from '../usage'
 import { SpendBudgetError } from '../usage/spend'
 import type { Project } from './index'
@@ -104,19 +110,23 @@ export async function productionBible(
 						status === 'confirmed' && references?.length,
 				)
 			: undefined
+	const style: Style = approved ??
+		seriesStyle ??
+		bible.style.find(({ status }) => status === 'confirmed') ??
+		bible.style[0] ?? {
+			id: 'style',
+			status: 'candidate',
+			description: '克制的叙事插画，自然光，线条干净',
+		}
 	return {
 		bible,
 		art: {
 			characters: bible.character,
 			locations: bible.location,
-			style: approved ??
-				seriesStyle ??
-				bible.style.find(({ status }) => status === 'confirmed') ??
-				bible.style[0] ?? {
-					id: 'style',
-					status: 'candidate' as const,
-					description: '克制的叙事插画，自然光，线条干净',
-				},
+			style:
+				style.status === 'candidate'
+					? await validateStyleReferences(project, style)
+					: style,
 		},
 	}
 }

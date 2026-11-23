@@ -52,6 +52,7 @@ import {
 	readBible,
 	validatePatch,
 } from './patch'
+import { validateStylePatch } from './style-references'
 
 export class BibleChangedDuringSynthesisError extends Error {
 	constructor() {
@@ -636,6 +637,14 @@ ${nextEvent.instructions}`
 			ready: false,
 			applied: false,
 		}
+	const savedParts = state.whole ? [state.whole] : state.events
+	for (const part of savedParts)
+		part.biblePatch = await validateStylePatch(project, part.biblePatch)
+	if (state.selectedPatch)
+		state.selectedPatch.biblePatch = await validateStylePatch(
+			project,
+			state.selectedPatch.biblePatch,
+		)
 	if (useEvents && !packets.length && !state.ready)
 		throw new Error('Existing Bible is too large for synthesis context')
 
@@ -643,7 +652,7 @@ ${nextEvent.instructions}`
 	async function request<T>(
 		prompt: string,
 		contract: ReturnType<typeof synthesisOutput<T>>,
-		check: (output: T) => void,
+		check: (output: T) => void | Promise<void>,
 		focusedPrompt?: string,
 		{
 			connection = options.connection,
@@ -686,7 +695,7 @@ ${nextEvent.instructions}`
 				const validation = contract.parse(output)
 				if (!validation.ok)
 					throw new Error(contract.repair(output, validation.errors))
-				check(validation.value)
+				await check(validation.value)
 				return validation.value
 			} catch (error) {
 				if (attempt === 1) throw error
@@ -723,7 +732,8 @@ ${nextEvent.instructions}`
 		)
 	}
 	if (!state.ready && !useEvents && !state.whole) {
-		state.whole = await request(wholePrompt, whole, (value) => {
+		state.whole = await request(wholePrompt, whole, async (value) => {
+			value.biblePatch = await validateStylePatch(project, value.biblePatch)
 			check(value, [])
 			combine(volumeId, chapterIds, [value])
 		})
@@ -818,7 +828,8 @@ ${packets[packet]}`
 		const event = await request(
 			extractionPrompt,
 			nextEvent,
-			(value: Event) => {
+			async (value: Event) => {
+				value.biblePatch = await validateStylePatch(project, value.biblePatch)
 				if (!value.is_last && repeatsPacketEvent(value, packetEvents))
 					throw new Error(
 						`This packet already has that event with the same progress and facts. Return the next event with new information, or set is_last if this packet is complete. Repeated event: ${JSON.stringify(value.event)}`,
