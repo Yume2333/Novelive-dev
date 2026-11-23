@@ -72,6 +72,7 @@ type Active = {
 	turn: Turn
 	task?: Promise<void>
 }
+type Resolution = CommandOutput<'proposal.resolve'>
 const readToolNames = new Set([
 	'read_chapter_preview',
 	'read_bible',
@@ -94,7 +95,11 @@ export class ChatService {
 	private readonly attachments: ChatAttachments
 	private readonly models: ChatModels
 	private readonly active = new Map<string, Active>()
-	private readonly resolving = new Map<string, string | null>()
+	private readonly resolving = new Map<
+		string,
+		{ sessionId: string | null; task: Promise<Resolution> }
+	>()
+	private closing = false
 	private readonly reads: AgentTool[]
 
 	constructor(private readonly options: ChatOptions) {
@@ -217,8 +222,9 @@ export class ChatService {
 
 	private requireIdle(sessionId: string) {
 		if (
+			this.closing ||
 			this.active.has(sessionId) ||
-			[...this.resolving.values()].includes(sessionId)
+			[...this.resolving.values()].some((run) => run.sessionId === sessionId)
 		)
 			throw chatError('stale_revision', '会话正在处理，请等待当前请求结束')
 	}
@@ -233,8 +239,12 @@ export class ChatService {
 	}
 
 	async close() {
+		this.closing = true
 		for (const run of this.active.values()) run.controller.abort()
-		await Promise.all([...this.active.values()].map((run) => run.task))
+		await Promise.allSettled([
+			...[...this.active.values()].map((run) => run.task),
+			...[...this.resolving.values()].map((run) => run.task),
+		])
 	}
 
 	proposal(proposalId: string) {
@@ -244,47 +254,59 @@ export class ChatService {
 	async resolve(
 		input: CommandInput<'proposal.resolve'>,
 		signal: AbortSignal,
-	): Promise<CommandOutput<'proposal.resolve'>> {
+	): Promise<Resolution> {
 		const { proposalId, decision } = input
 		const { proposal, rewrite } = this.store.proposal(proposalId)
 		if (proposal.status !== 'pending')
 			return { status: 'resolved', proposal, ...(rewrite ? { rewrite } : {}) }
-		if (this.resolving.has(proposalId))
+		if (this.closing || this.resolving.has(proposalId))
 			throw chatError('stale_revision', '提议正在处理')
 		signal.throwIfAborted()
-		this.resolving.set(proposalId, proposal.sessionId)
+		const task = Promise.resolve().then(() =>
+			this.resolvePending(proposal, decision, signal),
+		)
+		this.resolving.set(proposalId, { sessionId: proposal.sessionId, task })
 		try {
-			let resolved: ReturnType<ChatStore['resolve']>
-			if (decision.kind === 'approve') {
-				if (!this.options.proposals)
-					throw chatError('invalid_config', '提议执行器未配置')
-				const result = await this.options.proposals.applyIfCurrent(
-					proposal,
-					signal,
-				)
-				if (result.status === 'stale') return { status: 'stale', proposal }
-				resolved = this.store.resolve(
-					proposal,
-					'approved',
-					undefined,
-					result.rewrite,
-				)
-			} else {
-				resolved = this.store.resolve(proposal, 'rejected', decision.reason)
-			}
-			if (proposal.sessionId) this.resume(proposal.sessionId, proposalId)
-			return {
-				status: 'resolved',
-				proposal: resolved.proposal,
-				...(resolved.rewrite ? { rewrite: resolved.rewrite } : {}),
-			}
+			return await task
 		} finally {
 			this.resolving.delete(proposalId)
 		}
 	}
 
+	private async resolvePending(
+		proposal: Proposal,
+		decision: CommandInput<'proposal.resolve'>['decision'],
+		signal: AbortSignal,
+	): Promise<Resolution> {
+		signal.throwIfAborted()
+		let resolved: ReturnType<ChatStore['resolve']>
+		if (decision.kind === 'approve') {
+			if (!this.options.proposals)
+				throw chatError('invalid_config', '提议执行器未配置')
+			const result = await this.options.proposals.applyIfCurrent(
+				proposal,
+				signal,
+			)
+			if (result.status === 'stale') return { status: 'stale', proposal }
+			resolved = this.store.resolve(
+				proposal,
+				'approved',
+				undefined,
+				result.rewrite,
+			)
+		} else {
+			resolved = this.store.resolve(proposal, 'rejected', decision.reason)
+		}
+		if (proposal.sessionId) this.resume(proposal.sessionId, proposal.id)
+		return {
+			status: 'resolved',
+			proposal: resolved.proposal,
+			...(resolved.rewrite ? { rewrite: resolved.rewrite } : {}),
+		}
+	}
+
 	private resume(sessionId: string, proposalId: string) {
-		if (this.active.has(sessionId)) return
+		if (this.closing || this.active.has(sessionId)) return
 		const rows = this.store.entries(sessionId)
 		const last = rows.findLast((row) => row.kind === 'message')
 		if (

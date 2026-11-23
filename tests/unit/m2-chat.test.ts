@@ -14,8 +14,8 @@ afterEach(async () => {
 	fixture = undefined
 })
 
-async function openFixture() {
-	fixture = await createChatFixture()
+async function openFixture(...options: Parameters<typeof createChatFixture>) {
+	fixture = await createChatFixture(...options)
 	return fixture
 }
 
@@ -255,4 +255,40 @@ test('delegates with fresh context and gives child agents no dispatch or proposa
 		]),
 	)
 	expect(chat.work.writes).toBe(0)
+})
+
+test('waits for an in-flight approval before closing the project database', async () => {
+	const started = Promise.withResolvers<void>()
+	const release = Promise.withResolvers<void>()
+	const chat = await openFixture({}, async () => {
+		started.resolve()
+		await release.promise
+	})
+	const { session } = await chat.call('chat.create', { workId })
+	const event = await chat.done(
+		await chat.send(session.sessionId, prompts.propose),
+	)
+	const card = event.message.parts.find((part) => part.type === 'proposal')
+	if (!card) throw new Error('No proposal in the replay')
+	const target = { workId, proposalId: card.proposal.id }
+	const approving = chat.call('proposal.resolve', {
+		...target,
+		decision: { kind: 'approve' },
+	})
+	await started.promise
+	let reopened = false
+	const reopening = chat.reopen().then(() => {
+		reopened = true
+	})
+	try {
+		await new Promise<void>((resolve) => setImmediate(resolve))
+		expect(reopened).toBe(false)
+	} finally {
+		release.resolve()
+		await Promise.all([approving, reopening])
+	}
+	expect(await chat.call('proposal.get', target)).toMatchObject({
+		status: 'approved',
+	})
+	expect(chat.work.writes).toBe(1)
 })

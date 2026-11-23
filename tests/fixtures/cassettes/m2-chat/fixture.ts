@@ -46,7 +46,10 @@ type Overrides = Partial<
 		'mainModel' | 'summaryModel' | 'replay' | 'emit' | 'onError'
 	>
 >
-export async function createChatFixture(overrides: Overrides = {}) {
+export async function createChatFixture(
+	overrides: Overrides = {},
+	beforeApply?: () => Promise<void>,
+) {
 	const directory = await mkdtemp(join(tmpdir(), 'novelive-m2-chat-'))
 	const path = join(directory, 'project.db')
 	let db = openProjectDatabase(path, true)
@@ -85,6 +88,7 @@ export async function createChatFixture(overrides: Overrides = {}) {
 					}
 				},
 				async applyIfCurrent(proposal) {
+					await beforeApply?.()
 					if (proposal.payload.kind !== 'requirements')
 						throw new Error('Unexpected proposal')
 					if (
