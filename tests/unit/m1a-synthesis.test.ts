@@ -1978,6 +1978,92 @@ test.each([false, true])(
 	},
 )
 
+test.each([true, false])(
+	'recovers a legacy ready checkpoint without extracting again (valid: %s)',
+	async (valid) => {
+		await seed(root)
+		{
+			using project = await Project.open(root)
+			const write = project.write.bind(project)
+			vi.spyOn(project, 'write').mockImplementation(async (file, value) => {
+				await write(file, value)
+				if (
+					file.path === files.checkpoint.path &&
+					(value as { ready: boolean }).ready
+				)
+					throw new Error('Stopped before publication')
+			})
+			await expect(
+				synthesizeVolume(project, 'v1', chapters, {
+					...options,
+					strategy: 'whole',
+				}),
+			).rejects.toThrow('Stopped before publication')
+		}
+		const offline = vi.fn<typeof globalThis.fetch>(async () => {
+			throw new Error('Ready synthesis must not call the provider')
+		})
+		using project = await Project.open(root)
+		const checkpoint = await project.read(files.checkpoint)
+		if (!checkpoint.whole) throw new Error('Missing whole output')
+		const before = await readBible(project)
+		await project.write(files.checkpoint, {
+			...checkpoint,
+			fingerprint: createHash('sha256')
+				.update(
+					JSON.stringify({
+						packetFormat: 5,
+						previews: await Promise.all(
+							chapters.map((id) => project.read(projectFiles.preview(id))),
+						),
+						language: options.language,
+						strategy: 'auto',
+						incremental: false,
+						model: connection.model,
+						context: connection.contextWindow,
+					}),
+				)
+				.digest('hex'),
+			whole: valid
+				? checkpoint.whole
+				: {
+						...checkpoint.whole,
+						biblePatch: [
+							...checkpoint.whole.biblePatch,
+							{
+								kind: 'location',
+								op: 'update',
+								entry: { ...candidateTower, id: 'missing-tower' },
+							},
+						],
+					},
+		})
+		const result = await synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			fetch: offline,
+		})
+		expect(offline).not.toHaveBeenCalled()
+		expect(result.quarantined).toBe(!valid)
+		expect(await project.read(files.checkpoint)).toMatchObject({
+			applied: true,
+		})
+		if (valid) {
+			expect(await readBible(project)).not.toEqual(before)
+			expect(result.bibleBase).toBeDefined()
+		} else {
+			expect(await readBible(project)).toEqual(before)
+			expect(result.conflicts).toContainEqual(
+				expect.objectContaining({
+					entry: expect.objectContaining({
+						id: 'missing-tower',
+						conflict: 'Saved synthesis failed current validation',
+					}),
+				}),
+			)
+		}
+	},
+)
+
 test('a checkpoint quarantined on resume stays quarantined even if the original Bible is restored', async () => {
 	await seed(root)
 	const tower = projectFiles.location(scope, 'tower')

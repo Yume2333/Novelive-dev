@@ -281,22 +281,31 @@ export async function synthesizeVolume(
 	const saved = options.rerun
 		? undefined
 		: await existing(() => project.read(files.checkpoint))
-	if (saved?.applied) {
-		const mode = saved.whole ? 'whole' : 'events'
-		if (
-			(strategy === mode || strategy === 'auto') &&
-			[mode, 'auto' as const].some((candidate) => {
-				const inputs = inputsFor(candidate)
-				return saved.inputFingerprint
-					? saved.inputFingerprint === hash(inputs)
-					: legacyPacketFormats.some(
-							(format) =>
-								saved.fingerprint === hash({ packetFormat: format, ...inputs }),
-						)
-			})
+	const savedMode = saved && (saved.whole ? 'whole' : 'events')
+	const completedInputs =
+		savedMode && (strategy === savedMode || strategy === 'auto')
+			? [inputsFor(savedMode), inputsFor('auto')]
+			: []
+	const matchesPacket = (checkpoint: Checkpoint, formats: readonly number[]) =>
+		completedInputs.some((inputs) =>
+			formats.some(
+				(format) =>
+					checkpoint.fingerprint === hash({ packetFormat: format, ...inputs }),
+			),
 		)
-			return project.read(files.result)
-	}
+	if (
+		saved?.applied &&
+		(saved.inputFingerprint
+			? completedInputs.some(
+					(inputs) => saved.inputFingerprint === hash(inputs),
+				)
+			: matchesPacket(saved, legacyPacketFormats))
+	)
+		return project.read(files.result)
+	const legacyReady =
+		saved?.ready && !saved.applied && matchesPacket(saved, legacyPacketFormats)
+			? saved
+			: undefined
 	const bible = await readBible(project)
 	const contextBible = options.scope
 		? await readBible(project, options.scope)
@@ -318,17 +327,20 @@ ${whole.instructions}
 For each chapter, include progress and exhaustively extract every distinct Bible and glossary entry that meets the inclusion rules. Return their union across all chapters. Summarize only the overview; do not abridge the patch to a volume-level shortlist.
 Chapter previews:
 ${packetText.join('\n')}`
-	const useEvents =
-		strategy === 'events' ||
-		(strategy === 'auto' &&
-			bytes(wholePrompt) + 384 > model.contextWindow - packetOutputReserve)
+	const useEvents = legacyReady
+		? savedMode === 'events'
+		: strategy === 'events' ||
+			(strategy === 'auto' &&
+				bytes(wholePrompt) + 384 > model.contextWindow - packetOutputReserve)
 	const inputs = inputsFor(useEvents ? 'events' : 'whole')
 	const inputFingerprint = hash(inputs)
 	const fingerprint = hash({ packetFormat, ...inputs })
 	const basis = hash(bible)
-	const matching = saved?.fingerprint === fingerprint ? saved : undefined
-	const quarantined =
-		matching?.ready && matching.basis !== basis ? matching : undefined
+	const matching = saved?.fingerprint === fingerprint ? saved : legacyReady
+	let quarantineReason =
+		matching?.ready && matching.basis !== basis
+			? 'Bible changed before synthesis publication'
+			: undefined
 	const resumable = matching?.basis === basis ? matching : undefined
 	const eventPrompt = `${instructions}
 ${nextEvent.instructions}`
@@ -351,7 +363,7 @@ ${nextEvent.instructions}`
 			: []
 	const limit =
 		options.maxEvents ?? Math.max(minimumEventLimit, packets.length * 4)
-	const state: Checkpoint = quarantined ??
+	const state: Checkpoint = (quarantineReason ? matching : undefined) ??
 		resumable ?? {
 			formatVersion,
 			fingerprint,
@@ -466,7 +478,28 @@ ${packets[packet]}`,
 	}
 
 	const parts = state.whole ? [state.whole] : state.events
-	const skeleton = combine(volumeId, chapterIds, parts)
+	let skeleton: VolumeSkeleton
+	try {
+		skeleton = combine(volumeId, chapterIds, parts)
+	} catch (error) {
+		if (!legacyReady) throw error
+		quarantineReason ??= 'Saved synthesis failed current validation'
+		const observed = new Set(
+			parts.flatMap((part) => part.chapters.map(({ chapterId }) => chapterId)),
+		)
+		skeleton = combine(
+			volumeId,
+			chapterIds.filter((id) => observed.has(id)),
+			parts,
+		)
+	}
+	if (legacyReady && !quarantineReason) {
+		try {
+			for (const [i, part] of parts.entries()) check(part, parts.slice(0, i))
+		} catch {
+			quarantineReason = 'Saved synthesis failed current validation'
+		}
+	}
 	type Proposal = {
 		item: BiblePatch[number]
 		content: string
@@ -476,11 +509,12 @@ ${packets[packet]}`,
 	const located = new Map<string, Proposal>()
 	let packetIndex = 0
 	for (const part of parts) {
-		const packetIds = state.whole
-			? chapterIds
-			: [...(packets[packetIndex] ?? '').matchAll(/^Chapter ([\w-]+):$/gm)].map(
-					([, id]) => id,
-				)
+		const packetIds =
+			state.whole || legacyReady
+				? chapterIds
+				: [
+						...(packets[packetIndex] ?? '').matchAll(/^Chapter ([\w-]+):$/gm),
+					].map(([, id]) => id)
 		const affected = unique(
 			part.chapters
 				.map(({ chapterId }) => chapterId)
@@ -537,7 +571,9 @@ ${packets[packet]}`,
 		await project.write(files.checkpoint, state)
 		latest = await readBible(project)
 	}
-	const canPublish = !quarantined && hash(latest) === state.basis
+	const canPublish = !quarantineReason && hash(latest) === state.basis
+	const conflictReason =
+		quarantineReason ?? 'Bible changed before synthesis publication'
 	let publicationBase: ReturnType<typeof bibleEntryBases> | undefined
 	const { conflicts, glossaryConflicts, consolidatedAdds } = canPublish
 		? await applyPatches(
@@ -560,13 +596,13 @@ ${packets[packet]}`,
 						entry: {
 							...item.entry,
 							status: 'candidate',
-							conflict: 'Bible changed before synthesis publication',
+							conflict: conflictReason,
 						},
 					})) as typeof biblePatch,
 				glossaryConflicts: glossaryPatch.map((entry) => ({
 					...entry,
 					status: 'candidate' as const,
-					conflict: 'Bible changed before synthesis publication',
+					conflict: conflictReason,
 				})),
 			}
 	const publishedBible = await readBible(project)
@@ -579,10 +615,7 @@ ${packets[packet]}`,
 		glossaryPatch,
 		conflicts,
 		glossaryConflicts,
-		bibleRevision:
-			!quarantined && hash(latest) === state.basis
-				? hash(publishedBible)
-				: state.basis,
+		bibleRevision: canPublish ? hash(publishedBible) : state.basis,
 		bibleBase: publicationBase,
 		quarantined: !canPublish,
 		baseVersion: canPublish ? 1 : undefined,
