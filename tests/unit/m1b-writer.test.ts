@@ -1,4 +1,5 @@
 import type { Context } from '@earendil-works/pi-ai'
+import { paragraphIdPattern } from '@novelive/format/model'
 import { describe, expect, test, vi } from 'vitest'
 import {
 	ContextLimitError,
@@ -188,6 +189,44 @@ describe('M1b writer', () => {
 		)
 		expect(requests[2]).toContain('Quote not found in p0018')
 		expect(result).toEqual([cited])
+	})
+
+	test('uses a fixed citation pattern when a single line cannot fit the paragraph enum', async () => {
+		const paragraphs = Array.from({ length: 30 }, (_, i) => ({
+			id: `p${String(i + 1).padStart(4, '0')}`,
+			text: 'At dusk',
+		}))
+		const aligner = responses(
+			JSON.stringify([
+				{ paragraphCount: paragraphs.length, lineCount: 1, targets: [] },
+			]),
+		)
+		const { options, requests, toolSchemas } = responses(
+			{
+				tool: 'submit_review',
+				arguments: { issues: [{ ...issue, paragraphId: 'p0031' }] },
+			},
+			{ tool: 'submit_review', arguments: { issues: [issue] } },
+		)
+		const model = writingModel(
+			{ ...options.reviewer, contextWindow: 5250 },
+			options,
+		)
+		const result = await reviewFidelity(
+			model,
+			{ paragraphs },
+			`scene Bridge\nsource p0001-p0030\n\n: ${'x'.repeat(220)}`,
+			() => writingModel(aligner.options.writer, aligner.options),
+		)
+		for (const schema of toolSchemas) {
+			const json = JSON.stringify(schema)
+			expect(json).toContain(
+				JSON.stringify({ type: 'string', pattern: paragraphIdPattern }),
+			)
+			expect(json).not.toContain('"enum":["p0001"')
+		}
+		expect(requests[1]).toContain('Quote not found in p0031')
+		expect(result).toEqual([issue])
 	})
 
 	test('separates style-only review and carries the priority preview and chapter constraints', async () => {
