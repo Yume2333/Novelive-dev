@@ -1,6 +1,7 @@
 import type { CommandOutput, Proposal } from '@novelive/creator/contract'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { Collapse } from '../../components/Collapse'
 import { Page } from '../../components/Page'
 import { ScrollArea } from '../../components/ScrollArea'
 import styles from './BiblePage.module.css'
@@ -156,6 +157,8 @@ function Fields({ entry }: { entry: Entry }) {
 }
 
 function Occurrences({ entry }: { entry: Entry }) {
+	const [open, setOpen] = useState(false)
+	const id = useId()
 	const occurrences =
 		(
 			entry as Entry & {
@@ -167,23 +170,35 @@ function Occurrences({ entry }: { entry: Entry }) {
 			}
 		).occurrences ?? []
 	return (
-		<details>
-			<summary>跨章节定位（{occurrences.length}）</summary>
-			{occurrences.length ? (
-				<ul>
-					{occurrences.map(({ chapterId, paragraphId, quote }) => (
-						<li key={`${chapterId}/${paragraphId}`}>
-							<strong>
-								{chapterId} · {paragraphId}
-							</strong>
-							<p>{quote}</p>
-						</li>
-					))}
-				</ul>
-			) : (
-				<p>暂无原文匹配</p>
-			)}
-		</details>
+		<div>
+			<button
+				type="button"
+				className={styles.disclosure}
+				aria-expanded={open}
+				aria-controls={id}
+				onClick={() => setOpen((value) => !value)}
+			>
+				跨章节定位（{occurrences.length}）
+			</button>
+			<Collapse open={open}>
+				<div id={id}>
+					{occurrences.length ? (
+						<ul>
+							{occurrences.map(({ chapterId, paragraphId, quote }) => (
+								<li key={`${chapterId}/${paragraphId}`}>
+									<strong>
+										{chapterId} · {paragraphId}
+									</strong>
+									<p>{quote}</p>
+								</li>
+							))}
+						</ul>
+					) : (
+						<p>暂无原文匹配</p>
+					)}
+				</div>
+			</Collapse>
+		</div>
 	)
 }
 
