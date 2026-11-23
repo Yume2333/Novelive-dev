@@ -285,6 +285,49 @@ test('groups beats only within a chapter and preserves conflicting payoff or tim
 	})
 })
 
+test.each([
+	[
+		'Ada Lin escorts Mei Chen over the bridge',
+		'Ada Lin quietly escorts Mei Chen over the bridge',
+		'Ada Lin never escorts Mei Chen over the bridge',
+	],
+	[
+		'文素臣扶田氏登舟渡河',
+		'文素臣輕輕扶田氏登舟渡河',
+		'文素臣不扶田氏登舟渡河',
+	],
+])(
+	'merges a manner modifier but not a changed outcome: %s',
+	(base, elaborated, changed) => {
+		const bible = {
+			...emptyBible,
+			character: ['Ada Lin', 'Mei Chen', '文素臣', '田氏'].map(
+				(name, index) => ({
+					id: `character-${index}`,
+					name,
+					aliases: [],
+					status: 'confirmed' as const,
+				}),
+			),
+		}
+		const patch: BiblePatch = [base, elaborated, changed].map(
+			(event, index) => ({
+				kind: 'timeline',
+				op: 'add',
+				entry: {
+					id: `beat-${index}`,
+					chapterId: 'c1',
+					event,
+					status: 'candidate',
+				},
+			}),
+		)
+		expect(
+			canonicalizeAdditions(patch, bible, ['c1']).map(({ entry }) => entry.id),
+		).toEqual(['beat-0', 'beat-2'])
+	},
+)
+
 test('does not merge similar same-chapter timeline actions with different outcomes', () => {
 	const bible = {
 		...emptyBible,
