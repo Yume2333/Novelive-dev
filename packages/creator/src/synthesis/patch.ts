@@ -616,12 +616,34 @@ export async function applyPatches(
 				group.some((item) => item.op !== 'add' || !accepted.has(item))
 			)
 				continue
-			if (kind === 'character' && 'aliases' in entry) {
-				entry.aliases = unique(
-					group.flatMap((item) =>
-						item.kind === 'character' ? item.entry.aliases : [],
-					),
+			const fields =
+				kind === 'character'
+					? ['aliases', 'addresses', 'costumes', 'expressions', 'references']
+					: kind === 'location'
+						? ['variants', 'references']
+						: kind === 'style'
+							? ['references']
+							: []
+			for (const field of fields) {
+				const arrays = group.flatMap(({ entry }) => {
+					const value = (entry as Record<string, unknown>)[field]
+					return Array.isArray(value) ? [value as unknown[]] : []
+				})
+				if (!arrays.length) continue
+				const keyed = new Map(
+					arrays
+						.flat()
+						.map((value) => [
+							value && typeof value === 'object' && 'id' in value
+								? value.id
+								: value,
+							value,
+						]),
 				)
+				const merged = unique([...keyed.values()])
+				Object.assign(entry, {
+					[field]: kind === 'style' ? merged.slice(-3) : merged,
+				})
 			}
 			consolidatedAdds.set(group[0], { ...group[0], entry } as Patch)
 			for (const item of group.slice(1)) consolidatedAdds.set(item, null)

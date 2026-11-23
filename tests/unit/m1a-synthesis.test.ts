@@ -179,6 +179,7 @@ test('consolidates repeated candidate additions across events and remaps referen
 		id: 'guide',
 		name: 'Lin',
 		aliases: ['Guide'],
+		costumes: [{ id: 'travel', description: 'Travel clothes' }],
 		status: 'candidate',
 	} as const
 	let calls = 0
@@ -191,7 +192,13 @@ test('consolidates repeated candidate additions across events and remaps referen
 		const first = calls++ === 0
 		const candidate = first
 			? guide
-			: { ...guide, id: 'lin', name: 'Ｌｉｎ', aliases: ['Guide', 'Navigator'] }
+			: {
+					...guide,
+					id: 'lin',
+					name: 'Ｌｉｎ',
+					aliases: ['Guide', 'Navigator'],
+					costumes: [{ id: 'formal', description: 'Formal robes' }],
+				}
 		const result = {
 			overview: 'A journey',
 			chapters: [
@@ -234,13 +241,21 @@ test('consolidates repeated candidate additions across events and remaps referen
 	expect(result.biblePatch).toMatchObject([
 		{
 			kind: 'character',
-			entry: { id: 'guide', aliases: ['Guide', 'Navigator'] },
+			entry: {
+				id: 'guide',
+				aliases: ['Guide', 'Navigator'],
+				costumes: [{ id: 'travel' }, { id: 'formal' }],
+			},
 		},
 		{ kind: 'relation', entry: { from: 'guide', to: 'ada' } },
 	])
 	const bible = await readBible(project)
 	expect(bible.character.filter(({ id }) => id !== 'ada')).toMatchObject([
-		{ id: 'guide', aliases: ['Guide', 'Navigator'] },
+		{
+			id: 'guide',
+			aliases: ['Guide', 'Navigator'],
+			costumes: [{ id: 'travel' }, { id: 'formal' }],
+		},
 	])
 	expect(bible.relation).toContainEqual(
 		expect.objectContaining({ from: 'guide', to: 'ada' }),
