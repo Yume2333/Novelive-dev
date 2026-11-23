@@ -83,6 +83,15 @@ export const commands = {
 	...editorCommands,
 	...productionCommands,
 	...importCommands,
+	'library.list': {
+		input: empty,
+		output: obj({
+			works: arr(
+				obj({ workId: str(), title: str(), published: int(), chapters: int() }),
+			),
+			unreadableCount: int(),
+		}),
+	},
 	'config.get': {
 		input: empty,
 		output: union([maskedConfigSchema, configErrorSchema]),

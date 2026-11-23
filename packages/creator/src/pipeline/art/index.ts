@@ -13,6 +13,13 @@ import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
 import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
 import { resolveRegistry } from '../../project/series/resolve'
+import {
+	checkVariantProfile,
+	type Profile,
+	postprocess,
+	readProfiles,
+	recordProfile,
+} from '../postprocess'
 import { checkImage, type Dimensions, placeholder } from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
@@ -59,6 +66,8 @@ const isMissing = (error: unknown) =>
 const moderationHint = '上一次生成被内容审核拒绝，请收敛描写'
 const baseKeep = ['脸型', '发型', '瞳色', '服装', '姿势', '取景', '画风']
 const registryWrites = new Map<string, Promise<unknown>>()
+const isDrawnBase = ({ type, status }: RegistryEntry) =>
+	status === 'drawn' && (type === 'character' || type === 'location')
 
 export class ArtProduction {
 	private readonly render
@@ -195,10 +204,18 @@ export class ArtProduction {
 			const registry = await this.registry()
 			const entry = registry.entries.find((item) => item.id === id)
 			if (!entry) throw new Error(`Unregistered asset: ${id}`)
+			const profiles = await readProfiles(this.project)
+			const profile = profiles[source]?.profile ?? this.resizeProfile()
+			if (isDrawnBase(entry))
+				checkVariantProfile(
+					profiles[entry.path]?.profile ?? this.resizeProfile(),
+					profile,
+				)
 			await this.project.writeFile(
 				entry.path,
 				await this.project.readFile(source),
 			)
+			await recordProfile(this.project, entry.path, profile)
 			entry.status = 'drawn'
 			await this.persistRegistry(registry)
 			return entry.path
@@ -335,8 +352,24 @@ export class ArtProduction {
 					}
 				: this.savePlaceholder(entry.id, result.issue)
 		}
-		await this.saveWebp(redraw?.path ?? entry.path, result.png, output)
-		if (!redraw) await this.saveStatus(entry.id, 'drawn')
+		const profileSource =
+			foundBase ?? (redraw && isDrawnBase(entry) ? entry : undefined)
+		const profile = profileSource
+			? ((await readProfiles(this.project))[profileSource.path]?.profile ??
+				this.resizeProfile())
+			: this.configuredProfile()
+		const path = redraw?.path ?? entry.path
+		const applied = await this.saveWebp(
+			path,
+			result.png,
+			output,
+			profile,
+			!profileSource,
+		)
+		await this.writeRegistry(async () => {
+			await recordProfile(this.project, path, applied)
+			if (!redraw) await this.update(entry.id, 'drawn')
+		})
 		return { status: 'drawn' }
 	}
 
@@ -362,13 +395,50 @@ export class ArtProduction {
 			}))
 	}
 
-	private async saveWebp(path: string, png: Buffer, size: Dimensions) {
-		const bytes = await sharp(png)
-			.resize({ ...size, fit: 'cover', kernel: 'lanczos3' })
+	private configuredProfile(): Profile {
+		return {
+			mode: this.options.image.postProcess,
+			tier: this.options.image.upscaleTier,
+		}
+	}
+
+	private resizeProfile(): Profile {
+		return { mode: 'off', tier: this.options.image.upscaleTier }
+	}
+
+	private async saveWebp(
+		path: string,
+		png: Buffer,
+		size: Dimensions,
+		profile: Profile,
+		allowFallback = false,
+	) {
+		const target = { width: size.width, height: size.height }
+		let image = sharp(png)
+		let applied = profile
+		if (profile.mode !== 'off') {
+			try {
+				image = sharp(
+					await postprocess(
+						png,
+						{ ...profile, target, fit: 'cover' },
+						{ signal: this.options.signal },
+					),
+				)
+			} catch (error) {
+				this.options.signal?.throwIfAborted()
+				if (!allowFallback) throw error
+				applied = { ...profile, mode: 'off' }
+			}
+		}
+		if (applied.mode === 'off')
+			image.resize({ ...target, fit: 'cover', kernel: 'lanczos3' })
+		const bytes = await image
 			.webp({ quality: 90, lossless: this.options.lossless })
 			.toBuffer()
 		this.options.signal?.throwIfAborted()
 		await this.project.writeFile(path, bytes)
+		return applied
 	}
 
 	private async paint(
@@ -501,7 +571,16 @@ export class ArtProduction {
 				} else {
 					png = result.png
 				}
-				await this.saveWebp(path, png, this.outputSize(portrait))
+				const profile = await this.saveWebp(
+					path,
+					png,
+					this.outputSize(portrait),
+					this.configuredProfile(),
+					true,
+				)
+				await this.writeRegistry(() =>
+					recordProfile(this.project, path, profile),
+				)
 			}
 			return { id, cachePath: path }
 		}
@@ -633,7 +712,12 @@ export class ArtProduction {
 				path,
 				await this.project.readFile(source),
 				this.outputSize(false),
+				this.resizeProfile(),
 			)
+			await this.writeRegistry(async () => {
+				const profile = (await readProfiles(this.project))[source]?.profile
+				await recordProfile(this.project, path, profile ?? this.resizeProfile())
+			})
 			references.push({
 				path,
 				description: i === 0 ? '主视觉' : '补充画风参考',
@@ -641,6 +725,7 @@ export class ArtProduction {
 		}
 		await this.writeRegistry(async () => {
 			const registry = await this.registry()
+			const profiles = await readProfiles(this.project)
 			for (const { id, path } of costumes) {
 				const existing = registry.entries.find((entry) => entry.id === id)
 				const destination =
@@ -649,6 +734,12 @@ export class ArtProduction {
 					destination,
 					await this.project.readFile(path),
 					this.outputSize(true),
+					this.resizeProfile(),
+				)
+				await recordProfile(
+					this.project,
+					destination,
+					profiles[path]?.profile ?? this.resizeProfile(),
 				)
 				if (existing) existing.status = 'drawn'
 				else

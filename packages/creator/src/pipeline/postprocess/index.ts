@@ -27,9 +27,9 @@ const names = {
 }
 
 export function resolveUpscale(runtime: Runtime = {}) {
-	const root = fileURLToPath(
-		new URL('../../../../../bin/upscale/', import.meta.url),
-	)
+	const root =
+		process.env.NL_UPSCALE_DIR ??
+		fileURLToPath(new URL('../../../../../bin/upscale/', import.meta.url))
 	return {
 		binary:
 			runtime.binary ??

@@ -288,6 +288,9 @@ async function productionSession(workId: string) {
 }
 
 registry.register('config.get', () => config.get())
+registry.register('library.list', async () =>
+	(await import('./project/library')).listLibrary(dataDir),
+)
 registry.register('usage.list', () => listUsage(dataDir))
 registry.register('bible.get', async (input) => {
 	using project = await openBibleProject(dataDir, input.workId)
