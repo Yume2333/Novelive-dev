@@ -49,6 +49,19 @@ function pdf(pages, image = false, cjk = false) {
 
 for (const [name, pages, image, cjk] of [
 	[
+		'body-heading-header',
+		[
+			['Chapter 1', 'The tale begins', 'and travels onward'],
+			[
+				{ text: 'Chapter 1', y: 380 },
+				{ text: 'through the village', y: 326 },
+				{ text: 'toward the river', y: 308 },
+				{ text: 'and ends.', y: 290 },
+			],
+		],
+		false,
+	],
+	[
 		'many-folios',
 		Array.from({ length: 40 }, (_, i) => [
 			{ text: String(i + 10), y: 380 },

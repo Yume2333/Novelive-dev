@@ -125,7 +125,9 @@ function stripRunningEdges(lines: Line[]) {
 		if (line.zone === 'top') tops.set(line.page, line)
 		if (line.zone === 'bottom') bottoms.set(line.page, line)
 	}
+	let latestHeading: string | undefined
 	return lines.filter((line) => {
+		if (line.zone && line.text === latestHeading) return false
 		for (const edges of [tops, bottoms]) {
 			if (edges.get(line.page) !== line) continue
 			const previous = edges.get(line.page - 1)?.text === line.text
@@ -136,6 +138,7 @@ function stripRunningEdges(lines: Line[]) {
 			)
 				return false
 		}
+		if (heading(line.text)) latestHeading = line.text
 		return true
 	})
 }

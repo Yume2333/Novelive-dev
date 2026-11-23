@@ -8,6 +8,20 @@ import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
 
+test('does not duplicate a body chapter heading when it later appears as a zone header', async () => {
+	const result = await extractPdf(await fixture('body-heading-header'))
+	if (result.status !== 'ready') throw new Error('Expected text PDF')
+	expect(result.book.volumes[0].chapters).toEqual([
+		{
+			title: 'Chapter 1',
+			paragraphs: [
+				'The tale begins and travels onward through the village toward the river and ends.',
+			],
+			notes: [],
+		},
+	])
+})
+
 test('handles a long sequence of zone folios without losing repeated body lines', async () => {
 	const result = await extractPdf(await fixture('many-folios'))
 	if (result.status !== 'ready') throw new Error('Expected text PDF')
