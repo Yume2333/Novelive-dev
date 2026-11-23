@@ -8,7 +8,10 @@ import {
 	importFileProject,
 	reviseTxtProject,
 } from '../../packages/creator/src/import/wizard'
-import { readImportTarget } from '../../packages/creator/src/import/wizard/join'
+import {
+	joinImportedVolumes,
+	readImportTarget,
+} from '../../packages/creator/src/import/wizard/join'
 import { Project } from '../../packages/creator/src/project'
 import { projectFiles } from '../../packages/format/src/model'
 import {
@@ -177,6 +180,54 @@ test.each(['md', 'docx', 'txt', 'epub', 'pdf'] as const)(
 			code: 'invalid_config',
 			message: '系列已添加新卷，不能重新划分原文',
 		})
+	},
+)
+
+test.each(['en', 'ja'])(
+	'joining a declared %s source preserves the series output language',
+	async (language) => {
+		const { root, initial, series } = await existingProject()
+		const source = Buffer.from('Original foreign-language source')
+		const result = await joinImportedVolumes(
+			{
+				sourcePath: join(root, 'sequel.epub'),
+				folder: root,
+				title: 'Sequel',
+				references: [],
+				join: { projectDir: initial.projectDir, seriesId: series.seriesId },
+			},
+			source,
+			'epub',
+			{
+				format: 'epub',
+				metadata: { language },
+				volumes: [
+					{
+						title: 'Sequel',
+						chapters: [
+							{
+								title: 'Arrival',
+								paragraphs: ['A paper boat drifted beneath the bridge.'],
+								notes: [],
+							},
+						],
+					},
+				],
+			},
+		)
+		using project = await Project.open(initial.projectDir)
+		expect(
+			(
+				await project.read(
+					projectFiles.work(result.volumes[0].volumeId, result.workId),
+				)
+			).language,
+		).toBe('zh-CN')
+		expect(
+			await project.readFile(
+				`source/imports/${result.volumes[0].volumeId}/original.epub`,
+			),
+		).toEqual(source)
 	},
 )
 

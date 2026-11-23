@@ -85,6 +85,7 @@ export async function joinImportedVolumes(
 	)
 		throw invalid('原文含无正文的卷或章节，无法加入系列')
 	const language =
+		firstWork?.language ??
 		book?.metadata.language ??
 		(decoded
 			? decoded.encoding === 'shift_jis'
@@ -92,9 +93,7 @@ export async function joinImportedVolumes(
 				: decoded.encoding === 'big5'
 					? 'zh-TW'
 					: 'zh-CN'
-			: firstWork
-				? firstWork.language
-				: 'zh-CN')
+			: 'zh-CN')
 	const joined = []
 	for (const volume of volumes) {
 		const link = await joinSeries(project, {
