@@ -363,6 +363,25 @@ test('redacts escaped and percent-encoded relay origins in recorded JSON', async
 	})
 })
 
+test('replays image generation with an explicit default count without changing other counts', async () => {
+	const fetch = vi.fn(async () => new Response('image'))
+	const url = `${origin}/v1/images/generations`
+	const record = createReplayFetch({ mode: 'record', directory, fetch })
+	const strict = createReplayFetch({ mode: 'strict', directory, fetch })
+	await (
+		await record(url, { method: 'POST', body: '{"model":"fixture"}' })
+	).text()
+	expect(
+		await (
+			await strict(url, { method: 'POST', body: '{"model":"fixture","n":1}' })
+		).text(),
+	).toBe('image')
+	await expect(
+		strict(url, { method: 'POST', body: '{"model":"fixture","n":2}' }),
+	).rejects.toThrow('Missing strict replay cassette')
+	expect(fetch).toHaveBeenCalledTimes(1)
+})
+
 test('matches image-edit multipart requests across boundaries and externally stores raw large bodies', async () => {
 	const body = Buffer.alloc(256 * 1024 + 1, 0xab)
 	const fetch = vi.fn(
@@ -400,6 +419,20 @@ test('matches image-edit multipart requests across boundaries and externally sto
 			).arrayBuffer(),
 		),
 	).toEqual(body)
+	expect(fetch).toHaveBeenCalledTimes(1)
+	const explicit = imageForm()
+	explicit.append('n', '1')
+	expect(
+		Buffer.from(
+			await (
+				await strict(url, { method: 'POST', body: explicit })
+			).arrayBuffer(),
+		),
+	).toEqual(body)
+	explicit.set('n', '2')
+	await expect(strict(url, { method: 'POST', body: explicit })).rejects.toThrow(
+		'Missing strict replay cassette',
+	)
 	expect(fetch).toHaveBeenCalledTimes(1)
 })
 

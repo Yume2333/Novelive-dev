@@ -114,6 +114,7 @@ export function imageRenderer(config: ImageConfig, options: ModelOptions) {
 							{
 								...parameters,
 								...output,
+								n: 1,
 								quality: config.quality,
 								image: await Promise.all(
 									refs.map((ref, index) =>
@@ -124,7 +125,7 @@ export function imageRenderer(config: ImageConfig, options: ModelOptions) {
 							{ signal },
 						)
 					: await client.images.generate(
-							{ ...parameters, ...output, quality: config.quality },
+							{ ...parameters, ...output, n: 1, quality: config.quality },
 							{ signal },
 						)
 			recordImageUsage(

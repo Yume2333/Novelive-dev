@@ -243,6 +243,42 @@ it('uses OpenAI multipart edits for Seedream-named models on a relay', async () 
 	expect(Object.values(results).every((result) => result.ok)).toBe(true)
 })
 
+it('requests one image for each OpenAI-compatible connection test capability', async () => {
+	const cacheDir = await mkdtemp(join(tmpdir(), 'novelive-image-'))
+	dirs.push(cacheDir)
+	const png = await sharp({
+		create: {
+			width: 32,
+			height: 32,
+			channels: 4,
+			background: { r: 0, g: 0, b: 0, alpha: 0 },
+		},
+	})
+		.png()
+		.toBuffer()
+	const requests: Array<{ path: string; n: unknown }> = []
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		const path = new URL(request.url).pathname
+		const n =
+			path === '/v1/images/edits'
+				? (await request.formData()).get('n')
+				: (await request.json()).n
+		requests.push({ path, n })
+		return Response.json({ data: [{ b64_json: png.toString('base64') }] })
+	}
+	const results = await testImage(
+		{ ...base, model: 'gpt-image-synthetic' },
+		{ cacheDir, replay: { mode: 'replay', directory: cacheDir, fetch } },
+	)
+	expect(Object.values(results).every((result) => result.ok)).toBe(true)
+	expect(requests).toEqual([
+		{ path: '/v1/images/generations', n: 1 },
+		{ path: '/v1/images/generations', n: 1 },
+		{ path: '/v1/images/edits', n: '1' },
+	])
+})
+
 it('bounds URL downloads to 90 seconds and maps timeout to network', async () => {
 	const timeout = vi
 		.spyOn(AbortSignal, 'timeout')
