@@ -12,6 +12,18 @@ export class SpendBudgetError extends Error {
 const valid = (value: unknown): value is number =>
 	typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 
+const textSettlements = new WeakMap<Response, () => boolean>()
+
+export function textSettlement(response: Response) {
+	return textSettlements.get(response)
+}
+
+export function inheritTextSettlement(source: Response, target: Response) {
+	const settlement = textSettlement(source)
+	if (settlement) textSettlements.set(target, settlement)
+	return target
+}
+
 function cap(value: string | undefined, name: string) {
 	const amount = Number(value)
 	if (!value || !/^\d+$/.test(value) || !valid(amount))
@@ -140,27 +152,25 @@ export async function quoteSpend(request: Request) {
 function observeUsage(response: Response, settle: (tokens: number) => void) {
 	if (!response.body) return response
 	let pending = ''
-	let tokens: number | undefined
 	let anthropicInput: number | undefined
 	let anthropicOutput: number | undefined
 	const decoder = new TextDecoder()
 	function line(text: string) {
 		if (!text.startsWith('data:')) return
 		const data = text.slice(5).trim()
-		if (data === '[DONE]') {
-			if (tokens !== undefined) settle(tokens)
-			return
-		}
+		if (data === '[DONE]') return
 		let row: Record<string, unknown>
 		try {
 			row = object(JSON.parse(data))
 		} catch {
 			return
 		}
-		tokens = totalUsage(row.usage) ?? tokens
+		const usage = totalUsage(row.usage)
+		if (usage !== undefined) settle(usage)
 		if (
 			row.type === 'response.completed' ||
-			row.type === 'response.incomplete'
+			row.type === 'response.incomplete' ||
+			row.type === 'response.failed'
 		) {
 			const total = totalUsage(object(row.response).usage)
 			if (total !== undefined) settle(total)
@@ -180,7 +190,9 @@ function observeUsage(response: Response, settle: (tokens: number) => void) {
 			if (valid(output)) anthropicOutput = output
 		}
 		if (
-			row.type === 'message_stop' &&
+			(row.type === 'message_stop' ||
+				(row.type === 'message_delta' &&
+					typeof object(row.delta).stop_reason === 'string')) &&
 			anthropicInput !== undefined &&
 			anthropicOutput !== undefined
 		) {
@@ -258,15 +270,21 @@ export function projectSpend(database: DatabaseSync) {
 			`)
 				.run(actualTokens, actualImages, row.id)
 		}
-		const response = await send(
+		let settledTokens: number | undefined
+		const settleText = (actual: number) => {
+			if (settledTokens === actual) return
+			settle(actual, 0)
+			settledTokens = actual
+		}
+		let response = await send(
 			new Request(request, { redirect: 'error' }),
 			quote,
 		)
-		if (!response.ok) return response
+		if (images && !response.ok) return response
 		const type = response.headers.get('content-type') ?? ''
 		if (!images && type.includes('text/event-stream'))
-			return observeUsage(response, (actual) => settle(actual, 0))
-		if (type.includes('json')) {
+			response = observeUsage(response, settleText)
+		else if (type.includes('json')) {
 			const body = object(
 				await response
 					.clone()
@@ -286,9 +304,11 @@ export function projectSpend(database: DatabaseSync) {
 				}
 			} else {
 				const actual = totalUsage(body.usage)
-				if (actual !== undefined) settle(actual, 0)
+				if (actual !== undefined) settleText(actual)
 			}
 		}
+		if (!images)
+			textSettlements.set(response, () => settledTokens !== undefined)
 		return response
 	}
 }

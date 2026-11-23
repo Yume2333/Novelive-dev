@@ -18,6 +18,7 @@ import {
 	readBible,
 	validatePatch,
 } from '../../packages/creator/src/synthesis/patch'
+import { projectSpend } from '../../packages/creator/src/usage/spend'
 import {
 	type BiblePatch,
 	biblePatchSchema,
@@ -42,9 +43,14 @@ let directory: string
 let root: string
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
-const stream = (result: unknown) =>
+const providerUsage = {
+	prompt_tokens: 20,
+	completion_tokens: 7,
+	total_tokens: 27,
+}
+const stream = (result: unknown, usage?: typeof providerUsage) =>
 	new Response(
-		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage })}\n\ndata: [DONE]\n\n`,
 		{ headers: { 'content-type': 'text/event-stream' } },
 	)
 const candidatePositions = (prompt: string) =>
@@ -454,6 +460,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+	vi.unstubAllEnvs()
 	expect(network).not.toHaveBeenCalled()
 	await rm(directory, { recursive: true, force: true })
 })
@@ -560,6 +567,121 @@ test.each([
 			}),
 		).resolves.toMatchObject({ chapters: repairedEvent.chapters })
 		expect(fetch).toHaveBeenCalledTimes(2)
+	},
+)
+
+test.each([200, 429, 'replay miss'] as const)(
+	'synthesis %s without usage only blocks reopening if ambiguous',
+	async (status) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		vi.stubEnv('NL_USAGE_CSV', '')
+		try {
+			await seed(root)
+			const send = vi.fn(async () => {
+				if (status === 'replay miss') throw new Error('Connection terminated')
+				return status === 200 ? stream({}) : Response.json({}, { status })
+			})
+			const run = (project: Project) =>
+				synthesizeVolume(project, 'v1', chapters, {
+					...options,
+					strategy: 'whole',
+					fetch: createReplayFetch({
+						mode: status === 'replay miss' ? 'replay' : 'record',
+						directory: join(directory, 'recordings'),
+						fetch: send,
+						spend: projectSpend(project.database),
+					}),
+				})
+			const error =
+				status === 429
+					? { code: 'network' }
+					: {
+							code: 'internal',
+							message: expect.stringContaining(
+								status === 'replay miss'
+									? 'no HTTP status: connection or stream interrupted'
+									: 'HTTP 200: successful response did not report billable usage',
+							),
+						}
+			{
+				using project = await Project.open(root)
+				await expect(run(project)).rejects.toMatchObject(error)
+			}
+			using reopened = await Project.open(root)
+			await expect(run(reopened)).rejects.toMatchObject(error)
+			expect(send).toHaveBeenCalledTimes(status === 429 ? 2 : 1)
+			expect(
+				reopened.database
+					.prepare('SELECT actual_tokens FROM spend_reservation')
+					.all(),
+			).toEqual(
+				Array.from({ length: status === 429 ? 2 : 1 }, () => ({
+					actual_tokens: null,
+				})),
+			)
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	},
+)
+
+test.each([false, true])(
+	'synthesis cancellation blocks reopen only after dispatch (dispatched: %s)',
+	async (inFlight) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		vi.stubEnv('NL_USAGE_CSV', '')
+		await seed(root)
+		const controller = new AbortController()
+		const entered = Promise.withResolvers<void>()
+		const send = vi.fn<typeof globalThis.fetch>(async (input) => {
+			const { signal } = new Request(input)
+			if (!inFlight) return Response.json({}, { status: 429 })
+			return new Promise<Response>((_resolve, reject) => {
+				signal.addEventListener('abort', () => reject(signal.reason), {
+					once: true,
+				})
+				entered.resolve()
+			})
+		})
+		const run = (project: Project, signal?: AbortSignal) =>
+			synthesizeVolume(project, 'v1', chapters, {
+				...options,
+				signal,
+				strategy: 'whole',
+				fetch: createReplayFetch({
+					mode: 'record',
+					directory: join(directory, 'recordings'),
+					fetch: send,
+					spend: projectSpend(project.database),
+				}),
+			})
+		const unknown = {
+			code: 'internal',
+			message: expect.stringContaining(
+				'cancelled after dispatch without settled usage',
+			),
+		}
+		{
+			using project = await Project.open(root)
+			if (!inFlight) controller.abort()
+			const runResult = run(project, controller.signal)
+			const assertion = expect(runResult).rejects.toMatchObject(
+				inFlight ? unknown : { name: 'AbortError' },
+			)
+			if (inFlight) {
+				await entered.promise
+				controller.abort()
+			}
+			await assertion
+			expect(send).toHaveBeenCalledTimes(inFlight ? 1 : 0)
+		}
+		using reopened = await Project.open(root)
+		await expect(run(reopened)).rejects.toMatchObject(
+			inFlight ? unknown : { code: 'network' },
+		)
+		expect(send).toHaveBeenCalledOnce()
 	},
 )
 
@@ -896,6 +1018,9 @@ test('a saturated packet shows recent unique IDs from each kind and can finish w
 test.each([false, true])(
 	'packet reasoning-only responses get one focused retry (still reasoning only: %s)',
 	async (stillReasoning) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		vi.stubEnv('NL_USAGE_CSV', '')
 		await seed(root)
 		using project = await Project.open(root)
 		const prompts: string[] = []
@@ -903,23 +1028,31 @@ test.each([false, true])(
 			const { messages } = await new Request(input, init).json()
 			const prompt: string = messages[0].content
 			const candidates = candidatePositions(prompt)
-			if (candidates) return stream({ keep: candidates })
+			if (candidates) return stream({ keep: candidates }, providerUsage)
 			prompts.push(prompt)
 			if (!stillReasoning && prompt.includes('Return one short JSON answer'))
-				return stream({
-					event: 'Ada opens the tower.',
-					overview: '',
-					chapters: chapters.map((chapterId) => ({
-						chapterId,
-						progress: 'Ada opens the tower.',
-					})),
-					biblePatch: [{ kind: 'location', op: 'add', entry: candidateTower }],
-					glossaryPatch: [],
-					is_last: true,
-				})
+				return stream(
+					{
+						event: 'Ada opens the tower.',
+						overview: '',
+						chapters: chapters.map((chapterId) => ({
+							chapterId,
+							progress: 'Ada opens the tower.',
+						})),
+						biblePatch: [
+							{ kind: 'location', op: 'add', entry: candidateTower },
+						],
+						glossaryPatch: [],
+						is_last: true,
+					},
+					providerUsage,
+				)
 			const chunks = [
 				{ choices: [{ index: 0, delta: { reasoning_content: 'Thinking' } }] },
-				{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+				{
+					choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+					usage: providerUsage,
+				},
 			]
 			return new Response(
 				`${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
@@ -930,7 +1063,12 @@ test.each([false, true])(
 			...options,
 			connection: { ...connection, model: 'devin-swe-2' },
 			strategy: 'events',
-			fetch,
+			fetch: createReplayFetch({
+				mode: 'record',
+				directory: join(directory, 'recordings'),
+				fetch,
+				spend: projectSpend(project.database),
+			}),
 		})
 		if (stillReasoning)
 			await expect(result).rejects.toMatchObject({ code: 'reasoning_limit' })
@@ -938,6 +1076,11 @@ test.each([false, true])(
 		expect(prompts[0]).not.toContain('Return one short JSON answer')
 		expect(new Set(prompts).size).toBe(2)
 		expect(prompts.at(-1)).toContain('Return one short JSON answer')
+		expect(
+			project.database
+				.prepare('SELECT DISTINCT actual_tokens FROM spend_reservation')
+				.all(),
+		).toEqual([{ actual_tokens: 27 }])
 		expect(prompts.at(-1)?.split('Chapter previews:\n')[1]).toEqual(
 			prompts[0].split('Chapter previews:\n')[1],
 		)

@@ -329,6 +329,120 @@ test('M1b Electron refuses a zero-budget production request before transport', a
 	}
 })
 
+test('M1b creation surfaces an unresolved synthesis and does not redispatch after reopening', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-synthesis-'))
+	const fallback = join(root, 'fallback')
+	const projects = join(root, 'projects')
+	const source = join(root, '纸船与灯火.txt')
+	const director = 'loopback-unresolved-synthesis'
+	const calls: string[] = []
+	const provider = createServer(async (request, response) => {
+		const chunks = []
+		for await (const chunk of request) chunks.push(chunk)
+		const { model } = JSON.parse(Buffer.concat(chunks).toString())
+		calls.push(`${request.url}: ${model}`)
+		response
+			.writeHead(503, { 'content-type': 'application/json' })
+			.end(JSON.stringify({ error: { message: 'Service unavailable' } }))
+	})
+	try {
+		await Promise.all([
+			mkdir(fallback),
+			mkdir(projects),
+			writeFile(source, original),
+		])
+		await combineCassettes(fallback)
+		await new Promise<void>((resolve, reject) => {
+			provider.once('error', reject)
+			provider.listen(0, '127.0.0.1', resolve)
+		})
+		const address = provider.address()
+		if (!address || typeof address === 'string')
+			throw new Error('Missing stub address')
+		const baseUrl = `http://127.0.0.1:${address.port}/v1`
+		const launch = () =>
+			electron.launch({
+				executablePath: require('electron'),
+				args: ['apps/desktop', `--user-data-dir=${join(root, 'profile')}`],
+				env: {
+					...process.env,
+					ELECTRON_RENDERER_URL: '',
+					NL_REPLAY: 'record',
+					NL_CASSETTE_DIR: join(root, 'cassette'),
+					NL_PRODUCTION_CASSETTE_DIR: '',
+					NL_PRODUCTION_FALLBACK_DIR: fallback,
+					NL_IMAGE_BASE_URL: baseUrl,
+					NL_IMAGE_API_KEY: 'offline-placeholder',
+					NL_RUN_TOKEN_CAP: '1000000',
+					NL_RUN_IMAGE_CAP: '0',
+					NL_USAGE_CSV: '',
+				},
+			})
+		const expectProductionError = async (page: Page, workId: string) => {
+			await page.evaluate((id) => {
+				location.hash = `/work/${id}/production`
+			}, workId)
+			await expect(page.getByRole('alert')).toContainText(
+				'Model request outcome unknown; not retried automatically (HTTP 503: provider did not return a usable response)',
+			)
+		}
+		const getPage = async (app: Awaited<ReturnType<typeof launch>>) => {
+			await app.evaluate(({ dialog }) => {
+				dialog.showMessageBox = async () => ({
+					response: 1,
+					checkboxChecked: false,
+				})
+			})
+			const page = await app.firstWindow()
+			await expect(page.getByText('创作端已就绪')).toBeAttached()
+			return page
+		}
+		const app = await launch()
+		let workId: string
+		try {
+			const page = await getPage(app)
+			const imported = await page.evaluate(
+				async ({ models, baseUrl, director, projects, source }) => {
+					await window.novelive.call('config.update', {
+						models: {
+							fast: { ...models.fast, baseUrl },
+							main: { ...models.main, baseUrl, model: director },
+							writing: { ...models.writing, baseUrl },
+							visual: { ...models.visual, baseUrl },
+							image: { ...models.image, baseUrl },
+						},
+					}).promise
+					return window.novelive.call('import.txt', {
+						folder: projects,
+						sourcePath: source,
+						title: '纸船与灯火',
+						encoding: 'utf-8',
+						references: [],
+					}).promise
+				},
+				{ models: configuration.models, baseUrl, director, projects, source },
+			)
+			if (imported.status !== 'ready') throw new Error('Fixture import failed')
+			workId = imported.workId
+			await expectProductionError(page, workId)
+			expect(calls).toEqual([`/v1/chat/completions: ${director}`])
+		} finally {
+			await app.close()
+		}
+		const reopened = await launch()
+		try {
+			await expectProductionError(await getPage(reopened), workId)
+			expect(calls).toEqual([`/v1/chat/completions: ${director}`])
+		} finally {
+			await reopened.close()
+		}
+	} finally {
+		if (provider.listening)
+			await new Promise<void>((resolve) => provider.close(() => resolve()))
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
 test('M1b creation surfaces a writing budget pause and resumes without repeat dispatch', async () => {
 	test.setTimeout(75_000)
 	const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-soft-stop-'))

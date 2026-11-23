@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 import { arr, compile, int, obj, opt, str } from '@earendil-works/pi-schema'
 import {
+	inheritTextSettlement,
 	type projectSpend,
 	quoteSpend,
 	requestedOutputTokens,
@@ -31,6 +32,17 @@ export interface ReplayOptions {
 	reportMissing?: boolean
 	ignoreRecordedFailures?: boolean
 	spend?: ReturnType<typeof projectSpend>
+}
+
+const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
+const dispatchedRequests = new WeakSet<Request>()
+
+export function wasDispatched(request: Request) {
+	return dispatchedRequests.has(request)
+}
+
+export function isSpendGuardedFetch(fetch: typeof globalThis.fetch) {
+	return spendGuardedFetches.has(fetch)
 }
 
 const bodyLimit = 256 * 1024
@@ -282,11 +294,22 @@ export function createReplayFetch(
 	const mode = options.mode ?? modeFromEnvironment()
 	const send = options.fetch ?? globalThis.fetch
 	const spend = options.spend
-	const upstream: typeof fetch = spend
-		? (input, init) =>
-				spend(new Request(input, init), (admitted) => send(admitted))
-		: send
-	if (!mode) return upstream
+	const sendAdmitted = (input: RequestInfo | URL, admitted: Request) => {
+		admitted.signal.throwIfAborted()
+		if (input instanceof Request) dispatchedRequests.add(input)
+		return send(admitted)
+	}
+	const sendLive = (request: Request, original: RequestInfo | URL) =>
+		spend
+			? spend(request, (admitted) => sendAdmitted(original, admitted))
+			: send(request)
+	if (!mode) {
+		if (!spend) return send
+		const upstream: typeof fetch = (input, init) =>
+			sendLive(new Request(input, init), input)
+		spendGuardedFetches.add(upstream)
+		return upstream
+	}
 	const directory =
 		options.directory ??
 		process.env.NL_CASSETTE_DIR ??
@@ -364,7 +387,7 @@ export function createReplayFetch(
 		await write
 	}
 
-	return async (input, init) => {
+	const dispatch: typeof fetch = async (input, init) => {
 		const request = new Request(input, init)
 		const rebindIds =
 			options.rebindIds ?? process.env.NL_REPLAY_REBIND_IDS === '1'
@@ -421,7 +444,7 @@ export function createReplayFetch(
 						`${new Date().toISOString().slice(0, 10)},${String(body.model ?? 'image').replaceAll(',', '')},1,${reservation?.tokens ?? requestedOutputTokens(admitted, body) ?? 0},${reservation?.images ?? 0},cassette recording (${reservation ? 'reserved tokens and images' : 'reserved output tokens'})\n`,
 					)
 				}
-				return send(admitted)
+				return spend ? sendAdmitted(input, admitted) : send(admitted)
 			}
 			const response = await (spend
 				? spend(request, recordSend)
@@ -464,10 +487,13 @@ export function createReplayFetch(
 				},
 				{ highWaterMark: 0 },
 			)
-			return new Response(stream, {
-				status: response.status,
-				headers: response.headers,
-			})
+			return inheritTextSettlement(
+				response,
+				new Response(stream, {
+					status: response.status,
+					headers: response.headers,
+				}),
+			)
 		}
 		let text = ''
 		try {
@@ -506,7 +532,7 @@ export function createReplayFetch(
 					await appendFile(process.env.NL_REPLAY_MISSING_LOG, `${message}\n`)
 				throw new Error(message)
 			}
-			return upstream(request)
+			return sendLive(request, input)
 		}
 		const position = positions.get(identity.key) ?? 0
 		const row = rows[Math.min(position, rows.length - 1)]
@@ -535,4 +561,6 @@ export function createReplayFetch(
 				: replayBody(bytes, request.signal, options.fault, options.delayMs)
 		return new Response(stream, { status: row.status, headers: row.headers })
 	}
+	if (spend && mode !== 'strict') spendGuardedFetches.add(dispatch)
+	return dispatch
 }

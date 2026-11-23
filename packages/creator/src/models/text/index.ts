@@ -21,9 +21,13 @@ import { isRetryableAssistantError } from '@earendil-works/pi-ai/utils/retry'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import type { MaskedConfig } from '../../config/index.js'
 import type { CommandError } from '../../contract/index.js'
-import { createReplayFetch } from '../../replay/index.js'
+import {
+	createReplayFetch,
+	isSpendGuardedFetch,
+	wasDispatched,
+} from '../../replay/index.js'
 import { recordTextUsage } from '../../usage'
-import { SpendBudgetError } from '../../usage/spend'
+import { SpendBudgetError, textSettlement } from '../../usage/spend'
 import { textUsageSlots } from '../../usage/text-slots'
 
 type Settings = MaskedConfig['models']['fast']
@@ -123,6 +127,12 @@ export class TextModelError extends Error {
 		options?: ErrorOptions,
 	) {
 		super(message, options)
+	}
+}
+
+export class UnknownTextOutcomeError extends TextModelError {
+	constructor(message: string, usage?: Usage) {
+		super('internal', message, usage)
 	}
 }
 
@@ -243,6 +253,16 @@ const temporary =
 const interruption =
 	/(?:stream ended|connection|socket|terminated|fetch failed|network[_ -]error|timed? ?out|unexpected eof|malformed server-sent event)/i
 
+function requestFailureReason(message: AssistantMessage) {
+	const detail = message.errorMessage ?? ''
+	if (/timed? ?out|timeout/i.test(detail)) return 'request timeout'
+	if (/malformed|parse|syntaxerror|invalid json|unexpected token/i.test(detail))
+		return 'invalid provider response'
+	if (/abort/i.test(detail)) return 'transport aborted'
+	if (interruption.test(detail)) return 'connection or stream interrupted'
+	return 'provider did not return a usable response'
+}
+
 function errorFields(value: unknown): string {
 	if (typeof value !== 'object' || value === null) return ''
 	return Object.entries(value)
@@ -312,6 +332,7 @@ function failed(
 
 type StreamPolicy = {
 	fetch?: typeof globalThis.fetch
+	stopOnUnknownOutcome?: boolean
 	idleMs?: number
 	requestRetries?: number
 	streamRetries?: number
@@ -320,11 +341,13 @@ type StreamPolicy = {
 
 type TextStreamOptions = SimpleStreamOptions & { outputLimit?: number }
 const spendRefusals = new WeakMap<AssistantMessage, SpendBudgetError>()
+const unknownOutcomes = new WeakSet<AssistantMessage>()
 
 export function createTextStream(
 	policy: StreamPolicy = {},
 ): StreamFunction<Api, TextStreamOptions> {
 	const fetch = policy.fetch ?? createReplayFetch()
+	const guarded = policy.stopOnUnknownOutcome && isSpendGuardedFetch(fetch)
 	return (model, context, options) => {
 		const output = createAssistantMessageEventStream()
 		const limit = policy.streamRetries ?? 2
@@ -361,10 +384,12 @@ export function createTextStream(
 			detail?: string,
 			previous?: AssistantMessage,
 			spendRefusal?: SpendBudgetError,
+			unknownOutcome = false,
 		) => {
 			const error = failed(model, code, detail, previous)
 			if (usage) error.usage = usage
 			if (spendRefusal) spendRefusals.set(error, spendRefusal)
+			if (unknownOutcome) unknownOutcomes.add(error)
 			output.push({
 				type: 'error',
 				reason: code === 'cancelled' ? 'aborted' : 'error',
@@ -395,6 +420,9 @@ export function createTextStream(
 				let fields = ''
 				let spendError: SpendBudgetError | undefined
 				let headersReceived = false
+				let request: Request | undefined
+				let settlement: ReturnType<typeof textSettlement>
+				const started = Date.now()
 				const resetWatchdog = () => {
 					clearTimeout(timer)
 					timer = setTimeout(() => idle.abort(), policy.idleMs ?? watchdogMs)
@@ -424,16 +452,19 @@ export function createTextStream(
 						},
 						signal,
 						timeoutMs: headerDeadline,
-						maxRetries: policy.requestRetries ?? 2,
+						maxRetries: guarded ? 0 : (policy.requestRetries ?? 2),
 						fetch: async (input, init) => {
 							status = undefined
 							fields = ''
 							if (spendError) throw spendError
-							const response = await fetch(input, init).catch((error) => {
+							request = guarded ? new Request(input, init) : undefined
+							const pending = request ? fetch(request) : fetch(input, init)
+							const response = await pending.catch((error) => {
 								if (error instanceof SpendBudgetError) spendError = error
 								throw error
 							})
 							status = response.status
+							settlement = guarded ? textSettlement(response) : undefined
 							if (
 								!response.ok &&
 								response.headers.get('content-type')?.includes('json')
@@ -485,8 +516,6 @@ export function createTextStream(
 					)
 				recordTextUsage(model.id, result.usage, textUsageSlots.get(model))
 				usage = usage ? sumUsage(usage, result.usage) : result.usage
-				if (options?.signal?.aborted)
-					return fail('cancelled', undefined, result)
 				const empty =
 					(result.stopReason === 'stop' || result.stopReason === 'length') &&
 					!result.content.some(
@@ -495,13 +524,69 @@ export function createTextStream(
 							(result.stopReason === 'length' && part.type === 'toolCall'),
 					)
 				const watchdog = idle.signal.aborted
-				if (
+				const reasoningOnly =
 					!watchdog &&
 					empty &&
 					result.content.some(
 						(part) => part.type === 'thinking' && part.thinking.trim(),
 					)
+				const code =
+					watchdog || empty ? 'network' : classify(result, status, fields)
+				const failedResult =
+					result.stopReason === 'error' ||
+					result.stopReason === 'aborted' ||
+					result.stopReason === 'pending'
+				const ok = status !== undefined && status >= 200 && status < 300
+				const rejected =
+					status !== undefined &&
+					status >= 400 &&
+					status < 500 &&
+					status !== 408 &&
+					status !== 409
+				const settled = settlement?.()
+				const dispatched = request !== undefined && wasDispatched(request)
+				const cancelled = options?.signal?.aborted
+				const interrupted = cancelled && dispatched && !settled && !rejected
+				if (cancelled && !interrupted)
+					return fail('cancelled', undefined, result)
+				if (
+					interrupted ||
+					(dispatched && status === undefined) ||
+					(settlement &&
+						!rejected &&
+						((ok && (!settled || (failedResult && code === 'internal'))) ||
+							watchdog ||
+							(code === 'network' &&
+								(failedResult || (empty && !(settled && reasoningOnly))))))
 				) {
+					const reason = interrupted
+						? 'cancelled after dispatch without settled usage'
+						: watchdog
+							? 'stream idle timeout (watchdog)'
+							: empty
+								? 'empty model response'
+								: failedResult
+									? requestFailureReason(result)
+									: 'successful response did not report billable usage'
+					const outcome = settled
+						? 'Model response incomplete'
+						: 'Model request outcome unknown'
+					console.warn(outcome, {
+						model: model.id,
+						status,
+						errorClass: failedResult || empty ? code : 'missing_usage',
+						reason,
+						elapsedMs: Date.now() - started,
+					})
+					return fail(
+						'internal',
+						`${outcome}; not retried automatically (${status === undefined ? 'no HTTP status' : `HTTP ${status}`}: ${reason})`,
+						result,
+						undefined,
+						!settled,
+					)
+				}
+				if (reasoningOnly) {
 					const raised = Math.min(maxTokens * 2, outputLimit)
 					const canRaise = smallCompletionsWindow
 						? raised > maxTokens
@@ -530,8 +615,6 @@ export function createTextStream(
 					})
 					return output.end(message)
 				}
-				const code =
-					watchdog || empty ? 'network' : classify(result, status, fields)
 				const retryable =
 					watchdog ||
 					empty ||
@@ -541,7 +624,13 @@ export function createTextStream(
 						status < 500 &&
 						temporary.test(fields) &&
 						![408, 409, 429].includes(status))
-				if (code === 'network' && retryable && !live && attempt < limit) {
+				if (
+					code === 'network' &&
+					retryable &&
+					!(guarded && rejected) &&
+					!live &&
+					attempt < limit
+				) {
 					attempt++
 					continue
 				}
@@ -567,6 +656,8 @@ const descriptionsByPrefix = /^\[([a-z_]+)\] /
 
 export function textResultError(result: AssistantMessage, fallback: string) {
 	const message = result.errorMessage ?? fallback
+	if (unknownOutcomes.has(result))
+		return new UnknownTextOutcomeError(message, result.usage)
 	const match = descriptionsByPrefix.exec(message)
 	return new TextModelError(
 		(match?.[1] as Code | undefined) ?? 'internal',
