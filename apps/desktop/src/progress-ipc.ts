@@ -6,9 +6,17 @@ import {
 import type { WorkProgress } from '../../../packages/player/src/contract'
 import { slotKey } from '../../../packages/player/src/progress'
 import { createDesktopProgressStore } from './save-data'
+import {
+	type PackageWrites,
+	packageProgressId,
+} from './save-data/package-writes'
 
 export async function installProgressIpc(
 	window: () => BrowserWindow | undefined,
+	installed?: {
+		hasVersion(workId: string, version: number): boolean
+		writes: PackageWrites
+	},
 ) {
 	const store = await createDesktopProgressStore()
 	const progress = new Map<string, Promise<WorkProgress | null>>()
@@ -40,13 +48,31 @@ export async function installProgressIpc(
 			!playerProgressRequest.check(input)
 		)
 			throw new Error('无效的播放器存档请求')
-		const { workId } = input
+		const packageKey = /^package:(\d+):([a-f0-9-]+)$/.exec(input.workId)
+		const installedId = packageKey?.[2]
+		if (
+			installedId &&
+			!installed?.hasVersion(installedId, Number(packageKey?.[1]))
+		)
+			throw new Error('作品版本已更新，请重新打开作品')
+		const workId = installedId ? packageProgressId(installedId) : input.workId
+		const write = <T>(operation: () => Promise<T>) =>
+			installedId && installed
+				? installed.writes.run(installedId, operation)
+				: operation()
 		if (input.operation === 'load') return load(workId, true)
 		if (input.operation === 'save') {
-			await store.save(workId, input.progress)
-			progress.set(workId, Promise.resolve(input.progress))
+			await write(async () => {
+				await store.save(workId, input.progress)
+				progress.set(workId, Promise.resolve(input.progress))
+			})
 			return
 		}
+		if (input.operation === 'listLegacy') return store.loadLegacySaves(workId)
+		if (input.operation === 'deleteLegacy')
+			return write(() =>
+				store.deleteLegacySave(workId, input.version, input.slot),
+			)
 		if (input.operation === 'thumbnail') {
 			const entry = (await load(workId))?.saves.find(
 				(entry) => slotKey(entry.slot) === slotKey(input.slot),
@@ -60,14 +86,16 @@ export async function installProgressIpc(
 			input.rect.y + input.rect.height > height
 		)
 			throw new Error('无效的舞台截图范围')
-		const capture = await player.webContents.capturePage(input.rect)
-		const entry = await store.saveSlot(
-			workId,
-			input.slot,
-			input.snapshot,
-			capture.toPNG(),
-		)
-		progress.delete(workId)
-		return entry
+		return write(async () => {
+			const capture = await player.webContents.capturePage(input.rect)
+			const entry = await store.saveSlot(
+				workId,
+				input.slot,
+				input.snapshot,
+				capture.toPNG(),
+			)
+			progress.delete(workId)
+			return entry
+		})
 	})
 }

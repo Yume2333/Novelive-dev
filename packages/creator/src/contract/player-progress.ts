@@ -14,6 +14,7 @@ import {
 } from '@earendil-works/pi-schema'
 import { actionNames } from '../../../format/src/script/grammar'
 import type {
+	LegacySaveGroup,
 	SaveEntry,
 	SaveSlot,
 	StageSnapshot,
@@ -135,6 +136,13 @@ export const playerProgressRequest = compile(
 		obj({ operation: lit('load'), workId: id }),
 		obj({ operation: lit('save'), workId: id, progress: workProgressSchema }),
 		obj({ operation: lit('thumbnail'), workId: id, slot }),
+		obj({ operation: lit('listLegacy'), workId: id }),
+		obj({
+			operation: lit('deleteLegacy'),
+			workId: id,
+			version: int({ minimum: 1 }),
+			slot,
+		}),
 		obj({
 			operation: lit('saveSlot'),
 			workId: id,
@@ -150,6 +158,9 @@ export const playerProgressRequest = compile(
 	]),
 )
 
+export const installedProgressKey = (workId: string, version: number) =>
+	`package:${version}:${workId}`
+
 export interface DesktopProgressApi {
 	load(workId: string): Promise<WorkProgress | null>
 	save(workId: string, progress: WorkProgress): Promise<void>
@@ -160,4 +171,6 @@ export interface DesktopProgressApi {
 		rect: { x: number; y: number; width: number; height: number },
 	): Promise<SaveEntry>
 	thumbnail(workId: string, slot: SaveSlot): Promise<string>
+	listLegacy?(workId: string): Promise<readonly LegacySaveGroup[]>
+	deleteLegacy?(workId: string, version: number, slot: SaveSlot): Promise<void>
 }

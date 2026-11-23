@@ -18,6 +18,10 @@ import { exportPackage, openPackage } from '@novelive/format/package/codec'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { type Entry, openPromise } from 'yauzl'
 import { ZipFile } from 'yazl'
+import {
+	exportProject,
+	initializeExtractedProject,
+} from '../../packages/creator/src/share/project'
 import { migratePackageJson } from '../../packages/format/src/package/migrations'
 import {
 	artPath,
@@ -88,6 +92,30 @@ async function invalidNameArchive(name: string) {
 }
 
 describe('M5 .novelive archive', () => {
+	it('writes the host version only after a successful export', async () => {
+		await rm(join(projectRoot, 'project.db'))
+		initializeExtractedProject(projectRoot)
+		const version = async () =>
+			JSON.parse(await readFile(join(projectRoot, workPath), 'utf8')).version
+		await mkdir(destination)
+		await expect(
+			exportProject({ projectRoot, destination, scope }),
+		).rejects.toThrow()
+		expect(await version()).toBe(0)
+		await rm(destination, { recursive: true })
+		for (const release of [1, 2]) {
+			expect(await exportProject({ projectRoot, destination, scope })).toEqual([
+				{ workId: workA, version: release },
+			])
+			expect(await version()).toBe(release)
+			using archive = await openPackage(destination)
+			expect(archive.works[0].work).toMatchObject({
+				formatVersion: 1,
+				version: release,
+			})
+		}
+	})
+
 	it('uses the physical ZIP marker, UTF-8 filenames and locked compression', async () => {
 		await exportPackage({ projectRoot, destination, scope })
 		const zip = await openPromise(destination, { lazyEntries: true })

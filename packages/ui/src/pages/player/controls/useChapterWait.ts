@@ -16,7 +16,9 @@ export function useChapterWait({
 	loadChapter,
 	setChapters,
 	onError,
+	offline = false,
 }: {
+	offline?: boolean
 	workId?: string
 	current?: { chapterId: string; mode: PlaybackMode }
 	ended: boolean
@@ -33,7 +35,7 @@ export function useChapterWait({
 	setChapters(update: (chapters: ControlChapter[]) => ControlChapter[]): void
 	onError(message: string): void
 }) {
-	const waiting = ended && !nextChapterPublished
+	const waiting = !offline && ended && !nextChapterPublished
 	useEffect(() => {
 		if (!waiting || !nextChapterId || !workId) return
 		window.dispatchEvent(

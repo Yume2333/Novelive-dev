@@ -401,7 +401,8 @@ export function createProduction(
 				return preparation
 			}
 			const pausedAfterCrash = crashPaused(project, workId)
-			const preparation = pausedAfterCrash ? undefined : await prepare()
+			const preparation =
+				pausedAfterCrash || work.derivedFrom ? undefined : await prepare()
 			let continuing: Promise<ProductionSnapshot> | undefined
 			let pool: Awaited<ReturnType<typeof service.candidates>> | undefined
 			let visual: ProductionSnapshot['visual'] = null

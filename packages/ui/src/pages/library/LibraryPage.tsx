@@ -15,6 +15,10 @@ export function LibraryPage() {
 	const [error, setError] = useState(false)
 	const [revision, setRevision] = useState(0)
 	const share = window.novelive.host.share
+	const installed = window.novelive.host.installed
+	const [packages, setPackages] = useState<
+		Awaited<ReturnType<NonNullable<typeof installed>['list']>>
+	>([])
 
 	useEffect(() => {
 		void revision
@@ -51,6 +55,22 @@ export function LibraryPage() {
 			pending?.cancel()
 		}
 	}, [revision])
+	useEffect(() => {
+		void revision
+		if (!installed) return
+		let active = true
+		void installed.list().then(
+			(works) => {
+				if (active) setPackages(works)
+			},
+			() => {
+				if (active) setError(true)
+			},
+		)
+		return () => {
+			active = false
+		}
+	}, [revision, installed])
 
 	return (
 		<Page
@@ -77,14 +97,16 @@ export function LibraryPage() {
 				<p role="alert">{t('无法读取书库')}</p>
 			) : !library ? (
 				<p>{t('正在读取书库')}</p>
-			) : library.works.length === 0 && library.unreadableCount === 0 ? (
+			) : library.works.length === 0 &&
+				library.unreadableCount === 0 &&
+				packages.length === 0 ? (
 				<EmptyState
 					icon={LibraryBig}
 					title={t('书库还是空的')}
 					text={t('还没有作品')}
 					card
 				/>
-			) : (
+			) : library.works.length > 0 || library.unreadableCount > 0 ? (
 				<section aria-labelledby="library-projects" className={styles.projects}>
 					<h2 id="library-projects">{t('我的工程')}</h2>
 					{library.unreadableCount > 0 && (
@@ -121,6 +143,43 @@ export function LibraryPage() {
 								</Link>
 							</li>
 						))}
+					</ul>
+				</section>
+			) : null}
+			{packages.length > 0 && (
+				<section aria-labelledby="library-packages" className={styles.projects}>
+					<h2 id="library-packages">{t('导入的作品')}</h2>
+					<ul className={styles.grid}>
+						{packages.map(({ workId, title, version, published, chapters }) => {
+							const label = (
+								<>
+									<LibraryBig size={24} aria-hidden="true" />
+									<span>
+										<strong>{title}</strong>
+										<span className={styles.progress}>
+											{t(
+												'v{{version}} · 已发布 {{published}} / {{chapters}} 章',
+												{ version, published, chapters },
+											)}
+										</span>
+									</span>
+								</>
+							)
+							return (
+								<li key={workId}>
+									{published ? (
+										<Link
+											className={styles.card}
+											to={`/package/${workId}/${version}`}
+										>
+											{label}
+										</Link>
+									) : (
+										<div className={styles.card}>{label}</div>
+									)}
+								</li>
+							)
+						})}
 					</ul>
 				</section>
 			)}

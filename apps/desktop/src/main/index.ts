@@ -14,8 +14,12 @@ import {
 } from 'electron'
 import { cacheResponse } from '../../../../packages/creator/src/host-runtime/cache'
 import { installProgressIpc } from '../progress-ipc'
+import { createDesktopProgressStore } from '../save-data'
+import { PackageWrites } from '../save-data/package-writes'
+import { collectPackageOpens } from './file-association'
 import { t } from './i18n'
 import { installNotifications } from './notifications'
+import { installShareIpc } from './share'
 import { installLifecycle } from './tray'
 import { installUpdates } from './update'
 
@@ -31,8 +35,18 @@ let closeNotifications: (() => void) | undefined
 const failureLimit = 3
 const handshakeTimeoutMs = 10_000
 const primaryInstance = app.requestSingleInstanceLock()
+const packageOpens = collectPackageOpens(() => {
+	if (!library || library.webContents.isLoading()) return
+	lifecycle.show()
+	library.webContents.send('novelive:locate', '/')
+	library.webContents.send('novelive:package-open')
+})
 if (!primaryInstance) app.quit()
-else app.on('second-instance', () => lifecycle?.show())
+else
+	app.on('second-instance', (_event, args, cwd) => {
+		lifecycle?.show()
+		packageOpens.collect(args.slice(1), cwd)
+	})
 
 protocol.registerSchemesAsPrivileged([
 	{
@@ -172,7 +186,11 @@ function openLibrary() {
 	lifecycle.attach(window)
 	window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 	window.webContents.on('will-navigate', (event) => event.preventDefault())
-	window.webContents.on('did-finish-load', () => startCreator(window))
+	window.webContents.on('did-finish-load', () => {
+		startCreator(window)
+		if (packageOpens.hasFiles())
+			window.webContents.send('novelive:package-open')
+	})
 	window.once('closed', () => {
 		library = undefined
 		stopCreator()
@@ -186,7 +204,18 @@ function openLibrary() {
 
 app.whenReady().then(async () => {
 	if (!primaryInstance) return
-	await installProgressIpc(() => library)
+	const store = await createDesktopProgressStore()
+	const writes = new PackageWrites()
+	const installed = await installShareIpc(
+		() => library,
+		store,
+		writes,
+		packageOpens.take,
+	)
+	await installProgressIpc(() => library, {
+		hasVersion: (workId, version) => installed.hasVersion(workId, version),
+		writes,
+	})
 	lifecycle = installLifecycle({
 		window: () => library,
 		active: () => blocker !== undefined,

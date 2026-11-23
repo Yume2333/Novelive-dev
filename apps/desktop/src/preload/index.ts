@@ -1,10 +1,12 @@
 import {
 	type ClientFrame,
 	type CommandError,
+	checkShareResponse,
 	creatorFrame,
 	type HostState,
 	type Novelive,
 	type NoveliveEvents,
+	type ShareRequest,
 } from '@novelive/creator/contract'
 import { contextBridge, ipcRenderer } from 'electron'
 
@@ -132,12 +134,48 @@ const api: Novelive = {
 	pickPackageDestination: () =>
 		ipcRenderer.invoke('novelive:pick-package-destination'),
 	host: {
+		share: {
+			async call<Request extends ShareRequest>(request: Request) {
+				const response: unknown = await ipcRenderer.invoke(
+					'novelive:share',
+					request,
+				)
+				if (
+					!checkShareResponse<Request['operation']>(request.operation, response)
+				)
+					throw new Error('无效的作品包响应')
+				return response
+			},
+		},
+		installed: {
+			list: () => ipcRenderer.invoke('novelive:installed-list'),
+			chapter: (workId, version, chapterId) =>
+				ipcRenderer.invoke(
+					'novelive:installed-chapter',
+					workId,
+					version,
+					chapterId,
+				),
+			takeOpenFile: () => ipcRenderer.invoke('novelive:take-open-package'),
+		},
 		about: {
 			info: () => ipcRenderer.invoke('novelive:about'),
 			open: (kind) => ipcRenderer.invoke('novelive:about-open', kind),
 			checkUpdates: () => ipcRenderer.invoke('novelive:check-updates'),
 		},
 		progress: {
+			listLegacy: (workId) =>
+				ipcRenderer.invoke('novelive:progress', {
+					operation: 'listLegacy',
+					workId,
+				}),
+			deleteLegacy: (workId, version, slot) =>
+				ipcRenderer.invoke('novelive:progress', {
+					operation: 'deleteLegacy',
+					workId,
+					version,
+					slot,
+				}),
 			load: (workId) =>
 				ipcRenderer.invoke('novelive:progress', { operation: 'load', workId }),
 			save: (workId, progress) =>
@@ -168,6 +206,8 @@ const api: Novelive = {
 }
 
 contextBridge.exposeInMainWorld('novelive', api)
+
+ipcRenderer.on('novelive:package-open', () => emit('package.open', undefined))
 
 ipcRenderer.on('novelive:locate', (_event, path: string) => {
 	window.location.hash = path
