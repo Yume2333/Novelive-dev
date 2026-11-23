@@ -175,9 +175,11 @@ function sameEntry(a: Entry, b: Entry) {
 	if (!('action' in a && 'action' in b) || a.chapter !== b.chapter) return false
 	if (a.kind === 'timeline')
 		return (
-			a.participants.some((left) =>
-				b.participants.some((right) => overlap(left, right)),
-			) && sameTimelineAction(a.action, b.action)
+			a.participants.length > 0 &&
+			a.participants.length === b.participants.length &&
+			matchCount(a.participants, b.participants, overlap) ===
+				a.participants.length &&
+			sameTimelineAction(a.action, b.action)
 		)
 	const participantsMatch =
 		a.participants.length >= 2 &&
