@@ -305,6 +305,11 @@ test.each([
 		'Ada Lin tells Mei Chen not to speak quietly',
 		'Ada Lin tells Mei Chen to speak',
 	],
+	[
+		'Ada Lin tells Mei Chen the temperature is -5°C',
+		'Ada Lin tells Mei Chen the temperature is 5°C',
+		'Ada Lin tells Mei Chen the temperature is +5°C',
+	],
 ])(
 	'keeps distinct timeline wording, including differing qualifiers: %s',
 	(base, elaborated, changed) => {

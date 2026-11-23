@@ -127,11 +127,16 @@ function sameAction(a: string, b: string) {
 	return overlap >= 8 && (2 * overlap) / (left.size + right.size) >= 0.78
 }
 
+const foldWidth = (text: string) =>
+	text.replace(/[\u3000\uFF01-\uFFDC\uFFE0-\uFFEE]+/gu, (forms) =>
+		forms.normalize('NFKC'),
+	)
 const timelineWording = (event: string) =>
-	event
-		.normalize('NFKC')
-		.replace(/[\p{P}\s]+/gu, ' ')
+	foldWidth(event)
+		.replace(/\s+/gu, ' ')
 		.trim()
+		.replace(/[.!?。]+$/u, '')
+		.trimEnd()
 
 function normalizeNames(patch: BiblePatch, bible: Bible): BiblePatch {
 	const existingCharacters = names(bible.character)
@@ -395,7 +400,7 @@ export function canonicalizeAdditions(
 			continue
 		const text =
 			item.kind === 'timeline'
-				? item.entry.event.normalize('NFKC')
+				? foldWidth(item.entry.event)
 				: item.entry.description
 		const participants = new Set<string>()
 		const action = characters.text(text, ({ id, name }) => {
