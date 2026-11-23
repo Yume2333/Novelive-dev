@@ -55,12 +55,29 @@ test('M4 global production drawer shows paused rows, refetches and reorders a se
 		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
 		await page.evaluate(
 			(patch) => window.novelive.call('config.update', patch).promise,
-			configuration,
+			{
+				models: {
+					...configuration.models,
+					fast: { ...configuration.models.fast, model: '' },
+				},
+			},
 		)
 		await page.getByRole('button', { name: /全局制作状态/ }).click()
 		const drawer = page.getByRole('dialog', { name: '制作队列' })
 		await expect(drawer.getByText('异常退出后已暂停')).toHaveCount(2)
 		await expect(drawer.getByRole('link', { name: '排队甲' })).toBeVisible()
+		const first = drawer
+			.getByRole('listitem')
+			.filter({ has: page.getByRole('link', { name: '排队甲' }) })
+		await first.hover()
+		await first.getByRole('button', { name: '继续制作' }).click()
+		await expect(drawer.getByRole('alert')).toHaveText(
+			'模型配置无效，请在设置中检查接口地址、API Key、模型名和上下文长度。',
+		)
+		await page.evaluate(
+			(patch) => window.novelive.call('config.update', patch).promise,
+			configuration,
+		)
 		const sequel = drawer
 			.getByRole('listitem')
 			.filter({ has: page.getByRole('link', { name: '排队乙' }) })

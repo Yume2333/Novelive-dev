@@ -71,11 +71,15 @@ export function GlobalProductionQueue() {
 			await action()
 			setReload((value) => value + 1)
 		} catch (failure) {
-			setError(
-				commandError.check(failure) && failure.code === 'invalid_config'
-					? failure.message
-					: '队列操作失败，请重试',
-			)
+			if (commandError.check(failure) && failure.code === 'invalid_config') {
+				setError(
+					/[\u3400-\u9fff]/.test(failure.message)
+						? failure.message
+						: '模型配置无效，请在设置中检查接口地址、API Key、模型名和上下文长度。',
+				)
+			} else {
+				setError('队列操作失败，请重试')
+			}
 		} finally {
 			setBusy(false)
 		}
