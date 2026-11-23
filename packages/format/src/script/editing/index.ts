@@ -140,6 +140,12 @@ export function editScriptLine(
 		const [slot, { action }] = matches[0]
 		previous = edit.previous
 		next = edit.next
+		const index = (beat.line.line - offset) * 2
+		const eol = rawLines[index + 1] ?? rawLines[index - 1]
+		const linePatch = patchAt(
+			beat.line.line,
+			(raw) => `@show ${next} ${slot}${eol}${raw}`,
+		)
 		if (action.name === 'show' && beat.actions.includes(action)) {
 			patch = patchAt(action.line, (raw) =>
 				raw.replace(/\S+/g, (token) =>
@@ -147,12 +153,25 @@ export function editScriptLine(
 				),
 			)
 		} else {
-			const index = (beat.line.line - offset) * 2
-			const eol = rawLines[index + 1] ?? rawLines[index - 1]
-			patch = patchAt(
-				beat.line.line,
-				(raw) => `@show ${next} ${slot}${eol}${raw}`,
+			patch = linePatch
+		}
+		const beats = compiled.flatMap((scene) => scene.beats)
+		const following = beats[beats.indexOf(beat) + 1]
+		const firstAction = following?.actions[0]
+		if (
+			following &&
+			(firstAction?.name !== 'show' || firstAction.args.slot !== slot)
+		) {
+			// Restore the old expression in the same file, including at a scene boundary.
+			const tail = scene.nvs.slice(
+				patch.offset + patch.before.length,
+				linePatch.offset + linePatch.before.length,
 			)
+			patch = {
+				offset: patch.offset,
+				before: patch.before + tail,
+				after: `${patch.after}${tail}${eol}@show ${previous} ${slot}`,
+			}
 		}
 	}
 

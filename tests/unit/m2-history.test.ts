@@ -41,7 +41,6 @@ const originalScene = [
 	'',
 	`@show duration 0.3 ${neutral} center`,
 	`  ${originalLine} #a001  `,
-	'@wait #a002',
 	'',
 ].join('\r\n')
 const secondScene = 'scene 门外\nsource p0002-p0002\n\nrin: 走吧。 #a001\n'
@@ -166,8 +165,14 @@ test('edits text, inline marks and expressions by stable ID and audits their inv
 		},
 	})
 	expect(expression.scenes[0].nvs).toBe(
-		originalScene.replace(originalLine, editedLine).replace(neutral, happy),
+		originalScene
+			.replace(neutral, happy)
+			.replace(
+				`${originalLine} #a001  `,
+				`${editedLine} #a001  \r\n@show ${neutral} center`,
+			),
 	)
+	expect(expression.scenes[1].nvs).toBe(secondScene)
 	const undoneExpression = await service.undo({
 		...session,
 		expectedRevision: expression.revision,
@@ -227,7 +232,7 @@ test.each(['', '@move center right\n'])(
 	'changes an inherited expression without touching the earlier scene (move: %j)',
 	async (move) => {
 		using project = await fixture()
-		const scene = secondScene.replace('rin:', `${move}rin:`)
+		const scene = `${secondScene.replace('rin:', `${move}rin:`)}rin: 关门。 #a002\n`
 		await project.writeFile(secondPath, scene)
 		const service = editor(project)
 		const { editorId, chapter } = await service.open(target)
@@ -245,7 +250,9 @@ test.each(['', '@move center right\n'])(
 		})
 		expect(updated.scenes[0].nvs).toBe(originalScene)
 		expect(updated.scenes[1].nvs).toBe(
-			scene.replace('rin:', `@show ${happy} center\nrin:`),
+			scene
+				.replace('rin:', `@show ${happy} center\nrin:`)
+				.replace('#a001\n', `#a001\n@show ${neutral} center\n`),
 		)
 		const undone = await service.undo({
 			...session,
