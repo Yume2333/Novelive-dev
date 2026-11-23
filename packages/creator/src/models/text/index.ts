@@ -528,10 +528,17 @@ export function createTextStream(
 					result.stopReason === 'aborted' ||
 					result.stopReason === 'pending'
 				const ok = status !== undefined && status >= 200 && status < 300
+				const rejected =
+					status !== undefined &&
+					status >= 400 &&
+					status < 500 &&
+					status !== 408 &&
+					status !== 409
 				const settled = settlement?.()
 				if (
 					(guarded && dispatched && status === undefined) ||
 					(settlement &&
+						!rejected &&
 						((ok && (!settled || (failedResult && code === 'internal'))) ||
 							watchdog ||
 							(code === 'network' && (failedResult || empty))))
@@ -605,7 +612,13 @@ export function createTextStream(
 						status < 500 &&
 						temporary.test(fields) &&
 						![408, 409, 429].includes(status))
-				if (code === 'network' && retryable && !live && attempt < limit) {
+				if (
+					code === 'network' &&
+					retryable &&
+					!(guarded && rejected) &&
+					!live &&
+					attempt < limit
+				) {
 					attempt++
 					continue
 				}

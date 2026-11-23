@@ -564,46 +564,58 @@ test.each([
 	},
 )
 
-test('an unsettled synthesis response cannot trigger a repair or redispatch on reopen', async () => {
-	vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
-	vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
-	vi.stubEnv('NL_USAGE_CSV', '')
-	try {
-		await seed(root)
-		const send = vi.fn(async () => stream({}))
-		const run = (project: Project) =>
-			synthesizeVolume(project, 'v1', chapters, {
-				...options,
-				strategy: 'whole',
-				fetch: createReplayFetch({
-					mode: 'record',
-					directory: join(directory, 'recordings'),
-					fetch: send,
-					spend: projectSpend(project.database),
-				}),
-			})
-		const error = {
-			code: 'internal',
-			message: expect.stringContaining(
-				'HTTP 200: successful response did not report billable usage',
-			),
+test.each([200, 429])(
+	'synthesis HTTP %s without usage only blocks reopening if ambiguous',
+	async (status) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		vi.stubEnv('NL_USAGE_CSV', '')
+		try {
+			await seed(root)
+			const send = vi.fn(async () =>
+				status === 200 ? stream({}) : Response.json({}, { status }),
+			)
+			const run = (project: Project) =>
+				synthesizeVolume(project, 'v1', chapters, {
+					...options,
+					strategy: 'whole',
+					fetch: createReplayFetch({
+						mode: 'record',
+						directory: join(directory, 'recordings'),
+						fetch: send,
+						spend: projectSpend(project.database),
+					}),
+				})
+			const error =
+				status === 429
+					? { code: 'network' }
+					: {
+							code: 'internal',
+							message: expect.stringContaining(
+								'HTTP 200: successful response did not report billable usage',
+							),
+						}
+			{
+				using project = await Project.open(root)
+				await expect(run(project)).rejects.toMatchObject(error)
+			}
+			using reopened = await Project.open(root)
+			await expect(run(reopened)).rejects.toMatchObject(error)
+			expect(send).toHaveBeenCalledTimes(status === 429 ? 2 : 1)
+			expect(
+				reopened.database
+					.prepare('SELECT actual_tokens FROM spend_reservation')
+					.all(),
+			).toEqual(
+				Array.from({ length: status === 429 ? 2 : 1 }, () => ({
+					actual_tokens: null,
+				})),
+			)
+		} finally {
+			vi.unstubAllEnvs()
 		}
-		{
-			using project = await Project.open(root)
-			await expect(run(project)).rejects.toMatchObject(error)
-		}
-		using reopened = await Project.open(root)
-		await expect(run(reopened)).rejects.toMatchObject(error)
-		expect(send).toHaveBeenCalledOnce()
-		expect(
-			reopened.database
-				.prepare('SELECT actual_tokens FROM spend_reservation')
-				.all(),
-		).toEqual([{ actual_tokens: null }])
-	} finally {
-		vi.unstubAllEnvs()
-	}
-})
+	},
+)
 
 test('whole-volume replay persists a skeleton, candidates and conflicts without replacing confirmed content', async () => {
 	await seed(root)
