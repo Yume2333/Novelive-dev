@@ -261,6 +261,9 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		).toHaveLength(2)
 		await app.close()
 		app = await launch()
+		await app.evaluate(({ BrowserWindow }) =>
+			BrowserWindow.getAllWindows()[0].setContentSize(1440, 1000),
+		)
 		page = await app.firstWindow()
 		await expect(page.getByText('创作端已就绪')).toBeAttached()
 		await openEditor()
@@ -281,6 +284,16 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			(patch) => window.novelive.call('config.update', patch).promise,
 			configuration,
 		)
+		await page.getByRole('button', { name: '从当前句预览' }).click()
+		await expect(page.locator('canvas')).toBeVisible()
+		const imageBefore = await page.evaluate(
+			(workId) =>
+				window.novelive.call('editor.imageRevision', {
+					workId,
+					assetId: 'ada/uniform/neutral',
+				}).promise,
+			workId,
+		)
 		await page.getByRole('textbox', { name: '重绘要求' }).fill('光线更柔和')
 		await page
 			.getByRole('button', { name: '出一张，直接替换', exact: true })
@@ -300,6 +313,16 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 				).entries.filter((entry) => entry.kind === 'image').length
 			})
 			.toBe(1)
+		const imageAfter = await page.evaluate(
+			(workId) =>
+				window.novelive.call('editor.imageRevision', {
+					workId,
+					assetId: 'ada/uniform/neutral',
+				}).promise,
+			workId,
+		)
+		expect(imageAfter.revision).not.toBe(imageBefore.revision)
+		await expect(page.locator('canvas')).toBeVisible()
 		await capture(page, '07-image-redrawn')
 		await page.getByRole('textbox', { name: '重绘要求' }).fill('')
 		await page
