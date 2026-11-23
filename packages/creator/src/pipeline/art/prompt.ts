@@ -18,6 +18,7 @@ const descriptions = {
 export type Drawing = {
 	kind: ArtJob['kind'] | 'main-visual'
 	description: string
+	characterDescriptionFallback?: string
 	style: string
 	references: {
 		path: string
@@ -94,6 +95,7 @@ export function drawingPrompt(
 			descriptions[kind],
 			content,
 			feedback,
+			drawing.characterDescriptionFallback,
 			...appearance,
 			style,
 			framing,

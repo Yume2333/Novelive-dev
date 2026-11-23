@@ -11,6 +11,7 @@ import { expect, test, vi } from 'vitest'
 import {
 	applyBibleProposal,
 	bibleRevision,
+	getBible,
 } from '../../packages/creator/src/bible/editing'
 import { propagateStaleness } from '../../packages/creator/src/bible/staleness'
 import { ChatStore } from '../../packages/creator/src/chat/store'
@@ -29,6 +30,7 @@ import {
 	recordTextUsage,
 	withUsage,
 } from '../../packages/creator/src/usage'
+import { approvalNotice } from '../../packages/ui/src/pages/bible/BiblePage'
 import { bible } from '../fixtures/cassettes/m1b-art/fixture'
 import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
 
@@ -454,6 +456,68 @@ test('text provider usage preserves resolved slots even when every slot uses the
 	} finally {
 		vi.unstubAllEnvs()
 	}
+})
+
+test('approving a general character description marks the base sprite and expression stale and reports it', async () => {
+	await fixture(async (project, profile) => {
+		const character = {
+			id: 'ada',
+			name: 'Ada',
+			aliases: [],
+			status: 'confirmed' as const,
+			description: 'A red fox.',
+		}
+		const file = projectFiles.character({ level: 'series' }, character.id)
+		await project.write(file, { formatVersion, entries: [character] })
+		const base = 'ada/default/neutral'
+		const expression = 'ada/default/curious'
+		const unrelated = 'bea/default/neutral'
+		const insert = project.database.prepare(
+			"INSERT INTO asset(work_id, asset_key, kind, base_key, status) VALUES (?, ?, ?, ?, 'drawn')",
+		)
+		insert.run(workId, base, 'base', null)
+		insert.run(workId, expression, 'variant', base)
+		insert.run(workId, unrelated, 'base', null)
+		const updated = { ...character, description: 'A silver fox.' }
+		const payload = {
+			kind: 'bible',
+			volumeId: 'v1',
+			expectedRevision: bibleRevision(await readBible(project)),
+			changes: [
+				{
+					kind: 'character',
+					op: 'update',
+					entry: { ...updated, status: 'candidate' },
+				},
+			],
+		}
+		project.database
+			.prepare(
+				'INSERT INTO proposal(proposal_id, work_id, kind, prompt, payload, created_at) VALUES (?, ?, ?, ?, ?, 0)',
+			)
+			.run(
+				'edit',
+				workId,
+				payload.kind,
+				'Edit',
+				JSON.stringify({ chapterIds: [], payload }),
+			)
+		const { proposal } = new ChatStore(project.database, workId).proposal(
+			'edit',
+		)
+		const before = await getBible(project, { workId, volumeId: 'v1' })
+		await expect(applyBibleProposal(project, proposal)).resolves.toEqual({
+			status: 'applied',
+		})
+		expect(approvalNotice(proposal, before)).toBe(
+			'已接受候选；受影响的已有图片已标记过期。',
+		)
+		expect((await project.read(file)).entries).toEqual([updated])
+		expect((await listUsage(profile)).staleAssets).toEqual([
+			{ workId, assetKey: expression },
+			{ workId, assetKey: base },
+		])
+	})
 })
 
 test.each(['style', 'glossary'] as const)(

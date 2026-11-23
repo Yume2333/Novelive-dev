@@ -483,6 +483,125 @@ test('restores a narrow expression crown without accepting clipped bases or shif
 	}
 })
 
+test.each([
+	{
+		name: 'reference-only style advice does not block',
+		appearance: undefined,
+		verdict: { pass: true, failedChecks: [], feedback: '' },
+		status: 'drawn',
+	},
+	{
+		name: 'a mismatch against written style still blocks',
+		appearance: { description: ' ' },
+		verdict: {
+			pass: false,
+			failedChecks: ['style'],
+			feedback: 'Use thicker black contours.',
+		},
+		status: 'placeholder',
+	},
+])(
+	'shares a fallback base-sprite brief when $name',
+	async ({ appearance, verdict, status }) => {
+		const description = 'A red fox with a white-tipped tail.'
+		const style = 'Thick black contours with flat shading.'
+		const render = vi
+			.fn<ReturnType<typeof artModels.imageRenderer>>()
+			.mockImplementation(async (_prompt, _refs, { width, height }) => ({
+				bytes: await picture(width, height, true),
+			}))
+		const renderer = vi
+			.spyOn(artModels, 'imageRenderer')
+			.mockReturnValue(render)
+		const textCalls: { prompt: string; images: number }[] = []
+		const fetch: typeof globalThis.fetch = async (input, init) => {
+			const request = new Request(input, init)
+			const { messages } = await request.json()
+			const parts = messages[0].content
+			const prompt: string = typeof parts === 'string' ? parts : parts[0].text
+			const images = typeof parts === 'string' ? 0 : parts.length - 1
+			textCalls.push({ prompt, images })
+			const response = images
+				? {
+						...verdict,
+						styleReferenceFeedback: 'The reference uses a cool palette.',
+					}
+				: { content: 'The subject looks up.' }
+			const chunk = {
+				choices: [
+					{
+						index: 0,
+						delta: { content: JSON.stringify(response) },
+						finish_reason: 'stop',
+					},
+				],
+			}
+			return new Response(
+				`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
+				{
+					headers: { 'content-type': 'text/event-stream' },
+				},
+			)
+		}
+		try {
+			await projectTest(async (project) => {
+				const path = 'assets/style.png'
+				await project.writeFile(path, await picture(320, 180, false))
+				const [ada] = bible.characters
+				const styled = {
+					...bible,
+					characters: [
+						{
+							...ada,
+							description,
+							appearance,
+							costumes: undefined,
+							references: undefined,
+						},
+					],
+					style: {
+						...bible.style,
+						description: style,
+						references: [{ path, description: 'Style' }],
+					},
+				}
+				const art = service(
+					project,
+					{ ...replay, mode: 'replay', fetch },
+					undefined,
+					undefined,
+					undefined,
+					0,
+				)
+				const [base] = await art.register(
+					[{ id: 'ada/uniform/neutral', kind: 'character', description: '' }],
+					styled,
+				)
+				expect((await art.draw(base, styled)).status).toBe(status)
+				expect(render).toHaveBeenCalledTimes(1)
+				expect(render.mock.calls[0][0]).toContain(description)
+				expect(render.mock.calls[0][0]).toContain(style)
+				expect(render.mock.calls[0][1]).toEqual([])
+				expect(textCalls).toHaveLength(2)
+				expect(textCalls[0].prompt).toContain(`character: ${description}`)
+				expect(textCalls[1].prompt).toContain(
+					`Original image brief (verify independently of the painter's rewrite): ${description}`,
+				)
+				expect(textCalls[1].prompt).toContain(
+					`Judge the blocking style check only against this written style description: ${style}`,
+				)
+				expect(textCalls[1].prompt).toContain(
+					'must not affect pass, failedChecks, or blocking feedback',
+				)
+				expect(textCalls[1].prompt).not.toContain('Match how it is drawn')
+				expect(textCalls[1].images).toBe(2)
+			})
+		} finally {
+			renderer.mockRestore()
+		}
+	},
+)
+
 test('retries an expression with only the base after a composition failure', async () => {
 	const render = vi
 		.fn<ReturnType<typeof artModels.imageRenderer>>()

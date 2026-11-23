@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { arr, bool, obj, oneOf, str } from '@earendil-works/pi-schema'
+import { arr, bool, obj, oneOf, opt, str } from '@earendil-works/pi-schema'
 import {
 	type AssetRegistry,
 	type ChapterRef,
@@ -80,15 +80,45 @@ const auditSchema = obj({
 		{ uniqueItems: true },
 	),
 	feedback: str(),
+	styleReferenceFeedback: opt(str()),
 })
 const contentSchema = obj({ content: str({ minLength: 1 }) })
 
+function hasTextOnlyCharacterStyle(drawing: Drawing) {
+	return (
+		drawing.kind === 'character' &&
+		!drawing.references.some(({ role }) => role === 'identity')
+	)
+}
+
 function generationReferenceFilter(drawing: Drawing) {
-	const useStyle =
-		drawing.kind !== 'character' ||
-		drawing.references.some(({ role }) => role === 'identity')
+	const useStyle = !hasTextOnlyCharacterStyle(drawing)
 	return ({ role }: Drawing['references'][number]) =>
 		useStyle || role !== 'style'
+}
+
+function characterBriefFallback(
+	character: Drawing['characters'][number] | undefined,
+	costumeDescription: string | undefined,
+) {
+	if (
+		!character ||
+		!('description' in character) ||
+		typeof character.description !== 'string'
+	)
+		return
+	const { appearance } = character
+	if (
+		![
+			costumeDescription,
+			appearance?.description,
+			...(appearance?.anchorFeatures ?? []),
+			appearance?.keyColors?.hair,
+			appearance?.keyColors?.eyes,
+			appearance?.keyColors?.clothing,
+		].some((value) => value?.trim())
+	)
+		return character.description
 }
 
 async function auditPreview(png: Buffer) {
@@ -324,6 +354,9 @@ export class ArtProduction {
 		const character = portrait
 			? bible.characters.find((item) => item.id === entity)
 			: undefined
+		const costumeDescription = character?.costumes?.find(
+			(item) => item.id === costume,
+		)?.description
 		const location = bible.locations.find((item) => item.id === entity)
 		const designReference = character && characterDesignReference(character)
 		const priorCostume =
@@ -341,12 +374,16 @@ export class ArtProduction {
 			kind: job.kind,
 			description: [
 				job.description,
-				character?.costumes?.find((item) => item.id === costume)?.description,
+				costumeDescription,
 				job.kind === 'location' ? location?.description : undefined,
 				redraw?.instruction,
 			]
 				.filter(Boolean)
 				.join('；'),
+			characterDescriptionFallback:
+				job.kind === 'character'
+					? characterBriefFallback(character, costumeDescription)
+					: undefined,
 			style: bible.style.description,
 			references: this.styleReferences(bible.style),
 			characters: character ? [character] : [],
@@ -546,6 +583,7 @@ export class ArtProduction {
 		)
 		const auditDrawing = { ...drawing, references }
 		const forGeneration = generationReferenceFilter(auditDrawing)
+		const textOnlyStyle = hasTextOnlyCharacterStyle(auditDrawing)
 		const refs = auditRefs.filter((_, index) =>
 			forGeneration(references[index]),
 		)
@@ -553,6 +591,9 @@ export class ArtProduction {
 			...drawing,
 			references: references.filter(forGeneration),
 		}
+		const brief = [drawing.description, drawing.characterDescriptionFallback]
+			.filter(Boolean)
+			.join('；')
 		const painter = derived
 			? this.options.fast
 			: transparent
@@ -578,7 +619,7 @@ export class ArtProduction {
 				painter,
 				[
 					'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
-					`${drawing.kind}: ${drawing.description}`,
+					`${drawing.kind}: ${brief}`,
 					feedback,
 				]
 					.filter(Boolean)
@@ -695,11 +736,21 @@ export class ArtProduction {
 					'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
 					preview.transparencyHint,
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
-					refs.length < auditRefs.length
-						? 'The painter cannot see the style images. Describe style differences and concrete corrections in words; do not refer to reference images by number.'
+					textOnlyStyle
+						? `Judge the blocking style check only against this written style description: ${drawing.style}`
 						: undefined,
-					`Original image brief (verify independently of the painter's rewrite): ${drawing.description}`,
-					describe(2, '', auditDrawing),
+					textOnlyStyle && refs.length < auditRefs.length
+						? [
+								...references.flatMap(({ role }, index) =>
+									role === 'style'
+										? [`Image ${index + 2} is a style reference only.`]
+										: [],
+								),
+								'The painter cannot see the style images. Put differences that are not specified in the written style description in the optional styleReferenceFeedback string. Treat these as advisory only: they must not affect pass, failedChecks, or blocking feedback. Describe style differences and concrete corrections in words; do not refer to reference images by number.',
+							].join(' ')
+						: undefined,
+					`Original image brief (verify independently of the painter's rewrite): ${brief}`,
+					describe(2, '', textOnlyStyle ? promptDrawing : auditDrawing),
 				]
 					.filter(Boolean)
 					.join('\n'),
@@ -858,6 +909,10 @@ export class ArtProduction {
 					const drawing: Drawing = {
 						kind: 'character',
 						description: `造型候选 ${i}：${costume.description}`,
+						characterDescriptionFallback: characterBriefFallback(
+							character,
+							costume.description,
+						),
 						style,
 						references,
 						characters: [character],
