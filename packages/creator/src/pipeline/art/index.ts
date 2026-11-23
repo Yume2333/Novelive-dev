@@ -12,6 +12,7 @@ import sharp from 'sharp'
 import { type ImageConfig, imageProvider, imageSize } from '../../models/image'
 import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
+import { resolveRegistry } from '../../project/series/resolve'
 import { checkImage, type Dimensions, placeholder } from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
@@ -77,12 +78,7 @@ export class ArtProduction {
 	}
 
 	async registry(): Promise<AssetRegistry> {
-		try {
-			return await this.project.read(this.registryFile)
-		} catch (error) {
-			if (!isMissing(error)) throw error
-			return { formatVersion, entries: [] }
-		}
+		return resolveRegistry(this.project, this.scope)
 	}
 
 	async register(
@@ -95,6 +91,13 @@ export class ArtProduction {
 		return this.writeRegistry(async () => {
 			const previous = await this.registry()
 			const plan = planArt(items, bible, previous, merges)
+			if (this.scope.level !== 'series')
+				plan.jobs = plan.jobs.filter(
+					(job) =>
+						!previous.entries.some(
+							(entry) => entry.id === job.assetId && entry.status === 'drawn',
+						),
+				)
 			const existing = new Set(previous.entries.map((entry) => entry.id))
 			for (const entry of plan.registry.entries)
 				if (!existing.has(entry.id)) entry.path = this.scoped(entry.path)

@@ -19,7 +19,9 @@ import {
 	formatVersion,
 	glossaryPatchSchema,
 	type ProjectDocument,
+	type ProjectScope,
 	projectFiles,
+	type VolumeDigest,
 	type VolumeSkeleton,
 	version,
 } from '@novelive/format/model'
@@ -105,6 +107,8 @@ export interface SynthesisOptions {
 	strategy?: 'auto' | 'whole' | 'events'
 	maxEvents?: number
 	incremental?: boolean
+	scope?: ProjectScope
+	previousDigests?: readonly VolumeDigest[]
 	rerun?: boolean
 	signal?: AbortSignal
 	fetch?: typeof globalThis.fetch
@@ -252,6 +256,10 @@ export async function synthesizeVolume(
 		requirements: options.requirements,
 		strategy,
 		incremental,
+		...(options.scope ? { scope: options.scope } : {}),
+		...(options.previousDigests
+			? { previousDigests: options.previousDigests }
+			: {}),
 		model: model.id,
 		context: model.contextWindow,
 	})
@@ -262,6 +270,9 @@ export async function synthesizeVolume(
 		return project.read(files.result)
 
 	const bible = await readBible(project)
+	const contextBible = options.scope
+		? await readBible(project, options.scope)
+		: bible
 	const basis = hash(bible)
 	const matching = saved?.fingerprint === fingerprint ? saved : undefined
 	const quarantined =
@@ -280,7 +291,7 @@ Return only JSON with overview, chapters [{chapterId,progress}], biblePatch [{ki
 Bible kinds: character, relation, location, timeline, foreshadowing, style. Every entry has an id and status ("candidate"); use actual chapter IDs for provenance and relationships reference existing or extracted characters. Characters have name and aliases (mark main characters major:true); locations have name and description; relations have from, to and description; timeline has chapterId and event; foreshadowing has plantedChapter and description; style has description; glossary has original, written and category.
 Use stable IDs; record changing identities in changes with chapterId, field and value. Keep confirmed facts intact; ${incremental ? 'do not emit delete for successive volumes.' : 'delete only a mistaken candidate from this volume.'}
 Existing entries:
-${JSON.stringify(bible)}`
+${JSON.stringify(contextBible)}${options.previousDigests?.length ? `\nEarlier volume digests (context only):\n${JSON.stringify(options.previousDigests)}` : ''}`
 	const wholePrompt = `${instructions}
 Synthesize the entire volume. Include progress for every chapter.
 Chapter previews:

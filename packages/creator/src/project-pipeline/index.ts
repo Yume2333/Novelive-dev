@@ -79,6 +79,11 @@ export async function prepareVolume(
 	})
 	const synthesis = await synthesizeVolume(project, volumeId, chapterIds, {
 		...options,
+		scope:
+			options.scope ??
+			(works.length === 1
+				? { level: 'work', volumeId, workId: works[0].workId }
+				: { level: 'volume', volumeId }),
 		connection: synthesisConnection,
 		incremental: options.incremental ?? volumeIndex > 0,
 	})
