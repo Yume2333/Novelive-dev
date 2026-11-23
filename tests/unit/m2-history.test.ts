@@ -223,33 +223,38 @@ test('edits text, inline marks and expressions by stable ID and audits their inv
 	])
 })
 
-test('changes an inherited expression at the selected line without touching the earlier scene', async () => {
-	using project = await fixture()
-	const service = editor(project)
-	const { editorId, chapter } = await service.open(target)
-	const session = { ...target, editorId }
-	const updated = await service.editLine({
-		...session,
-		sceneId: secondSceneId,
-		expectedRevision: chapter.revision,
-		edit: {
-			kind: 'expression',
-			lineId: 'a001',
-			previous: neutral,
-			next: happy,
-		},
-	})
-	expect(updated.scenes[0].nvs).toBe(originalScene)
-	expect(updated.scenes[1].nvs).toBe(
-		secondScene.replace('rin:', `@show ${happy} center\nrin:`),
-	)
-	const undone = await service.undo({
-		...session,
-		expectedRevision: updated.revision,
-	})
-	expect(undone.scenes[1].nvs).toBe(secondScene)
-	expect((await project.readFile(secondPath)).toString()).toBe(secondScene)
-})
+test.each(['', '@move center right\n'])(
+	'changes an inherited expression without touching the earlier scene (move: %j)',
+	async (move) => {
+		using project = await fixture()
+		const scene = secondScene.replace('rin:', `${move}rin:`)
+		await project.writeFile(secondPath, scene)
+		const service = editor(project)
+		const { editorId, chapter } = await service.open(target)
+		const session = { ...target, editorId }
+		const updated = await service.editLine({
+			...session,
+			sceneId: secondSceneId,
+			expectedRevision: chapter.revision,
+			edit: {
+				kind: 'expression',
+				lineId: 'a001',
+				previous: neutral,
+				next: happy,
+			},
+		})
+		expect(updated.scenes[0].nvs).toBe(originalScene)
+		expect(updated.scenes[1].nvs).toBe(
+			scene.replace('rin:', `@show ${happy} center\nrin:`),
+		)
+		const undone = await service.undo({
+			...session,
+			expectedRevision: updated.revision,
+		})
+		expect(undone.scenes[1].nvs).toBe(scene)
+		expect((await project.readFile(secondPath)).toString()).toBe(scene)
+	},
+)
 
 test('rejects stale values, invalid edits, and racing writes without logging them', async () => {
 	using project = await fixture()

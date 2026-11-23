@@ -20,13 +20,6 @@ export function portraitsAt(scenes: readonly CompiledScene[], target: Beat) {
 							for (const [slot, { id }] of portraits)
 								if (id.split('/')[0] === args.target) portraits.delete(slot)
 						break
-					case 'move': {
-						const from = String(args.slot)
-						const portrait = portraits.get(from)
-						portraits.delete(from)
-						if (portrait) portraits.set(String(args.target), portrait)
-						break
-					}
 					case 'face':
 					case 'costume':
 						for (const { id, slot } of assets) {
