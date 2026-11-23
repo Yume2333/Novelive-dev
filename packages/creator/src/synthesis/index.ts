@@ -794,10 +794,18 @@ ${packets[packet]}`
 			const contextRoom =
 				messageRoom -
 				Math.max(bytes(prompt(extract, '', '')), bytes(prompt(focus, '', '')))
+			const historyShare = recentEvents(
+				state.events,
+				Math.min(historyBudget, Math.floor(contextRoom / 2)),
+				true,
+			)
 			const { text: entries } = proposedEntries(
 				state.events,
 				packetEvents,
-				Math.max(0, Math.min(registryBudget, contextRoom - bytes('[]'))),
+				Math.max(
+					0,
+					Math.min(registryBudget, contextRoom - bytes(historyShare)),
+				),
 			)
 			const history = recentEvents(
 				state.events,

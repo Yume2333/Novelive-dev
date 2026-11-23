@@ -2791,83 +2791,102 @@ test('format-6 resume starts at the exact next fragment of a split chapter', asy
 	).toEqual([first.event, 'Remaining fragment'])
 })
 
-test('format-6 resume fits a full Chinese packet without dropping preview text', async () => {
-	await seed(root)
-	using project = await Project.open(root)
-	const { label, size, text, first } = await seedFormatSixSplit(
-		project,
-		'沿江行船至渡口尋人'.repeat(1250),
-	)
-	const checkpoint = await project.read(files.checkpoint)
-	const character = {
-		kind: 'character',
-		op: 'add',
-		entry: { id: 'boatman', name: '船夫', aliases: [], status: 'candidate' },
-	} satisfies BiblePatch[number]
-	const relation = {
-		kind: 'relation',
-		op: 'add',
-		entry: {
-			id: 'boatman-guide',
-			from: 'boatman',
-			to: 'ada',
-			description: 'Guide: 船夫為乘客引路。',
-			status: 'candidate',
-		},
-	} satisfies BiblePatch[number]
-	const events = [
-		{ ...first, event: '往'.repeat(160), biblePatch: [character] },
-		{ ...first, event: '來'.repeat(18), is_last: false },
-		{ ...first, event: '回'.repeat(160), is_last: false },
-		{ ...first, event: '走'.repeat(160), is_last: false },
-	]
-	await project.write(files.checkpoint, {
-		...checkpoint,
-		events,
-	})
-	const prompts: string[] = []
-	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-		const { messages } = await new Request(input, init).json()
-		const prompt: string = messages[0].content
-		prompts.push(prompt)
-		expect(
-			prompt
-				.split('Already proposed entries:\n')[1]
-				.split('\nRecent event summaries:')[0],
-		).toMatch(/^character:? boatman(?:\s|$)/m)
-		return stream({
-			...first,
-			event: 'Resumed next fragment',
-			overview: '',
-			biblePatch: [relation],
+test.each([0, 120])(
+	'format-6 resume fits a full Chinese packet with prior IDs and summaries (%i extra IDs)',
+	async (count) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const { label, size, text, first } = await seedFormatSixSplit(
+			project,
+			'沿江行船至渡口尋人'.repeat(1250),
+		)
+		const checkpoint = await project.read(files.checkpoint)
+		const character = {
+			kind: 'character',
+			op: 'add',
+			entry: { id: 'boatman', name: '船夫', aliases: [], status: 'candidate' },
+		} satisfies BiblePatch[number]
+		const relation = {
+			kind: 'relation',
+			op: 'add',
+			entry: {
+				id: 'boatman-guide',
+				from: 'boatman',
+				to: 'ada',
+				description: 'Guide: 船夫為乘客引路。',
+				status: 'candidate',
+			},
+		} satisfies BiblePatch[number]
+		const events = [
+			{
+				...first,
+				event: '往'.repeat(160),
+				biblePatch: [
+					character,
+					...Array.from({ length: count }, (_, index) => ({
+						...character,
+						entry: { ...character.entry, id: `b${index}` },
+					})),
+				],
+			},
+			{ ...first, event: '來'.repeat(18), is_last: false },
+			{ ...first, event: '回'.repeat(160), is_last: false },
+			{ ...first, event: '走'.repeat(160), is_last: false },
+		]
+		await project.write(files.checkpoint, {
+			...checkpoint,
+			events,
 		})
-	})
-	await expect(
-		synthesizeVolume(project, 'v1', [chapters[0]], {
-			...options,
-			strategy: 'events',
-			maxEvents: 5,
-			fetch,
-		}),
-	).rejects.toThrow('Synthesis reached its event limit (5)')
-	expect(fetch).toHaveBeenCalledTimes(1)
-	expect(prompts[0]).toContain(
-		'Return the next uncovered event, its progress and new facts.',
-	)
-	expect(prompts[0].split('Chapter previews:\n')[1]).toBe(
-		label + text.slice(size, size * 2),
-	)
-	expect(
-		Buffer.byteLength(prompts[0]) + Buffer.byteLength('Repair the JSON: '),
-	).toBeLessThan(16384 - 4096)
-	expect(await project.read(files.checkpoint)).toMatchObject({
-		packet: 2,
-		events: [
-			...events,
-			{ event: 'Resumed next fragment', biblePatch: [relation] },
-		],
-	})
-})
+		const prompts: string[] = []
+		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+			const { messages } = await new Request(input, init).json()
+			const prompt: string = messages[0].content
+			prompts.push(prompt)
+			expect(
+				prompt
+					.split('Already proposed entries:\n')[1]
+					.split('\nRecent event summaries:')[0],
+			).toMatch(/^character:? boatman(?:\s|$)/m)
+			const summaries: string[] = JSON.parse(
+				prompt
+					.split('Recent event summaries: ')[1]
+					.split('\nChapter previews:')[0],
+			)
+			expect(summaries.at(-1)).toMatch(/^走{8,}$/u)
+			return stream({
+				...first,
+				event: 'Resumed next fragment',
+				overview: '',
+				biblePatch: [relation],
+			})
+		})
+		await expect(
+			synthesizeVolume(project, 'v1', [chapters[0]], {
+				...options,
+				strategy: 'events',
+				maxEvents: 5,
+				fetch,
+			}),
+		).rejects.toThrow('Synthesis reached its event limit (5)')
+		expect(fetch).toHaveBeenCalledTimes(1)
+		expect(prompts[0]).toContain(
+			'Return the next uncovered event, its progress and new facts.',
+		)
+		expect(prompts[0].split('Chapter previews:\n')[1]).toBe(
+			label + text.slice(size, size * 2),
+		)
+		expect(
+			Buffer.byteLength(prompts[0]) + Buffer.byteLength('Repair the JSON: '),
+		).toBeLessThan(16384 - 4096)
+		expect(await project.read(files.checkpoint)).toMatchObject({
+			packet: 2,
+			events: [
+				...events,
+				{ event: 'Resumed next fragment', biblePatch: [relation] },
+			],
+		})
+	},
+)
 
 test.each([2, 5])(
 	'restores packet chapter scope when legacy events omit progress (format: %s)',
