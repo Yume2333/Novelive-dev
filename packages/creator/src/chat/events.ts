@@ -4,7 +4,7 @@ export class EventReplay {
 	private readonly entries: { event: EventEnvelope; bytes: number }[] = []
 	private bytes = 0
 	private readonly droppedThrough = new Map<string, number>()
-	private readonly droppedChapters = new Map<string, Set<number>>()
+	private readonly droppedChapters = new Map<number, string>()
 
 	constructor(
 		private readonly maxEntries = 256,
@@ -33,12 +33,18 @@ export class EventReplay {
 	private dropped(event: EventEnvelope) {
 		const key = JSON.stringify([event.scope, event.scopeId])
 		if (event.event.type === 'production.chapterRecord') {
-			let chapters = this.droppedChapters.get(key)
-			if (!chapters) {
-				chapters = new Set()
-				this.droppedChapters.set(key, chapters)
+			this.droppedChapters.set(event.seq, key)
+			if (this.droppedChapters.size > this.maxEntries) {
+				const oldest = this.droppedChapters.entries().next().value
+				if (oldest) {
+					const [seq, scope] = oldest
+					this.droppedChapters.delete(seq)
+					this.droppedThrough.set(
+						scope,
+						Math.max(this.droppedThrough.get(scope) ?? 0, seq),
+					)
+				}
 			}
-			chapters.add(event.seq)
 			return
 		}
 		this.droppedThrough.set(
@@ -61,13 +67,16 @@ export class EventReplay {
 		for (const { event } of this.entries)
 			if (matches(event)) merged.set(event.seq, event)
 		const key = JSON.stringify([scope, scopeId])
+		let chapterGap = false
+		for (const [seq, droppedScope] of this.droppedChapters) {
+			if (droppedScope === key && seq > afterSeq && !merged.has(seq)) {
+				chapterGap = true
+				break
+			}
+		}
 		return {
 			events: [...merged.values()].sort((a, b) => a.seq - b.seq),
-			gap:
-				afterSeq < (this.droppedThrough.get(key) ?? 0) ||
-				[...(this.droppedChapters.get(key) ?? [])].some(
-					(seq) => seq > afterSeq && !merged.has(seq),
-				),
+			gap: afterSeq < (this.droppedThrough.get(key) ?? 0) || chapterGap,
 		}
 	}
 }

@@ -72,10 +72,11 @@ test('a new creator generation uses a fresh cursor for reconstructed records', (
 })
 
 test('backfill repairs chapter eviction but cannot hide lost snapshots or chat events', () => {
-	const replay = new EventReplay(1)
+	const replay = new EventReplay(2)
 	replay.append(chapter(1))
 	replay.append(chapter(2))
 	replay.append(event(3, 'foreign', 'other'))
+	replay.append(event(4, 'foreign', 'other'))
 	expect(replay.list('work', 0).gap).toBe(true)
 	expect(replay.list('work', 0, 'work', [chapter(1), chapter(2)])).toEqual({
 		events: [chapter(1), chapter(2)],
@@ -83,14 +84,28 @@ test('backfill repairs chapter eviction but cannot hide lost snapshots or chat e
 	})
 	expect(replay.list('work', 0, 'work', [chapter(2)]).gap).toBe(true)
 	expect(replay.list('work', 1, 'work', [chapter(2)]).gap).toBe(false)
-	replay.append(event(4))
 	replay.append(event(5))
+	replay.append(event(6))
+	replay.append(event(7))
 	expect(replay.list('work', 0, 'work', [chapter(1), chapter(2)]).gap).toBe(
 		true,
 	)
-	expect(replay.list('work', 4, 'work', [chapter(1), chapter(2)]).gap).toBe(
+	expect(replay.list('work', 6, 'work', [chapter(1), chapter(2)]).gap).toBe(
 		false,
 	)
+})
+
+test('chapter eviction history is bounded and older backfill conservatively retains a gap', () => {
+	const replay = new EventReplay(2)
+	const records = Array.from({ length: 100 }, (_, index) => chapter(index + 1))
+	for (const record of records) replay.append(record)
+	expect(replay.list('work', 0, 'work', records).gap).toBe(true)
+	expect(replay.list('work', 96, 'work', records)).toEqual({
+		events: records.slice(96),
+		gap: false,
+	})
+	expect(replay.list('work', 96, 'work', records.slice(97)).gap).toBe(true)
+	expect(replay.list('other', 0)).toEqual({ events: [], gap: false })
 })
 
 test('app replay returns available queue events separately from work backfill', () => {
