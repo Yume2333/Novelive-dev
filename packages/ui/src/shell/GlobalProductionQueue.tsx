@@ -118,7 +118,7 @@ export function GlobalProductionQueue() {
 						aria-label="关闭制作队列"
 						onClick={() => dialog.current?.close()}
 					>
-						<X aria-hidden="true" size={18} />
+						<X aria-hidden="true" size={18} strokeWidth={1.8} />
 					</button>
 				</header>
 				<ScrollArea className={styles.scroll}>
