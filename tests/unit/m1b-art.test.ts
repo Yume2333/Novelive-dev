@@ -350,7 +350,7 @@ test('requests a schema repair for bare model-generated place IDs after a stagin
 		if (answers.length === 1)
 			expect(prompt).toContain('Repair the staging patch and manifest')
 		if (answers.length === 0) {
-			expect(prompt).toContain('Repair the staging patch and manifest')
+			expect(prompt).not.toContain('Repair the staging patch and manifest')
 			expect(prompt).toContain('/items/0/id')
 			expect(prompt).toContain('/items/2/id')
 			expect(prompt).toContain('location: place/variant')
@@ -382,6 +382,44 @@ test('requests a schema repair for bare model-generated place IDs after a stagin
 				.filter(({ name }) => name === 'bg')
 				.map(({ assets }) => assets),
 	).toEqual([[{ id: 'loc_courtyard/day' }], [{ id: 'loc_gate/day' }]])
+})
+
+test('staging repair edits the schema-corrected reply, not the original rejection', async () => {
+	const original = {
+		patch: 'PUT <4:\n@bg loc_courtyard',
+		items: [{ id: 'loc_courtyard', kind: 'location', description: '庭院' }],
+		merges: {},
+	}
+	const corrected = {
+		...original,
+		patch: 'PUT <4:\n@bg loc_courtyard/day',
+		items: [{ ...original.items[0], id: 'loc_courtyard/evening' }],
+	}
+	const staged = {
+		...corrected,
+		items: [{ ...original.items[0], id: 'loc_courtyard/day' }],
+	}
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockRejectedValueOnce(
+			new artModels.ArtResponseSchemaError('/items/0/id', original),
+		)
+		.mockResolvedValueOnce(corrected)
+		.mockResolvedValueOnce(staged)
+	try {
+		await expect(
+			directChapterArt(script, bible, empty, { main, replay }),
+		).resolves.toMatchObject({ items: staged.items })
+		expect(model).toHaveBeenCalledTimes(3)
+		expect(model.mock.calls[1][1]).toContain(JSON.stringify(original))
+		const retry = model.mock.calls[2][1]
+		expect(retry).toContain('Repair the staging patch and manifest')
+		expect(retry).toContain(JSON.stringify(corrected))
+		expect(retry).not.toContain(JSON.stringify(original))
+		expect(retry).not.toContain('Repair the JSON manifest')
+	} finally {
+		model.mockRestore()
+	}
 })
 
 test('preserves configured custom marks through staging and rejects unconfigured marks', async () => {
