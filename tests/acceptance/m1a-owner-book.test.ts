@@ -147,6 +147,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			...synthesisConnection,
 			contextWindow: eventContextWindow,
 		}
+		const selectionConnection = {
+			...synthesisConnection,
+			maxOutputTokens: 32_768,
+		}
 		const timeoutFor = (slot: TextConnection) =>
 			requestTimeout(outputTokenBudget(buildTextModel(slot)))
 		const stats = {
@@ -159,6 +163,11 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			packetCount: 0,
 			resumedPacket: 0,
 			resumedEvents: 0,
+			selectionPrompts: [] as {
+				candidates: number
+				bytes: number
+				outputCap: number
+			}[],
 		}
 		let used = 0
 		let capReached = false
@@ -199,11 +208,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				controller.abort()
 				throw new Error('Resume attempted a paid preview request')
 			}
-			if (checkpointSource && dryRun === 'cap' && stats.calls === 0) {
-				const firstReserve = reserveOwnerBookSelection(0, text, outputCap)
-				if (firstReserve === undefined) throw new Error('Invalid stub request')
-				used = ownerBookSelectionCap - firstReserve
-			}
+			if (dryRun === 'cap') used = ownerBookSelectionCap
 			const reserve = checkpointSource
 				? reserveOwnerBookSelection(used, text, outputCap)
 				: Buffer.byteLength(text) + outputCap + 1024
@@ -217,6 +222,14 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			}
 			used += reserve
 			const call = ++stats.calls
+			if (checkpointSource) {
+				const lines = prompt.split('\nCandidates:\n')[1].split('\n')
+				stats.selectionPrompts.push({
+					candidates: lines.length,
+					bytes: Buffer.byteLength(prompt),
+					outputCap,
+				})
+			}
 			stats.previewCalls += Number(!isSynthesis)
 			stats.synthesisCalls += Number(isSynthesis)
 			const match = /Extract only the next event in packet \d+\/(\d+)/.exec(
@@ -269,9 +282,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 									},
 								],
 								usage: {
-									prompt_tokens: dryRun === 'cap' ? reserve - 1 : 1,
+									prompt_tokens: 1,
 									completion_tokens: 1,
-									total_tokens: dryRun === 'cap' ? reserve : 2,
+									total_tokens: 2,
 								},
 							})}\n\ndata: [DONE]\n\n`,
 							{ headers: { 'content-type': 'text/event-stream' } },
@@ -345,7 +358,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const options = {
 			previewConnection,
 			synthesisConnection: eventConnection,
-			requestTimeoutMs: timeoutFor(eventConnection),
+			selectionConnection,
+			requestTimeoutMs: timeoutFor(selectionConnection),
 			language,
 			strategy: 'events' as const,
 			fetch: fetchReplay,
@@ -486,7 +500,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 						expect(paused.selections?.length).toBeGreaterThanOrEqual(
 							selectionStart.selections?.length ?? 0,
 						)
-						if (dryRun === 'cap') expect(paused.selections).toEqual([[]])
+						if (dryRun === 'cap') expect(paused.selections).toEqual([])
 						await Promise.all(pendingUsage)
 						if (ledgerFailed)
 							throw new Error('Could not write the private usage ledger')

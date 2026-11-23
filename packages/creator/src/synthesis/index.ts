@@ -37,7 +37,11 @@ import {
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
 import { canonicalizeAdditions } from './canonicalize'
-import { reconcileNamedAdditions, selectAdditions } from './consolidate'
+import {
+	reconcileNamedAdditions,
+	type SelectionGroup,
+	selectAdditions,
+} from './consolidate'
 import { scopedOnlyBrief } from './incremental/context'
 import { synthesisInstructions, synthesisOutput } from './output'
 import {
@@ -92,6 +96,7 @@ const checkpointSchema = obj({
 	events: arr(eventSchema),
 	selections: opt(arr(arr(int({ minimum: 1 })))),
 	selectionVersion: opt(int({ minimum: 1 })),
+	selectionPlan: opt(str()),
 	selectedPatch: opt(
 		obj({ biblePatch: biblePatchSchema, glossaryPatch: glossaryPatchSchema }),
 	),
@@ -134,6 +139,7 @@ type Event = Static<typeof eventSchema>
 
 export interface SynthesisOptions {
 	connection: TextConnection
+	selectionConnection?: TextConnection
 	language: string
 	requirements?: string
 	strategy?: 'auto' | 'whole' | 'events'
@@ -149,7 +155,7 @@ export interface SynthesisOptions {
 
 const minimumEventLimit = 128
 const packetFormat = 7
-const selectionVersion = 4
+const selectionVersion = 5
 const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -449,6 +455,9 @@ export async function synthesizeVolume(
 	if (!chapterIds.length || new Set(chapterIds).size !== chapterIds.length)
 		throw new Error('Synthesis requires distinct ordered chapter IDs')
 	const model = buildTextModel(options.connection)
+	const selector = options.selectionConnection
+		? buildTextModel(options.selectionConnection)
+		: model
 	const stream = createTextStream({ fetch: options.fetch })
 	if (
 		options.maxEvents !== undefined &&
@@ -624,20 +633,30 @@ ${nextEvent.instructions}`
 		contract: ReturnType<typeof synthesisOutput<T>>,
 		check: (output: T) => void,
 		focusedPrompt?: string,
+		{
+			connection = options.connection,
+			requestModel = model,
+			inputBudget = budget,
+			requestOutputLimit = outputLimit,
+		} = {},
 	): Promise<T> {
-		const repairBudget = budget - bytes(prompt) - bytes(repairPrefix)
+		const repairBudget = inputBudget - bytes(prompt) - bytes(repairPrefix)
 		if (repairBudget <= 0)
 			throw new Error('Synthesis input exceeds the model context budget')
 		const messages = [{ role: 'user' as const, content: prompt, timestamp: 0 }]
 		for (let attempt = 0; ; attempt++) {
 			options.signal?.throwIfAborted()
-			const response = await stream(model, normalizeContext({ messages }), {
-				apiKey: options.connection.apiKey,
-				signal: options.signal,
-				timeoutMs: options.requestTimeoutMs,
-				outputLimit,
-				cacheRetention: 'none',
-			}).result()
+			const response = await stream(
+				requestModel,
+				normalizeContext({ messages }),
+				{
+					apiKey: connection.apiKey,
+					signal: options.signal,
+					timeoutMs: options.requestTimeoutMs,
+					outputLimit: requestOutputLimit,
+					cacheRetention: 'none',
+				},
+			).result()
 			if (response.stopReason !== 'stop') {
 				const error = textResultError(
 					response,
@@ -838,69 +857,75 @@ ${packets[packet]}`
 		state.selections = []
 		state.selectionVersion = selectionVersion
 	}
-	const progressBudget = historyBudget * 2
-	const chapterRoom = Math.floor(progressBudget / skeleton.chapters.length)
-	const progress = fitBytes(
-		skeleton.chapters
+	async function choose(groups: readonly SelectionGroup[]) {
+		const selectionOutput = outputTokenBudget(selector)
+		const selectionBudget = selector.contextWindow - selectionOutput - 1024
+		const progressBudget = Math.min(
+			8192,
+			Math.floor(selector.contextWindow / 8),
+		)
+		const chapterRoom = Math.floor(progressBudget / skeleton.chapters.length)
+		const progress = skeleton.chapters
 			.map(({ chapterId, progress }) => {
 				const label = `${chapterId}: `
 				return `${label}${fitBytes(progress, Math.max(0, chapterRoom - bytes(label) - 1))}`
 			})
-			.join('\n'),
-		progressBudget,
-	)
-	let selectionIndex = 0
-	async function choose(kind: string, candidates: readonly unknown[]) {
-		const prompt = `${instructions}
+			.join('\n')
+		let position = 0
+		const numbered = groups.map(({ kind, entries }) => ({
+			kind,
+			lines: entries.map(
+				(entry) => `${++position} ${JSON.stringify({ kind, ...entry })}`,
+			),
+		}))
+		const promptFor = (batches: typeof numbered) => `${instructions}
 ${selection.instructions}
-These ${kind} candidates were extracted packet by packet from this volume, so many are incidental, restated or split across IDs. Keep a candidate only when the evidence shows why the adaptation needs it for a consequential scene, continuity, or recurring assets. Observations are evidence about the same entry, not separate choices. Accuracy, a name, or repeated extraction is not enough. ${selectionScope[kind]} Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
+Select from these canonical candidates across the whole volume. Compare evidence from early and late chapters and keep the entries the adaptation needs for consequential scenes, continuity, or recurring assets. Accuracy, a name, or repeated extraction is not enough. Observations are evidence about the same entry, not separate choices. Keep one representative for repeated people, places, relationships, or plot beats. Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
+${batches.map(({ kind }) => `${kind}: ${selectionScope[kind]}`).join('\n')}
 Respond with only the JSON object, with no commentary before or after it.
 Chapter progress:
 ${progress}
-`
-		const available = Math.max(384, budget - bytes(prompt) - 1024)
-		const keptRoom = Math.floor(available / 3)
-		const room = available - keptRoom
-		const lines = candidates.map((candidate) =>
-			fitBytes(
-				JSON.stringify(candidate, (_, value) =>
-					typeof value === 'string'
-						? Array.from(value).slice(0, 120).join('')
-						: value,
-				),
-				room - 8,
-			),
-		)
-		const chunks: string[][] = []
-		let size = 0
-		for (const line of lines) {
-			if (!chunks.length || size + bytes(line) + 8 > room) {
-				chunks.push([])
-				size = 0
-			}
-			chunks[chunks.length - 1].push(line)
-			size += bytes(line) + 8
-		}
+Candidates:
+${batches.flatMap(({ lines }) => lines).join('\n')}`
+		const fits = (prompt: string) =>
+			bytes(prompt) + bytes(repairPrefix) < selectionBudget
+		const whole = promptFor(numbered)
+		const batches = fits(whole)
+			? [{ prompt: whole, count: position }]
+			: numbered.map((group) => ({
+					prompt: promptFor([group]),
+					count: group.lines.length,
+				}))
+		if (batches.some(({ prompt }) => !fits(prompt)))
+			throw new Error(
+				'A whole-volume candidate kind exceeds the selection context budget',
+			)
+		const plan = hash(batches.map(({ count }) => count))
+		if (state.selectionPlan !== plan) state.selections = []
+		state.selectionPlan = plan
 		const kept = new Set<number>()
 		let offset = 0
-		for (const chunk of chunks) {
-			let keep = state.selections?.[selectionIndex]
+		for (const [index, { prompt, count }] of batches.entries()) {
+			let keep = state.selections?.[index]
 			if (!keep) {
-				const earlier = [...kept]
-					.reverse()
-					.map((i) => lines[i])
-					.join('\n')
 				const answer = await request(
-					`${prompt}${earlier ? `Kept from earlier candidates; drop any candidate that restates one of these:\n${fitBytes(earlier, keptRoom)}\n` : ''}Candidates:\n${chunk.map((line, i) => `${i + 1} ${line}`).join('\n')}`,
+					prompt,
 					selection,
 					(value) => {
 						if (
 							new Set(value.keep).size !== value.keep.length ||
-							value.keep.some((n) => n > chunk.length)
+							value.keep.some((n) => n <= offset || n > offset + count)
 						)
 							throw new Error(
-								`keep must list distinct candidate numbers from 1 to ${chunk.length}`,
+								`keep must list distinct candidate numbers from ${offset + 1} to ${offset + count}`,
 							)
+					},
+					undefined,
+					{
+						connection: options.selectionConnection,
+						requestModel: selector,
+						inputBudget: selectionBudget,
+						requestOutputLimit: selectionOutput,
 					},
 				)
 				keep = answer.keep
@@ -908,9 +933,8 @@ ${progress}
 				state.selectionVersion = selectionVersion
 				await project.write(files.checkpoint, state)
 			}
-			selectionIndex++
-			for (const n of keep) kept.add(offset + n - 1)
-			offset += chunk.length
+			for (const n of keep) kept.add(n)
+			offset += count
 		}
 		return kept
 	}

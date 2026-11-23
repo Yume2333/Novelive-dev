@@ -330,12 +330,14 @@ test('selection drops unchosen additions with their updates and dangling referen
 			},
 		],
 		bible,
-		async (kind, candidates) => {
-			asked.push(`${kind}:${candidates.length}`)
-			return new Set([0])
+		async (groups) => {
+			asked.push(
+				...groups.map(({ kind, entries }) => `${kind}:${entries.length}`),
+			)
+			return new Set([1, 3, 4, 5])
 		},
 	)
-	expect(asked).toEqual(['character:2', 'glossary:2'])
+	expect(asked).toEqual(['character:2', 'relation:2', 'glossary:2'])
 	expect(biblePatch.map(({ op, entry }) => `${op}:${entry.id}`)).toEqual([
 		'add:lin',
 		'update:ada',
@@ -360,7 +362,7 @@ test('selection compares alternate relation IDs and directions together without 
 		patch,
 		[],
 		emptyBible,
-		async (kind, entries) => {
+		async ([{ kind, entries }]) => {
 			expect(kind).toBe('relation')
 			expect(entries).toEqual([
 				patch[0].entry,
@@ -368,7 +370,7 @@ test('selection compares alternate relation IDs and directions together without 
 				patch[3].entry,
 				patch[1].entry,
 			])
-			return new Set([0, 2, 3])
+			return new Set([1, 3, 4])
 		},
 	)
 	expect(result.biblePatch).toEqual([patch[0], patch[1], patch[3]])
@@ -403,7 +405,7 @@ test('selection decides once per ID with later evidence and preserves the comple
 		patch,
 		[],
 		emptyBible,
-		async (kind, candidates) => {
+		async ([{ kind, entries: candidates }]) => {
 			expect(kind).toBe('character')
 			expect(candidates).toEqual([
 				{
@@ -418,7 +420,7 @@ test('selection decides once per ID with later evidence and preserves the comple
 					observations: [{ chapterId: undefined, fact: 'A spectator' }],
 				},
 			])
-			return new Set([0])
+			return new Set([1])
 		},
 	)
 	expect(result.biblePatch).toEqual([first, restated, ongoing])
@@ -463,10 +465,10 @@ test('selection deduplicates identical glossary spellings across new IDs without
 		[],
 		glossary,
 		{ ...emptyBible, glossary: existing },
-		async (kind, entries) => {
+		async ([{ kind, entries }]) => {
 			expect(kind).toBe('glossary')
 			expect(entries).toEqual([lantern, otherReading, differentPronunciation])
-			return new Set([0])
+			return new Set([1])
 		},
 	)
 	expect(result.glossaryPatch).toEqual([lantern, update])

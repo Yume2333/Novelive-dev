@@ -36,12 +36,16 @@ const stream = (result: unknown) =>
 		`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
 		{ headers: { 'content-type': 'text/event-stream' } },
 	)
+const candidatePositions = (prompt: string) =>
+	prompt
+		.split('Candidates:\n')[1]
+		?.split('\n')
+		.map((line) => Number(line.split(' ')[0]))
 const packetFetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 	const body = await new Request(input, init).json()
 	const prompt: string = body.messages[0].content
-	const candidates = prompt.split('Candidates:\n')[1]
-	if (candidates !== undefined)
-		return stream({ keep: candidates.split('\n').map((_, i) => i + 1) })
+	const candidates = candidatePositions(prompt)
+	if (candidates) return stream({ keep: candidates })
 	const packet = /Extract only the next event in packet (\d+)\/(\d+)/.exec(
 		prompt,
 	)
@@ -343,10 +347,12 @@ test('consolidates repeated candidate additions across events and remaps referen
 		if (body.messages[0].content.includes('Candidates:\n')) {
 			selections++
 			expect(body.messages[0].content).toMatch(
-				/character candidates[\s\S]*\n1 \{"id":"guide"/,
+				/\n1 \{"kind":"character","id":"guide"/,
 			)
-			expect(body.messages[0].content).not.toMatch(/\n2 \{/)
-			return sse({ keep: [1] })
+			expect(body.messages[0].content).toMatch(
+				/\n2 \{"kind":"relation","id":"guiding"/,
+			)
+			return sse({ keep: [1, 2] })
 		}
 		expect(body.messages[0].content).toContain('Never restate a proposed entry')
 		const first = calls++ === 0
@@ -624,6 +630,12 @@ test('only an explicit rerun re-synthesizes a completed volume with the same inp
 test('a hard stop persists exactly one event and resumes after reopening without replaying it', async () => {
 	await seed(root)
 	const fetch = vi.fn<typeof globalThis.fetch>(strict)
+	const select = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const request = new Request(input, init)
+		const { messages } = await request.clone().json()
+		const candidates = candidatePositions(messages[0].content)
+		return candidates ? stream({ keep: candidates }) : fetch(request)
+	})
 	{
 		using project = await Project.open(root)
 		await expect(
@@ -631,7 +643,7 @@ test('a hard stop persists exactly one event and resumes after reopening without
 				...options,
 				strategy: 'events',
 				maxEvents: 1,
-				fetch,
+				fetch: select,
 			}),
 		).rejects.toThrow('Synthesis reached its event limit (1)')
 		expect(fetch).toHaveBeenCalledTimes(1)
@@ -651,7 +663,7 @@ test('a hard stop persists exactly one event and resumes after reopening without
 		const result = await synthesizeVolume(project, 'v1', chapters, {
 			...options,
 			strategy: 'events',
-			fetch,
+			fetch: select,
 		})
 		expect(fetch).toHaveBeenCalledTimes(2)
 		expect(result.biblePatch).toHaveLength(2)
@@ -674,10 +686,11 @@ test('a hard stop persists exactly one event and resumes after reopening without
 			await synthesizeVolume(project, 'v1', chapters, {
 				...options,
 				strategy: 'events',
-				fetch,
+				fetch: select,
 			}),
 		).toEqual(result)
 		expect(fetch).toHaveBeenCalledTimes(2)
+		expect(select).toHaveBeenCalledTimes(3)
 	}
 })
 
@@ -712,6 +725,8 @@ test('same event wording preserves new facts but a repeat needs progress or pack
 	let call = 0
 	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 		const { messages } = await new Request(input, init).json()
+		const candidates = candidatePositions(messages[0].content)
+		if (candidates) return stream({ keep: candidates })
 		call++
 		if (call === 4) {
 			expect(messages[0].content).toContain('Events already extracted: 2')
@@ -725,7 +740,8 @@ test('same event wording preserves new facts but a repeat needs progress or pack
 		strategy: 'events',
 		fetch,
 	})
-	expect(fetch).toHaveBeenCalledTimes(4)
+	expect(call).toBe(4)
+	expect(fetch).toHaveBeenCalledTimes(5)
 	expect(result.biblePatch).toHaveLength(1)
 	expect(result.glossaryPatch.map(({ id }) => id)).toEqual(['seal'])
 	expect(await project.read(files.checkpoint)).toMatchObject({
@@ -791,10 +807,15 @@ test('a saturated packet shows recent unique IDs from each kind and can finish w
 		is_last: true,
 	}
 	let extractions = 0
+	const selectors: number[][] = []
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const { messages } = await new Request(input, init).json()
 		const prompt: string = messages[0].content
-		if (prompt.includes('Candidates:\n')) return stream({ keep: [1] })
+		const candidates = candidatePositions(prompt)
+		if (candidates) {
+			selectors.push(candidates)
+			return stream({ keep: [candidates[0]] })
+		}
 		extractions++
 		if (extractions === 1) return stream(first)
 		if (extractions === 2) return stream(second)
@@ -820,6 +841,11 @@ test('a saturated packet shows recent unique IDs from each kind and can finish w
 	).rejects.toThrow('Synthesis reached its event limit (2)')
 	await synthesizeVolume(project, 'v1', chapters, args)
 	expect(extractions).toBe(3)
+	expect(selectors).toEqual([
+		Array.from({ length: 64 }, (_, i) => i + 1),
+		[65],
+		[66],
+	])
 	expect(await project.read(files.checkpoint)).toMatchObject({
 		packet: 1,
 		events: [first, second, finish],
@@ -836,6 +862,8 @@ test.each([false, true])(
 		const fetch: typeof globalThis.fetch = async (input, init) => {
 			const { messages } = await new Request(input, init).json()
 			const prompt: string = messages[0].content
+			const candidates = candidatePositions(prompt)
+			if (candidates) return stream({ keep: candidates })
 			prompts.push(prompt)
 			if (!stillReasoning && prompt.includes('Return one short JSON answer'))
 				return stream({
@@ -886,9 +914,7 @@ const selectionFixture = async (
 ) => {
 	const prompt: string = (await new Request(input, init).json()).messages[0]
 		.content
-	if (prompt.includes('These character candidates'))
-		return stream({ keep: [1] })
-	if (prompt.includes('These glossary candidates')) return stream({ keep: [2] })
+	if (prompt.includes('Candidates:\n')) return stream({ keep: [1, 3] })
 	return stream({
 		overview: 'Ada meets a guide.',
 		chapters: chapters.map((chapterId) => ({
@@ -920,36 +946,38 @@ test.each(['current', 'previous', 'unversioned'] as const)(
 		const args = { ...options, strategy: 'events' as const }
 		{
 			using project = await Project.open(root)
+			const write = project.write.bind(project)
+			vi.spyOn(project, 'write').mockImplementation((file, value) => {
+				if (
+					file.path === files.checkpoint.path &&
+					(value as { ready: boolean }).ready
+				)
+					throw new Error('Selection interrupted')
+				return write(file, value)
+			})
 			await expect(
 				synthesizeVolume(project, 'v1', chapters, {
 					...args,
-					fetch: async (input, init) => {
-						const prompt = (await new Request(input, init).clone().json())
-							.messages[0].content
-						if (prompt.includes('These glossary candidates'))
-							throw new Error('Selection interrupted')
-						return selectionFixture(input, init)
-					},
+					fetch: selectionFixture,
 				}),
-			).rejects.toMatchObject({ code: 'network' })
+			).rejects.toThrow('Selection interrupted')
 			const checkpoint = await project.read(files.checkpoint)
 			expect(checkpoint).toMatchObject({
 				packet: 1,
-				selections: [[1]],
+				selections: [[1, 3]],
 				ready: false,
-				selectionVersion: 4,
+				selectionVersion: 5,
 			})
 			if (version !== 'current') {
 				const { selectionVersion: _version, ...old } = checkpoint
 				await project.write(files.checkpoint, {
 					...old,
-					...(version === 'previous' ? { selectionVersion: 3 } : {}),
+					...(version === 'previous' ? { selectionVersion: 4 } : {}),
 					selections: [[2]],
 				})
 			}
 		}
 		using project = await Project.open(root)
-		const selectors: string[] = []
 		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 			const prompt = (await new Request(input, init).clone().json()).messages[0]
 				.content
@@ -958,32 +986,38 @@ test.each(['current', 'previous', 'unversioned'] as const)(
 			)
 			expect(prompt).toContain('Keep nothing if no candidate qualifies.')
 			expect(prompt).toContain('c2: They travel.')
-			if (prompt.includes('These character candidates')) {
-				selectors.push('character')
-				expect(prompt).toContain(
-					'A one-scene character qualifies only when consequential',
-				)
-			} else {
-				selectors.push('glossary')
-				expect(prompt).toContain(
-					'Drop ordinary objects, generic offices and roles',
-				)
-			}
+			expect(prompt).toContain(
+				'A one-scene character qualifies only when consequential',
+			)
+			expect(prompt).toContain(
+				'Drop ordinary objects, generic offices and roles',
+			)
+			expect(
+				prompt
+					.split('Candidates:\n')[1]
+					.split('\n')
+					.map((line) => {
+						const space = line.indexOf(' ')
+						const { kind, id } = JSON.parse(line.slice(space + 1))
+						return [Number(line.slice(0, space)), kind, id]
+					}),
+			).toEqual([
+				[1, 'character', 'guide'],
+				[2, 'glossary', 'key'],
+				[3, 'glossary', 'seal'],
+			])
 			return selectionFixture(input, init)
 		})
 		const result = await synthesizeVolume(project, 'v1', chapters, {
 			...args,
 			fetch,
 		})
-		expect(selectors).toEqual(
-			version === 'current' ? ['glossary'] : ['character', 'glossary'],
-		)
 		expect(result.biblePatch.map(({ entry }) => entry.id)).toEqual(['guide'])
 		expect(result.glossaryPatch.map(({ id }) => id)).toEqual(['seal'])
 		expect(
 			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
 		).toEqual(result)
-		expect(fetch).toHaveBeenCalledTimes(version === 'current' ? 1 : 2)
+		expect(fetch).toHaveBeenCalledTimes(version === 'current' ? 0 : 1)
 	},
 )
 
@@ -1014,7 +1048,7 @@ test.each([false, true])(
 			expect(checkpoint).toMatchObject({
 				ready: true,
 				applied: false,
-				selections: [[1], [2]],
+				selections: [[1, 3]],
 			})
 			expect(selectedPatch?.biblePatch.map(({ entry }) => entry.id)).toEqual([
 				'guide',
@@ -1505,6 +1539,8 @@ test('automatic fallback streams all preview packets without truncation', async 
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const request = new Request(input, init)
 		const body = await request.clone().json()
+		const candidates = candidatePositions(body.messages[0].content)
+		if (candidates) return stream({ keep: candidates })
 		const history = /^Recent event summaries: (.+)$/m.exec(
 			body.messages[0].content,
 		)?.[1]

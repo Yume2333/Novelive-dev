@@ -18,11 +18,11 @@ export function checkOwnerBookResumePrompt(
 			)
 				return 'extraction'
 		} else if (
-			/^These \w+ candidates were extracted packet by packet from this volume, .* Return keep as the numbers of the kept candidates\.$/m.test(
+			/^Select from these canonical candidates across the whole volume\. .* Return keep as the numbers of the kept candidates\.$/m.test(
 				prompt,
 			) &&
 			/^Chapter progress:$/m.test(prompt) &&
-			/^Candidates:\n1 \{/m.test(prompt)
+			/^Candidates:\n[1-9]\d* \{/m.test(prompt)
 		)
 			return 'selection'
 	}

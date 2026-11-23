@@ -135,6 +135,11 @@ const selectionKinds = [
 	'style',
 ] as const
 
+export type SelectionGroup = {
+	kind: (typeof selectionKinds)[number] | 'glossary'
+	entries: readonly { id: string }[]
+}
+
 function groupRelationAdditions(additions: BiblePatch) {
 	const groups = new Map<string, BiblePatch>()
 	for (const item of additions) {
@@ -233,68 +238,86 @@ export function deduplicateNewTerms(
 }
 
 /**
- * Lets `choose` keep a subset of each kind's additions, then removes changes
+ * Lets `choose` compare all additions, then removes changes
  * and references that only pointed at a dropped addition.
  */
 export async function selectAdditions(
 	patch: BiblePatch,
 	glossary: GlossaryPatch,
 	bible: Awaited<ReturnType<typeof readBible>>,
-	choose: (
-		kind: string,
-		candidates: readonly unknown[],
-	) => Promise<Set<number>>,
+	choose: (groups: readonly SelectionGroup[]) => Promise<Set<number>>,
 ) {
-	let selected = patch
+	const groups: SelectionGroup[] = []
 	for (const kind of selectionKinds) {
-		const proposed = selected.filter((item) => item.kind === kind)
+		const proposed = patch.filter((item) => item.kind === kind)
 		const additions = proposed.filter(({ op }) => op === 'add')
-		if (additions.length < 2) continue
-		const candidates = selectionCandidates(
-			proposed,
-			kind === 'relation' ? groupRelationAdditions(additions) : additions,
-		)
-		const kept = await choose(kind, candidates)
-		const dropped = new Set(
-			candidates.flatMap(({ id }, i) => (kept.has(i) ? [] : [id])),
+		if (!additions.length) continue
+		groups.push({
+			kind,
+			entries: selectionCandidates(
+				proposed,
+				kind === 'relation' ? groupRelationAdditions(additions) : additions,
+			),
+		})
+	}
+	const uniqueGlossary = deduplicateNewTerms(glossary, bible.glossary)
+	const existingTerms = new Set(bible.glossary.map(({ id }) => id))
+	const terms = uniqueGlossary.filter(({ id }) => !existingTerms.has(id))
+	if (terms.length) groups.push({ kind: 'glossary', entries: terms })
+	if (!groups.length)
+		return { biblePatch: patch, glossaryPatch: uniqueGlossary }
+	const kept = await choose(groups)
+	const dropped = new Map<SelectionGroup['kind'], Set<string>>()
+	const gone = new Map<SelectionGroup['kind'], Set<string>>()
+	const keptTerms = new Set<(typeof terms)[number]>()
+	let position = 0
+	for (const { kind, entries } of groups) {
+		if (kind === 'glossary') {
+			for (const term of terms) if (kept.has(++position)) keptTerms.add(term)
+			continue
+		}
+		const rejected = new Set(
+			entries.flatMap(({ id }) => (kept.has(++position) ? [] : [id])),
 		)
 		const existing = new Set(bible[kind].map(({ id }) => id))
-		const gone = new Set([...dropped].filter((id) => !existing.has(id)))
-		selected = selected.flatMap((item): BiblePatch => {
-			if (item.kind === kind && item.op === 'add' && dropped.has(item.entry.id))
+		dropped.set(kind, rejected)
+		gone.set(kind, new Set([...rejected].filter((id) => !existing.has(id))))
+	}
+	const missingCharacters = gone.get('character')
+	return {
+		biblePatch: patch.flatMap((item): BiblePatch => {
+			const { kind, op, entry } = item
+			if (
+				(op === 'add' && dropped.get(kind)?.has(entry.id)) ||
+				gone.get(kind)?.has(entry.id)
+			)
 				return []
-			if (item.kind === kind && gone.has(item.entry.id)) return []
-			if (kind !== 'character') return [item]
-			if (item.kind === 'relation')
-				return gone.has(item.entry.from) || gone.has(item.entry.to)
-					? []
-					: [item]
-			if (item.kind === 'character' && item.entry.addresses)
+			if (
+				item.kind === 'relation' &&
+				(missingCharacters?.has(item.entry.from) ||
+					missingCharacters?.has(item.entry.to))
+			)
+				return []
+			if (
+				item.kind === 'character' &&
+				item.entry.addresses &&
+				missingCharacters?.size
+			)
 				return [
 					{
 						...item,
 						entry: {
 							...item.entry,
 							addresses: item.entry.addresses.filter(
-								({ speakerId }) => !gone.has(speakerId),
+								({ speakerId }) => !missingCharacters.has(speakerId),
 							),
 						},
 					} as typeof item,
 				]
 			return [item]
-		})
-	}
-	const uniqueGlossary = deduplicateNewTerms(glossary, bible.glossary)
-	const terms = uniqueGlossary.filter(
-		({ id }) => !bible.glossary.some((term) => term.id === id),
-	)
-	if (terms.length < 2)
-		return { biblePatch: selected, glossaryPatch: uniqueGlossary }
-	const kept = await choose('glossary', terms)
-	return {
-		biblePatch: selected,
+		}),
 		glossaryPatch: uniqueGlossary.filter(
-			(term) => !terms.includes(term) || kept.has(terms.indexOf(term)),
+			(term) => existingTerms.has(term.id) || keptTerms.has(term),
 		),
 	}
 }
