@@ -159,6 +159,6 @@ export function placeholder(kind: 'character' | 'location' | 'cg') {
 			: kind === 'location'
 				? '<path d="M-56 36l38-58 22 28 18-21 34 51z"/><circle cx="30" cy="-32" r="10"/>'
 				: '<path d="M-52-37h104v74H-52z"/><path d="M-14-19l35 19-35 19z" fill="#5b5b5b"/>'
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect x="${portrait ? 80 : 0}" y="${portrait ? 80 : 0}" width="${width - (portrait ? 160 : 0)}" height="${height - (portrait ? 160 : 0)}" fill="#5b5b5b" rx="${portrait ? 40 : 0}"/><g transform="translate(${width / 2} ${height / 2 - 45})" fill="#ddd">${icon}</g><text x="50%" y="${height / 2 + 82}" text-anchor="middle" font-family="sans-serif" font-size="52" fill="#eee">需要处理</text></svg>`
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect x="${portrait ? 80 : 0}" y="${portrait ? 80 : 0}" width="${width - (portrait ? 160 : 0)}" height="${height - (portrait ? 160 : 0)}" fill="#5b5b5b" rx="${portrait ? 40 : 0}"/><g transform="translate(${width / 2} ${height / 2 - 45})" fill="#ddd">${icon}</g><text x="50%" y="${height / 2 + 82}" text-anchor="middle" font-family="PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans CJK SC, Source Han Sans SC, WenQuanYi Micro Hei, sans-serif" font-size="52" fill="#eee">需要处理</text></svg>`
 	return sharp(Buffer.from(svg)).webp({ quality: 90 }).toBuffer()
 }

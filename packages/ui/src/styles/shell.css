@@ -17,6 +17,20 @@ body {
 	font: 14px / 1.5 var(--font-body);
 }
 
+button,
+input,
+textarea,
+select {
+	font: inherit;
+}
+
+pre,
+code,
+kbd,
+samp {
+	font-family: var(--font-mono);
+}
+
 :focus-visible {
 	outline: 2px solid var(--color-outline);
 	outline-offset: 2px;

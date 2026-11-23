@@ -117,7 +117,7 @@
   background: rgba(14,19,25,0.92);
   border: 1px solid color-mix(in srgb, var(--nl-accent) 30%, transparent);
   color: var(--nl-text);
-  font-family: 'Noto Serif SC','Source Han Serif SC',serif;
+  font-family: var(--font-body);
   font-size: 12px;
   letter-spacing: 0.1em;
   white-space: nowrap;
