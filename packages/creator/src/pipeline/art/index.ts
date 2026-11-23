@@ -1,11 +1,9 @@
-import { isDeepStrictEqual } from 'node:util'
 import { arr, bool, obj, oneOf, str } from '@earendil-works/pi-schema'
 import {
 	type AssetRegistry,
 	type ChapterRef,
 	formatVersion,
 	type ImageJobResult,
-	overlayEntries,
 	type ProjectScope,
 	projectFiles,
 	type Style,
@@ -14,7 +12,8 @@ import sharp from 'sharp'
 import { type ImageConfig, imageProvider, imageSize } from '../../models/image'
 import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
-import { optionalFile, resolveRegistry } from '../../project/series/resolve'
+import { resolveRegistry } from '../../project/series/resolve'
+import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
 import { checkImage, type Dimensions, placeholder } from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
@@ -85,19 +84,7 @@ export class ArtProduction {
 	}
 
 	private async persistRegistry(registry: AssetRegistry) {
-		const local = await optionalFile(() => this.project.read(this.registryFile))
-		const resolved = await this.registry()
-		const changed = registry.entries.filter(
-			(entry) =>
-				!isDeepStrictEqual(
-					entry,
-					resolved.entries.find((existing) => existing.id === entry.id),
-				),
-		)
-		await this.project.write(this.registryFile, {
-			formatVersion,
-			entries: overlayEntries(local?.entries ?? [], changed),
-		})
+		await persistOwnedEntries(this.project, this.options.readScope ?? this.scope, this.scope, projectFiles.assetRegistry, registry.entries)
 	}
 
 	async register(
@@ -162,7 +149,7 @@ export class ArtProduction {
 	}
 
 	private writeRegistry<T>(operation: () => Promise<T>) {
-		const key = `${this.project.root}/${this.registryFile.path}`
+		const key = this.project.root
 		const previous = registryWrites.get(key)
 		const task = previous ? previous.then(operation, operation) : operation()
 		registryWrites.set(key, task)
@@ -603,8 +590,9 @@ export class ArtProduction {
 			},
 		)
 		const references: NonNullable<Style['references']> = []
+		const styleScope = await entryOwner(this.project, this.options.readScope ?? this.scope, this.scope, projectFiles.style, style.id)
 		for (const [i, source] of [main, ...supplemental].entries()) {
-			const path = this.scoped(
+			const path = projectFiles.style(styleScope).path.replace('bible/style.json',
 				i === 0
 					? 'assets/style/main-visual.webp'
 					: `assets/style/supplemental-${i}.webp`,
@@ -643,17 +631,7 @@ export class ArtProduction {
 			await this.persistRegistry(registry)
 		})
 		const chosen: Style = { ...style, status: 'confirmed', references }
-		const file = projectFiles.style(this.scope)
-		let entries: Style[] = []
-		try {
-			entries = (await this.project.read(file)).entries
-		} catch (error) {
-			if (!isMissing(error)) throw error
-		}
-		await this.project.write(file, {
-			formatVersion,
-			entries: [...entries.filter((entry) => entry.id !== chosen.id), chosen],
-		})
+		await this.writeRegistry(() => persistOwnedEntries(this.project, this.options.readScope ?? this.scope, this.scope, projectFiles.style, [chosen]))
 		return chosen
 	}
 }

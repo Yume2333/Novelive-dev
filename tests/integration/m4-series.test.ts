@@ -2,10 +2,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, test, vi } from 'vitest'
+import sharp from 'sharp'
 import { ArtProduction } from '../../packages/creator/src/pipeline/art'
 import { writeChapter } from '../../packages/creator/src/pipeline/writing'
 import { Project } from '../../packages/creator/src/project'
 import { productionBible } from '../../packages/creator/src/project/production-worker'
+import { loadPlayerChapter } from '../../packages/creator/src/project/player'
 import {
 	joinSeries,
 	resolveSeries,
@@ -482,4 +484,33 @@ test('synthesis validates relation references against work-level characters', as
 	})
 	expect(fetch).toHaveBeenCalledTimes(1)
 	expect(result.biblePatch[0].entry.id).toBe('meeting')
+})
+
+test('production updates the effective asset and style owners without hiding artwork from playback', async () => {
+	using p = await project()
+	const joined = await joinSeries(p, book)
+	const scope = { level: 'work', volumeId: joined.volumeId, workId: joined.workId } as const
+	const baseStyle = { id: 'style', status: 'confirmed' as const, description: 'Series style' }
+	const workStyle = { id: 'style', status: 'candidate' as const, description: 'Work style' }
+	await p.write(projectFiles.style(series), { formatVersion: 1, entries: [baseStyle] })
+	await p.write(projectFiles.style(scope), { formatVersion: 1, entries: [workStyle] })
+	const asset = { id: 'room/day', type: 'location' as const, path: 'assets/work-room.webp', status: 'pending' as const, aliases: [] }
+	await p.write(projectFiles.assetRegistry(scope), { formatVersion: 1, entries: [asset] })
+	const pixels = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#223344' } }).webp().toBuffer()
+	await p.writeFile(asset.path, pixels)
+	await p.writeFile('source/visual.webp', pixels)
+	const { art } = await productionBible(p, joined.volumeId, joined.workId)
+	const service = new ArtProduction(p, { readScope: scope, resolution: '2K', main: connection, fast: connection, visual: connection, image: { baseUrl: 'https://relay.invalid/v1', apiKey: 'offline', model: 'fixture-image', concurrency: 1, retries: 0, quality: 'low', nativeMaxEdge: 1536, postProcess: 'off', upscaleTier: 'anime' } })
+	const jobs = await service.register([{ id: asset.id, kind: 'location', description: 'A room' }], art)
+	await service.draw(jobs[0], art)
+	expect((await p.read(projectFiles.assetRegistry(scope))).entries[0].status).toBe('drawn')
+	const playback = await loadPlayerChapter(p.root, joined.workId, join(p.root, 'cache'))
+	expect(playback.registry.entries[0].status).toBe('drawn')
+	expect(playback.registry.entries[0].path).not.toContain('unavailable')
+	await service.confirmVisual(workStyle, { mainVisuals: [{ id: 'main', cachePath: 'source/visual.webp' }], supplemental: [], characters: [] }, { mainVisualId: 'main', supplementalIds: [], characters: [] })
+	expect((await p.read(projectFiles.style(series))).entries).toEqual([baseStyle])
+	const confirmedStyle = (await p.read(projectFiles.style(scope))).entries[0]
+	expect(confirmedStyle.status).toBe('confirmed')
+	expect(confirmedStyle.description).toBe('Work style')
+	expect(confirmedStyle.references?.[0].path).toContain(`volumes/${joined.volumeId}/works/${joined.workId}/`)
 })
