@@ -161,6 +161,20 @@ test('does not send invented chapter context for unplaced images', async () => {
 	expect(prompt).toContain('"nearby":""')
 })
 
+test('does not promote subsection or non-chapter headings', async () => {
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/nav.xhtml': undefined,
+			'OPS/toc.ncx': undefined,
+			'OPS/chapter.xhtml': xhtml(
+				'<h2>Reading notes</h2><p>One.</p><h4>Chapter detail</h4><p>Two.</p>',
+			),
+		}),
+	)
+	expect(book.navigation).toBe('spine')
+	expect(book.volumes[0].chapters).toHaveLength(1)
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)
@@ -249,16 +263,16 @@ test('preserves preface and splits nested NCX volume leaves', async () => {
 	})
 })
 
-test('accepts standard XHTML doctypes and lower-level headings', async () => {
+test('accepts standard XHTML doctypes', async () => {
 	const { book } = await extractEpub(
 		await epub({
 			'OPS/nav.xhtml': undefined,
 			'OPS/toc.ncx': undefined,
-			'OPS/chapter.xhtml': `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">${xhtml('<h4>Small heading</h4>')}`,
+			'OPS/chapter.xhtml': `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">${xhtml('<h1>Chapter One</h1>')}`,
 		}),
 	)
 	expect(book.navigation).toBe('heading')
-	expect(book.volumes[0].chapters[0].title).toBe('Small heading')
+	expect(book.volumes[0].chapters[0].title).toBe('Chapter One')
 })
 
 test('spine order, not manifest or navigation order, determines text order across documents', async () => {

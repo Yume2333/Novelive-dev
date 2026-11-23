@@ -150,7 +150,14 @@ function document(path: string, root: Element): Document {
 				.split(/\n+/)
 				.map((value) => value.replace(/\s+/g, ' ').trim())
 				.filter(Boolean))
-				blocks.push({ text: paragraph, heading: /^h[1-6]$/.test(node.name) })
+				blocks.push({
+					text: paragraph,
+					heading:
+						/^h[12]$/.test(node.name) &&
+						/^(?:第.{1,12}[章节回卷]|chapter\b|序|楔子|尾[聲声]|番外|后[記记])/i.test(
+							paragraph,
+						),
+				})
 			for (const image of [...all(node, 'img'), ...all(node, 'image')])
 				visit(image)
 			return
