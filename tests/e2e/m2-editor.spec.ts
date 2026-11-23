@@ -267,6 +267,7 @@ test.describe('contract-render', () => {
 		const workId = ${JSON.stringify(playerWorkId)};
 		let chapter = {workId, chapterId:'ch1', revision:'r1', title:'固定编辑章', paragraphs:[{id:'p0001',text:'空屋原文。'},{id:'p0002',text:'门外原文。'}], scenes:[{sceneId:'aaaabbbb',sourceIds:['p0001'],nvs:${JSON.stringify(firstScene)}},{sceneId:'ccccdddd',sourceIds:['p0002'],nvs:${JSON.stringify(secondScene)}}], markSuggestions:[{id:'mark1',name:'glow',css:'color: var(--color-primary)',perChar:false},{id:'mark2',name:'shade',css:'opacity: 0.5',perChar:true}]};
 		if (window.fixtureMode === 'empty') chapter.scenes = [];
+		if (window.fixtureMode === 'crlf') chapter.scenes.forEach(scene => scene.nvs = scene.nvs.replaceAll(${JSON.stringify('\n')}, ${JSON.stringify('\r\n')}));
 		let history = [], revision = 1;
 		window.fixtureCalls = [];
 		window.novelive = {call(command, input) {
@@ -318,7 +319,7 @@ test.describe('contract-render', () => {
 			.join('\n')
 	})
 
-	for (const mode of ['normal', 'empty', 'failure', 'stale']) {
+	for (const mode of ['normal', 'empty', 'failure', 'stale', 'crlf']) {
 		test(`M2 editor contract fixture ${mode}`, async () => {
 			const profile = await mkdtemp(
 				join(tmpdir(), 'novelive-editor-component-'),
@@ -353,6 +354,16 @@ test.describe('contract-render', () => {
 				}
 				if (mode === 'failure') {
 					await expect(page.getByRole('alert')).toHaveText('版本已改变')
+					return
+				}
+				if (mode === 'crlf') {
+					await expect(
+						page.getByRole('textbox', { name: 'NVS 剧本' }),
+					).toContainText('第一句。')
+					await expect(
+						page.getByRole('button', { name: '保存当前句' }),
+					).toBeDisabled()
+					await editAndPreview(page)
 					return
 				}
 				if (mode === 'stale') {

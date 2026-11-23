@@ -38,7 +38,9 @@ export function EditorPage() {
 	const sourceViewport = useRef<HTMLDivElement>(null)
 	const chapter = opening?.chapter
 	const scene = chapter?.scenes[sceneIndex]
-	const dirty = !!scene && draft !== scene.nvs
+	const dirty =
+		!!scene &&
+		draft.replace(/\r\n?/g, '\n') !== scene.nvs.replace(/\r\n?/g, '\n')
 	useEffect(() => {
 		if (source && scene)
 			sourceViewport.current
@@ -128,8 +130,8 @@ export function EditorPage() {
 	}
 	async function save() {
 		if (!target || !scene) return
-		const previous = scene.nvs.split('\n')
-		const next = draft.split('\n')
+		const previous = scene.nvs.split(/\r\n?|\n/)
+		const next = draft.split(/\r\n?|\n/)
 		const changed = next.flatMap((value, index) =>
 			value !== previous[index] ? [index] : [],
 		)
