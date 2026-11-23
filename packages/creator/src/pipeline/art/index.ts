@@ -606,17 +606,26 @@ export class ArtProduction {
 			this.options.imageGenerationReplay,
 		)
 		const render = this.render
-		const references = drawing.references.slice(0, 16)
-		const auditRefs = await Promise.all(
-			references.map(async (ref, i) => {
-				const image = sharp(await this.project.readFile(ref.path))
-				return (
-					derived && i === 0 ? image.resize({ ...target, fit: 'fill' }) : image
-				)
-					.png()
-					.toBuffer()
-			}),
-		)
+		const availableReferences = (
+			await Promise.all(
+				drawing.references.slice(0, 16).map(async (ref, i) => {
+					const bytes = await (ref.role === 'style'
+						? this.file(ref.path)
+						: this.project.readFile(ref.path))
+					if (!bytes) return undefined
+					const image = sharp(bytes)
+					const png = await (derived && i === 0
+						? image.resize({ ...target, fit: 'fill' })
+						: image
+					)
+						.png()
+						.toBuffer()
+					return { ref, png }
+				}),
+			)
+		).filter((reference) => reference !== undefined)
+		const references = availableReferences.map(({ ref }) => ref)
+		const auditRefs = availableReferences.map(({ png }) => png)
 		const auditDrawing = { ...drawing, references }
 		const expression = drawing.kind === 'expression'
 		const forGeneration = generationReferenceFilter(auditDrawing)

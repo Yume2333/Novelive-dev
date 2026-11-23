@@ -504,11 +504,24 @@ parent.once('message', ({ ports }) => {
 			)
 			response = { type: 'result', generation, requestId, result }
 		} catch (error) {
+			const failure = creatorCommandError(error)
+			if (
+				data.command === 'production.get' &&
+				failure.code === 'internal' &&
+				error instanceof Error
+			)
+				console.error('production.get failed', {
+					name: error.name,
+					code: 'code' in error ? error.code : undefined,
+					stack: error.stack
+						?.split('\n')
+						.filter((line) => line.startsWith('    at ')),
+				})
 			response = {
 				type: 'error',
 				generation,
 				requestId,
-				error: creatorCommandError(error),
+				error: failure,
 			}
 		}
 		if (!controller.signal.aborted) {
