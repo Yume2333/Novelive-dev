@@ -94,6 +94,7 @@ export function ScriptEditor({
 			selection: { anchor: line.from },
 			effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
 		})
+		editor.focus()
 	}, [position])
 	useEffect(() => {
 		const editor = view.current

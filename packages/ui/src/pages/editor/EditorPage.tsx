@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
 import { ScrollArea } from '../../components/ScrollArea'
+import { JumpPoints } from './JumpPoints'
 import { ScriptEditor } from './ScriptEditor'
 import '../player/player.css'
 import './editor.css'
@@ -425,30 +426,13 @@ export function EditorPage() {
 											))}
 										</select>
 									</label>
-									<label>
-										快捷位置
-										<select
-											aria-label="快捷位置"
-											value=""
-											onChange={(event) => {
-												const line = Number(event.target.value)
-												setPosition((value) => ({ line, key: value.key + 1 }))
-											}}
-										>
-											<option value="">跳转到句子</option>
-											{draft.split('\n').map(
-												(value, index) =>
-													/ #[0-9a-f]{4}\s*$/.test(value) && (
-														<option
-															key={value.match(/ #([0-9a-f]{4})\s*$/)?.[1]}
-															value={index + 1}
-														>
-															{index + 1} · {value}
-														</option>
-													),
-											)}
-										</select>
-									</label>
+									<JumpPoints
+										script={draft}
+										disabled={busy}
+										onJump={(line) =>
+											setPosition((value) => ({ line, key: value.key + 1 }))
+										}
+									/>
 								</div>
 								<div className="editor-columns">
 									<ScriptEditor

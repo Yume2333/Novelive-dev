@@ -89,6 +89,37 @@
 	display: none;
 }
 
+.editor-jumps {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.editor-jump-menu {
+	position: fixed;
+	inset: auto;
+	width: min(30rem, calc(100vw - var(--space-8)));
+	margin: 0;
+	padding: var(--space-2);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-lg);
+	background: var(--veil-95);
+	color: var(--color-on-surface);
+	box-shadow: var(--shadow-glass);
+}
+
+.editor-jump-scroll {
+	height: min(16rem, 40vh);
+}
+
+.editor-workbench .editor-jump-item {
+	display: block;
+	width: 100%;
+	border: 0;
+	text-align: left;
+	overflow-wrap: anywhere;
+}
+
 .editor-code .cm-focused {
 	outline: none;
 	box-shadow: var(--shadow-focus);

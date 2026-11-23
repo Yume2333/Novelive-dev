@@ -27,6 +27,11 @@ const firstScene =
 	'scene 空屋\nsource p0001\n: 第一句。 #0001\n: 第二句。 #0002\n'
 const secondScene = 'scene 门外\nsource p0002\n: 门外的风。 #0003\n'
 
+async function jumpTo(page: Page, line: number | string) {
+	await page.getByRole('button', { name: '快捷位置', exact: true }).click()
+	await page.getByRole('menuitem', { name: new RegExp(`^${line} ·`) }).click()
+}
+
 async function editAndPreview(page: Page, secondLine = 4) {
 	await expect(
 		page.getByRole('heading', { name: '编辑器', exact: true }),
@@ -35,9 +40,7 @@ async function editAndPreview(page: Page, secondLine = 4) {
 		'第一句。',
 	)
 	const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
-	await page
-		.getByLabel('快捷位置', { exact: true })
-		.selectOption(String(secondLine))
+	await jumpTo(page, secondLine)
 	await editor.press('End')
 	await page.keyboard.insertText(' ')
 	await page.getByRole('button', { name: '保存当前句' }).click()
@@ -56,9 +59,7 @@ async function editAndPreview(page: Page, secondLine = 4) {
 	await expect(
 		page.getByRole('button', { name: 'p0001 · 空屋原文。' }),
 	).toHaveAttribute('aria-pressed', 'true')
-	await page
-		.getByLabel('快捷位置', { exact: true })
-		.selectOption(String(secondLine))
+	await jumpTo(page, secondLine)
 	await expect(
 		page.getByText(`当前行 ${secondLine}`, { exact: true }),
 	).toBeVisible()
@@ -75,9 +76,7 @@ async function editAndPreview(page: Page, secondLine = 4) {
 	await expect(page.locator('.nl-player-text')).toHaveText('改过的第二句。')
 	await page.getByRole('button', { name: '撤销', exact: true }).click()
 	await expect(editor).not.toContainText('改过的')
-	await page
-		.getByLabel('快捷位置', { exact: true })
-		.selectOption(String(secondLine))
+	await jumpTo(page, secondLine)
 	await page.getByRole('button', { name: '从当前句预览' }).click()
 	await expect(page.locator('.nl-player-text')).toHaveText('第二句。')
 	await mkdir(evidence, { recursive: true })
@@ -280,6 +279,7 @@ test.describe('contract-render', () => {
 		if (window.fixtureMode === 'crlf') chapter.scenes.forEach(scene => scene.nvs = scene.nvs.replaceAll(${JSON.stringify('\n')}, ${JSON.stringify('\r\n')}));
 		if (window.fixtureMode === 'leading') chapter.scenes.forEach(scene => scene.nvs = ${JSON.stringify('\n\n')} + scene.nvs);
 		if (window.fixtureMode === 'effects') chapter.scenes[0].nvs = ${JSON.stringify('scene 空屋\nsource p0001\n  @caption 标题 wait #0001\n\t:旁白 #0002\n:你好 #0003\n  hero (inner) as 来客:\t你好 #0004\n')};
+		if (window.fixtureMode === 'long') chapter.scenes[0].nvs = ${JSON.stringify(`scene 空屋\nsource p0001\n${Array.from({ length: 34 }, (_, i) => `: 第${i + 1}句。 #${(i + 1).toString(16).padStart(4, '0')}`).join('\n')}\n`)};
 		let history = [], revision = 1;
 		window.fixtureCalls = [];
 		window.novelive = {call(command, input) {
@@ -339,6 +339,7 @@ test.describe('contract-render', () => {
 		'crlf',
 		'leading',
 		'effects',
+		'long',
 	]) {
 		test(`M2 editor contract fixture ${mode}`, async () => {
 			const profile = await mkdtemp(
@@ -376,6 +377,40 @@ test.describe('contract-render', () => {
 					await expect(page.getByRole('alert')).toHaveText('版本已改变')
 					return
 				}
+				if (mode === 'long') {
+					const trigger = page.getByRole('button', {
+						name: '快捷位置',
+						exact: true,
+					})
+					await trigger.click()
+					const menu = page.getByRole('menu', { name: '快捷位置', exact: true })
+					await expect(menu.getByRole('menuitem')).toHaveCount(34)
+					const viewport = menu.locator('[data-scroll-viewport]')
+					await expect(viewport).toHaveCSS('scrollbar-width', 'none')
+					expect(
+						await viewport.evaluate((el) => el.scrollHeight > el.clientHeight),
+					).toBe(true)
+					await expect(menu.locator('[data-active]')).toHaveCount(1)
+					await page.keyboard.press('End')
+					await expect(menu.getByRole('menuitem').last()).toBeFocused()
+					await page.keyboard.press('Enter')
+					await expect(
+						page.getByText('当前行 36', { exact: true }),
+					).toBeVisible()
+					await expect(menu).not.toBeVisible()
+					await trigger.press('ArrowDown')
+					await expect(menu.getByRole('menuitem').first()).toBeFocused()
+					await page.keyboard.press('Escape')
+					await expect(trigger).toBeFocused()
+					await trigger.click()
+					await menu.getByRole('menuitem').last().scrollIntoViewIfNeeded()
+					await page.screenshot({ path: `${evidence}/05-editor-jump-menu.png` })
+					await menu.getByRole('menuitem').last().click()
+					await expect(
+						page.getByText('当前行 36', { exact: true }),
+					).toBeVisible()
+					return
+				}
 				if (mode === 'effects') {
 					const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
 					await expect(editor).toContainText('标题')
@@ -385,9 +420,7 @@ test.describe('contract-render', () => {
 						['5', ':{em}{/em}你好 #0003'],
 						['6', '  hero (inner) as 来客:\t{em}{/em}你好 #0004'],
 					]) {
-						await page
-							.getByLabel('快捷位置', { exact: true })
-							.selectOption(line)
+						await jumpTo(page, line)
 						await page
 							.getByRole('button', { name: '强调', exact: true })
 							.click()
@@ -426,9 +459,7 @@ test.describe('contract-render', () => {
 						['5', '第一句。'],
 						['6', '第二句。'],
 					]) {
-						await page
-							.getByLabel('快捷位置', { exact: true })
-							.selectOption(line)
+						await jumpTo(page, line)
 						await page.getByRole('button', { name: '从当前句预览' }).click()
 						await expect(page.locator('.nl-player-text')).toHaveText(text)
 					}
@@ -450,7 +481,7 @@ test.describe('contract-render', () => {
 				if (mode === 'stale') {
 					const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
 					await expect(editor).toContainText('第一句。')
-					await page.getByLabel('快捷位置', { exact: true }).selectOption('3')
+					await jumpTo(page, 3)
 					await editor.press('End')
 					await editor.press('Home')
 					await editor.press('ArrowRight')
@@ -471,7 +502,7 @@ test.describe('contract-render', () => {
 				await expect(
 					page.getByRole('region', { name: '新标记提议' }),
 				).toHaveCount(0)
-				await page.getByLabel('快捷位置', { exact: true }).selectOption('3')
+				await jumpTo(page, 3)
 				await page.getByRole('button', { name: '强调', exact: true }).click()
 				await expect(
 					page.getByRole('textbox', { name: 'NVS 剧本' }),
