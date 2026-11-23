@@ -191,7 +191,7 @@ test('consolidates repeated candidate additions across events and remaps referen
 		const first = calls++ === 0
 		const candidate = first
 			? guide
-			: { ...guide, id: 'lin', name: 'Ｌｉｎ', aliases: ['Navigator'] }
+			: { ...guide, id: 'lin', name: 'Ｌｉｎ', aliases: ['Guide', 'Navigator'] }
 		const result = {
 			overview: 'A journey',
 			chapters: [
