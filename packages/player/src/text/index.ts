@@ -180,10 +180,12 @@ export function mountText(
 	return {
 		finished,
 		click() {
-			if (revealed < glyphs.length || trailingPending) {
-				pause = 0
-				trailingPending = false
-				revealed = glyphs.length
+			if (revealed < ends[page] || (page === ends.length - 1 && trailingPending)) {
+				if (page === ends.length - 1) {
+					pause = 0
+					trailingPending = false
+				}
+				revealed = ends[page]
 				schedule()
 				return true
 			}
