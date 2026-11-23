@@ -205,8 +205,9 @@ export class CreativeRevisions {
 		chapterId: string
 		expectedRevision: string
 	}) {
-		await this.currentChapter(input)
-		return this.worker.redo(input.chapterId)
+		return this.editor.whileCurrent(input, () =>
+			this.worker.redo(input.chapterId),
+		)
 	}
 
 	chapterRevision(chapterId: string) {
@@ -217,17 +218,6 @@ export class CreativeRevisions {
 
 	async imageRevision(assetId: string) {
 		return (await this.imageState(assetId)).revision
-	}
-
-	private async currentChapter(input: {
-		workId: string
-		chapterId: string
-		expectedRevision: string
-	}) {
-		const snapshot = await this.editor.snapshot(input)
-		if (snapshot.revision !== input.expectedRevision)
-			throw stale('章节已改变，请刷新后重试。')
-		return snapshot
 	}
 
 	private async currentScene(request: RewriteRequest) {
@@ -368,10 +358,13 @@ function applyHunks(nvs: string, hunks: readonly Hunk[]) {
 			return position
 		})
 		const first = index.values().next().value
-		const target =
-			positions[0] ??
-			(hunk.afterLineId !== null ? at(hunk.afterLineId) + 1 : (first ?? end))
-		inserts.set(target, [...(inserts.get(target) ?? []), ...hunk.after])
+		const insertAt =
+			hunk.afterLineId !== null ? at(hunk.afterLineId) + 1 : (first ?? end)
+		// Replacements take the removed lines' places so stage cues between them stay put.
+		for (const [k, line] of hunk.after.entries()) {
+			const target = positions[Math.min(k, positions.length - 1)] ?? insertAt
+			inserts.set(target, [...(inserts.get(target) ?? []), line])
+		}
 	}
 	const output: string[] = []
 	for (let i = 0; i <= raw.length; i++) {

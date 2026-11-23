@@ -92,6 +92,19 @@ export class ProjectEditor {
 		})
 	}
 
+	/** Runs `run` under the edit lock only while the chapter still has `expectedRevision`. */
+	whileCurrent<T>(
+		input: { workId: string; chapterId: string; expectedRevision: string },
+		run: () => Promise<T>,
+	): Promise<T> {
+		return withProjectEdits(this.project, async () => {
+			this.checkWork(input.workId)
+			const model = await this.loadChapter(input.chapterId)
+			this.checkRevision(model.snapshot, input.expectedRevision)
+			return run()
+		})
+	}
+
 	/** The chapter snapshot with one scene compiled against the project's assets. */
 	compiledScene(input: CommandInput<'editor.open'>, sceneId: string) {
 		return withProjectEdits(this.project, async () => {
@@ -99,14 +112,11 @@ export class ProjectEditor {
 			const model = await this.loadChapter(input.chapterId)
 			const index = model.scripts.findIndex((s) => s.sceneId === sceneId)
 			if (index < 0) throw { code: 'not_found', message: '找不到场景。' }
-			const [compiled] = compileEditorScript(
-				[model.scripts[index]],
-				model.options,
-			)
+			const compiled = compileEditorScript(model.scripts, model.options)
 			return {
 				snapshot: model.snapshot,
 				scene: model.snapshot.scenes[index],
-				compiled: compiled.scene,
+				compiled: compiled[index].scene,
 			}
 		})
 	}
