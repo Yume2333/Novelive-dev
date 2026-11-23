@@ -36,3 +36,33 @@ until it is reconciled.
 
 No book content, credentials, relay address, prompts, provider responses,
 or generated assets are included in this receipt.
+
+Full-artwork follow-up — 2026-11-23
+===================================
+App build: a49c0ed, containing the reservation fix from #81. The same
+public-domain fable was imported in a fresh profile. The first attempt
+stopped before visual confirmation; reopening the project under the
+same budget guard reached visual confirmation and published ch0001.
+
+The guard admitted five vision-audit requests whose serialized bodies
+each exceeded 5 MB; all five returned HTTP 200. The old byte-based
+reservation would have blocked them. Full artwork still did not pass:
+the visual audit rejected the generated base sprite, so the scheduler
+used placeholders for that sprite and four dependent variants. SQLite
+recorded one drawn chapter artwork dependency, five placeholders, and
+ch0001 published with placeholder=1.
+
+Offline playback passed on the saved project. To rerun on the smoke
+machine from the a49c0ed app build's checkout, close the live app and run:
+
+  env -u NL_IMAGE_API_KEY -u NL_IMAGE_BASE_URL -u NL_API_BASE_URL \
+    NL_REPLAY=strict xvfb-run -a node "$HOME/novelive-m4-full-artwork/verify-playback.mjs"
+
+Expected: one published chapter (ch0001, placeholder=1), artwork
+dependencies drawn=1 and placeholder=5, and chapter text and canvas in
+the offline player.
+
+Provider-measured totals across both attempts: 32 calls, 71,610 input
+tokens, 29,906 output tokens (101,516 total), and 7 generated images.
+No unmetered requests from this follow-up remain; the measured usage is
+in the owner's private ledger, not in Git.
