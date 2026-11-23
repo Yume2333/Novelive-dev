@@ -15,6 +15,11 @@ import type { TextConnection } from '../../models/text'
 import { ContextLimitError, fitUnits, promptFits } from './budget'
 import { canonicalNamesBrief } from './locale'
 import {
+	markInstructions,
+	type ProposedMark,
+	splitMarkSuggestions,
+} from './marks'
+import {
 	TruncatedWritingError,
 	textOf,
 	userMessage,
@@ -55,6 +60,7 @@ export type WriterOptions = WritingTransport & {
 	writer: TextConnection
 	reviewer: TextConnection
 	script: Omit<CompileOptions, 'paragraphIds'>
+	proposeMarks?: boolean
 }
 
 const adaptation = {
@@ -297,15 +303,21 @@ export async function writeChapter(
 	const compileOptions = {
 		...options.script,
 		speakers,
+		customMarks: [...(options.script.customMarks ?? [])],
 		paragraphIds: chapter.paragraphs.map(({ id }) => id),
 	}
 	const staged: string[] = []
+	const marks = new Map<string, ProposedMark>()
+	const registered = new Set(compileOptions.customMarks)
 	const paragraphs = chapter.paragraphs
 	if (!paragraphs.length)
 		throw new Error('Writing requires at least one source paragraph')
 	const prompt = (batch: readonly SourceParagraph[]) =>
 		[
 			instructions.instructions,
+			...(options.proposeMarks
+				? [markInstructions(compileOptions.customMarks)]
+				: []),
 			`Previous segment ending (context only): ${staged.at(-1)?.trimEnd().split('\n').at(-1) ?? ''}`,
 			'Source paragraphs:',
 			source(batch),
@@ -346,6 +358,13 @@ export async function writeChapter(
 				throw error
 			return split()
 		}
+		if (options.proposeMarks) {
+			const { script, suggestions } = splitMarkSuggestions(draft)
+			draft = script
+			for (const mark of suggestions)
+				if (!registered.has(mark.name) && !marks.has(mark.name))
+					marks.set(mark.name, mark)
+		}
 		const compiled = await validate(
 			model,
 			draft,
@@ -366,18 +385,19 @@ export async function writeChapter(
 		'Source paragraph adaptation',
 	))
 		await writeBatch(batch)
-	return validate(
+	const compiled = await validate(
 		model,
 		staged.join('\n\n'),
 		compileOptions,
 		paragraphs,
 		instructions,
 	)
+	return { ...compiled, markSuggestions: [...marks.values()] }
 }
 
 export async function reviewChapter(
 	chapter: WritingChapter,
-	draft: Awaited<ReturnType<typeof writeChapter>>,
+	draft: Awaited<ReturnType<typeof validate>>,
 	options: WriterOptions,
 ) {
 	const settings = chapter.settings ?? defaultWorkSettings()
