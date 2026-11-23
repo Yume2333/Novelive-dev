@@ -453,6 +453,12 @@ test('restores a narrow expression crown without accepting clipped bases or shif
 			(await raw(base)).subarray(0, 400 * 4 * 3),
 		)
 	}
+	const flaredHair = 'M193 3h14v4h-14Z'
+	const hairBase = await sprite('M199 1h2v1l5 1h-12l5-1Z', flaredHair)
+	const hairEdit = await sprite('M199 0h2v2l5 1h-12l5-1Z', flaredHair)
+	expect(
+		await checkImage(hairEdit, target, { ...checks, base: hairBase }),
+	).toHaveProperty('png')
 	for (const [input, reference] of [
 		[drift, undefined],
 		[clipped, base],
