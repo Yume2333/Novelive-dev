@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import {
 	arr,
@@ -168,6 +169,21 @@ function recentEvents(events: Event[], historyBudget: number) {
 		remaining -= size
 	}
 	return JSON.stringify(summaries)
+}
+function repeatsPacketEvent(event: Event, packetEvents: Event[]) {
+	const matching = packetEvents.filter(
+		(previous) => previous.event === event.event,
+	)
+	return (
+		matching.length > 0 &&
+		(['chapters', 'biblePatch', 'glossaryPatch'] as const).every((field) =>
+			event[field].every((item) =>
+				matching.some((previous) =>
+					previous[field].some((saved) => isDeepStrictEqual(item, saved)),
+				),
+			),
+		)
+	)
 }
 function proposedEntries(events: Event[], budget: number) {
 	const lines = new Map<string, string>()
@@ -629,6 +645,9 @@ ${nextEvent.instructions}`
 		if (state.events.length >= limit)
 			throw new Error(`Synthesis reached its event limit (${limit})`)
 		const packet = state.packet
+		const packetEvents = state.events.slice(
+			state.events.findLastIndex(({ is_last }) => is_last) + 1,
+		)
 		const event = await request(
 			`${eventPrompt}
 Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Describe a relation as the standing relationship between the pair, naming its kind first, not the scene that shows it. Set is_last when done.
@@ -640,8 +659,10 @@ Chapter previews:
 ${packets[packet]}`,
 			nextEvent,
 			(value: Event) => {
-				if (state.events.some((previous) => previous.event === value.event))
-					throw new Error('Event was already extracted; return a new event')
+				if (!value.is_last && repeatsPacketEvent(value, packetEvents))
+					throw new Error(
+						`This packet already has that event with the same progress and facts. Return the next event with new information, or set is_last if this packet is complete. Repeated event: ${JSON.stringify(value.event)}`,
+					)
 				check(value, state.events)
 				if (value.is_last && packet === packets.length - 1)
 					combine(volumeId, chapterIds, [...state.events, value])

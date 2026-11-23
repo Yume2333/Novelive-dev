@@ -680,6 +680,60 @@ test('a hard stop persists exactly one event and resumes after reopening without
 	}
 })
 
+test('same event wording preserves new facts but a repeat needs progress or packet completion', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const first = {
+		event: 'Ada investigates the tower.',
+		overview: 'An investigation.',
+		chapters: chapters.map((chapterId) => ({
+			chapterId,
+			progress: 'Ada investigates.',
+		})),
+		biblePatch: [{ kind: 'location', op: 'add', entry: candidateTower }],
+		glossaryPatch: [],
+		is_last: false,
+	}
+	const second = {
+		...first,
+		biblePatch: [],
+		glossaryPatch: [
+			{
+				...term,
+				id: 'seal',
+				original: 'Blue Seal',
+				written: 'Blue Seal',
+				status: 'candidate',
+			},
+		],
+	}
+	const replies = [first, second, second, { ...second, is_last: true }]
+	let call = 0
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		call++
+		if (call === 4) {
+			expect(messages[0].content).toContain('Events already extracted: 2')
+			expect(messages[1].content).toContain('or set is_last')
+			expect(messages[1].content).toContain(first.event)
+		}
+		return stream(replies[call - 1])
+	})
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		strategy: 'events',
+		fetch,
+	})
+	expect(fetch).toHaveBeenCalledTimes(4)
+	expect(result.biblePatch).toHaveLength(1)
+	expect(result.glossaryPatch.map(({ id }) => id)).toEqual(['seal'])
+	expect(await project.read(files.checkpoint)).toMatchObject({
+		packet: 1,
+		events: [first, second, { ...second, is_last: true }],
+		applied: true,
+	})
+})
+
 const selectionFixture = async (
 	input: RequestInfo | URL,
 	init?: RequestInit,
