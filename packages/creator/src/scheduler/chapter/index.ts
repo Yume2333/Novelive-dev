@@ -293,6 +293,8 @@ export class ChapterScheduler {
 		if (!task) throw { code: 'not_found', message: '制作队列中找不到这一章' }
 		if (task.status === 'running')
 			throw { code: 'stale_revision', message: '这一章正在制作，请稍后重做' }
+		if (this.work(workId).status === 'awaiting_confirm')
+			throw { code: 'invalid_config', message: '请先处理确认点，再重做章节' }
 		this.transaction(() => {
 			this.exec(
 				`UPDATE task SET status = 'queued', phase = 'queued', attempts = 0, desensitized = 0,
@@ -308,7 +310,14 @@ export class ChapterScheduler {
 			)
 			const work = this.work(workId)
 			if (work.status === 'done') this.requeueWork(workId)
-			else if (work.reason === 'chapter_failed') this.resumeWork(workId)
+			else if (
+				work.reason === 'chapter_failed' &&
+				!this.get(
+					"SELECT 1 FROM task WHERE work_id = ? AND kind = 'chapter' AND status = 'needs_attention'",
+					workId,
+				)
+			)
+				this.resumeWork(workId)
 		})
 		this.pump()
 		return this.snapshot(workId)
