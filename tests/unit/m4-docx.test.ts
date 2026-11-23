@@ -29,6 +29,51 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 }
 
 describe('DOCX extraction', () => {
+	test('resolves relationship targets with case different from their ZIP entries', async () => {
+		const rels = (targets: Record<string, string>) =>
+			`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${Object.entries(
+				targets,
+			)
+				.map(
+					([kind, target], i) =>
+						`<Relationship Id="r${i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/${kind}" Target="${target}"/>`,
+				)
+				.join('')}</Relationships>`
+		const result = await extractDocx(
+			await syntheticDocx({
+				'_rels/.rels': rels({ officeDocument: 'Word/Main.XML' }),
+				'word/_rels/main.xml.rels': rels({
+					styles: 'Styles.XML',
+					footnotes: 'FootNotes.XML',
+					endnotes: 'EndNotes.XML',
+				}),
+				'word/main.xml': documentXml(
+					p('关系标题', '<w:pStyle w:val="Custom"/>') +
+						'<w:p><w:r><w:t>正文。</w:t><w:footnoteReference w:id="1"/><w:endnoteReference w:id="2"/></w:r></w:p>',
+				),
+				'word/styles.xml': `<w:styles xmlns:w="${namespace}"><w:style w:styleId="Custom"><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style></w:styles>`,
+				'word/footnotes.xml': `<w:footnotes xmlns:w="${namespace}"><w:footnote w:id="1">${p('脚注。')}</w:footnote></w:footnotes>`,
+				'word/endnotes.xml': `<w:endnotes xmlns:w="${namespace}"><w:endnote w:id="2">${p('尾注。')}</w:endnote></w:endnotes>`,
+			}),
+		)
+		expect(compile(importExtractionSchema).check(result)).toBe(true)
+		expect(result).toMatchObject({
+			status: 'ready',
+			book: {
+				volumes: [
+					{
+						chapters: [
+							{
+								title: '关系标题',
+								paragraphs: ['正文。'],
+								notes: ['脚注。', '尾注。'],
+							},
+						],
+					},
+				],
+			},
+		})
+	})
 	test('reuses TXT cleanup for standalone watermark paragraphs without dropping URL dialogue', async () => {
 		const dialogue = '他说：“打开 https://example.com 看看。”'
 		const book = await extract(p(dialogue) + p('请收藏') + p('笔趣阁'))
