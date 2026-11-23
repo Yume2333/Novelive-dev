@@ -239,6 +239,58 @@ test('published character updates do not clear omitted aliases or reject them on
 	})
 })
 
+test('auto reopens a whole result even when the published Bible is too large for whole mode', async () => {
+	await seed(root)
+	const description = 'A tower overlooking the harbor. '.repeat(800)
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const body = await new Request(input, init).json()
+		expect(body.messages[0].content).toContain(
+			'Return their union across all chapters',
+		)
+		const output = {
+			overview: 'Ada reaches the tower.',
+			chapters: chapters.map((chapterId) => ({
+				chapterId,
+				progress: 'Journey continues.',
+			})),
+			biblePatch: [
+				{
+					kind: 'location',
+					op: 'add',
+					entry: { ...candidateTower, description },
+				},
+			],
+		}
+		return new Response(
+			`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(output) }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+			{ headers: { 'content-type': 'text/event-stream' } },
+		)
+	})
+	let result: Awaited<ReturnType<typeof synthesizeVolume>>
+	{
+		using project = await Project.open(root)
+		result = await synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			fetch,
+		})
+		expect((await readBible(project)).location).toContainEqual(
+			expect.objectContaining({ description }),
+		)
+	}
+	const offline = vi.fn<typeof globalThis.fetch>(async () => {
+		throw new Error('Reopening must not call the provider')
+	})
+	using project = await Project.open(root)
+	expect(
+		await synthesizeVolume(project, 'v1', chapters, {
+			...options,
+			fetch: offline,
+		}),
+	).toEqual(result)
+	expect(fetch).toHaveBeenCalledOnce()
+	expect(offline).not.toHaveBeenCalled()
+})
+
 test('whole synthesis requests a complete chapter-by-chapter patch, not a shortlist', async () => {
 	await seed(root)
 	using project = await Project.open(root)
