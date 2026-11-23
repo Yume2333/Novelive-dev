@@ -9,7 +9,6 @@ export function useChapterWait({
 	nextChapterId,
 	nextChapterPublished,
 	nextChapterRead,
-	newestPublished,
 	directory,
 	loadChapter,
 	setChapters,
@@ -21,7 +20,6 @@ export function useChapterWait({
 	nextChapterId?: string
 	nextChapterPublished: boolean
 	nextChapterRead: boolean
-	newestPublished: boolean
 	directory?: string
 	loadChapter(
 		directory: undefined,
@@ -32,7 +30,7 @@ export function useChapterWait({
 	setChapters(update: (chapters: ControlChapter[]) => ControlChapter[]): void
 	onError(message: string): void
 }) {
-	const waiting = ended && newestPublished && !nextChapterPublished
+	const waiting = ended && !nextChapterPublished
 	useEffect(() => {
 		if (!waiting || !nextChapterId || !workId) return
 		window.dispatchEvent(

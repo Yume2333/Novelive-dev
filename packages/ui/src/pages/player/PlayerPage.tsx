@@ -177,15 +177,6 @@ export function PlayerPage() {
 				) + 1
 			]
 		: undefined
-	const newestPublished =
-		!!loaded &&
-		!chapters
-			.slice(
-				chapters.findIndex(
-					(chapter) => chapter.chapterId === loaded.chapterId,
-				) + 1,
-			)
-			.some((chapter) => chapter.published)
 	useChapterWait({
 		workId: id,
 		current: loaded,
@@ -193,7 +184,6 @@ export function PlayerPage() {
 		nextChapterId: nextChapter?.chapterId,
 		nextChapterPublished: nextChapter?.published ?? false,
 		nextChapterRead: nextChapter?.read ?? false,
-		newestPublished,
 		directory: directoryRef.current,
 		loadChapter: loadProject,
 		setChapters,
@@ -234,7 +224,7 @@ export function PlayerPage() {
 						if (id) navigate(playerEditorRoute(id, position))
 					}}
 					waiting={
-						ended && newestPublished && !nextChapter?.published
+						ended && !nextChapter?.published
 							? nextChapter
 							: undefined
 					}

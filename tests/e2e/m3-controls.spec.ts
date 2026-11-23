@@ -129,7 +129,7 @@ test.describe('M3 player controls', () => {
 				const file = projectFiles.work('v1', playerWorkId)
 				await project.write(file, {
 					...(await project.read(file)),
-					chapterIds: ['ch1', 'ch2'],
+					chapterIds: scenario === 'chapter wait' ? ['ch1', 'ch2', 'ch3'] : ['ch1', 'ch2'],
 				})
 				await project.write(
 					projectFiles.chapter({ ...playerRef, chapterId: 'ch2' }),
@@ -155,6 +155,10 @@ test.describe('M3 player controls', () => {
 						"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, 'ch1', 1, 'published'), (?, 'ch2', 2, 'producing')",
 					)
 					.run(playerWorkId, playerWorkId)
+				if (scenario === 'chapter wait') {
+					await project.write(projectFiles.chapter({ ...playerRef, chapterId: 'ch3' }), { ...(await project.read(projectFiles.chapter(playerRef))), chapterId: 'ch3', title: '后续章节' })
+					project.database.prepare("INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, 'ch3', 3, 'producing')").run(playerWorkId)
+				}
 				if (scenario === 'reread successor')
 					project.database
 						.prepare(
@@ -361,6 +365,11 @@ test.describe('M3 player controls', () => {
 					for (let index = 0; index < 6; index++) await advance()
 					await expect(page.getByRole('status')).toContainText('下一章 · 晨光')
 					await expect(page.getByRole('status')).toContainText('制作中')
+					{
+						using project = await Project.open(root)
+						project.database.prepare("UPDATE chapter SET user_state = 'published' WHERE chapter_id = 'ch3'").run()
+					}
+					await page.waitForTimeout(2200)
 					await expect(page.locator('body')).toHaveAttribute(
 						'data-player-waiting',
 						JSON.stringify(playerWorkId),
