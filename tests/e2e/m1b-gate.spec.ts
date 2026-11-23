@@ -662,6 +662,19 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 						.get()
 				})
 				.toEqual({ status: 'completed' })
+			await expect
+				.poll(() => {
+					using db = new DatabaseSync(join(project, 'project.db'), {
+						readOnly: true,
+					})
+					return db
+						.prepare(
+							"SELECT purpose FROM run_step WHERE error_type = 'budget_paused' ORDER BY rowid DESC LIMIT 1",
+						)
+						.get()
+				})
+				.toEqual({ purpose: 'draw' })
+			await expect(queue.getByText('已暂停：模型预算不足')).toBeVisible()
 			expect(calls).toHaveLength(malformedAttempts + 3)
 			expect(calls.at(-1)).toEqual(calls.at(-2))
 			expect(JSON.stringify(calls.at(-1))).toContain(
