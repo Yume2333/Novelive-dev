@@ -5,6 +5,7 @@ import {
 	readdir,
 	readFile,
 	rename,
+	rm,
 	unlink,
 	writeFile,
 } from 'node:fs/promises'
@@ -31,6 +32,12 @@ type StoredMigration = Omit<
 	'positions' | 'progress' | 'legacySaves'
 > & {
 	chapters: readonly (readonly PlaybackBeat[])[]
+}
+type MigrationBackup = Pick<
+	StoredMigration,
+	'workId' | 'fromVersion' | 'toVersion'
+> & {
+	stored: ProgressMigrationResult
 }
 
 function migratedProgress(
@@ -93,6 +100,42 @@ export class FileProgressStore implements ProgressStore {
 		await rename(temporary, join(directory, 'progress.json'))
 	}
 
+	private get migrationJournal() {
+		return join(this.userData, 'player-progress', 'pending-package-update.json')
+	}
+
+	private async restoreMigration(backups: readonly MigrationBackup[]) {
+		for (const { workId, stored } of backups) await this.write(workId, stored)
+	}
+
+	recoverPackageMigration(
+		hasVersion: (workId: string, version: number) => boolean,
+	) {
+		return this.enqueue(async () => {
+			let backups: MigrationBackup[]
+			try {
+				backups = JSON.parse(await readFile(this.migrationJournal, 'utf8'))
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+				throw error
+			}
+			if (
+				!backups.every(({ workId, toVersion }) => hasVersion(workId, toVersion))
+			) {
+				if (
+					!backups.every(({ workId, fromVersion }) =>
+						hasVersion(workId, fromVersion),
+					)
+				)
+					throw new Error(
+						'Package migration journal does not match the installed library',
+					)
+				await this.restoreMigration(backups)
+			}
+			await rm(this.migrationJournal)
+		})
+	}
+
 	save(workId: string, progress: WorkProgress): Promise<void> {
 		const copy = structuredClone(progress)
 		return this.enqueue(async () => {
@@ -125,29 +168,43 @@ export class FileProgressStore implements ProgressStore {
 	) {
 		const updates = structuredClone(inputs)
 		return this.enqueue(async () => {
-			const backups = new Map<string, ProgressMigrationResult>()
+			const backups: MigrationBackup[] = []
+			const migrated: Array<[string, ProgressMigrationResult]> = []
+			for (const update of updates) {
+				const { workId, fromVersion, toVersion } = update
+				const stored = await this.read(workId)
+				if (!stored) continue
+				backups.push({ workId, fromVersion, toVersion, stored })
+				migrated.push([workId, migratedProgress(update, stored)])
+			}
+			if (!backups.length) return publish()
+			const journal = this.migrationJournal
+			const temporary = `${journal}.tmp`
 			try {
-				for (const update of updates) {
-					const stored = await this.read(update.workId)
-					if (!stored) continue
-					await this.write(update.workId, migratedProgress(update, stored))
-					backups.set(update.workId, stored)
-				}
+				await access(journal)
+				throw new Error('A previous package migration requires recovery')
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+			}
+			await writeFile(temporary, JSON.stringify(backups), 'utf8')
+			await rename(temporary, journal)
+			try {
+				for (const [workId, stored] of migrated)
+					await this.write(workId, stored)
 				await publish()
 			} catch (error) {
-				const restored = await Promise.allSettled(
-					[...backups].map(([workId, stored]) => this.write(workId, stored)),
-				)
-				const failures = restored.flatMap((result) =>
-					result.status === 'rejected' ? [result.reason] : [],
-				)
-				if (failures.length)
+				try {
+					await this.restoreMigration(backups)
+					await rm(journal)
+				} catch (rollbackError) {
 					throw new AggregateError(
-						[error, ...failures],
+						[error, rollbackError],
 						'Save migration rollback failed',
 					)
+				}
 				throw error
 			}
+			await rm(journal, { force: true })
 		})
 	}
 

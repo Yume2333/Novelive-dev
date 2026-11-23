@@ -144,6 +144,54 @@ test('restores every work’s progress and legacy saves when package publication
 	).toEqual(before)
 })
 
+test.each([false, true])(
+	'recovers an interrupted migration (library published: %s)',
+	async (published) => {
+		const { userData, store } = await createStore()
+		await store.saveSlot(
+			workId,
+			quick,
+			snapshot(first),
+			await capture('#123456'),
+		)
+		const before = await store.load(workId)
+		const staged = Promise.withResolvers<void>()
+		const release = Promise.withResolvers<void>()
+		const migration = store.migrateAndPublish(
+			[
+				{
+					workId,
+					fromVersion: 1,
+					toVersion: 2,
+					chapters: [[textBeat(otherChapter)]],
+				},
+			],
+			async () => {
+				staged.resolve()
+				await release.promise
+			},
+		)
+		try {
+			await Promise.race([staged.promise, migration])
+			const restarted = new FileProgressStore(userData)
+			expect((await restarted.load(workId))?.saves).toEqual([])
+			const hasVersion = (id: string, version: number) =>
+				id === workId && version === (published ? 2 : 1)
+			await restarted.recoverPackageMigration(hasVersion)
+			expect(await restarted.load(workId)).toEqual(
+				published ? { ...before, saves: [] } : before,
+			)
+			expect(await restarted.loadLegacySaves(workId)).toMatchObject(
+				published ? [{ version: 1 }] : [],
+			)
+			await restarted.recoverPackageMigration(hasVersion)
+		} finally {
+			release.resolve()
+			await migration
+		}
+	},
+)
+
 test('restores the new release sprite in time for its next expression change', async () => {
 	const { store } = await createStore()
 	const saved = snapshot(first)

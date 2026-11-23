@@ -32,6 +32,14 @@ export async function installShareIpc(
 		dataDir,
 		app.getPath('documents'),
 	)
+	const versions = new Map(
+		library
+			.list()
+			.map(({ workId, version }) => [packageProgressId(workId), version]),
+	)
+	await store.recoverPackageMigration(
+		(workId, version) => versions.get(workId) === version,
+	)
 	function allowed(event: Electron.IpcMainInvokeEvent) {
 		const contents = window()?.webContents
 		return (
