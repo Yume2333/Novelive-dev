@@ -26,6 +26,7 @@ import {
 import { existing, readBible } from '../synthesis/patch'
 import { usageMethods, withUsage } from '../usage'
 import type { Project } from './index'
+import { resolveBible } from './series/resolve'
 
 const draft = (id: string) => `source/production/${id}/draft.nvs`
 const drawing = (id: string) => `source/production/art/${id}.json`
@@ -74,8 +75,15 @@ export async function productionModels(
 	}
 }
 
-export async function productionBible(project: Project) {
-	const bible = await readBible(project)
+export async function productionBible(
+	project: Project,
+	volumeId?: string,
+	workId?: string,
+) {
+	const bible =
+		volumeId && workId
+			? await resolveBible(project, { level: 'work', volumeId, workId })
+			: await readBible(project)
 	return {
 		bible,
 		art: {
@@ -110,6 +118,7 @@ export function chapterWorker(
 				replay,
 				signal,
 				resolution: work.settings.outputResolution,
+				readScope: { level: 'work', volumeId, workId: work.workId },
 			}),
 			project,
 			work.workId,
@@ -129,7 +138,7 @@ export function chapterWorker(
 		const body = (await project.readFile(projectFiles.chapterText(chapterId)))
 			.toString('utf8')
 			.trimEnd()
-		const { bible } = await productionBible(project)
+		const { bible } = await productionBible(project, volumeId, work.workId)
 		const preview = await existing(() =>
 			project.read(projectFiles.preview(chapterId)),
 		)
@@ -172,6 +181,16 @@ export function chapterWorker(
 				bible.glossary.map(({ original, written }) => [original, written]),
 			),
 			bible: JSON.stringify(bible),
+			...(bible.character.length ||
+			bible.location.length ||
+			bible.glossary.length
+				? {
+						canonicalNames: {
+							characters: bible.character,
+							locations: bible.location,
+						},
+					}
+				: {}),
 			...(ctx.desensitized
 				? {
 						redLines: [
@@ -258,7 +277,8 @@ export function chapterWorker(
 		stage: (ctx) =>
 			step(async () => {
 				const { current, chapter, options } = await input(ctx)
-				const bible = (await productionBible(project)).art
+				const bible = (await productionBible(project, volumeId, work.workId))
+					.art
 				const service = art(ctx.signal)
 				const script = (await project.readFile(draft(ctx.chapterId))).toString()
 				const staged = await directChapterArt(
@@ -351,7 +371,7 @@ export function chapterWorker(
 			const metadata = await drawingMetadata(job.assetId)
 			return art(ctx.signal).draw(
 				metadata.job,
-				(await productionBible(project)).art,
+				(await productionBible(project, volumeId, work.workId)).art,
 				metadata.cg,
 			)
 		},
@@ -415,7 +435,7 @@ export function chapterWorker(
 			target: { path: string; instruction?: string },
 			signal: AbortSignal,
 		) {
-			const bible = (await productionBible(project)).art
+			const bible = (await productionBible(project, volumeId, work.workId)).art
 			const metadata =
 				(await existing(() => drawingMetadata(assetId))) ??
 				(await confirmedPortrait(assetId, bible))

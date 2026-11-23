@@ -10,12 +10,14 @@ import {
 	type GlossaryPatch,
 	type Location,
 	type ProjectDocument,
+	type ProjectScope,
 	projectFiles,
 	type Relation,
 	type Style,
 	type TimelineEntry,
 } from '@novelive/format/model'
 import type { Project } from '../project'
+import { resolveBible } from '../project/series/resolve'
 
 type Bible = {
 	character: Character[]
@@ -58,7 +60,11 @@ export async function existing<T>(
 	}
 }
 
-export async function readBible(project: Project): Promise<Bible> {
+export async function readBible(
+	project: Project,
+	targetScope?: ProjectScope,
+): Promise<Bible> {
+	if (targetScope) return resolveBible(project, targetScope)
 	const collection = async <T>(file: ProjectDocument<Collection<T>>) =>
 		(await existing(() => project.read(file)))?.entries ?? []
 	async function directory<T>(

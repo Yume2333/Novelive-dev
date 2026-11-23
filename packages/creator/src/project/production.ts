@@ -275,7 +275,7 @@ export function createProduction(
 					)
 					summary = synthesis.overview
 				}
-				const bible = (await productionBible(project)).art
+				const bible = (await productionBible(project, volumeId, workId)).art
 				const references = (await readImportWizard(project)).references.map(
 					(cachePath, i) => ({ id: `reference-${i + 1}`, cachePath }),
 				)
@@ -339,7 +339,7 @@ export function createProduction(
 					if (snapshot().phase !== 'confirm-visual' || !pool) return snapshot()
 					await refresh()
 					await art().confirmVisual(
-						(await productionBible(project)).art.style,
+						(await productionBible(project, volumeId, workId)).art.style,
 						pool,
 						input,
 					)

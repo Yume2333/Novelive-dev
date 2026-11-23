@@ -18,7 +18,9 @@ import {
 	formatVersion,
 	glossaryPatchSchema,
 	type ProjectDocument,
+	type ProjectScope,
 	projectFiles,
+	type VolumeDigest,
 	type VolumeSkeleton,
 	version,
 } from '@novelive/format/model'
@@ -33,6 +35,7 @@ import {
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
 import { reconcileNamedAdditions } from './consolidate'
+import { scopedOnlyBrief } from './incremental/context'
 import { synthesisOutput } from './output'
 import {
 	applyPatches,
@@ -110,6 +113,8 @@ export interface SynthesisOptions {
 	strategy?: 'auto' | 'whole' | 'events'
 	maxEvents?: number
 	incremental?: boolean
+	scope?: ProjectScope
+	previousDigests?: readonly VolumeDigest[]
 	rerun?: boolean
 	requestTimeoutMs?: number
 	signal?: AbortSignal
@@ -266,6 +271,10 @@ export async function synthesizeVolume(
 		requirements: options.requirements,
 		strategy,
 		incremental,
+		...(options.scope ? { scope: options.scope } : {}),
+		...(options.previousDigests
+			? { previousDigests: options.previousDigests }
+			: {}),
 		model: model.id,
 		context: model.contextWindow,
 	}
@@ -287,6 +296,9 @@ export async function synthesizeVolume(
 		return project.read(files.result)
 
 	const bible = await readBible(project)
+	const contextBible = options.scope
+		? await readBible(project, options.scope)
+		: bible
 	const basis = hash(bible)
 	const matching = saved?.fingerprint === fingerprint ? saved : undefined
 	const quarantined =
@@ -303,7 +315,7 @@ export async function synthesizeVolume(
 Return JSON. Use stable IDs, real chapter IDs, and character IDs for relations. Mark main characters major and new entries candidate. Preserve confirmed facts; ${incremental ? 'never delete.' : 'delete only this volume’s mistaken candidates.'}
 ${inclusionCriteria}
 Existing entries:
-${JSON.stringify(bible)}`
+${JSON.stringify(contextBible)}${scopedOnlyBrief(contextBible, bible)}${options.previousDigests?.length ? `\nEarlier volume digests (context only):\n${JSON.stringify(options.previousDigests)}` : ''}`
 	const wholePrompt = `${instructions}
 ${whole.instructions}
 For each chapter, include progress and exhaustively extract every distinct Bible and glossary entry that meets the inclusion rules. Return their union across all chapters. Summarize only the overview; do not abridge the patch to a volume-level shortlist.

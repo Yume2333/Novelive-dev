@@ -2,7 +2,6 @@ import { arr, bool, obj, oneOf, str } from '@earendil-works/pi-schema'
 import {
 	type AssetRegistry,
 	type ChapterRef,
-	formatVersion,
 	type ImageJobResult,
 	type ProjectScope,
 	projectFiles,
@@ -12,6 +11,8 @@ import sharp from 'sharp'
 import { type ImageConfig, imageProvider, imageSize } from '../../models/image'
 import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
+import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
+import { resolveRegistry } from '../../project/series/resolve'
 import { checkImage, type Dimensions, placeholder } from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
@@ -39,6 +40,7 @@ type Options = ModelOptions & {
 	fast: TextConnection
 	visual: TextConnection
 	scope?: ProjectScope
+	readScope?: ProjectScope
 	resolution?: '2K' | '4K'
 	lossless?: boolean
 }
@@ -77,12 +79,17 @@ export class ArtProduction {
 	}
 
 	async registry(): Promise<AssetRegistry> {
-		try {
-			return await this.project.read(this.registryFile)
-		} catch (error) {
-			if (!isMissing(error)) throw error
-			return { formatVersion, entries: [] }
-		}
+		return resolveRegistry(this.project, this.options.readScope ?? this.scope)
+	}
+
+	private async persistRegistry(registry: AssetRegistry) {
+		await persistOwnedEntries(
+			this.project,
+			this.options.readScope ?? this.scope,
+			this.scope,
+			projectFiles.assetRegistry,
+			registry.entries,
+		)
 	}
 
 	async register(
@@ -99,7 +106,7 @@ export class ArtProduction {
 			for (const entry of plan.registry.entries)
 				if (!existing.has(entry.id)) entry.path = this.scoped(entry.path)
 			await beforeCommit?.(plan)
-			await this.project.write(this.registryFile, plan.registry)
+			await this.persistRegistry(plan.registry)
 			if (chapter) {
 				const file = projectFiles.chapter(chapter)
 				const metadata = await this.project.read(file)
@@ -123,7 +130,7 @@ export class ArtProduction {
 		const entry = registry.entries.find((item) => item.id === id)
 		if (!entry) throw new Error(`Unregistered asset: ${id}`)
 		entry.status = status
-		await this.project.write(this.registryFile, registry)
+		await this.persistRegistry(registry)
 	}
 
 	private readonly pendingDraws = new Map<string, Promise<ImageJobResult>>()
@@ -147,7 +154,7 @@ export class ArtProduction {
 	}
 
 	private writeRegistry<T>(operation: () => Promise<T>) {
-		const key = `${this.project.root}/${this.registryFile.path}`
+		const key = this.project.root
 		const previous = registryWrites.get(key)
 		const task = previous ? previous.then(operation, operation) : operation()
 		registryWrites.set(key, task)
@@ -193,7 +200,7 @@ export class ArtProduction {
 				await this.project.readFile(source),
 			)
 			entry.status = 'drawn'
-			await this.project.write(this.registryFile, registry)
+			await this.persistRegistry(registry)
 			return entry.path
 		})
 	}
@@ -463,6 +470,15 @@ export class ArtProduction {
 		creatorMainVisual?: string,
 		supplemental: Candidate[] = [],
 	): Promise<VisualCandidates> {
+		const styleScope = await entryOwner(
+			this.project,
+			this.options.readScope ?? this.scope,
+			this.scope,
+			projectFiles.style,
+			bible.style.id,
+		)
+		const cachePath = (path: string) =>
+			projectFiles.style(styleScope).path.replace('bible/style.json', path)
 		const candidate = async (
 			id: string,
 			drawing: Drawing,
@@ -497,7 +513,7 @@ export class ArtProduction {
 								characters: [],
 								keep: [],
 							},
-							this.scoped(`candidates/style/${id}.webp`),
+							cachePath(`candidates/style/${id}.webp`),
 						),
 			)
 		}
@@ -527,7 +543,7 @@ export class ArtProduction {
 								characters: [character],
 								keep: [],
 							},
-							this.scoped(
+							cachePath(
 								`candidates/characters/${character.id}/${costume.id}/${id}.webp`,
 							),
 							true,
@@ -588,12 +604,22 @@ export class ArtProduction {
 			},
 		)
 		const references: NonNullable<Style['references']> = []
+		const styleScope = await entryOwner(
+			this.project,
+			this.options.readScope ?? this.scope,
+			this.scope,
+			projectFiles.style,
+			style.id,
+		)
 		for (const [i, source] of [main, ...supplemental].entries()) {
-			const path = this.scoped(
-				i === 0
-					? 'assets/style/main-visual.webp'
-					: `assets/style/supplemental-${i}.webp`,
-			)
+			const path = projectFiles
+				.style(styleScope)
+				.path.replace(
+					'bible/style.json',
+					i === 0
+						? 'assets/style/main-visual.webp'
+						: `assets/style/supplemental-${i}.webp`,
+				)
 			await this.saveWebp(
 				path,
 				await this.project.readFile(source),
@@ -625,20 +651,18 @@ export class ArtProduction {
 						aliases: [],
 					})
 			}
-			await this.project.write(this.registryFile, registry)
+			await this.persistRegistry(registry)
 		})
 		const chosen: Style = { ...style, status: 'confirmed', references }
-		const file = projectFiles.style(this.scope)
-		let entries: Style[] = []
-		try {
-			entries = (await this.project.read(file)).entries
-		} catch (error) {
-			if (!isMissing(error)) throw error
-		}
-		await this.project.write(file, {
-			formatVersion,
-			entries: [...entries.filter((entry) => entry.id !== chosen.id), chosen],
-		})
+		await this.writeRegistry(() =>
+			persistOwnedEntries(
+				this.project,
+				this.options.readScope ?? this.scope,
+				this.scope,
+				projectFiles.style,
+				[chosen],
+			),
+		)
 		return chosen
 	}
 }
