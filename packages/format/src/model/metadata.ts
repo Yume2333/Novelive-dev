@@ -47,6 +47,7 @@ export const volumeSchema = obj(
 	},
 	open,
 )
+export const customMarksSchema = map(obj({ css: str(), perChar: bool() }, open))
 export const workSettingsSchema = obj(
 	{
 		adaptation: oneOf(['faithful', 'balanced', 'condensed']),
@@ -58,7 +59,7 @@ export const workSettingsSchema = obj(
 		fidelityReview: bool(),
 		styleReview: bool(),
 		confirmWithReferences: bool(),
-		customMarks: map(obj({ css: str(), perChar: bool() }, open)),
+		customMarks: customMarksSchema,
 		outputResolution: oneOf(['2K', '4K']),
 		accent: opt(str()),
 	},

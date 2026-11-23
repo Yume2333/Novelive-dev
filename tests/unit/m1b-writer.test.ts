@@ -1,4 +1,5 @@
 import type { Context } from '@earendil-works/pi-ai'
+import { paragraphIdPattern } from '@novelive/format/model'
 import { describe, expect, test, vi } from 'vitest'
 import {
 	ContextLimitError,
@@ -24,9 +25,11 @@ type Reply =
 	| { truncated: string }
 function responses(...replies: Reply[]) {
 	const requests: string[] = []
+	const toolSchemas: unknown[] = []
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const body = await new Request(input, init).json()
 		requests.push(JSON.stringify(body.messages))
+		toolSchemas.push(body.tools)
 		const reply = replies.shift()
 		if (reply === undefined) throw new Error('Unexpected model request')
 		const tool = typeof reply !== 'string' && 'tool' in reply
@@ -72,11 +75,42 @@ function responses(...replies: Reply[]) {
 			{ headers: { 'content-type': 'text/event-stream' } },
 		)
 	}
-	return { requests, options: fixtureOptions(fetch), fetch }
+	return { requests, toolSchemas, options: fixtureOptions(fetch), fetch }
 }
 
 const scene =
 	'scene Bridge\nsource p0001\n: A paper boat drifted under the bridge.'
+
+test('separates new mark proposals from NVS and skips unsafe or registered marks', async () => {
+	const { options, requests } = responses(
+		[
+			scene,
+			'@propose-mark {"name":"shiver","css":" color: #99f; ","perChar":true}',
+			'@propose-mark {"name":"shiver","css":"color: red;","perChar":false}',
+			'@propose-mark {"name":"em","css":"opacity: 0.5;","perChar":false}',
+			'@propose-mark {"name":"ruby","css":"opacity: 0.5;","perChar":false}',
+			'@propose-mark {"name":"ripple","css":"opacity: 0.5;","perChar":false}',
+			'@propose-mark {"name":"leak","css":"background: image-set(\\"https://invalid.test/x\\" 1x);","perChar":false}',
+			'@propose-mark {"name":"escape","css":"} body { opacity: 0;","perChar":false}',
+			'@propose-mark malformed',
+		].join('\n'),
+	)
+	const draft = await writeChapter(chapter, {
+		...options,
+		proposeMarks: true,
+		script: { ...options.script, customMarks: ['ripple'] },
+	})
+	expect(requests).toHaveLength(1)
+	expect(requests[0]).toContain(
+		'Registered custom marks you may use in NVS: ripple.',
+	)
+	expect(draft.scenes).toHaveLength(1)
+	expect(draft.scenes[0].scene.lines).toHaveLength(1)
+	expect(draft.markSuggestions).toEqual([
+		{ name: 'shiver', css: 'color: #99f;', perChar: true },
+	])
+})
+
 const issue = {
 	category: 'omission',
 	paragraphId: 'p0001',
@@ -124,6 +158,106 @@ describe('M1b writer', () => {
 		expect(result.scenes[0].beats[0].line).toMatchObject({
 			id: draft.scenes[0].beats[0].line?.id,
 		})
+	})
+
+	test('restricts fidelity citations to the scene source and corrects a draft-line citation', async () => {
+		const cited = { ...issue, paragraphId: 'p0020', quote: '窗外下着雨' }
+		const draftQuote = '屋里彻夜点着灯'
+		const input = {
+			paragraphs: [
+				{ id: 'p0019', text: '他推开窗。' },
+				{ id: 'p0020', text: '窗外下着雨。' },
+			],
+		}
+		const { options, requests, toolSchemas } = responses(
+			{
+				tool: 'submit_review',
+				arguments: {
+					issues: [{ ...cited, paragraphId: '#0002', quote: draftQuote }],
+				},
+			},
+			{
+				tool: 'submit_review',
+				arguments: {
+					issues: [{ ...cited, paragraphId: 'p0018', quote: '船靠在桥边' }],
+				},
+			},
+			{ tool: 'submit_review', arguments: { issues: [cited] } },
+		)
+		const model = writingModel(options.reviewer, options)
+		const result = await reviewFidelity(
+			model,
+			input,
+			`scene Window\nsource p0019-p0020\n: 他推开窗。 #0001\n: ${draftQuote}。 #0002`,
+			() => model,
+		)
+		expect(toolSchemas[0]).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					function: expect.objectContaining({
+						name: 'submit_review',
+						parameters: expect.objectContaining({
+							properties: expect.objectContaining({
+								issues: expect.objectContaining({
+									items: expect.objectContaining({
+										properties: expect.objectContaining({
+											paragraphId: expect.objectContaining({
+												enum: ['p0019', 'p0020'],
+											}),
+										}),
+									}),
+								}),
+							}),
+						}),
+					}),
+				}),
+			]),
+		)
+		expect(requests[0]).toContain('Source text (via read_source_range)')
+		expect(requests[0]).toContain('Draft script (comparison only)')
+		expect(requests[1]).toContain(
+			'You cited draft line #0002; cite source paragraph IDs (p0019, p0020) with text quoted verbatim from the source.',
+		)
+		expect(requests[2]).toContain('Quote not found in p0018')
+		expect(result).toEqual([cited])
+	})
+
+	test('uses a fixed citation pattern when a single line cannot fit the paragraph enum', async () => {
+		const paragraphs = Array.from({ length: 30 }, (_, i) => ({
+			id: `p${String(i + 1).padStart(4, '0')}`,
+			text: 'At dusk',
+		}))
+		const aligner = responses(
+			JSON.stringify([
+				{ paragraphCount: paragraphs.length, lineCount: 1, targets: [] },
+			]),
+		)
+		const { options, requests, toolSchemas } = responses(
+			{
+				tool: 'submit_review',
+				arguments: { issues: [{ ...issue, paragraphId: 'p0031' }] },
+			},
+			{ tool: 'submit_review', arguments: { issues: [issue] } },
+		)
+		const model = writingModel(
+			{ ...options.reviewer, contextWindow: 5250 },
+			options,
+		)
+		const result = await reviewFidelity(
+			model,
+			{ paragraphs },
+			`scene Bridge\nsource p0001-p0030\n\n: ${'x'.repeat(220)}`,
+			() => writingModel(aligner.options.writer, aligner.options),
+		)
+		for (const schema of toolSchemas) {
+			const json = JSON.stringify(schema)
+			expect(json).toContain(
+				JSON.stringify({ type: 'string', pattern: paragraphIdPattern }),
+			)
+			expect(json).not.toContain('"enum":["p0001"')
+		}
+		expect(requests[1]).toContain('Quote not found in p0031')
+		expect(result).toEqual([issue])
 	})
 
 	test('separates style-only review and carries the priority preview and chapter constraints', async () => {

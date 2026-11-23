@@ -85,10 +85,7 @@ async function revisionsFor(workId: string) {
 
 registry.register('editor.resolveMark', async (input) => {
 	const { editor } = await editorWork(input.workId)
-	await editor.whileCurrent(input, async () => {
-		throw { code: 'not_found', message: '找不到这个标记提议。' }
-	})
-	return editor.snapshot(input)
+	return editor.resolveMark(input)
 })
 registry.register('editor.rewriteScene', async (input, signal) =>
 	(await revisionsFor(input.workId)).rewriteScene(input, signal),

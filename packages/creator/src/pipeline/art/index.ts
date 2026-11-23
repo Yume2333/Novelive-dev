@@ -398,6 +398,7 @@ export class ArtProduction {
 				: this.options.main
 		let issue = '没有生成可用图片。'
 		let feedback = ''
+		let reviewed: Buffer | undefined
 		let moderated = false
 		let attempt = 0
 		while (attempt <= this.options.image.retries) {
@@ -458,10 +459,11 @@ export class ArtProduction {
 				[checked.png, ...refs],
 			)
 			if (judge.pass && judge.failedChecks.length === 0) return checked
+			reviewed = checked.png
 			issue = feedback =
 				judge.feedback || `视觉审核未通过：${judge.failedChecks.join('、')}`
 		}
-		return { issue }
+		return { issue, reviewed }
 	}
 
 	async candidates(
@@ -491,8 +493,15 @@ export class ArtProduction {
 					this.nativeSize(portrait),
 					portrait,
 				)
-				if ('issue' in result) throw new Error(result.issue)
-				await this.saveWebp(path, result.png, this.outputSize(portrait))
+				let png: Buffer
+				if ('issue' in result) {
+					if (!('reviewed' in result) || !result.reviewed)
+						throw new Error(result.issue)
+					png = result.reviewed
+				} else {
+					png = result.png
+				}
+				await this.saveWebp(path, png, this.outputSize(portrait))
 			}
 			return { id, cachePath: path }
 		}

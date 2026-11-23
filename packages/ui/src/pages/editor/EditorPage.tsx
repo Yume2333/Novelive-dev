@@ -4,7 +4,7 @@ import type {
 	RewriteProposal,
 } from '@novelive/creator/contract'
 import { compileScript } from '@novelive/format/script'
-import { mountMinimalPlayer } from '@novelive/player'
+import { effectiveMarkCss, mountMinimalPlayer } from '@novelive/player'
 import { useEffect, useRef, useState } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
@@ -277,6 +277,8 @@ export function EditorPage() {
 			abort.signal,
 			fail,
 			opening.speakerNames,
+			undefined,
+			{ customMarks: opening.settings.customMarks },
 		).catch(fail)
 		return () => abort.abort()
 	}, [preview, opening, scene, sceneIndex, draft, line])
@@ -307,7 +309,9 @@ export function EditorPage() {
 								aria-label="新标记提议"
 							>
 								<strong>新标记：{mark.name}</strong>
-								<code>{mark.css}</code>
+								<code title="播放生效的 CSS">
+									{effectiveMarkCss(mark.name, mark.css) || '无可渲染样式'}
+								</code>
 								<span>{mark.perChar ? '逐字' : '整段'}</span>
 								{(['accept', 'reject'] as const).map((decision) => (
 									<button
@@ -518,6 +522,7 @@ export function EditorPage() {
 								<div className="editor-columns">
 									<ScriptEditor
 										readOnly={busy}
+										autoFocus={!chapter?.markSuggestions.length}
 										value={draft}
 										onChange={setDraft}
 										onLine={setLine}

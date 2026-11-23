@@ -1,8 +1,12 @@
+import type { WorkSettings } from '@novelive/format/model'
 import type { Inline } from '@novelive/format/script'
+import { glyphProperties, markDeclarations } from './custom-marks'
 import { textTiming } from './timing'
 import './text.css'
 
 export interface TextOptions {
+	customMarks?: WorkSettings['customMarks']
+	viewport?: { element: HTMLElement; textHeight(): number }
 	millisecondsPerCharacter?: number
 	auto?: boolean
 	continueImmediately?: boolean
@@ -23,11 +27,15 @@ export function mountText(
 		content,
 		options.millisecondsPerCharacter ?? 30,
 	)
-	const stack: HTMLElement[] = [layout]
+	const styles = new Map<string, ReturnType<typeof markDeclarations>>()
+	let styledMetrics = false
+	const stack: { element: HTMLElement; perChar?: string }[] = [
+		{ element: layout },
+	]
 	let pause = trailingPause
 	let trailingPending = trailingPause > 0
 	for (const part of content) {
-		const current = stack[stack.length - 1]
+		const current = stack[stack.length - 1].element
 		if (part.type === 'pause') continue
 		if (part.type === 'open') {
 			const element = document.createElement(
@@ -36,8 +44,21 @@ export function mountText(
 			element.dataset.mark = part.name
 			element.className = `nl-text-mark-${part.name}`
 			if (part.name === 'ruby') element.dataset.reading = part.argument ?? ''
+			const marks = options.customMarks
+			const mark =
+				marks && Object.hasOwn(marks, part.name) ? marks[part.name] : undefined
+			if (mark && !styles.has(part.name))
+				styles.set(part.name, markDeclarations(part.name, mark.css))
+			const styled = !!styles.get(part.name)?.length
+			if (styled) {
+				if (mark?.perChar) element.dataset.markInheritance = part.name
+				else element.dataset.markStyle = part.name
+			}
 			current.append(element)
-			stack.push(element)
+			stack.push({
+				element,
+				perChar: styled && mark?.perChar ? part.name : undefined,
+			})
 		} else if (part.type === 'close') {
 			if (current.tagName === 'RUBY') {
 				const rt = document.createElement('rt')
@@ -51,7 +72,16 @@ export function mountText(
 			}).segment(part.text)) {
 				const glyph = document.createElement('span')
 				glyph.dataset.glyph = String(glyphs.length)
-				glyph.textContent = segment
+				let target = glyph
+				for (const { perChar } of stack) {
+					if (!perChar) continue
+					const effect = document.createElement('span')
+					effect.dataset.markGlyph = ''
+					effect.dataset.markStyle = perChar
+					target.append(effect)
+					target = effect
+				}
+				target.textContent = segment
 				current.append(glyph)
 				glyphs.push(glyph)
 			}
@@ -60,6 +90,26 @@ export function mountText(
 	const display = layout.cloneNode(true) as HTMLElement
 	display.className = 'nl-text-display'
 	display.removeAttribute('aria-hidden')
+	for (const layer of [layout, display]) {
+		for (const element of layer.querySelectorAll<HTMLElement>(
+			'[data-mark-style], [data-mark-inheritance]',
+		)) {
+			const inherited = element.dataset.markInheritance
+			const glyph = element.hasAttribute('data-mark-glyph')
+			for (const [property, value, priority] of styles.get(
+				element.dataset.markStyle ?? inherited ?? '',
+			) ?? []) {
+				if (glyph && !glyphProperties.has(property)) continue
+				if (inherited && glyphProperties.has(property)) continue
+				if (priority || !element.style.getPropertyPriority(property))
+					element.style.setProperty(property, value, priority)
+			}
+			if (element.style.fontSize) {
+				element.dataset.markSize = ''
+				if (layer === layout) styledMetrics = true
+			}
+		}
+	}
 	const visible = Array.from(
 		display.querySelectorAll<HTMLElement>('[data-glyph]'),
 	)
@@ -71,6 +121,7 @@ export function mountText(
 	let ends: number[] = []
 	let offsets: number[] = []
 	let heights: number[] = []
+	let minimumHeight = 0
 	let page = 0
 	let revealed = 0
 	let disposed = false
@@ -95,6 +146,7 @@ export function mountText(
 		}
 		display.style.transform = `translateY(${-offsets[page]}px)`
 		window.style.height = `${heights[page]}px`
+		host.style.height = `${Math.max(minimumHeight, heights[page])}px`
 		host.dataset.page = String(page + 1)
 		host.dataset.pages = String(ends.length)
 		host.dataset.revealed = String(revealed)
@@ -146,28 +198,63 @@ export function mountText(
 		if (disposed) return
 		const anchor = ends[page - 1] ?? 0
 		const lineHeight = Number.parseFloat(getComputedStyle(layout).lineHeight)
+		const availableHeight = styledMetrics
+			? Math.max(0, options.viewport?.textHeight() ?? Infinity)
+			: Infinity
 		const top = layout.getBoundingClientRect().top
-		const lines: { start: number; top: number }[] = []
+		const lines: { start: number; top: number; bottom: number }[] = []
+		const range = styledMetrics ? document.createRange() : undefined
 		glyphs.forEach((glyph, index) => {
-			const y = glyph.getBoundingClientRect().top - top
-			if (!lines.length || y - lines[lines.length - 1].top > lineHeight / 2)
-				lines.push({ start: index, top: y })
+			range?.selectNodeContents(glyph)
+			const rect =
+				range?.getBoundingClientRect() ?? glyph.getBoundingClientRect()
+			const y = rect.top - top
+			const bottom = rect.bottom - top
+			const previous = lines.at(-1)
+			if (
+				!previous ||
+				(styledMetrics
+					? y >= previous.bottom
+					: y - previous.top > lineHeight / 2)
+			)
+				lines.push({ start: index, top: y, bottom })
+			else if (styledMetrics) {
+				previous.top = Math.min(previous.top, y)
+				previous.bottom = Math.max(previous.bottom, bottom)
+			}
 		})
 		ends = []
 		offsets = []
 		heights = []
+		function edge(line: number) {
+			if (line === 0) return 0
+			if (line === lines.length)
+				return Math.max(layout.clientHeight, lines[line - 1].bottom)
+			return Math.max(lines[line - 1].bottom, lines[line].top - lines[0].top)
+		}
 		for (let line = 0; line < lines.length; ) {
 			let next = Math.min(line + 3, lines.length)
+			if (styledMetrics)
+				while (next > line + 1 && edge(next) - edge(line) > availableHeight)
+					next--
 			if (
 				next < lines.length &&
+				next > line + 1 &&
 				/[。！？、，；：.!?,;:」』）]/u.test(
 					glyphs[lines[next - 1].start - 1]?.textContent ?? '',
 				)
 			)
 				next--
-			offsets.push(line === 0 ? 0 : lines[line].top - lines[0].top)
+			const offset = styledMetrics
+				? edge(line)
+				: line === 0
+					? 0
+					: lines[line].top - lines[0].top
+			offsets.push(offset)
 			ends.push(lines[next]?.start ?? glyphs.length)
-			heights.push((next - line) * lineHeight)
+			heights.push(
+				styledMetrics ? edge(next) - offset : (next - line) * lineHeight,
+			)
 			line = next
 		}
 		if (!ends.length) {
@@ -177,11 +264,13 @@ export function mountText(
 		}
 		page = ends.findIndex((end) => end > anchor)
 		if (page === -1) page = ends.length - 1
-		host.style.height = `${lineHeight * 3}px`
+		minimumHeight = Math.min(lineHeight * 3, availableHeight)
 		schedule()
 	}
 	const observer = new ResizeObserver(measure)
 	observer.observe(layout)
+	if (styledMetrics && options.viewport)
+		observer.observe(options.viewport.element)
 	void document.fonts.ready.then(measure)
 	measure()
 	return {

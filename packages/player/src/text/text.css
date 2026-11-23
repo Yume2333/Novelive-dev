@@ -1,9 +1,10 @@
 .nl-text-viewport {
+	--nl-text-line-height: 1.8;
 	position: relative;
 	overflow: hidden;
 	font-family: var(--font-body);
 	font-size: 30px;
-	line-height: 1.8;
+	line-height: var(--nl-text-line-height);
 	width: 78%;
 	margin-inline: auto;
 	line-break: strict;
@@ -24,6 +25,9 @@
 	position: absolute;
 	inset: 0 0 auto;
 	overflow: hidden;
+}
+.nl-text-viewport [data-mark-size] {
+	line-height: var(--nl-text-line-height);
 }
 .nl-text-viewport [data-mark="em"] {
 	font-style: italic;

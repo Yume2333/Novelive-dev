@@ -460,9 +460,11 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 		sceneIds: result.chapter.sceneIds,
 		assets: result.registry.entries,
 		speakers: result.speakers,
-		customMarks: result.customMarks,
+		customMarks: Object.keys(result.customMarks),
 	})
-	expect(result.customMarks).toEqual(['wave'])
+	expect(result.customMarks).toEqual({
+		wave: { css: 'color: red', perChar: false },
+	})
 	expect(
 		compileScript(result.script, {
 			paragraphIds: result.chapter.paragraphIds,
@@ -484,7 +486,7 @@ test('loads a local chapter with merged registry, resolves cache bytes and rejec
 			paragraphIds: result.chapter.paragraphIds,
 			assets: result.registry.entries,
 			speakers: ['traveler'],
-			customMarks: result.customMarks,
+			customMarks: Object.keys(result.customMarks),
 		}).diagnostics,
 	).toEqual(
 		expect.arrayContaining([expect.objectContaining({ code: 'E_SPEAKER' })]),

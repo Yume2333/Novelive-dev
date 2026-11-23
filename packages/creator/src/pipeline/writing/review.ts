@@ -1,5 +1,6 @@
 import type { Message, Tool } from '@earendil-works/pi-ai'
 import { arr, compile, obj, oneOf, str } from '@earendil-works/pi-schema'
+import { paragraphIdPattern } from '@novelive/format/model'
 import { ContextLimitError, fitUnits, promptFits } from './budget'
 import { textOf, userMessage, type writingModel } from './request'
 import {
@@ -72,7 +73,10 @@ const tools: Tool[] = [
 		description: 'Read the relevant Bible context.',
 		parameters: strings(),
 	},
-	{
+]
+
+function citationTool(paragraphIds: string[], usePattern: boolean): Tool {
+	return {
 		name: 'submit_review',
 		description: 'Submit all source-grounded issues, or an empty issue list.',
 		parameters: {
@@ -84,6 +88,14 @@ const tools: Tool[] = [
 						...strings('category', 'paragraphId', 'quote', 'issue'),
 						properties: {
 							...strings('paragraphId', 'quote', 'issue').properties,
+							paragraphId: {
+								type: 'string',
+								...(usePattern
+									? { pattern: paragraphIdPattern }
+									: paragraphIds.length
+										? { enum: paragraphIds }
+										: {}),
+							},
 							category: { type: 'string', enum: categories },
 						},
 					},
@@ -91,24 +103,33 @@ const tools: Tool[] = [
 			},
 			required: ['issues'],
 		},
-	},
-]
+	}
+}
 
-function reviewTools(chapter: ReviewContext) {
-	if (!chapter.bible && !Object.keys(chapter.terms ?? {}).length) return tools
-	return tools.map((tool) =>
-		tool.name === 'read_bible'
-			? {
-					...tool,
-					description:
-						'Read Bible context. Select a Markdown section, an entry ID, or an inclusive glossary range (section=glossary, from/to are term keys).',
-					parameters: {
-						...strings('section', 'entry', 'from', 'to'),
-						required: [],
-					},
-				}
-			: tool,
-	)
+function reviewTools(chapter: ReviewContext, usePattern = false) {
+	const scoped = tools.map((tool) => {
+		if (
+			tool.name === 'read_bible' &&
+			(chapter.bible || Object.keys(chapter.terms ?? {}).length)
+		)
+			return {
+				...tool,
+				description:
+					'Read Bible context. Select a Markdown section, an entry ID, or an inclusive glossary range (section=glossary, from/to are term keys).',
+				parameters: {
+					...strings('section', 'entry', 'from', 'to'),
+					required: [],
+				},
+			}
+		return tool
+	})
+	return [
+		...scoped,
+		citationTool(
+			chapter.paragraphs.map(({ id }) => id),
+			usePattern,
+		),
+	]
 }
 
 function bibleSection(bible: string, selector: string) {
@@ -165,14 +186,16 @@ function fidelityPrompt(
 	partial: boolean,
 ) {
 	return [
-		'Check source fidelity only: omissions, inventions, changed dialogue, speaker attribution, downgraded inner speech, sequence, and Bible contradictions. Do not review prose style.',
-		'Use read_source_range to check the source. Each issue must cite a non-blank verbatim quote inside the named paragraph. Call submit_review when done, even if there are zero issues.',
+		'Review fidelity, not style: omissions, inventions, dialogue, speakers, inner speech, sequence, Bible contradictions.',
+		'Use submit_review even with no issues.',
+		'Source text (via read_source_range): cite a source paragraph ID and a verbatim quote.',
 		`Source paragraph IDs: ${chapter.paragraphs.map(({ id }) => id).join(', ')}`,
 		...(partial
 			? [
-					'This is an excerpt of a scene. Only report findings supported by the available script and source; do not infer omissions from the excerpt boundaries.',
+					'Scene excerpt: report only supported findings; do not infer omissions at excerpt boundaries.',
 				]
 			: []),
+		'Draft script (comparison only): never cite draft line IDs or text.',
 		script,
 	].join('\n')
 }
@@ -183,12 +206,12 @@ export async function reviewFidelity(
 	script: string,
 	aligner: () => ReturnType<typeof writingModel>,
 ) {
-	const activeTools = reviewTools(chapter)
 	const { heading } = sceneBody(script)
 	const fits = (
 		paragraphs: readonly SourceParagraph[],
 		draft: string,
 		partial: boolean,
+		usePattern = false,
 	) => {
 		const id = 'call_'.padEnd(64, 'x')
 		const name = 'read_source_range'
@@ -209,7 +232,7 @@ export async function reviewFidelity(
 		const limits = { ...model, inputLimit: model.inputLimit - argumentsSize }
 		return [JSON.stringify(paragraphs), overflow].every((reply) =>
 			promptFits(limits, {
-				tools: activeTools,
+				tools: reviewTools({ ...chapter, paragraphs }, usePattern),
 				messages: [
 					userMessage(
 						fidelityPrompt({ ...chapter, paragraphs }, draft, partial),
@@ -220,7 +243,7 @@ export async function reviewFidelity(
 		)
 	}
 	if (fits(chapter.paragraphs, script, false))
-		return reviewWindow(model, chapter, script, false, activeTools)
+		return reviewWindow(model, chapter, script, false)
 
 	const issues = new Map<string, FidelityIssue>()
 	for (const { paragraphs, lines } of await scopeScene(
@@ -231,28 +254,35 @@ export async function reviewFidelity(
 		const excerpt = (body: readonly string[]) =>
 			scopedScene(heading, paragraphs, body)
 		const whole = excerpt(lines)
-		if (fits(paragraphs, whole, false)) {
+		const wholeFits = fits(paragraphs, whole, false)
+		if (
+			wholeFits ||
+			(lines.length <= 1 && fits(paragraphs, whole, false, true))
+		) {
 			for (const issue of await reviewWindow(
 				model,
 				{ ...chapter, paragraphs },
 				whole,
 				false,
-				activeTools,
+				!wholeFits,
 			))
 				issues.set(JSON.stringify(issue), issue)
 			continue
 		}
 		for (const body of fitUnits(
 			lines.length ? lines : [''],
-			(batch) => fits(paragraphs, excerpt(batch), true),
+			(batch) =>
+				fits(paragraphs, excerpt(batch), true) ||
+				(batch.length === 1 && fits(paragraphs, excerpt(batch), true, true)),
 			'Fidelity scene line',
 		)) {
+			const draft = excerpt(body)
 			for (const issue of await reviewWindow(
 				model,
 				{ ...chapter, paragraphs },
-				excerpt(body),
+				draft,
 				true,
-				activeTools,
+				!fits(paragraphs, draft, true),
 			))
 				issues.set(JSON.stringify(issue), issue)
 		}
@@ -281,8 +311,9 @@ async function reviewWindow(
 	chapter: ReviewContext,
 	script: string,
 	partial: boolean,
-	activeTools: Tool[],
+	usePattern = false,
 ) {
+	const activeTools = reviewTools(chapter, usePattern)
 	const messages: Message[] = [
 		userMessage(fidelityPrompt(chapter, script, partial)),
 	]
@@ -351,7 +382,11 @@ async function reviewWindow(
 								Math.max(index - 1, 0),
 								Math.max(index + 2, 3),
 							)
-							error = `Quote not found in ${invalid.paragraphId}; use read_source_range for nearby IDs ${nearby.map(({ id }) => id).join(', ')}.`
+							const sourceIds = nearby.map(({ id }) => id).join(', ')
+							error =
+								index < 0 && /^#?[0-9a-f]{4}$/i.test(invalid.paragraphId)
+									? `You cited draft line #${invalid.paragraphId.replace(/^#/, '')}; cite source paragraph IDs (${sourceIds}) with text quoted verbatim from the source. Use read_source_range to read those paragraphs.`
+									: `Quote not found in ${invalid.paragraphId}; use read_source_range for nearby IDs ${sourceIds}.`
 						} else {
 							submitted = checked.value.issues
 							value = 'Accepted'

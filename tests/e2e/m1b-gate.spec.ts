@@ -154,6 +154,43 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			await expect(page.getByText('已发布', { exact: true })).toBeVisible()
 			expect(published()).toEqual(['ch0001'])
 			await capture(page, '03-confirm-first')
+			const priorUrl = await page.evaluate(() => location.hash)
+			const workId = priorUrl.match(/\/work\/([^/?]+)/)?.[1]
+			expect(workId).toBeTruthy()
+			const firstChapter = { workId: workId as string, chapterId: 'ch0001' }
+			const editorUrl = `#/work/${workId}/edit?chapterId=ch0001`
+			await page.evaluate((hash) => {
+				location.hash = hash
+			}, editorUrl)
+			const banners = page.getByRole('region', { name: '新标记提议' })
+			const dusk = banners.filter({ hasText: 'dusk-glow' })
+			const boat = banners.filter({ hasText: 'boat-trail' })
+			await expect(dusk.getByText('逐字')).toBeVisible()
+			await expect(dusk.getByText('color: #aabbff;')).toBeVisible()
+			await expect(boat.getByText('整段')).toBeVisible()
+			const marks = page.getByRole('combobox', { name: '文本标记' })
+			await expect(marks.locator('option[value="dusk-glow"]')).toHaveCount(0)
+			await expect(dusk).toBeInViewport()
+			await expect(boat).toBeInViewport()
+			await capture(page, '06-editor-pending-marks')
+			await dusk.getByRole('button', { name: '接受标记' }).click()
+			await expect(dusk).toHaveCount(0)
+			await expect(marks.locator('option[value="dusk-glow"]')).toHaveCount(1)
+			await boat.getByRole('button', { name: '拒绝标记' }).click()
+			await expect(banners).toHaveCount(0)
+			await expect(marks.locator('option[value="boat-trail"]')).toHaveCount(0)
+			const reopened = await page.evaluate(
+				(target) => window.novelive.call('editor.open', target).promise,
+				firstChapter,
+			)
+			expect(reopened.chapter.markSuggestions).toEqual([])
+			expect(reopened.settings.customMarks).toEqual({
+				'dusk-glow': { css: 'color: #aabbff;', perChar: true },
+			})
+			await capture(page, '07-editor-marks-resolved')
+			await page.evaluate((hash) => {
+				location.hash = hash
+			}, priorUrl)
 			await page.getByRole('link', { name: '试玩第一章' }).click()
 			await expect(
 				page.locator('.nl-text-display').filter({

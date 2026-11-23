@@ -2,6 +2,7 @@ import type { AssetRegistry } from '@novelive/format/model'
 import { Application, Sprite, Texture } from 'pixi.js'
 
 export { mountMinimalPlayer } from './minimal'
+export { effectiveMarkCss } from './text/custom-marks'
 
 type AssetId = AssetRegistry['entries'][number]['id']
 
