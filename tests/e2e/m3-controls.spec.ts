@@ -93,6 +93,12 @@ test.describe('M3 player controls', () => {
 				page.getByLabel('自动播放', { exact: true }),
 			).not.toBeChecked()
 			await expect(page.getByLabel('跳过已读')).not.toBeChecked()
+			await page.getByRole('button', { name: '读档', exact: true }).click()
+			await expect(
+				page.getByRole('button', { name: '返回菜单', exact: true }),
+			).toBeFocused()
+			await menu()
+			await menu()
 			await page.getByRole('button', { name: '存档', exact: true }).click()
 			await expect(page.locator('.nl-save-grid button')).toHaveCount(60)
 			await page

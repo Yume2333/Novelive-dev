@@ -64,7 +64,9 @@ export function PlayerControls({
 	useEffect(() => {
 		if (screen)
 			panel.current
-				?.querySelector<HTMLElement>('button, input, select')
+				?.querySelector<HTMLElement>(
+					'button:not(:disabled), input:not(:disabled), select:not(:disabled)',
+				)
 				?.focus()
 	}, [screen])
 	useEffect(
