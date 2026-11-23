@@ -4,9 +4,13 @@ import {
 	contentText,
 	type Message,
 } from '@earendil-works/pi-ai'
-import { streamSimple } from '@earendil-works/pi-ai/compat'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
-import { buildTextModel, type TextConnection } from '../models/text'
+import {
+	buildTextModel,
+	createTextStream,
+	type TextConnection,
+	textResultError,
+} from '../models/text'
 import { createReplayFetch, type ReplayOptions } from '../replay'
 
 export class ChatModels {
@@ -24,12 +28,17 @@ export class ChatModels {
 		onEvent?: Parameters<Agent['subscribe']>[0],
 	) {
 		signal.throwIfAborted()
+		const stream = createTextStream({
+			fetch: this.fetch,
+			streaming: true,
+			requestRetries: 0,
+			streamRetries: 0,
+		})
 		const agent = new Agent({
 			...options,
 			streamFn: (model, context, options) =>
-				streamSimple(model, context, {
+				stream(model, context, {
 					...options,
-					fetch: this.fetch,
 					cacheRetention: 'none',
 					timeoutMs: 90_000,
 				}),
@@ -57,7 +66,12 @@ export class ChatModels {
 			if (prompt) await agent.prompt(prompt)
 			else await agent.continue()
 			signal.throwIfAborted()
-			if (agent.state.errorMessage) throw new Error(agent.state.errorMessage)
+			if (agent.state.errorMessage) {
+				const last = agent.state.messages.at(-1)
+				if (last?.role === 'assistant')
+					throw textResultError(last, agent.state.errorMessage)
+				throw new Error(agent.state.errorMessage)
+			}
 			return agent.state.messages
 		} finally {
 			unsubscribe?.()
@@ -71,7 +85,11 @@ export class ChatModels {
 		messages: Message[],
 		signal: AbortSignal,
 	) {
-		const stream = streamSimple(
+		const stream = createTextStream({
+			fetch: this.fetch,
+			requestRetries: 0,
+			streamRetries: 0,
+		})(
 			buildTextModel(connection),
 			normalizeContext({
 				systemPrompt:
@@ -89,7 +107,6 @@ export class ChatModels {
 			{
 				apiKey: connection.apiKey,
 				signal,
-				fetch: this.fetch,
 				cacheRetention: 'none',
 				timeoutMs: 90_000,
 			},
@@ -98,7 +115,7 @@ export class ChatModels {
 		signal.throwIfAborted()
 		const summary = contentText(result.content).trim()
 		if (result.stopReason !== 'stop' || !summary)
-			throw new Error(result.errorMessage ?? '会话压缩未返回摘要')
+			throw textResultError(result, '会话压缩未返回摘要')
 		return summary
 	}
 }

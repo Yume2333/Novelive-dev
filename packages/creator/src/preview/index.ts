@@ -13,7 +13,9 @@ import {
 import {
 	buildTextModel,
 	createTextStream,
+	outputTokenBudget,
 	type TextConnection,
+	textResultError,
 } from '../models/text'
 import type { Project } from '../project'
 
@@ -126,7 +128,7 @@ export async function previewBook(
 ): Promise<{ previews: ChapterPreview[]; digests: PreviewDigest[] }> {
 	const model = buildTextModel(options.connection)
 	const stream = createTextStream({ fetch: options.fetch })
-	const outputTokens = Math.min(4096, Math.floor(model.contextWindow / 4))
+	const outputTokens = outputTokenBudget(model)
 	// Four tokens per UTF-16 unit conservatively cover UTF-8, with room for repair.
 	const budget = Math.floor((model.contextWindow - outputTokens - 1024) / 4)
 	if (budget < 1) throw new Error('Insufficient preview context')
@@ -142,13 +144,11 @@ export async function previewBook(
 			const result = await stream(model, normalizeContext({ messages }), {
 				apiKey: options.connection.apiKey,
 				signal: options.signal,
-				maxTokens: outputTokens,
+				outputLimit: outputTokens,
 				cacheRetention: 'none',
 			}).result()
 			if (['error', 'aborted', 'length'].includes(result.stopReason))
-				throw new Error(
-					result.errorMessage ?? `Preview stopped: ${result.stopReason}`,
-				)
+				throw textResultError(result, `Preview stopped: ${result.stopReason}`)
 			const text = result.content
 				.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 				.join('')

@@ -59,6 +59,7 @@ const error = obj({
 		'moderation',
 		'invalid_config',
 		'context_limit',
+		'reasoning_limit',
 		'stale_revision',
 		'cancelled',
 		'creator_down',

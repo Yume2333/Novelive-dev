@@ -123,11 +123,12 @@ function integer(text: string, minimum: number) {
 }
 
 function textDraft(model: TextModel) {
-	const { apiKeyMasked, contextWindow, ...rest } = model
+	const { apiKeyMasked, contextWindow, maxOutputTokens, ...rest } = model
 	return {
 		...rest,
 		apiKey: apiKeyMasked as string,
 		context: contextWindow?.toString() ?? '',
+		output: maxOutputTokens?.toString() ?? '',
 	}
 }
 
@@ -168,7 +169,7 @@ export function useTextFields(
 		dirty: JSON.stringify(draft) !== JSON.stringify(textDraft(saved)),
 		async save() {
 			revision.current++
-			const { context, ...model } = draft
+			const { context, output, ...model } = draft
 			const result = await update({
 				models: {
 					[slot]: {
@@ -176,6 +177,7 @@ export function useTextFields(
 						baseUrl: model.baseUrl.trim(),
 						model: model.model.trim(),
 						contextWindow: context.trim() ? integer(context, 4096) : null,
+						maxOutputTokens: output.trim() ? integer(output, 1) : null,
 					},
 				},
 			})
@@ -246,7 +248,7 @@ export function useTextFields(
 					value={draft.model}
 					placeholder="模型名"
 					onChange={(event) =>
-						change({ model: event.target.value, context: '' })
+						change({ model: event.target.value, context: '', output: '' })
 					}
 					onBlur={() => {
 						if (lastModel.current !== draft.model) {
@@ -261,6 +263,13 @@ export function useTextFields(
 					inputMode="numeric"
 					placeholder="模型上下文窗口 tokens（至少 4096）"
 					onChange={(event) => change({ context: event.target.value })}
+				/>
+				<Input
+					label="最大输出量"
+					value={draft.output}
+					inputMode="numeric"
+					placeholder="留空则按模型自动设置"
+					onChange={(event) => change({ output: event.target.value })}
 				/>
 				<ApiKeyInput
 					value={inherited ? fast.apiKeyMasked : draft.apiKey}

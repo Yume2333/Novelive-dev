@@ -3,8 +3,10 @@ import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import {
 	buildTextModel,
 	createTextStream,
+	outputTokenBudget,
 	type TextConnection,
 	TextModelError,
+	textResultError,
 } from '../../models/text'
 import { fitPrompt } from './budget'
 
@@ -30,10 +32,11 @@ export function writingModel(
 			? { requestRetries: 0, streamRetries: 0 }
 			: {}),
 	})
+	const outputLimit = outputTokenBudget(model)
 	const outputTokens = Math.min(
 		4096,
-		model.maxTokens,
 		Math.floor(model.contextWindow / 4),
+		outputLimit,
 	)
 	const limits = {
 		outputTokens,
@@ -55,16 +58,13 @@ export function writingModel(
 					apiKey: connection.apiKey,
 					signal: options.signal,
 					cacheRetention: 'none',
-					maxTokens: outputTokens,
+					outputLimit,
+					maxTokens: connection.maxOutputTokens ?? undefined,
 				},
 			).result()
 			options.signal?.throwIfAborted()
 			if (result.stopReason === 'error' || result.stopReason === 'aborted') {
-				const message = result.errorMessage ?? 'Writing model failed'
-				const code = message.match(/^\[([a-z_]+)\]/)?.[1] as
-					| TextModelError['code']
-					| undefined
-				throw new TextModelError(code ?? 'internal', message, result.usage)
+				throw textResultError(result, 'Writing model failed')
 			}
 			if (result.stopReason === 'length')
 				throw new TruncatedWritingError(result.usage)

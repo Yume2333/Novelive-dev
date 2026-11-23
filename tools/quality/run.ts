@@ -20,6 +20,7 @@ export function evaluateFixtures(
 			...endpoint,
 			model,
 			contextWindow,
+			...(mode === 'strict' ? { maxOutputTokens: 4096 } : {}),
 			format: 'openai-completions',
 			compat: 'auto',
 		},

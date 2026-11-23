@@ -15,6 +15,7 @@ const text = {
 	baseUrl,
 	apiKey,
 	contextWindow: 12_000,
+	maxOutputTokens: 4096,
 	format: 'openai-completions',
 	compat: 'auto',
 } as const

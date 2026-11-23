@@ -9,12 +9,14 @@ import {
 	type StreamFunction,
 	type Usage,
 } from '@earendil-works/pi-ai'
+import { clampMaxTokensToContext } from '@earendil-works/pi-ai/api/simple-options'
 import { streamSimple } from '@earendil-works/pi-ai/compat'
 import {
 	type BuiltinProvider,
 	getBuiltinModels,
 	getBuiltinProviders,
 } from '@earendil-works/pi-ai/providers/all'
+import { estimateContextTokens } from '@earendil-works/pi-ai/utils/estimate'
 import { isRetryableAssistantError } from '@earendil-works/pi-ai/utils/retry'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import type { MaskedConfig } from '../../config/index.js'
@@ -37,9 +39,37 @@ const vendors: Record<Exclude<Settings['compat'], 'auto'>, BuiltinProvider> = {
 	'anthropic-compat': 'anthropic',
 }
 const minimumContext = 4096
+const relayReasoningModels = new Set(['devin-swe-2'])
 const watchdogMs = 90_000
 const cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
 const noUsage: Usage = { ...cost, totalTokens: 0, cost: { ...cost, total: 0 } }
+
+function sumUsage(first: Usage, last: Usage): Usage {
+	return {
+		input: first.input + last.input,
+		output: first.output + last.output,
+		cacheRead: first.cacheRead + last.cacheRead,
+		cacheWrite: first.cacheWrite + last.cacheWrite,
+		...(first.cacheWrite1h !== undefined || last.cacheWrite1h !== undefined
+			? { cacheWrite1h: (first.cacheWrite1h ?? 0) + (last.cacheWrite1h ?? 0) }
+			: {}),
+		...(first.reasoning !== undefined || last.reasoning !== undefined
+			? { reasoning: (first.reasoning ?? 0) + (last.reasoning ?? 0) }
+			: {}),
+		totalTokens: first.totalTokens + last.totalTokens,
+		cost: {
+			input: first.cost.input + last.cost.input,
+			output: first.cost.output + last.cost.output,
+			cacheRead: first.cost.cacheRead + last.cost.cacheRead,
+			cacheWrite: first.cost.cacheWrite + last.cost.cacheWrite,
+			total: first.cost.total + last.cost.total,
+			totalFromProvider:
+				first.cost.totalFromProvider === true &&
+				last.cost.totalFromProvider === true,
+		},
+	}
+}
+
 export const textConnectionImage: ImageContent = {
 	type: 'image',
 	mimeType: 'image/png',
@@ -127,6 +157,7 @@ export function buildTextModel(
 		)
 	}
 	const provider = config.compat === 'auto' ? 'custom' : vendor(config)
+	const relayReasoning = relayReasoningModels.has(config.model)
 	const nativeCompat =
 		entry?.provider === provider && entry.api === config.format
 			? entry.compat
@@ -147,13 +178,31 @@ export function buildTextModel(
 		baseUrl: url.href.replace(/\/$/, ''),
 		input: image ? ['text', 'image'] : (entry?.input ?? ['text']),
 		cost: entry?.cost ?? cost,
-		reasoning: entry?.reasoning ?? false,
-		thinkingLevelMap:
-			entry?.api === config.format ? entry.thinkingLevelMap : undefined,
+		reasoning: entry?.reasoning ?? relayReasoning,
+		thinkingLevelMap: relayReasoning
+			? { off: null }
+			: entry?.api === config.format
+				? entry.thinkingLevelMap
+				: undefined,
 		contextWindow,
-		maxTokens: Math.min(contextWindow, entry?.maxTokens ?? 4096),
+		maxTokens: Math.min(
+			contextWindow,
+			config.maxOutputTokens ??
+				entry?.maxTokens ??
+				Math.floor(contextWindow / 2),
+			entry?.maxTokens ?? contextWindow,
+		),
 		compat: nativeCompat ?? qwenCompat,
 	}
+}
+
+export function outputTokenBudget(
+	model: Pick<Model<Api>, 'reasoning' | 'contextWindow' | 'maxTokens'>,
+) {
+	return Math.min(
+		model.maxTokens,
+		Math.floor(model.contextWindow / (model.reasoning ? 2 : 4)),
+	)
 }
 
 const descriptions: Partial<Record<Code, string>> = {
@@ -162,6 +211,7 @@ const descriptions: Partial<Record<Code, string>> = {
 	network: 'Model connection interrupted or unavailable',
 	moderation: 'Model declined the request due to content moderation',
 	invalid_config: 'Model request configuration was rejected',
+	reasoning_limit: 'Model generated reasoning but no answer',
 	cancelled: 'Model request cancelled',
 	internal: 'Model returned an unexpected response',
 }
@@ -244,17 +294,49 @@ type StreamPolicy = {
 	idleMs?: number
 	requestRetries?: number
 	streamRetries?: number
+	streaming?: boolean
 }
+
+type TextStreamOptions = SimpleStreamOptions & { outputLimit?: number }
 
 export function createTextStream(
 	policy: StreamPolicy = {},
-): StreamFunction<Api, SimpleStreamOptions> {
+): StreamFunction<Api, TextStreamOptions> {
 	const fetch = policy.fetch ?? createReplayFetch()
 	return (model, context, options) => {
 		const output = createAssistantMessageEventStream()
 		const limit = policy.streamRetries ?? 2
+		const smallCompletionsWindow =
+			model.reasoning &&
+			model.api === 'openai-completions' &&
+			model.contextWindow <= 8192
+		const input = smallCompletionsWindow
+			? estimateContextTokens(context).tokens
+			: 0
+		const smallWindowRoom = smallCompletionsWindow
+			? Math.max(
+					1,
+					model.contextWindow - input - Math.max(256, Math.ceil(input * 0.15)),
+				)
+			: Infinity
+		const outputLimit = Math.min(
+			model.maxTokens,
+			smallWindowRoom,
+			options?.outputLimit ??
+				(model.reasoning ? outputTokenBudget(model) : model.maxTokens),
+		)
+		let maxTokens = Math.min(
+			outputLimit,
+			options?.maxTokens ??
+				(model.reasoning
+					? Math.max(1, Math.floor(outputLimit * 0.75))
+					: outputLimit),
+		)
+		let usage: Usage | undefined
+		let reasoningRetried = false
 		const fail = (code: Code, detail?: string, previous?: AssistantMessage) => {
 			const error = failed(model, code, detail, previous)
+			if (usage) error.usage = usage
 			output.push({
 				type: 'error',
 				reason: code === 'cancelled' ? 'aborted' : 'error',
@@ -262,7 +344,7 @@ export function createTextStream(
 			})
 		}
 		async function run() {
-			for (let attempt = 0; attempt <= limit; attempt++) {
+			for (let attempt = 0; ; ) {
 				if (options?.signal?.aborted) return fail('cancelled')
 				const idle = new AbortController()
 				const signal = options?.signal
@@ -277,10 +359,28 @@ export function createTextStream(
 					timer = setTimeout(() => idle.abort(), policy.idleMs ?? watchdogMs)
 				}
 				const buffered: AssistantMessageEvent[] = []
+				let live = false
 				let result: AssistantMessage
 				try {
 					const stream = streamSimple(model, context, {
 						...options,
+						maxTokens,
+						async onPayload(payload, currentModel) {
+							// pi reserves 4096 tokens even on a 4096-token model.
+							if (
+								smallCompletionsWindow &&
+								typeof payload === 'object' &&
+								payload !== null
+							) {
+								const key = Object.hasOwn(payload, 'max_completion_tokens')
+									? 'max_completion_tokens'
+									: 'max_tokens'
+								payload = { ...payload, [key]: maxTokens }
+							}
+							return (
+								(await options?.onPayload?.(payload, currentModel)) ?? payload
+							)
+						},
 						signal,
 						timeoutMs: options?.timeoutMs ?? watchdogMs,
 						maxRetries: policy.requestRetries ?? 2,
@@ -312,11 +412,26 @@ export function createTextStream(
 							await options?.onProviderStreamEvent?.(event, currentModel)
 						},
 					})
-					for await (const event of stream) buffered.push(event)
+					for await (const event of stream) {
+						if (event.type === 'done' || event.type === 'error') continue
+						if (
+							!live &&
+							policy.streaming &&
+							((event.type === 'text_delta' && event.delta.trim()) ||
+								event.type === 'toolcall_start')
+						) {
+							live = true
+							for (const pending of buffered) output.push(pending)
+							buffered.length = 0
+						}
+						if (live) output.push(event)
+						else buffered.push(event)
+					}
 					result = await stream.result()
 				} finally {
 					clearTimeout(timer)
 				}
+				usage = usage ? sumUsage(usage, result.usage) : result.usage
 				if (options?.signal?.aborted)
 					return fail('cancelled', undefined, result)
 				const empty =
@@ -329,12 +444,38 @@ export function createTextStream(
 				const watchdog = idle.signal.aborted
 				if (
 					!watchdog &&
+					empty &&
+					result.content.some(
+						(part) => part.type === 'thinking' && part.thinking.trim(),
+					)
+				) {
+					const raised = Math.min(maxTokens * 2, outputLimit)
+					const canRaise = smallCompletionsWindow
+						? raised > maxTokens
+						: clampMaxTokensToContext(model, context, raised) >
+							clampMaxTokensToContext(model, context, maxTokens)
+					if (!reasoningRetried && !live && canRaise) {
+						reasoningRetried = true
+						maxTokens = raised
+						continue
+					}
+					return fail('reasoning_limit', undefined, result)
+				}
+				if (
+					!watchdog &&
 					!empty &&
 					result.stopReason !== 'error' &&
-					result.stopReason !== 'aborted'
+					result.stopReason !== 'aborted' &&
+					result.stopReason !== 'pending'
 				) {
+					const message = { ...result, usage }
 					for (const event of buffered) output.push(event)
-					return output.end(result)
+					output.push({
+						type: 'done',
+						reason: result.stopReason,
+						message,
+					})
+					return output.end(message)
 				}
 				const code =
 					watchdog || empty ? 'network' : classify(result, status, fields)
@@ -347,7 +488,10 @@ export function createTextStream(
 						status < 500 &&
 						temporary.test(fields) &&
 						![408, 409, 429].includes(status))
-				if (code === 'network' && retryable && attempt < limit) continue
+				if (code === 'network' && retryable && !live && attempt < limit) {
+					attempt++
+					continue
+				}
 				return fail(
 					code,
 					watchdog
@@ -367,6 +511,16 @@ export function createTextStream(
 }
 
 const descriptionsByPrefix = /^\[([a-z_]+)\] /
+
+export function textResultError(result: AssistantMessage, fallback: string) {
+	const message = result.errorMessage ?? fallback
+	const match = descriptionsByPrefix.exec(message)
+	return new TextModelError(
+		(match?.[1] as Code | undefined) ?? 'internal',
+		message,
+		result.usage,
+	)
+}
 
 export async function testTextConnection(
 	config: TextConnection,
@@ -401,13 +555,7 @@ export async function testTextConnection(
 	)
 	const result = await stream.result()
 	if (result.stopReason === 'error' || result.stopReason === 'aborted') {
-		const message = result.errorMessage ?? ''
-		const match = descriptionsByPrefix.exec(message)
-		throw new TextModelError(
-			(match?.[1] as Code | undefined) ?? 'internal',
-			message.replace(descriptionsByPrefix, ''),
-			result.usage,
-		)
+		throw textResultError(result, 'Model connection test failed')
 	}
 	return { usage: result.usage }
 }

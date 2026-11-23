@@ -132,6 +132,20 @@ function resolvedTurn(store: ChatStore, turn: Turn, parts: Part[]) {
 		}),
 	)
 	const messages = turn.map((message) => {
+		if (
+			message.role === 'assistant' &&
+			(message.stopReason === 'error' || message.stopReason === 'aborted')
+		) {
+			const { errorMessage: _, ...partial } = message
+			return {
+				...partial,
+				stopReason: 'stop' as const,
+				content: [
+					{ type: 'text' as const, text: '[Interrupted response]\n' },
+					...partial.content,
+				],
+			}
+		}
 		if (message.role !== 'toolResult') return message
 		const outcome = outcomes.get(message.toolCallId)
 		return outcome ? { ...message, content: toolResult(outcome) } : message

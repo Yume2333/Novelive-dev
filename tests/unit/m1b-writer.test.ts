@@ -94,7 +94,7 @@ describe('M1b writer', () => {
 				throw new Error('Network forbidden')
 			},
 		})
-		const result = await runRecording(fixtureOptions(replay))
+		const result = await runRecording(fixtureOptions(replay, undefined, 4096))
 		expect(result.scenes).toHaveLength(1)
 		expect(result.scenes[0].scene.source).toMatchObject({
 			from: 'p0001',

@@ -20,6 +20,91 @@ async function openFixture(...options: Parameters<typeof createChatFixture>) {
 	return fixture
 }
 
+test('preserves an interrupted reply in reopened history and follow-up context', async () => {
+	let body!: ReadableStreamDefaultController<Uint8Array>
+	const incoming = new ReadableStream<Uint8Array>({
+		start(controller) {
+			body = controller
+			const chunk = {
+				choices: [{ index: 0, delta: { content: 'Visible text' } }],
+			}
+			controller.enqueue(
+				new TextEncoder().encode(`data: ${JSON.stringify(chunk)}\n\n`),
+			)
+		},
+	})
+	const requests: unknown[] = []
+	const chat = await openFixture({
+		replay: {
+			mode: 'replay',
+			fetch: async (input, init) => {
+				const request = await new Request(input, init).json()
+				requests.push(request.messages)
+				if (requests.length > 1) {
+					const chunk = {
+						choices: [
+							{
+								index: 0,
+								delta: { content: 'Continued' },
+								finish_reason: 'stop',
+							},
+						],
+					}
+					return new Response(
+						`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
+						{
+							headers: { 'content-type': 'text/event-stream' },
+						},
+					)
+				}
+				return new Response(incoming, {
+					headers: { 'content-type': 'text/event-stream' },
+				})
+			},
+		},
+	})
+	const { session } = await chat.call('chat.create', { workId })
+	const headId = await chat.send(session.sessionId, 'Test an interrupted reply')
+	const parts = [{ type: 'text', text: 'Visible text' }]
+	await chat.waitFor(
+		(event) =>
+			event.headId === headId &&
+			event.status === 'streaming' &&
+			event.message.parts.some((part) => part.type === 'text'),
+	)
+	body.error(new Error('Connection interrupted'))
+	expect(
+		await chat.waitFor(
+			(event) => event.headId === headId && event.status !== 'streaming',
+		),
+	).toMatchObject({
+		status: 'failed',
+		message: { status: 'failed', parts },
+	})
+	await chat.reopen()
+	const snapshot = await chat.call('chat.get', {
+		workId,
+		sessionId: session.sessionId,
+	})
+	expect(snapshot.entries.at(-1)).toMatchObject({
+		id: headId,
+		status: 'failed',
+		parts,
+	})
+	await chat.done(
+		await chat.send(session.sessionId, 'Continue the reply', headId),
+	)
+	expect(requests).toHaveLength(2)
+	expect(requests[1]).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				role: 'assistant',
+				content: '[Interrupted response]\nVisible text',
+			}),
+		]),
+	)
+})
+
 test('streams an attached image reply, cancels a retry, and reopens both branches', async () => {
 	const chat = await openFixture()
 	const {

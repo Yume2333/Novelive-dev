@@ -13,6 +13,7 @@ import {
 	buildTextModel,
 	createTextStream,
 	type TextConnection,
+	textResultError,
 } from '../../models/text'
 import { createReplayFetch, type ReplayOptions } from '../../replay'
 import type { Dimensions } from './check'
@@ -184,9 +185,7 @@ export async function artJson<T>(
 	options.signal?.throwIfAborted()
 	if (replay.failure) throw replay.failure
 	if (response.stopReason !== 'stop')
-		throw new Error(
-			response.errorMessage ?? `Art model stopped: ${response.stopReason}`,
-		)
+		throw textResultError(response, `Art model stopped: ${response.stopReason}`)
 	const text = response.content
 		.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 		.join('')

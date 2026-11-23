@@ -5,7 +5,7 @@ import {
 	lit,
 	nullable,
 	num,
-	type Optional,
+	Optional,
 	obj,
 	oneOf,
 	opt,
@@ -39,6 +39,9 @@ const textFields = {
 	]),
 	contextWindow: nullable(
 		int({ minimum: 4096, maximum: Number.MAX_SAFE_INTEGER }),
+	),
+	maxOutputTokens: opt(
+		nullable(int({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })),
 	),
 }
 export const textCatalogSchema = obj({
@@ -136,11 +139,16 @@ const configErrorSchema = obj({
 	configError: obj({ path: str(), reason: str() }),
 })
 
-function optionalFields<T extends Record<string, Schema>>(fields: T) {
+function optionalFields<T extends Record<string, Schema | Optional>>(
+	fields: T,
+) {
 	return Object.fromEntries(
-		Object.entries(fields).map(([key, schema]) => [key, opt(schema)]),
+		Object.entries(fields).map(([key, schema]) => [
+			key,
+			schema instanceof Optional ? schema : opt(schema),
+		]),
 	) as {
-		[K in keyof T]: Optional<T[K]>
+		[K in keyof T]: T[K] extends Schema ? Optional<T[K]> : T[K]
 	}
 }
 
