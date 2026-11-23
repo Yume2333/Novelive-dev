@@ -78,6 +78,11 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 				.getByRole('status')
 				.filter({ hasText: '本地去背景不可用' })
 			await expect(matting).toBeVisible()
+			const dismissMatting = page.getByRole('button', { name: '关闭提示' })
+			await expect(dismissMatting.locator('svg')).toHaveAttribute(
+				'stroke-width',
+				'1.8',
+			)
 			await page.getByRole('button', { name: '关闭提示' }).click()
 			await expect(matting).toHaveCount(0)
 			const main = page.getByRole('group', { name: '主视觉', exact: true })
