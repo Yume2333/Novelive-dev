@@ -27,6 +27,9 @@ let lifecycle: ReturnType<typeof installLifecycle>
 let closeNotifications: (() => void) | undefined
 const failureLimit = 3
 const handshakeTimeoutMs = 10_000
+const primaryInstance = app.requestSingleInstanceLock()
+if (!primaryInstance) app.quit()
+else app.on('second-instance', () => lifecycle?.show())
 
 protocol.registerSchemesAsPrivileged([
 	{
@@ -160,6 +163,7 @@ function openLibrary() {
 }
 
 app.whenReady().then(async () => {
+	if (!primaryInstance) return
 	await installProgressIpc(() => library)
 	lifecycle = installLifecycle({
 		window: () => library,

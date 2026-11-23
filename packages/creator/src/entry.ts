@@ -191,6 +191,9 @@ registry.register('editor.saveRules', async (input) => {
 })
 const chats = new Map<string, ReturnType<typeof openChat>>()
 const events = new EventReplay()
+// Sequences belong to this creator generation. Reopened sessions republish their
+// persisted chapter records with new seqs; clients must reset afterSeq when the
+// creator generation changes.
 let eventSeq = 0
 let closingChat = false
 
@@ -406,9 +409,12 @@ registry.register(
 )
 
 registry.register('events.list', async ({ scope, scopeId, afterSeq }) => ({
-	...(scope === 'work'
-		? events.list(scopeId, afterSeq)
-		: { events: [], gap: false }),
+	...events.list(
+		scopeId,
+		afterSeq,
+		scope,
+		scope === 'work' && production ? (await production).records(scopeId) : [],
+	),
 	snapshot: scope === 'app' ? { ready: true, generation } : null,
 }))
 

@@ -42,6 +42,7 @@ export function createProduction(
 	const bindingsDir = join(dataDir, 'projects')
 	const binding = (workId: string) => join(bindingsDir, workId)
 	const sessions = new Map<string, ReturnType<typeof open>>()
+	const chapterRecords = new Map<string, EventEnvelope[]>()
 	const recoveredProjects = new Set<string>()
 	const preparations = new Map<string, ReturnType<typeof startPreparation>>()
 	let loading = 0
@@ -413,6 +414,7 @@ export function createProduction(
 				}
 			}
 			emit()
+			chapterRecords.set(workId, records)
 			return {
 				workId,
 				project,
@@ -488,6 +490,9 @@ export function createProduction(
 	return {
 		remember,
 		get,
+		records(workId: string): readonly EventEnvelope[] {
+			return chapterRecords.get(workId) ?? []
+		},
 		async getQueue() {
 			await ready()
 			return workQueue.snapshot()
@@ -524,6 +529,7 @@ export function createProduction(
 		},
 		async close() {
 			closing = true
+			chapterRecords.clear()
 			workQueue.close()
 			for (const preparation of preparations.values())
 				preparation.controller.abort()

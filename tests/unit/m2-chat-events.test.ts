@@ -15,6 +15,103 @@ function event(seq: number, text = 'text', scopeId = 'work'): EventEnvelope {
 	}
 }
 
+function chapter(seq: number, scopeId = 'work'): EventEnvelope {
+	return {
+		...event(seq, '', scopeId),
+		event: {
+			type: 'production.chapterRecord',
+			payload: {
+				workId: scopeId,
+				chapterId: 'ch1',
+				step: 'write',
+				status: 'done',
+				message: '已完成',
+			},
+		},
+	}
+}
+
+test('chapter backfill is filtered, sorted and deduplicated against live replay', () => {
+	const replay = new EventReplay()
+	const first = chapter(1)
+	const second = chapter(3)
+	replay.append(second)
+	expect(
+		replay.list('work', 0, 'work', [
+			second,
+			chapter(2, 'foreign'),
+			first,
+			first,
+		]),
+	).toEqual({ events: [first, second], gap: false })
+	expect(replay.list('work', 1, 'work', [second, first])).toEqual({
+		events: [second],
+		gap: false,
+	})
+	expect(replay.list('work', 3, 'work', [second, first])).toEqual({
+		events: [],
+		gap: false,
+	})
+})
+
+test('a new creator generation uses a fresh cursor for reconstructed records', () => {
+	const before = new EventReplay(1)
+	before.append(chapter(99))
+	before.append(event(100))
+	const restarted = new EventReplay(1)
+	restarted.append(chapter(1))
+	restarted.append(event(2, 'foreign', 'other'))
+	expect(restarted.list('work', 0, 'work', [chapter(1)])).toEqual({
+		events: [chapter(1)],
+		gap: false,
+	})
+	expect(restarted.list('work', 100, 'work', [chapter(1)])).toEqual({
+		events: [],
+		gap: false,
+	})
+})
+
+test('backfill repairs chapter eviction but cannot hide lost snapshots or chat events', () => {
+	const replay = new EventReplay(1)
+	replay.append(chapter(1))
+	replay.append(chapter(2))
+	replay.append(event(3, 'foreign', 'other'))
+	expect(replay.list('work', 0).gap).toBe(true)
+	expect(replay.list('work', 0, 'work', [chapter(1), chapter(2)])).toEqual({
+		events: [chapter(1), chapter(2)],
+		gap: false,
+	})
+	expect(replay.list('work', 0, 'work', [chapter(2)]).gap).toBe(true)
+	expect(replay.list('work', 1, 'work', [chapter(2)]).gap).toBe(false)
+	replay.append(event(4))
+	replay.append(event(5))
+	expect(replay.list('work', 0, 'work', [chapter(1), chapter(2)]).gap).toBe(
+		true,
+	)
+	expect(replay.list('work', 4, 'work', [chapter(1), chapter(2)]).gap).toBe(
+		false,
+	)
+})
+
+test('app replay returns available queue events separately from work backfill', () => {
+	const replay = new EventReplay()
+	const queue = {
+		...event(2),
+		scope: 'app' as const,
+		scopeId: 'app',
+		event: {
+			type: 'production.queue',
+			payload: { active: null, queued: [], inactive: [] },
+		},
+	}
+	replay.append(chapter(1, 'app'))
+	replay.append(queue)
+	expect(replay.list('app', 0, 'app', [chapter(1, 'app')])).toEqual({
+		events: [queue],
+		gap: false,
+	})
+})
+
 test('event replay is initially empty and filters work and sequence', () => {
 	const replay = new EventReplay()
 	expect(replay.list('work', 0)).toEqual({ events: [], gap: false })

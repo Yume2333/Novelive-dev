@@ -370,6 +370,22 @@ test('real process death preserves checkpoints and pauses active and queued work
 			{ purpose: 'review', status: 'cancelled' },
 		],
 	})
+	expect(host.records('unopened')).toEqual([])
+	expect(host.records(a.workId)).toBe(first.records)
+	expect(host.records(a.workId).map(({ event }) => event.payload)).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				chapterId: 'ch2',
+				step: 'write',
+				status: 'done',
+			}),
+			expect.objectContaining({
+				chapterId: 'ch2',
+				step: 'review',
+				status: 'cancelled',
+			}),
+		]),
+	)
 	expect(a.worker.calls).toEqual([])
 	expect(b.worker.calls).toEqual([])
 	expect(first.snapshot().status).toBe('stopped')
