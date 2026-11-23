@@ -48,11 +48,14 @@ const fetch: typeof globalThis.fetch = async (input, init) => {
 			assert.match(body.prompt, /Images 2–3 are style references/)
 			assert.match(body.prompt, /Image 1 is the .* base image/)
 		}
-		if (body.prompt.includes('previous costume base image'))
+		if (body.prompt.includes('previous costume base image')) {
 			assert.match(
 				body.prompt,
 				/Image 3 is the ada\/uniform\/neutral previous costume base image/,
 			)
+			assert.match(body.prompt, /identity reference for the subject/)
+			assert.match(body.prompt, /not the style reference’s pose or silhouette/)
+		}
 		if (
 			body.prompt.includes('Draw a full scene') &&
 			body.prompt.includes('Ada:')

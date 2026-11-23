@@ -82,6 +82,25 @@ const auditSchema = obj({
 	feedback: str(),
 })
 const contentSchema = obj({ content: str({ minLength: 1 }) })
+
+async function auditPreview(png: Buffer) {
+	const { hasAlpha, width, height } = await sharp(png).metadata()
+	if (!hasAlpha) return { png }
+	const tile = Math.max(1, Math.round(Math.min(width, height) / 24))
+	const checkerboard = Buffer.from(
+		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><pattern id="checker" width="${tile * 2}" height="${tile * 2}" patternUnits="userSpaceOnUse"><rect width="${tile * 2}" height="${tile * 2}" fill="#ddd"/><path d="M0 0h${tile}v${tile}H0z M${tile} ${tile}h${tile}v${tile}h-${tile}z" fill="#aaa"/></pattern></defs><rect width="100%" height="100%" fill="url(#checker)"/></svg>`,
+	)
+	return {
+		png: await sharp(checkerboard)
+			.composite([{ input: png }])
+			.removeAlpha()
+			.png()
+			.toBuffer(),
+		transparencyHint:
+			'The gray checkerboard in Image 1 shows transparency; it is not part of the artwork.',
+	}
+}
+
 const isMissing = (error: unknown) =>
 	error instanceof Error && 'code' in error && error.code === 'ENOENT'
 const moderationHint = '上一次生成被内容审核拒绝，请收敛描写'
@@ -506,8 +525,14 @@ export class ArtProduction {
 	) {
 		this.render ??= imageRenderer(this.options.image, this.options)
 		const render = this.render
+		const references = (
+			drawing.kind === 'character' &&
+			!drawing.references.some(({ role }) => role === 'identity')
+				? drawing.references.filter(({ role }) => role !== 'style')
+				: drawing.references
+		).slice(0, 16)
 		const refs = await Promise.all(
-			drawing.references.slice(0, 16).map(async (ref, i) => {
+			references.map(async (ref, i) => {
 				const image = sharp(await this.project.readFile(ref.path))
 				return (
 					derived && i === 0 ? image.resize({ ...target, fit: 'fill' }) : image
@@ -516,10 +541,7 @@ export class ArtProduction {
 					.toBuffer()
 			}),
 		)
-		const promptDrawing = {
-			...drawing,
-			references: drawing.references.slice(0, refs.length),
-		}
+		const promptDrawing = { ...drawing, references }
 		const painter = derived
 			? this.options.fast
 			: transparent
@@ -651,17 +673,21 @@ export class ArtProduction {
 				continue
 			}
 			reviewed = checked.png
+			const preview = await auditPreview(checked.png)
 			const judge = await artJson(
 				this.options.visual,
 				[
 					'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
+					preview.transparencyHint,
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
 					`Original image brief (verify independently of the painter's rewrite): ${drawing.description}`,
 					describe(2),
-				].join('\n'),
+				]
+					.filter(Boolean)
+					.join('\n'),
 				auditSchema,
 				this.options,
-				[checked.png, ...editReferences],
+				[preview.png, ...editReferences],
 			)
 			if (judge.pass && judge.failedChecks.length === 0) return checked
 			issue = feedback =

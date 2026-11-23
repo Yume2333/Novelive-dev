@@ -519,6 +519,8 @@ test('retries an expression with only the base after a composition failure', asy
 				styled,
 			)
 			expect(await art.draw(base, styled)).toEqual({ status: 'drawn' })
+			expect(render.mock.calls[0][1]).toEqual([])
+			expect(render.mock.calls[0][0]).toContain(styled.style.description)
 			expect(await art.draw(expression, styled)).toEqual({ status: 'drawn' })
 			expect(render.mock.calls[1][1]).toHaveLength(2)
 			expect(render.mock.calls[2][1]).toEqual([render.mock.calls[1][1][0]])
@@ -570,12 +572,19 @@ test('removes an opaque sprite background before validating and auditing the res
 					.raw()
 					.toBuffer({ resolveWithObject: true })
 				if (info.height > info.width) {
-					expect(info.channels).toBe(4)
-					expect(data[3]).toBe(0)
+					expect(prompt).toContain('checkerboard in Image 1 shows transparency')
+					expect(info.channels).toBe(3)
+					expect([...data.subarray(0, 3)]).toEqual([170, 170, 170])
+					const tile = Math.round(info.width / 24)
+					expect([...data.subarray(tile * 3, (tile + 1) * 3)]).toEqual([
+						221, 221, 221,
+					])
 					const center =
 						Math.floor(info.height / 2) * info.width +
 						Math.floor(info.width / 2)
-					expect(data[center * 4 + 3]).toBe(255)
+					expect(data[center * 3]).not.toBe(data[center * 3 + 1])
+				} else {
+					expect(prompt).not.toContain('checkerboard')
 				}
 				return { pass: true, failedChecks: [], feedback: '' }
 			},
@@ -674,6 +683,15 @@ test('removes an opaque sprite background before validating and auditing the res
 				bible,
 			)
 			expect(await art.draw(sprite, bible)).toEqual({ status: 'drawn' })
+			const drawn = (await art.registry()).entries.find(
+				({ id }) => id === sprite.assetId,
+			)
+			if (!drawn) throw new Error('Missing drawn sprite')
+			const { data } = await sharp(await project.readFile(drawn.path))
+				.ensureAlpha()
+				.raw()
+				.toBuffer({ resolveWithObject: true })
+			expect(data[3]).toBe(0)
 		})
 	} finally {
 		vi.unstubAllEnvs()

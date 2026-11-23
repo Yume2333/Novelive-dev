@@ -42,8 +42,12 @@ export function drawingPrompt(
 		styleIndices.length === 1
 			? `Image ${styleIndices[0]}`
 			: `Images ${styleIndices[0]}–${styleIndices.at(-1)}`
+	const subject =
+		kind === 'character'
+			? 'Use the character description and identity reference for the subject, never the style reference. Compose a pose from the brief, not the style reference’s pose or silhouette.'
+			: `Do not copy the people in ${styleIndices.length === 1 ? 'it' : 'them'}: face, hairstyle, hair and eye color, outfit and accessories come only from the description below.`
 	const declaration = styleIndices.length
-		? `${numbered} ${styleIndices.length === 1 ? 'is a style reference' : 'are style references'} only. Match how ${styleIndices.length === 1 ? 'it is' : 'they are'} drawn: line quality, coloring and shading method, brushwork, level of detail, lighting and overall color treatment, including whether ${styleIndices.length === 1 ? 'it is' : 'they are'} in color or monochrome. Do not copy the people in ${styleIndices.length === 1 ? 'it' : 'them'}: face, hairstyle, hair and eye color, outfit and accessories come only from the description below.`
+		? `${numbered} ${styleIndices.length === 1 ? 'is a style reference' : 'are style references'} only. Match how ${styleIndices.length === 1 ? 'it is' : 'they are'} drawn: line quality, coloring and shading method, brushwork, level of detail, lighting and overall color treatment, including whether ${styleIndices.length === 1 ? 'it is' : 'they are'} in color or monochrome. ${subject}`
 		: ''
 	const other = references.flatMap(({ role, label }, index) =>
 		role === 'style'
