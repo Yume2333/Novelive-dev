@@ -29,6 +29,17 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 }
 
 describe('DOCX extraction', () => {
+	test('ignores historical paragraph and run properties', async () => {
+		const old =
+			'<w:pPrChange><w:pPr><w:pStyle w:val="Heading1"/><w:outlineLvl w:val="0"/></w:pPr></w:pPrChange>'
+		const book = await extract(
+			p('正文。', old) +
+				'<w:p><w:r><w:rPr><w:rPrChange><w:rPr><w:outlineLvl w:val="0"/></w:rPr></w:rPrChange></w:rPr><w:t>继续。</w:t></w:r></w:p>',
+		)
+		expect(book.volumes[0].chapters).toEqual([
+			{ title: '正文', paragraphs: ['正文。', '继续。'], notes: [] },
+		])
+	})
 	test('retains dialogue containing a URL', async () => {
 		const text = '他说：“打开 https://example.com 看看。”'
 		const book = await extract(p(text))
