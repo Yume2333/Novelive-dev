@@ -700,7 +700,7 @@ test.each([
 	},
 )
 
-test('recording dispatches identical image requests for distinct editor candidates', async () => {
+async function verifyFreshCandidates(returnUrl: boolean) {
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
 	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
 	const { projectDir, workId } = await fixture()
@@ -737,17 +737,10 @@ test('recording dispatches identical image requests for distinct editor candidat
 	}
 	const images: unknown[] = []
 	const textModels: string[] = []
-	const fetch: typeof globalThis.fetch = async (input, init) => {
-		const request = new Request(input, init)
-		if (!request.url.endsWith('/images/generations')) {
-			const { model } = await request.json()
-			textModels.push(model)
-			return model === configuration.models.visual.model
-				? completion({ pass: true, failedChecks: [], feedback: '' })
-				: completion({ content: 'A sunny room.' })
-		}
-		images.push(await request.json())
-		const png = await sharp({
+	const downloads: string[] = []
+	const url = new URL('/candidate.png', configuration.models.image.baseUrl).href
+	const candidatePng = () =>
+		sharp({
 			create: {
 				width: 64,
 				height: 36,
@@ -757,6 +750,24 @@ test('recording dispatches identical image requests for distinct editor candidat
 		})
 			.png()
 			.toBuffer()
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		if (request.url === url && request.method === 'GET') {
+			downloads.push(request.url)
+			return new Response(new Uint8Array(await candidatePng()), {
+				headers: { 'content-type': 'image/png' },
+			})
+		}
+		if (!request.url.endsWith('/images/generations')) {
+			const { model } = await request.json()
+			textModels.push(model)
+			return model === configuration.models.visual.model
+				? completion({ pass: true, failedChecks: [], feedback: '' })
+				: completion({ content: 'A sunny room.' })
+		}
+		images.push(await request.json())
+		if (returnUrl) return Response.json({ data: [{ url }] })
+		const png = await candidatePng()
 		return Response.json({ data: [{ b64_json: png.toString('base64') }] })
 	}
 	const recorded = join(directory, 'cassettes')
@@ -811,10 +822,19 @@ test('recording dispatches identical image requests for distinct editor candidat
 	])
 	const [third, fourth] = await regenerate(join(directory, 'fresh'), recorded)
 	expect(images).toHaveLength(4)
+	if (returnUrl) expect(downloads).toEqual([url, url, url, url])
 	expect(images.slice(2)).toEqual(images.slice(0, 2))
 	expect(third.equals(first)).toBe(true)
 	expect(third.equals(fourth)).toBe(false)
 	expect(textModels.slice(4)).toEqual([configuration.models.visual.model])
+}
+
+test('recording dispatches identical image requests for distinct editor candidates', async () => {
+	await verifyFreshCandidates(false)
+})
+
+test('recording downloads fresh candidate bytes when generation returns the same URL', async () => {
+	await verifyFreshCandidates(true)
 })
 
 test('production records to NL_CASSETTE_DIR when no production directory is set', async () => {

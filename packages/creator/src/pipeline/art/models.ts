@@ -62,8 +62,8 @@ export function imageRenderer(
 	const provider = imageProvider(config.baseUrl, config.model)
 	const replay = checkedReplay(createReplayFetch(generationReplay))
 	const download = createReplayFetch({
-		...options.replay,
-		fetch: imageDownloadUpstream(config.baseUrl, options.replay?.fetch),
+		...generationReplay,
+		fetch: imageDownloadUpstream(config.baseUrl, generationReplay?.fetch),
 		spend: undefined,
 	})
 	const client = new OpenAI({
