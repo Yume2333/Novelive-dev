@@ -233,7 +233,7 @@ export async function mountMinimalPlayer(
 				beat.actions,
 				false,
 				() => {
-					snapshot = incoming
+					if (incoming) snapshot = incoming
 					renderText(state.text)
 				},
 			)
