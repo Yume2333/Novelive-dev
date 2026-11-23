@@ -268,6 +268,7 @@ test.describe('contract-render', () => {
 		let chapter = {workId, chapterId:'ch1', revision:'r1', title:'固定编辑章', paragraphs:[{id:'p0001',text:'空屋原文。'},{id:'p0002',text:'门外原文。'}], scenes:[{sceneId:'aaaabbbb',sourceIds:['p0001'],nvs:${JSON.stringify(firstScene)}},{sceneId:'ccccdddd',sourceIds:['p0002'],nvs:${JSON.stringify(secondScene)}}], markSuggestions:[{id:'mark1',name:'glow',css:'color: var(--color-primary)',perChar:false},{id:'mark2',name:'shade',css:'opacity: 0.5',perChar:true}]};
 		if (window.fixtureMode === 'empty') chapter.scenes = [];
 		if (window.fixtureMode === 'crlf') chapter.scenes.forEach(scene => scene.nvs = scene.nvs.replaceAll(${JSON.stringify('\n')}, ${JSON.stringify('\r\n')}));
+		if (window.fixtureMode === 'leading') chapter.scenes.forEach(scene => scene.nvs = ${JSON.stringify('\n\n')} + scene.nvs);
 		let history = [], revision = 1;
 		window.fixtureCalls = [];
 		window.novelive = {call(command, input) {
@@ -319,7 +320,14 @@ test.describe('contract-render', () => {
 			.join('\n')
 	})
 
-	for (const mode of ['normal', 'empty', 'failure', 'stale', 'crlf']) {
+	for (const mode of [
+		'normal',
+		'empty',
+		'failure',
+		'stale',
+		'crlf',
+		'leading',
+	]) {
 		test(`M2 editor contract fixture ${mode}`, async () => {
 			const profile = await mkdtemp(
 				join(tmpdir(), 'novelive-editor-component-'),
@@ -354,6 +362,25 @@ test.describe('contract-render', () => {
 				}
 				if (mode === 'failure') {
 					await expect(page.getByRole('alert')).toHaveText('版本已改变')
+					return
+				}
+				if (mode === 'leading') {
+					await expect(
+						page.getByRole('textbox', { name: 'NVS 剧本' }),
+					).toContainText('第一句。')
+					for (const [line, text] of [
+						['5', '第一句。'],
+						['6', '第二句。'],
+					]) {
+						await page
+							.getByLabel('快捷位置', { exact: true })
+							.selectOption(line)
+						await page.getByRole('button', { name: '从当前句预览' }).click()
+						await expect(page.locator('.nl-player-text')).toHaveText(text)
+					}
+					await page.getByLabel('场景', { exact: true }).selectOption('1')
+					await page.getByRole('button', { name: '从当前句预览' }).click()
+					await expect(page.locator('.nl-player-text')).toHaveText('门外的风。')
 					return
 				}
 				if (mode === 'crlf') {

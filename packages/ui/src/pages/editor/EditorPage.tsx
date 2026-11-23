@@ -193,7 +193,9 @@ export function EditorPage() {
 		}
 		const current = result.scenes[sceneIndex]
 		if (!current) return
-		const offset = current.scene.line - 1
+		const offset = opening.chapter.scenes
+			.slice(0, sceneIndex)
+			.reduce((sum, item) => sum + item.nvs.split(/\r\n?|\n/).length + 1, 0)
 		const index = current.beats.findIndex(
 			(beat) => beat.line && beat.line.line >= line + offset,
 		)
