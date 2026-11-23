@@ -7,6 +7,23 @@ $ tsc --noEmit
 Exit code: 0
 
 PR #35 review follow-up (baseline d1ea43a verified as HEAD ancestor)
+Rebased onto origin/main 5ea3d49 after M2/02 and M2/03 merged, with no conflicts.
+Rebased finding commits: 91647a4 (finding 1), 43fd56a (finding 2).
+Desktop integration now uses registerChat(registry, getChat), one retained ChatService/Project per work, and waits for chat shutdown before closing its DB. The project adapter prepares versioned Bible/glossary proposals without writing and calls applyBibleProposal at approval. ChatStore owns all resolution persistence; the temporary resolver was deleted. Bible readers and fixtures now use ChatStore's {chapterIds,payload,rewrite?} DB envelope. Shared host event sequencing/replay now includes chat events without initializing production just to list chat events. No editor.* registration changed.
+M2/03 has no chat e2e Check: its archived task Check is the seven-test unit command below. Electron additionally verifies chat create/list/get/rename/delete through the desktop host, alongside all Bible approval/rejection/staleness checks. Other proposal domains intentionally return unsupported until their project adapters land; read tools and child agents remain unconfigured.
+
+$ NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M2 bible and glossary'
+  1 passed (2.8s)
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+$ NL_REPLAY=strict pnpm check
+Checked 218 files in 113ms. No fixes applied.
+Found 1 info.
+ Test Files  26 passed (26)
+      Tests  353 passed (353)
+All exit codes: 0. Existing fixture info unchanged. No paid calls or missing cassettes.
+
 - Finding 1: 9fe152d compares confirmed/candidate field-key union and labels omitted fields as removed; Electron asserts 性格：谨慎 → 移除.
 - Finding 2: ad19471 replaces native details with shared Collapse and accessible disclosure button.
 - CI job 137423707801 failed because the existing M1b navigation assertion expected three links after Bible navigation was added. b0b1aa6 updates that expectation only.

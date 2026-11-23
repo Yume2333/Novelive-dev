@@ -4,14 +4,16 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, extname, join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
-import {
-	getBible,
-	getBibleProposal,
-	openBibleProject,
-	resolveBibleProposal,
-} from './bible/editing'
+import { getBible, openBibleProject } from './bible/editing'
+import { registerChat } from './chat'
+import { projectChat } from './chat/project'
 import { createConfigStore } from './config'
-import { type CreatorFrame, clientFrame, creatorCommandError } from './contract'
+import {
+	type CreatorFrame,
+	clientFrame,
+	creatorCommandError,
+	type EventEnvelope,
+} from './contract'
 import { createRegistry } from './registry'
 import { createReplayFetch, type ReplayOptions } from './replay'
 
@@ -128,6 +130,49 @@ registry.register('editor.saveRules', async (input) => {
 	const { saveRules } = await import('./editor/rules')
 	return saveRules(project, volumeId, input)
 })
+const chats = new Map<string, ReturnType<typeof openChat>>()
+const events: EventEnvelope[] = []
+let eventSeq = 0
+let closingChat = false
+
+function publish(envelope: EventEnvelope) {
+	envelope.seq = ++eventSeq
+	events.push(envelope)
+	sendEvent?.({ type: 'event', generation, envelope })
+}
+
+async function openChat(workId: string) {
+	const project = await openBibleProject(dataDir, workId)
+	const chat = projectChat(
+		project,
+		workId,
+		config,
+		cacheDir,
+		strictReplayOptions(),
+		(event) => {
+			const envelope: EventEnvelope = {
+				scope: 'work',
+				scopeId: workId,
+				seq: 0,
+				at: new Date().toISOString(),
+				event,
+			}
+			publish(envelope)
+		},
+	)
+	return { chat, project }
+}
+
+async function getChat(workId: string) {
+	if (closingChat) throw { code: 'cancelled', message: '创作端正在关闭' }
+	let opening = chats.get(workId)
+	if (!opening) {
+		opening = openChat(workId)
+		chats.set(workId, opening)
+		opening.catch(() => chats.delete(workId))
+	}
+	return (await opening).chat
+}
 
 function strictReplayOptions(): ReplayOptions | undefined {
 	if (process.env.NL_REPLAY !== 'strict') return undefined
@@ -145,7 +190,7 @@ function loadProduction() {
 			dataDir,
 			config,
 			strictReplayOptions(),
-			(envelope) => sendEvent?.({ type: 'event', generation, envelope }),
+			publish,
 			(active) =>
 				parent.postMessage({ type: 'production.active', generation, active }),
 		),
@@ -166,14 +211,7 @@ registry.register('bible.get', async (input) => {
 	using project = await openBibleProject(dataDir, input.workId)
 	return await getBible(project, input)
 })
-registry.register('proposal.get', async ({ workId, proposalId }) => {
-	using project = await openBibleProject(dataDir, workId)
-	return getBibleProposal(project, workId, proposalId)
-})
-registry.register('proposal.resolve', async (input) => {
-	using project = await openBibleProject(dataDir, input.workId)
-	return await resolveBibleProposal(project, input)
-})
+registerChat(registry, getChat)
 registry.register('config.update', async (patch) => {
 	const value = await config.update(patch)
 	await (await production)?.refreshSettings()
@@ -261,8 +299,8 @@ registry.register('import.revise', async ({ projectDir, layout }) => {
 registry.register('events.list', async ({ scope, scopeId, afterSeq }) => ({
 	events:
 		scope === 'work'
-			? (await productionSession(scopeId)).records.filter(
-					({ seq }) => seq > afterSeq,
+			? events.filter(
+					(event) => event.scopeId === scopeId && event.seq > afterSeq,
 				)
 			: [],
 	gap: false,
@@ -345,6 +383,14 @@ parent.once('message', ({ ports }) => {
 	})
 	port.once('close', () => {
 		sendEvent = undefined
+		closingChat = true
+		for (const opening of chats.values())
+			void opening
+				.then(async ({ chat, project }) => {
+					await chat.close()
+					project.close()
+				})
+				.catch(() => {})
 		for (const controller of pending.values()) controller.abort()
 		pending.clear()
 		void production?.then((session) => session.close())

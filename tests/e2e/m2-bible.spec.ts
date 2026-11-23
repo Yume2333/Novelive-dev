@@ -242,7 +242,13 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 				.prepare(
 					'INSERT INTO proposal (proposal_id, work_id, kind, prompt, payload, created_at) VALUES (?, ?, ?, ?, ?, 0)',
 				)
-				.run(id, workId, value.kind, prompt, JSON.stringify(value))
+				.run(
+					id,
+					workId,
+					value.kind,
+					prompt,
+					JSON.stringify({ chapterIds: [], payload: value }),
+				)
 		await mkdir(join(profile, 'projects'), { recursive: true })
 		await writeFile(join(profile, 'projects', workId), directory)
 		const app = await electron.launch({
@@ -297,6 +303,43 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 				}
 			}, workId)
 			expect(missing).toBe('not_found')
+			const chat = await page.evaluate(async (workId) => {
+				const { session } = await window.novelive.call('chat.create', {
+					workId,
+					title: 'Bible integration',
+				}).promise
+				const { sessions } = await window.novelive.call('chat.list', { workId })
+					.promise
+				const snapshot = await window.novelive.call('chat.get', {
+					workId,
+					sessionId: session.sessionId,
+				}).promise
+				await window.novelive.call('chat.rename', {
+					workId,
+					sessionId: session.sessionId,
+					title: 'Renamed integration',
+				}).promise
+				const renamed = await window.novelive.call('chat.get', {
+					workId,
+					sessionId: session.sessionId,
+				}).promise
+				await window.novelive.call('chat.delete', {
+					workId,
+					sessionId: session.sessionId,
+				}).promise
+				return {
+					listed: sessions.some(
+						({ sessionId }) => sessionId === session.sessionId,
+					),
+					entries: snapshot.entries,
+					title: renamed.session.title,
+				}
+			}, workId)
+			expect(chat).toEqual({
+				listed: true,
+				entries: [],
+				title: 'Renamed integration',
+			})
 			const confirmed = page.getByRole('region', { name: '已登记内容' })
 			await expect(
 				confirmed.getByText('小夏', { exact: true }).first(),

@@ -2,14 +2,9 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
-import { compile } from '@earendil-works/pi-schema'
 import { formatVersion, projectFiles } from '@novelive/format/model'
-import {
-	type CommandInput,
-	type CommandOutput,
-	type Proposal,
-	proposalSchema,
-} from '../../contract'
+import { ChatStore } from '../../chat/store'
+import type { CommandInput, CommandOutput, Proposal } from '../../contract'
 import { Project } from '../../project'
 import { existing, readBible, validatePatch } from '../../synthesis/patch'
 
@@ -63,24 +58,7 @@ export function getBibleProposal(
 	workId: string,
 	proposalId: string,
 ): Proposal {
-	const row = project.database
-		.prepare('SELECT * FROM proposal WHERE work_id = ? AND proposal_id = ?')
-		.get(workId, proposalId)
-	if (!row) throw { code: 'not_found', message: '找不到候选' }
-	const payload = JSON.parse(String(row.payload))
-	const proposal = {
-		workId,
-		id: proposalId,
-		sessionId: row.session_id,
-		prompt: row.prompt,
-		chapterIds: [],
-		payload,
-		status: row.status,
-		...(row.feedback === null ? {} : { feedback: row.feedback }),
-	}
-	const result = compile(proposalSchema).validate(proposal)
-	if (!result.ok) throw { code: 'invalid_config', message: '候选数据无效' }
-	return result.value
+	return new ChatStore(project.database, workId).proposal(proposalId).proposal
 }
 
 export async function getBible(
@@ -297,40 +275,4 @@ export async function applyBibleProposal(
 	return exclusive(project, async () =>
 		(await apply(project, proposal.workId, payload)) ? 'applied' : 'stale',
 	)
-}
-
-export async function resolveBibleProposal(
-	project: Project,
-	input: CommandInput<'proposal.resolve'>,
-): Promise<CommandOutput<'proposal.resolve'>> {
-	return exclusive(project, async () => {
-		const proposal = getBibleProposal(project, input.workId, input.proposalId)
-		if (
-			proposal.payload.kind !== 'bible' &&
-			proposal.payload.kind !== 'glossary'
-		)
-			throw { code: 'unsupported', message: '不是设定或术语候选' }
-		if (proposal.status !== 'pending') return { status: 'resolved', proposal }
-		if (
-			input.decision.kind === 'approve' &&
-			!(await apply(project, proposal.workId, proposal.payload))
-		)
-			return { status: 'stale', proposal }
-		proposal.status =
-			input.decision.kind === 'approve' ? 'approved' : 'rejected'
-		if (input.decision.kind === 'reject')
-			proposal.feedback = input.decision.reason
-		project.database
-			.prepare(
-				'UPDATE proposal SET status = ?, feedback = ?, resolved_at = ? WHERE proposal_id = ? AND work_id = ?',
-			)
-			.run(
-				proposal.status,
-				proposal.feedback ?? null,
-				Date.now(),
-				proposal.id,
-				proposal.workId,
-			)
-		return { status: 'resolved', proposal }
-	})
 }
