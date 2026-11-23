@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -65,6 +65,47 @@ const results = {
 		},
 	},
 } satisfies Record<ShareRequest['operation'], ShareResponse>
+
+test('M5 share surfaces confirm overwrite after adding the package extension', async () => {
+	const profile = await mkdtemp(join(tmpdir(), 'novelive-share-picker-'))
+	try {
+		const stem = join(profile, '作品')
+		const destination = `${stem}.novelive`
+		await writeFile(destination, 'existing work')
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${profile}`],
+			env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
+		})
+		try {
+			const page = await app.firstWindow()
+			await app.evaluate(
+				({ dialog }, paths) => {
+					let confirms = 0
+					dialog.showSaveDialog = async () => ({
+						canceled: false,
+						filePath: paths.shift(),
+					})
+					dialog.showMessageBox = async () => ({
+						response: confirms++ === 1 ? 1 : 0,
+						checkboxChecked: false,
+					})
+				},
+				[stem, stem, destination, join(profile, '新作品')],
+			)
+			const pick = () =>
+				page.evaluate(() => window.novelive.pickPackageDestination?.())
+			expect(await pick()).toBeNull()
+			expect(await pick()).toBe(destination)
+			expect(await pick()).toBe(destination)
+			expect(await pick()).toBe(join(profile, '新作品.novelive'))
+		} finally {
+			await app.close()
+		}
+	} finally {
+		await rm(profile, { recursive: true, force: true })
+	}
+})
 
 test('M5 share surfaces review export, approve updates and import as a project in Electron', async () => {
 	const profile = await mkdtemp(join(tmpdir(), 'novelive-share-ui-'))
