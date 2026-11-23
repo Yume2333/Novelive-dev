@@ -444,6 +444,7 @@ test('restores a narrow expression crown without accepting clipped bases or shif
 	const drift = await sprite('M199 0h2v3h-2Z')
 	const clipped = await sprite('M175 0h50v3h-50Z')
 	const misalignedSeam = await sprite('M199 0h2v3h-2Z', 'M207 3h2v4h-2Z')
+	const disconnectedTip = await sprite('M194 1h2v1h-2Z M199 1h2v2h-2Z')
 	const checks = { transparent: true, variant: false }
 	const fixed = await checkImage(drift, target, { ...checks, base })
 	expect(fixed).toHaveProperty('png')
@@ -463,6 +464,7 @@ test('restores a narrow expression crown without accepting clipped bases or shif
 		[drift, undefined],
 		[clipped, base],
 		[misalignedSeam, base],
+		[drift, disconnectedTip],
 	] as const) {
 		expect(
 			await checkImage(input, target, { ...checks, base: reference }),

@@ -32,6 +32,30 @@ function bounds({ data, width, height }: Pixels) {
 	return { left, right, top, bottom }
 }
 
+function crownConnects(raster: Pixels, base: Pixels, rows: number) {
+	const { width } = base
+	const visited = new Uint8Array(rows * width)
+	const connected: number[] = []
+	const visit = (x: number, y: number) => {
+		if (x < 0 || x >= width || y < 0 || y >= rows) return
+		const pixel = y * width + x
+		if (visited[pixel] || !base.data[pixel * 4 + 3]) return
+		visited[pixel] = 1
+		connected.push(pixel)
+	}
+	for (let x = 0; x < width; x++) {
+		if (!raster.data[(rows * width + x) * 4 + 3]) continue
+		for (let dx = -1; dx <= 1; dx++) visit(x + dx, rows - 1)
+	}
+	for (let i = 0; i < connected.length; i++) {
+		const x = connected[i] % width
+		const y = Math.floor(connected[i] / width)
+		for (let dy = -1; dy <= 1; dy++)
+			for (let dx = -1; dx <= 1; dx++) visit(x + dx, y + dy)
+	}
+	return visited.every((seen, pixel) => seen || !base.data[pixel * 4 + 3])
+}
+
 function restoreExpressionCrown(raster: Pixels, base: Pixels) {
 	const { width, height } = raster
 	const rows = Math.ceil(height * 0.005)
@@ -71,7 +95,7 @@ function restoreExpressionCrown(raster: Pixels, base: Pixels) {
 		}
 		if (!near) return false
 	}
-	if (!overlaps) return false
+	if (!overlaps || !crownConnects(raster, base, rows)) return false
 	base.data.copy(raster.data, 0, 0, rows * width * 4)
 	return true
 }
