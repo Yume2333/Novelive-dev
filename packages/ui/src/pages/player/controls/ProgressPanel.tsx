@@ -39,16 +39,19 @@ export function ProgressPanel({
 		return { snapshot, key: `${position}-${occurrence}` }
 	})
 	useEffect(() => {
+		if (view === 'history') return
 		let cancelled = false
 		setFailure('')
 		void Promise.all(
-			progress.saves.map(async (entry) => {
-				const image = await window.novelive.host.progress?.thumbnail(
-					workId,
-					entry.slot,
-				)
-				return [slotKey(entry.slot), image ?? ''] as const
-			}),
+			progress.saves
+				.filter((entry) => entry.slot.kind === 'manual')
+				.map(async (entry) => {
+					const image = await window.novelive.host.progress?.thumbnail(
+						workId,
+						entry.slot,
+					)
+					return [slotKey(entry.slot), image ?? ''] as const
+				}),
 		)
 			.then((images) => {
 				if (!cancelled) setThumbnails(Object.fromEntries(images))
@@ -59,7 +62,7 @@ export function ProgressPanel({
 		return () => {
 			cancelled = true
 		}
-	}, [workId, progress.saves])
+	}, [view, workId, progress.saves])
 	if (view === 'history')
 		return (
 			<>
