@@ -584,8 +584,10 @@ export class ArtProduction {
 				if (
 					candidateBudget.matting.error &&
 					candidateBudget.opaqueStreak >= opaqueCandidateLimit
-				)
+				) {
+					if (reviewed) return { issue, reviewed }
 					throw candidateBudget.matting.error
+				}
 			}
 			if ('issue' in checked && checked.unsupported) {
 				let recovered: Buffer
@@ -594,7 +596,10 @@ export class ArtProduction {
 				} catch (error) {
 					this.options.signal?.throwIfAborted()
 					if (error instanceof MattingUnavailableError) {
-						if (candidateBudget) candidateBudget.matting.error = error
+						if (candidateBudget) {
+							candidateBudget.matting.error = error
+							if (reviewed) return { issue, reviewed }
+						}
 						throw error
 					}
 					return checked

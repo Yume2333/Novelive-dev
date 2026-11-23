@@ -778,6 +778,62 @@ test('skips an isolated opaque RGBA candidate when matting is unavailable and re
 	}
 })
 
+test('keeps a reviewed transparent fallback when later opaque responses exhaust the budget', async () => {
+	const rgb = await picture(320, 480, false)
+	const rgba = await sharp(rgb).ensureAlpha().png().toBuffer()
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const responses = [rgb, rgb, portrait, rgba, rgba]
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, _refs, _size, transparent) => {
+			const bytes = transparent ? responses.shift() : landscape
+			if (!bytes) throw new Error('Unexpected extra portrait request')
+			return { bytes }
+		})
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+			return prompt.includes('造型候选')
+				? {
+						pass: false,
+						failedChecks: ['style'],
+						feedback: 'Try another style',
+					}
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay, undefined, undefined, undefined, 2)
+			const [ada] = bible.characters
+			const pool = await art.candidates(
+				{ ...bible, characters: [ada, { ...ada, id: 'bea', name: 'Bea' }] },
+				['c1'],
+				'assets/main.webp',
+			)
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [{ characterId: 'bea', candidates: [{ id: 'costume-1' }] }],
+			})
+			const { cachePath } = pool.characters[0].candidates[0]
+			expect(
+				await sharp(await project.readFile(cachePath)).metadata(),
+			).toMatchObject({
+				hasAlpha: true,
+			})
+			expect(responses).toHaveLength(0)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(
 		'Invalid staging patch',
