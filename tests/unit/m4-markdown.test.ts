@@ -192,6 +192,55 @@ test('a table-of-contents heading line is not a chapter', () => {
 	])
 })
 
+test('a leading thematic break is not front matter; YAML comments, escapes and block scalars parse', () => {
+	expect(
+		extract('---\n\n# 第一章\n\n甲。\n\n---\n\n# 第二章\n\n乙。\n').volumes[0]
+			.chapters,
+	).toEqual([
+		{ title: '第一章', paragraphs: ['甲。'], notes: [] },
+		{ title: '第二章', paragraphs: ['乙。'], notes: [] },
+	])
+	expect(
+		extract(
+			'---\ntitle: "A \\"Quiet\\" City" # working title\nlang: en # en-US\n---\n正文。\n',
+		).metadata,
+	).toEqual({ title: 'A "Quiet" City', language: 'en' })
+	expect(
+		extract('---\ntitle: >-\n  The Long\n  Road\nauthor: x\n---\n正文。\n')
+			.metadata,
+	).toEqual({ title: 'The Long Road' })
+})
+
+test('a top heading other than the front matter title is a volume', () => {
+	const book = extract(
+		'---\ntitle: The Long Road\n---\n# Volume I: The Crossing\n\n## Chapter 1\n\nThey left.\n',
+	)
+	expect(book.metadata).toEqual({ title: 'The Long Road' })
+	expect(book.volumes.map((v) => v.title)).toEqual(['Volume I: The Crossing'])
+	expect(
+		extract('---\ntitle: 雨\n---\n# 雨\n\n## 第一章\n\n落。\n').volumes,
+	).toEqual([
+		{
+			title: '第一卷',
+			chapters: [{ title: '第一章', paragraphs: ['落。'], notes: [] }],
+		},
+	])
+})
+
+test('annotation lines stay apart from adjacent prose; heading footnotes and inline comments are handled', () => {
+	const book = extract(
+		'# 第一章[^t]\n\n注：旧版作小门\n她走进了院子。<!-- a > b -->\n\n# 第二章\n\n完。\n\n[^t]: 标题注。\n',
+	)
+	expect(book.volumes[0].chapters).toEqual([
+		{
+			title: '第一章',
+			paragraphs: ['她走进了院子。'],
+			notes: ['标题注。', '注：旧版作小门'],
+		},
+		{ title: '第二章', paragraphs: ['完。'], notes: [] },
+	])
+})
+
 test('rejects non-UTF-8 bytes and Markdown without body text', () => {
 	expect(() => extractMarkdown(Uint8Array.from([0xd5, 0xfd]))).toThrow(
 		MarkdownImportError,

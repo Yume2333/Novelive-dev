@@ -12,4 +12,4 @@
 - [x] 解析实际合成 Markdown 文件，不要求模型识别文本边界。
 
 ## Progress
-- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-markdown.test.ts` → 8 passed；Pandoc 生成的 Setext/ATX 两份多卷 fixture 抽取结果一致并通过导入契约校验，目录、版权、脚注、注释进 notes。真实入口 `pnpm exec tsx tests/fixtures/source/markdown/extract.ts <file>` 跑通两份 fixture。收据：`.workflow/evidence/m4-longform/03-markdown-import.txt`。无模型调用，不需要 cassette。
+- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-markdown.test.ts` → 11 passed；Setext 与 ATX 两份多卷 fixture 抽取结果一致并通过导入契约校验，目录、版权、脚注、注释进 notes。真实入口 `pnpm exec tsx tests/fixtures/source/markdown/extract.ts <file>` 跑通两份 fixture。收据：`.workflow/evidence/m4-longform/03-markdown-import.txt`。无模型调用，不需要 cassette。

@@ -1,9 +1,8 @@
 # Synthetic Markdown fixtures
 
-All prose here is written for tests, not taken from a book. `source.txt` is the hand-written Pandoc Markdown source; the two fixtures are Pandoc 2.9.2.1 output from it:
+All prose here is written for tests, not taken from a book. `source.txt` is the hand-written Pandoc Markdown source. `multivolume.atx.md` is Pandoc 2.9.2.1 output from it, and `multivolume.md` is the same file with its level 1 and 2 headings rewritten as Setext (`===` / `---` underlines):
 
 ```sh
-pandoc -f markdown-auto_identifiers -t markdown -s source.txt -o multivolume.md
 pandoc -f markdown-auto_identifiers -t markdown --atx-headers -s source.txt -o multivolume.atx.md
 ```
 

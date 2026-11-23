@@ -29,27 +29,59 @@ const wide =
 // Marks a hard line break inside extracted text.
 const hard = '\u0000'
 
+const yamlLine = /^(?:#|\s|-(?:\s|$)|[^\s#:-][^:]*:(?:\s|$))/
+const yamlKey = /^[^\s#:-][^:]*:(?:\s|$)/
+
+function scalar(raw: string, rest: string[]) {
+	if (/^[|>][-+0-9]*(?:\s+#.*)?$/.test(raw)) {
+		const lines: string[] = []
+		for (const line of rest) {
+			if (line && !/^\s/.test(line)) break
+			lines.push(line.trim())
+		}
+		return lines.filter(Boolean).join(' ')
+	}
+	const single = raw.match(/^'((?:[^']|'')*)'/)
+	if (single) return single[1].replaceAll("''", "'")
+	const double = raw.match(/^"((?:[^"\\]|\\.)*)"/)
+	if (double) {
+		try {
+			return JSON.parse(`"${double[1]}"`) as string
+		} catch {
+			return double[1]
+		}
+	}
+	return raw.replace(/\s+#.*$/, '')
+}
+
+// A leading `---` block is YAML front matter only when every line reads as
+// YAML; otherwise it is a thematic break and the text stays in the body.
 function frontMatter(text: string) {
+	const metadata: MarkdownBook['metadata'] = {}
 	const block = text.match(
 		/^---[ \t]*\n([\s\S]*?)\n(?:---|\.\.\.)[ \t]*(?:\n|$)/,
 	)
-	const metadata: MarkdownBook['metadata'] = {}
-	if (!block) return { body: text, metadata }
-	for (const line of block[1].split('\n')) {
+	const lines = block?.[1].split('\n') ?? []
+	const filled = lines.filter((line) => line.trim())
+	if (
+		!block ||
+		!filled.some((line) => yamlKey.test(line)) ||
+		!filled.every((line) => yamlLine.test(line))
+	)
+		return { body: text, metadata }
+	for (const [i, line] of lines.entries()) {
 		const field = line.match(/^(title|lang|language):[ \t]*(.+?)[ \t]*$/)
 		if (!field) continue
-		const raw = field[2]
-		const value = raw.startsWith("'")
-			? raw.slice(1, -1).replaceAll("''", "'")
-			: raw.startsWith('"')
-				? (JSON.parse(raw) as string)
-				: raw
+		const value = scalar(field[2], lines.slice(i + 1)).trim()
 		if (!value) continue
 		if (field[1] === 'title') metadata.title = value
 		else metadata.language = value
 	}
 	return { body: text.slice(block[0].length), metadata }
 }
+
+const stripHtml = (html: string) =>
+	html.replace(/<!--[\s\S]*?(?:-->|$)/g, '').replace(/<[^>]*>/g, '')
 
 function phrasing(nodes: PhrasingContent[], refs: string[] = []): string {
 	return nodes
@@ -61,7 +93,7 @@ function phrasing(nodes: PhrasingContent[], refs: string[] = []): string {
 				case 'break':
 					return hard
 				case 'html':
-					return node.value.replace(/<[^>]*>/g, '')
+					return stripHtml(node.value)
 				case 'footnoteReference':
 					refs.push(node.identifier)
 					return ''
@@ -77,6 +109,7 @@ function phrasing(nodes: PhrasingContent[], refs: string[] = []): string {
 
 // Soft breaks join wrapped lines. A hard break, or a soft break after a CJK
 // sentence end, starts a new paragraph, as in line-per-paragraph novel text.
+// An annotation line is always a paragraph of its own.
 function paragraphs(text: string) {
 	const out: string[] = []
 	for (const part of text.split(hard)) {
@@ -84,7 +117,8 @@ function paragraphs(text: string) {
 		for (const raw of part.split('\n')) {
 			const line = raw.trim()
 			if (!line) continue
-			if (current && sentenceEnd.test(current)) {
+			const alone = annotation.test(line)
+			if (current && (alone || sentenceEnd.test(current))) {
 				out.push(current)
 				current = ''
 			}
@@ -92,6 +126,10 @@ function paragraphs(text: string) {
 				!current || wide.test(current.at(-1) ?? '') || wide.test(line[0])
 					? line
 					: ` ${line}`
+			if (alone) {
+				out.push(current)
+				current = ''
+			}
 		}
 		if (current) out.push(current)
 	}
@@ -164,10 +202,11 @@ export function extractMarkdown(bytes: Uint8Array): {
 		depths.length > 1 &&
 		top.length === 1 &&
 		top[0] === structural[0] &&
-		headingKind(top[0].title) === 'other'
+		headingKind(top[0].title) === 'other' &&
+		(metadata.title ?? top[0].title) === top[0].title
 	) {
 		titleIndex = top[0].index
-		metadata.title ??= top[0].title
+		metadata.title = top[0].title
 		structural = structural.slice(1)
 		depths = levels()
 	}
@@ -216,6 +255,9 @@ export function extractMarkdown(bytes: Uint8Array): {
 			if (asNote || inMatter || annotation.test(paragraph)) note(paragraph)
 			else section.paragraphs.push(paragraph)
 		}
+		attach(refs)
+	}
+	function attach(refs: string[]) {
 		for (const id of refs) {
 			const definition = definitions.get(id)
 			if (!definition) continue
@@ -232,14 +274,7 @@ export function extractMarkdown(bytes: Uint8Array): {
 			case 'code':
 				return add(node.value.replaceAll('\n', hard), refs, asNote)
 			case 'html':
-				return add(
-					node.value
-						.replace(/<!--[\s\S]*?(?:-->|$)/g, '')
-						.replace(/<[^>]*>/g, '')
-						.replaceAll('\n', hard),
-					refs,
-					asNote,
-				)
+				return add(stripHtml(node.value).replaceAll('\n', hard), refs, asNote)
 			case 'footnoteDefinition':
 				// Referenced notes follow their first reference; others stay here.
 				if (!referenced.has(node.identifier)) {
@@ -262,14 +297,19 @@ export function extractMarkdown(bytes: Uint8Array): {
 			block(node)
 			continue
 		}
-		if (index === titleIndex) continue
+		const refs: string[] = []
+		const title = phrasing(node.children, refs).trim()
+		if (index === titleIndex) {
+			attach(refs)
+			continue
+		}
 		if (matter.has(index)) {
 			inMatter = true
-			note(phrasing(node.children).trim())
+			note(title)
+			attach(refs)
 			continue
 		}
 		inMatter = false
-		const title = phrasing(node.children).trim()
 		if (node.depth > chapterDepth || !title) {
 			block(node)
 			continue
@@ -284,6 +324,7 @@ export function extractMarkdown(bytes: Uint8Array): {
 			closeVolume()
 			volume = { title, chapters: [] }
 		}
+		attach(refs)
 	}
 	for (const definition of definitions.values())
 		for (const child of definition.children) block(child, true)
