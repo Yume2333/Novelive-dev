@@ -3,7 +3,7 @@ import { posix } from 'node:path'
 import { TextWriter, Uint8ArrayReader, ZipReader } from '@zip.js/zip.js'
 import { SaxesParser } from 'saxes'
 import type { ExtractedBook, ImportExtraction } from '../../contract/import'
-import { parseTxt } from '../txt/structure'
+import { MAX_CHAPTER_CHARS } from '../txt/structure'
 
 const wordNamespaces = new Set([
 	'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
@@ -236,32 +236,34 @@ export async function extractDocx(
 		let archived: string[] = []
 		let pendingNotes: string[] = []
 		const flush = () => {
-			const protectedLines = new Map<string, string>()
-			const input = lines.map((line, index) => {
-				if (
-					!/(?:https?:\/\/|www\.)\S+/i.test(line) ||
-					/^(?:https?:\/\/|www\.)\S+$/i.test(line)
-				)
-					return line
-				const token = `DOCXURLPARAGRAPH${index}`
-				protectedLines.set(token, line)
-				return token
-			})
-			const parsed = parseTxt(input.join('\n\n'), { rules: [] }).volumes[0]
-				.chapters
-			for (const [index, chapter] of parsed.entries()) {
-				const paragraphs = chapter.paragraphs.map(
-					(p) => protectedLines.get(p.text) ?? p.text,
-				)
-				const notes = [...chapter.notes, ...(index === 0 ? archived : [])]
-				if (!paragraphs.length) {
-					pendingNotes.push(...notes)
+			const chunks: string[][] = [[]]
+			const notes: string[] = []
+			let size = 0
+			for (const raw of lines.flatMap((line) => line.split('\n'))) {
+				const line = raw.trim()
+				if (!line) continue
+				const annotation =
+					/^(?:[【[]?(?:注释|注釋|脚注|腳註|附注|附註|版权|版權|著作权|著作權|译者注|譯者註|作者注|注\s*[:：]|註\s*[:：])|[①②③④⑤⑥⑦⑧⑨⑩]|\[\d+\]\s)/
+				const watermark =
+					/^(?:(?:https?:\/\/|www\.)\S+|(?:[\w-]+\.)+(?:com|net|org|cn|io)(?:\/\S*)?|[=*_─━—\-~～·◆◇※\s]{3,})$/i
+				if (annotation.test(line) || watermark.test(line)) {
+					notes.push(line)
 					continue
 				}
+				if (size && size + 2 + line.length > MAX_CHAPTER_CHARS) {
+					chunks.push([])
+					size = 0
+				}
+				chunks[chunks.length - 1].push(line)
+				size += line.length + (size ? 2 : 0)
+			}
+			pendingNotes.push(...notes, ...archived)
+			for (const [index, paragraphs] of chunks.entries()) {
+				if (!paragraphs.length) continue
 				volume.chapters.push({
-					title: title + (parsed.length > 1 ? `（${index + 1}）` : ''),
+					title: title + (chunks.length > 1 ? `（${index + 1}）` : ''),
 					paragraphs,
-					notes: [...pendingNotes, ...notes],
+					notes: [...pendingNotes],
 				})
 				pendingNotes = []
 			}
