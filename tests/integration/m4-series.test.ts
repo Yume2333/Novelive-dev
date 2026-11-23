@@ -581,7 +581,7 @@ test('production updates the effective asset and style owners without hiding art
 	expect(playback.registry.entries[0].status).toBe('drawn')
 	expect(playback.registry.entries[0].path).not.toContain('unavailable')
 	await service.confirmVisual(
-		workStyle,
+		art.style,
 		{
 			mainVisuals: [{ id: 'main', cachePath: 'source/visual.webp' }],
 			supplemental: [],
