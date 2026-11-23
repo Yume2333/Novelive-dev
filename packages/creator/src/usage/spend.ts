@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite'
+import sharp from 'sharp'
 import { reserveTokenFields } from './reservation'
 
 export class SpendBudgetError extends Error {
@@ -90,6 +91,45 @@ export function requestedOutputTokens(
 		: (body.max_completion_tokens ?? body.max_tokens)
 }
 
+function imagePartData(part: Record<string, unknown>): string | undefined {
+	if (part.type === 'image_url' || part.type === 'input_image') {
+		const url =
+			typeof part.image_url === 'string'
+				? part.image_url
+				: object(part.image_url).url
+		const prefix =
+			typeof url === 'string' && /^data:image\/[\w.+-]+;base64,/i.exec(url)
+		if (typeof url !== 'string' || !prefix) throw new Error()
+		return url.slice(prefix[0].length)
+	}
+	if (part.type === 'image') {
+		const source = object(part.source)
+		if (
+			source.type !== 'base64' ||
+			typeof source.media_type !== 'string' ||
+			!source.media_type.startsWith('image/') ||
+			typeof source.data !== 'string'
+		)
+			throw new Error()
+		return source.data
+	}
+}
+
+async function reserveImage(data: string) {
+	const { format, width, height, pages } = await sharp(
+		Buffer.from(data, 'base64'),
+	).metadata()
+	if (
+		!width ||
+		!height ||
+		!['png', 'jpeg', 'webp', 'gif'].includes(format ?? '') ||
+		(pages ?? 1) !== 1
+	)
+		throw new Error()
+	const tiles = (edge: number) => Math.max(2, Math.ceil(edge / 512))
+	return 4096 + 8192 * tiles(width) * tiles(height)
+}
+
 export async function quoteSpend(request: Request) {
 	const path = new URL(request.url).pathname.replace(/\/$/, '')
 	try {
@@ -113,7 +153,8 @@ export async function quoteSpend(request: Request) {
 			throw new Error()
 		const body = object(await request.clone().json())
 		const output = requestedOutputTokens(request, body)
-		const input = responses ? body.input : body.messages
+		const inputKey = responses ? 'input' : 'messages'
+		const input = body[inputKey]
 		if (
 			!valid(output) ||
 			output < 1 ||
@@ -123,24 +164,48 @@ export async function quoteSpend(request: Request) {
 		const outputReserve = output * outputFactor(body.model)
 		if (!valid(outputReserve)) throw new Error()
 		const fields: string[] = []
+		const images: string[] = []
 		let largeFieldBytes = 0
-		function collect(value: unknown) {
+		function collect(
+			value: unknown,
+			level: 'body' | 'messages' | 'parts' | 'field' = 'field',
+		) {
 			if (typeof value === 'string' && value.length > 16_384) {
 				largeFieldBytes += Buffer.byteLength(value)
 			} else if (Array.isArray(value)) {
-				for (const item of value) collect(item)
+				for (const item of value) collect(item, level)
 			} else if (value && typeof value === 'object') {
+				if (level === 'parts' || (responses && level === 'messages')) {
+					const data = imagePartData(object(value))
+					if (data !== undefined) {
+						images.push(data)
+						return
+					}
+				}
 				for (const [key, item] of Object.entries(value)) {
 					fields.push(key)
-					collect(item)
+					collect(
+						item,
+						level === 'body' && key === inputKey
+							? 'messages'
+							: (level === 'messages' || level === 'parts') &&
+									(key === 'content' || (responses && key === 'output')) &&
+									Array.isArray(item)
+								? 'parts'
+								: 'field',
+					)
 				}
 			} else {
 				fields.push(String(value))
 			}
 		}
-		collect(body)
+		collect(body, 'body')
+		let vision = 0
+		for (const data of images) vision += await reserveImage(data)
 		const tokens =
-			reserveTokenFields(fields, outputReserve).reserved + largeFieldBytes
+			reserveTokenFields(fields, outputReserve).reserved +
+			largeFieldBytes +
+			vision
 		if (!valid(tokens)) throw new Error()
 		return { tokens, images: 0 }
 	} catch (error) {

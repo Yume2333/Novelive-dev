@@ -132,8 +132,25 @@ function characterBriefFallback(
 		return character.description
 }
 
-async function auditPreview(png: Buffer) {
-	const { hasAlpha, width, height } = await sharp(png).metadata()
+async function boundAuditImage(png: Buffer) {
+	const image = sharp(png)
+	const metadata = await image.metadata()
+	let { width, height } = metadata
+	const edge = 1536
+	if (width > edge || height > edge) {
+		const { data, info } = await image
+			.resize({ width: edge, height: edge, fit: 'inside' })
+			.png()
+			.toBuffer({ resolveWithObject: true })
+		png = data
+		width = info.width
+		height = info.height
+	}
+	return { png, width, height, hasAlpha: metadata.hasAlpha }
+}
+
+async function auditPreview(image: Buffer) {
+	const { png, width, height, hasAlpha } = await boundAuditImage(image)
 	if (!hasAlpha) return { png }
 	const tile = Math.max(1, Math.round(Math.min(width, height) / 24))
 	const checkerboard = Buffer.from(
@@ -683,18 +700,24 @@ export class ArtProduction {
 			}
 			await this.project.writeFile(checkpoint.path, JSON.stringify(pending))
 		}
+		let boundedRefs: Promise<Buffer[]> | undefined
 		const audit = async (
 			png: Buffer,
 			prompt: string,
 			preview: Awaited<ReturnType<typeof auditPreview>>,
 		) => {
 			try {
+				boundedRefs ??= Promise.all(
+					auditRefs.map(
+						async (reference) => (await boundAuditImage(reference)).png,
+					),
+				)
 				const judge = await artJson(
 					this.options.visual,
 					prompt,
 					auditSchema,
 					this.options,
-					[preview.png, ...auditRefs],
+					[preview.png, ...(await boundedRefs)],
 				)
 				if (judge.pass && judge.failedChecks.length === 0) {
 					await clearReview()

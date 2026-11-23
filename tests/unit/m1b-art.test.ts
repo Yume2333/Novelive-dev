@@ -6,6 +6,7 @@ import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
 import sharp from 'sharp'
 import { expect, test, vi } from 'vitest'
+import { ArtProduction } from '../../packages/creator/src/pipeline/art'
 import * as background from '../../packages/creator/src/pipeline/art/background'
 import { checkImage } from '../../packages/creator/src/pipeline/art/check'
 import {
@@ -16,6 +17,7 @@ import * as artModels from '../../packages/creator/src/pipeline/art/models'
 import { planArt } from '../../packages/creator/src/pipeline/art/plan'
 import * as upscale from '../../packages/creator/src/pipeline/postprocess'
 import { Project } from '../../packages/creator/src/project'
+import { quoteSpend } from '../../packages/creator/src/usage/spend'
 import {
 	bible,
 	directory,
@@ -188,6 +190,125 @@ test('confirms three main visuals and costumes, stages the chapter and draws can
 			})
 	})
 }, 45_000)
+
+test('bounds chapter review quotes without shrinking generation references or saved images', async () => {
+	const render = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, refs, size) => {
+			expect(await sharp(refs[0]).metadata()).toMatchObject({
+				width: 3840,
+				height: 2160,
+			})
+			return { bytes: await picture(size.width, size.height, false) }
+		})
+	const postprocess = vi
+		.spyOn(upscale, 'postprocess')
+		.mockImplementation(async (image, { target, fit }) =>
+			sharp(image)
+				.resize({ ...target, fit })
+				.png()
+				.toBuffer(),
+		)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(
+			async (_connection, prompt, _schema, _options, images) => {
+				if (!prompt.startsWith('Visually audit')) return { content: '窗光' }
+				expect(await sharp(images?.[0]).metadata()).toMatchObject({
+					width: 1536,
+					height: 864,
+				})
+				expect(await sharp(images?.[1]).metadata()).toMatchObject({
+					width: 1536,
+					height: 864,
+				})
+				const quote = await quoteSpend(
+					new Request('https://example.invalid/v1/chat/completions', {
+						method: 'POST',
+						body: JSON.stringify({
+							max_tokens: 4096,
+							messages: [
+								{
+									role: 'user',
+									content: [
+										{ type: 'text', text: prompt },
+										...(images ?? []).map((image) => ({
+											type: 'image_url',
+											image_url: {
+												url: `data:image/png;base64,${image.toString('base64')}`,
+											},
+										})),
+									],
+								},
+							],
+						}),
+					}),
+				)
+				expect(quote.tokens).toBeGreaterThan(2 * 53_248)
+				expect(quote.tokens).toBeLessThan(120_000)
+				return { pass: true, failedChecks: [], feedback: '' }
+			},
+		)
+	try {
+		await projectTest(async (project) => {
+			const path = 'assets/style/reference.png'
+			const original = await picture(3840, 2160, false)
+			await project.writeFile(path, original)
+			const art = new ArtProduction(project, {
+				replay,
+				main,
+				fast: main,
+				visual: main,
+				image: {
+					baseUrl: main.baseUrl,
+					apiKey: main.apiKey,
+					model: 'fixture-art-image',
+					nativeMaxEdge: 2048,
+					concurrency: 1,
+					retries: 0,
+					quality: 'medium',
+					postProcess: 'single',
+					upscaleTier: 'anime',
+				},
+			})
+			const confirmed = {
+				...bible,
+				style: {
+					...bible.style,
+					status: 'confirmed' as const,
+					references: [{ path, description: 'Style' }],
+				},
+			}
+			const [job] = await art.register(
+				[{ id: 'cg-window', kind: 'cg', description: 'A window' }],
+				confirmed,
+			)
+			expect(await art.draw(job, confirmed)).toEqual({ status: 'drawn' })
+			expect(postprocess).toHaveBeenCalledTimes(1)
+			expect(
+				await sharp(postprocess.mock.calls[0][0]).metadata(),
+			).toMatchObject({ width: 2048, height: 1152 })
+			const entry = (await art.registry()).entries.find(
+				(entry) => entry.id === job.assetId,
+			)
+			const profiles = await readProfiles(project)
+			expect(entry && profiles[entry.path]?.profile).toEqual({
+				mode: 'single',
+				tier: 'anime',
+			})
+			expect(await project.readFile(path)).toEqual(original)
+			expect(
+				model.mock.calls.filter(([, prompt]) =>
+					prompt.startsWith('Visually audit'),
+				),
+			).toHaveLength(1)
+		})
+	} finally {
+		render.mockRestore()
+		model.mockRestore()
+		postprocess.mockRestore()
+	}
+}, 30_000)
 
 test('preserves audited art when the local upscaler is unavailable', async () => {
 	const render = vi
