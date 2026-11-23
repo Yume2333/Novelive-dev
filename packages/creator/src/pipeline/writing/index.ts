@@ -38,6 +38,7 @@ export type WritingChapter = ReviewContext & {
 	settings?: WorkSettings
 	redLines?: readonly string[]
 	preset?: string
+	rewrite?: { instruction: string; current: string }
 }
 
 export type WriterOptions = WritingTransport & {
@@ -93,6 +94,12 @@ function brief(chapter: WritingChapter, speakers: string[]) {
 							`Previous chapter's preview summary (context only): ${link.summary}`,
 						]
 					: []),
+			...(chapter.rewrite
+				? [
+						`Rewrite this existing scene as exactly one scene: ${chapter.rewrite.current}`,
+						`Creator rewrite instruction: ${chapter.rewrite.instruction}`,
+					]
+				: []),
 		].join('\n'),
 		revision: [adaptationRule, requirements, rules].join('\n'),
 		end: redLines ? `\nRED LINES (mandatory):\n${redLines}` : '',

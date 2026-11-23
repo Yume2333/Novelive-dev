@@ -162,6 +162,46 @@ export class ProjectEditor {
 		})
 	}
 
+	replaceScene(
+		input: CommandInput<'editor.rewriteScene'>,
+		kind: string,
+		change: (nvs: string) => string,
+	): Promise<Snapshot> {
+		return withProjectEdits(this.project, async () => {
+			this.checkWork(input.workId)
+			const model = await this.loadChapter(input.chapterId)
+			this.checkRevision(model.snapshot, input.expectedRevision)
+			const scene = model.scripts.find(
+				({ sceneId }) => sceneId === input.sceneId,
+			)
+			if (!scene) throw { code: 'not_found', message: '找不到场景。' }
+			const nvs = change(scene.nvs)
+			compileEditorScript(
+				model.scripts.map((item) =>
+					item === scene ? { ...scene, nvs } : item,
+				),
+				model.options,
+			)
+			const { chapterId, sceneId } = input
+			await writeAuditedFile(
+				this.project,
+				projectFiles.scene(this.chapterRef(chapterId), sceneId),
+				scene.nvs,
+				nvs,
+				() =>
+					recordHistory(this.project, this.workId, {
+						origin: 'agent',
+						kind,
+						chapterId,
+						sceneId,
+						previous: scene.nvs,
+						next: nvs,
+					}),
+			)
+			return (await this.loadChapter(chapterId)).snapshot
+		})
+	}
+
 	private checkWork(workId: string) {
 		if (workId !== this.workId)
 			throw { code: 'not_found', message: '工程中找不到这部作品。' }
