@@ -1,0 +1,16 @@
+m2-editor/03 — Agent 会话与提议确认
+Base: 0bf76ad045f9180ed1683ab7a372974519b557e4
+
+NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-chat.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+
+NL_REPLAY=strict pnpm check
+ Test Files  24 passed (24)
+      Tests  344 passed (344)
+
+真实后端入口：registerChat 注册的命令 → ChatService → pi → SQLite 工程。
+通过：附图与流式取消、重开分支、分支压缩、跨分支的提议跟进、过期审批、
+确认与拒绝、压缩后的拒绝理由、关闭时等待审批落盘、只读且不可递归的子 Agent。
+供应商用合成 SSE 严格回放；项目写入用测试适配器，桌面接线和真实写入由集成验收负责。
+本任务付费调用：0。
