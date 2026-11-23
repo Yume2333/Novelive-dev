@@ -820,11 +820,11 @@ test('keeps a reviewed transparent fallback when later opaque responses exhaust 
 				characters: [{ characterId: 'bea', candidates: [{ id: 'costume-1' }] }],
 			})
 			const { cachePath } = pool.characters[0].candidates[0]
-			expect(
-				await sharp(await project.readFile(cachePath)).metadata(),
-			).toMatchObject({
-				hasAlpha: true,
-			})
+			const alpha = await sharp(await project.readFile(cachePath))
+				.extractChannel('alpha')
+				.raw()
+				.toBuffer()
+			expect(alpha.includes(0)).toBe(true)
 			expect(responses).toHaveLength(0)
 		})
 	} finally {
