@@ -9,8 +9,8 @@ import { buildTextModel, type TextConnection } from '../../models/text'
 import { ArtResponseSchemaError, artJson, type ModelOptions } from './models'
 import {
 	type ArtBible,
-	manifestIdShapes,
 	type ManifestItem,
+	manifestIdShapes,
 	planArt,
 } from './plan'
 

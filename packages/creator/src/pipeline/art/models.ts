@@ -22,7 +22,10 @@ import type { Dimensions } from './check'
 export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
 
 export class ArtResponseSchemaError extends Error {
-	constructor(message: string, readonly rejected: unknown) {
+	constructor(
+		message: string,
+		readonly rejected: unknown,
+	) {
 		super(message)
 	}
 }

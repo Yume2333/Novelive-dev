@@ -12,6 +12,7 @@ import {
 	directChapterArt,
 } from '../../packages/creator/src/pipeline/art/director'
 import * as artModels from '../../packages/creator/src/pipeline/art/models'
+import { planArt } from '../../packages/creator/src/pipeline/art/plan'
 import { Project } from '../../packages/creator/src/project'
 import {
 	bible,
@@ -307,19 +308,30 @@ test('requests repair when a staging patch adds an image absent from the manifes
 test('requests a schema repair for bare model-generated place IDs after a staging repair', async () => {
 	const patch = 'PUT <4:\n@cg cg-window'
 	const cg = { id: 'cg-window', kind: 'cg', description: '窗边' }
-	const location = { kind: 'location', description: '庭院' }
+	const courtyard = {
+		id: 'loc_courtyard',
+		kind: 'location',
+		description: '庭院',
+	}
+	const gate = { id: 'loc_gate', kind: 'location', description: '石门' }
+	const corrected = [
+		{ ...courtyard, id: 'loc_courtyard/day' },
+		cg,
+		{ ...gate, id: 'loc_gate/day' },
+	]
 	const answers = [
 		{ patch, items: [], merges: {} },
 		{
-			patch,
-			items: [
-				{ ...location, id: 'loc_courtyard' },
-				cg,
-				{ ...location, id: 'loc_gate' },
-			],
+			patch: 'PUT <4:\n@bg loc_courtyard\n@cg cg-window\nPUT >4:\n@bg loc_gate',
+			items: [courtyard, cg, gate],
 			merges: {},
 		},
-		{ patch, items: [cg], merges: {} },
+		{
+			patch:
+				'PUT <4:\n@bg loc_courtyard/day\n@cg cg-window\nPUT >4:\n@bg loc_gate/day',
+			items: corrected,
+			merges: {},
+		},
 	]
 	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 		const { messages } = await new Request(input, init).json()
@@ -355,7 +367,21 @@ test('requests a schema repair for bare model-generated place IDs after a stagin
 		replay: { ...replay, mode: 'replay', fetch },
 	})
 	expect(fetch).toHaveBeenCalledTimes(3)
-	expect(staged.items).toEqual([cg])
+	expect(staged.items).toEqual(corrected)
+	const plan = planArt(staged.items, bible, empty, staged.merges)
+	const compiled = compileScript(staged.script, {
+		assets: plan.registry.entries,
+		speakers: ['ada'],
+		paragraphIds: ['p0001'],
+	})
+	expect(compiled.ok).toBe(true)
+	expect(
+		compiled.ok &&
+			compiled.scenes[0].beats
+				.flatMap(({ actions }) => actions)
+				.filter(({ name }) => name === 'bg')
+				.map(({ assets }) => assets),
+	).toEqual([[{ id: 'loc_courtyard/day' }], [{ id: 'loc_gate/day' }]])
 })
 
 test('preserves configured custom marks through staging and rejects unconfigured marks', async () => {
