@@ -35,6 +35,11 @@ export interface ReplayOptions {
 }
 
 const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
+const dispatchedRequests = new WeakSet<Request>()
+
+export function wasDispatched(request: Request) {
+	return dispatchedRequests.has(request)
+}
 
 export function isSpendGuardedFetch(fetch: typeof globalThis.fetch) {
 	return spendGuardedFetches.has(fetch)
@@ -289,9 +294,16 @@ export function createReplayFetch(
 	const mode = options.mode ?? modeFromEnvironment()
 	const send = options.fetch ?? globalThis.fetch
 	const spend = options.spend
+	const sendAdmitted = (input: RequestInfo | URL, admitted: Request) => {
+		admitted.signal.throwIfAborted()
+		if (input instanceof Request) dispatchedRequests.add(input)
+		return send(admitted)
+	}
 	const upstream: typeof fetch = spend
 		? (input, init) =>
-				spend(new Request(input, init), (admitted) => send(admitted))
+				spend(new Request(input, init), (admitted) =>
+					sendAdmitted(input, admitted),
+				)
 		: send
 	if (spend && mode !== 'strict') spendGuardedFetches.add(upstream)
 	if (!mode) return upstream
@@ -429,7 +441,7 @@ export function createReplayFetch(
 						`${new Date().toISOString().slice(0, 10)},${String(body.model ?? 'image').replaceAll(',', '')},1,${reservation?.tokens ?? requestedOutputTokens(admitted, body) ?? 0},${reservation?.images ?? 0},cassette recording (${reservation ? 'reserved tokens and images' : 'reserved output tokens'})\n`,
 					)
 				}
-				return send(admitted)
+				return spend ? sendAdmitted(input, admitted) : send(admitted)
 			}
 			const response = await (spend
 				? spend(request, recordSend)

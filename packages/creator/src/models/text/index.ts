@@ -21,7 +21,11 @@ import { isRetryableAssistantError } from '@earendil-works/pi-ai/utils/retry'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import type { MaskedConfig } from '../../config/index.js'
 import type { CommandError } from '../../contract/index.js'
-import { createReplayFetch, isSpendGuardedFetch } from '../../replay/index.js'
+import {
+	createReplayFetch,
+	isSpendGuardedFetch,
+	wasDispatched,
+} from '../../replay/index.js'
 import { recordTextUsage } from '../../usage'
 import { SpendBudgetError, textSettlement } from '../../usage/spend'
 import { textUsageSlots } from '../../usage/text-slots'
@@ -416,7 +420,7 @@ export function createTextStream(
 				let fields = ''
 				let spendError: SpendBudgetError | undefined
 				let headersReceived = false
-				let dispatched = false
+				let request: Request | undefined
 				let settlement: ReturnType<typeof textSettlement>
 				const started = Date.now()
 				const resetWatchdog = () => {
@@ -453,8 +457,10 @@ export function createTextStream(
 							status = undefined
 							fields = ''
 							if (spendError) throw spendError
-							dispatched = true
-							const response = await fetch(input, init).catch((error) => {
+							const pending = guarded
+								? fetch((request = new Request(input, init)))
+								: fetch(input, init)
+							const response = await pending.catch((error) => {
 								if (error instanceof SpendBudgetError) spendError = error
 								throw error
 							})
@@ -511,8 +517,6 @@ export function createTextStream(
 					)
 				recordTextUsage(model.id, result.usage, textUsageSlots.get(model))
 				usage = usage ? sumUsage(usage, result.usage) : result.usage
-				if (options?.signal?.aborted)
-					return fail('cancelled', undefined, result)
 				const empty =
 					(result.stopReason === 'stop' || result.stopReason === 'length') &&
 					!result.content.some(
@@ -541,8 +545,14 @@ export function createTextStream(
 					status !== 408 &&
 					status !== 409
 				const settled = settlement?.()
+				const dispatched = request !== undefined && wasDispatched(request)
+				const cancelled = options?.signal?.aborted
+				const interrupted = cancelled && dispatched && !settled && !rejected
+				if (cancelled && !interrupted)
+					return fail('cancelled', undefined, result)
 				if (
-					(guarded && dispatched && status === undefined) ||
+					interrupted ||
+					(dispatched && status === undefined) ||
 					(settlement &&
 						!rejected &&
 						((ok && (!settled || (failedResult && code === 'internal'))) ||
@@ -550,13 +560,15 @@ export function createTextStream(
 							(code === 'network' &&
 								(failedResult || (empty && !(settled && reasoningOnly))))))
 				) {
-					const reason = watchdog
-						? 'stream idle timeout (watchdog)'
-						: empty
-							? 'empty model response'
-							: failedResult
-								? requestFailureReason(result)
-								: 'successful response did not report billable usage'
+					const reason = interrupted
+						? 'cancelled after dispatch without settled usage'
+						: watchdog
+							? 'stream idle timeout (watchdog)'
+							: empty
+								? 'empty model response'
+								: failedResult
+									? requestFailureReason(result)
+									: 'successful response did not report billable usage'
 					const outcome = settled
 						? 'Model response incomplete'
 						: 'Model request outcome unknown'

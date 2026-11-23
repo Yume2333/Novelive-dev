@@ -460,6 +460,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+	vi.unstubAllEnvs()
 	expect(network).not.toHaveBeenCalled()
 	await rm(directory, { recursive: true, force: true })
 })
@@ -619,6 +620,65 @@ test.each([200, 429])(
 		} finally {
 			vi.unstubAllEnvs()
 		}
+	},
+)
+
+test.each([false, true])(
+	'synthesis cancellation blocks reopen only after dispatch (dispatched: %s)',
+	async (inFlight) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		vi.stubEnv('NL_USAGE_CSV', '')
+		await seed(root)
+		const controller = new AbortController()
+		const entered = Promise.withResolvers<void>()
+		const send = vi.fn<typeof globalThis.fetch>(async (input) => {
+			const { signal } = new Request(input)
+			if (!inFlight) return Response.json({}, { status: 429 })
+			return new Promise<Response>((_resolve, reject) => {
+				signal.addEventListener('abort', () => reject(signal.reason), {
+					once: true,
+				})
+				entered.resolve()
+			})
+		})
+		const run = (project: Project, signal?: AbortSignal) =>
+			synthesizeVolume(project, 'v1', chapters, {
+				...options,
+				signal,
+				strategy: 'whole',
+				fetch: createReplayFetch({
+					mode: 'record',
+					directory: join(directory, 'recordings'),
+					fetch: send,
+					spend: projectSpend(project.database),
+				}),
+			})
+		const unknown = {
+			code: 'internal',
+			message: expect.stringContaining(
+				'cancelled after dispatch without settled usage',
+			),
+		}
+		{
+			using project = await Project.open(root)
+			if (!inFlight) controller.abort()
+			const runResult = run(project, controller.signal)
+			const assertion = expect(runResult).rejects.toMatchObject(
+				inFlight ? unknown : { name: 'AbortError' },
+			)
+			if (inFlight) {
+				await entered.promise
+				controller.abort()
+			}
+			await assertion
+			expect(send).toHaveBeenCalledTimes(inFlight ? 1 : 0)
+		}
+		using reopened = await Project.open(root)
+		await expect(run(reopened)).rejects.toMatchObject(
+			inFlight ? unknown : { code: 'network' },
+		)
+		expect(send).toHaveBeenCalledOnce()
 	},
 )
 
