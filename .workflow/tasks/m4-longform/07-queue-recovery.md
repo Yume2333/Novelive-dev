@@ -15,7 +15,8 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-queue.test.ts` — 3 passed；包括同一工程的两部作品、独立工程重排、子进程被强杀后重开和显式续跑。
+- Check after: `NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-queue.test.ts` — 5 passed；包括共享工程让槽、跨工程重排、停止后续跑不插队、章节和出图遭强杀后显式续跑。
 - M4/10 接线：将现有 `productionQueueSchema` 用于队列查询 `createProduction.getQueue()`、相邻重排 `createProduction.moveQueueWork(workId, direction)`（`-1` 提前、`1` 延后）与 app scope 的 `production.queue` 快照事件。制作页挂载 `ProductionQueuePanel`，继续和停止复用现有作品命令。此任务不改 M4/01 契约或桌面注册。
+- M4/10 宿主验收：启动 creator 前取得 Electron 单实例锁，避免同一桌面配置的第二个进程将仍在运行的任务误判为崩溃；`events.list` 将已打开作品的持久章节记录与事件缓存按序号去重合并，避免其他作品挤掉历史后返回空记录。
 - 调度只为章节和章内出图分配制作槽；预览、综合和确认素材准备独立于该队列。重开项目时以原工程工作状态、任务检查点、`run`/`run_step` 为准；重排只影响当次运行中的待排作品，不会在重开后自动续跑。
 - 离线验收只替换模型侧 worker；主控、SQLite 和异常退出后重开均走真实实现，无缺失 cassette。
