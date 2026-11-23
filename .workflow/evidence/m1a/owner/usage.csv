@@ -14,3 +14,4 @@ date,model,calls,tokens,images,purpose
 2026-11-23,gpt-image-2.6-sunburst,7,13051,7,M4 full-artwork smoke measured usage from PR 83
 2026-11-23,devin-swe-2,76,347495,0,W4 selection-only at ebcdeaa measured from relay responses across all attempts
 2026-11-23,devin-swe-2,35,185670,0,W4 selection-only at b3cca62 measured from relay responses
+2026-11-23,devin-swe-2,1,68396,0,W4 global selection-only at 9b2e274 measured from relay response
