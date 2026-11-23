@@ -205,6 +205,37 @@ test.each([
 	},
 )
 
+test('can skip a recorded HTTP failure in replay mode without changing strict replay', async () => {
+	const url = origin + path
+	const failed = createReplayFetch({
+		mode: 'record',
+		directory,
+		fetch: async () => new Response('temporarily unavailable', { status: 500 }),
+	})
+	await (await failed(url)).text()
+	const fetch = vi.fn<typeof globalThis.fetch>(
+		async () => new Response('recovered'),
+	)
+	const record = createReplayFetch({ mode: 'record', directory, fetch })
+	const replay = createReplayFetch({
+		mode: 'replay',
+		directory,
+		fetch: record,
+		ignoreRecordedFailures: true,
+	})
+	const strict = createReplayFetch({
+		mode: 'strict',
+		directory,
+		ignoreRecordedFailures: true,
+		fetch,
+	})
+	expect((await strict(url)).status).toBe(500)
+	expect(fetch).not.toHaveBeenCalled()
+	expect(await (await replay(url)).text()).toBe('recovered')
+	expect(await (await replay(url)).text()).toBe('recovered')
+	expect(fetch).toHaveBeenCalledOnce()
+})
+
 test('stream faults and abort during a delayed pull do not change the recording', async () => {
 	const fetch = vi.fn(
 		async () =>

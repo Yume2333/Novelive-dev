@@ -247,6 +247,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const replay = createReplayFetch({
 			...cassette,
 			mode: 'replay',
+			ignoreRecordedFailures: true,
 			fetch: upstream,
 		})
 		const fetchReplay: typeof globalThis.fetch = async (input, init) => {
