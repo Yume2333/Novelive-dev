@@ -74,6 +74,7 @@ export const roleModelDefaults = {
 	'painter-scene': 'main',
 	'painter-variant': 'fast',
 	'reviewer-visual': 'visual',
+	'illustration-screening': 'visual',
 } as const satisfies Record<string, (typeof textSlots)[number]>
 export type ProductionRole = keyof typeof roleModelDefaults
 
@@ -87,6 +88,7 @@ const roleModels = obj({
 	'painter-scene': opt(oneOf(textSlots)),
 	'painter-variant': opt(oneOf(textSlots)),
 	'reviewer-visual': opt(oneOf(textSlots)),
+	'illustration-screening': opt(oneOf(textSlots)),
 })
 const writerPreset = obj({
 	id: entityId,

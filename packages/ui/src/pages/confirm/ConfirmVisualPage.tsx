@@ -17,6 +17,7 @@ function CandidateCard({
 	candidate,
 	index,
 	name,
+	label,
 	checked,
 	onChange,
 	multiple = false,
@@ -25,6 +26,7 @@ function CandidateCard({
 	candidate: Candidate
 	index: number
 	name: string
+	label?: string
 	checked: boolean
 	onChange(): void
 	multiple?: boolean
@@ -41,7 +43,7 @@ function CandidateCard({
 			/>
 			<img src={window.novelive.resourceUrl(candidate.cachePath)} alt="" />
 			<span>
-				{t('方案 {{value}}', { value: index + 1 })}
+				{label ?? t('方案 {{value}}', { value: index + 1 })}
 				{checked && <Check size={16} aria-hidden="true" />}
 			</span>
 		</label>
@@ -68,12 +70,41 @@ export function ConfirmVisualPage() {
 function VisualChoices({ visual }: { visual: Visual }) {
 	const { snapshot, run, busy } = useWorkProduction()
 	const navigate = useNavigate()
-	const [mainId, setMainId] = useState('')
+	const imported = visual.importedIllustrations
+	const recommended = imported?.recommended ?? []
+	const importedCandidates = imported?.candidates ?? []
+	const defaults = [...new Set([...(imported?.selected ?? []), ...recommended])]
+	const [mainId, setMainId] = useState(() => defaults[0] ?? '')
 	const [characterIds, setCharacterIds] = useState<Record<string, string>>({})
-	const [supplemental, setSupplemental] = useState<string[]>([])
-	const main = visual.mainVisuals.find(({ id }) => id === mainId)
+	const [supplemental, setSupplemental] = useState(() => defaults.slice(1, 3))
+	const [showAll, setShowAll] = useState(false)
+	const visibleImported = importedCandidates.filter(
+		({ id }) =>
+			showAll ||
+			imported?.fallback ||
+			recommended.includes(id) ||
+			imported?.selected.includes(id) ||
+			id === mainId ||
+			supplemental.includes(id),
+	)
+	const label = (id: string) => {
+		const index = importedCandidates.findIndex(
+			(candidate) => candidate.id === id,
+		)
+		return index === -1
+			? undefined
+			: recommended.includes(id)
+				? t('推荐 · EPUB 插图 {{value}}', { value: index + 1 })
+				: t('EPUB 插图 {{value}}', { value: index + 1 })
+	}
+	const mainVisuals = [...visual.mainVisuals, ...visibleImported]
+	const supplementalVisuals = [
+		...visual.supplemental,
+		...visibleImported,
+	].filter(({ id }) => id !== mainId)
+	const main = mainVisuals.find(({ id }) => id === mainId)
 	const supplementalIds = supplemental.filter((id) =>
-		visual.supplemental.some((candidate) => candidate.id === id),
+		supplementalVisuals.some((candidate) => candidate.id === id),
 	)
 	const characters = visual.characters.flatMap(
 		({ characterId, costumeId, candidates }) => {
@@ -105,17 +136,42 @@ function VisualChoices({ visual }: { visual: Visual }) {
 			<p className={styles.lead}>
 				{t('确认点 1 / 2 · 选择首卷主要角色的设定和全作统一的主视觉。')}
 			</p>
+			{imported?.fallback ? (
+				<p className={styles.notice} role="status">
+					{t('未能筛选 EPUB 插图，已显示全部插图，可手动选择。')}
+				</p>
+			) : importedCandidates.some(
+					({ id }) =>
+						!recommended.includes(id) && !imported?.selected.includes(id),
+				) ? (
+				<div className={styles.actions}>
+					<button
+						className={styles.button}
+						type="button"
+						aria-pressed={showAll}
+						onClick={() => setShowAll(!showAll)}
+					>
+						{showAll ? t('收起未推荐的 EPUB 插图') : t('显示全部 EPUB 插图')}
+					</button>
+				</div>
+			) : null}
 			<fieldset className={styles.card} disabled={busy}>
 				<legend>{t('主视觉')}</legend>
 				<div className={styles.gallery}>
-					{visual.mainVisuals.map((candidate, index) => (
+					{mainVisuals.map((candidate, index) => (
 						<CandidateCard
 							key={candidate.id}
 							candidate={candidate}
 							index={index}
 							name="main-visual"
+							label={label(candidate.id)}
 							checked={candidate.id === mainId}
-							onChange={() => setMainId(candidate.id)}
+							onChange={() => {
+								setMainId(candidate.id)
+								setSupplemental((ids) =>
+									ids.filter((id) => id !== candidate.id),
+								)
+							}}
 						/>
 					))}
 				</div>
@@ -148,6 +204,11 @@ function VisualChoices({ visual }: { visual: Visual }) {
 												candidate={candidate}
 												index={index}
 												name={key}
+												label={
+													candidate.id === 'costume-epub'
+														? t('EPUB 参考方案')
+														: undefined
+												}
 												checked={characterIds[key] === candidate.id}
 												onChange={() =>
 													setCharacterIds((choices) => ({
@@ -164,11 +225,11 @@ function VisualChoices({ visual }: { visual: Visual }) {
 					)}
 				</section>
 			)}
-			{visual.supplemental.length > 0 && (
+			{supplementalVisuals.length > 0 && (
 				<fieldset className={styles.card} disabled={busy}>
 					<legend>{t('补充画风参考（最多两张）')}</legend>
 					<div className={styles.gallery}>
-						{visual.supplemental.map((candidate, index) => {
+						{supplementalVisuals.map((candidate, index) => {
 							const checked = supplementalIds.includes(candidate.id)
 							return (
 								<CandidateCard
@@ -176,6 +237,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 									candidate={candidate}
 									index={index}
 									name="supplemental"
+									label={label(candidate.id)}
 									multiple
 									checked={checked}
 									disabled={!checked && supplementalIds.length >= 2}

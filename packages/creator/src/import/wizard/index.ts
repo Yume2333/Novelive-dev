@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { copyFile, mkdir, readFile, rename, rm } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import {
@@ -10,9 +11,13 @@ import type {
 	ImportExtraction,
 	ImportJoinTarget,
 } from '../../contract/import'
+import type { TextConnection } from '../../models/text'
+import type { ModelOptions } from '../../pipeline/art/models'
 import { Project } from '../../project'
+import { existing } from '../../synthesis/patch'
 import { extractDocx } from '../docx'
 import { extractEpub } from '../epub'
+import { classifyIllustrations } from '../epub/illustrations'
 import { extractMarkdown } from '../markdown'
 import { extractPdf } from '../pdf'
 import {
@@ -253,6 +258,92 @@ export async function readImportWizard(
 			({ cachePath: _cachePath, ...candidate }) => candidate,
 		),
 		selectedIllustrations: report.selectedIllustrations ?? [],
+	}
+}
+
+export async function screenImportedIllustrations(
+	project: Project,
+	bible: string,
+	connection: () => Promise<TextConnection>,
+	options: ModelOptions,
+	characterIds: readonly string[] = [],
+) {
+	const report = (await project.read(projectFiles.importReport)) as WizardReport
+	const candidates =
+		report.format === 'epub' ? (report.illustrations ?? []) : []
+	if (!candidates.length) return undefined
+	const choices = candidates.map(({ id, cachePath }) => ({ id, cachePath }))
+	try {
+		const bytes = await project.readFile(projectFiles.original('epub'))
+		const model = await connection()
+		const key = createHash('sha256')
+			.update(
+				JSON.stringify([
+					2,
+					choices,
+					bible,
+					characterIds,
+					model.model,
+					model.baseUrl,
+					model.format,
+					model.compat,
+					model.contextWindow,
+					model.maxOutputTokens,
+				]),
+			)
+			.update(bytes)
+			.digest('hex')
+		const path = `source/imports/screening/${key}.json`
+		const cached = await existing(() => project.readFile(path))
+		const output = (matches: readonly (string | null)[]) => ({
+			fallback: false,
+			candidates: choices.map((choice, index) => ({
+				...choice,
+				recommended: matches[index] !== '',
+				...(matches[index] && { characterId: matches[index] }),
+			})),
+		})
+		options.signal?.throwIfAborted()
+		if (cached) {
+			const hits: unknown = JSON.parse(cached.toString())
+			if (
+				Array.isArray(hits) &&
+				hits.length === choices.length &&
+				hits.every(
+					(hit) => hit === null || hit === '' || characterIds.includes(hit),
+				)
+			)
+				return output(hits)
+		}
+		const extraction = await extractEpub(bytes)
+		const ids = new Set(candidates.map(({ id }) => id))
+		const illustrations = extraction.book.illustrations.filter((_, index) =>
+			ids.has(`illustration-${index + 1}`),
+		)
+		if (illustrations.length !== candidates.length)
+			throw new Error('EPUB illustration list does not match import')
+		const results = await classifyIllustrations(
+			{ ...extraction, book: { ...extraction.book, illustrations } },
+			bible,
+			model,
+			options,
+			characterIds,
+		)
+		const matches = results.map(({ label, characterId }) =>
+			label === 'irrelevant' ? '' : (characterId ?? null),
+		)
+		await project.writeFile(path, JSON.stringify(matches))
+		return output(matches)
+	} catch {
+		options.signal?.throwIfAborted()
+		return {
+			fallback: true,
+			candidates: choices.map((choice) => ({
+				...choice,
+				recommended: false,
+				characterId: undefined,
+			})),
+		}
 	}
 }
 

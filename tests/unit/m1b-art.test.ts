@@ -430,6 +430,52 @@ test('rejects mismatched derivation sizes and RGB transparency, not legitimate R
 	).toEqual({ issue: '差分图尺寸与基准图不一致。' })
 })
 
+test('removes an opaque sprite background before validating and auditing the result', async () => {
+	const svg = Buffer.from(
+		'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><path fill="#e8dfd7" d="M0 0h300v450H0z"/><ellipse fill="#3d2536" cx="150" cy="122" rx="49" ry="63"/><ellipse fill="#e1a07f" cx="150" cy="126" rx="36" ry="48"/><path fill="#5230a0" d="M112 175q-44 12-51 81l18 92 22-14 2 116h94l2-116 22 14 18-92q-7-69-51-81z"/></svg>',
+	)
+	const opaque = await sharp(svg).removeAlpha().png().toBuffer()
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async () => ({ bytes: opaque }))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(
+			async (_connection, prompt, _schema, _options, images) => {
+				if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+				const { data, info } = await sharp(images?.[0])
+					.raw()
+					.toBuffer({ resolveWithObject: true })
+				expect(info.channels).toBe(4)
+				expect(data[3]).toBe(0)
+				const center =
+					Math.floor(info.height / 2) * info.width + Math.floor(info.width / 2)
+				expect(data[center * 4 + 3]).toBe(255)
+				return { pass: true, failedChecks: [], feedback: '' }
+			},
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay)
+			const [sprite] = await art.register(
+				[{ id: 'ada/uniform/neutral', kind: 'character', description: 'Ada' }],
+				bible,
+			)
+			vi.stubEnv('NL_MATTING_DIR', join(project.root, 'missing-matting'))
+			await expect(art.draw(sprite, bible)).resolves.toEqual({
+				status: 'unsupported',
+				issue: '本地去背景不可用；请使用可返回透明底的图片模型。',
+			})
+			vi.unstubAllEnvs()
+			expect(await art.draw(sprite, bible)).toEqual({ status: 'drawn' })
+		})
+	} finally {
+		vi.unstubAllEnvs()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+}, 15_000)
+
 test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(
 		'Invalid staging patch',
@@ -734,3 +780,143 @@ test('uses a supplied character design in both costume candidate rendering and a
 		model.mockRestore()
 	}
 }, 30_000)
+
+test.each([
+	{ rejection: 'none', first: 'costume-epub', calls: [1, 0, 0], onReopen: 0 },
+	{
+		rejection: 'prompt',
+		code: 'InputTextRiskDetection',
+		first: 'costume-epub',
+		calls: [1, 1, 0, 0],
+		onReopen: 0,
+	},
+	{
+		rejection: 'unknown',
+		code: 'OutputImageRiskDetection',
+		first: 'costume-1',
+		calls: [1, 1, 0, 0, 0],
+		onReopen: 2,
+	},
+	{
+		rejection: 'reference HTTP error',
+		code: 'InputImageRiskDetection',
+		first: 'costume-1',
+		calls: [1, 0, 0, 0],
+		onReopen: 1,
+	},
+	{
+		rejection: 'reference item error',
+		code: 'InputImageSensitiveContentDetected.PrivacyInformation',
+		first: 'costume-1',
+		calls: [1, 0, 0, 0],
+		onReopen: 1,
+	},
+])(
+	'chooses the EPUB costume moderation retry for $rejection',
+	async ({ rejection, code, first, calls, onReopen }) => {
+		const rewritten = '上一次生成被内容审核拒绝，请收敛描写'
+		type ImageRequest = {
+			prompt: string
+			image?: string[]
+			size: string
+			background?: string
+		}
+		const requests: ImageRequest[] = []
+		const render = artModels.imageRenderer
+		const renderer = vi
+			.spyOn(artModels, 'imageRenderer')
+			.mockImplementation((config) =>
+				render(
+					{ ...config, baseUrl: 'https://fixture.volces.com/api/v3' },
+					{
+						replay: {
+							mode: 'replay',
+							directory,
+							fetch: async (input, init) => {
+								const request = new Request(input, init)
+								expect(request.url).toBe(
+									'https://fixture.volces.com/api/v3/images/generations',
+								)
+								const body: ImageRequest = await request.json()
+								requests.push(body)
+								const alpha = body.background === 'transparent'
+								if (
+									alpha &&
+									body.image?.length &&
+									code &&
+									(rejection !== 'prompt' || !body.prompt.includes(rewritten))
+								) {
+									const error = { code, message: 'Content rejected' }
+									return rejection === 'reference item error'
+										? Response.json({ data: [{ error }] })
+										: Response.json({ error }, { status: 400 })
+								}
+								const [width, height] = body.size.split('x').map(Number)
+								return Response.json({
+									data: [
+										{
+											b64_json: (await picture(width, height, alpha)).toString(
+												'base64',
+											),
+										},
+									],
+								})
+							},
+						},
+					},
+				),
+			)
+		const model = vi
+			.spyOn(artModels, 'artJson')
+			.mockImplementation(async (_connection, prompt) =>
+				prompt.startsWith('Visually audit')
+					? { pass: true, failedChecks: [], feedback: '' }
+					: { content: '窗光' },
+			)
+		try {
+			await projectTest(async (project) => {
+				const path = 'source/imports/illustrations/illustration-1.png'
+				await project.writeFile(path, await picture(64, 96, false))
+				const art = service(project, replay)
+				const references = new Map([
+					['ada', { id: 'illustration-1', cachePath: path }],
+				])
+				const pool = await art.candidates(
+					bible,
+					['c1'],
+					undefined,
+					[],
+					references,
+				)
+				expect(pool.characters[0].candidates.map(({ id }) => id)).toEqual([
+					first,
+					'costume-2',
+					'costume-3',
+				])
+				const portraits = requests.filter(
+					({ background }) => background === 'transparent',
+				)
+				expect(portraits.map(({ image }) => image?.length ?? 0)).toEqual(calls)
+				expect(portraits[0].prompt).toContain(
+					'ada EPUB character design reference',
+				)
+				if (rejection === 'prompt' || rejection === 'unknown') {
+					expect(portraits[1].prompt).toContain(rewritten)
+					expect(portraits[1].image).toEqual(portraits[0].image)
+				}
+				if (first === 'costume-1')
+					expect(portraits[calls.lastIndexOf(1) + 1].prompt).not.toContain(
+						'EPUB character design reference',
+					)
+				expect(
+					await art.candidates(bible, ['c1'], undefined, [], references),
+				).toEqual(pool)
+				expect(requests).toHaveLength(3 + calls.length + onReopen)
+			})
+		} finally {
+			renderer.mockRestore()
+			model.mockRestore()
+		}
+	},
+	30_000,
+)

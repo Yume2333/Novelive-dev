@@ -25,6 +25,7 @@ const roles = [
 	['painter-scene', msg('场景画师')],
 	['painter-variant', msg('差分画师')],
 	['reviewer-visual', msg('视觉审核')],
+	['illustration-screening', msg('EPUB 插图筛选')],
 ] as const
 const slots = [
 	['fast', msg('快速模型')],

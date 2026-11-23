@@ -70,7 +70,9 @@ export function imageRenderer(config: ImageConfig, options: ModelOptions) {
 		refs: readonly Buffer[],
 		size: Dimensions,
 		transparent: boolean,
-	): Promise<{ bytes: Buffer } | { error: CommandError }> => {
+	): Promise<
+		{ bytes: Buffer } | { error: CommandError; referenceModerated?: true }
+	> => {
 		const capability: ImageCapability = refs.length
 			? 'edit'
 			: transparent
@@ -164,7 +166,17 @@ export function imageRenderer(config: ImageConfig, options: ModelOptions) {
 				error.message.startsWith('Missing strict replay cassette:')
 			)
 				throw error
-			return { error: imageError(error, capability, signal) }
+			const failure = imageError(error, capability, signal)
+			const referenceModerated =
+				failure.code === 'moderation' &&
+				error instanceof OpenAI.APIError &&
+				/^InputImage(?:SensitiveContentDetected|RiskDetection)(?:\.|$)/i.test(
+					error.code ?? '',
+				)
+			return {
+				error: failure,
+				...(referenceModerated && { referenceModerated: true }),
+			}
 		}
 	}
 }

@@ -100,6 +100,9 @@ function startCreator(window: BrowserWindow) {
 				...process.env,
 				NL_CREATOR_GENERATION: String(current),
 				NL_CREATOR_DATA_DIR: app.getPath('userData'),
+				NL_MATTING_DIR: app.isPackaged
+					? join(process.resourcesPath, 'matting')
+					: join(app.getAppPath(), '../../bin/matting'),
 				NL_UPSCALE_DIR: app.isPackaged
 					? join(process.resourcesPath, 'upscale')
 					: join(app.getAppPath(), '../../bin/upscale'),
