@@ -68,6 +68,14 @@ export const productionSnapshotSchema = obj({
 				}),
 			),
 			supplemental: arr(candidateSchema),
+			importedIllustrations: opt(
+				obj({
+					fallback: bool(),
+					recommended: arr(entityId),
+					selected: arr(entityId),
+					candidates: arr(candidateSchema),
+				}),
+			),
 		}),
 	),
 })

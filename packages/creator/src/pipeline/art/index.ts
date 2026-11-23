@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { arr, bool, obj, oneOf, str } from '@earendil-works/pi-schema'
 import {
 	type AssetRegistry,
@@ -471,6 +472,7 @@ export class ArtProduction {
 		target: Dimensions,
 		transparent: boolean,
 		derived = false,
+		optionalReference = false,
 	) {
 		const refs = await Promise.all(
 			drawing.references.slice(0, 16).map(async (ref, i) => {
@@ -528,6 +530,8 @@ export class ArtProduction {
 				if (result.error.code === 'unsupported')
 					return { issue, unsupported: true } as const
 				if (result.error.code === 'moderation') {
+					if (optionalReference && (result.referenceModerated || moderated))
+						return { issue, moderated: true } as const
 					if (moderated) break
 					moderated = true
 					feedback = moderationHint
@@ -590,6 +594,7 @@ export class ArtProduction {
 		firstVolumeChapters: readonly string[],
 		creatorMainVisual?: string,
 		supplemental: Candidate[] = [],
+		illustrations?: ReadonlyMap<string, Candidate>,
 	): Promise<VisualCandidates> {
 		const styleScope = await entryOwner(
 			this.project,
@@ -600,20 +605,23 @@ export class ArtProduction {
 		)
 		const cachePath = (path: string) =>
 			projectFiles.style(styleScope).path.replace('bible/style.json', path)
-		const candidate = async (
-			id: string,
+		const saveCandidate = async (
 			drawing: Drawing,
 			path: string,
-			portrait = false,
+			portrait: boolean,
+			optionalReference = false,
 		) => {
 			if (!(await this.file(path))) {
 				const result = await this.paint(
 					drawing,
 					this.nativeSize(portrait),
 					portrait,
+					false,
+					optionalReference,
 				)
 				let png: Buffer
 				if ('issue' in result) {
+					if ('moderated' in result) return false
 					if (!('reviewed' in result) || !result.reviewed)
 						throw new Error(result.issue)
 					png = result.reviewed
@@ -631,6 +639,15 @@ export class ArtProduction {
 					recordProfile(this.project, path, profile),
 				)
 			}
+			return true
+		}
+		const candidate = async (
+			id: string,
+			drawing: Drawing,
+			path: string,
+			portrait = false,
+		) => {
+			await saveCandidate(drawing, path, portrait)
 			return { id, cachePath: path }
 		}
 		const style = bible.style.description
@@ -663,28 +680,59 @@ export class ArtProduction {
 				!firstVolumeChapters.includes(character.firstSeenChapter)
 			)
 				continue
+			const illustration = illustrations?.get(character.id)
+			const illustrationKey = illustration
+				? createHash('sha256')
+						.update(await this.project.readFile(illustration.cachePath))
+						.digest('hex')
+				: undefined
 			for (const costume of character.costumes ?? []) {
 				const candidates: Candidate[] = []
 				const references = this.styleReferences(bible.style)
 				const designReference = characterDesignReference(character)
 				if (designReference) references.push(designReference)
 				for (const i of [1, 2, 3]) {
-					const id = `costume-${i}`
+					const drawing: Drawing = {
+						kind: 'character',
+						description: `造型候选 ${i}：${costume.description}`,
+						style,
+						references,
+						characters: [character],
+						keep: [],
+					}
+					const directory = `candidates/characters/${character.id}/${costume.id}`
 					try {
+						if (i === 1 && illustration) {
+							const path = cachePath(
+								`${directory}/costume-epub-${illustrationKey}.webp`,
+							)
+							const saved = await saveCandidate(
+								{
+									...drawing,
+									references: [
+										...this.styleReferences(bible.style),
+										{
+											role: 'identity',
+											path: illustration.cachePath,
+											label: `${character.id} EPUB character design reference`,
+										},
+									],
+								},
+								path,
+								true,
+								true,
+							)
+							if (saved) {
+								candidates.push({ id: 'costume-epub', cachePath: path })
+								continue
+							}
+						}
+						const id = `costume-${i}`
 						candidates.push(
 							await candidate(
 								id,
-								{
-									kind: 'character',
-									description: `造型候选 ${i}：${costume.description}`,
-									style,
-									references,
-									characters: [character],
-									keep: [],
-								},
-								cachePath(
-									`candidates/characters/${character.id}/${costume.id}/${id}.webp`,
-								),
+								drawing,
+								cachePath(`${directory}/${id}.webp`),
 								true,
 							),
 						)
@@ -732,6 +780,7 @@ export class ArtProduction {
 			selection.supplementalIds.length > 2 ||
 			new Set(selection.supplementalIds).size !==
 				selection.supplementalIds.length ||
+			selection.supplementalIds.includes(selection.mainVisualId) ||
 			selection.characters.length !== pool.characters.length
 		)
 			throw new Error('Invalid visual selection')
