@@ -540,12 +540,13 @@ test('a settings save changes the next step of an active production session', as
 })
 
 test.each([
-	{ setting: 'unchanged', redraw: false, reject: false },
-	{ setting: 'changed', redraw: true, reject: false },
-	{ setting: 'review rejected', redraw: false, reject: true },
+	{ scenario: 'unchanged setting' },
+	{ scenario: 'changed setting', redraw: true },
+	{ scenario: 'review rejected', reject: true },
+	{ scenario: 'first image blocked', firstImage: true },
 ])(
-	'recording resumes an image budget pause with $setting approved setting',
-	async ({ redraw, reject }) => {
+	'recording resumes an image budget pause: $scenario',
+	async ({ redraw, reject, firstImage }) => {
 		const { projectDir, workId } = await fixture()
 		const config = createConfigStore(directory)
 		await config.update(configuration)
@@ -555,9 +556,9 @@ test.each([
 		const requests: string[] = []
 		const painterPrompts: string[] = []
 		const imagePrompts: string[] = []
-		let allowReview = false
+		let allowReview = firstImage === true
 		let rejectReview = reject
-		let blockImage = false
+		let blockImage = firstImage === true
 		const open = async () => {
 			const project = await Project.open(projectDir)
 			const work = await project.read(projectFiles.work('v0001', workId))
@@ -635,7 +636,10 @@ test.each([
 				queue.confirmVisual(workId)
 				await queue.idle()
 				expect(queue.snapshot(workId).chapters[0].issue).toMatch(/超出工程预算/)
-				expect(requests).toEqual([models.main.model, models.image.model])
+				expect(requests).toEqual([
+					models.main.model,
+					...(firstImage ? [] : [models.image.model]),
+				])
 				if (redraw)
 					await project.write(location, {
 						formatVersion,
@@ -649,6 +653,7 @@ test.each([
 			}
 		}
 		allowReview = true
+		blockImage = false
 		if (reject) {
 			const { project, queue } = await open()
 			try {

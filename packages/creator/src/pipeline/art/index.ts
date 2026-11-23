@@ -50,13 +50,15 @@ type ReviewCheckpoint = {
 	path: string
 	resume: boolean
 }
-type PendingPaint = {
+type PaintContinuation =
+	| { prompt: string; png: string }
+	| { feedback: string; rewritten?: string; png?: string }
+type PendingPaint = PaintContinuation & {
 	settingsVersion: string
-	png: string
 	attempt: number
 	baseOnly: boolean
 	moderated: boolean
-} & ({ prompt: string } | { feedback: string; rewritten?: string })
+}
 const opaqueCandidateLimit = 2
 type PaintStop =
 	| 'retries'
@@ -671,14 +673,10 @@ export class ArtProduction {
 			if (checkpoint)
 				await rm(join(this.project.root, checkpoint.path), { force: true })
 		}
-		const savePaint = async (
-			png: Buffer,
-			next: { prompt: string } | { feedback: string; rewritten?: string },
-		) => {
+		const savePaint = async (next: PaintContinuation) => {
 			if (!checkpoint) return
 			const pending: PendingPaint = {
 				settingsVersion,
-				png: png.toString('base64'),
 				attempt,
 				baseOnly,
 				moderated,
@@ -706,11 +704,12 @@ export class ArtProduction {
 				issue = feedback =
 					judge.feedback || `视觉审核未通过：${judge.failedChecks.join('、')}`
 				if (attempt <= this.options.image.retries)
-					await savePaint(png, { feedback })
+					await savePaint({ feedback, png: png.toString('base64') })
 				else await clearReview()
 				return false
 			} catch (error) {
-				if (error instanceof SpendBudgetError) await savePaint(png, { prompt })
+				if (error instanceof SpendBudgetError)
+					await savePaint({ prompt, png: png.toString('base64') })
 				throw error
 			}
 		}
@@ -722,14 +721,23 @@ export class ArtProduction {
 					attempt = pending.attempt
 					baseOnly = pending.baseOnly
 					moderated = pending.moderated
-					reviewed = Buffer.from(pending.png, 'base64')
 					if ('feedback' in pending) {
 						issue = feedback = pending.feedback
 						rewritten = pending.rewritten
-					} else if (
-						await audit(reviewed, pending.prompt, await auditPreview(reviewed))
-					)
-						return { png: reviewed }
+						reviewed = pending.png
+							? Buffer.from(pending.png, 'base64')
+							: undefined
+					} else {
+						reviewed = Buffer.from(pending.png, 'base64')
+						if (
+							await audit(
+								reviewed,
+								pending.prompt,
+								await auditPreview(reviewed),
+							)
+						)
+							return { png: reviewed }
+					}
 				} else {
 					await clearReview()
 				}
@@ -755,7 +763,7 @@ export class ArtProduction {
 					.then(({ content }) => content)
 					.catch(async (error: unknown) => {
 						if (error instanceof SpendBudgetError && reviewed)
-							await savePaint(reviewed, { feedback })
+							await savePaint({ feedback, png: reviewed.toString('base64') })
 						throw error
 					}))
 			const editReferences = baseOnly ? refs.slice(0, 1) : refs
@@ -767,16 +775,17 @@ export class ArtProduction {
 				baseOnly
 					? `Edit only the brows, eyes and mouth of Image ${firstReference}: ${content} ${issue} Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face.`
 					: drawingPrompt(input, content, issue, firstReference)
+			await savePaint({
+				feedback,
+				rewritten: content,
+				png: reviewed?.toString('base64'),
+			})
 			const result = await render(
 				describe(1, feedback),
 				editReferences,
 				target,
 				transparent,
-			).catch(async (error: unknown) => {
-				if (error instanceof SpendBudgetError && reviewed)
-					await savePaint(reviewed, { feedback, rewritten: content })
-				throw error
-			})
+			)
 			rewritten = undefined
 			feedback = ''
 			if ('error' in result) {
