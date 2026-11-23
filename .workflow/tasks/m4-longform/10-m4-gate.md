@@ -15,11 +15,11 @@
 
 ## Progress
 
-- Check after: `NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 longform and queue'` → 3 passed；同一构建全量 Electron E2E → 58 passed；`pnpm check` → 50 files / 661 passed, 1 skipped。见 `.workflow/evidence/m4-longform/gate-resume.txt`。
+- Check after: `NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M4 longform and queue'` → 4 passed；同一构建全量 Electron E2E → 59 passed；`pnpm check` → 50 files / 665 passed, 1 skipped。见 `.workflow/evidence/m4-longform/gate-resume.txt`（代码 `f917f5a`）。
 - 本轮：关闭时取消并等待生产任务；首卷出图失败会解除后卷等待并允许重新打开；保存设置不等待主视觉确认；后卷画师实际发送已批准主视觉。真实 Electron 验证双向重排、外部参考图与 EPUB 内嵌图合计上限、所选 EPUB 图实际保存。
 - 证据：`gate-*.png`、上一轮 `gate.txt`。生产用量来自严格回放；29 条公开合成 cassette 位于 `tests/fixtures/cassettes/m4-gate/`，本轮无付费调用。
 - UUID 响应重绑定为显式回放选项；生产 cassette 目录沿用严格回放延迟/故障选项。已有回放默认响应不变。
 - 所有者授权的最小付费抽查已完成：真实 writeChapter / devin-swe-2 一次，输入 702、输出 118 tokens，简体中文且 NVS 编译通过；有超出原句的氛围描写，非忠实度完整验收。真实 classifyIllustrations / gemini-3.8-flash 一次，输入 1228、输出 218 tokens，照片参考合理归为 character 且保持未选中。共 2266 tokens、0 生图，无 fallback 调用。私有 cassette 留在仓库外，usage.csv 已追加两行；公开脱敏凭证见 `.workflow/evidence/m4-longform/spot-check.txt`。
 - 无头宿主检查控制托盘 watcher 可用性并截获原生通知 show；原生托盘点击处理、窗口状态、IPC 与 creator 均为真实路径。未验收 OS 通知气泡或授权原文的广泛跨语种/插图质量；本次真模型仅抽查公开微型夹具，里程碑独立验收仍待进行。
 - Review: blocked (base ce09ca4bff51b1093dc37854ddda795e49348cb1, reviewer Devin Review)
-- [PR #66](https://github.com/Yume2333/Novelive-dev/pull/66) 的 `f7cc34e` 已通过 Linux CI；独立复审另报 9 项待处理。下轮先复现崩溃后后卷自动入队、多卷导入失败后重试重复追加、EPUB 区域语言显示与落盘不一致，再核实桌面退出是否应等待创作端清理。留在 `devin/1795408423-m4-gate`，不提前归档。
+- [PR #66](https://github.com/Yume2333/Novelive-dev/pull/66)：`96307a` 接通并验证原生退出清理；`8e756aa` 修复崩溃后的显式继续和自动确认漏用补充参考图；`f917f5a` 修复多卷原子追加、EPUB 区域语言显示、DOCX 续卷封面和旧 TXT 命令。ZIP 解码器已有实际输出上限，非仅检查头部大小。等待对新提交的独立复审，不提前归档。
