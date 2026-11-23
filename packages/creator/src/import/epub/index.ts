@@ -352,7 +352,24 @@ export async function extractEpub(
 		const paragraphs = blocks
 			.filter((block) => block.text && !block.note)
 			.map((block) => block.text)
-		if (!paragraphs.length) continue
+		if (!paragraphs.length) {
+			const volume = Math.max(0, book.volumes.length - 1)
+			const chapter = Math.max(
+				0,
+				(book.volumes[volume]?.chapters.length ?? 1) - 1,
+			)
+			for (const block of blocks) {
+				if (!block.image) continue
+				const data = files.get(block.image)
+				if (!data) throw new Error(`Missing EPUB image: ${block.image}`)
+				images.set(block.image, data)
+				book.illustrations.push({ archivePath: block.image, volume, chapter })
+			}
+			book.volumes[volume]?.chapters[chapter]?.notes.push(
+				...blocks.filter((block) => block.note).map((block) => block.text),
+			)
+			continue
+		}
 		const volumeTitle = marker.volume ?? '正文'
 		if (book.volumes.at(-1)?.title !== volumeTitle)
 			book.volumes.push({ title: volumeTitle, chapters: [] })

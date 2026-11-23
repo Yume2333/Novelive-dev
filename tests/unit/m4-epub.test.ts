@@ -130,6 +130,22 @@ test('keeps footnotes outside prose in chapter notes', async () => {
 	expect(book.volumes[0].chapters[0].paragraphs).not.toContain('Not body')
 })
 
+test('keeps image-only TOC pages next to the preceding chapter', async () => {
+	const { book } = await extractEpub(
+		await epub({
+			'OPS/chapter.xhtml': xhtml(
+				'<h1 id="one">Chapter One</h1><p>First.</p><h1 id="two">Chapter Two</h1><p>Second.</p><div id="plate"><img src="images/picture.svg"/></div>',
+			),
+			'OPS/nav.xhtml': nav.replace(
+				'</ol></li></ol>',
+				'<li><a href="chapter.xhtml#plate">Plate</a></li></ol></li></ol>',
+			),
+		}),
+	)
+	expect(book.illustrations[0]).toMatchObject({ chapter: 1 })
+	expect(book.volumes[0].chapters).toHaveLength(2)
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)
