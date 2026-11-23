@@ -545,3 +545,27 @@ test('selection deduplicates identical glossary spellings across new IDs without
 	)
 	expect(result.glossaryPatch).toEqual([lantern, update])
 })
+
+test('selecting a deduplicated term preserves distinct notes from later proposals', async () => {
+	const term = {
+		id: 'lantern',
+		original: '燈',
+		written: 'Lantern',
+		category: 'item',
+		status: 'candidate',
+		note: 'It marks the harbor.',
+	} as const
+	const later = { ...term, note: 'It also opens the gate.' }
+	const combined = { ...term, note: `${term.note}\n\n${later.note}` }
+	const result = await selectAdditions(
+		[],
+		[term, later, term],
+		emptyBible,
+		async ([{ kind, entries }]) => {
+			expect(kind).toBe('glossary')
+			expect(entries).toEqual([combined])
+			return new Set([1])
+		},
+	)
+	expect(result.glossaryPatch).toEqual([combined])
+})

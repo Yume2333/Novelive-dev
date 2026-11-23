@@ -227,14 +227,32 @@ export function deduplicateNewTerms(
 			pronunciation?.normalize('NFKC').trim() ?? '',
 		])
 	const existingIds = new Set(existing.map(({ id }) => id))
-	const seen = new Set(existing.map(key))
-	return glossary.filter((term) => {
-		if (existingIds.has(term.id)) return true
+	const existingSpellings = new Set(existing.map(key))
+	const result: GlossaryPatch = []
+	const grouped = new Map<string, { index: number; notes: Set<string> }>()
+	for (const term of glossary) {
+		if (existingIds.has(term.id)) {
+			result.push(term)
+			continue
+		}
 		const name = key(term)
-		if (seen.has(name)) return false
-		seen.add(name)
-		return true
-	})
+		if (existingSpellings.has(name)) continue
+		const prior = grouped.get(name)
+		if (!prior) {
+			grouped.set(name, {
+				index: result.length,
+				notes: new Set(term.note ? [term.note] : []),
+			})
+			result.push(term)
+		} else if (term.note && !prior.notes.has(term.note)) {
+			prior.notes.add(term.note)
+			result[prior.index] = {
+				...result[prior.index],
+				note: [...prior.notes].join('\n\n'),
+			}
+		}
+	}
+	return result
 }
 
 /**
