@@ -1,4 +1,11 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+	mkdtemp,
+	readFile,
+	rm,
+	stat,
+	utimes,
+	writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
@@ -91,6 +98,36 @@ function snapshot(index: number): StageSnapshot {
 
 const compare = (a: SentenceRef, b: SentenceRef) =>
 	Number(a.sentenceId) - Number(b.sentenceId)
+
+test('reusing a content-hashed thumbnail leaves the existing file untouched', async () => {
+	const { directory, saves } = await store()
+	const capture = await sharp({
+		create: { width: 480, height: 270, channels: 4, background: '#123456' },
+	})
+		.png()
+		.toBuffer()
+	const entry = await saves.saveSlot(
+		'work',
+		{ kind: 'quick' },
+		snapshot(1),
+		capture,
+	)
+	const { createHash } = await import('node:crypto')
+	const path = join(
+		directory,
+		'player-progress',
+		createHash('sha256').update('work').digest('hex'),
+		entry.thumbnailRef,
+	)
+	await utimes(path, new Date(0), new Date(0))
+	const before = await stat(path)
+	const original = await readFile(path)
+	await saves.saveSlot('work', { kind: 'quick' }, snapshot(2), capture)
+	const after = await stat(path)
+	expect(after.mtimeMs).toBe(before.mtimeMs)
+	expect(after.ino).toBe(before.ino)
+	expect(await readFile(path)).toEqual(original)
+})
 
 test('empty history and slots are empty, invalid moves and slots are rejected', async () => {
 	const { saves } = await store()

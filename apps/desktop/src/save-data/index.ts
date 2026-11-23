@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import {
@@ -77,7 +77,15 @@ export class FileProgressStore implements ProgressStore {
 				.toBuffer()
 			const thumbnailRef = `${createHash('sha256').update(image).digest('hex')}.webp`
 			await mkdir(this.directory(workId), { recursive: true })
-			await writeFile(join(this.directory(workId), thumbnailRef), image)
+			const thumbnailPath = join(this.directory(workId), thumbnailRef)
+			try {
+				await access(thumbnailPath)
+			} catch (error) {
+				if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+				const temporary = join(this.directory(workId), `${randomUUID()}.tmp`)
+				await writeFile(temporary, image, { flag: 'wx' })
+				await rename(temporary, thumbnailPath)
+			}
 			const entry: SaveEntry = {
 				slot: captured.slot,
 				snapshot: captured.snapshot,
