@@ -782,16 +782,40 @@ test('uses a supplied character design in both costume candidate rendering and a
 }, 30_000)
 
 test.each([
-	{ rejected: false, first: 'costume-epub', calls: [1, 0, 0] },
-	{ rejected: true, first: 'costume-1', calls: [1, 0, 0, 0] },
+	{ rejection: 'none', first: 'costume-epub', calls: [1, 0, 0], onReopen: 0 },
+	{
+		rejection: 'prompt',
+		first: 'costume-epub',
+		calls: [1, 1, 0, 0],
+		onReopen: 0,
+	},
+	{
+		rejection: 'unknown',
+		first: 'costume-1',
+		calls: [1, 1, 0, 0, 0],
+		onReopen: 2,
+	},
+	{
+		rejection: 'reference',
+		first: 'costume-1',
+		calls: [1, 0, 0, 0],
+		onReopen: 1,
+	},
 ])(
-	'uses normal costume options if the matched EPUB image is rejected ($rejected)',
-	async ({ rejected, first, calls }) => {
+	'chooses the EPUB costume moderation retry for $rejection',
+	async ({ rejection, first, calls, onReopen }) => {
+		const rewritten = '上一次生成被内容审核拒绝，请收敛描写'
 		const render = vi
 			.fn<ReturnType<typeof artModels.imageRenderer>>()
-			.mockImplementation(async (_prompt, refs, size, alpha) =>
-				rejected && alpha && refs.length
-					? { error: { code: 'moderation', message: '内容审核拒绝' } }
+			.mockImplementation(async (prompt, refs, size, alpha) =>
+				alpha &&
+				refs.length &&
+				rejection !== 'none' &&
+				(rejection !== 'prompt' || !prompt.includes(rewritten))
+					? {
+							error: { code: 'moderation', message: '内容审核拒绝' },
+							...(rejection === 'reference' && { referenceModerated: true }),
+						}
 					: { bytes: await picture(size.width, size.height, alpha) },
 			)
 		const renderer = vi
@@ -827,10 +851,18 @@ test.each([
 				const portraits = render.mock.calls.filter((call) => call[3])
 				expect(portraits.map(([, refs]) => refs.length)).toEqual(calls)
 				expect(portraits[0][0]).toContain('ada EPUB character design reference')
+				if (rejection === 'prompt' || rejection === 'unknown') {
+					expect(portraits[1][0]).toContain(rewritten)
+					expect(portraits[1][1]).toEqual(portraits[0][1])
+				}
+				if (first === 'costume-1')
+					expect(portraits[calls.lastIndexOf(1) + 1][0]).not.toContain(
+						'EPUB character design reference',
+					)
 				expect(
 					await art.candidates(bible, ['c1'], undefined, [], references),
 				).toEqual(pool)
-				expect(render).toHaveBeenCalledTimes(rejected ? 8 : 6)
+				expect(render).toHaveBeenCalledTimes(3 + calls.length + onReopen)
 			})
 		} finally {
 			renderer.mockRestore()

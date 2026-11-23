@@ -448,7 +448,7 @@ export class ArtProduction {
 		target: Dimensions,
 		transparent: boolean,
 		derived = false,
-		omitOnModeration = false,
+		optionalReference = false,
 	) {
 		const refs = await Promise.all(
 			drawing.references.slice(0, 16).map(async (ref, i) => {
@@ -500,7 +500,8 @@ export class ArtProduction {
 				if (result.error.code === 'unsupported')
 					return { issue, unsupported: true } as const
 				if (result.error.code === 'moderation') {
-					if (omitOnModeration) return { issue, moderated: true } as const
+					if (optionalReference && (result.referenceModerated || moderated))
+						return { issue, moderated: true } as const
 					if (moderated) break
 					moderated = true
 					feedback = moderationHint
@@ -573,7 +574,7 @@ export class ArtProduction {
 			drawing: Drawing,
 			path: string,
 			portrait: boolean,
-			omitOnModeration = false,
+			optionalReference = false,
 		) => {
 			if (!(await this.file(path))) {
 				const result = await this.paint(
@@ -581,7 +582,7 @@ export class ArtProduction {
 					this.nativeSize(portrait),
 					portrait,
 					false,
-					omitOnModeration,
+					optionalReference,
 				)
 				let png: Buffer
 				if ('issue' in result) {
