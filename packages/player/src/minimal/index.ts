@@ -98,6 +98,20 @@ export async function mountMinimalPlayer(
 		overlay.replaceChildren(box)
 		textRenderer = mountText(text, line.content, {
 			customMarks: options.customMarks,
+			viewport: {
+				element: overlay,
+				textHeight() {
+					const above =
+						text.getBoundingClientRect().top - box.getBoundingClientRect().top
+					const style = getComputedStyle(box)
+					return (
+						overlay.clientHeight -
+						above -
+						Number.parseFloat(style.paddingBottom) -
+						Number.parseFloat(style.borderBottomWidth)
+					)
+				},
+			},
 			millisecondsPerCharacter: textSpeed,
 			auto,
 			continueImmediately: auto && line.kind !== 'caption',

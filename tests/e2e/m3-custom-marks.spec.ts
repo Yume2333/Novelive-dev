@@ -238,6 +238,30 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 					'large custom glyphs under shout paginate',
 				)
 				.toBeGreaterThan(1)
+
+			await page.evaluate(({ workId, chapterId }) => {
+				window.location.hash = `/work/${workId}/edit?chapterId=${chapterId}`
+			}, playerRef)
+			const stage = page.locator('.editor-stage')
+			await stage.evaluate((element) => {
+				element.style.height = '220px'
+			})
+			await page.getByRole('button', { name: '快捷位置', exact: true }).click()
+			await page.getByRole('menuitem', { name: /^9 ·/ }).click()
+			await page.getByRole('button', { name: '从当前句预览' }).click()
+			const previewGlyph = stage
+				.locator('.nl-text-display [data-glyph]')
+				.first()
+			await expect(previewGlyph).toHaveText('大')
+			expect(
+				await previewGlyph.evaluate((glyph) => {
+					const viewport = glyph.closest('.editor-stage')
+					return viewport
+						? glyph.getBoundingClientRect().top -
+								viewport.getBoundingClientRect().top
+						: -1
+				}),
+			).toBeGreaterThanOrEqual(0)
 		} finally {
 			await app.close()
 		}

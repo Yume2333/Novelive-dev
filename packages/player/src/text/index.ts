@@ -6,6 +6,7 @@ import './text.css'
 
 export interface TextOptions {
 	customMarks?: WorkSettings['customMarks']
+	viewport?: { element: HTMLElement; textHeight(): number }
 	millisecondsPerCharacter?: number
 	auto?: boolean
 	continueImmediately?: boolean
@@ -195,6 +196,9 @@ export function mountText(
 		if (disposed) return
 		const anchor = ends[page - 1] ?? 0
 		const lineHeight = Number.parseFloat(getComputedStyle(layout).lineHeight)
+		const availableHeight = styledMetrics
+			? Math.max(0, options.viewport?.textHeight() ?? Infinity)
+			: Infinity
 		const top = layout.getBoundingClientRect().top
 		const lines: { start: number; top: number; bottom: number }[] = []
 		const range = styledMetrics ? document.createRange() : undefined
@@ -228,8 +232,12 @@ export function mountText(
 		}
 		for (let line = 0; line < lines.length; ) {
 			let next = Math.min(line + 3, lines.length)
+			if (styledMetrics)
+				while (next > line + 1 && edge(next) - edge(line) > availableHeight)
+					next--
 			if (
 				next < lines.length &&
+				next > line + 1 &&
 				/[。！？、，；：.!?,;:」』）]/u.test(
 					glyphs[lines[next - 1].start - 1]?.textContent ?? '',
 				)
@@ -254,11 +262,16 @@ export function mountText(
 		}
 		page = ends.findIndex((end) => end > anchor)
 		if (page === -1) page = ends.length - 1
-		host.style.height = `${Math.max(lineHeight * 3, ...heights)}px`
+		host.style.height = `${heights.reduce(
+			(max, height) => Math.max(max, height),
+			Math.min(lineHeight * 3, availableHeight),
+		)}px`
 		schedule()
 	}
 	const observer = new ResizeObserver(measure)
 	observer.observe(layout)
+	if (styledMetrics && options.viewport)
+		observer.observe(options.viewport.element)
 	void document.fonts.ready.then(measure)
 	measure()
 	return {
