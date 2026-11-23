@@ -936,3 +936,10 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** 原文当键不改简体中文源文案、改动面最小，抽取后不会出现键和文案对不上；重新挂载只丢设置页的临时状态，整窗重载要重连创作端；日文用户更可能读懂英文而不是简体中文。
 - **Revisit when:** 同一中文在不同上下文需要不同译法且无法靠命名空间区分，或引入复数敏感的语言。
 
+## 2026-11-23 - 暂停 M1b/11 真书验收直至视觉预算修复合入
+
+- **Decided:** 将 [M1b/11](tasks/m1b-production/11-m1b-owner-book.md) 标为阻塞；待视觉预算修复 #96 合入后，由所有者重新授权串行窗口，再按原预算、停止规则和完整真书 Check 执行。
+- **Instead of:** 使用当前分支直接消耗新的付费额度、放宽预算，或以离线确认屏作为真书验收。
+- **Because:** 两次 Check 分别在综合与视觉审查停止，未到达首个确认点；离线核对证明修复路径，不证明整本制作和作品质量。
+- **Effort:** m1b-production
+- **Decided by:** agent (m1b-production/11)
