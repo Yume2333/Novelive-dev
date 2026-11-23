@@ -26,17 +26,11 @@ import {
 	recordProfile,
 } from '../postprocess'
 import { MattingUnavailableError, removeBackground } from './background'
-import {
-	checkImage,
-	type Dimensions,
-	derivedFrameIssue,
-	placeholder,
-	spriteFrameIssue,
-} from './check'
+import { checkImage, type Dimensions, placeholder } from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
 import { type ArtBible, type ArtJob, type ManifestItem, planArt } from './plan'
-import { type Drawing, drawingPrompt } from './prompt'
+import { type Drawing, drawingPrompt, expressionPreservation } from './prompt'
 
 export { directChapterArt } from './director'
 export { type ArtBible, type ArtJob, type ManifestItem, planArt } from './plan'
@@ -56,7 +50,6 @@ type PaintContinuation =
 type PendingPaint = PaintContinuation & {
 	settingsVersion: string
 	attempt: number
-	baseOnly: boolean
 	moderated: boolean
 }
 const opaqueCandidateLimit = 2
@@ -360,7 +353,8 @@ export class ArtProduction {
 			if (entry.status === 'pending') await this.saveStatus(entry.id, 'drawn')
 			return { status: 'drawn' }
 		}
-		const portrait = job.kind === 'character' || job.kind === 'expression'
+		const expression = job.kind === 'expression'
+		const portrait = job.kind === 'character' || expression
 		const target = this.nativeSize(portrait)
 		const foundBase =
 			'baseAssetId' in job
@@ -398,22 +392,25 @@ export class ArtProduction {
 			kind: job.kind,
 			description: [
 				job.description,
-				costumeDescription,
+				expression ? undefined : costumeDescription,
 				job.kind === 'location' ? location?.description : undefined,
 				redraw?.instruction,
 			]
 				.filter(Boolean)
 				.join('；'),
-			characterDescriptionFallback:
-				job.kind === 'character'
-					? characterBriefFallback(character, costumeDescription)
-					: undefined,
+			characterDescriptionFallback: portrait
+				? characterBriefFallback(
+						character,
+						expression ? undefined : costumeDescription,
+					)
+				: undefined,
 			style: bible.style.description,
-			references: this.styleReferences(bible.style),
+			references: expression ? [] : this.styleReferences(bible.style),
 			characters: character ? [character] : [],
 			keep: portrait
 				? [
 						...baseKeep,
+						expression ? (costumeDescription ?? '') : '',
 						character?.appearance?.description ?? '',
 						...(character?.appearance?.anchorFeatures ?? []),
 						...Object.values(character?.appearance?.keyColors ?? {}),
@@ -621,6 +618,7 @@ export class ArtProduction {
 			}),
 		)
 		const auditDrawing = { ...drawing, references }
+		const expression = drawing.kind === 'expression'
 		const forGeneration = generationReferenceFilter(auditDrawing)
 		const textOnlyStyle = hasTextOnlyCharacterStyle(auditDrawing)
 		const refs = auditRefs.filter((_, index) =>
@@ -630,7 +628,10 @@ export class ArtProduction {
 			...drawing,
 			references: references.filter(forGeneration),
 		}
-		const brief = [drawing.description, drawing.characterDescriptionFallback]
+		const brief = [
+			drawing.description,
+			expression ? undefined : drawing.characterDescriptionFallback,
+		]
 			.filter(Boolean)
 			.join('；')
 		const painter = derived
@@ -652,7 +653,6 @@ export class ArtProduction {
 		})
 		let moderated = false
 		let attempt = 0
-		let baseOnly = false
 		let rewritten: string | undefined
 		const settingsVersion = checkpoint
 			? createHash('sha256')
@@ -678,7 +678,6 @@ export class ArtProduction {
 			const pending: PendingPaint = {
 				settingsVersion,
 				attempt,
-				baseOnly,
 				moderated,
 				...next,
 			}
@@ -695,7 +694,7 @@ export class ArtProduction {
 					prompt,
 					auditSchema,
 					this.options,
-					[preview.png, ...(baseOnly ? refs.slice(0, 1) : auditRefs)],
+					[preview.png, ...auditRefs],
 				)
 				if (judge.pass && judge.failedChecks.length === 0) {
 					await clearReview()
@@ -719,7 +718,6 @@ export class ArtProduction {
 				const pending: PendingPaint = JSON.parse(saved.toString())
 				if (pending.settingsVersion === settingsVersion) {
 					attempt = pending.attempt
-					baseOnly = pending.baseOnly
 					moderated = pending.moderated
 					if ('feedback' in pending) {
 						issue = feedback = pending.feedback
@@ -754,6 +752,9 @@ export class ArtProduction {
 					[
 						'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
 						`${drawing.kind}: ${brief}`,
+						expression
+							? `Character preservation context (not part of the expression cue): ${expressionPreservation(drawing)}.`
+							: undefined,
 						feedback,
 					]
 						.filter(Boolean)
@@ -768,18 +769,14 @@ export class ArtProduction {
 					png: reviewed?.toString('base64'),
 				})
 			}
-			const editReferences = baseOnly ? refs.slice(0, 1) : refs
 			const describe = (
 				firstReference: number,
 				issue = '',
 				input = promptDrawing,
-			) =>
-				baseOnly
-					? `Edit only the brows, eyes and mouth of Image ${firstReference}: ${content} ${issue} Use the base as the exact canvas, including the transparent background. Keep the pose, hair, silhouette, position and scale pixel-aligned outside the face.`
-					: drawingPrompt(input, content, issue, firstReference)
+			) => drawingPrompt(input, content, issue, firstReference)
 			const result = await render(
 				describe(1, feedback),
-				editReferences,
+				refs,
 				target,
 				transparent,
 			)
@@ -861,12 +858,6 @@ export class ArtProduction {
 					attempt > this.options.image.retries
 				)
 					return stopped('matting', candidateBudget.matting.error.message)
-				if (
-					drawing.kind === 'expression' &&
-					(checked.issue === spriteFrameIssue ||
-						checked.issue === derivedFrameIssue)
-				)
-					baseOnly = true
 				issue = feedback = checked.issue
 				continue
 			}
@@ -875,7 +866,9 @@ export class ArtProduction {
 			const passed = await audit(
 				checked.png,
 				[
-					'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
+					expression
+						? 'Visually audit the first image. Image 2 is the accepted base. Check the requested facial expression against the saved cue (description); verify identity, anchors and key colors against the base and preservation context. Reject unintended changes outside the face, including pose, silhouette, framing, transparency, colors, shading and linework. Judge style only by preservation of the accepted base, not by matching any other look. Check for artifacts independently.'
+						: 'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
 					preview.transparencyHint,
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
 					textOnlyStyle
@@ -892,7 +885,9 @@ export class ArtProduction {
 							].join(' ')
 						: undefined,
 					`Original image brief (verify independently of the painter's rewrite): ${brief}`,
-					describe(2, '', textOnlyStyle ? promptDrawing : auditDrawing),
+					expression
+						? `Character preservation context: ${expressionPreservation(drawing)}.`
+						: describe(2, '', textOnlyStyle ? promptDrawing : auditDrawing),
 				]
 					.filter(Boolean)
 					.join('\n'),
