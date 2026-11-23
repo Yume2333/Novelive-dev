@@ -12,8 +12,8 @@ export async function installProgressIpc(
 ) {
 	const store = await createDesktopProgressStore()
 	const progress = new Map<string, Promise<WorkProgress | null>>()
-	function load(workId: string) {
-		let pending = progress.get(workId)
+	function load(workId: string, fresh = false) {
+		let pending = fresh ? undefined : progress.get(workId)
 		if (!pending) {
 			pending = store
 				.load(workId)
@@ -41,7 +41,7 @@ export async function installProgressIpc(
 		)
 			throw new Error('无效的播放器存档请求')
 		const { workId } = input
-		if (input.operation === 'load') return load(workId)
+		if (input.operation === 'load') return load(workId, true)
 		if (input.operation === 'save') {
 			await store.save(workId, input.progress)
 			progress.set(workId, Promise.resolve(input.progress))

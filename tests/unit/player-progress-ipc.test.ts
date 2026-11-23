@@ -112,3 +112,25 @@ test('invalid senders and corrupt progress cannot populate the thumbnail cache',
 	await expect(invoke(request)).resolves.toEqual(progress)
 	expect(store.load).toHaveBeenCalledTimes(2)
 })
+
+test("explicit loads refresh another instance's progress without disabling thumbnail caching", async () => {
+	const { invoke } = await setup()
+	const request = { operation: 'load', workId: 'work' }
+	await expect(invoke(request)).resolves.toEqual(progress)
+	const newer = {
+		...progress,
+		mainline: { ...position, sentenceId: 'newer' },
+		saves: [
+			...progress.saves,
+			{ ...progress.saves[0], slot: { kind: 'quick' } },
+		],
+	}
+	store.load.mockResolvedValue(newer)
+	await expect(invoke(request)).resolves.toEqual(newer)
+	await invoke({
+		operation: 'thumbnail',
+		workId: 'work',
+		slot: { kind: 'quick' },
+	})
+	expect(store.load).toHaveBeenCalledTimes(2)
+})
