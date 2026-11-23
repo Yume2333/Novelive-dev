@@ -220,13 +220,21 @@ function Candidate({
 				)
 				const conflicts =
 					confirmed?.status === 'confirmed'
-						? Object.entries(entry).filter(
-								([key, value]) =>
-									!['status', 'conflict', 'occurrences'].includes(key) &&
-									JSON.stringify(
-										(confirmed as unknown as Record<string, unknown>)[key],
-									) !== JSON.stringify(value),
-							)
+						? [...new Set([...Object.keys(confirmed), ...Object.keys(entry)])]
+								.map(
+									(key) =>
+										[
+											key,
+											(entry as unknown as Record<string, unknown>)[key],
+										] as const,
+								)
+								.filter(
+									([key, value]) =>
+										!['status', 'conflict', 'occurrences'].includes(key) &&
+										JSON.stringify(
+											(confirmed as unknown as Record<string, unknown>)[key],
+										) !== JSON.stringify(value),
+								)
 						: []
 				return (
 					<section key={`${kind}/${entry.id}`}>
@@ -247,7 +255,7 @@ function Candidate({
 										{print(
 											(confirmed as unknown as Record<string, unknown>)[key],
 										) ?? '未设置'}{' '}
-										→ {print(value)}
+										→ {value === undefined ? '移除' : print(value)}
 									</p>
 								))}
 							</div>

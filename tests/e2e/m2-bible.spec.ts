@@ -87,6 +87,7 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 		const xia = {
 			id: 'xia',
 			name: '小夏',
+			personality: '谨慎',
 			aliases: [],
 			status: 'confirmed' as const,
 			appearance: { description: '黑发' },
@@ -168,7 +169,11 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 				)
 		const initial = await readBible(project)
 		const revision = bibleRevision(initial)
-		const nextXia = { ...xia, appearance: { description: '银发' } }
+		const nextXia = {
+			...xia,
+			personality: undefined,
+			appearance: { description: '银发' },
+		}
 		const nextLin = {
 			...lin,
 			costumes: [
@@ -303,6 +308,9 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 				exact: true,
 			})
 			await expect(accept.getByText('与已确认内容冲突').first()).toBeVisible()
+			await expect(
+				accept.getByText('性格：谨慎 → 移除', { exact: true }),
+			).toBeVisible()
 			await page.screenshot({
 				path: '.workflow/evidence/m2-editor/04-bible-before.png',
 				fullPage: true,
