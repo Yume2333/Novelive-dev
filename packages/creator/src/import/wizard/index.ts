@@ -19,6 +19,11 @@ import {
 	type TxtVolume,
 	writeTxtLayout,
 } from '../txt'
+import {
+	importIllustrations,
+	type StoredIllustration,
+	type WizardIllustration,
+} from './illustrations'
 
 export interface ImportLayout {
 	title: string
@@ -42,6 +47,8 @@ export interface ImportWizardView {
 	suggested: ImportLayout
 	findings: { paragraph: number; note: string }[]
 	references: string[]
+	illustrations: WizardIllustration[]
+	selectedIllustrations: string[]
 }
 
 type WizardReport = ImportReport & {
@@ -49,6 +56,9 @@ type WizardReport = ImportReport & {
 	encoding?: TxtEncoding
 	structure: TxtStructure
 	references?: string[]
+	externalReferences?: string[]
+	illustrations?: StoredIllustration[]
+	selectedIllustrations?: string[]
 	layout?: ImportLayout
 }
 
@@ -234,6 +244,10 @@ export async function readImportWizard(
 			}),
 		),
 		references: report.references ?? [],
+		illustrations: (report.illustrations ?? []).map(
+			({ cachePath: _cachePath, ...candidate }) => candidate,
+		),
+		selectedIllustrations: report.selectedIllustrations ?? [],
 	}
 }
 
@@ -276,6 +290,7 @@ async function importProject(
 	for (const path of options.references)
 		if (!referenceTypes.has(extname(path).toLowerCase()))
 			throw invalid(`不支持的参考图格式：${basename(path)}`)
+	if (options.references.length > 3) throw invalid('最多选择 3 张参考图')
 	const bytes = await readFile(options.sourcePath)
 	if (format === 'txt' && !options.encoding) {
 		const candidates = detectTxtEncoding(bytes)
@@ -376,7 +391,16 @@ async function importProject(
 		const report = (await opened.read(
 			projectFiles.importReport,
 		)) as WizardReport
-		const next: WizardReport = { ...report, references }
+		const illustrations = book
+			? await importIllustrations(opened, bytes, book)
+			: []
+		const next: WizardReport = {
+			...report,
+			references,
+			externalReferences: references,
+			illustrations,
+			selectedIllustrations: [],
+		}
 		await opened.write(projectFiles.importReport, next)
 		return await readImportWizard(opened)
 	} catch (error) {
@@ -388,10 +412,29 @@ async function importProject(
 export async function reviseTxtProject(
 	projectDir: string,
 	layout: ImportLayout,
+	selectedIllustrations?: string[],
 ) {
 	using project = await Project.open(projectDir)
 	const report = (await project.read(projectFiles.importReport)) as WizardReport
+	const selected = selectedIllustrations ?? report.selectedIllustrations ?? []
+	const externalReferences =
+		report.externalReferences ?? report.references ?? []
+	const illustrations = report.illustrations ?? []
+	if (new Set(selected).size !== selected.length) throw invalid('插图选择无效')
+	const selectedCandidates = selected.map((id) => {
+		const candidate = illustrations.find((candidate) => candidate.id === id)
+		if (!candidate) throw invalid('插图选择无效')
+		return candidate
+	})
+	if (externalReferences.length + selected.length > 3)
+		throw invalid('最多选择 3 张参考图')
 	const volumes = applyLayout(report.structure, layout)
+	const references = [...externalReferences]
+	for (const candidate of selectedCandidates) {
+		const path = `source/references/${candidate.id}.png`
+		await project.writeFile(path, await project.readFile(candidate.cachePath))
+		references.push(path)
+	}
 	const ids = await workIds(project)
 	const settings = {
 		...(await firstSettings(project)),
@@ -426,6 +469,9 @@ export async function reviseTxtProject(
 	const starts = layout.chapters.map((chapter) => chapter.start)
 	const next: WizardReport = {
 		...report,
+		externalReferences,
+		selectedIllustrations: selected,
+		references,
 		check: {
 			title,
 			language: layout.language,

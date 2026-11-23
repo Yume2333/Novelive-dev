@@ -3,10 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compile } from '@earendil-works/pi-schema'
 import { TextReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js'
+import sharp from 'sharp'
 import { afterEach, expect, test } from 'vitest'
 import { importCommands } from '../../packages/creator/src/contract/import'
 import {
 	importFileProject,
+	readImportWizard,
 	reviseTxtProject,
 } from '../../packages/creator/src/import/wizard'
 import { Project } from '../../packages/creator/src/project'
@@ -16,6 +18,7 @@ import {
 	paragraph,
 	syntheticDocx,
 } from '../fixtures/source/docx/synthetic'
+import { illustratedBook } from '../fixtures/source/illustrations'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -42,6 +45,125 @@ async function epub() {
 		await zip.add(name, new TextReader(text))
 	return zip.close()
 }
+
+test.each(['epub', 'docx'] as const)(
+	'%s only persists explicitly selected illustrations as references',
+	async (format) => {
+		const root = await workspace()
+		const sourcePath = join(root, `source.${format}`)
+		await writeFile(sourcePath, await illustratedBook(format, 4))
+		const external = join(root, 'external.png')
+		await writeFile(
+			external,
+			await sharp({
+				create: { width: 2, height: 2, channels: 3, background: '#ffffff' },
+			})
+				.png()
+				.toBuffer(),
+		)
+		const result = await importFileProject({
+			sourcePath,
+			folder: root,
+			title: '插图',
+			references: [external],
+		})
+		if (result.status !== 'ready') throw new Error('Expected ready')
+		expect(compile(importCommands['import.file'].output).check(result)).toBe(
+			true,
+		)
+		expect(result.illustrations).toHaveLength(4)
+		expect(result.selectedIllustrations).toEqual([])
+		expect(result.references).toEqual(['source/references/01.png'])
+		for (const candidate of result.illustrations) {
+			expect(candidate).toMatchObject({ volume: 0, chapter: 0 })
+			expect(candidate).not.toHaveProperty('cachePath')
+			const preview = await sharp(
+				Buffer.from(candidate.preview.split(',')[1], 'base64'),
+			).metadata()
+			expect(preview.format).toBe('png')
+			expect(preview.width).toBeLessThanOrEqual(192)
+		}
+		await expect(
+			reviseTxtProject(result.projectDir, result.layout, ['unknown']),
+		).rejects.toMatchObject({ message: '插图选择无效' })
+		await expect(
+			reviseTxtProject(result.projectDir, result.layout, [
+				'illustration-1',
+				'illustration-1',
+			]),
+		).rejects.toMatchObject({ message: '插图选择无效' })
+		await expect(
+			reviseTxtProject(result.projectDir, result.layout, [
+				'illustration-1',
+				'illustration-2',
+				'illustration-3',
+			]),
+		).rejects.toMatchObject({ message: '最多选择 3 张参考图' })
+		const selected = await reviseTxtProject(result.projectDir, result.layout, [
+			'illustration-2',
+		])
+		expect(selected.references).toEqual([
+			'source/references/01.png',
+			'source/references/illustration-2.png',
+		])
+		expect(selected.selectedIllustrations).toEqual(['illustration-2'])
+		using project = await Project.open(result.projectDir)
+		expect(
+			(await sharp(await project.readFile(selected.references[1])).metadata())
+				.format,
+		).toBe('png')
+		expect((await readImportWizard(project)).selectedIllustrations).toEqual([
+			'illustration-2',
+		])
+		expect(await readdir(join(result.projectDir, 'source/references'))).toEqual(
+			['01.png', 'illustration-2.png'],
+		)
+		expect(
+			(await reviseTxtProject(result.projectDir, result.layout)).references,
+		).toEqual(selected.references)
+		expect(
+			(await reviseTxtProject(result.projectDir, result.layout, [])).references,
+		).toEqual(['source/references/01.png'])
+	},
+)
+
+test.each(['epub', 'docx'] as const)(
+	'%s safely omits invalid images and caps candidates',
+	async (format) => {
+		const root = await workspace()
+		const sourcePath = join(root, `source.${format}`)
+		await writeFile(
+			sourcePath,
+			await illustratedBook(
+				format,
+				2,
+				new TextEncoder().encode('<svg>not an image'),
+			),
+		)
+		const invalid = await importFileProject({
+			sourcePath,
+			folder: root,
+			title: '无图片',
+			references: [],
+		})
+		expect(invalid).toMatchObject({
+			status: 'ready',
+			illustrations: [],
+			selectedIllustrations: [],
+			references: [],
+		})
+		await writeFile(sourcePath, await illustratedBook(format, 42))
+		const capped = await importFileProject({
+			sourcePath,
+			folder: root,
+			title: '图片上限',
+			references: [],
+		})
+		if (capped.status !== 'ready') throw new Error('Expected ready')
+		expect(capped.illustrations).toHaveLength(40)
+		expect(capped.references).toEqual([])
+	},
+)
 
 test.each(['txt', 'epub', 'md', 'markdown', 'docx', 'pdf'])(
 	'%s reaches the disk wizard and preserves layout and notes on revision',
@@ -80,6 +202,8 @@ test.each(['txt', 'epub', 'md', 'markdown', 'docx', 'pdf'])(
 			true,
 		)
 		if (result.status !== 'ready') throw new Error('Expected ready')
+		expect(result.illustrations).toEqual([])
+		expect(result.selectedIllustrations).toEqual([])
 		expect(result.format).toBe(
 			['md', 'markdown'].includes(extension) ? 'markdown' : extension,
 		)

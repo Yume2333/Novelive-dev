@@ -379,14 +379,21 @@ async function importFile(payload: CommandInput<'import.file'>) {
 }
 registry.register('import.file', importFile)
 registry.register('import.txt', importFile)
-registry.register('import.revise', async ({ projectDir, layout }) => {
-	const { reviseTxtProject } = await import('./project-pipeline')
-	const result = await reviseTxtProject(projectDir, layout)
-	const service = await getProduction()
-	for (const workId of result.workIds)
-		await service.remember(workId, result.projectDir)
-	return result
-})
+registry.register(
+	'import.revise',
+	async ({ projectDir, layout, selectedIllustrations }) => {
+		const { reviseTxtProject } = await import('./project-pipeline')
+		const result = await reviseTxtProject(
+			projectDir,
+			layout,
+			selectedIllustrations,
+		)
+		const service = await getProduction()
+		for (const workId of result.workIds)
+			await service.remember(workId, result.projectDir)
+		return result
+	},
+)
 
 registry.register('events.list', async ({ scope, scopeId, afterSeq }) => ({
 	...(scope === 'work'

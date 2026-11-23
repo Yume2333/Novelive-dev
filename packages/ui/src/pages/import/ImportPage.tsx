@@ -63,6 +63,9 @@ export function ImportPage() {
 	const [title, setTitle] = useState('')
 	const [folder, setFolder] = useState<string>()
 	const [references, setReferences] = useState<string[]>([])
+	const [selectedIllustrations, setSelectedIllustrations] = useState<string[]>(
+		[],
+	)
 	const [candidates, setCandidates] = useState<Candidates>()
 	const [encoding, setEncoding] = useState<Encoding>()
 	const [wizard, setWizard] = useState<Wizard>()
@@ -126,15 +129,19 @@ export function ImportPage() {
 				return
 			}
 			setWizard(result)
+			setSelectedIllustrations(result.selectedIllustrations)
 			setLayout(result.layout)
 		})
 	const finish = (revise: boolean) =>
 		run(async () => {
 			if (!wizard || !layout) return
-			if (revise)
+			if (revise || selectedIllustrations.length)
 				await window.novelive.call('import.revise', {
 					projectDir: wizard.projectDir,
-					layout: { ...layout, title: layout.title.trim() },
+					layout: revise
+						? { ...layout, title: layout.title.trim() }
+						: wizard.layout,
+					selectedIllustrations,
 				}).promise
 			navigate(workRoute('work', wizard.workId))
 		})
@@ -143,6 +150,8 @@ export function ImportPage() {
 		return (
 			<Review
 				wizard={wizard}
+				selectedIllustrations={selectedIllustrations}
+				onSelectIllustrations={setSelectedIllustrations}
 				layout={layout}
 				busy={busy}
 				error={error}
@@ -262,6 +271,8 @@ export function ImportPage() {
 
 function Review({
 	wizard,
+	selectedIllustrations,
+	onSelectIllustrations,
 	layout,
 	busy,
 	error,
@@ -269,6 +280,8 @@ function Review({
 	onFinish,
 }: {
 	wizard: Wizard
+	selectedIllustrations: string[]
+	onSelectIllustrations(ids: string[]): void
 	layout: ImportLayout
 	busy: boolean
 	error: string
@@ -336,7 +349,7 @@ function Review({
 							: ''}
 					</span>
 				</label>
-				{wizard.references.length > 0 && (
+				{wizard.references.length + selectedIllustrations.length > 0 && (
 					<label className={styles.row}>
 						<input
 							type="checkbox"
@@ -349,11 +362,52 @@ function Review({
 							}
 						/>
 						<span className={styles.value}>
-							已有 {wizard.references.length} 张参考图时也停在角色设定
+							已有 {wizard.references.length + selectedIllustrations.length}{' '}
+							张参考图时也停在角色设定
 						</span>
 					</label>
 				)}
 			</div>
+			{wizard.illustrations.length > 0 && (
+				<fieldset className={styles.card}>
+					<legend className={styles.cardTitle}>插图参考（最多 3 张）</legend>
+					{wizard.illustrations.map((candidate, index) => (
+						<label key={candidate.id} className={styles.row}>
+							<input
+								type="checkbox"
+								checked={selectedIllustrations.includes(candidate.id)}
+								disabled={
+									busy ||
+									(!selectedIllustrations.includes(candidate.id) &&
+										wizard.references.length + selectedIllustrations.length >=
+											3)
+								}
+								onChange={(event) =>
+									onSelectIllustrations(
+										event.target.checked
+											? [...selectedIllustrations, candidate.id]
+											: selectedIllustrations.filter(
+													(id) => id !== candidate.id,
+												),
+									)
+								}
+							/>
+							<img
+								className={styles.illustration}
+								src={candidate.preview}
+								alt={`插图 ${index + 1}`}
+							/>
+							<span className={styles.value}>
+								使用插图 {index + 1} · 第 {candidate.volume + 1} 卷 · 第{' '}
+								{candidate.chapter + 1} 章
+								{candidate.paragraph === undefined
+									? ''
+									: ` · 第 ${candidate.paragraph + 1} 段`}
+							</span>
+						</label>
+					))}
+				</fieldset>
+			)}
 			{wizard.findings.length > 0 && (
 				<section className={styles.card} aria-label="整理建议">
 					<div className={styles.cardHeader}>
