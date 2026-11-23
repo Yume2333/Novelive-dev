@@ -495,6 +495,9 @@ test('synthesis requests repair for work-only relation references before series 
 		fetch,
 	})
 	expect(fetch).toHaveBeenCalledTimes(2)
+	expect(prompts[0]).toContain('Scoped-only entries')
+	expect(prompts[0]).toContain('add to biblePatch before referencing')
+	expect(prompts[0]).toContain('guest')
 	expect(prompts[1]).toContain('Repair the JSON')
 	expect(result.biblePatch.some(({ entry }) => entry.id === 'meeting')).toBe(
 		true,

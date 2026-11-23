@@ -34,6 +34,7 @@ import {
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
+import { scopedOnlyBrief } from './incremental/context'
 import {
 	applyPatches,
 	bibleEntryBases,
@@ -291,7 +292,7 @@ Return only JSON with overview, chapters [{chapterId,progress}], biblePatch [{ki
 Bible kinds: character, relation, location, timeline, foreshadowing, style. Every entry has an id and status ("candidate"); use actual chapter IDs for provenance and relationships reference existing or extracted characters. Characters have name and aliases (mark main characters major:true); locations have name and description; relations have from, to and description; timeline has chapterId and event; foreshadowing has plantedChapter and description; style has description; glossary has original, written and category.
 Use stable IDs; record changing identities in changes with chapterId, field and value. Keep confirmed facts intact; ${incremental ? 'do not emit delete for successive volumes.' : 'delete only a mistaken candidate from this volume.'}
 Existing entries:
-${JSON.stringify(contextBible)}${options.previousDigests?.length ? `\nEarlier volume digests (context only):\n${JSON.stringify(options.previousDigests)}` : ''}`
+${JSON.stringify(contextBible)}${scopedOnlyBrief(contextBible, bible)}${options.previousDigests?.length ? `\nEarlier volume digests (context only):\n${JSON.stringify(options.previousDigests)}` : ''}`
 	const wholePrompt = `${instructions}
 Synthesize the entire volume. Include progress for every chapter.
 Chapter previews:
