@@ -6,6 +6,7 @@ import type {
 import type { PlaybackMode } from '../../../../../player/src/contract/progress'
 import type { PlaybackProgress } from '../../../../../player/src/progress'
 import type { ControlFrame, PlayerControlsController } from './controller'
+import { textPage } from './text-page'
 
 export function sentenceKey(position: SentenceRef) {
 	return JSON.stringify([
@@ -47,15 +48,35 @@ export function minimalControlsController(
 		current = {
 			position,
 			read,
-			characters: Array.from(
-				host.querySelector('.nl-player-text')?.textContent ?? '',
-			).length,
+			...textPage(host),
 			ready: line?.type === 'text' && item?.beat.advance.kind === 'click',
 			ended: !item,
 		}
 		for (const listener of listeners) listener()
 	}
-	signal.addEventListener('abort', () => listeners.clear(), { once: true })
+	const observer = new MutationObserver(() => {
+		current = { ...current, ...textPage(host) }
+		for (const listener of listeners) listener()
+	})
+	observer.observe(host, {
+		subtree: true,
+		childList: true,
+		attributes: true,
+		attributeFilter: [
+			'data-page',
+			'data-pages',
+			'data-revealed',
+			'data-text-finished',
+		],
+	})
+	signal.addEventListener(
+		'abort',
+		() => {
+			observer.disconnect()
+			listeners.clear()
+		},
+		{ once: true },
+	)
 	return {
 		rendered,
 		mode,
@@ -80,6 +101,11 @@ export function minimalControlsController(
 				`${settings.textMillisecondsPerCharacter}ms`,
 			)
 			host.dataset.dialogueStyle = settings.dialogueStyle
+			host.style.setProperty(
+				'--player-auto-multiplier',
+				String(settings.autoPlaySpeedMultiplier),
+			)
+			host.dispatchEvent(new Event('novelive:player-settings'))
 		},
 	}
 }

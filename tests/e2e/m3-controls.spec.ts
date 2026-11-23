@@ -23,6 +23,129 @@ const require = createRequire(
 )
 
 test.describe('M3 player controls', () => {
+	test('live text speed, page dwell, first-page saves and read-only page skipping', async () => {
+		test.setTimeout(60000)
+		const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-pages-'))
+		const root = join(directory, 'project')
+		const read = '山川河流正在等待旅人。'.repeat(24)
+		const unread = '下一句仍未读，不能跳过。'.repeat(24)
+		const png = await sharp({
+			create: { width: 32, height: 32, channels: 3, background: '#203060' },
+		})
+			.png()
+			.toBuffer()
+		await seedPlayerProject(root, png, png)
+		{
+			using project = await Project.open(root)
+			await project.writeFile(
+				projectFiles.scene(playerRef, 'aaaabbbb'),
+				playerScript
+					.replace('你好，世界。', read)
+					.replace('我在想什么？', unread),
+			)
+		}
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${join(directory, 'profile')}`],
+			env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
+		})
+		try {
+			const page = await app.firstWindow()
+			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await app.evaluate(({ dialog }, path) => {
+				dialog.showOpenDialog = async () => ({
+					canceled: false,
+					filePaths: [path],
+				})
+			}, root)
+			await page.evaluate((id) => {
+				window.location.hash = `/work/${id}/play`
+			}, playerWorkId)
+			await page.getByRole('button', { name: '打开本地工程' }).click()
+			const viewport = page.locator('.nl-player-text')
+			const display = viewport.locator('.nl-text-display')
+			await expect(display).toHaveText(read)
+			await page.keyboard.press('Escape')
+			await page.getByRole('button', { name: '设置', exact: true }).click()
+			await page
+				.getByRole('slider', { name: '文字速度（毫秒 / 字）', exact: true })
+				.press('End')
+			await page
+				.getByRole('slider', { name: '自动播放倍率', exact: true })
+				.press('Home')
+			await page.getByRole('button', { name: '返回菜单' }).click()
+			await page.getByLabel('自动播放', { exact: true }).check()
+			await page.keyboard.press('Escape')
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await page.waitForTimeout(3000)
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await expect(display.locator('[data-glyph="50"]')).toHaveCSS(
+				'visibility',
+				'hidden',
+			)
+			await page.keyboard.press('Escape')
+			await page.getByRole('button', { name: '设置', exact: true }).click()
+			await page.getByLabel('瞬间显示').check()
+			const firstEnd = Number(await viewport.getAttribute('data-revealed'))
+			const pages = Number(await viewport.getAttribute('data-pages'))
+			expect(firstEnd).toBeGreaterThan(50)
+			expect(pages).toBeGreaterThan(2)
+			await expect(display.locator(`[data-glyph="${firstEnd - 1}"]`)).toHaveCSS(
+				'visibility',
+				'visible',
+			)
+			await expect(display.locator(`[data-glyph="${firstEnd}"]`)).toHaveCSS(
+				'visibility',
+				'hidden',
+			)
+			await page.keyboard.press('Escape')
+			await page.waitForTimeout(200)
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await expect(viewport).toHaveAttribute('data-page', '2', {
+				timeout: dwellMilliseconds(firstEnd, 0.25) + 2000,
+			})
+			await page.keyboard.press('Escape')
+			await page.getByRole('button', { name: '快速存档', exact: true }).click()
+			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await page.keyboard.press('Escape')
+			await page.getByRole('button', { name: '快速读档', exact: true }).click()
+			await expect(display).toHaveText(read)
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await page.evaluate((content) => {
+				const overlay = document.querySelector('.nl-player-overlay')
+				if (!overlay) throw new Error('Missing overlay')
+				const seen = new Set([1])
+				new MutationObserver(() => {
+					const text = overlay.querySelector<HTMLElement>('.nl-player-text')
+					if (text?.querySelector('.nl-text-display')?.textContent === content)
+						seen.add(Number(text.dataset.page))
+					document.body.dataset.skippedPages = JSON.stringify([...seen])
+				}).observe(overlay, {
+					subtree: true,
+					attributes: true,
+					attributeFilter: ['data-page'],
+				})
+			}, read)
+			await page.keyboard.press('Escape')
+			await page.getByLabel('跳过已读').check()
+			await page.keyboard.press('Escape')
+			await expect(display).toHaveText(unread)
+			await expect(page.locator('body')).toHaveAttribute(
+				'data-skipped-pages',
+				JSON.stringify(Array.from({ length: pages }, (_, index) => index + 1)),
+			)
+			await page.waitForTimeout(350)
+			await expect(display).toHaveText(unread)
+			await expect(viewport).toHaveAttribute('data-page', '1')
+			await page.screenshot({
+				path: '.workflow/evidence/m3-playback/05-controls-pages.png',
+			})
+		} finally {
+			await app.close()
+			await rm(directory, { recursive: true, force: true })
+		}
+	})
+
 	test('persistent slots, thumbnails, history and reread survive restart', async () => {
 		const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-persistent-'))
 		const root = join(directory, 'project')
@@ -70,9 +193,16 @@ test.describe('M3 player controls', () => {
 		}
 		let { app, page } = await open()
 		try {
-			const text = () => page.locator('.nl-player-text')
-			const advance = () =>
-				page.locator('.nl-player canvas').click({ position: { x: 20, y: 20 } })
+			const text = () => page.locator('.nl-player-text .nl-text-display')
+			const advance = async () => {
+				await expect(page.locator('.nl-player-text')).toHaveAttribute(
+					'data-text-finished',
+					'true',
+				)
+				await page
+					.locator('.nl-player canvas')
+					.click({ position: { x: 20, y: 20 } })
+			}
 			const menu = () => page.keyboard.press('Escape')
 			await expect(text()).toHaveText('你好，世界。')
 			await menu()
@@ -320,6 +450,7 @@ test.describe('M3 player controls', () => {
 			characters: 10,
 			read: false,
 			ready: true,
+			pageReady: true,
 			ended: false,
 		}
 		const controller = {
@@ -364,6 +495,10 @@ test.describe('M3 player controls', () => {
 		await new Promise((resolve) => setTimeout(resolve, 350))
 		expect(advances).toBe(1)
 		cancelUnread()
+		frame = { ...frame, pageReady: false }
+		schedulePlayback(controller, defaultPlayerSettings, true, false)()
+		expect(advances).toBe(1)
+		frame = { ...frame, pageReady: true }
 		const cancelAuto = schedulePlayback(
 			controller,
 			{ ...defaultPlayerSettings, autoPlaySpeedMultiplier: 0.25 },
@@ -484,9 +619,14 @@ test.describe('M3 player controls', () => {
 				}, playerWorkId)
 				await page.getByRole('button', { name: '打开本地工程' }).click()
 				const canvas = page.locator('.nl-player canvas')
-				const text = page.locator('.nl-player-text')
+				const text = page.locator('.nl-player-text .nl-text-display')
 				await expect(text).toHaveText('你好，世界。')
-				const advance = () => canvas.click({ position: { x: 20, y: 20 } })
+				const advance = async () => {
+					const viewport = page.locator('.nl-player-text')
+					if (await viewport.count())
+						await expect(viewport).toHaveAttribute('data-text-finished', 'true')
+					await canvas.click({ position: { x: 20, y: 20 } })
+				}
 				async function range(label: string, value: number) {
 					const input = page.getByRole('slider', { name: label, exact: true })
 					const min = Number(await input.getAttribute('min'))
@@ -518,6 +658,10 @@ test.describe('M3 player controls', () => {
 					await range('自动播放倍率', 2)
 					await page.getByLabel('对话框样式').selectOption('paper')
 					await expect(page.locator('.nl-player-textbox')).toHaveCSS(
+						'font-size',
+						'36px',
+					)
+					await expect(page.locator('.nl-text-viewport')).toHaveCSS(
 						'font-size',
 						'36px',
 					)

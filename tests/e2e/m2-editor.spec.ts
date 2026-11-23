@@ -73,12 +73,12 @@ async function editAndPreview(page: Page, secondLine = 4) {
 		page.getByRole('button', { name: '撤销', exact: true }),
 	).toBeEnabled()
 	await page.getByRole('button', { name: '从当前句预览' }).click()
-	await expect(page.locator('.nl-player-text')).toHaveText('改过的第二句。')
+	await expect(page.locator('.nl-text-display')).toHaveText('改过的第二句。')
 	await page.getByRole('button', { name: '撤销', exact: true }).click()
 	await expect(editor).not.toContainText('改过的')
 	await jumpTo(page, secondLine)
 	await page.getByRole('button', { name: '从当前句预览' }).click()
-	await expect(page.locator('.nl-player-text')).toHaveText('第二句。')
+	await expect(page.locator('.nl-text-display')).toHaveText('第二句。')
 	await mkdir(evidence, { recursive: true })
 }
 
@@ -472,11 +472,13 @@ test.describe('contract-render', () => {
 					]) {
 						await jumpTo(page, line)
 						await page.getByRole('button', { name: '从当前句预览' }).click()
-						await expect(page.locator('.nl-player-text')).toHaveText(text)
+						await expect(page.locator('.nl-text-display')).toHaveText(text)
 					}
 					await page.getByLabel('场景', { exact: true }).selectOption('1')
 					await page.getByRole('button', { name: '从当前句预览' }).click()
-					await expect(page.locator('.nl-player-text')).toHaveText('门外的风。')
+					await expect(page.locator('.nl-text-display')).toHaveText(
+						'门外的风。',
+					)
 					return
 				}
 				if (mode === 'crlf') {

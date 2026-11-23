@@ -1,5 +1,6 @@
 export * from './bible'
 export * from './files'
+export * from './inheritance'
 export * from './metadata'
 export * from './pipeline'
 export * from './production'

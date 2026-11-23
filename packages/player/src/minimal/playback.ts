@@ -5,10 +5,11 @@ export function createPlayback(
 	render: (beat: Beat | undefined) => Promise<void>,
 	signal: AbortSignal,
 	onError: (error: unknown) => void,
-	startIndex = 0,
+	textFinished?: () => Promise<void>,
+	options: { startIndex?: number } = {},
 ) {
 	const beats = scenes.flatMap((scene) => scene.beats)
-	let index = startIndex - 1
+	let index = (options.startIndex ?? 0) - 1
 	let busy = false
 	let stopped = false
 	let timer: ReturnType<typeof setTimeout> | undefined
@@ -21,10 +22,12 @@ export function createPlayback(
 			await render(beat)
 			if (!beat) stopped = true
 			if (!beat || signal.aborted || beat.advance.kind === 'click') return
+			await textFinished?.()
+			if (signal.aborted) return
 			const delay =
 				beat.advance.kind === 'delay'
 					? beat.advance.seconds * 1000
-					: beat.line?.type === 'text'
+					: !textFinished && beat.line?.type === 'text'
 						? 2000
 						: 0
 			timer = setTimeout(() => void advance(), delay)

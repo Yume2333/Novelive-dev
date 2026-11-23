@@ -294,6 +294,74 @@ test('plays compiled beats in order across scenes including click, auto, delay a
 	expect(onError).not.toHaveBeenCalled()
 })
 
+test('restored start options keep the fifth text-finished hook, including failure and abort', async () => {
+	vi.useFakeTimers()
+	const result = compileScript(
+		'scene 一\nsource p0001\n: 已过\n: 自动 cont\n: 结束\n',
+		{ ...context, paragraphIds: ['p0001'] },
+	)
+	if (!result.ok) throw new Error(JSON.stringify(result.diagnostics))
+	const beats = result.scenes.flatMap((scene) => scene.beats)
+	const render = vi.fn(async (_beat: Beat | undefined) => {})
+	const onError = vi.fn()
+	let finish = () => {}
+	const textFinished = vi.fn(
+		() =>
+			new Promise<void>((resolve) => {
+				finish = resolve
+			}),
+	)
+	const controller = new AbortController()
+	const playback = createPlayback(
+		result.scenes,
+		render,
+		controller.signal,
+		onError,
+		textFinished,
+		{ startIndex: 1 },
+	)
+	const starting = playback.start()
+	await vi.advanceTimersByTimeAsync(0)
+	expect(render).toHaveBeenCalledExactlyOnceWith(beats[1])
+	expect(textFinished).toHaveBeenCalledTimes(1)
+	playback.click()
+	finish()
+	await starting
+	await vi.advanceTimersByTimeAsync(0)
+	expect(render.mock.calls.map(([beat]) => beat)).toEqual([beats[1], beats[2]])
+	controller.abort()
+	const failure = new Error('text unavailable')
+	const broken = createPlayback(
+		result.scenes,
+		render,
+		new AbortController().signal,
+		onError,
+		async () => {
+			throw failure
+		},
+		{ startIndex: 1 },
+	)
+	await broken.start()
+	expect(onError).toHaveBeenCalledExactlyOnceWith(failure)
+	render.mockClear()
+	const abort = new AbortController()
+	const waiting = createPlayback(
+		result.scenes,
+		render,
+		abort.signal,
+		onError,
+		textFinished,
+		{ startIndex: 1 },
+	)
+	const pending = waiting.start()
+	await vi.advanceTimersByTimeAsync(0)
+	abort.abort()
+	finish()
+	await pending
+	await vi.runAllTimersAsync()
+	expect(render).toHaveBeenCalledExactlyOnceWith(beats[1])
+})
+
 test('empty playback ends once; rendering errors stop playback and abort cancels timers', async () => {
 	vi.useFakeTimers()
 	const render = vi.fn(async (_beat: Beat | undefined) => {})

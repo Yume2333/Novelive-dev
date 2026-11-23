@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
-import { mkdir, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
-import { type AssetRegistry, projectFiles } from '@novelive/format/model'
+import { projectFiles } from '@novelive/format/model'
 import { Project } from './index'
+import { resolveBible, resolveRegistry } from './series/resolve'
 
 async function playerChapters(
 	project: Project,
@@ -101,43 +102,16 @@ export async function loadPlayerChapter(
 				),
 			),
 		)
-		const entries = new Map<string, AssetRegistry['entries'][number]>()
-		const speakers = new Map<string, string>()
-		for (const scope of [
-			{ level: 'series' },
-			{ level: 'volume', volumeId },
-			{ level: 'work', volumeId, workId },
-		] as const) {
-			const characters = dirname(
-				projectFiles.character(scope, 'character').path,
-			)
-			let files: string[]
-			try {
-				files = await readdir(join(project.root, characters))
-			} catch (error) {
-				if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-				files = []
-			}
-			for (const file of files
-				.filter((file) => file.endsWith('.json'))
-				.sort()) {
-				const bible = await project.read(
-					projectFiles.character(scope, file.slice(0, -5)),
-				)
-				for (const character of bible.entries)
-					speakers.set(character.id, character.name)
-			}
-			let registry: AssetRegistry
-			try {
-				registry = await project.read(projectFiles.assetRegistry(scope))
-			} catch (error) {
-				if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
-				throw error
-			}
-			for (const entry of registry.entries) entries.set(entry.id, entry)
-		}
+		const scope = { level: 'work', volumeId, workId } as const
+		const [bible, registry] = await Promise.all([
+			resolveBible(project, scope),
+			resolveRegistry(project, scope),
+		])
+		const speakers = new Map(
+			bible.character.map((entry) => [entry.id, entry.name]),
+		)
 		const assets = await Promise.all(
-			[...entries.values()].map(async (entry) => {
+			registry.entries.map(async (entry) => {
 				const missing = () => ({
 					...entry,
 					path: `player/unavailable/${createHash('sha256').update(`${project.root}/${entry.id}`).digest('hex')}${extname(entry.path)}`,

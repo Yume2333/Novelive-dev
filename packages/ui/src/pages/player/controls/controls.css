@@ -147,6 +147,10 @@
 	visibility: hidden;
 }
 
+.nl-player .nl-text-viewport {
+	font-size: var(--player-font-size, 30px);
+}
+
 .nl-player .nl-player-textbox {
 	font-size: var(--player-font-size, 30px);
 	background: color-mix(

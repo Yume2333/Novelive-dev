@@ -19,6 +19,7 @@ export interface ControlFrame {
 	characters: number
 	read: boolean
 	ready: boolean
+	pageReady?: boolean
 	ended: boolean
 }
 
@@ -45,6 +46,7 @@ export function schedulePlayback(
 	if (settings.skipRead && !frame.read) return () => {}
 	const skip = settings.skipRead && frame.read
 	if (!skip && !auto) return () => {}
+	if (!skip && frame.pageReady === false) return () => {}
 	const timer = setTimeout(
 		() => controller.advance(skip),
 		skip

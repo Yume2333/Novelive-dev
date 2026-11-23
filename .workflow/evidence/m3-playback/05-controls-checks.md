@@ -80,3 +80,49 @@ Devin Review findings on `91e7841` were addressed in separate commits:
 Real Electron coverage includes stale resume IDs after restart, history reread → mainline with subsequent forward progress, invalid save rejection without losing stage/history, and re-saving an old-text snapshot after an actual scene rewrite.
 
 The initial implementation skipped independent workflow review because no reviewer-spawning tool was available; independent workflow/security review is still needed at effort close. Read/mainline and saves persist using M3/04; settings and session history remain in memory. The minimal snapshot renderer restores background, sprites and dialogue text, not the full stage's camera/effects/audio or interrupted animations. No paid calls or replay cassette changes were needed.
+
+## M3/03 merge integration
+
+Merged `origin/main` at `3c57712` without rebasing. M3/03's `text/` source is unchanged. `createPlayback` keeps `textFinished` fifth and takes `{ startIndex }` sixth. Minimal-player clicks first go through `mountText.click()`, preserving page completion and scripted `cont` holds. Snapshot text remains the content actually mounted, including old text restored after a script edit, and restarts at page one.
+
+Live speed uses `millisecondsPerCharacter`; a speed change remounts the displayed sentence at page one because M3/03 exposes construction-time options, not an update hook. Scripted completion follows the replacement renderer. Native scripted-auto multiplier uses the reciprocal of the controls multiplier, translating M3/03's divisor into the contract's `(1200 + 80 × page characters) × multiplier`. Font size consumes the existing CSS variable on the new viewport; opacity/style remain on the dialogue box via CSS variables/data attributes.
+
+The controller observes text page/reveal metadata, not beat identity; direct rendered-beat reporting remains authoritative for textless beats and chapter completion. Page glyph geometry determines page character counts and complete reveal. Final-page readiness also waits for `finished`, preserving trailing pauses. Skip-read routes clicks through every page of a read sentence and stops before advancing unread text.
+
+Requested strict Electron commands (exit 0):
+
+```text
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M3 player controls'
+Running 6 tests using 1 worker
+6 passed (28.6s)
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M1b minimal player'
+Running 2 tests using 1 worker
+2 passed (5.9s)
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M3 text typography'
+Running 2 tests using 1 worker
+2 passed (16.8s)
+```
+
+Relevant Vitest coverage: save integration, M3 contract and progress IPC suites passed (19 tests); the loader/playback suite passed (9 tests). The corrected restored-start test uses the fixture's single paragraph and checks the fifth completion hook alongside sixth-argument restore, completion errors and abort. M3/03's timing units live in its Playwright spec and ran above.
+
+```text
+NL_REPLAY=strict pnpm test tests/unit/m1b-player.test.ts
+Test Files  1 passed (1)
+Tests  9 passed (9)
+
+pnpm typecheck
+$ tsc --noEmit
+
+pnpm lint
+Checked 316 files in 133ms. No fixes applied.
+Found 1 info.
+
+bash .workflow/bin/workflow validate
+Workflow is valid (66 task files).
+```
+
+`git diff --check` and `git diff origin/main --check` exit 0. The extra cached-diff check against the pre-merge branch reports whitespace in incoming PDF fixture xref rows; those files match main and were not edited (stripping PDF whitespace would invalidate offsets).
+
+Real-window `05-controls-pages.png` was inspected: the multi-page read sentence has been skipped page-by-page, and the next unread sentence remains at page one. The same test verifies visible 153 ms/grapheme typing, instant speed, autoplay waiting for page reveal, page dwell and page-two quick save restoring at page one. Existing menu/save-grid evidence and the M1b screenshot were refreshed by their regression tests.

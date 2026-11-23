@@ -1,0 +1,125 @@
+M4/06 series pipeline — offline service evidence
+Base: bb12fa20a21b5fb537757a0b3b9e4005adebd6ff
+
+Task check:
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.test.ts
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  03:05:47
+   Duration  973ms (transform 40%, import 37%, tests 22%)
+Exit code: 0
+
+Existing regression coverage:
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m1a-synthesis.test.ts tests/unit/m1b-writer.test.ts tests/unit/m1b-player.test.ts tests/unit/m1b-art.test.ts tests/unit/m1b-production-worker.test.ts tests/integration/m1a-project.test.ts
+ Test Files  1 failed | 5 passed (6)
+      Tests  1 failed | 103 passed (104)
+Initial art failure: expected jobs included ada/uniform/neutral; filtering drawn jobs at series scope changed that established API result.
+Fix: preserve series-scope jobs; skip drawn jobs for resolved volume/work scopes only.
+
+Final affected recheck (includes task integration check):
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.test.ts tests/unit/m1b-art.test.ts tests/unit/m1b-production-worker.test.ts
+ RUN  v5.1.1 /home/ubuntu/repos/Novelive-dev
+ Test Files  3 passed (3)
+      Tests  23 passed (23)
+   Start at  03:06:36
+   Duration  11.58s (tests 92%, import 6%, transform 2%)
+Exit code: 0
+Other passing regression inputs were unchanged; no redundant rerun.
+
+$ pnpm typecheck
+$ tsc --noEmit
+Exit code: 0
+
+$ pnpm lint
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 249 files in 100ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+Existing informational lint diagnostic: tests/fixtures/text-models/build-synthetic.ts:63:3 lint/style/useTemplate.
+
+Additional review: git diff --check produced no output.
+Initial typecheck found literal-type, parameter-shadowing and test-fixture typing issues; all corrected before the successful final typecheck.
+Environment: noninteractive shell did not load nvm (pnpm: command not found); initialized a persistent TTY shell with nvm use 24.22.3. Node v24.22.3 / pnpm 12.21.0.
+
+Real service entry points exercised with on-disk Project and injected synthetic SSE:
+- series -> volume -> work whole-entry override; CSS concatenation; empty scopes; malformed document rejection.
+- joinSeries twice, distinct IDs and exclusive source writes; old original/chapter/Bible/glossary/registry bytes unchanged; deletion and empty-book rejection.
+- volume-two productionBible and ArtProduction.register reuse series-level drawn character; precommit callback sees zero jobs; image fetch and global network denied.
+- writeChapter in en from Chinese source; prompt includes original-to-written canonical character/glossary mappings, unchanged speaker ID, and valid compiled output.
+- prepareSeries publishes volume-one readiness while volume-two preview is blocked; later synthesis sees earlier digest, effective scoped Bible and no-delete instruction; completed checkpoint rerun sends no new requests.
+
+No new cassettes or paid calls. No Electron/visual W2 verification.
+Review: skipped — no independent reviewer/subagent creation tool exposed in this host.
+Follow-ups intentionally outside this task: importer/wizard joinSeries call-site; task 07 queue-service prepareSeries/onReady wiring. No scheduling, importer or shared contract/schema files changed.
+
+PR #50 review corrections (supersedes initial job-filter and join-patch descriptions above):
+- Art writes series scope in production, reads resolved work overlay; keeps all planArt jobs so staging records approved-portrait dependencies. draw reuses the existing image without an image request.
+- Registry persistence merges only changed entries into the write-scope's local file; inherited rows remain live rather than copied down.
+- Synthesis validates model references against contextBible, including work-only characters.
+- Playback response has no CSS field (contract/production.ts production.playerChapter); removed unused CSS resolution, without expanding the contract.
+- JoinBook no longer accepts biblePatch; only subsequent incremental synthesis publishes patches.
+- Empty canonical name collections leave legacy writing prompts unchanged, fixing the m2-revisions strict replay miss from CI.
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.test.ts tests/unit/m1a-synthesis.test.ts tests/unit/m1b-writer.test.ts tests/unit/m1b-art.test.ts tests/unit/m1b-production-worker.test.ts tests/unit/m1b-player.test.ts tests/unit/m2-revisions.test.ts tests/unit/m0-dev-bridge.test.ts
+ Test Files  8 passed (8)
+      Tests  113 passed (113)
+   Start at  03:13:22
+   Duration  10.99s (tests 87%, import 8%, transform 5%)
+Exit code: 0
+New coverage: volume-one art service registers/adopts a portrait into series storage and volume two reuses it; local registry writes do not freeze inherited assets; relation references to work-only characters validate without repair requests.
+
+$ pnpm typecheck && pnpm lint
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 249 files in 103ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+The same existing useTemplate informational diagnostic remains.
+
+Second review corrections (supersedes scoped-reference validation above):
+- Existing effective registry/style entries are updated at their winning scope; new production entries retain series ownership. Work style reference images also remain work-local.
+- Synthesis prompts retain scoped context, but validation uses the series publication bible plus patch additions. A work-only relation reference now triggers JSON repair.
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.test.ts tests/unit/m1a-synthesis.test.ts tests/unit/m1b-writer.test.ts tests/unit/m1b-art.test.ts tests/unit/m1b-production-worker.test.ts tests/unit/m1b-player.test.ts tests/unit/m2-revisions.test.ts
+ Test Files  7 passed (7)
+      Tests  111 passed (111)
+   Start at  03:17:45
+   Duration  10.85s (tests 89%, import 7%, transform 4%)
+Exit code: 0
+New coverage: pending work-owned asset adoption becomes drawn in loadPlayerChapter; work-owned style approval leaves the series style unchanged; work-only relation references request repair before publishing.
+
+$ pnpm typecheck && pnpm lint
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 250 files in 107ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+The existing useTemplate informational diagnostic remains.
+
+Subsequent review corrections:
+- de9a637: both production visual-approval paths load the effective work-scoped style, preserving work override fields.
+- ef3adaf: scoped-only prompt entries are marked as absent from the publication bible and must be added before referencing. Existing unscoped strict-replay prompts remain unchanged.
+
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.test.ts tests/unit/m1a-synthesis.test.ts tests/unit/m1b-writer.test.ts tests/unit/m1b-art.test.ts tests/unit/m1b-production-worker.test.ts tests/unit/m1b-player.test.ts tests/unit/m1b-production-contract.test.ts tests/unit/m1b-production-settings.test.ts tests/unit/m2-revisions.test.ts
+ Test Files  9 passed (9)
+      Tests  118 passed (118)
+   Start at  03:21:07
+   Duration  10.65s (tests 88%, import 8%, transform 5%)
+Exit code: 0
+pnpm typecheck && pnpm lint: exit code 0; Checked 251 files in 109ms. No fixes applied. Found 1 info (existing useTemplate).
+
+Candidate-cache review correction: candidate images are cached under the effective style owner's scope. Offline coverage checks a work override gets its own cached images while two series-style works share images.
+$ NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-series.test.ts tests/unit/m1b-art.test.ts tests/unit/m1b-production-worker.test.ts tests/unit/m1b-production-contract.test.ts tests/unit/m1b-player.test.ts
+ Test Files  5 passed (5)
+      Tests  37 passed (37)
+   Start at  03:24:11
+   Duration  10.88s (tests 90%, import 6%, transform 3%)
+Exit code: 0
+$ pnpm typecheck && pnpm lint
+$ tsc --noEmit
+$ biome check && stylelint 'packages/ui/src/**/*.css'
+Checked 251 files in 110ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+The existing useTemplate informational diagnostic remains.

@@ -7,6 +7,7 @@ import {
 	restoreSnapshot,
 	type SnapshotRenderer,
 } from '../progress'
+import { mountText } from '../text'
 import { createPlayback } from './playback'
 
 export async function mountMinimalPlayer(
@@ -41,6 +42,7 @@ export async function mountMinimalPlayer(
 	const cast = new Map<string, { id: string; sprite: Sprite }>()
 	let background: Sprite | undefined
 	let backgroundId: string | undefined
+	let textRenderer: ReturnType<typeof mountText> | undefined
 	const texture = async (id: string) => {
 		let result = textures.get(id)
 		if (!result) {
@@ -55,7 +57,18 @@ export async function mountMinimalPlayer(
 		kind: 'narration',
 		content: [],
 	}
-	function showText(line: TextLine) {
+	let displayedLine: TextLine | undefined
+	let displayedAuto = false
+	let textSpeed = 30
+	function setting(name: string, fallback: number) {
+		const value = Number.parseFloat(host.style.getPropertyValue(name))
+		return Number.isFinite(value) ? value : fallback
+	}
+	function showText(line: TextLine, auto: boolean) {
+		textRenderer?.dispose()
+		displayedLine = line
+		displayedAuto = auto
+		textSpeed = setting('--player-text-delay', 30)
 		displayedText = {
 			kind: line.kind,
 			speaker: line.speaker,
@@ -76,13 +89,27 @@ export async function mountMinimalPlayer(
 		}
 		const text = document.createElement('div')
 		text.className = 'nl-player-text'
-		text.textContent = line.content
-			.map((part) => (part.type === 'text' ? part.text : ''))
-			.join('')
+		text.dataset.textFinished = 'false'
 		box.append(text)
 		overlay.replaceChildren(box)
+		textRenderer = mountText(text, line.content, {
+			millisecondsPerCharacter: textSpeed,
+			auto,
+			continueImmediately: auto && line.kind !== 'caption',
+			get autoSpeedMultiplier() {
+				return 1 / setting('--player-auto-multiplier', 1)
+			},
+		})
+		const current = textRenderer
+		void current.finished.then(() => {
+			if (textRenderer === current && !signal.aborted)
+				text.dataset.textFinished = 'true'
+		})
 	}
 	async function render(current: Beat | undefined) {
+		textRenderer?.dispose()
+		textRenderer = undefined
+		displayedLine = undefined
 		if (!current) {
 			overlay.textContent = '本章结束'
 			return
@@ -125,14 +152,22 @@ export async function mountMinimalPlayer(
 				}
 			}
 		}
-		if (current.line?.type === 'text') showText(current.line)
+		if (current.line?.type === 'text')
+			showText(current.line, current.advance.kind !== 'click')
 		else overlay.replaceChildren()
 	}
 	let click = () => {}
+	const settingsChanged = () => {
+		if (displayedLine && textSpeed !== setting('--player-text-delay', 30))
+			showText(displayedLine, displayedAuto)
+	}
+	host.addEventListener('novelive:player-settings', settingsChanged)
 	signal.addEventListener(
 		'abort',
 		() => {
+			textRenderer?.dispose()
 			host.removeEventListener('click', click)
+			host.removeEventListener('novelive:player-settings', settingsChanged)
 			stage.remove()
 			app.destroy(false, { children: true })
 			for (const item of textures.values()) item.destroy(true)
@@ -180,16 +215,19 @@ export async function mountMinimalPlayer(
 		replayState: (action) =>
 			render({ actions: [action], advance: { kind: 'click' } }),
 		restartText: (text) =>
-			showText({
-				type: 'text',
-				line: 1,
-				col: 1,
-				kind: text.kind,
-				speaker: text.speaker,
-				alias: text.displayName,
-				content: [...text.content],
-				click: true,
-			}),
+			showText(
+				{
+					type: 'text',
+					line: 1,
+					col: 1,
+					kind: text.kind,
+					speaker: text.speaker,
+					alias: text.displayName,
+					content: [...text.content],
+					click: true,
+				},
+				ordered[startIndex]?.beat.advance.kind !== 'click',
+			),
 	}
 	const ordered = scenes.flatMap(({ scene, beats }) =>
 		beats.map((beat) => ({ sceneId: scene.id, beat })),
@@ -267,9 +305,18 @@ export async function mountMinimalPlayer(
 		},
 		signal,
 		onError,
-		startIndex,
+		async () => {
+			let current: typeof textRenderer
+			do {
+				current = textRenderer
+				await current?.finished
+			} while (current !== textRenderer && !signal.aborted)
+		},
+		{ startIndex },
 	)
-	click = playback.click
+	click = () => {
+		if (!textRenderer?.click()) playback.click()
+	}
 	host.addEventListener('click', click)
 	await playback.start()
 }
