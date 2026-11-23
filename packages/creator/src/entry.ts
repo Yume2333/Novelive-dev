@@ -5,9 +5,8 @@ import { tmpdir } from 'node:os'
 import { dirname, extname, join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
 import { getBible, openBibleProject } from './bible/editing'
-import { registerChat } from './chat'
 import { EventReplay } from './chat/events'
-import { projectChat } from './chat/project'
+import { registerChat } from './chat/register'
 import { createConfigStore } from './config'
 import {
 	type CreatorFrame,
@@ -145,6 +144,7 @@ function publish(envelope: EventEnvelope) {
 async function openChat(workId: string) {
 	const project = await openBibleProject(dataDir, workId)
 	try {
+		const { projectChat } = await import('./chat/project')
 		const chat = await projectChat(
 			project,
 			workId,
