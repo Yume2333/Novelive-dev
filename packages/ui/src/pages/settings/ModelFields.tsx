@@ -124,6 +124,7 @@ function integer(text: string, minimum: number) {
 	if (!text.trim() || !Number.isSafeInteger(number) || number < minimum)
 		throw {
 			code: 'invalid_config',
+			localized: true,
 			message: t('请输入不小于 {{minimum}} 的整数。', { minimum }),
 		}
 	return number

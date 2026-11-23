@@ -58,6 +58,11 @@ function readableError(error: unknown): CommandError {
 			? (error as CommandError)
 			: undefined
 	const code = failure?.code ?? 'internal'
+	const readable =
+		failure?.message &&
+		('localized' in failure || /[\u3400-\u9fff]/.test(failure.message))
+			? failure.message
+			: undefined
 	const message = {
 		auth: t('鉴权失败，请检查接口地址、API Key 和模型名。'),
 		not_found: t('接口或模型不存在，请检查接口地址和模型名。'),
@@ -69,16 +74,11 @@ function readableError(error: unknown): CommandError {
 		reasoning_limit: t('模型用完了推理额度，未返回答案。请尝试其他模型。'),
 		stale_revision: t('内容已改变，请刷新后重试。'),
 		invalid_config:
-			failure?.message && /[\u3400-\u9fff]/.test(failure.message)
-				? failure.message
-				: t('配置无效，请检查接口地址、API Key、模型名和上下文长度。'),
+			readable ?? t('配置无效，请检查接口地址、API Key、模型名和上下文长度。'),
 		unsupported: failure?.message ?? t('当前模型不支持此项。'),
 		cancelled: t('已取消测试。'),
 		creator_down: t('创作端已断开，重新连接后可再测试。'),
-		internal:
-			failure?.message && /[\u3400-\u9fff]/.test(failure.message)
-				? failure.message
-				: t('操作失败，请重试。'),
+		internal: readable ?? t('操作失败，请重试。'),
 	}[code]
 	return { code, message }
 }
