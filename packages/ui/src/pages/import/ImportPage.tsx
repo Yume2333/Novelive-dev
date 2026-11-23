@@ -118,7 +118,7 @@ export function ImportPage() {
 			const result = await window.novelive.call('import.file', {
 				sourcePath: source,
 				folder: joining ? (joinTarget?.projectDir ?? '') : location,
-				title: title.trim(),
+				title: joining ? (joinTarget?.title ?? '') : title.trim(),
 				encoding,
 				references: joining ? [] : references,
 				join:
@@ -200,7 +200,7 @@ export function ImportPage() {
 
 	const ready =
 		source &&
-		title.trim() &&
+		(joining || title.trim()) &&
 		(joining ? joinTarget : location) &&
 		(!candidates || encoding) &&
 		!busy

@@ -55,6 +55,10 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 		await page.getByRole('link', { name: '书库', exact: true }).click()
 		await page.getByRole('link', { name: '导入原文' }).click()
 		await page.getByRole('button', { name: '选择原文', exact: true }).click()
+		await page.getByRole('textbox', { name: '作品名' }).fill('')
+		await expect(
+			page.getByRole('button', { name: '导入', exact: true }),
+		).toBeDisabled()
 		await page.getByRole('radio', { name: '加入已有系列' }).check()
 		await expect(page.getByRole('textbox', { name: '作品名' })).toHaveCount(0)
 		await page.getByRole('button', { name: '选择已有工程' }).click()
@@ -68,6 +72,9 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 		await expect(
 			page.getByRole('combobox', { name: '系列', exact: true }),
 		).toHaveValue('series')
+		await expect(
+			page.getByRole('button', { name: '导入', exact: true }),
+		).toBeEnabled()
 		const before = JSON.parse(
 			await readFile(join(projectDir, 'series.json'), 'utf8'),
 		)
