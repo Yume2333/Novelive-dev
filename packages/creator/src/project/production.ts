@@ -598,6 +598,7 @@ export function createProduction(
 						cachePath: await cache(project, cachePath),
 					})
 					visual = {
+						...(pool.mattingUnavailable ? { mattingUnavailable: true } : {}),
 						...(imported && {
 							importedIllustrations: {
 								fallback: imported.fallback,

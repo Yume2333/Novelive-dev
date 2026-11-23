@@ -279,6 +279,35 @@ test('a placeholder after retry does not surface the resolved chapter failure', 
 	)
 })
 
+test('local matting unavailable publishes with the reason on each affected chapter', async () => {
+	const sprite = { assetId: 'hero/default', kind: 'character' } as const
+	const worker = new ScriptedWorker({ ch1: [sprite], ch2: [sprite] })
+	const target = open(worker)
+	const issue = '本地去背景不可用；请使用可返回透明底的图片模型。'
+	worker.script('draw:hero/default', {
+		status: 'placeholder',
+		reason: 'matting_unavailable',
+		issue,
+	})
+	target.start(workId, ['ch1', 'ch2'])
+	await throughConfirmations(target)
+	await target.idle()
+
+	for (const chapter of snapshot().chapters)
+		expect(chapter).toMatchObject({
+			status: 'published',
+			issue: `1 张图用了占位图；${issue}`,
+		})
+	expect(target.runLog(workId)).toContainEqual(
+		expect.objectContaining({
+			ref: 'hero/default',
+			status: 'done',
+			errorType: 'matting_unavailable',
+			errorMessage: issue,
+		}),
+	)
+})
+
 test('image failures fall back to placeholders but unsupported capabilities pause the work', async () => {
 	const worker = new ScriptedWorker({
 		ch1: [

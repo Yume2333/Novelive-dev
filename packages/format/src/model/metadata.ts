@@ -101,6 +101,7 @@ export const assetRegistrySchema = obj(
 					type: oneOf(['character', 'location', 'cg', 'expression', 'variant']),
 					path: str({ minLength: 1 }),
 					status: oneOf(['drawn', 'pending', 'placeholder']),
+					mattingUnavailableIssue: opt(str({ minLength: 1 })),
 					aliases: arr(str()),
 				},
 				open,

@@ -50,7 +50,11 @@ export const imageQueueItemSchema = union([
 
 export const imageJobResultSchema = union([
 	obj({ status: lit('drawn') }),
-	obj({ status: lit('placeholder'), issue: str({ minLength: 1 }) }),
+	obj({
+		status: lit('placeholder'),
+		issue: str({ minLength: 1 }),
+		reason: opt(lit('matting_unavailable')),
+	}),
 	obj({ status: lit('unsupported'), issue: str({ minLength: 1 }) }),
 ])
 

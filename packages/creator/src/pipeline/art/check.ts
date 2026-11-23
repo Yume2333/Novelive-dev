@@ -2,6 +2,8 @@ import sharp from 'sharp'
 import { hasTransparency } from '../../models/image'
 
 export type Dimensions = { width: number; height: number }
+export const spriteFrameIssue = '立绘主体缺失，或头部、侧面超出画布。'
+export const derivedFrameIssue = '差分图主体外框偏离基准图。'
 type Pixels = Dimensions & { data: Buffer }
 
 async function pixels(input: Buffer): Promise<Pixels> {
@@ -28,6 +30,74 @@ function bounds({ data, width, height }: Pixels) {
 		}
 	}
 	return { left, right, top, bottom }
+}
+
+function crownConnects(raster: Pixels, base: Pixels, rows: number) {
+	const { width } = base
+	const visited = new Uint8Array(rows * width)
+	const connected: number[] = []
+	const visit = (x: number, y: number) => {
+		if (x < 0 || x >= width || y < 0 || y >= rows) return
+		const pixel = y * width + x
+		if (visited[pixel] || !base.data[pixel * 4 + 3]) return
+		visited[pixel] = 1
+		connected.push(pixel)
+	}
+	for (let x = 0; x < width; x++) {
+		if (!raster.data[(rows * width + x) * 4 + 3]) continue
+		for (let dx = -1; dx <= 1; dx++) visit(x + dx, rows - 1)
+	}
+	for (let i = 0; i < connected.length; i++) {
+		const x = connected[i] % width
+		const y = Math.floor(connected[i] / width)
+		for (let dy = -1; dy <= 1; dy++)
+			for (let dx = -1; dx <= 1; dx++) visit(x + dx, y + dy)
+	}
+	return visited.every((seen, pixel) => seen || !base.data[pixel * 4 + 3])
+}
+
+function restoreExpressionCrown(raster: Pixels, base: Pixels) {
+	const { width, height } = raster
+	const rows = Math.ceil(height * 0.005)
+	const reference = bounds({ ...base, height: rows })
+	const margin = Math.ceil(width * 0.01)
+	if (
+		reference.top === 0 ||
+		reference.top >= rows ||
+		reference.right - reference.left > width * 0.05
+	)
+		return false
+	const edited = bounds({ ...raster, height: rows })
+	if (
+		edited.left < reference.left - margin ||
+		edited.right > reference.right + margin
+	)
+		return false
+	const seamTolerance = Math.ceil(width * 0.003)
+	const covers = (source: Pixels, x: number) =>
+		source.data[(rows * width + x) * 4 + 3] >= 128
+	let overlaps = false
+	for (let x = 0; x < width; x++) {
+		const expected = covers(base, x)
+		const below = covers(raster, x)
+		if (expected && below) overlaps = true
+		if (expected === below) continue
+		let near = false
+		for (
+			let neighbor = Math.max(0, x - seamTolerance);
+			neighbor <= Math.min(width - 1, x + seamTolerance);
+			neighbor++
+		) {
+			if (covers(expected ? raster : base, neighbor)) {
+				near = true
+				break
+			}
+		}
+		if (!near) return false
+	}
+	if (!overlaps || !crownConnects(raster, base, rows)) return false
+	base.data.copy(raster.data, 0, 0, rows * width * 4)
+	return true
 }
 
 function checkerboard({ data, width, height }: Pixels) {
@@ -95,39 +165,65 @@ async function safeArea(input: Buffer) {
 export async function checkImage(
 	input: Buffer,
 	target: Dimensions,
-	options: { transparent: boolean; base?: Buffer; variant: boolean },
+	options: {
+		transparent: boolean
+		base?: Buffer
+		variant: boolean
+		onTransparency?: (hasTransparency: boolean) => void
+	},
 ): Promise<{ png: Buffer } | { issue: string; unsupported?: true }> {
 	try {
 		const { width, height, hasAlpha } = await sharp(input).metadata()
-		if (options.transparent && !hasAlpha)
+		if (options.transparent && !hasAlpha) {
+			options.onTransparency?.(false)
 			return {
 				issue: '透明底能力不支持（图片没有 alpha 通道）；请换图片模型。',
 				unsupported: true,
 			}
+		}
 		if (options.base && (width !== target.width || height !== target.height))
 			return { issue: '差分图尺寸与基准图不一致。' }
 		const fit =
 			Math.abs(width / height / (target.width / target.height) - 1) <= 0.01
 				? 'fill'
 				: 'cover'
-		const png = await sharp(input)
+		let png = await sharp(input)
 			.resize({ ...target, fit, kernel: 'lanczos3' })
 			.png()
 			.toBuffer()
 		if (options.transparent) {
-			if (!(await hasTransparency(png))) return { issue: '全透明像素不足。' }
+			const transparentEnough = await hasTransparency(png)
+			options.onTransparency?.(transparentEnough)
+			if (!transparentEnough) return { issue: '全透明像素不足。' }
 			const raster = await pixels(png)
 			if (checkerboard(raster)) return { issue: '立绘绘制了棋盘格背景。' }
-			const frame = bounds(raster)
+			let frame = bounds(raster)
+			const base = options.base ? await pixels(options.base) : undefined
+			if (
+				base &&
+				!options.variant &&
+				frame.top === 0 &&
+				base.width === raster.width &&
+				base.height === raster.height &&
+				restoreExpressionCrown(raster, base)
+			) {
+				png = await sharp(raster.data, {
+					raw: { width: raster.width, height: raster.height, channels: 4 },
+				})
+					.png()
+					.toBuffer()
+				if (!(await hasTransparency(png))) return { issue: '全透明像素不足。' }
+				frame = bounds(raster)
+			}
 			if (
 				frame.right < 0 ||
 				frame.top === 0 ||
 				frame.left === 0 ||
 				frame.right === target.width - 1
 			)
-				return { issue: '立绘主体缺失，或头部、侧面超出画布。' }
-			if (options.base) {
-				const original = bounds(await pixels(options.base))
+				return { issue: spriteFrameIssue }
+			if (base) {
+				const original = bounds(base)
 				if (
 					(['left', 'right', 'top', 'bottom'] as const).some(
 						(key) =>
@@ -138,7 +234,7 @@ export async function checkImage(
 								0.02,
 					)
 				)
-					return { issue: '差分图主体外框偏离基准图。' }
+					return { issue: derivedFrameIssue }
 			}
 		} else if (!options.variant && !(await safeArea(png))) {
 			return { issue: '主体未达到中央 4:3 安全区的 70% 阈值。' }

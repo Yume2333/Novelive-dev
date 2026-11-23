@@ -14,7 +14,7 @@ export function ProductionNotice({ children }: { children: ReactNode }) {
 				aria-label="关闭提示"
 				onClick={() => setDismissed(true)}
 			>
-				<X size={16} aria-hidden="true" />
+				<X size={16} strokeWidth={1.8} aria-hidden="true" />
 			</button>
 		</div>
 	)

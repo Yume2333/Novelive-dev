@@ -27,6 +27,7 @@ const beforeVisual: ProductionSnapshot = {
 	status: 'confirm',
 	chapters: [...chapters],
 	visual: {
+		mattingUnavailable: true,
 		mainVisuals: candidates('visual'),
 		characters: [
 			{

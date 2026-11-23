@@ -6,6 +6,7 @@ import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
 import sharp from 'sharp'
 import { expect, test, vi } from 'vitest'
+import * as background from '../../packages/creator/src/pipeline/art/background'
 import { checkImage } from '../../packages/creator/src/pipeline/art/check'
 import {
 	applyStagingPatch,
@@ -430,43 +431,248 @@ test('rejects mismatched derivation sizes and RGB transparency, not legitimate R
 	).toEqual({ issue: '差分图尺寸与基准图不一致。' })
 })
 
+test('restores a narrow expression crown without accepting clipped bases or shifted edits', async () => {
+	const target = { width: 400, height: 600 }
+	const sprite = (crown: string, join = 'M199 3h2v4h-2Z') =>
+		sharp(
+			Buffer.from(
+				`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><path fill="#259" d="${crown} ${join} M201 7Q310 80 285 215L350 600H50l65-385Q90 80 199 7Z"/></svg>`,
+			),
+		)
+			.png()
+			.toBuffer()
+	const base = await sprite('M199 1h2v2h-2Z')
+	const drift = await sprite('M199 0h2v3h-2Z')
+	const clipped = await sprite('M175 0h50v3h-50Z')
+	const misalignedSeam = await sprite('M199 0h2v3h-2Z', 'M207 3h2v4h-2Z')
+	const disconnectedTip = await sprite('M194 1h2v1h-2Z M199 1h2v2h-2Z')
+	const checks = { transparent: true, variant: false }
+	const fixed = await checkImage(drift, target, { ...checks, base })
+	expect(fixed).toHaveProperty('png')
+	if ('png' in fixed) {
+		const raw = (input: Buffer) => sharp(input).raw().toBuffer()
+		expect((await raw(fixed.png)).subarray(0, 400 * 4 * 3)).toEqual(
+			(await raw(base)).subarray(0, 400 * 4 * 3),
+		)
+	}
+	const flaredHair = 'M193 3h14v4h-14Z'
+	const hairBase = await sprite('M199 1h2v1l5 1h-12l5-1Z', flaredHair)
+	const hairEdit = await sprite('M199 0h2v2l5 1h-12l5-1Z', flaredHair)
+	expect(
+		await checkImage(hairEdit, target, { ...checks, base: hairBase }),
+	).toHaveProperty('png')
+	for (const [input, reference] of [
+		[drift, undefined],
+		[clipped, base],
+		[misalignedSeam, base],
+		[drift, disconnectedTip],
+	] as const) {
+		expect(
+			await checkImage(input, target, { ...checks, base: reference }),
+		).toEqual({
+			issue: '立绘主体缺失，或头部、侧面超出画布。',
+		})
+	}
+})
+
+test('retries an expression with only the base after a composition failure', async () => {
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(async (_prompt, _refs, { width, height }) => ({
+			bytes:
+				render.mock.calls.length === 2
+					? await sharp(
+							Buffer.from(
+								`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width / 2}" height="${height}" fill="#456def"/></svg>`,
+							),
+						)
+							.png()
+							.toBuffer()
+					: await picture(width, height, true),
+		}))
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: 'Ada raises her eyebrows.' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay)
+			const path = 'assets/style.png'
+			await project.writeFile(path, await picture(320, 180, false))
+			const styled = {
+				...bible,
+				style: { ...bible.style, references: [{ path, description: 'Style' }] },
+			}
+			const [base, expression] = await art.register(
+				[
+					{ id: 'ada/uniform/neutral', kind: 'character', description: 'Ada' },
+					{
+						id: 'ada/uniform/curious',
+						kind: 'expression',
+						description: 'Curious',
+					},
+				],
+				styled,
+			)
+			expect(await art.draw(base, styled)).toEqual({ status: 'drawn' })
+			expect(await art.draw(expression, styled)).toEqual({ status: 'drawn' })
+			expect(render.mock.calls[1][1]).toHaveLength(2)
+			expect(render.mock.calls[2][1]).toEqual([render.mock.calls[1][1][0]])
+			expect(render.mock.calls[2][0]).toContain(
+				'pixel-aligned outside the face',
+			)
+		})
+	} finally {
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('removes an opaque sprite background before validating and auditing the result', async () => {
 	const svg = Buffer.from(
 		'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><path fill="#e8dfd7" d="M0 0h300v450H0z"/><ellipse fill="#3d2536" cx="150" cy="122" rx="49" ry="63"/><ellipse fill="#e1a07f" cx="150" cy="126" rx="36" ry="48"/><path fill="#5230a0" d="M112 175q-44 12-51 81l18 92 22-14 2 116h94l2-116 22 14 18-92q-7-69-51-81z"/></svg>',
 	)
 	const opaque = await sharp(svg).removeAlpha().png().toBuffer()
-	const renderer = vi
-		.spyOn(artModels, 'imageRenderer')
-		.mockReturnValue(async () => ({ bytes: opaque }))
+	const landscape = await picture(320, 180, false)
+	let nativeCandidate = false
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(
+			async (prompt, refs, { width, height }, transparent) => ({
+				bytes: !transparent
+					? landscape
+					: nativeCandidate &&
+							(refs.length
+								? prompt.includes('银色外套')
+								: prompt.includes('造型候选 1'))
+						? await picture(width, height, true)
+						: opaque,
+			}),
+		)
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
 	const model = vi
 		.spyOn(artModels, 'artJson')
 		.mockImplementation(
 			async (_connection, prompt, _schema, _options, images) => {
-				if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+				if (!prompt.startsWith('Visually audit'))
+					return {
+						content: prompt.includes('银色外套')
+							? '银色外套'
+							: prompt.includes('造型候选 1')
+								? '造型候选 1'
+								: 'Ada',
+					}
 				const { data, info } = await sharp(images?.[0])
 					.raw()
 					.toBuffer({ resolveWithObject: true })
-				expect(info.channels).toBe(4)
-				expect(data[3]).toBe(0)
-				const center =
-					Math.floor(info.height / 2) * info.width + Math.floor(info.width / 2)
-				expect(data[center * 4 + 3]).toBe(255)
+				if (info.height > info.width) {
+					expect(info.channels).toBe(4)
+					expect(data[3]).toBe(0)
+					const center =
+						Math.floor(info.height / 2) * info.width +
+						Math.floor(info.width / 2)
+					expect(data[center * 4 + 3]).toBe(255)
+				}
 				return { pass: true, failedChecks: [], feedback: '' }
 			},
 		)
 	try {
 		await projectTest(async (project) => {
 			const art = service(project, replay)
+			const [ada] = bible.characters
+			const twoCostumes = {
+				...bible,
+				characters: [
+					{
+						...ada,
+						costumes: [
+							...(ada.costumes ?? []),
+							{ id: 'coat', description: '外套' },
+						],
+					},
+				],
+			}
+			const portraitRequests = () =>
+				render.mock.calls.filter(([, , , portrait]) => portrait)
+			vi.stubEnv('NL_MATTING_DIR', join(project.root, 'missing-matting'))
+			const pool = await art.candidates(
+				twoCostumes,
+				['c1'],
+				'assets/main.webp',
+				[],
+			)
+			expect(pool).toMatchObject({ mattingUnavailable: true, characters: [] })
+			expect(portraitRequests()).toHaveLength(2)
+			const illustration = 'source/references/illustration-1.png'
+			await project.writeFile(illustration, landscape)
+			render.mockClear()
+			nativeCandidate = true
+			const withIllustration = await art.candidates(
+				{
+					...twoCostumes,
+					characters: [
+						...twoCostumes.characters,
+						{
+							...ada,
+							id: 'bea',
+							name: 'Bea',
+							costumes: [{ id: 'jacket', description: '银色外套' }],
+						},
+					],
+				},
+				['c1'],
+				'assets/main.webp',
+				[],
+				new Map(
+					['ada', 'bea'].map((id) => [
+						id,
+						{ id: 'illustration-1', cachePath: illustration },
+					]),
+				),
+			)
+			expect(withIllustration).toMatchObject({
+				mattingUnavailable: true,
+				characters: [
+					{ costumeId: 'uniform', candidates: [{ id: 'costume-1' }] },
+					{
+						characterId: 'bea',
+						costumeId: 'jacket',
+						candidates: [{ id: 'costume-epub' }],
+					},
+				],
+			})
+			expect(portraitRequests().map(([, refs]) => refs.length)).toEqual([
+				1, 0, 0, 0, 1, 1, 0, 0,
+			])
+			nativeCandidate = false
+			const [fallback] = await art.register(
+				[{ id: 'ada/coat/neutral', kind: 'character', description: 'Ada' }],
+				bible,
+			)
+			await expect(art.draw(fallback, bible)).resolves.toEqual({
+				status: 'placeholder',
+				reason: 'matting_unavailable',
+				issue: '本地去背景不可用；请使用可返回透明底的图片模型。',
+			})
+			const registry = await art.registry()
+			const saved = registry.entries.find(({ id }) => id === fallback.assetId)
+			if (!saved) throw new Error('Missing registered sprite')
+			expect(saved?.status).toBe('placeholder')
+			expect(
+				await sharp(await project.readFile(saved.path)).metadata(),
+			).toMatchObject({
+				format: 'webp',
+				hasAlpha: true,
+			})
+			vi.unstubAllEnvs()
 			const [sprite] = await art.register(
 				[{ id: 'ada/uniform/neutral', kind: 'character', description: 'Ada' }],
 				bible,
 			)
-			vi.stubEnv('NL_MATTING_DIR', join(project.root, 'missing-matting'))
-			await expect(art.draw(sprite, bible)).resolves.toEqual({
-				status: 'unsupported',
-				issue: '本地去背景不可用；请使用可返回透明底的图片模型。',
-			})
-			vi.unstubAllEnvs()
 			expect(await art.draw(sprite, bible)).toEqual({ status: 'drawn' })
 		})
 	} finally {
@@ -475,6 +681,531 @@ test('removes an opaque sprite background before validating and auditing the res
 		model.mockRestore()
 	}
 }, 15_000)
+
+test('an opaque RGBA response counts toward the unavailable-matting candidate limit', async () => {
+	const rgb = await picture(320, 480, false)
+	const rgba = await sharp(rgb).ensureAlpha().png().toBuffer()
+	const landscape = await picture(320, 180, false)
+	let portraits = 0
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(
+			async (_prompt, _refs, { width, height }, transparent) => ({
+				bytes: !transparent
+					? landscape
+					: ++portraits === 1
+						? rgb
+						: portraits === 2
+							? rgba
+							: await picture(width, height, true),
+			}),
+		)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: 'Ada' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const pool = await service(project, replay).candidates(
+				bible,
+				['c1'],
+				'assets/main.webp',
+			)
+			expect(pool).toMatchObject({ mattingUnavailable: true, characters: [] })
+			expect(portraits).toBe(2)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
+test('skips an isolated opaque RGBA candidate when matting is unavailable and retries are off', async () => {
+	const rgb = await picture(320, 480, false)
+	const rgba = await sharp(rgb).ensureAlpha().png().toBuffer()
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const responses = [rgb, rgb, rgba, portrait, portrait]
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(async (_prompt, _refs, _size, transparent) => {
+			const bytes = transparent ? responses.shift() : landscape
+			if (!bytes) throw new Error('Unexpected extra portrait request')
+			return { bytes }
+		})
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: { content: 'Ada' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay, undefined, undefined, undefined, 0)
+			const [ada] = bible.characters
+			const pool = await art.candidates(
+				{ ...bible, characters: [ada, { ...ada, id: 'bea', name: 'Bea' }] },
+				['c1'],
+				'assets/main.webp',
+			)
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [
+					{
+						characterId: 'bea',
+						candidates: [{ id: 'costume-2' }, { id: 'costume-3' }],
+					},
+				],
+			})
+			expect(responses).toHaveLength(0)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
+test('keeps a reviewed transparent fallback when later opaque responses exhaust the budget', async () => {
+	const rgb = await picture(320, 480, false)
+	const rgba = await sharp(rgb).ensureAlpha().png().toBuffer()
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const responses = [rgb, rgb, portrait, rgba, rgba]
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, _refs, _size, transparent) => {
+			const bytes = transparent ? responses.shift() : landscape
+			if (!bytes) throw new Error('Unexpected extra portrait request')
+			return { bytes }
+		})
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+			return prompt.includes('造型候选')
+				? {
+						pass: false,
+						failedChecks: ['style'],
+						feedback: 'Try another style',
+					}
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay, undefined, undefined, undefined, 2)
+			const [ada] = bible.characters
+			const pool = await art.candidates(
+				{ ...bible, characters: [ada, { ...ada, id: 'bea', name: 'Bea' }] },
+				['c1'],
+				'assets/main.webp',
+			)
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [{ characterId: 'bea', candidates: [{ id: 'costume-1' }] }],
+			})
+			const { cachePath } = pool.characters[0].candidates[0]
+			const alpha = await sharp(await project.readFile(cachePath))
+				.extractChannel('alpha')
+				.raw()
+				.toBuffer()
+			expect(alpha.includes(0)).toBe(true)
+			expect(responses).toHaveLength(0)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
+test('retries after an unmattable image instead of immediately offering a rejected fallback', async () => {
+	const opaque = await picture(320, 480, false)
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const approved = await sharp(portrait)
+		.negate({ alpha: false })
+		.png()
+		.toBuffer()
+	const responses = [portrait, opaque, approved, opaque, opaque]
+	const portraitPrompts: string[] = []
+	let portraitReviews = 0
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (prompt, _refs, _size, transparent) => {
+			if (transparent) portraitPrompts.push(prompt)
+			const bytes = transparent ? responses.shift() : landscape
+			if (!bytes) throw new Error('Unexpected extra portrait request')
+			return { bytes }
+		})
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+			return prompt.includes('造型候选') && ++portraitReviews === 1
+				? {
+						pass: false,
+						failedChecks: ['style'],
+						feedback: 'Try another style',
+					}
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const art = service(project, replay, undefined, undefined, undefined, 2)
+			const pool = await art.candidates(bible, ['c1'], 'assets/main.webp')
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [{ characterId: 'ada', candidates: [{ id: 'costume-1' }] }],
+			})
+			expect(portraitReviews).toBe(2)
+			expect(portraitPrompts[1]).toContain('Try another style')
+			expect(portraitPrompts[2]).toContain('Try another style')
+			expect(responses).toHaveLength(0)
+			const { cachePath } = pool.characters[0].candidates[0]
+			const saved = sharp(await project.readFile(cachePath))
+			const { width, height } = await saved.metadata()
+			const pixel = await saved
+				.extract({
+					left: Math.floor(width / 2),
+					top: Math.floor(height / 2),
+					width: 1,
+					height: 1,
+				})
+				.raw()
+				.toBuffer()
+			expect(pixel[0]).toBeGreaterThan(128)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
+test.each([
+	{ terminal: 'both repair prompts are moderated', first: 'costume-epub' },
+	{ terminal: 'the repair reference is refused', first: 'costume-1' },
+	{
+		terminal: 'the plain replacement fails every technical check',
+		first: 'costume-epub',
+		replacementFails: true,
+	},
+])('offers $first after $terminal', async ({ first, replacementFails }) => {
+	const opaque = await picture(320, 480, false)
+	const landscape = await picture(320, 180, false)
+	const portrait = await picture(320, 480, true)
+	const moderated = {
+		error: { code: 'moderation', message: 'Content rejected' },
+	} as const
+	const keepEpub = first === 'costume-epub'
+	const blank = await sharp({
+		create: {
+			width: 320,
+			height: 480,
+			channels: 4,
+			background: { r: 0, g: 0, b: 0, alpha: 0 },
+		},
+	})
+		.png()
+		.toBuffer()
+	const responses: Awaited<
+		ReturnType<ReturnType<typeof artModels.imageRenderer>>
+	>[] = [
+		{ bytes: portrait },
+		...(keepEpub
+			? [{ bytes: opaque }, moderated, moderated]
+			: [
+					{ bytes: opaque },
+					{ ...moderated, referenceModerated: true } as const,
+					{ bytes: portrait },
+				]),
+		...(replacementFails
+			? Array.from({ length: 3 }, () => ({ bytes: blank }))
+			: []),
+		{ bytes: opaque },
+		{ bytes: opaque },
+	]
+	const render = vi
+		.fn<ReturnType<typeof artModels.imageRenderer>>()
+		.mockImplementation(async (_prompt, _refs, _size, transparent) => {
+			const response = transparent ? responses.shift() : { bytes: landscape }
+			if (!response) throw new Error('Unexpected extra portrait request')
+			return response
+		})
+	const renderer = vi.spyOn(artModels, 'imageRenderer').mockReturnValue(render)
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockRejectedValue(new background.MattingUnavailableError(undefined))
+	let portraitReviews = 0
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+			return prompt.includes('造型候选') && ++portraitReviews === 1
+				? {
+						pass: false,
+						failedChecks: ['style'],
+						feedback: 'Try another style',
+					}
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const illustration = 'source/references/illustration-1.png'
+			await project.writeFile(illustration, landscape)
+			const art = service(project, replay, undefined, undefined, undefined, 2)
+			const pool = await art.candidates(
+				bible,
+				['c1'],
+				'assets/main.webp',
+				[],
+				new Map([['ada', { id: 'illustration-1', cachePath: illustration }]]),
+			)
+			expect(pool).toMatchObject({
+				mattingUnavailable: true,
+				characters: [{ characterId: 'ada', candidates: [{ id: first }] }],
+			})
+			expect(
+				render.mock.calls
+					.filter(([, , , transparent]) => transparent)
+					.map(([, refs]) => refs.length),
+			).toEqual([
+				...(keepEpub ? [1, 1, 1, 1] : [1, 1, 1, 0]),
+				...(replacementFails ? [0, 0, 0] : []),
+				0,
+				0,
+			])
+			expect(portraitReviews).toBe(keepEpub ? 1 : 2)
+		})
+	} finally {
+		renderer.mockRestore()
+		matte.mockRestore()
+		model.mockRestore()
+	}
+})
+
+test('offers all technically valid costume options after visual rejection when matting works', async () => {
+	const opaque = await picture(320, 480, false)
+	const portrait = await picture(320, 480, true)
+	const landscape = await picture(320, 180, false)
+	const matte = vi
+		.spyOn(background, 'removeBackground')
+		.mockResolvedValue(portrait)
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, _refs, _size, transparent) => ({
+			bytes: transparent ? opaque : landscape,
+		}))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) => {
+			if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+			return prompt.includes('造型候选')
+				? {
+						pass: false,
+						failedChecks: ['style'],
+						feedback: 'Try another style',
+					}
+				: { pass: true, failedChecks: [], feedback: '' }
+		})
+	try {
+		await projectTest(async (project) => {
+			const illustration = 'source/references/illustration-1.png'
+			await project.writeFile(illustration, landscape)
+			const art = service(project, replay, undefined, undefined, undefined, 0)
+			const pool = await art.candidates(
+				bible,
+				['c1'],
+				'assets/main.webp',
+				[],
+				new Map([['ada', { id: 'illustration-1', cachePath: illustration }]]),
+			)
+			expect(pool.mattingUnavailable).toBeUndefined()
+			expect(pool.characters[0].candidates.map(({ id }) => id)).toEqual([
+				'costume-epub',
+				'costume-2',
+				'costume-3',
+			])
+			expect(matte).toHaveBeenCalledTimes(3)
+		})
+	} finally {
+		matte.mockRestore()
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+}, 30_000)
+
+test.each([
+	...[
+		'plain moderation',
+		'plain moderation before a cached choice',
+		'EPUB moderation',
+		'EPUB reference refusal',
+		'opaque budget',
+		'matting unavailable',
+		'technical retries',
+		'EPUB provider unsupported',
+	].flatMap((stop) => [false, true].map((retained) => ({ stop, retained }))),
+	{ stop: 'EPUB approved before provider unsupported', retained: true },
+])(
+	'resolves $stop with retained=$retained',
+	async ({ stop, retained }) => {
+		const opaque = await picture(320, 480, false)
+		const portrait = await picture(320, 480, true)
+		const landscape = await picture(320, 180, false)
+		const moderation = {
+			error: { code: 'moderation', message: 'Refused' },
+		} as const
+		const invalid = { bytes: Buffer.from('invalid image') }
+		const epub = stop.startsWith('EPUB')
+		const approved = stop === 'EPUB approved before provider unsupported'
+		const capabilityError = stop === 'EPUB provider unsupported' || approved
+		const cached = stop.endsWith('cached choice')
+		const opaqueResponse = { bytes: opaque }
+		const unsupported = {
+			error: { code: 'unsupported', message: 'Unsupported' },
+		} as const
+		const failures = {
+			'plain moderation': [moderation, moderation],
+			'plain moderation before a cached choice': [moderation, moderation],
+			'EPUB moderation': [moderation, moderation],
+			'EPUB reference refusal': [
+				{ ...moderation, referenceModerated: true } as const,
+			],
+			'opaque budget': [opaqueResponse, opaqueResponse],
+			'matting unavailable': [opaqueResponse],
+			'technical retries': [invalid, invalid, invalid],
+			'EPUB provider unsupported': [unsupported],
+			'EPUB approved before provider unsupported': [unsupported],
+		}
+		const primary = failures[stop as keyof typeof failures]
+		const pending = [
+			...(retained && !cached ? [{ bytes: portrait }] : []),
+			...primary,
+		]
+		let portraitRequests = 0
+		let approvedReviews = 0
+		const renderer = vi
+			.spyOn(artModels, 'imageRenderer')
+			.mockReturnValue(async (_prompt, refs, _size, transparent) => {
+				if (!transparent) return { bytes: landscape }
+				portraitRequests++
+				if (capabilityError && !approved && !refs.length)
+					return { bytes: portrait }
+				return pending.shift() ?? opaqueResponse
+			})
+		const matte = vi
+			.spyOn(background, 'removeBackground')
+			.mockRejectedValue(new background.MattingUnavailableError(undefined))
+		const model = vi
+			.spyOn(artModels, 'artJson')
+			.mockImplementation(async (_connection, prompt) => {
+				if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+				if (approved && prompt.includes('造型候选')) {
+					approvedReviews++
+					return { pass: true, failedChecks: [], feedback: '' }
+				}
+				return prompt.includes('造型候选')
+					? {
+							pass: false,
+							failedChecks: ['style'],
+							feedback: 'Try another style',
+						}
+					: { pass: true, failedChecks: [], feedback: '' }
+			})
+		try {
+			await projectTest(async (project) => {
+				const illustration = 'source/references/illustration-1.png'
+				if (epub) await project.writeFile(illustration, landscape)
+				if (retained && cached)
+					await project.writeFile(
+						projectFiles
+							.style({ level: 'series' })
+							.path.replace(
+								'bible/style.json',
+								'candidates/characters/ada/uniform/costume-2.webp',
+							),
+						await sharp(portrait).webp().toBuffer(),
+					)
+				const art = service(
+					project,
+					replay,
+					undefined,
+					undefined,
+					undefined,
+					stop === 'matting unavailable' ? 1 : 2,
+				)
+				const pool = art.candidates(
+					bible,
+					['c1'],
+					'assets/main.webp',
+					[],
+					epub
+						? new Map([
+								['ada', { id: 'illustration-1', cachePath: illustration }],
+							])
+						: undefined,
+				)
+				if (capabilityError) {
+					await expect(pool).rejects.toThrow('Unsupported')
+					expect(portraitRequests).toBe(retained ? 2 : 1)
+					expect(approvedReviews).toBe(approved ? 1 : 0)
+				} else if (retained) {
+					const { characters } = await pool
+					expect(characters).toMatchObject([
+						{
+							characterId: 'ada',
+							candidates: [
+								{
+									id: epub
+										? 'costume-epub'
+										: cached
+											? 'costume-2'
+											: 'costume-1',
+								},
+							],
+						},
+					])
+				} else if (
+					epub ||
+					stop === 'opaque budget' ||
+					stop === 'matting unavailable'
+				) {
+					expect((await pool).characters).toEqual([])
+				} else {
+					const message =
+						stop === 'technical retries' ? '图片无法解码。' : 'Refused'
+					await expect(pool).rejects.toThrow(message)
+				}
+				expect(portraitRequests).toBeGreaterThanOrEqual(primary.length)
+			})
+		} finally {
+			model.mockRestore()
+			matte.mockRestore()
+			renderer.mockRestore()
+		}
+	},
+	30_000,
+)
 
 test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(

@@ -60,6 +60,7 @@ export const productionSnapshotSchema = obj({
 	visual: nullable(
 		obj({
 			mainVisuals: arr(candidateSchema, { minItems: 3, maxItems: 3 }),
+			mattingUnavailable: opt(lit(true)),
 			characters: arr(
 				obj({
 					characterId: entityId,
