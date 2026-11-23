@@ -2,7 +2,7 @@
 
 **Effort:** m1b-production
 **Executor:** spine (paid calls)
-**Blocked by:** 09, 10, m1a-project/07
+**Blocked by:** 09, 10
 **Covers:** W4
 **Task type:** spike
 **Files:** .workflow/evidence/m1b/owner/
@@ -13,6 +13,6 @@
 
 - [ ] 一个所有者选书完整真跑；将录制目录设在仓库外，不提交原文/请求/私有模型结果。没有资料或余额则记录阻塞，不以合成用例替代。
 
-## Blocked
+## Progress
 
-M1a/07 的 0.90 门槛未通过，待[所有者评审](../../owner-review.md)；不再付费跑 M1a W4。M1b 已完成的离线任务不受影响，不依赖此项的准备可继续；本任务的真书验收仍等待前置，未启动付费。
+M1a 恢复与综合代码已在 `f9dd863` 合入 main（[#86](https://github.com/Yume2333/Novelive-dev/pull/86)），满足本任务的代码前提。M1a/07 的 0.90 门槛仍未通过，待[所有者评审](../../owner-review.md)，不再付费跑 M1a W4；该比较验收不再是本任务的前置。本任务的真书验收仍须由获授权的串行主线按原 Check 执行，尚未启动付费。
