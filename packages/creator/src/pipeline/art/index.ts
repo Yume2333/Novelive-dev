@@ -695,6 +695,9 @@ export class ArtProduction {
 					'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
 					preview.transparencyHint,
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
+					refs.length < auditRefs.length
+						? 'The painter cannot see the style images. Describe style differences and concrete corrections in words; do not refer to reference images by number.'
+						: undefined,
 					`Original image brief (verify independently of the painter's rewrite): ${drawing.description}`,
 					describe(2, '', auditDrawing),
 				]

@@ -525,6 +525,9 @@ test('retries an expression with only the base after a composition failure', asy
 				prompt.startsWith('Visually audit'),
 			)
 			expect(audit?.[1]).toContain('Image 2 is a style reference only.')
+			expect(audit?.[1]).toContain(
+				'Describe style differences and concrete corrections in words; do not refer to reference images by number.',
+			)
 			expect(audit?.[4]?.slice(1)).toEqual([await project.readFile(path)])
 			expect(await art.draw(expression, styled)).toEqual({ status: 'drawn' })
 			expect(render.mock.calls[1][1]).toHaveLength(2)
