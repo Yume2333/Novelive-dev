@@ -285,6 +285,37 @@ test('groups beats only within a chapter and preserves conflicting payoff or tim
 	})
 })
 
+test('does not merge similar same-chapter timeline actions with different outcomes', () => {
+	const bible = {
+		...emptyBible,
+		character: [
+			{
+				id: 'ada',
+				name: 'Ada Lin',
+				aliases: ['Captain Lin'],
+				status: 'confirmed' as const,
+			},
+			{
+				id: 'mei',
+				name: 'Mei Chen',
+				aliases: [],
+				status: 'confirmed' as const,
+			},
+		],
+	}
+	const patch: BiblePatch = ['saves', 'loses'].map((outcome) => ({
+		kind: 'timeline',
+		op: 'add',
+		entry: {
+			id: outcome,
+			chapterId: 'c1',
+			event: `Ada Lin carries Mei Chen through the flooded underground passage to the old wooden bridge and ${outcome} her.`,
+			status: 'candidate',
+		},
+	}))
+	expect(canonicalizeAdditions(patch, bible, ['c1'])).toEqual(patch)
+})
+
 test.each([false, true])(
 	'keeps distinct homonyms separate (same alias: %s)',
 	(sameAlias) => {

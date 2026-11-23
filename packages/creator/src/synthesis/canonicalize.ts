@@ -416,7 +416,8 @@ export function canonicalizeAdditions(
 							!item.entry.storyTime ||
 							prior.entry.storyTime === item.entry.storyTime) &&
 						(participants.size
-							? sameAction(action, previous)
+							? (action.startsWith(previous) || previous.startsWith(action)) &&
+								sameAction(action, previous)
 							: !!action && action === previous)) ||
 					(prior.kind === 'foreshadowing' &&
 						item.kind === 'foreshadowing' &&
