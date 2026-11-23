@@ -12,7 +12,10 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 import { afterEach, expect, test } from 'vitest'
 import { FileProgressStore } from '../../apps/desktop/src/save-data'
+import { packageProgressId } from '../../apps/desktop/src/save-data/package-writes'
 import { workProgress } from '../../packages/creator/src/contract/player-progress'
+import { InstalledPackages } from '../../packages/creator/src/share/installed'
+import { exportProject } from '../../packages/creator/src/share/project'
 import type {
 	PlaybackBeat,
 	SentenceRef,
@@ -25,6 +28,7 @@ import {
 	emptyStage,
 	stageAssets,
 } from '../../packages/player/src/stage/state'
+import { playerWorkId, seedPlayerProject } from '../fixtures/minimal-player'
 
 const directories: string[] = []
 afterEach(async () => {
@@ -199,49 +203,77 @@ test('blocks writes for an unresolved migration until its backup is recovered', 
 })
 
 test.each([false, true])(
-	'recovers an interrupted migration (library published: %s)',
+	'reopens the installed library and recovers interrupted saves (index replaced: %s)',
 	async (published) => {
 		const { userData, store } = await createStore()
-		await store.saveSlot(
-			workId,
-			quick,
-			snapshot(first),
-			await capture('#123456'),
-		)
-		const before = await store.load(workId)
+		const documents = join(userData, 'Documents')
+		const projectRoot = join(userData, 'project')
+		const release1 = join(userData, 'first.novelive')
+		const release2 = join(userData, 'second.novelive')
+		const scope = { level: 'series' } as const
+		const image = await capture('#123456')
+		await seedPlayerProject(projectRoot, image, image)
+		await exportProject({ projectRoot, destination: release1, scope })
+		await exportProject({ projectRoot, destination: release2, scope })
+		const library = await InstalledPackages.open(userData, documents)
+		const trash = async () => {}
+		await library.install(release1, [], async (_, publish) => publish(), trash)
+		const key = packageProgressId(playerWorkId)
+		await store.saveSlot(key, quick, snapshot(first), image)
+		const before = await store.load(key)
 		const staged = Promise.withResolvers<void>()
 		const release = Promise.withResolvers<void>()
-		const migration = store.migrateAndPublish(
-			[
-				{
-					workId,
-					fromVersion: 1,
-					toVersion: 2,
-					chapters: [[textBeat(otherChapter)]],
-				},
-			],
-			async () => {
-				staged.resolve()
-				await release.promise
-			},
+		const interrupted = new Error('simulated interruption before publication')
+		const migration = library.install(
+			release2,
+			[{ workId: playerWorkId, installedVersion: 2, incomingVersion: 3 }],
+			(migrations, publish) =>
+				store.migrateAndPublish(
+					migrations.map(
+						({ workId, installedVersion, incomingVersion, chapters }) => ({
+							workId: packageProgressId(workId),
+							fromVersion: installedVersion,
+							toVersion: incomingVersion,
+							chapters,
+						}),
+					),
+					async () => {
+						if (published) await publish()
+						staged.resolve()
+						await release.promise
+						if (!published) throw interrupted
+					},
+				),
+			trash,
 		)
 		try {
 			await Promise.race([staged.promise, migration])
+			const installed = await InstalledPackages.open(userData, documents)
+			expect(installed.list()).toMatchObject([
+				{ workId: playerWorkId, version: published ? 3 : 2 },
+			])
 			const restarted = new FileProgressStore(userData)
-			expect((await restarted.load(workId))?.saves).toEqual([])
+			expect((await restarted.load(key))?.saves).toEqual([])
+			const versions = new Map(
+				installed
+					.list()
+					.map(({ workId, version }) => [packageProgressId(workId), version]),
+			)
 			const hasVersion = (id: string, version: number) =>
-				id === workId && version === (published ? 2 : 1)
+				versions.get(id) === version
 			await restarted.recoverPackageMigration(hasVersion)
-			expect(await restarted.load(workId)).toEqual(
+			expect(await restarted.load(key)).toEqual(
 				published ? { ...before, saves: [] } : before,
 			)
-			expect(await restarted.loadLegacySaves(workId)).toMatchObject(
-				published ? [{ version: 1 }] : [],
+			expect(await restarted.loadLegacySaves(key)).toMatchObject(
+				published ? [{ version: 2 }] : [],
 			)
 			await restarted.recoverPackageMigration(hasVersion)
 		} finally {
 			release.resolve()
-			await migration
+			await migration.catch((error) => {
+				if (error !== interrupted) throw error
+			})
 		}
 	},
 )
