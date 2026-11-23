@@ -328,3 +328,193 @@ test('M1b Electron refuses a zero-budget production request before transport', a
 		await rm(root, { recursive: true, force: true })
 	}
 })
+
+test('M1b creation surfaces a writing budget pause and resumes without repeat dispatch', async () => {
+	test.setTimeout(75_000)
+	const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-soft-stop-'))
+	const cassette = join(root, 'cassette')
+	const projects = join(root, 'projects')
+	const source = join(root, '纸船与灯火.txt')
+	const project = join(projects, '纸船与灯火')
+	const writer = 'loopback-writing-budget'
+	const script = 'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。'
+	const calls: unknown[] = []
+	const unexpected: string[] = []
+	const provider = createServer(async (request, response) => {
+		if (request.url !== '/v1/chat/completions') {
+			unexpected.push(request.url ?? '')
+			response.writeHead(400).end('Unexpected provider request')
+			return
+		}
+		const chunks = []
+		for await (const chunk of request) chunks.push(chunk)
+		const body = JSON.parse(Buffer.concat(chunks).toString())
+		if (body.model !== writer) {
+			unexpected.push(`${request.url}: ${body.model}`)
+			response.writeHead(400).end('Unexpected provider request')
+			return
+		}
+		calls.push(body.messages)
+		const initial = calls.length === 1
+		const events = [
+			{
+				choices: [
+					{
+						index: 0,
+						delta: {
+							role: 'assistant',
+							content: initial ? script.replace('p0001', 'p9999') : script,
+						},
+						finish_reason: null,
+					},
+				],
+			},
+			{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+			{
+				choices: [],
+				usage: {
+					prompt_tokens: initial ? 79_900 : 100,
+					completion_tokens: 100,
+				},
+			},
+		]
+		response
+			.writeHead(200, { 'content-type': 'text/event-stream' })
+			.end(
+				events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('') +
+					'data: [DONE]\n\n',
+			)
+	})
+	try {
+		await Promise.all([
+			mkdir(projects),
+			mkdir(cassette),
+			writeFile(source, original),
+		])
+		await combineCassettes(cassette)
+		await new Promise<void>((resolve, reject) => {
+			provider.once('error', reject)
+			provider.listen(0, '127.0.0.1', resolve)
+		})
+		const address = provider.address()
+		if (!address || typeof address === 'string')
+			throw new Error('Missing stub address')
+		const baseUrl = `http://127.0.0.1:${address.port}/v1`
+		const launch = (cap: string) =>
+			electron.launch({
+				executablePath: require('electron'),
+				args: ['apps/desktop', `--user-data-dir=${join(root, 'profile')}`],
+				env: {
+					...process.env,
+					ELECTRON_RENDERER_URL: '',
+					NL_REPLAY: 'record',
+					NL_PRODUCTION_CASSETTE_DIR: cassette,
+					NL_PRODUCTION_FALLBACK_DIR: '',
+					NL_IMAGE_BASE_URL: baseUrl,
+					NL_IMAGE_API_KEY: 'offline-placeholder',
+					NL_RUN_TOKEN_CAP: cap,
+					NL_RUN_TOKEN_SOFT_FRACTION: '0.8',
+					NL_RUN_IMAGE_CAP: '0',
+					NL_USAGE_CSV: '',
+				},
+			})
+		const openQueue = async (page: Page) => {
+			await page.getByRole('button', { name: /^全局制作状态：/ }).click()
+			return page.getByRole('dialog', { name: '制作队列' })
+		}
+		const app = await launch('100000')
+		try {
+			await app.evaluate(
+				({ dialog }, answers) => {
+					dialog.showOpenDialog = async () => ({
+						canceled: false,
+						filePaths: [answers.shift() ?? ''],
+					})
+				},
+				[source, projects],
+			)
+			const page = await app.firstWindow()
+			await expect(page.getByText('创作端已就绪')).toBeAttached()
+			await page.evaluate(
+				({ models }) =>
+					window.novelive.call('config.update', { models }).promise,
+				{
+					models: {
+						fast: { ...configuration.models.fast, baseUrl },
+						main: { ...configuration.models.main, baseUrl },
+						writing: {
+							...configuration.models.writing,
+							baseUrl,
+							model: writer,
+						},
+						visual: { ...configuration.models.visual, baseUrl },
+						image: { ...configuration.models.image, baseUrl },
+					},
+				},
+			)
+			await page.getByRole('link', { name: '导入原文' }).click()
+			await page.getByRole('button', { name: '选择原文' }).click()
+			await page.getByRole('button', { name: '选择文件夹' }).click()
+			await page.getByRole('button', { name: '导入', exact: true }).click()
+			await page.getByRole('button', { name: '跳过核对' }).click()
+			await page
+				.getByRole('link', { name: '选择主视觉' })
+				.click({ timeout: 25_000 })
+			await page
+				.getByRole('group', { name: '主视觉', exact: true })
+				.getByRole('radio')
+				.first()
+				.check()
+			await page
+				.getByRole('group', { name: /Ada/ })
+				.getByRole('radio')
+				.first()
+				.check()
+			await page.getByRole('button', { name: '确认并制作第一章' }).click()
+			await expect(page.getByText(/软停止线 80000 tokens/)).toBeVisible()
+			const queue = await openQueue(page)
+			await expect(queue.getByText('已暂停：模型预算不足')).toBeVisible()
+			await queue
+				.getByRole('listitem')
+				.filter({ hasText: '已暂停：模型预算不足' })
+				.hover()
+			expect(calls).toHaveLength(1)
+			expect(unexpected).toEqual([])
+			await capture(page, '08-writing-budget-paused')
+		} finally {
+			await app.close()
+		}
+		const resumed = await launch('200000')
+		try {
+			const page = await resumed.firstWindow()
+			await expect(page.getByText('创作端已就绪')).toBeAttached()
+			const queue = await openQueue(page)
+			await expect(queue.getByText('已暂停：模型预算不足')).toBeVisible()
+			await queue
+				.getByRole('listitem')
+				.filter({ hasText: '已暂停：模型预算不足' })
+				.hover()
+			await queue.getByRole('button', { name: '继续制作' }).click()
+			await expect
+				.poll(() =>
+					readFile(
+						join(project, 'source/production/ch0001/draft.nvs'),
+						'utf8',
+					).catch(() => ''),
+				)
+				.toContain('暮色中，一只纸船从桥下漂过。')
+			await expect(queue.getByText('已暂停：模型预算不足')).toHaveCount(0)
+			expect(calls).toHaveLength(2)
+			expect(JSON.stringify(calls[1])).toContain(
+				'Repair only the supplied scene',
+			)
+			await capture(page, '09-writing-budget-resumed')
+		} finally {
+			await resumed.close()
+		}
+	} finally {
+		if (provider.listening)
+			await new Promise<void>((resolve) => provider.close(() => resolve()))
+		await rm(root, { recursive: true, force: true })
+	}
+})
