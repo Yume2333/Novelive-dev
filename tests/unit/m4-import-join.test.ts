@@ -200,6 +200,8 @@ test.each(['en', 'ja'])(
 			'epub',
 			{
 				format: 'epub',
+				navigation: 'spine',
+				illustrations: [],
 				metadata: { language },
 				volumes: [
 					{

@@ -59,6 +59,8 @@ const synthetic: typeof globalThis.fetch = async (input, init) => {
 			)
 		return response
 	}
+	if (prompt.startsWith('Review prose style only'))
+		return completion({ issues: [] })
 	if (prompt.startsWith('You are the art director'))
 		return completion({
 			patch: 'PUT <4:\n@bg gate-room/day',
@@ -160,13 +162,13 @@ try {
 			const complete = async (workId: string) => {
 				const session = await production.get(workId)
 				const visual = session.snapshot().visual
-				assert.ok(visual)
-				await session.confirm({
-					workId,
-					mainVisualId: visual.mainVisuals[0].id,
-					characters: [],
-					supplementalIds: [],
-				})
+				if (visual)
+					await session.confirm({
+						workId,
+						mainVisualId: visual.mainVisuals[0].id,
+						characters: [],
+						supplementalIds: [],
+					})
 				await session.queue.idle()
 				assert.equal(
 					session.snapshot().phase,

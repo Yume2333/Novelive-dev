@@ -25,7 +25,8 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 		await syntheticDocx({ 'word/document.xml': documentXml(body), ...parts }),
 	)
 	expect(compile(importExtractionSchema).check(result)).toBe(true)
-	if (result.status !== 'ready') throw new Error('Expected ready')
+	if (result.status !== 'ready' || result.book.format !== 'docx')
+		throw new Error('Expected ready DOCX')
 	return result.book
 }
 

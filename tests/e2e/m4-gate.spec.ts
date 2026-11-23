@@ -272,6 +272,7 @@ test.describe('M4 longform and queue', () => {
 				.poll(async () => (await snapshot(a)).phase, { timeout: 40_000 })
 				.toBe('confirm-first')
 			const protectedFiles = [
+				'assets/style/main-visual.webp',
 				'volumes/v0001/volume.json',
 				`volumes/v0001/works/${a}/work.json`,
 			]
@@ -304,8 +305,7 @@ test.describe('M4 longform and queue', () => {
 			const v2 = series.volumeIds[1] as string
 			const a2 = (await json(join(projectA, `volumes/${v2}/volume.json`)))
 				.workIds[0] as string
-			await page.getByRole('button', { name: '进入作品' }).click()
-			await visual(a2)
+			await page.getByRole('link', { name: '书库', exact: true }).click()
 			await importBook(app, page, join(root, '山路.txt'), projects)
 			await page.getByRole('button', { name: '跳过核对' }).click()
 			const projectB = join(projects, '山路')
@@ -317,10 +317,13 @@ test.describe('M4 longform and queue', () => {
 					.filter((work) => work.status === 'awaiting_confirm')
 					.map((work) => work.link.workId)
 					.sort(),
-			).toEqual([a, a2, b].sort())
+			).toEqual([a, b].sort())
 			await confirm(b)
-			await visual(a2)
-			await confirm(a2)
+			expect((await snapshot(a2)).visual).toBeNull()
+			expect((await snapshot(a2)).phase).not.toBe('confirm-visual')
+			expect(await readFile(join(projectA, protectedFiles[0]))).toEqual(
+				saved.get(join(projectA, protectedFiles[0])),
+			)
 			await call(page, 'production.continue', { workId: a })
 			const ordered = await queue()
 			expect(ordered.active?.link.workId).toBe(b)
