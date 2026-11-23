@@ -173,29 +173,12 @@ export async function directChapterArt(
 	if (parsed.diagnostics.some((item) => item.code.startsWith('E_')))
 		throw new Error('The art director requires a valid chapter script')
 	const context = JSON.stringify({ bible, registry })
-	const ids = JSON.stringify({
-		characters: bible.characters.map(({ id, costumes, expressions }) => ({
-			id,
-			costumes: costumes?.map(({ id }) => id) ?? [],
-			expressions: expressions?.map(({ id }) => id) ?? [],
-		})),
-		places: bible.locations.map(({ id, variants }) => ({
-			id,
-			variants: variants?.map(({ id }) => id) ?? [],
-		})),
-		registered: registry.entries.map(({ id, type, aliases }) => ({
-			id,
-			kind: type,
-			aliases,
-		})),
-	})
 	const assetContract = [
 		`Asset ID contract — required items[].id shape by kind: ${manifestIdGuidance}.`,
 		'Each segment starts with a lowercase ASCII letter or digit; the rest may also include underscores and hyphens. Slashes separate segments. Bare character and place IDs are not asset IDs.',
 		'For kind "character" (a costume base) use all three segments, ending in neutral for a new default base (e.g. ada/uniform/neutral), never ada or ada/uniform. An expression uses the same character/costume prefix with its own expression ID.',
 		'For kind "location" (a place base) use both segments, ending in day for a new default base (e.g. room/day), never room. A variant uses the same place prefix with its own variant ID.',
-		`Exact IDs from the bible and registry: ${ids}`,
-		'Copy IDs verbatim for known characters, costumes, expressions, places and variants. Reuse registered asset IDs rather than naming the same asset again. For an asset that needs a new ID, follow the same rules. Keep patch and merge references consistent with the registered or declared asset IDs.',
+		'Copy IDs verbatim from the bible and registry below. Reuse registry.entries IDs rather than naming the same asset again. For an asset that needs a new ID, follow the same rules. Keep patch and merge references consistent with the registered or declared asset IDs.',
 	].join('\n')
 	const scenes = parsed.scenes.map(formatScene)
 	const budget =

@@ -1910,8 +1910,12 @@ test('repairs a bare place ID and then reports every incomplete character asset 
 	for (const prompt of prompts) {
 		expect(prompt).toContain('character: character/costume/expression')
 		expect(prompt).toContain('never ada or ada/uniform')
-		expect(prompt).toContain('"id":"ada","costumes":["uniform"]')
-		expect(prompt).toContain('"id":"room/day","kind":"location"')
+		const [brief] = prompt.split('\nRepair the ', 1)
+		expect(brief).toContain(
+			`Bible and registered assets: ${JSON.stringify({ bible, registry })}`,
+		)
+		expect(brief.match(/"id":"ada"/g)).toHaveLength(1)
+		expect(brief.match(/"id":"room\/day"/g)).toHaveLength(1)
 	}
 	expect(prompts[1]).toContain('"/items/0/id","keyword":"pattern"')
 	expect(prompts[2]).toContain(
