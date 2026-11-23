@@ -213,6 +213,93 @@
 	margin-block-end: 0;
 }
 
+.markdown [data-streamdown="code-block"] {
+	position: relative;
+	min-width: 0;
+	margin-block: var(--space-3);
+	overflow: hidden;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-lg);
+	background: var(--color-surface-container);
+	color: var(--color-on-surface);
+	font-family: var(--font-mono);
+}
+
+.markdown [data-streamdown="code-block-header"] {
+	display: flex;
+	align-items: center;
+	min-height: calc(var(--space-6) + var(--space-2));
+	padding-inline: var(--space-3) calc(var(--space-6) * 2 + var(--space-4));
+	border-bottom: 1px solid var(--divider);
+	color: var(--color-on-surface-variant);
+	font-size: 12px;
+}
+
+.markdown [data-streamdown="code-block-actions"] {
+	position: absolute;
+	inset-block-start: var(--space-1);
+	inset-inline-end: var(--space-2);
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+}
+
+.markdown [data-streamdown="code-block-actions"] button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--space-6);
+	height: var(--space-6);
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	cursor: pointer;
+}
+
+.markdown [data-streamdown="code-block-actions"] button:hover:not(:disabled) {
+	background: var(--accent-wash);
+}
+
+.markdown [data-streamdown="code-block-actions"] button:focus-visible {
+	outline: none;
+	box-shadow: var(--shadow-focus);
+}
+
+.markdown [data-streamdown="code-block-actions"] button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.markdown [data-streamdown="code-block-actions"] output {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.markdown [data-streamdown="code-block-body"] {
+	min-width: 0;
+	padding: var(--space-3);
+	background: var(--color-surface-container-low);
+}
+
+.markdown [data-streamdown="code-block-body"] pre {
+	margin: 0;
+	font-family: var(--font-mono);
+	font-size: 12px;
+	line-height: 1.7;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.markdown [data-streamdown="code-block-body"] code > span {
+	display: block;
+}
+
 .card {
 	overflow: hidden;
 	border: 1px solid var(--glass-border);
@@ -337,6 +424,29 @@
 .impact,
 .resolution {
 	margin: 0;
+}
+
+.rewrite {
+	display: grid;
+	gap: var(--space-2);
+}
+
+.rewriteHunk {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: var(--space-1) var(--space-2);
+	padding: var(--space-2);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-container);
+	font-family: var(--font-mono);
+	font-size: 12px;
+}
+
+.rewriteHunk del,
+.rewriteHunk ins {
+	grid-column: 1 / -1;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
 }
 
 .impact {

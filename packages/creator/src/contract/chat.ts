@@ -107,7 +107,11 @@ const messagePart = union([
 		label: id,
 		status: oneOf(['running', 'done', 'failed', 'cancelled']),
 	}),
-	obj({ type: lit('proposal'), proposal: proposalSchema }),
+	obj({
+		type: lit('proposal'),
+		proposal: proposalSchema,
+		rewrite: opt(rewriteProposalSchema),
+	}),
 ])
 const entry = {
 	id,

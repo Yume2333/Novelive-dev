@@ -75,6 +75,36 @@
 	background: var(--panel-75);
 }
 
+.editor-image-candidates img {
+	display: block;
+	width: 120px;
+	height: 120px;
+	object-fit: contain;
+}
+
+.editor-image-loading {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	color: var(--color-primary);
+}
+
+.editor-image-loading svg {
+	animation: editor-image-spin calc(var(--dur-slow) * 4) linear infinite;
+}
+
+@keyframes editor-image-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.editor-image-loading svg {
+		animation: none;
+	}
+}
+
 .editor-code .cm-editor {
 	height: 360px;
 	font-family: var(--font-body);

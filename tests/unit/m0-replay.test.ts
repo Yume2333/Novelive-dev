@@ -9,12 +9,224 @@ const path = '/v1/chat/completions'
 const rowFile = 'cassette.jsonl'
 const stream =
 	'data: {"delta":"first"}\n\ndata: {"delta":"second"}\n\ndata: [DONE]\n\n'
+
+test('resuming a gate recording reuses successful identities and records only missing requests', async () => {
+	const upstream = vi.fn(async () => new Response('response'))
+	const options = {
+		mode: 'record' as const,
+		directory,
+		reuseRecorded: true,
+		fetch: upstream,
+	}
+	const first = createReplayFetch(options)
+	expect(await (await first(origin)).text()).toBe('response')
+	const resumed = createReplayFetch(options)
+	expect(await (await resumed(origin)).text()).toBe('response')
+	expect(upstream).toHaveBeenCalledTimes(1)
+	expect(await (await resumed(`${origin}/next`)).text()).toBe('response')
+	expect(upstream).toHaveBeenCalledTimes(2)
+	expect(
+		(await readFile(join(directory, rowFile), 'utf8')).trim().split('\n'),
+	).toHaveLength(2)
+	upstream.mockResolvedValueOnce(new Response('temporary', { status: 503 }))
+	const failed = await resumed(`${origin}/retry`)
+	expect(failed.status).toBe(503)
+	await failed.text()
+	await (await resumed(`${origin}/retry`)).text()
+	expect((await resumed(`${origin}/retry`)).status).toBe(200)
+	expect(upstream).toHaveBeenCalledTimes(4)
+})
+
+test('successful recording reuse composes with replay failure filtering without strict upstream calls', async () => {
+	const fetch = vi
+		.fn<typeof globalThis.fetch>()
+		.mockResolvedValueOnce(new Response('temporary', { status: 503 }))
+		.mockResolvedValueOnce(new Response('recovered'))
+	const record = createReplayFetch({ mode: 'record', directory, fetch })
+	await (await record(origin)).text()
+	await (await record(origin)).text()
+	for (const { mode, reuseRecorded, ignoreRecordedFailures, expected } of [
+		{
+			mode: 'replay',
+			reuseRecorded: false,
+			ignoreRecordedFailures: false,
+			expected: 'temporary',
+		},
+		{
+			mode: 'replay',
+			reuseRecorded: false,
+			ignoreRecordedFailures: true,
+			expected: 'recovered',
+		},
+		{
+			mode: 'strict',
+			reuseRecorded: true,
+			ignoreRecordedFailures: false,
+			expected: 'recovered',
+		},
+		{
+			mode: 'strict',
+			reuseRecorded: true,
+			ignoreRecordedFailures: true,
+			expected: 'recovered',
+		},
+	] as const) {
+		const replay = createReplayFetch({
+			mode,
+			directory,
+			fetch,
+			reuseRecorded,
+			ignoreRecordedFailures,
+		})
+		expect(await (await replay(origin)).text()).toBe(expected)
+		if (mode === 'strict')
+			await expect(replay(`${origin}/missing`)).rejects.toThrow(
+				'Missing strict replay cassette:',
+			)
+	}
+	expect(fetch).toHaveBeenCalledTimes(2)
+})
+
+test('gate recording reserves private usage and strict misses retain only the request identity', async () => {
+	const usage = join(directory, 'usage.csv')
+	const missing = join(directory, 'missing.txt')
+	vi.stubEnv('NL_USAGE_CSV', usage)
+	vi.stubEnv('NL_REPLAY_MISSING_LOG', missing)
+	const upstream = vi.fn(async () => new Response('recorded'))
+	const request = {
+		method: 'POST',
+		headers: {
+			'content-type': 'application/json',
+			authorization: 'Bearer private-key',
+		},
+		body: JSON.stringify({ model: 'gate-model', max_tokens: 512 }),
+	}
+	await (
+		await createReplayFetch({ mode: 'record', directory, fetch: upstream })(
+			`${origin}${path}`,
+			request,
+		)
+	).text()
+	expect(await readFile(usage, 'utf8')).toMatch(
+		/,gate-model,1,512,0,cassette recording/,
+	)
+	expect(await readdir(directory)).not.toContain('missing.txt')
+	await expect(
+		createReplayFetch({ mode: 'strict', directory, fetch: upstream })(
+			`${origin}/missing`,
+			request,
+		),
+	).rejects.toThrow('Missing strict replay cassette:')
+	const diagnostic = await readFile(missing, 'utf8')
+	expect(diagnostic).toMatch(
+		/^Missing strict replay cassette: POST [a-f0-9]{16} /,
+	)
+	expect(diagnostic).not.toContain('private-key')
+	expect(diagnostic).not.toContain(origin)
+	expect(upstream).toHaveBeenCalledTimes(1)
+})
+
+test('gate request identities normalize generated IDs without changing recorded responses', async () => {
+	const upstream = vi.fn(
+		async () => new Response('aabbccdd-1111-2222-3333-aabbccddeeff'),
+	)
+	const body = (id: string, line: string) =>
+		JSON.stringify({ text: `Proposal ${id}; : 中文 #${line}` })
+	const first = 'aabbccdd-1111-2222-3333-aabbccddeeff'
+	const second = 'aabbccdd-4444-5555-6666-aabbccddeeff'
+	const record = createReplayFetch({
+		mode: 'record',
+		directory,
+		normalizeIds: true,
+		fetch: upstream,
+	})
+	await (
+		await record(`${origin}${path}`, {
+			method: 'POST',
+			body: body(first, 'abcd'),
+		})
+	).text()
+	const strict = createReplayFetch({
+		mode: 'strict',
+		directory,
+		normalizeIds: true,
+		fetch: upstream,
+	})
+	expect(
+		await (
+			await strict(`${origin}${path}`, {
+				method: 'POST',
+				body: body(second, 'ef01'),
+			})
+		).text(),
+	).toBe(first)
+	await expect(
+		strict(`${origin}${path}`, {
+			method: 'POST',
+			body: JSON.stringify({ text: 'different content' }),
+		}),
+	).rejects.toThrow('Missing strict replay cassette:')
+	expect(upstream).toHaveBeenCalledTimes(1)
+})
+
+test('fallback misses are silent when the primary cassette answers and final misses log once', async () => {
+	const missingLog = join(directory, 'missing.txt')
+	vi.stubEnv('NL_REPLAY_MISSING_LOG', missingLog)
+	await (
+		await createReplayFetch({
+			mode: 'record',
+			directory,
+			fetch: async () => new Response('primary'),
+		})(origin)
+	).text()
+	const replay = createReplayFetch({
+		mode: 'strict',
+		directory,
+		fallbackDirectory: join(directory, 'empty'),
+	})
+	expect(await (await replay(origin)).text()).toBe('primary')
+	expect(await readdir(directory)).not.toContain('missing.txt')
+	await expect(replay(`${origin}/missing`)).rejects.toThrow(
+		'Missing strict replay cassette:',
+	)
+	const diagnostics = (await readFile(missingLog, 'utf8')).trim().split('\n')
+	expect(diagnostics).toHaveLength(1)
+	expect(diagnostics[0]).not.toContain('/empty')
+})
+
+test('gate fallback reuses existing cassettes before recording and a missing fallback stays offline in strict mode', async () => {
+	const upstream = vi.fn(async () => new Response('existing'))
+	const record = createReplayFetch({
+		mode: 'record',
+		directory,
+		fetch: upstream,
+	})
+	await (await record(origin)).text()
+	const privateDirectory = join(directory, 'private')
+	const reuse = createReplayFetch({
+		mode: 'record',
+		directory: privateDirectory,
+		fallbackDirectory: directory,
+		fetch: upstream,
+	})
+	expect(await (await reuse(origin)).text()).toBe('existing')
+	expect(upstream).toHaveBeenCalledTimes(1)
+	const strict = createReplayFetch({
+		mode: 'strict',
+		directory: privateDirectory,
+		fallbackDirectory: directory,
+		fetch: upstream,
+	})
+	await expect(strict(`${origin}/missing`)).rejects.toThrow(privateDirectory)
+	expect(upstream).toHaveBeenCalledTimes(1)
+})
 let directory: string
 
 beforeEach(async () => {
 	directory = await mkdtemp(join(tmpdir(), 'novelive-replay-'))
 })
 afterEach(async () => {
+	vi.unstubAllEnvs()
 	await rm(directory, { recursive: true, force: true })
 })
 

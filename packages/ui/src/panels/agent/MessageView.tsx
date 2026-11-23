@@ -1,4 +1,4 @@
-import type { CommandOutput } from '@novelive/creator/contract'
+import type { CommandOutput, RewriteProposal } from '@novelive/creator/contract'
 import {
 	Ban,
 	Check,
@@ -152,9 +152,11 @@ export function ScrollField(props: ComponentProps<'textarea'>) {
 
 function ProposalCard({
 	proposal,
+	savedRewrite,
 	actions,
 }: {
 	proposal: Proposal
+	savedRewrite?: RewriteProposal
 	actions: ProposalActions
 }) {
 	const [current, setCurrent] = useState(proposal)
@@ -164,6 +166,10 @@ function ProposalCard({
 	const [reason, setReason] = useState('')
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState('')
+	const [rewrite, setRewrite] = useState(savedRewrite)
+	const [selected, setSelected] = useState<string[]>(
+		savedRewrite?.hunks.map((hunk) => hunk.id) ?? [],
+	)
 	const chapters = current.chapterIds.map(
 		(chapterId) => actions.chapterTitles[chapterId] ?? chapterId,
 	)
@@ -175,6 +181,10 @@ function ProposalCard({
 		try {
 			const result = await actions.resolve(current, decision)
 			setCurrent(result.proposal)
+			if (result.status === 'resolved' && result.rewrite) {
+				setRewrite(result.rewrite)
+				setSelected(result.rewrite.hunks.map((hunk) => hunk.id))
+			}
 			setStale(result.status === 'stale')
 			setRestriction(result.status === 'restricted' ? result.reason : '')
 			setRejecting(false)
@@ -187,6 +197,61 @@ function ProposalCard({
 	const { payload } = current
 	return (
 		<section className={styles.proposal} aria-label="确认卡">
+			{rewrite && (
+				<section className={styles.rewrite} aria-label="重写差异">
+					{rewrite.hunks.map((hunk) => (
+						<label key={hunk.id} className={styles.rewriteHunk}>
+							<input
+								type="checkbox"
+								checked={selected.includes(hunk.id)}
+								onChange={(event) =>
+									setSelected((ids) =>
+										event.target.checked
+											? [...ids, hunk.id]
+											: ids.filter((id) => id !== hunk.id),
+									)
+								}
+							/>
+							<span>{hunk.id}</span>
+							<del>{hunk.before.join('\n')}</del>
+							<ins>{hunk.after.join('\n')}</ins>
+						</label>
+					))}
+					<button
+						type="button"
+						className={styles.button}
+						disabled={busy || !selected.length}
+						onClick={async () => {
+							setBusy(true)
+							try {
+								await window.novelive.call('editor.applyRewrite', {
+									workId: rewrite.workId,
+									chapterId: rewrite.chapterId,
+									sceneId: rewrite.sceneId,
+									expectedRevision: rewrite.expectedRevision,
+									proposalId: rewrite.proposalId,
+									hunkIds: selected,
+								}).promise
+								setRewrite(undefined)
+								window.dispatchEvent(
+									new CustomEvent('novelive:chapter-changed', {
+										detail: {
+											workId: rewrite.workId,
+											chapterId: rewrite.chapterId,
+										},
+									}),
+								)
+							} catch {
+								setError('没能应用，请刷新后重试')
+							} finally {
+								setBusy(false)
+							}
+						}}
+					>
+						应用勾选差异
+					</button>
+				</section>
+			)}
 			<span className={styles.caption}>{proposalKinds[payload.kind]}</span>
 			<p className={styles.proposalPrompt}>{current.prompt}</p>
 			{payload.kind === 'requirements' && (
@@ -298,6 +363,7 @@ export function MessageParts({
 					<Streamdown
 						key={key}
 						className={styles.markdown}
+						codeBlockMaxHeight={0}
 						parseIncompleteMarkdown={activity === 'streaming'}
 					>
 						{part.text}
@@ -350,6 +416,7 @@ export function MessageParts({
 					<ProposalCard
 						key={part.proposal.id}
 						proposal={part.proposal}
+						savedRewrite={part.rewrite}
 						actions={actions}
 					/>
 				)

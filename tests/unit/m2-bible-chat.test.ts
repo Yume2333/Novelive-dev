@@ -11,6 +11,7 @@ import {
 import { createConfigStore } from '../../packages/creator/src/config'
 import { Project } from '../../packages/creator/src/project'
 import { readBible } from '../../packages/creator/src/synthesis/patch'
+import { model } from '../fixtures/cassettes/m2-chat/fixture'
 import { ref, seed } from '../fixtures/project-schema/seed'
 
 let directory: string
@@ -23,6 +24,64 @@ beforeEach(async () => {
 afterEach(async () => {
 	project.close()
 	await rm(directory, { recursive: true, force: true })
+})
+
+test('production chat includes the current editor position in model instructions', async () => {
+	const config = createConfigStore(join(directory, 'profile'))
+	await config.update({
+		models: { main: { ...model, maxOutputTokens: 128, inheritFast: false } },
+	})
+	let request = ''
+	let finish!: () => void
+	const completed = new Promise<void>((resolve) => {
+		finish = resolve
+	})
+	const chat = await projectChat(
+		project,
+		ref.workId,
+		config,
+		directory,
+		{
+			mode: 'replay',
+			directory: join(directory, 'empty-cassette'),
+			fetch: async (input, init) => {
+				request = await new Request(input, init).text()
+				return new Response(
+					'data: {"choices":[{"index":0,"delta":{"content":"好"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+					{ headers: { 'content-type': 'text/event-stream' } },
+				)
+			},
+		},
+		(event) => {
+			if (event.payload.status !== 'streaming') finish()
+		},
+	)
+	try {
+		const { session } = chat.create()
+		chat.send(
+			{
+				workId: ref.workId,
+				sessionId: session.sessionId,
+				expectedHeadId: null,
+				parentId: null,
+				content: { text: '重写这里', attachmentIds: [] },
+				position: {
+					kind: 'editor',
+					chapterId: ref.chapterId,
+					sceneId: 'aabbccdd',
+					sourceIds: ['p0001'],
+				},
+			},
+			new AbortController().signal,
+		)
+		await completed
+		const { messages } = JSON.parse(request)
+		expect(messages[0].content).toContain('aabbccdd')
+		expect(messages[0].content).toContain(ref.chapterId)
+		expect(messages[0].content).toContain('p0001')
+	} finally {
+		await chat.close()
+	}
 })
 
 test('chat opens an imported work before production and preserves existing scheduler state on reopen', async () => {

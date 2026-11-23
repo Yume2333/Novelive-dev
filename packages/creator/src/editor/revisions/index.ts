@@ -119,7 +119,7 @@ export class CreativeRevisions {
 		)
 		if (selected.length !== input.hunkIds.length)
 			throw { code: 'not_found', message: '找不到所选的重写差异。' }
-		return this.editor.replaceScene(
+		const snapshot = await this.editor.replaceScene(
 			{ ...proposal, instruction: '' },
 			'rewrite',
 			(nvs) => {
@@ -127,6 +127,13 @@ export class CreativeRevisions {
 				return applyHunks(nvs, selected)
 			},
 		)
+		if (selected.length)
+			this.project.database
+				.prepare(
+					"UPDATE proposal SET payload = json_remove(payload, '$.rewrite') WHERE work_id = ? AND json_extract(payload, '$.rewrite.proposalId') = ?",
+				)
+				.run(input.workId, input.proposalId)
+		return snapshot
 	}
 
 	async regenerateImage(
@@ -352,8 +359,7 @@ function applyHunks(nvs: string, hunks: readonly Hunk[]) {
 		const positions = hunk.before.map((line) => {
 			const id = line.match(idSuffix)?.[1]
 			const position = id === undefined ? undefined : at(id)
-			if (position === undefined || raw[position].trim() !== line)
-				throw stale('剧本行已改变，请重新生成重写。')
+			if (position === undefined) throw stale('剧本行已改变，请重新生成重写。')
 			removed.add(position)
 			return position
 		})

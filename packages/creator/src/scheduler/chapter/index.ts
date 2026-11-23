@@ -370,7 +370,19 @@ export class ChapterScheduler {
 		if (!task) throw { code: 'not_found', message: '制作队列中找不到这一章' }
 		if (task.status === 'running')
 			throw { code: 'stale_revision', message: '这一章正在制作，请稍后重做' }
-		if (this.work(workId).status === 'awaiting_confirm')
+		const work = this.work(workId)
+		const first = this.get<{ chapter_id: string }>(
+			'SELECT chapter_id FROM chapter WHERE work_id = ? ORDER BY ord LIMIT 1',
+			workId,
+		)?.chapter_id
+		if (
+			work.status === 'awaiting_confirm' &&
+			!(
+				work.reason === 'confirm_first' &&
+				first === chapterId &&
+				task.status === 'done'
+			)
+		)
 			throw { code: 'invalid_config', message: '请先处理确认点，再重做章节' }
 		this.transaction(() => {
 			this.exec(
@@ -385,7 +397,7 @@ export class ChapterScheduler {
 				workId,
 				chapterId,
 			)
-			const work = this.work(workId)
+			if (work.status === 'awaiting_confirm') this.resumeWork(workId)
 			if (work.status === 'done') this.requeueWork(workId)
 			else if (
 				work.reason === 'chapter_failed' &&

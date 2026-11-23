@@ -1,12 +1,18 @@
-import type { CommandOutput, RewriteProposal } from '@novelive/creator/contract'
+import type {
+	CommandInput,
+	CommandOutput,
+	RewriteProposal,
+} from '@novelive/creator/contract'
 import { compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
 import { ScrollArea } from '../../components/ScrollArea'
 import { JumpPoints } from './JumpPoints'
+import { SceneImages } from './SceneImages'
 import { ScriptEditor } from './ScriptEditor'
+import { sceneAssets } from './scene-assets'
 import '../player/player.css'
 import './editor.css'
 
@@ -15,6 +21,9 @@ type Chapter = Opening['chapter']
 
 export function EditorPage() {
 	const { id = '' } = useParams()
+	const setAgentPosition = useOutletContext<{
+		setAgentPosition(position: CommandInput<'chat.send'>['position']): void
+	}>()?.setAgentPosition
 	const [params] = useSearchParams()
 	const chapterId = params.get('chapterId') ?? 'ch0001'
 	const [opening, setOpening] = useState<Opening>()
@@ -35,19 +44,46 @@ export function EditorPage() {
 		key: number
 	}>()
 	const [preview, setPreview] = useState(0)
-	const stage = useRef<HTMLDivElement>(null)
-	const sourceViewport = useRef<HTMLDivElement>(null)
+	const [refresh, setRefresh] = useState(0)
+	const [pendingRefresh, setPendingRefresh] = useState(false)
 	const chapter = opening?.chapter
 	const scene = chapter?.scenes[sceneIndex]
 	const dirty =
 		!!scene &&
 		draft.replace(/\r\n?/g, '\n') !== scene.nvs.replace(/\r\n?/g, '\n')
 	useEffect(() => {
+		const changed = (event: Event) => {
+			const { workId, chapterId: changedChapter } = (event as CustomEvent)
+				.detail
+			if (workId === id && changedChapter === chapterId) {
+				if (dirty) {
+					setPendingRefresh(true)
+					setError('章节已更新，当前修改已保留；放弃修改后加载新版本')
+				} else setRefresh((value) => value + 1)
+			}
+		}
+		window.addEventListener('novelive:chapter-changed', changed)
+		return () => window.removeEventListener('novelive:chapter-changed', changed)
+	}, [id, chapterId, dirty])
+	const stage = useRef<HTMLDivElement>(null)
+	const sourceViewport = useRef<HTMLDivElement>(null)
+	useEffect(() => {
+		if (scene)
+			setAgentPosition?.({
+				kind: 'editor',
+				chapterId,
+				sceneId: scene.sceneId,
+				sourceIds: scene.sourceIds,
+			})
+		return () => setAgentPosition?.(undefined)
+	}, [scene, chapterId, setAgentPosition])
+	useEffect(() => {
 		if (source && scene)
 			sourceViewport.current
 				?.querySelector('[aria-pressed="true"]')
 				?.scrollIntoView({ block: 'nearest' })
 	}, [source, scene])
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 外部应用差异后重开编辑会话
 	useEffect(() => {
 		let disposed = false
 		let opened: Opening | undefined
@@ -82,7 +118,7 @@ export function EditorPage() {
 			disposed = true
 			if (opened) void close(opened)
 		}
-	}, [id, chapterId])
+	}, [id, chapterId, refresh])
 	function accept(next: Chapter) {
 		setOpening((value) => (value ? { ...value, chapter: next } : value))
 		setDraft(next.scenes[sceneIndex]?.nvs ?? '')
@@ -164,9 +200,15 @@ export function EditorPage() {
 		if (saved.revision !== target.expectedRevision)
 			setUndoCount((count) => count + 1)
 	}
+	function discard() {
+		if (pendingRefresh) {
+			setPendingRefresh(false)
+			setRefresh((value) => value + 1)
+		} else if (scene) setDraft(scene.nvs)
+	}
 	function undo() {
 		if (dirty && scene) {
-			setDraft(scene.nvs)
+			discard()
 			return
 		}
 		if (!target || !undoCount) return
@@ -347,8 +389,8 @@ export function EditorPage() {
 									</button>
 									<button
 										type="button"
-										disabled={!dirty || busy}
-										onClick={() => setDraft(scene.nvs)}
+										disabled={(!dirty && !pendingRefresh) || busy}
+										onClick={discard}
 									>
 										放弃修改
 									</button>
@@ -365,6 +407,45 @@ export function EditorPage() {
 									className="editor-stage"
 									ref={stage}
 									aria-label="舞台预览"
+								/>
+								<SceneImages
+									key={scene.sceneId}
+									workId={id}
+									assets={sceneAssets(
+										chapter.scenes.map((item) => item.nvs).join('\n\n'),
+										{
+											paragraphIds: chapter.paragraphs.map((p) => p.id),
+											sceneIds: chapter.scenes.map((s) => s.sceneId),
+											assets: opening.registry.entries,
+											speakers: Object.keys(opening.speakerNames),
+											customMarks: Object.keys(opening.settings.customMarks),
+										},
+										sceneIndex,
+									)}
+									disabled={busy || dirty}
+									run={run}
+									onApplied={async (assetId) => {
+										const asset = await window.novelive.call(
+											'production.resolveAsset',
+											{ workId: id, assetId },
+										).promise
+										if (!asset) throw new Error('找不到素材')
+										setOpening((value) =>
+											value
+												? {
+														...value,
+														registry: {
+															...value.registry,
+															entries: value.registry.entries.map((entry) =>
+																entry.id === assetId
+																	? { ...entry, path: asset.cachePath }
+																	: entry,
+															),
+														},
+													}
+												: value,
+										)
+									}}
 								/>
 								<div
 									className="editor-toolbar"

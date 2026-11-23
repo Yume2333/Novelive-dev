@@ -186,6 +186,8 @@ export async function projectChat(
 			mainModel: () => config.resolveTextModel('main'),
 			summaryModel: () => config.resolveTextModel('fast'),
 			proposals: projectProposals(project, workId, revisions),
+			instructions: (position) =>
+				position ? `Current creator position: ${JSON.stringify(position)}` : '',
 			replay,
 			emit,
 		}),
