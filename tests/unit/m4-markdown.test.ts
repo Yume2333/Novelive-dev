@@ -218,6 +218,14 @@ test('a leading thematic break is not front matter; YAML comments, escapes and b
 		).metadata,
 	).toEqual({ title: 'Harbor' })
 	expect(
+		extract(
+			'---\ntitle: Harbor\ndescription: |\n  Excerpt: [A door opens.\nextra:\n  links: ["See\n    the ] sign"]\nlang: en\n---\nThe ship left.\n',
+		),
+	).toMatchObject({
+		metadata: { title: 'Harbor', language: 'en' },
+		volumes: [{ chapters: [{ paragraphs: ['The ship left.'] }] }],
+	})
+	expect(
 		extract('---\ntitle: Matching a literal ]\nlang: en\n---\nText.\n')
 			.metadata,
 	).toEqual({ title: 'Matching a literal ]', language: 'en' })

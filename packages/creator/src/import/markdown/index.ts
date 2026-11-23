@@ -55,39 +55,25 @@ function scalar(raw: string, rest: string[]) {
 	return raw.replace(/\s+#.*$/, '')
 }
 
-function flowDepth(line: string) {
-	const bare = line
-		.replace(/"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'/g, '')
-		.replace(/(?:^|\s)#.*$/, '')
-	return (
-		(bare.match(/[[{]/g)?.length ?? 0) - (bare.match(/[\]}]/g)?.length ?? 0)
-	)
-}
-
 // A leading `---` block is YAML front matter only when every line reads as
 // YAML; otherwise it is a thematic break and the text stays in the body. A
-// flow collection opens only where a key's value starts with `[` or `{`.
+// closing `]` or `}` may sit at the margin only after a key whose value opens
+// a flow collection.
 function frontMatter(text: string) {
 	const metadata: MarkdownBook['metadata'] = {}
 	const block = text.match(
 		/^---[ \t]*\n([\s\S]*?)\n(?:---|\.\.\.)[ \t]*(?:\n|$)/,
 	)
 	const lines = block?.[1].split('\n') ?? []
-	let open = 0
+	let flow = false
 	let keys = 0
 	for (const line of lines) {
 		if (!line.trim()) continue
-		if (open) {
-			if (!/^(?:\s|#)/.test(line) && !/^[\]}][\]},\s]*(?:#.*)?$/.test(line))
-				return { body: text, metadata }
-			open += flowDepth(line)
-		} else if (!yamlLine.test(line)) return { body: text, metadata }
-		else {
-			if (yamlKey.test(line)) keys++
-			const value = line.match(/^\s*[^\s#:-][^:]*:\s*([[{].*)$/)?.[1]
-			if (value) open = flowDepth(value)
-		}
-		if (open < 0) return { body: text, metadata }
+		if (flow && /^[\]}][\]},\s]*(?:#.*)?$/.test(line)) continue
+		if (!yamlLine.test(line)) return { body: text, metadata }
+		if (yamlKey.test(line)) keys++
+		if (/^\s*[^\s#:-][^:]*:/.test(line))
+			flow = /^\s*[^\s#:-][^:]*:\s*[[{]/.test(line)
 	}
 	if (!block || !keys) return { body: text, metadata }
 	for (const [i, line] of lines.entries()) {
