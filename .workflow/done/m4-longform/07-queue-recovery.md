@@ -9,13 +9,13 @@
 
 **付费调用：** 只由协调者在交接中明确指定的串行主线会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
 **Base commit:** 8c3fc4b9b649a8e754e0d294163a22682970364f
-**Status:** active
 
-- [ ] 优先章、确认回头部而不抢占、系统真实重开状态恢复，关联主控已有运行记录。
+- [x] 优先章、确认回头部而不抢占、系统真实重开状态恢复，关联主控已有运行记录。
 
 ## Progress
 
 - Check after: `NL_REPLAY=strict pnpm exec vitest run tests/integration/m4-queue.test.ts` — 5 passed；包括共享工程让槽、跨工程重排、停止后续跑不插队、章节和出图遭强杀后显式续跑。
+- Review: pass (base 8c3fc4b9b649a8e754e0d294163a22682970364f, reviewer pr-review-job-05896ae69ea3434b9a8dcd0039332299)
 - M4/10 接线：将现有 `productionQueueSchema` 用于队列查询 `createProduction.getQueue()`、相邻重排 `createProduction.moveQueueWork(workId, direction)`（`-1` 提前、`1` 延后）与 app scope 的 `production.queue` 快照事件。制作页挂载 `ProductionQueuePanel`，继续和停止复用现有作品命令。此任务不改 M4/01 契约或桌面注册。
 - M4/10 宿主验收：启动 creator 前取得 Electron 单实例锁，避免同一桌面配置的第二个进程将仍在运行的任务误判为崩溃；`events.list` 将已打开作品的持久章节记录与事件缓存按序号去重合并，避免其他作品挤掉历史后返回空记录。
 - 调度只为章节和章内出图分配制作槽；预览、综合和确认素材准备独立于该队列。重开项目时以原工程工作状态、任务检查点、`run`/`run_step` 为准；重排只影响当次运行中的待排作品，不会在重开后自动续跑。
