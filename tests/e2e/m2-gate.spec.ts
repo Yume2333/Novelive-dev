@@ -338,9 +338,20 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			(patch) => window.novelive.call('config.update', patch).promise,
 			configuration,
 		)
+		await page.evaluate(() => {
+			const decode = HTMLImageElement.prototype.decode
+			HTMLImageElement.prototype.decode = async function () {
+				await decode.call(this)
+				document.body.dataset.previewImageSrc = this.currentSrc
+			}
+		})
 		await page.getByRole('button', { name: '从当前句预览' }).click()
 		await expect(page.locator('canvas')).toBeVisible()
 		await expect(page.locator('.nl-player-text')).toContainText('暮色里')
+		const previewBefore = await page
+			.locator('body')
+			.getAttribute('data-preview-image-src')
+		expect(previewBefore).toMatch(/^novelive:\/\/cache\//)
 		const imageBefore = await page.evaluate(
 			(workId) =>
 				window.novelive.call('editor.imageRevision', {
@@ -402,6 +413,21 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			workId,
 		)
 		expect(imageAfter.revision).not.toBe(imageBefore.revision)
+		const replacedPreview = await page.evaluate(async (workId) => {
+			const asset = await window.novelive.call('production.resolveAsset', {
+				workId,
+				assetId: 'ada/uniform/neutral',
+			}).promise
+			return asset && window.novelive.resourceUrl(asset.cachePath)
+		}, workId)
+		expect(replacedPreview).not.toBe(previewBefore)
+		expect(replacedPreview?.split('/').at(-1)).not.toBe(
+			previewBefore?.split('/').at(-1),
+		)
+		await expect(page.locator('body')).toHaveAttribute(
+			'data-preview-image-src',
+			replacedPreview as string,
+		)
 		const imageStatus = page.getByRole('status', { name: '图片已替换' })
 		await expect(imageStatus).toHaveText('图片已替换')
 		expect(
@@ -440,10 +466,21 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 					),
 			)
 			.toBe(true)
+		const selectedImage = await candidates
+			.getByRole('img')
+			.nth(1)
+			.getAttribute('src')
 		await candidates
 			.getByRole('button', { name: '选择版本 2', exact: true })
 			.click()
 		await expect(candidates).toHaveCount(0)
+		await expect
+			.poll(async () =>
+				(await page.locator('body').getAttribute('data-preview-image-src'))
+					?.split('/')
+					.at(-1),
+			)
+			.toBe(selectedImage?.split('/').at(-1))
 		await expect
 			.poll(
 				async () =>
