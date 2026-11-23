@@ -89,6 +89,7 @@ export function minimalControlsController(
 			}
 		},
 		advance(skip) {
+			if (skip && !current.read) return
 			if (skip && current.scripted)
 				host.dispatchEvent(new Event('novelive:player-skip'))
 			else host.dispatchEvent(new MouseEvent('click', { bubbles: true }))
