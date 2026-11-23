@@ -9,10 +9,111 @@ import {
 	imageRenderer,
 } from '../../packages/creator/src/pipeline/art/models'
 import { createReplayFetch } from '../../packages/creator/src/replay'
-import { projectSpend } from '../../packages/creator/src/usage/spend'
+import {
+	projectSpend,
+	quoteSpend,
+} from '../../packages/creator/src/usage/spend'
 import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
 
 afterEach(() => vi.unstubAllEnvs())
+
+test('overshoot factors change the reserved output but not dispatch or actual settlement', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '10000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+	const body = {
+		model: 'devin-swe-2',
+		messages: [],
+		max_completion_tokens: 128,
+	}
+	const request = () =>
+		new Request('https://example.invalid/v1/chat/completions', {
+			method: 'POST',
+			body: JSON.stringify(body),
+		})
+	const quoted = await quoteSpend(request())
+	vi.stubEnv('NL_RUN_OUTPUT_OVERSHOOT_FACTORS', '{"devin-swe-2":1}')
+	const single = await quoteSpend(request())
+	expect(quoted.tokens - single.tokens).toBe(4 * 128)
+	vi.stubEnv('NL_RUN_OUTPUT_OVERSHOOT_FACTORS', '{"devin-swe-2":7}')
+	expect((await quoteSpend(request())).tokens - single.tokens).toBe(6 * 128)
+	vi.stubEnv('NL_RUN_OUTPUT_OVERSHOOT_FACTORS', '{"other":2}')
+	using database = new DatabaseSync(':memory:')
+	const spend = projectSpend(database)
+	const send = vi.fn(async (admitted: Request, quote: typeof quoted) => {
+		expect(await admitted.json()).toEqual(body)
+		expect(quote).toEqual(quoted)
+		return Response.json({
+			usage: { prompt_tokens: 10, completion_tokens: 509 },
+		})
+	})
+	vi.stubEnv('NL_RUN_TOKEN_CAP', String(quoted.tokens - 1))
+	await expect(spend(request(), send)).rejects.toThrow('超出工程预算')
+	expect(send).not.toHaveBeenCalled()
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '10000')
+	await spend(request(), send)
+	expect(
+		database
+			.prepare('SELECT tokens, actual_tokens FROM spend_reservation')
+			.get(),
+	).toEqual({
+		tokens: quoted.tokens,
+		actual_tokens: 519,
+	})
+	vi.stubEnv('NL_RUN_OUTPUT_OVERSHOOT_FACTORS', '{"devin-swe-2":0}')
+	await expect(spend(request(), send)).rejects.toThrow(
+		'NL_RUN_OUTPUT_OVERSHOOT_FACTORS',
+	)
+	expect(send).toHaveBeenCalledTimes(1)
+})
+
+test('soft cutoff stops new requests at settled plus unresolved usage across guard instances', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '30000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '10')
+	const request = () =>
+		new Request('https://example.invalid/v1/images/generations', {
+			method: 'POST',
+			body: '{}',
+		})
+	using database = new DatabaseSync(':memory:')
+	const send = vi
+		.fn()
+		.mockImplementationOnce(async () =>
+			Response.json({
+				data: [{ b64_json: 'fixture' }],
+				usage: { total_tokens: 10000 },
+			}),
+		)
+		.mockImplementation(async () => new Response(null, { status: 500 }))
+	await projectSpend(database)(request(), send)
+	await projectSpend(database)(request(), send)
+	await projectSpend(database)(request(), send)
+	expect(
+		database
+			.prepare(
+				'SELECT tokens, actual_tokens FROM spend_reservation ORDER BY id',
+			)
+			.all(),
+	).toEqual([
+		{ tokens: 7000, actual_tokens: 10000 },
+		{ tokens: 7000, actual_tokens: null },
+		{ tokens: 7000, actual_tokens: null },
+	])
+	const text = new Request('https://example.invalid/v1/chat/completions', {
+		method: 'POST',
+		body: JSON.stringify({ messages: [], max_tokens: 32 }),
+	})
+	await expect(projectSpend(database)(text, send)).rejects.toThrow(
+		'软停止线 24000 tokens',
+	)
+	expect(send).toHaveBeenCalledTimes(3)
+	vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '1')
+	await projectSpend(database)(text, send)
+	vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', 'NaN')
+	await expect(projectSpend(database)(request(), send)).rejects.toThrow(
+		'NL_RUN_TOKEN_SOFT_FRACTION',
+	)
+	expect(send).toHaveBeenCalledTimes(4)
+})
 
 test('Responses recording logs the full SQLite reservation before dispatch', async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'novelive-spend-'))

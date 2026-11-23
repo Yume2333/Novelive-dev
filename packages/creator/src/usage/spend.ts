@@ -25,6 +25,40 @@ function object(value: unknown): Record<string, unknown> {
 		: {}
 }
 
+function outputFactor(model: unknown) {
+	const name = 'NL_RUN_OUTPUT_OVERSHOOT_FACTORS'
+	const raw = process.env[name]
+	if (raw !== undefined) {
+		try {
+			const value: unknown = JSON.parse(raw)
+			const factors = object(value)
+			if (
+				factors !== value ||
+				Object.values(factors).some((factor) => !valid(factor) || factor < 1)
+			)
+				throw new Error()
+			if (typeof model === 'string' && Object.hasOwn(factors, model))
+				return factors[model] as number
+		} catch {
+			throw new SpendBudgetError(
+				`请将 ${name} 设置为模型名到正整数的 JSON 对象`,
+			)
+		}
+	}
+	return model === 'devin-swe-2' ? 5 : 1
+}
+
+function softTokenLimit(tokenCap: number) {
+	const name = 'NL_RUN_TOKEN_SOFT_FRACTION'
+	const raw = process.env[name] ?? '0.8'
+	const [, whole, decimal = ''] = /^(\d*)(?:\.(\d+))?$/.exec(raw) ?? []
+	const denominator = 10n ** BigInt(decimal.length)
+	const numerator = BigInt((whole ?? '') + decimal)
+	if (numerator <= 0n || numerator > denominator)
+		throw new SpendBudgetError(`请将 ${name} 设置为大于 0 且不超过 1 的小数`)
+	return Number((BigInt(tokenCap) * numerator + denominator - 1n) / denominator)
+}
+
 function totalUsage(value: unknown) {
 	const usage = object(value)
 	const input = usage.prompt_tokens ?? usage.input_tokens
@@ -55,7 +89,7 @@ export async function quoteSpend(request: Request) {
 			const count = typeof n === 'string' && /^\d+$/.test(n) ? Number(n) : n
 			if (!valid(count) || count < 1) throw new Error()
 			const perImage = cap(
-				process.env.NL_RUN_IMAGE_TOKEN_RESERVE ?? '100000',
+				process.env.NL_RUN_IMAGE_TOKEN_RESERVE ?? '7000',
 				'NL_RUN_IMAGE_TOKEN_RESERVE',
 			)
 			const tokens = count * perImage
@@ -74,6 +108,8 @@ export async function quoteSpend(request: Request) {
 			(!Array.isArray(input) && !(responses && typeof input === 'string'))
 		)
 			throw new Error()
+		const outputReserve = output * outputFactor(body.model)
+		if (!valid(outputReserve)) throw new Error()
 		const fields: string[] = []
 		let largeFieldBytes = 0
 		function collect(value: unknown) {
@@ -91,7 +127,8 @@ export async function quoteSpend(request: Request) {
 			}
 		}
 		collect(body)
-		const tokens = reserveTokenFields(fields, output).reserved + largeFieldBytes
+		const tokens =
+			reserveTokenFields(fields, outputReserve).reserved + largeFieldBytes
 		if (!valid(tokens)) throw new Error()
 		return { tokens, images: 0 }
 	} catch (error) {
@@ -181,6 +218,7 @@ export function projectSpend(database: DatabaseSync) {
 	) => {
 		const tokenCap = cap(process.env.NL_RUN_TOKEN_CAP, 'NL_RUN_TOKEN_CAP')
 		const imageCap = cap(process.env.NL_RUN_IMAGE_CAP, 'NL_RUN_IMAGE_CAP')
+		const softLimit = softTokenLimit(tokenCap)
 		const quote = await quoteSpend(request)
 		const { tokens, images } = quote
 		request.signal.throwIfAborted()
@@ -199,15 +237,15 @@ export function projectSpend(database: DatabaseSync) {
 					COALESCE(SUM(COALESCE(actual_images, images)), 0) AS used_images
 				FROM spend_reservation
 			)
-			WHERE used_tokens + ? <= ? AND used_images + ? <= ?
+			WHERE used_tokens < ? AND used_tokens + ? <= ? AND used_images + ? <= ?
 			RETURNING id
 		`)
-			.get(tokens, images, tokens, tokenCap, images, imageCap) as
+			.get(tokens, images, softLimit, tokens, tokenCap, images, imageCap) as
 			| { id: number }
 			| undefined
 		if (!row)
 			throw new SpendBudgetError(
-				`超出工程预算（上限 ${tokenCap} tokens / ${imageCap} 张图，含未核销预留）`,
+				`超出工程预算（软停止线 ${softLimit} tokens；硬上限 ${tokenCap} tokens / ${imageCap} 张图，含未核销预留）`,
 			)
 		const settle = (
 			actualTokens: number | null,

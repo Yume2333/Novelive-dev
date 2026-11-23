@@ -91,6 +91,9 @@ type TaskRow = {
 	run_id: string | null
 }
 type Inflight = { runId: string; controller: AbortController }
+const budgetRefusal = (error: Error) =>
+	error instanceof SpendBudgetError || error.cause instanceof SpendBudgetError
+
 type PauseReason =
 	| 'chapter_failed'
 	| 'image_unsupported'
@@ -264,6 +267,17 @@ export class ChapterScheduler {
 			this.resumeWork(workId)
 		} else if (work.status === 'paused' && work.reason !== 'chapter_failed') {
 			this.transaction(() => {
+				this.exec(
+					`UPDATE chapter SET flagged = 0 WHERE work_id = ? AND chapter_id IN
+					(SELECT ref_id FROM task WHERE work_id = ? AND kind = 'chapter' AND status = 'needs_attention' AND error_type = 'budget_paused')`,
+					workId,
+					workId,
+				)
+				this.exec(
+					`UPDATE task SET status = 'queued', attempts = 0, desensitized = 0, error_type = NULL
+					WHERE work_id = ? AND kind = 'chapter' AND status = 'needs_attention' AND error_type = 'budget_paused'`,
+					workId,
+				)
 				for (const task of this.all<{ task_id: string; ref_id: string }>(
 					`SELECT task_id, ref_id FROM task
 					WHERE work_id = ? AND kind = 'image' AND status = 'needs_attention'`,
@@ -701,7 +715,11 @@ export class ChapterScheduler {
 			} catch (cause) {
 				if (!this.current(task)) return null
 				const error = cause instanceof Error ? cause : new Error(String(cause))
-				const kind = error instanceof ProductionTaskError ? error.kind : 'final'
+				const kind = budgetRefusal(error)
+					? 'budget_paused'
+					: error instanceof ProductionTaskError
+						? error.kind
+						: 'final'
 				this.step(task, purpose, started, 'failed', kind, error.message)
 				if (kind === 'transient' && task.attempts < transientRetries) {
 					task.attempts++
@@ -820,7 +838,7 @@ export class ChapterScheduler {
 		let outcome: ImageJobResult
 		let reason: 'budget_paused' | undefined
 		if (result.ok) outcome = result.value
-		else if (result.error instanceof SpendBudgetError) {
+		else if (budgetRefusal(result.error)) {
 			outcome = { status: 'unsupported', issue: result.error.message }
 			reason = 'budget_paused'
 		} else {
@@ -923,7 +941,12 @@ export class ChapterScheduler {
 	}
 
 	private failChapter(task: TaskRow, error: Error) {
-		const kind = error instanceof ProductionTaskError ? error.kind : 'final'
+		const budget = budgetRefusal(error)
+		const kind = budget
+			? 'budget_paused'
+			: error instanceof ProductionTaskError
+				? error.kind
+				: 'final'
 		this.exec(
 			"UPDATE task SET status = 'needs_attention', error_type = ?, ended_at = ? WHERE task_id = ?",
 			kind,
@@ -937,7 +960,11 @@ export class ChapterScheduler {
 			task.work_id,
 			task.ref_id,
 		)
-		this.setWork(task.work_id, 'paused', 'chapter_failed')
+		this.setWork(
+			task.work_id,
+			'paused',
+			budget ? 'budget_paused' : 'chapter_failed',
+		)
 	}
 
 	private maybePublish(chapterTaskId: string) {

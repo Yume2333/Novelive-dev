@@ -5,6 +5,7 @@ import { compile } from '@earendil-works/pi-schema'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { productionSnapshotSchema } from '../../packages/creator/src/contract/production'
 import { productionQueueSchema } from '../../packages/creator/src/contract/queue'
+import { testTextConnection } from '../../packages/creator/src/models/text'
 import { Project } from '../../packages/creator/src/project'
 import {
 	ChapterScheduler,
@@ -13,6 +14,7 @@ import {
 import { readQueueWork } from '../../packages/creator/src/scheduler/work-queue'
 import { SpendBudgetError } from '../../packages/creator/src/usage/spend'
 import type { ImageQueueItem } from '../../packages/format/src/model'
+import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
 import { ref, series } from '../fixtures/project-schema/seed'
 import { ScriptedWorker } from '../fixtures/scheduler/m1b/worker'
 
@@ -420,6 +422,44 @@ test('a budget refusal pauses the queue explicitly and retains the image for con
 	await target.idle()
 	expect(draw).toHaveBeenCalledTimes(2)
 	expect(snapshot().chapters[0]).toMatchObject({ status: 'published' })
+})
+
+test('a refused writing request surfaces the budget pause and continues the same step', async () => {
+	const worker = new ScriptedWorker()
+	const refused = new SpendBudgetError(
+		'超出工程预算（软停止线 1600000 tokens）',
+	)
+	const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(refused)
+	const write = vi.spyOn(worker, 'write').mockImplementationOnce(async () => {
+		await testTextConnection(configuration.models.writing, { fetch })
+	})
+	const target = open(worker)
+	target.start(workId, ['ch1'])
+	target.confirmVisual(workId)
+	await target.idle()
+
+	expect(
+		row<{ pause_reason: string }>('SELECT pause_reason FROM work').pause_reason,
+	).toBe('budget_paused')
+	expect(snapshot()).toMatchObject({
+		status: 'stopped',
+		chapters: [
+			{
+				status: 'producing',
+				step: 'write',
+				issue: expect.stringContaining(refused.message),
+			},
+		],
+	})
+	expect(fetch).toHaveBeenCalledTimes(1)
+	expect(worker.count('review:ch1')).toBe(0)
+	target.continue(workId)
+	await target.idle()
+	expect(write).toHaveBeenCalledTimes(2)
+	expect(snapshot()).toMatchObject({
+		phase: 'confirm-first',
+		chapters: [{ status: 'published' }],
+	})
 })
 
 test('crash recovery keeps confirmed work, skips saved images and leaves a replayable run log', async () => {

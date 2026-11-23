@@ -120,8 +120,9 @@ export class TextModelError extends Error {
 		readonly code: Code,
 		message: string,
 		readonly usage?: Usage,
+		options?: ErrorOptions,
 	) {
-		super(message)
+		super(message, options)
 	}
 }
 
@@ -318,6 +319,7 @@ type StreamPolicy = {
 }
 
 type TextStreamOptions = SimpleStreamOptions & { outputLimit?: number }
+const spendRefusals = new WeakMap<AssistantMessage, SpendBudgetError>()
 
 export function createTextStream(
 	policy: StreamPolicy = {},
@@ -354,9 +356,15 @@ export function createTextStream(
 		)
 		let usage: Usage | undefined
 		let reasoningRetried = false
-		const fail = (code: Code, detail?: string, previous?: AssistantMessage) => {
+		const fail = (
+			code: Code,
+			detail?: string,
+			previous?: AssistantMessage,
+			spendRefusal?: SpendBudgetError,
+		) => {
 			const error = failed(model, code, detail, previous)
 			if (usage) error.usage = usage
+			if (spendRefusal) spendRefusals.set(error, spendRefusal)
 			output.push({
 				type: 'error',
 				reason: code === 'cancelled' ? 'aborted' : 'error',
@@ -468,7 +476,13 @@ export function createTextStream(
 				} finally {
 					clearTimeout(timer)
 				}
-				if (spendError) return fail(spendError.code, spendError.message)
+				if (spendError)
+					return fail(
+						spendError.code,
+						spendError.message,
+						undefined,
+						spendError,
+					)
 				recordTextUsage(model.id, result.usage, textUsageSlots.get(model))
 				usage = usage ? sumUsage(usage, result.usage) : result.usage
 				if (options?.signal?.aborted)
@@ -558,6 +572,7 @@ export function textResultError(result: AssistantMessage, fallback: string) {
 		(match?.[1] as Code | undefined) ?? 'internal',
 		message,
 		result.usage,
+		{ cause: spendRefusals.get(result) },
 	)
 }
 
