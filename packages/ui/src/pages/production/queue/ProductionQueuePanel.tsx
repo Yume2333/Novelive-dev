@@ -51,10 +51,10 @@ export function ProductionQueuePanel({
 				<p className={styles.lead}>暂无制作任务</p>
 			)}
 			{queue.active && (
-				<div className={styles.row}>
+				<div className={`${styles.row} ${queueStyles.row}`}>
 					<WorkLink work={queue.active} label="制作中" />
 					<button
-						className={styles.button}
+						className={`${styles.button} ${queueStyles.actions}`}
 						type="button"
 						disabled={busy}
 						onClick={() => queue.active && onStop(queue.active.link.workId)}
@@ -66,9 +66,12 @@ export function ProductionQueuePanel({
 			{queue.queued.length > 0 && (
 				<ol className={styles.list} aria-label="排队中">
 					{queue.queued.map((work, index) => (
-						<li className={styles.row} key={work.link.workId}>
+						<li
+							className={`${styles.row} ${queueStyles.row}`}
+							key={work.link.workId}
+						>
 							<WorkLink work={work} label={`排队中 · ${index + 1}`} />
-							<div className={`${styles.actions} ${queueStyles.move}`}>
+							<div className={`${styles.actions} ${queueStyles.actions}`}>
 								<button
 									className={styles.button}
 									type="button"
@@ -95,7 +98,10 @@ export function ProductionQueuePanel({
 			{queue.inactive.length > 0 && (
 				<ul className={styles.list} aria-label="未在排队">
 					{queue.inactive.map((work) => (
-						<li className={styles.row} key={work.link.workId}>
+						<li
+							className={`${styles.row} ${queueStyles.row}`}
+							key={work.link.workId}
+						>
 							<WorkLink
 								work={work}
 								label={inactiveLabel(work)}
@@ -109,7 +115,7 @@ export function ProductionQueuePanel({
 							/>
 							{work.status === 'paused' && work.reason !== 'chapter_failed' && (
 								<button
-									className={styles.button}
+									className={`${styles.button} ${queueStyles.actions}`}
 									type="button"
 									disabled={busy}
 									onClick={() => onContinue(work.link.workId)}

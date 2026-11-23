@@ -1,10 +1,12 @@
 @media (hover: hover) {
-	.move {
+	.actions {
 		opacity: 0;
+		pointer-events: none;
 	}
 
-	li:hover > .move,
-	li:focus-within > .move {
+	.row:hover > .actions,
+	.row:focus-within > .actions {
 		opacity: 1;
+		pointer-events: auto;
 	}
 }
