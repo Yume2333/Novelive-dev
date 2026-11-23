@@ -378,15 +378,14 @@ test('M1b creation surfaces an unresolved synthesis and does not redispatch afte
 					NL_USAGE_CSV: '',
 				},
 			})
-		const getProductionError = (page: Page, workId: string) =>
-			page.evaluate(async (workId) => {
-				try {
-					await window.novelive.call('production.get', { workId }).promise
-					return null
-				} catch (error) {
-					return error
-				}
+		const expectProductionError = async (page: Page, workId: string) => {
+			await page.evaluate((id) => {
+				location.hash = `/work/${id}/production`
 			}, workId)
+			await expect(page.getByRole('alert')).toContainText(
+				'Model request outcome unknown; not retried automatically (HTTP 503: provider did not return a usable response)',
+			)
+		}
 		const getPage = async (app: Awaited<ReturnType<typeof launch>>) => {
 			await app.evaluate(({ dialog }) => {
 				dialog.showMessageBox = async () => ({
@@ -400,10 +399,6 @@ test('M1b creation surfaces an unresolved synthesis and does not redispatch afte
 		}
 		const app = await launch()
 		let workId: string
-		const unknown = {
-			code: 'internal',
-			message: expect.stringContaining('HTTP 503:'),
-		}
 		try {
 			const page = await getPage(app)
 			const imported = await page.evaluate(
@@ -429,16 +424,14 @@ test('M1b creation surfaces an unresolved synthesis and does not redispatch afte
 			)
 			if (imported.status !== 'ready') throw new Error('Fixture import failed')
 			workId = imported.workId
-			expect(await getProductionError(page, workId)).toMatchObject(unknown)
+			await expectProductionError(page, workId)
 			expect(calls).toEqual([`/v1/chat/completions: ${director}`])
 		} finally {
 			await app.close()
 		}
 		const reopened = await launch()
 		try {
-			expect(
-				await getProductionError(await getPage(reopened), workId),
-			).toMatchObject(unknown)
+			await expectProductionError(await getPage(reopened), workId)
 			expect(calls).toEqual([`/v1/chat/completions: ${director}`])
 		} finally {
 			await reopened.close()
