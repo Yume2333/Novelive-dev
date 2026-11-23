@@ -1,0 +1,921 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import {
+	bibleRevision,
+	getBible,
+} from '../../packages/creator/src/bible/editing'
+import { sourceRevision } from '../../packages/creator/src/bible/editing/sources'
+import { ChatService } from '../../packages/creator/src/chat'
+import { projectProposals } from '../../packages/creator/src/chat/project'
+import { ChatStore } from '../../packages/creator/src/chat/store'
+import type { Proposal } from '../../packages/creator/src/contract'
+import { Project } from '../../packages/creator/src/project'
+import {
+	synthesisFiles,
+	type VolumeSynthesis,
+} from '../../packages/creator/src/synthesis'
+import {
+	bibleEntryBases,
+	readBible,
+} from '../../packages/creator/src/synthesis/patch'
+import { formatVersion, projectFiles } from '../../packages/format/src/model'
+import { ref, scope, seed } from '../fixtures/project-schema/seed'
+
+let directory: string
+let project: Project
+const input = { workId: ref.workId, volumeId: ref.volumeId }
+const file = synthesisFiles(ref.volumeId).result
+
+beforeEach(async () => {
+	directory = join(
+		await mkdtemp(join(tmpdir(), 'novelive-bible-sources-')),
+		'project',
+	)
+	await seed(directory)
+	project = await Project.open(directory)
+})
+afterEach(async () => {
+	project.close()
+	await rm(dirname(directory), { recursive: true, force: true })
+})
+
+async function publish() {
+	const bible = await readBible(project)
+	const result: VolumeSynthesis = {
+		formatVersion,
+		volumeId: ref.volumeId,
+		overview: 'Synthesized fixture',
+		chapters: [],
+		biblePatch: [],
+		glossaryPatch: [],
+		conflicts: [
+			{
+				kind: 'character',
+				op: 'update',
+				entry: {
+					...bible.character[0],
+					name: '新旅人',
+					status: 'candidate',
+					conflict: 'Name conflict',
+				},
+			},
+		],
+		glossaryConflicts: [
+			{ ...bible.glossary[0], written: '铁门', conflict: 'Term conflict' },
+		],
+		bibleRevision: bibleRevision(bible),
+		bibleBase: bibleEntryBases(bible),
+		baseVersion: 1,
+	}
+	await project.write(file, result)
+	return result
+}
+
+function chat() {
+	return new ChatService({
+		database: project.database,
+		workId: ref.workId,
+		cacheDir: directory,
+		mainModel() {
+			throw new Error('Network forbidden')
+		},
+		emit() {},
+		proposals: projectProposals(project, ref.workId),
+	})
+}
+
+test('getBible reads the series, each volume and work once regardless of candidate count', async () => {
+	await publish()
+	const reads = vi.spyOn(project, 'read')
+	try {
+		const view = await getBible(project, input)
+		expect(view.proposalIds.length).toBeGreaterThan(1)
+		for (const path of [
+			projectFiles.series.path,
+			projectFiles.volume(ref.volumeId).path,
+			projectFiles.work(ref.volumeId, ref.workId).path,
+		])
+			expect(
+				reads.mock.calls.filter(([file]) => file.path === path),
+			).toHaveLength(1)
+	} finally {
+		reads.mockRestore()
+	}
+})
+
+test('synthesis proposals persist source revisions, resolve through chat and never resurrect on reopen', async () => {
+	const result = await publish()
+	project.database.prepare('DELETE FROM task WHERE work_id = ?').run(ref.workId)
+	project.database.prepare('DELETE FROM work WHERE work_id = ?').run(ref.workId)
+	const first = await getBible(project, input)
+	expect(first.proposalIds).toHaveLength(2)
+	const store = new ChatStore(project.database, ref.workId)
+	const proposals = first.proposalIds.map((id) => store.proposal(id).proposal)
+	const character = proposals.find(({ payload }) => payload.kind === 'bible')
+	const glossary = proposals.find(({ payload }) => payload.kind === 'glossary')
+	if (!character || !glossary) throw new Error('Missing bridged proposals')
+	expect(store.proposal(character.id).source).toMatchObject({
+		path: file.path,
+		revision: expect.any(String),
+	})
+	expect(character.payload).toMatchObject({
+		expectedRevision: result.bibleRevision,
+	})
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{
+					...input,
+					proposalId: glossary.id,
+					decision: { kind: 'reject', reason: 'Keep wooden door' },
+				},
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'resolved', proposal: { status: 'rejected' } })
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: character.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'resolved', proposal: { status: 'approved' } })
+	} finally {
+		await service.close()
+	}
+	expect((await readBible(project)).character[0].name).toBe('新旅人')
+	project.close()
+	project = await Project.open(directory)
+	expect((await getBible(project, input)).proposalIds).toEqual([])
+	const reopened = new ChatStore(project.database, ref.workId)
+	expect(reopened.proposal(glossary.id)).toMatchObject({
+		proposal: { status: 'rejected', feedback: 'Keep wooden door' },
+		source: { path: file.path },
+	})
+	expect(
+		project.database.prepare('SELECT COUNT(*) AS n FROM proposal').get(),
+	).toEqual({ n: 2 })
+})
+
+test('a targeted entry changed before discovery makes its published synthesis conflict stale', async () => {
+	const result = await publish()
+	const character = await project.read(
+		projectFiles.character(scope, 'traveler'),
+	)
+	await project.write(projectFiles.character(scope, 'traveler'), {
+		...character,
+		entries: character.entries.map((entry) => ({
+			...entry,
+			name: 'Newer confirmed name',
+		})),
+	})
+	const first = await getBible(project, input)
+	const before = await readBible(project)
+	const service = chat()
+	try {
+		for (const id of first.proposalIds) {
+			if (
+				new ChatStore(project.database, ref.workId).proposal(id).proposal
+					.payload.kind !== 'bible'
+			)
+				continue
+			expect(
+				new ChatStore(project.database, ref.workId).proposal(id).proposal
+					.payload,
+			).toMatchObject({ expectedRevision: result.bibleRevision })
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject({ status: 'stale' })
+		}
+	} finally {
+		await service.close()
+	}
+	expect(await readBible(project)).toEqual(before)
+	expect((await getBible(project, input)).proposalIds).toEqual(
+		first.proposalIds,
+	)
+})
+
+test('replaced or missing synthesis source cannot apply an old proposal even if Bible is unchanged', async () => {
+	const result = await publish()
+	const first = await getBible(project, input)
+	await project.write(file, { ...result, overview: 'A replacement synthesis' })
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{
+					...input,
+					proposalId: first.proposalIds[0],
+					decision: { kind: 'approve' },
+				},
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'stale' })
+		await rm(join(directory, file.path))
+		expect(
+			await service.resolve(
+				{
+					...input,
+					proposalId: first.proposalIds[0],
+					decision: { kind: 'approve' },
+				},
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'stale' })
+	} finally {
+		await service.close()
+	}
+})
+
+test('unversioned legacy conflicts stay stale without a trusted original base', async () => {
+	const {
+		bibleRevision: _,
+		bibleBase: __,
+		baseVersion: ___,
+		...legacy
+	} = await publish()
+	await project.write(file, legacy)
+	const first = await getBible(project, input)
+	const service = chat()
+	try {
+		for (const id of first.proposalIds)
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject({ status: 'stale' })
+	} finally {
+		await service.close()
+	}
+	expect((await readBible(project)).character[0].name).toBe('旅人')
+})
+
+test.each([false, true])(
+	'legacy versioned synthesis uses the saved whole-Bible revision without a provenance marker (newer edit: %s)',
+	async (newerEdit) => {
+		const { bibleBase: _, baseVersion: __, ...legacy } = await publish()
+		expect(legacy).not.toHaveProperty('baseVersion')
+		await project.write(file, legacy)
+		if (newerEdit) {
+			const character = await project.read(
+				projectFiles.character(scope, 'traveler'),
+			)
+			await project.write(projectFiles.character(scope, 'traveler'), {
+				...character,
+				entries: character.entries.map((entry) => ({
+					...entry,
+					name: 'Newer creator revision',
+				})),
+			})
+		}
+		const before = await readBible(project)
+		const view = await getBible(project, input)
+		expect(view.proposalIds).toHaveLength(2)
+		const service = chat()
+		try {
+			for (const id of view.proposalIds) {
+				const row = new ChatStore(project.database, ref.workId).proposal(id)
+				expect(view.proposalActions[id]).toMatchObject(
+					newerEdit
+						? {
+								canApprove: false,
+								status: 'stale',
+								reason: expect.stringContaining('已过期'),
+							}
+						: { canApprove: true },
+				)
+				if (newerEdit) expect(row.source?.bases).toBeUndefined()
+				else expect(row.source?.bases).toHaveLength(1)
+				expect(
+					await service.resolve(
+						{ ...input, proposalId: id, decision: { kind: 'approve' } },
+						new AbortController().signal,
+					),
+				).toMatchObject(
+					newerEdit
+						? { status: 'stale' }
+						: { status: 'resolved', proposal: { status: 'approved' } },
+				)
+			}
+			if (newerEdit) expect(await readBible(project)).toEqual(before)
+		} finally {
+			await service.close()
+		}
+	},
+)
+
+test('candidate deduplication survives rejection, unrelated collection edits and reopen', async () => {
+	const first = await getBible(project, input)
+	const store = new ChatStore(project.database, ref.workId)
+	const term = first.proposalIds
+		.map((id) => store.proposal(id).proposal)
+		.find(({ payload }) => payload.kind === 'glossary')
+	if (!term) throw new Error('Missing glossary candidate')
+	const source = store.proposal(term.id).source
+	store.resolve(term, 'rejected', 'Keep original')
+	const glossary = await project.read(projectFiles.glossary(scope))
+	await project.write(projectFiles.glossary(scope), {
+		...glossary,
+		entries: [
+			...glossary.entries,
+			{
+				id: 'extra',
+				original: 'Extra',
+				written: 'Extra',
+				category: 'object',
+				status: 'confirmed',
+			},
+		],
+	})
+	project.close()
+	project = await Project.open(directory)
+	expect((await getBible(project, input)).proposalIds).not.toContain(term.id)
+	expect(
+		new ChatStore(project.database, ref.workId).proposal(term.id),
+	).toMatchObject({
+		source,
+		proposal: { status: 'rejected', feedback: 'Keep original' },
+	})
+})
+
+test('empty sources yield no proposals and invalid synthesis is not silently ignored', async () => {
+	await project.write(projectFiles.character(scope, 'traveler'), {
+		formatVersion,
+		entries: [],
+	})
+	await project.write(projectFiles.glossary(scope), {
+		formatVersion,
+		entries: [],
+	})
+	expect((await getBible(project, input)).proposalIds).toEqual([])
+	await project.writeFile(file.path, '{invalid JSON')
+	await expect(getBible(project, input)).rejects.toThrow()
+	expect(
+		project.database.prepare('SELECT COUNT(*) AS n FROM proposal').get(),
+	).toEqual({ n: 0 })
+})
+
+test('a pending file candidate can be approved through the unified resolver', async () => {
+	const first = await getBible(project, input)
+	const term = first.proposalIds
+		.map(
+			(id) => new ChatStore(project.database, ref.workId).proposal(id).proposal,
+		)
+		.find(({ payload }) => payload.kind === 'glossary')
+	if (!term) throw new Error('Missing glossary candidate')
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: term.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'resolved', proposal: { status: 'approved' } })
+	} finally {
+		await service.close()
+	}
+	expect((await readBible(project)).glossary[0].status).toBe('confirmed')
+	expect((await getBible(project, input)).proposalIds).not.toContain(term.id)
+})
+
+test('legacy synthesis cannot invent post-merge bases from an unversioned result and pre-merge checkpoint', async () => {
+	const {
+		bibleRevision: basis,
+		bibleBase: _,
+		baseVersion: __,
+		...legacy
+	} = await publish()
+	await project.write(file, legacy)
+	await project.write(synthesisFiles(ref.volumeId).checkpoint, {
+		formatVersion,
+		fingerprint: 'legacy',
+		basis: basis ?? '',
+		packet: 0,
+		events: [],
+		whole: null,
+		ready: true,
+		applied: true,
+	})
+	await project.write(projectFiles.style(scope), {
+		formatVersion,
+		entries: [
+			{
+				id: 'merged',
+				status: 'candidate',
+				description: 'Synthesis merged style',
+			},
+		],
+	})
+	const first = await getBible(project, input)
+	expect(first.revision).not.toBe(basis)
+	for (const id of first.proposalIds) {
+		const row = new ChatStore(project.database, ref.workId).proposal(id)
+		if (row.source?.path === file.path)
+			expect(row.proposal.payload).toMatchObject({
+				expectedRevision: 'unversioned-synthesis',
+			})
+	}
+	await project.write(projectFiles.style(scope), {
+		formatVersion,
+		entries: [{ id: 'new', status: 'confirmed', description: 'Newer style' }],
+	})
+	expect((await getBible(project, input)).proposalIds).toEqual(
+		first.proposalIds,
+	)
+	for (const id of first.proposalIds) {
+		const row = new ChatStore(project.database, ref.workId).proposal(id)
+		if (row.source?.path === file.path)
+			expect(row.proposal.payload).toMatchObject({
+				expectedRevision: 'unversioned-synthesis',
+			})
+	}
+	const service = chat()
+	try {
+		for (const id of first.proposalIds) {
+			const { proposal } = new ChatStore(project.database, ref.workId).proposal(
+				id,
+			)
+			if (
+				proposal.payload.kind === 'bible' &&
+				proposal.payload.changes.some(({ kind }) => kind === 'style')
+			)
+				continue
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject({ status: 'stale' })
+		}
+	} finally {
+		await service.close()
+	}
+})
+
+test('an unfinished replacement checkpoint cannot rebase previously bridged target snapshots', async () => {
+	const { bibleBase: _, baseVersion: __, ...legacy } = await publish()
+	await project.write(file, legacy)
+	const first = await getBible(project, input)
+	for (const id of first.proposalIds)
+		expect(first.proposalActions[id]).toMatchObject({ canApprove: true })
+	const character = await project.read(
+		projectFiles.character(scope, 'traveler'),
+	)
+	await project.write(projectFiles.character(scope, 'traveler'), {
+		...character,
+		entries: character.entries.map((entry) => ({
+			...entry,
+			name: 'Newer name',
+		})),
+	})
+	await project.write(synthesisFiles(ref.volumeId).checkpoint, {
+		formatVersion,
+		fingerprint: 'replacement',
+		basis: bibleRevision(await readBible(project)),
+		packet: 0,
+		events: [],
+		whole: null,
+		ready: true,
+		applied: false,
+	})
+	await getBible(project, input)
+	const service = chat()
+	try {
+		for (const id of first.proposalIds) {
+			if (
+				new ChatStore(project.database, ref.workId).proposal(id).proposal
+					.payload.kind !== 'bible'
+			)
+				continue
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject({ status: 'stale' })
+		}
+	} finally {
+		await service.close()
+	}
+})
+
+test('independent conflicts from one synthesis can both be approved sequentially', async () => {
+	await publish()
+	const first = await getBible(project, input)
+	const service = chat()
+	try {
+		for (const id of first.proposalIds)
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject({ status: 'resolved', proposal: { status: 'approved' } })
+	} finally {
+		await service.close()
+	}
+})
+
+test('chapter-scoped synthesis conflicts cannot replace global facts but can be rejected', async () => {
+	const result = await publish()
+	result.conflicts[0].observedChapter = ref.chapterId
+	await project.write(file, result)
+	const first = await getBible(project, input)
+	const proposal = first.proposalIds
+		.map(
+			(id) => new ChatStore(project.database, ref.workId).proposal(id).proposal,
+		)
+		.find(({ payload }) => payload.kind === 'bible')
+	if (!proposal) throw new Error('Missing chapter-scoped conflict')
+	expect(first.proposalActions[proposal.id]).toMatchObject({
+		canApprove: false,
+		reason: expect.stringContaining('暂不支持按章应用'),
+	})
+	const before = await readBible(project)
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({
+			status: 'restricted',
+			reason: expect.stringContaining('暂不支持按章应用'),
+		})
+		expect(await readBible(project)).toEqual(before)
+		expect(
+			await service.resolve(
+				{
+					...input,
+					proposalId: proposal.id,
+					decision: {
+						kind: 'reject',
+						reason: 'Do not change earlier chapters',
+					},
+				},
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'resolved', proposal: { status: 'rejected' } })
+	} finally {
+		await service.close()
+	}
+})
+
+test('relation conflicts with unpublished character dependencies cannot be approved', async () => {
+	const result = await publish()
+	result.conflicts = [
+		{
+			kind: 'relation',
+			op: 'add',
+			entry: {
+				id: 'unpublished-relation',
+				from: 'traveler',
+				to: 'missing',
+				description: 'Unpublished friend',
+				status: 'candidate',
+			},
+		},
+	]
+	result.glossaryConflicts = []
+	await project.write(file, result)
+	const first = await getBible(project, input)
+	const proposal = first.proposalIds
+		.map(
+			(id) => new ChatStore(project.database, ref.workId).proposal(id).proposal,
+		)
+		.find(
+			({ payload }) =>
+				payload.kind === 'bible' &&
+				payload.changes.some(({ kind }) => kind === 'relation'),
+		)
+	if (!proposal) throw new Error('Missing relation conflict')
+	expect(first.proposalActions[proposal.id]).toMatchObject({
+		canApprove: false,
+		reason: 'Unknown character reference: missing',
+	})
+	const before = await readBible(project)
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({
+			status: 'restricted',
+			reason: 'Unknown character reference: missing',
+		})
+		expect(await readBible(project)).toEqual(before)
+		await project.write(projectFiles.character(scope, 'missing'), {
+			formatVersion,
+			entries: [
+				{
+					id: 'missing',
+					name: 'Published friend',
+					aliases: [],
+					status: 'confirmed',
+				},
+			],
+		})
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'resolved', proposal: { status: 'approved' } })
+	} finally {
+		await service.close()
+	}
+})
+
+test('quarantined synthesis never authorizes snapshots of the newer confirmed Bible', async () => {
+	const result = await publish()
+	const character = await project.read(
+		projectFiles.character(scope, 'traveler'),
+	)
+	await project.write(projectFiles.character(scope, 'traveler'), {
+		...character,
+		entries: character.entries.map((entry) => ({
+			...entry,
+			name: 'Newer creator edit',
+		})),
+	})
+	await project.write(file, {
+		...result,
+		quarantined: true,
+		bibleBase: bibleEntryBases(await readBible(project)),
+	})
+	const first = await getBible(project, input)
+	const before = await readBible(project)
+	const service = chat()
+	try {
+		for (const id of first.proposalIds) {
+			expect(
+				new ChatStore(project.database, ref.workId).proposal(id).source?.bases,
+			).toBeUndefined()
+			expect(first.proposalActions[id]).toMatchObject({
+				canApprove: false,
+				reason: expect.stringContaining('已过期'),
+			})
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject({ status: 'stale' })
+		}
+	} finally {
+		await service.close()
+	}
+	expect(await readBible(project)).toEqual(before)
+})
+
+test('legacy pending proposal backfill cannot snapshot a newer targeted confirmed entry', async () => {
+	const first = await getBible(project, input)
+	const store = new ChatStore(project.database, ref.workId)
+	const proposal = first.proposalIds
+		.map((id) => store.proposal(id).proposal)
+		.find(({ payload }) => payload.kind === 'bible')
+	if (!proposal) throw new Error('Missing pending character')
+	project.database
+		.prepare(
+			"UPDATE proposal SET payload = json_remove(payload, '$.source.bases', '$.source.baseRevision') WHERE proposal_id = ?",
+		)
+		.run(proposal.id)
+	const character = await project.read(
+		projectFiles.character(scope, 'traveler'),
+	)
+	await project.write(projectFiles.character(scope, 'traveler'), {
+		...character,
+		entries: character.entries.map((entry) =>
+			entry.status === 'confirmed'
+				? { ...entry, name: 'Newer confirmed creator edit' }
+				: entry,
+		),
+	})
+	const next = await getBible(project, input)
+	expect(store.proposal(proposal.id).source?.bases).toBeUndefined()
+	expect(next.proposalActions[proposal.id]).toMatchObject({
+		canApprove: false,
+		reason: expect.stringContaining('已过期'),
+	})
+	const before = await readBible(project)
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({ status: 'stale' })
+	} finally {
+		await service.close()
+	}
+	expect(await readBible(project)).toEqual(before)
+})
+
+test('backfill may enrich pending snapshots only while the saved whole-Bible revision matches', async () => {
+	const first = await getBible(project, input)
+	const store = new ChatStore(project.database, ref.workId)
+	for (const id of first.proposalIds)
+		project.database
+			.prepare(
+				"UPDATE proposal SET payload = json_remove(payload, '$.source.bases', '$.source.baseRevision') WHERE proposal_id = ?",
+			)
+			.run(id)
+	const next = await getBible(project, input)
+	for (const id of next.proposalIds) {
+		expect(next.proposalActions[id]).toMatchObject({ canApprove: true })
+		expect(store.proposal(id).source).toMatchObject({
+			baseRevision: first.revision,
+			bases: expect.any(Array),
+		})
+	}
+})
+
+test('real patch preflight blocks missing speakers without writing confirmed content', async () => {
+	const result = await publish()
+	const change = result.conflicts[0]
+	if (change.kind !== 'character')
+		throw new Error('Expected character conflict')
+	change.entry.addresses = [
+		{ speakerId: 'unpublished-speaker', name: 'Captain' },
+	]
+	await project.write(file, result)
+	const before = await readBible(project)
+	const first = await getBible(project, input)
+	const proposal = first.proposalIds
+		.map(
+			(id) => new ChatStore(project.database, ref.workId).proposal(id).proposal,
+		)
+		.find(({ payload }) => payload.kind === 'bible')
+	if (!proposal) throw new Error('Missing speaker conflict')
+	expect(first.proposalActions[proposal.id]).toMatchObject({
+		canApprove: false,
+		reason: 'Unknown character reference: unpublished-speaker',
+	})
+	expect(await readBible(project)).toEqual(before)
+	const service = chat()
+	try {
+		expect(
+			await service.resolve(
+				{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+				new AbortController().signal,
+			),
+		).toMatchObject({
+			status: 'restricted',
+			reason: 'Unknown character reference: unpublished-speaker',
+			proposal: { status: 'pending' },
+		})
+		expect(
+			await service.resolve(
+				{
+					...input,
+					proposalId: proposal.id,
+					decision: { kind: 'reject', reason: 'Publish the speaker first' },
+				},
+				new AbortController().signal,
+			),
+		).toMatchObject({
+			status: 'resolved',
+			proposal: { status: 'rejected', feedback: 'Publish the speaker first' },
+		})
+	} finally {
+		await service.close()
+	}
+})
+
+test.each([true, false])(
+	'post-patch preflight and apply agree when deleting a referenced character (keep reference: %s)',
+	async (keepReference) => {
+		const removed = {
+			id: 'removed',
+			name: 'Removed character',
+			aliases: [],
+			status: 'confirmed' as const,
+		}
+		const relation = {
+			id: 'deletion-relation',
+			from: 'traveler',
+			to: removed.id,
+			description: 'friend',
+			status: 'confirmed' as const,
+		}
+		await project.write(projectFiles.character(scope, removed.id), {
+			formatVersion,
+			entries: [removed],
+		})
+		await project.write(projectFiles.relations(scope), {
+			formatVersion,
+			entries: [relation],
+		})
+		const result = await publish()
+		const before = await readBible(project)
+		const revision = bibleRevision(before)
+		const proposal: Proposal = {
+			id: 'batch-delete',
+			workId: ref.workId,
+			sessionId: null,
+			prompt: 'Batch character removal',
+			chapterIds: [],
+			status: 'pending',
+			payload: {
+				kind: 'bible',
+				volumeId: ref.volumeId,
+				expectedRevision: revision,
+				changes: [
+					{ kind: 'character', op: 'delete', entry: removed },
+					{
+						kind: 'relation',
+						op: 'update',
+						entry: {
+							...relation,
+							to: keepReference ? removed.id : 'traveler',
+							description: 'updated friend',
+						},
+					},
+				],
+			},
+		}
+		new ChatStore(project.database, ref.workId).recordStandaloneProposal(
+			proposal,
+			{
+				path: file.path,
+				revision: sourceRevision(result),
+				bases: bibleEntryBases(before).filter(
+					({ kind, id }) =>
+						(kind === 'character' && id === removed.id) ||
+						(kind === 'relation' && id === relation.id),
+				),
+				baseRevision: revision,
+			},
+			revision,
+		)
+		const view = await getBible(project, input)
+		expect(view.proposalActions[proposal.id]).toMatchObject(
+			keepReference
+				? {
+						canApprove: false,
+						status: 'restricted',
+						reason: 'Unknown character reference: removed',
+					}
+				: { canApprove: true },
+		)
+		const service = chat()
+		try {
+			expect(
+				await service.resolve(
+					{ ...input, proposalId: proposal.id, decision: { kind: 'approve' } },
+					new AbortController().signal,
+				),
+			).toMatchObject(
+				keepReference
+					? {
+							status: 'restricted',
+							reason: 'Unknown character reference: removed',
+							proposal: { status: 'pending' },
+						}
+					: { status: 'resolved', proposal: { status: 'approved' } },
+			)
+			if (keepReference) {
+				expect(await readBible(project)).toEqual(before)
+				expect(
+					await service.resolve(
+						{
+							...input,
+							proposalId: proposal.id,
+							decision: {
+								kind: 'reject',
+								reason: 'Keep dependencies consistent',
+							},
+						},
+						new AbortController().signal,
+					),
+				).toMatchObject({
+					status: 'resolved',
+					proposal: { status: 'rejected' },
+				})
+			} else {
+				expect(
+					(await readBible(project)).character.some(
+						({ id }) => id === removed.id,
+					),
+				).toBe(false)
+				expect((await readBible(project)).relation).toContainEqual({
+					...relation,
+					to: 'traveler',
+					description: 'updated friend',
+				})
+			}
+		} finally {
+			await service.close()
+		}
+	},
+)

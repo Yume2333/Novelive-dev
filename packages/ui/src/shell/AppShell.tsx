@@ -36,6 +36,7 @@ const workNavigation = [
 	{ route: 'work', icon: LibraryBig, name: '概览' },
 	{ route: 'play', icon: Play, name: '游玩' },
 	{ route: 'production', icon: Workflow, name: '制作' },
+	{ route: 'bible', icon: LibraryBig, name: '设定集' },
 ] as const
 export interface SettingsHost {
 	config: CommandOutput<'config.get'> | undefined

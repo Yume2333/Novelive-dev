@@ -51,7 +51,9 @@ export interface ProposalActions {
 		proposal: Proposal,
 		signal: AbortSignal,
 	): Promise<
-		{ status: 'applied'; rewrite?: RewriteProposal } | { status: 'stale' }
+		| { status: 'applied'; rewrite?: RewriteProposal }
+		| { status: 'stale' }
+		| { status: 'restricted'; reason: string }
 	>
 }
 

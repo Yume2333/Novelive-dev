@@ -1578,6 +1578,8 @@ test.each([false, true])(
 				}),
 			)
 			expect(result.glossaryConflicts).toHaveLength(2)
+			expect(result.quarantined).toBe(true)
+			expect(result.bibleBase).toBeUndefined()
 		}
 	},
 )

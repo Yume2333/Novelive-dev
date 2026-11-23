@@ -159,6 +159,7 @@ function ProposalCard({
 }) {
 	const [current, setCurrent] = useState(proposal)
 	const [stale, setStale] = useState(false)
+	const [restriction, setRestriction] = useState('')
 	const [rejecting, setRejecting] = useState(false)
 	const [reason, setReason] = useState('')
 	const [busy, setBusy] = useState(false)
@@ -175,6 +176,7 @@ function ProposalCard({
 			const result = await actions.resolve(current, decision)
 			setCurrent(result.proposal)
 			setStale(result.status === 'stale')
+			setRestriction(result.status === 'restricted' ? result.reason : '')
 			setRejecting(false)
 		} catch {
 			setError('没能提交，请重试')
@@ -198,6 +200,11 @@ function ProposalCard({
 			<p className={styles.impact}>
 				影响：{chapters.length ? chapters.join('、') : '不改动已生成的章节'}
 			</p>
+			{restriction && (
+				<p className={styles.resolution} role="status">
+					{restriction}
+				</p>
+			)}
 			{stale ? (
 				<p className={styles.resolution} role="status">
 					内容已经变了，这张卡已过期
@@ -256,7 +263,7 @@ function ProposalCard({
 					<button
 						type="button"
 						className={styles.primary}
-						disabled={busy}
+						disabled={busy || Boolean(restriction)}
 						onClick={() => void decide({ kind: 'approve' })}
 					>
 						确认
