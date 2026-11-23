@@ -119,6 +119,31 @@ test('gate request identities normalize generated IDs without changing recorded 
 	expect(upstream).toHaveBeenCalledTimes(1)
 })
 
+test('fallback misses are silent when the primary cassette answers and final misses log once', async () => {
+	const missingLog = join(directory, 'missing.txt')
+	vi.stubEnv('NL_REPLAY_MISSING_LOG', missingLog)
+	await (
+		await createReplayFetch({
+			mode: 'record',
+			directory,
+			fetch: async () => new Response('primary'),
+		})(origin)
+	).text()
+	const replay = createReplayFetch({
+		mode: 'strict',
+		directory,
+		fallbackDirectory: join(directory, 'empty'),
+	})
+	expect(await (await replay(origin)).text()).toBe('primary')
+	expect(await readdir(directory)).not.toContain('missing.txt')
+	await expect(replay(`${origin}/missing`)).rejects.toThrow(
+		'Missing strict replay cassette:',
+	)
+	const diagnostics = (await readFile(missingLog, 'utf8')).trim().split('\n')
+	expect(diagnostics).toHaveLength(1)
+	expect(diagnostics[0]).not.toContain('/empty')
+})
+
 test('gate fallback reuses existing cassettes before recording and a missing fallback stays offline in strict mode', async () => {
 	const upstream = vi.fn(async () => new Response('existing'))
 	const record = createReplayFetch({

@@ -22,6 +22,7 @@ export interface ReplayOptions {
 	normalizeIds?: boolean
 	fallbackDirectory?: string
 	reuseRecorded?: boolean
+	reportMissing?: boolean
 }
 
 const bodyLimit = 256 * 1024
@@ -256,6 +257,7 @@ export function createReplayFetch(
 		? createReplayFetch({
 				mode: 'strict',
 				directory: options.fallbackDirectory,
+				reportMissing: false,
 			})
 		: undefined
 	let pending: Promise<unknown> = Promise.resolve()
@@ -437,7 +439,10 @@ export function createReplayFetch(
 		if (rows.length === 0) {
 			if (mode === 'strict') {
 				const message = `Missing strict replay cassette: ${identity.method} ${identity.key} (${directory})`
-				if (process.env.NL_REPLAY_MISSING_LOG)
+				if (
+					options.reportMissing !== false &&
+					process.env.NL_REPLAY_MISSING_LOG
+				)
 					await appendFile(process.env.NL_REPLAY_MISSING_LOG, `${message}\n`)
 				throw new Error(message)
 			}
