@@ -129,9 +129,12 @@ test('reserves reasoning output capacity and propagates a typed exhaustion error
 			fetch,
 		}),
 	).rejects.toMatchObject({ code: 'reasoning_limit' })
-	expect(fetch).toHaveBeenCalledOnce()
-	const [request] = payloads
-	expect(request.max_tokens ?? request.max_completion_tokens).toBe(8192)
+	expect(fetch).toHaveBeenCalledTimes(2)
+	expect(
+		payloads.map(
+			(request) => request.max_tokens ?? request.max_completion_tokens,
+		),
+	).toEqual([24_576, 32_768])
 })
 
 test('restart reuses completed chapter files and volume digests without model calls', async () => {

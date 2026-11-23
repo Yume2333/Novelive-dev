@@ -32,10 +32,9 @@ const home = homedir()
 const source = join(home, 'novelive-testbooks', 'yesou-puyan.txt')
 const root = join(home, '.local/novelive-tools/m1a-owner-book')
 const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
-const purpose = 'M1a/07 owner book'
+const purpose = 'M1a/07 owner book after shared output budgeting'
 const previewModel = 'gemini-3.8-flash'
-const synthesisModel = 'devin-swe-2'
-const cap = 20_000_000
+const cap = 15_000_000
 const series = {
 	formatVersion: 1,
 	seriesId: 'yesou-puyan',
@@ -73,6 +72,15 @@ function normalized(entries: BiblePatch) {
 test.skipIf(process.env.NL_REPLAY !== 'record')(
 	'M1a/07 imports a complete public-domain book and compares one real volume on disk',
 	async () => {
+		const synthesisModel =
+			process.env.NL_OWNER_BOOK_SYNTHESIS_MODEL ?? 'devin-swe-2'
+		if (
+			synthesisModel !== 'devin-swe-2' &&
+			synthesisModel !== 'gemini-3.8-flash'
+		)
+			throw new Error('Unexpected synthesis model')
+		const mustResume = process.env.NL_OWNER_BOOK_EXPECT_RESUME === '1'
+		let expectedResume: { packet: number; events: number } | undefined
 		const baseUrl = process.env.NL_IMAGE_BASE_URL
 		const apiKey = process.env.NL_IMAGE_API_KEY
 		if (!baseUrl || !apiKey)
@@ -104,6 +112,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			previewCalls: 0,
 			synthesisCalls: 0,
 			packetCount: 0,
+			resumedPacket: 0,
+			resumedEvents: 0,
 		}
 		let used = 0
 		for (const line of (await readFile(ledger, 'utf8')).split('\n')) {
@@ -123,15 +133,22 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			const model: string = payload.model
 			if (model !== previewModel && model !== synthesisModel)
 				throw new Error('Unexpected real-book provider model')
-			const reserve = Buffer.byteLength(text) + 16_384
+			const outputCap = payload.max_completion_tokens ?? payload.max_tokens
+			if (!Number.isSafeInteger(outputCap) || outputCap < 1)
+				throw new Error('Real-book request has no valid output cap')
+			const reserve = Buffer.byteLength(text) + outputCap + 1024
 			if (used + reserve > cap) {
 				controller.abort()
 				throw new Error('Real-book token cap reached')
 			}
 			used += reserve
 			stats.calls++
-			stats.previewCalls += Number(model === previewModel)
-			stats.synthesisCalls += Number(model === synthesisModel)
+			const prompt = payload.messages[0]?.content
+			const isSynthesis =
+				typeof prompt === 'string' &&
+				prompt.startsWith('Synthesize the ordered chapter previews')
+			stats.previewCalls += Number(!isSynthesis)
+			stats.synthesisCalls += Number(isSynthesis)
 			const match = /Extract only the next event in packet \d+\/(\d+)/.exec(
 				text,
 			)
@@ -197,11 +214,30 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			mode: 'record',
 			fetch: paid,
 		})
-		const fetchReplay = createReplayFetch({
+		const replay = createReplayFetch({
 			...cassette,
 			mode: 'replay',
 			fetch: upstream,
 		})
+		const fetchReplay: typeof globalThis.fetch = async (input, init) => {
+			const request = new Request(input, init)
+			if (expectedResume) {
+				const prompt = (await request.clone().json()).messages[0]?.content
+				const packet = /Extract only the next event in packet (\d+)\/\d+/.exec(
+					prompt,
+				)
+				const events = /^Events already extracted: (\d+)$/m.exec(prompt)
+				if (
+					Number(packet?.[1]) !== expectedResume.packet ||
+					Number(events?.[1]) !== expectedResume.events
+				)
+					throw new Error('Request did not resume the saved synthesis packet')
+				stats.resumedPacket = expectedResume.packet
+				stats.resumedEvents = expectedResume.events
+				expectedResume = undefined
+			}
+			return replay(request)
+		}
 		const options = {
 			previewConnection,
 			synthesisConnection: { ...synthesisConnection, contextWindow: 16_384 },
@@ -265,6 +301,15 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					await first.read(projectFiles.work(volumeId, volume.workIds[0]))
 				).chapterIds
 				expect(chapterIds).toHaveLength(7)
+				if (mustResume) {
+					const saved = await first.read(synthesisFiles(volumeId).checkpoint)
+					expect(saved.applied).toBe(false)
+					expect(saved.events.length).toBeGreaterThan(0)
+					expectedResume = {
+						packet: saved.packet + 1,
+						events: saved.events.length,
+					}
+				}
 				phase = 'preview and chunked synthesis'
 				const result = await prepareVolume(first, volumeId, options)
 				chunked = result.synthesis
