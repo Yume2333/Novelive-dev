@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { posix } from 'node:path'
 import { TextWriter, Uint8ArrayReader, ZipReader } from '@zip.js/zip.js'
 import { SaxesParser } from 'saxes'
 import type { ExtractedBook, ImportExtraction } from '../../contract/import'
@@ -89,6 +90,39 @@ function bodyText(node: Element): string {
 		.join('')
 }
 
+function relationshipTarget(source: string, kind: string, part: string) {
+	const root = xml(source)
+	const relationships = root.children.flatMap((node) =>
+		typeof node === 'string' ? [] : node.children,
+	)
+	for (const rel of relationships) {
+		if (
+			typeof rel === 'string' ||
+			rel.name !== 'Relationship' ||
+			![
+				'http://schemas.openxmlformats.org/package/2006/relationships',
+				'http://purl.oclc.org/ooxml/package/relationships',
+			].includes(rel.uri) ||
+			!rel.attrs.Type?.endsWith(`/${kind}`) ||
+			rel.attrs.TargetMode === 'External'
+		)
+			continue
+		const target = posix.normalize(
+			posix.join(posix.dirname(part), rel.attrs.Target),
+		)
+		if (
+			target.startsWith('../') ||
+			target.includes('\\') ||
+			/^[a-z]+:/i.test(target)
+		)
+			throw new DocxImportError(
+				'invalid_docx',
+				'Invalid DOCX relationship target',
+			)
+		return rel.attrs.Target.startsWith('/') ? rel.attrs.Target.slice(1) : target
+	}
+}
+
 /** Extracts DOCX bytes without writing archive entries to disk. */
 export async function extractDocx(
 	source: Uint8Array,
@@ -102,18 +136,31 @@ export async function extractDocx(
 				? entry.getData(new TextWriter(), { checkSignature: true })
 				: undefined
 		}
-		const document = await read('word/document.xml')
+		const packageRels = await read('_rels/.rels')
+		const mainPart =
+			(packageRels && relationshipTarget(packageRels, 'officeDocument', '')) ||
+			'word/document.xml'
+		const partRels = await read(
+			posix.join(
+				posix.dirname(mainPart),
+				'_rels',
+				`${posix.basename(mainPart)}.rels`,
+			),
+		)
+		const relatedPart = (kind: string, fallback: string) =>
+			(partRels && relationshipTarget(partRels, kind, mainPart)) || fallback
+		const document = await read(mainPart)
 		if (document === undefined)
 			throw new DocxImportError(
 				'missing_document',
-				'DOCX is missing word/document.xml',
+				`DOCX is missing ${mainPart}`,
 			)
 		const tree = xml(document)
 		const body = [...elements(tree, 'body')][0]
 		if (!body)
 			throw new DocxImportError('invalid_docx', 'Not a Word DOCX document')
 		const styles = new Map<string, Element>()
-		const styleXml = await read('word/styles.xml')
+		const styleXml = await read(relatedPart('styles', 'word/styles.xml'))
 		if (styleXml)
 			for (const style of elements(xml(styleXml), 'style'))
 				styles.set(style.attrs.styleId, style)
@@ -140,7 +187,7 @@ export async function extractDocx(
 		}
 		const notes = new Map<string, string[]>()
 		for (const kind of ['footnote', 'endnote']) {
-			const source = await read(`word/${kind}s.xml`)
+			const source = await read(relatedPart(`${kind}s`, `word/${kind}s.xml`))
 			if (!source) continue
 			for (const note of elements(xml(source), kind)) {
 				if (note.attrs.type && note.attrs.type !== 'normal') continue

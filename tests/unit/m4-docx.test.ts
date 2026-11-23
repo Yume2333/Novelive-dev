@@ -29,6 +29,51 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 }
 
 describe('DOCX extraction', () => {
+	test('resolves relocated document, styles, footnotes and endnotes relationships', async () => {
+		const rels = (targets: Record<string, string>) =>
+			`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${Object.entries(
+				targets,
+			)
+				.map(
+					([kind, target], i) =>
+						`<Relationship Id="r${i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/${kind}" Target="${target}"/>`,
+				)
+				.join('')}</Relationships>`
+		const result = await extractDocx(
+			await syntheticDocx({
+				'_rels/.rels': rels({ officeDocument: 'custom/main.xml' }),
+				'custom/_rels/main.xml.rels': rels({
+					styles: '../parts/styles.xml',
+					footnotes: '../parts/foot.xml',
+					endnotes: '../parts/end.xml',
+				}),
+				'custom/main.xml': documentXml(
+					p('章', '<w:pStyle w:val="Custom"/>') +
+						'<w:p><w:r><w:t>正文。</w:t><w:footnoteReference w:id="1"/><w:endnoteReference w:id="2"/></w:r></w:p>',
+				),
+				'parts/styles.xml': `<w:styles xmlns:w="${namespace}"><w:style w:styleId="Custom"><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style></w:styles>`,
+				'parts/foot.xml': `<w:footnotes xmlns:w="${namespace}"><w:footnote w:id="1">${p('脚注。')}</w:footnote></w:footnotes>`,
+				'parts/end.xml': `<w:endnotes xmlns:w="${namespace}"><w:endnote w:id="2">${p('尾注。')}</w:endnote></w:endnotes>`,
+			}),
+		)
+		expect(compile(importExtractionSchema).check(result)).toBe(true)
+		expect(result).toMatchObject({
+			status: 'ready',
+			book: {
+				volumes: [
+					{
+						chapters: [
+							{
+								title: '章',
+								paragraphs: ['正文。'],
+								notes: ['脚注。', '尾注。'],
+							},
+						],
+					},
+				],
+			},
+		})
+	})
 	test('ignores historical paragraph and run properties', async () => {
 		const old =
 			'<w:pPrChange><w:pPr><w:pStyle w:val="Heading1"/><w:outlineLvl w:val="0"/></w:pPr></w:pPrChange>'
