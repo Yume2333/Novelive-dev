@@ -17,7 +17,7 @@ export function SceneImages({
 	assets: CommandOutput<'editor.open'>['registry']['entries']
 	disabled: boolean
 	run(action: () => Promise<void>): Promise<void>
-	onApplied(): void
+	onApplied(assetId: string): Promise<void>
 }) {
 	const [selection, setSelection] = useState('')
 	const [instruction, setInstruction] = useState('')
@@ -39,7 +39,7 @@ export function SceneImages({
 				count,
 				...(instruction.trim() ? { instruction: instruction.trim() } : {}),
 			}).promise
-			if (result.status === 'applied') onApplied()
+			if (result.status === 'applied') await onApplied(assetId)
 			else {
 				setRevision(revision)
 				setChoices(result)
@@ -102,7 +102,7 @@ export function SceneImages({
 										candidateId: candidate.id,
 									}).promise
 									setChoices(undefined)
-									onApplied()
+									await onApplied(assetId)
 								})
 							}
 						>

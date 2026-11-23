@@ -386,10 +386,10 @@ export function EditorPage() {
 									>
 										保存当前句
 									</button>
-										<button
-											type="button"
-											disabled={(!dirty && !pendingRefresh) || busy}
-											onClick={discard}
+									<button
+										type="button"
+										disabled={(!dirty && !pendingRefresh) || busy}
+										onClick={discard}
 									>
 										放弃修改
 									</button>
@@ -417,7 +417,28 @@ export function EditorPage() {
 									)}
 									disabled={busy || dirty}
 									run={run}
-									onApplied={() => setRefresh((value) => value + 1)}
+									onApplied={async (assetId) => {
+										const asset = await window.novelive.call(
+											'production.resolveAsset',
+											{ workId: id, assetId },
+										).promise
+										if (!asset) throw new Error('找不到素材')
+										setOpening((value) =>
+											value
+												? {
+														...value,
+														registry: {
+															...value.registry,
+															entries: value.registry.entries.map((entry) =>
+																entry.id === assetId
+																	? { ...entry, path: asset.cachePath }
+																	: entry,
+															),
+														},
+													}
+												: value,
+										)
+									}}
 								/>
 								<div
 									className="editor-toolbar"

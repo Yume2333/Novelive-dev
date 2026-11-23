@@ -350,6 +350,20 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			workId,
 		)
 		await page.getByRole('textbox', { name: '重绘要求' }).fill('光线更柔和')
+		const beforeImage = (
+			await page
+				.getByRole('textbox', { name: 'NVS 剧本' })
+				.locator('.cm-line')
+				.allTextContents()
+		).join('\n')
+		await page
+			.getByRole('textbox', { name: 'NVS 剧本' })
+			.fill(beforeImage.replace('桥下很安静', '桥下依然很安静'))
+		await page.getByRole('textbox', { name: 'NVS 剧本' }).press('Control+Home')
+		await page.getByRole('button', { name: '保存当前句', exact: true }).click()
+		await expect(
+			page.getByRole('button', { name: '撤销', exact: true }),
+		).toBeEnabled()
 		await page
 			.getByRole('button', { name: '出一张，直接替换', exact: true })
 			.click()
@@ -377,6 +391,13 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			workId,
 		)
 		expect(imageAfter.revision).not.toBe(imageBefore.revision)
+		await expect(
+			page.getByRole('button', { name: '撤销', exact: true }),
+		).toBeEnabled()
+		await page.getByRole('button', { name: '撤销', exact: true }).click()
+		await expect(
+			page.getByRole('textbox', { name: 'NVS 剧本' }),
+		).not.toContainText('依然')
 		await expect(page.locator('canvas')).toBeVisible()
 		await expect(page.locator('.nl-player-text')).toContainText('暮色里')
 		await capture(page, '07-image-redrawn')
