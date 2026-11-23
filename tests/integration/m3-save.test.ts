@@ -1,4 +1,5 @@
 import {
+	mkdir,
 	mkdtemp,
 	readdir,
 	readFile,
@@ -174,6 +175,34 @@ test('slot replacement collects only thumbnails no remaining save references', a
 	expect((await readdir(workDirectory)).sort()).toEqual(
 		['progress.json', quick.thumbnailRef].sort(),
 	)
+})
+
+test('cleanup errors do not reject a committed save or prevent other orphan collection', async () => {
+	const { directory, saves } = await store()
+	const capture = await sharp({
+		create: { width: 480, height: 270, channels: 4, background: '#123456' },
+	})
+		.png()
+		.toBuffer()
+	await saves.saveSlot('work', { kind: 'quick' }, snapshot(1), capture)
+	const { createHash } = await import('node:crypto')
+	const workDirectory = join(
+		directory,
+		'player-progress',
+		createHash('sha256').update('work').digest('hex'),
+	)
+	await mkdir(join(workDirectory, 'blocked.webp'))
+	await writeFile(join(workDirectory, 'orphan.webp'), 'orphan')
+	const entry = await saves.saveSlot(
+		'work',
+		{ kind: 'quick' },
+		snapshot(2),
+		capture,
+	)
+	expect(entry.snapshot.position).toEqual(snapshot(2).position)
+	expect((await saves.load('work'))?.saves).toEqual([entry])
+	expect(await readdir(workDirectory)).toContain('blocked.webp')
+	expect(await readdir(workDirectory)).not.toContain('orphan.webp')
 })
 
 test('empty history and slots are empty, invalid moves and slots are rejected', async () => {

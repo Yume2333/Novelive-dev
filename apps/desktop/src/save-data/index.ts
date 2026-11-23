@@ -113,9 +113,10 @@ export class FileProgressStore implements ProgressStore {
 			const referenced = new Set(
 				progress.saves.map((save) => save.thumbnailRef),
 			)
-			for (const file of await readdir(this.directory(workId))) {
+			const files = await readdir(this.directory(workId)).catch(() => [])
+			for (const file of files) {
 				if (file.endsWith('.webp') && !referenced.has(file))
-					await unlink(join(this.directory(workId), file))
+					await unlink(join(this.directory(workId), file)).catch(() => {})
 			}
 			return entry
 		})
