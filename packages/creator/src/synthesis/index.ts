@@ -64,16 +64,12 @@ const eventSchema = obj(eventFields)
 const nextEvent = synthesisOutput(eventSchema)
 const selection = synthesisOutput(obj({ keep: arr(int({ minimum: 1 })) }))
 const selectionScope: Record<string, string> = {
-	location:
-		'Keep one entry per recurring or consequential location; drop places mentioned only in passing and restatements.',
 	relation:
 		"Keep only relationships that shape the volume's plot across chapters, one per pair of characters; drop single-scene interactions and restatements.",
 	timeline:
 		"Keep one entry per turning point of the volume's main plot; drop steps inside the same turning point.",
 	foreshadowing:
 		'Keep only the major threads the volume sets up for later chapters or volumes; drop scene-level suspense, hints resolved by the next chapter, and restatements.',
-	glossary:
-		'Keep one entry per recurring or consequential term; drop terms used only in passing and restatements.',
 }
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
@@ -628,7 +624,7 @@ ${nextEvent.instructions}`
 		const packet = state.packet
 		const event = await request(
 			`${eventPrompt}
-Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Set is_last when done.
+Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and every qualifying entry. Never restate a proposed entry; update its ID only with a new fact. Describe a relation as the standing relationship between the pair, naming its kind first, not the scene that shows it. Set is_last when done.
 Events already extracted: ${state.events.length}
 Already proposed entries:
 ${proposedEntries(state.events, registryBudget)}
@@ -733,12 +729,13 @@ ${packets[packet]}`,
 	async function choose(kind: string, candidates: readonly unknown[]) {
 		const prompt = `${instructions}
 ${selection.instructions}
-These ${kind} candidates were extracted packet by packet from this volume, so many restate, narrow or split one another. Choose the set a single whole-volume pass would return. ${selectionScope[kind] ?? `Keep every distinct ${kind} that meets the inclusion rules; drop a candidate only when it restates, narrows or splits another one for the same ${kind}, keeping the most complete.`} Return keep as the numbers of the kept candidates.
+These ${kind} candidates were extracted packet by packet from this volume, so many restate, narrow or split one another. Choose the set a single whole-volume pass would return. ${selectionScope[kind] ?? `Keep every distinct ${kind} that meets the inclusion rules; drop a candidate only when it restates, narrows or splits another one for the same ${kind}, keeping the most complete under the name the text usually uses.`} Return keep as the numbers of the kept candidates.
 Chapter progress:
 ${progress}
-Candidates:
 `
-		const room = Math.max(256, budget - bytes(prompt) - 1024)
+		const available = Math.max(384, budget - bytes(prompt) - 1024)
+		const keptRoom = Math.floor(available / 3)
+		const room = available - keptRoom
 		const lines = candidates.map((candidate) =>
 			fitBytes(
 				JSON.stringify(candidate, (_, value) =>
@@ -764,8 +761,9 @@ Candidates:
 		for (const chunk of chunks) {
 			let keep = state.selections?.[selectionIndex]
 			if (!keep) {
+				const earlier = [...kept].map((i) => lines[i]).join('\n')
 				const answer = await request(
-					prompt + chunk.map((line, i) => `${i + 1} ${line}`).join('\n'),
+					`${prompt}${earlier ? `Kept from earlier candidates; drop any candidate that restates one of these:\n${fitBytes(earlier, keptRoom)}\n` : ''}Candidates:\n${chunk.map((line, i) => `${i + 1} ${line}`).join('\n')}`,
 					selection,
 					(value) => {
 						if (
