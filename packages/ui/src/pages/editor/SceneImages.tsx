@@ -1,4 +1,5 @@
 import type { CommandOutput } from '@novelive/creator/contract'
+import { LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 
 type Choices = Extract<
@@ -23,30 +24,49 @@ export function SceneImages({
 	const [instruction, setInstruction] = useState('')
 	const [choices, setChoices] = useState<Choices>()
 	const [revision, setRevision] = useState('')
+	const [generating, setGenerating] = useState(false)
 	const assetId = selection || assets[0]?.id
 	if (!assetId) return null
 	const generate = (count: number) =>
 		void run(async () => {
-			setChoices(undefined)
-			const { revision } = await window.novelive.call('editor.imageRevision', {
-				workId,
-				assetId,
-			}).promise
-			const result = await window.novelive.call('editor.regenerateImage', {
-				workId,
-				assetId,
-				expectedRevision: revision,
-				count,
-				...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-			}).promise
-			if (result.status === 'applied') await onApplied(assetId)
-			else {
-				setRevision(revision)
-				setChoices(result)
+			setGenerating(true)
+			try {
+				setChoices(undefined)
+				const { revision } = await window.novelive.call(
+					'editor.imageRevision',
+					{
+						workId,
+						assetId,
+					},
+				).promise
+				const result = await window.novelive.call('editor.regenerateImage', {
+					workId,
+					assetId,
+					expectedRevision: revision,
+					count,
+					...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+				}).promise
+				if (result.status === 'applied') await onApplied(assetId)
+				else {
+					setRevision(revision)
+					setChoices(result)
+				}
+			} finally {
+				setGenerating(false)
 			}
 		})
 	return (
 		<section aria-label="场景图片">
+			{generating && (
+				<div
+					className="editor-image-loading"
+					role="status"
+					aria-label="正在生成图片"
+				>
+					<LoaderCircle aria-hidden="true" size={18} strokeWidth={1.8} />
+					正在生成图片…
+				</div>
+			)}
 			<div className="editor-toolbar">
 				<label>
 					图片

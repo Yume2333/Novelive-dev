@@ -364,6 +364,17 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(
 			page.getByRole('button', { name: '撤销', exact: true }),
 		).toBeEnabled()
+		await page.evaluate(() => {
+			const observer = new MutationObserver(() => {
+				if (
+					document.querySelector(
+						'[role="status"][aria-label="正在生成图片"] svg',
+					)
+				)
+					document.body.dataset.imageLoadingObserved = 'true'
+			})
+			observer.observe(document.body, { childList: true, subtree: true })
+		})
 		await page
 			.getByRole('button', { name: '出一张，直接替换', exact: true })
 			.click()
@@ -391,6 +402,10 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			workId,
 		)
 		expect(imageAfter.revision).not.toBe(imageBefore.revision)
+		await expect(page.locator('body')).toHaveAttribute(
+			'data-image-loading-observed',
+			'true',
+		)
 		await expect(
 			page.getByRole('button', { name: '撤销', exact: true }),
 		).toBeEnabled()
