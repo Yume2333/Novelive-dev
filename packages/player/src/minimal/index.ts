@@ -51,7 +51,18 @@ export async function mountMinimalPlayer(
 		}
 		return result
 	}
+	let displayedText: StageSnapshot['stage']['text'] = {
+		kind: 'narration',
+		content: [],
+	}
 	function showText(line: TextLine) {
+		displayedText = {
+			kind: line.kind,
+			speaker: line.speaker,
+			displayName:
+				line.alias ?? speakerNames[line.speaker ?? ''] ?? line.speaker,
+			content: line.content,
+		}
 		const box = document.createElement('div')
 		box.className =
 			line.kind === 'caption' ? 'nl-player-caption' : 'nl-player-textbox'
@@ -247,15 +258,7 @@ export async function mountMinimalPlayer(
 							particle: null,
 							mask: null,
 							filter: null,
-							text: {
-								kind: line.kind,
-								speaker: line.speaker,
-								displayName:
-									line.alias ??
-									speakerNames[line.speaker ?? ''] ??
-									line.speaker,
-								content: line.content,
-							},
+							text: displayedText,
 						},
 						[],
 					),

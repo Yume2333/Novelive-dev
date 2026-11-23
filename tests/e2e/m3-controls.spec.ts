@@ -275,6 +275,31 @@ test.describe('M3 player controls', () => {
 			await expect(
 				page.getByRole('button', { name: '2. 我在想什么？', exact: true }),
 			).toBeVisible()
+			{
+				using project = await Project.open(root)
+				await project.writeFile(
+					projectFiles.scene(playerRef, 'aaaabbbb'),
+					playerScript.replace('你好，世界。', '改写后的句子。'),
+				)
+			}
+			await menu()
+			await menu()
+			await page.getByRole('button', { name: '读档', exact: true }).click()
+			await page
+				.getByRole('button', { name: '读档槽位 1', exact: true })
+				.click()
+			await expect(text()).toHaveText('你好，世界。')
+			await menu()
+			await page.getByRole('button', { name: '快速存档', exact: true }).click()
+			await expect(page.getByRole('status')).toHaveText('存档成功')
+			const savedText = await page.evaluate(
+				async (id) =>
+					(await window.novelive.host.progress?.load(id))?.saves.find(
+						(entry) => entry.slot.kind === 'quick',
+					)?.snapshot.stage.text.content,
+				playerWorkId,
+			)
+			expect(savedText).toEqual([{ type: 'text', text: '你好，世界。' }])
 		} finally {
 			await app.close()
 			await rm(directory, { recursive: true, force: true })
