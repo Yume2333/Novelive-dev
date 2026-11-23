@@ -14,6 +14,20 @@ launch in strict replay mode without credentials, the confirmation page
 showed the chapter as published and the player rendered text and a canvas.
 This verifies publication and playback, not complete production artwork.
 
+Offline rerun on the machine that performed the smoke (requires the
+saved profile and project, not a new provider call). From the app build's
+checkout, close any open smoke app, then run:
+
+  env -u NL_IMAGE_API_KEY -u NL_IMAGE_BASE_URL -u NL_API_BASE_URL \
+    NL_REPLAY=strict xvfb-run -a node "$HOME/novelive-m4-paid-smoke/verify-playback.mjs"
+
+The local verifier copies the saved profile for the second launch, opens
+the original project, checks SQLite for ch0001 in the published state,
+then opens "试玩第一章" and checks that chapter text and a canvas render.
+Expected output: "SQLite: ch0001 published; placeholder=1" and
+"Electron: published chapter opened in the offline player; text and canvas rendered".
+The saved artifacts and verifier are local to the smoke machine.
+
 Provider-measured smoke totals: 24 calls, 28,811 input tokens, 24,349 output
 tokens (53,160 total), 4 generated images, and no unmetered requests.
 
