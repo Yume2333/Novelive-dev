@@ -242,7 +242,7 @@ export async function extractDocx(
 			const chunks: string[][] = [[]]
 			const notes: string[] = []
 			let size = 0
-			for (const raw of lines.flatMap((line) => line.split('\n'))) {
+			for (const raw of lines) {
 				const line = raw.trim()
 				if (!line) continue
 				const annotation =
@@ -253,12 +253,17 @@ export async function extractDocx(
 					notes.push(line)
 					continue
 				}
-				if (size && size + 2 + line.length > MAX_CHAPTER_CHARS) {
-					chunks.push([])
-					size = 0
+				for (const bodyLine of line
+					.split('\n')
+					.map((text) => text.trim())
+					.filter(Boolean)) {
+					if (size && size + 2 + bodyLine.length > MAX_CHAPTER_CHARS) {
+						chunks.push([])
+						size = 0
+					}
+					chunks[chunks.length - 1].push(bodyLine)
+					size += bodyLine.length + (size ? 2 : 0)
 				}
-				chunks[chunks.length - 1].push(line)
-				size += line.length + (size ? 2 : 0)
 			}
 			pendingNotes.push(...notes, ...archived)
 			for (const [index, paragraphs] of chunks.entries()) {

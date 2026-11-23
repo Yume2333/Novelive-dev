@@ -29,6 +29,17 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 }
 
 describe('DOCX extraction', () => {
+	test('archives the entire annotation paragraph including manual line breaks', async () => {
+		const book = await extract(
+			p('故事。') +
+				'<w:p><w:r><w:t>译者注：说明。</w:t><w:br/><w:t>附注续行。</w:t></w:r></w:p>',
+		)
+		expect(book.volumes[0].chapters[0]).toEqual({
+			title: '正文',
+			paragraphs: ['故事。'],
+			notes: ['译者注：说明。\n附注续行。'],
+		})
+	})
 	test('matches normalized OPC part names case-insensitively', async () => {
 		const result = await extractDocx(
 			await syntheticDocx({ 'WORD/DOCUMENT.XML': documentXml(p('正文。')) }),
