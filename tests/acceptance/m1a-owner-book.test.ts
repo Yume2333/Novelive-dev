@@ -31,6 +31,7 @@ import {
 } from '../../packages/creator/src/synthesis'
 import { projectFiles } from '../../packages/format/src/model'
 import { scoreAgainstConsensus } from './bible-patch-score'
+import { writeOwnerBookEvidence } from './owner-book-evidence'
 import { checkOwnerBookResumePrompt } from './owner-book-resume'
 import {
 	type WholeBookRun,
@@ -647,29 +648,20 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 						JSON.stringify(report, null, 2),
 					)
 					await writeFile(join(run, 'chunked-run.json'), fixture)
-					expect(confirmedIntact && restartIntact).toBe(true)
 					if (dryRun) {
+						expect(confirmedIntact && restartIntact).toBe(true)
 						console.log(JSON.stringify(report))
 						return
 					}
-					phase = 'consensus-normalized BiblePatch F1'
-					if (score.normalized < 0.9) console.log(JSON.stringify(report))
-					expect(score.normalized).toBeGreaterThanOrEqual(0.9)
 				} else {
 					await writeFile(
 						join(root, 'redacted-result.json'),
 						JSON.stringify(report, null, 2),
 					)
 				}
-				await writeFile(join(fixtures, 'chunked-run.json'), fixture)
-				await writeFile(
-					join(evidence, 'w4-consensus.json'),
-					`${JSON.stringify(report, null, '\t')}\n`,
-				)
 				console.log(JSON.stringify(report))
-				expect(confirmedIntact && restartIntact).toBe(true)
-				phase = 'consensus-normalized BiblePatch F1'
-				expect(score.normalized).toBeGreaterThanOrEqual(0.9)
+				phase = 'W4 acceptance and evidence publication'
+				await writeOwnerBookEvidence(fixtures, evidence, fixture, report)
 			} finally {
 				if (!closed) first.close()
 			}
