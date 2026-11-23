@@ -375,7 +375,7 @@ test.each([
 			const prompt = messages[0].content as string
 			expect(prompt).toContain('is_last:b')
 			expect(prompt).toMatch(
-				/glossaryPatch:\[\{id:[^,]+,status:(?:\$\d+|"candidate"\|"confirmed")/,
+				/glossaryPatch\?:\[\{id:[^,]+,status:(?:\$\d+|"candidate"\|"confirmed")/,
 			)
 			expect(prompt).toContain('"candidate"|"confirmed"')
 			let output: unknown = response

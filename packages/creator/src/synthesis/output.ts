@@ -12,6 +12,7 @@ type Shape = {
 	properties?: Record<string, Shape>
 	required?: string[]
 	items?: Shape
+	default?: unknown
 	minItems?: number
 	maxItems?: number
 	minLength?: number
@@ -118,11 +119,52 @@ function objectRules(schema: Shape, value: unknown, path: string[]) {
 	]
 }
 
+const emptyCollections = new Set(['aliases', 'biblePatch', 'glossaryPatch'])
+
+function modelShape(shape: Shape): Shape {
+	const result = { ...shape }
+	if (shape.anyOf) result.anyOf = shape.anyOf.map(modelShape)
+	if (shape.items) result.items = modelShape(shape.items)
+	if (shape.properties) {
+		const properties = Object.entries(shape.properties).map(([key, field]) => {
+			const child = modelShape(field)
+			if (emptyCollections.has(key) && child.items && !child.minItems)
+				child.default = []
+			return [key, child] as const
+		})
+		result.properties = Object.fromEntries(properties)
+		if (shape.required)
+			result.required = shape.required.filter(
+				(key) => result.properties?.[key]?.default === undefined,
+			)
+	}
+	return result
+}
+
+function fillCollections(shape: Shape, value: unknown): void {
+	if (shape.anyOf) {
+		const [variant, ...others] = variants(shape, value)
+		if (variant && !others.length) fillCollections(variant, value)
+	}
+	if (shape.items && Array.isArray(value))
+		for (const item of value) fillCollections(shape.items, item)
+	const fields = record(value)
+	if (!fields || !shape.properties) return
+	for (const [key, field] of Object.entries(shape.properties)) {
+		if (!Object.hasOwn(fields, key) && Array.isArray(field.default))
+			fields[key] = []
+		else fillCollections(field, fields[key])
+	}
+}
+
 export function synthesisOutput<T>(schema: Schema<T>) {
-	const shape = schema as Shape
+	const shape = modelShape(schema)
 	const validator = compile(schema)
 	return {
-		validator,
+		parse(value: unknown) {
+			fillCollections(shape, value)
+			return validator.validate(value)
+		},
 		instructions: `JSON shape (s=string, b=boolean, ?=optional, |=or, ...=extra keys allowed, [T]=array; numeric suffix=min length, <=max length): ${describeShape(shape)}`,
 		repair(value: unknown, errors: ValidationError[]) {
 			const contexts = new Map<string, string[]>()

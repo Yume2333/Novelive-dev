@@ -122,7 +122,7 @@ export interface SynthesisOptions {
 }
 
 const minimumEventLimit = 128
-const packetFormat = 5
+const packetFormat = 6
 const legacyPacketFormats = [1, 2, 3, 4, 5]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -389,7 +389,7 @@ ${nextEvent.instructions}`
 					.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 					.join('')
 				const output = parseModelJson(text)
-				const validation = contract.validator.validate(output)
+				const validation = contract.parse(output)
 				if (!validation.ok)
 					throw new Error(contract.repair(output, validation.errors))
 				check(validation.value)
