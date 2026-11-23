@@ -163,6 +163,98 @@ afterEach(async () => {
 	await rm(directory, { recursive: true, force: true })
 })
 
+const repairedEvent = {
+	overview: 'A key opens a tower.',
+	chapters: [
+		{ chapterId: 'c1', progress: 'Ada finds a key.' },
+		{ chapterId: 'c2', progress: 'Ada opens the tower.' },
+	],
+	event: 'Ada finds and uses a key.',
+	is_last: true,
+	biblePatch: [],
+	glossaryPatch: [],
+}
+
+test.each([
+	{
+		response: {
+			overview: { summary: 'A key opens a tower.' },
+			chapters: [{ chapterId: 'c1', progress: ['Ada finds a key.'] }],
+			biblePatch: [{ kind: 'location', op: 'upsert', entry: candidateTower }],
+			glossaryPatch: [],
+		},
+		errors: [
+			'/event [required]: missing',
+			'/is_last [required]: missing',
+			'/overview [type]: expected string, got object',
+			'/chapters/0/progress [type]: expected string, got array',
+			'/biblePatch/0/op [enum]:',
+		],
+	},
+	{
+		response: {
+			...repairedEvent,
+			glossaryPatch: [
+				{ id: 'key', original: 'Key', written: 'Key', category: 'object' },
+			],
+			changes: [],
+		},
+		errors: [
+			'/glossaryPatch/0/status [required]: missing',
+			'/changes [additionalProperties]: unknown field',
+			'declared keys: id, status,',
+			'required fields: id, status, original, written, category',
+		],
+	},
+] as const)(
+	'repairs a redacted invalid event against the same contract',
+	async ({ response, errors }) => {
+		await seed(root)
+		using project = await Project.open(root)
+		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+			const { messages } = await new Request(input, init).json()
+			const prompt = messages[0].content as string
+			expect(prompt).toContain('is_last:b')
+			expect(prompt).toMatch(
+				/glossaryPatch:\[\{id:[^,]+,status:(?:\$\d+|"candidate"\|"confirmed")/,
+			)
+			expect(prompt).toContain('"candidate"|"confirmed"')
+			let output: unknown = response
+			if (messages.length === 2) {
+				for (const expected of errors)
+					expect(messages[1].content).toContain(expected)
+				expect(messages[1].content).toContain(
+					'allowed keys: overview, chapters, biblePatch, glossaryPatch, event, is_last',
+				)
+				output = repairedEvent
+			}
+			const data = [
+				{
+					choices: [
+						{
+							index: 0,
+							delta: { role: 'assistant', content: JSON.stringify(output) },
+						},
+					],
+				},
+				{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+			]
+			return new Response(
+				`${data.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
+				{ headers: { 'content-type': 'text/event-stream' } },
+			)
+		})
+		await expect(
+			synthesizeVolume(project, 'v1', chapters, {
+				...options,
+				strategy: 'events',
+				fetch,
+			}),
+		).resolves.toMatchObject({ chapters: repairedEvent.chapters })
+		expect(fetch).toHaveBeenCalledTimes(2)
+	},
+)
+
 test('whole-volume replay persists a skeleton, candidates and conflicts without replacing confirmed content', async () => {
 	await seed(root)
 	using project = await Project.open(root)

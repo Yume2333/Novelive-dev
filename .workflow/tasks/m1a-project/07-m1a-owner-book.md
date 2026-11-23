@@ -21,3 +21,4 @@
 - Check after: `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → `Tests  1 failed (1)`。DeepSeek 禁用探针仍输出推理；已改用 Gemini 完成首卷 7 回预览及卷摘要。第一包综合的初始及修复响应未通过 schema，整卷对照、已确认设定和重启保持未验收。
 - 严格 `pnpm check` → `Tests  342 passed (342)`。累计付费 20 次、190,995 tokens、0 张图。
 - [脱敏凭据](../../evidence/m1a/owner/receipt.txt)
+- 部分交付：schema 契约修复的严格检查为 `Tests  344 passed (344)`。复用首卷预览，第一包综合已保存；第二包修复报 `reasoning_limit`。W4 未通过。

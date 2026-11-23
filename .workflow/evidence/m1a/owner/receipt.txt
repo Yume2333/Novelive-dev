@@ -1,5 +1,6 @@
 M1a/07 — 公版真书分块综合验收
 Base: ea99733e566c72be5873d6507a07de37ef7b40ba
+Status: partial — W4 未通过
 
 书目：夏敬渠《野叟曝言》，维基文库一百五十四回本。
 来源：https://zh.wikisource.org/wiki/野叟曝言
@@ -27,3 +28,18 @@ Error: M1a/07 did not pass during preview and chunked synthesis; see the redacte
 NL_REPLAY=strict pnpm check
  Test Files  22 passed (22)
       Tests  342 passed (342)
+
+Schema 契约修复：模型请求和修复提示从校验器使用的 pi-schema 派生，保留严格校验；
+修复提示列出完整字段路径、允许键和必填字段。两条脱敏失败响应纳入单元回归。
+单次 devin-swe-2 强制工具探针（608 tokens）返回 HTTP 200，但无工具调用，
+不启用该模式；未探测其他结构化输出方式。
+
+NL_REPLAY=strict pnpm check
+ Test Files  22 passed (22)
+      Tests  344 passed (344)
+
+单次付费重跑复用已保存的工程和预览（0 次预览调用）。首包修复通过并保存，
+第二包缺必填字段，修复只返回推理，报 `reasoning_limit`。
+付费 Check: Tests  1 failed (1)。重跑 4 次、36,358 tokens、0 张图；
+含探针累计 25 次、227,961 实测 tokens、0 张图。整卷对照、F1、已确认设定
+保全和重启未验收。

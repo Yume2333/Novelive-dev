@@ -3,7 +3,6 @@ import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import {
 	arr,
 	bool,
-	compile,
 	int,
 	nullable,
 	obj,
@@ -31,6 +30,7 @@ import {
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
+import { synthesisOutput } from './output'
 import {
 	applyPatches,
 	existing,
@@ -46,13 +46,13 @@ const fields = {
 	glossaryPatch: glossaryPatchSchema,
 }
 const outputSchema = obj(fields)
-const whole = compile(outputSchema)
+const whole = synthesisOutput(outputSchema)
 const eventSchema = obj({
 	...fields,
 	event: str({ minLength: 1 }),
 	is_last: bool(),
 })
-const nextEvent = compile(eventSchema)
+const nextEvent = synthesisOutput(eventSchema)
 const checkpointSchema = obj({
 	...version,
 	fingerprint: str(),
@@ -240,7 +240,7 @@ export async function synthesizeVolume(
 	if (previews.some((preview, i) => preview.chapterId !== chapterIds[i]))
 		throw new Error('Stored preview chapter ID does not match its file')
 	const fingerprint = hash({
-		packetFormat: 2,
+		packetFormat: 3,
 		previews,
 		language: options.language,
 		requirements: options.requirements,
@@ -261,29 +261,40 @@ export async function synthesizeVolume(
 	const quarantined =
 		matching?.ready && matching.basis !== basis ? matching : undefined
 	const resumable = matching?.basis === basis ? matching : undefined
-	const maxTokens = outputTokenBudget(model)
+	const outputLimit = outputTokenBudget(model)
 	const historyBudget = Math.min(1024, Math.floor(model.contextWindow / 16))
 	const packetOutputReserve = Math.min(
 		4096,
 		Math.floor(model.contextWindow / 4),
 	)
-	const budget = model.contextWindow - packetOutputReserve - historyBudget
 	const packetText = previews.map((preview) => JSON.stringify(preview))
 	const instructions = `Synthesize the ordered chapter previews in ${options.language}. Adaptation requirements: ${options.requirements ?? ''}.
-Return only JSON with overview, chapters [{chapterId,progress}], biblePatch [{kind,op,entry}], glossaryPatch [entry].
-Bible kinds: character, relation, location, timeline, foreshadowing, style. Every entry has an id and status ("candidate"); use actual chapter IDs for provenance and relationships reference existing or extracted characters. Characters have name and aliases (mark main characters major:true); locations have name and description; relations have from, to and description; timeline has chapterId and event; foreshadowing has plantedChapter and description; style has description; glossary has original, written and category.
-Use stable IDs; record changing identities in changes with chapterId, field and value. Keep confirmed facts intact; ${incremental ? 'do not emit delete for successive volumes.' : 'delete only a mistaken candidate from this volume.'}
+Return one JSON object. Use stable IDs, actual chapter IDs for provenance, and existing or extracted character IDs for relations. Mark main characters as major and new entries as candidate. Preserve confirmed facts; ${incremental ? 'do not delete in successive volumes.' : 'delete only mistaken candidates from this volume.'}
 Existing entries:
 ${JSON.stringify(bible)}`
 	const wholePrompt = `${instructions}
+${whole.instructions}
 Synthesize the entire volume. Include progress for every chapter.
 Chapter previews:
 ${packetText.join('\n')}`
 	const useEvents =
 		strategy === 'events' ||
-		(strategy === 'auto' && bytes(wholePrompt) + 384 > budget)
+		(strategy === 'auto' &&
+			bytes(wholePrompt) + 384 > model.contextWindow - packetOutputReserve)
+	const eventPrompt = `${instructions}
+${nextEvent.instructions}`
+	const outputReserve = useEvents
+		? Math.min(
+				packetOutputReserve,
+				Math.max(
+					512,
+					model.contextWindow - bytes(eventPrompt) - historyBudget - 768,
+				),
+			)
+		: packetOutputReserve
+	const budget = model.contextWindow - outputReserve
 	const packetBudget = Math.floor(
-		(budget - bytes(instructions) - historyBudget - 768) / 3,
+		(budget - bytes(eventPrompt) - historyBudget - 384) / 3,
 	)
 	const packets =
 		useEvents && packetBudget > 0
@@ -308,11 +319,7 @@ ${packetText.join('\n')}`
 	const chapterSet = new Set(chapterIds)
 	async function request<T extends Output>(
 		prompt: string,
-		validator: {
-			validate(
-				input: unknown,
-			): { ok: true; value: T } | { ok: false; errors: unknown }
-		},
+		contract: ReturnType<typeof synthesisOutput<T>>,
 		check: (output: T) => void,
 	): Promise<T> {
 		const messages = [{ role: 'user' as const, content: prompt, timestamp: 0 }]
@@ -326,7 +333,7 @@ ${packetText.join('\n')}`
 			const response = await stream(model, normalizeContext({ messages }), {
 				apiKey: options.connection.apiKey,
 				signal: options.signal,
-				outputLimit: maxTokens,
+				outputLimit,
 				cacheRetention: 'none',
 			}).result()
 			if (response.stopReason !== 'stop')
@@ -338,15 +345,17 @@ ${packetText.join('\n')}`
 				const text = response.content
 					.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 					.join('')
-				const validation = validator.validate(parseModelJson(text))
-				if (!validation.ok) throw new Error(JSON.stringify(validation.errors))
+				const output = parseModelJson(text)
+				const validation = contract.validator.validate(output)
+				if (!validation.ok)
+					throw new Error(contract.repair(output, validation.errors))
 				check(validation.value)
 				return validation.value
 			} catch (error) {
 				if (attempt === 1) throw error
 				messages.push({
 					role: 'user',
-					content: `Repair the JSON: ${String(error).slice(0, 320)}`,
+					content: `Repair the JSON: ${error instanceof Error ? error.message : String(error)}`,
 					timestamp: 0,
 				})
 			}
@@ -383,8 +392,8 @@ ${packetText.join('\n')}`
 			throw new Error(`Synthesis reached its event limit (${limit})`)
 		const packet = state.packet
 		const event = await request(
-			`${instructions}
-Extract only the next event in packet ${packet + 1}/${packets.length}. A packet can contain a fragment of a chapter preview. Include one event string, only its changes, and is_last (true if this is the last event of this packet); report progress for affected chapters.
+			`${eventPrompt}
+Extract only the next event in packet ${packet + 1}/${packets.length}. A preview may be partial. Report only this event's changes and chapter progress. Set is_last when done with this packet.
 Events already extracted: ${state.events.length}
 Recent event summaries: ${recentEvents(state.events, historyBudget)}
 Chapter previews:

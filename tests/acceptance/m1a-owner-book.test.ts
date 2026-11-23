@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import {
+	access,
 	appendFile,
 	mkdir,
 	mkdtemp,
@@ -34,7 +35,7 @@ const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
 const purpose = 'M1a/07 owner book'
 const previewModel = 'gemini-3.8-flash'
 const synthesisModel = 'devin-swe-2'
-const cap = 30_000_000
+const cap = 20_000_000
 const series = {
 	formatVersion: 1,
 	seriesId: 'yesou-puyan',
@@ -184,7 +185,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			),
 		)
 		expect(sha256).toBe(manifest.sha256)
-		const run = await mkdtemp(join(root, 'run-'))
+		const run =
+			process.env.NL_OWNER_BOOK_RUN_DIR ?? (await mkdtemp(join(root, 'run-')))
 		const directory = join(run, 'events')
 		const cassette = {
 			directory: join(root, 'cassette'),
@@ -209,6 +211,25 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			signal: controller.signal,
 		}
 		async function provision(path: string) {
+			const exists = await access(join(path, projectFiles.database)).then(
+				() => true,
+				(error) => {
+					if (error.code !== 'ENOENT') throw error
+					return false
+				},
+			)
+			if (exists) {
+				const project = await Project.open(path)
+				try {
+					expect(
+						digest(await project.readFile(projectFiles.original('txt'))),
+					).toBe(sha256)
+					return project
+				} catch (error) {
+					project.close()
+					throw error
+				}
+			}
 			const project = await Project.create(path, { ...series, volumeIds: [] })
 			try {
 				const imported = await importTxt(project, book, {
