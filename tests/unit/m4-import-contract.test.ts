@@ -45,7 +45,12 @@ describe('longform payloads', () => {
 	test.each(['markdown', 'docx', 'pdf'] as const)(
 		'%s emits the common volume, chapter, body and note shape',
 		(format) => {
-			const book = { format, volumes, metadata: { language: 'zh-Hans' } }
+			const book = {
+				format,
+				volumes,
+				metadata: { language: 'zh-Hans' },
+				...(format === 'docx' ? { illustrations: [] } : {}),
+			}
 			expect(ready.check({ status: 'ready', book })).toBe(true)
 			expect(
 				ready.check({ status: 'ready', book: { ...book, volumes: [] } }),

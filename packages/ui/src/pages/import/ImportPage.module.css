@@ -231,3 +231,10 @@ fieldset > .cardTitle {
 	color: var(--color-on-error-container);
 	font-size: 13px;
 }
+
+.illustration {
+	width: calc(var(--space-5) * 4);
+	height: calc(var(--space-5) * 4);
+	object-fit: contain;
+	border-radius: var(--radius-md);
+}

@@ -3,6 +3,7 @@ import { matchPath } from 'react-router-dom'
 import { expect, test } from 'vitest'
 import {
 	commands,
+	productionQueueEvent,
 	productionSnapshotEventSchema,
 } from '../../packages/creator/src/contract'
 import {
@@ -23,6 +24,24 @@ const first = {
 	issue: '占位图',
 }
 const waiting = { chapterId: 'ch2', status: 'waiting', priority: false }
+
+test('queue commands validate empty state, paused reasons and queued-only move directions', () => {
+	const queue = { active: null, queued: [], inactive: [] }
+	expect(compile(commands['production.getQueue'].output).check(queue)).toBe(
+		true,
+	)
+	expect(
+		productionQueueEvent.check({ type: 'production.queue', payload: queue }),
+	).toBe(true)
+	expect(
+		productionQueueEvent.check({ type: 'production.queue', payload: {} }),
+	).toBe(false)
+	const input = compile(commands['production.moveQueueWork'].input)
+	expect(input.check({ workId, direction: -1 })).toBe(true)
+	expect(input.check({ workId, direction: 1 })).toBe(true)
+	expect(input.check({ workId, direction: 0 })).toBe(false)
+	expect(input.check({ workId: 'invalid', direction: 1 })).toBe(false)
+})
 
 test('the first chapter is published while the work awaits confirmation', () => {
 	const snapshot = {

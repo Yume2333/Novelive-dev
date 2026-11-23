@@ -45,7 +45,10 @@ export function ProductionQueuePanel({
 }: Props) {
 	const heading = useId()
 	return (
-		<section className={styles.card} aria-labelledby={heading}>
+		<section
+			className={`${styles.card} ${queueStyles.panel}`}
+			aria-labelledby={heading}
+		>
 			<h2 id={heading}>制作队列</h2>
 			{!queue.active && !queue.queued.length && !queue.inactive.length && (
 				<p className={styles.lead}>暂无制作任务</p>

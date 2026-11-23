@@ -1,11 +1,18 @@
 import { createRequire } from 'node:module'
 import { dirname, join, sep } from 'node:path'
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { pathToFileURL } from 'node:url'
+import {
+	GlobalWorkerOptions,
+	getDocument,
+} from 'pdfjs-dist/legacy/build/pdf.mjs'
 import type { ImportExtraction } from '../../contract/import'
 import { headingRules, parseTxt } from '../txt/structure'
 
 const require = createRequire(import.meta.url)
 const pdfRoot = dirname(require.resolve('pdfjs-dist/package.json'))
+GlobalWorkerOptions.workerSrc = pathToFileURL(
+	join(pdfRoot, 'legacy/build/pdf.worker.mjs'),
+).href
 
 interface Line {
 	text: string

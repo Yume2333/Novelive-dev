@@ -186,6 +186,38 @@ test('join appends collision-free sources without modifying shared entries or or
 	expect((await p.read(projectFiles.series)).volumeIds).toHaveLength(2)
 })
 
+test('overlapping joins across project handles preserve both volumes and a rejected join does not block the next', async () => {
+	using p = await project()
+	using other = await Project.open(p.root)
+	const results = await Promise.allSettled([
+		joinSeries(p, { ...book, title: 'First' }),
+		joinSeries(other, { ...book, chapters: [] }),
+		joinSeries(other, { ...book, title: 'Second' }),
+	])
+	const [first, rejected, second] = results
+	expect(rejected.status).toBe('rejected')
+	if (first.status !== 'fulfilled' || second.status !== 'fulfilled')
+		throw new Error('Valid joins failed')
+	expect((await p.read(projectFiles.series)).volumeIds).toEqual([
+		first.value.volumeId,
+		second.value.volumeId,
+	])
+	for (const result of [first.value, second.value]) {
+		expect(
+			(await p.read(projectFiles.volume(result.volumeId))).workIds,
+		).toEqual([result.workId])
+		expect(
+			(await p.read(projectFiles.work(result.volumeId, result.workId)))
+				.chapterIds,
+		).toEqual(result.chapterIds)
+		expect(
+			(
+				await p.readFile(projectFiles.chapterText(result.chapterIds[0]))
+			).toString(),
+		).toContain(book.chapters[0].paragraphs[0])
+	}
+})
+
 test('volume two art reuses a drawn series character and writer uses target language and canonical names', async () => {
 	using p = await project()
 	const first = await joinSeries(p, book)
@@ -367,6 +399,75 @@ test('incremental preparation reports volume one before later work, passes diges
 	await prepareSeries(p, { ...options, onReady: undefined })
 	expect(requests).toHaveLength(count)
 })
+
+test.each([false, true])(
+	'series preparation retries a changed bible serially and is bounded (keeps changing: %s)',
+	async (keepsChanging) => {
+		using p = await project()
+		const first = await joinSeries(p, book)
+		const second = await joinSeries(p, book)
+		const ready: string[] = []
+		let firstCalls = 0
+		let secondCalls = 0
+		let previews = 0
+		const synthetic: typeof fetch = async (input, init) => {
+			const body = await new Request(input, init).json()
+			const prompt = body.messages[0].content as string
+			if (prompt.startsWith('Preview fiction')) {
+				previews++
+				return sse({
+					summary: 'Arrival',
+					characters: [],
+					locations: [],
+					timelineNotes: [],
+					foreshadowingHints: [],
+				})
+			}
+			if (prompt.startsWith('Summarize volume'))
+				return sse({ summary: 'Earlier digest' })
+			const later = prompt.includes(second.chapterIds[0])
+			if (later) {
+				secondCalls++
+				if (keepsChanging || secondCalls === 1)
+					await p.write(projectFiles.character(series, 'lin'), {
+						formatVersion: 1,
+						entries: [{ ...character, name: `Approved ${secondCalls}` }],
+					})
+			} else firstCalls++
+			return sse({
+				overview: 'Arrival',
+				chapters: [
+					{
+						chapterId: (later ? second : first).chapterIds[0],
+						progress: 'Arrived',
+					},
+				],
+				biblePatch: [],
+				glossaryPatch: [],
+			})
+		}
+		const running = prepareSeries(p, {
+			previewConnection: connection,
+			synthesisConnection: connection,
+			language: 'en',
+			fetch: synthetic,
+			onReady: (id) => {
+				ready.push(id)
+			},
+		})
+		if (keepsChanging) {
+			await expect(running).rejects.toThrow('Bible changed during synthesis')
+			expect(ready).toEqual([first.volumeId])
+			expect(secondCalls).toBe(3)
+		} else {
+			await running
+			expect(ready).toEqual([first.volumeId, second.volumeId])
+			expect(secondCalls).toBe(2)
+		}
+		expect(firstCalls).toBe(1)
+		expect(previews).toBe(2)
+	},
+)
 
 test('art registration persists local entries without freezing inherited rows', async () => {
 	using p = await project()

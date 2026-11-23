@@ -29,10 +29,10 @@ import {
 	startVolume,
 } from './layout'
 
-type Result = CommandOutput<'import.txt'>
+type Result = CommandOutput<'import.file'>
 type Wizard = Extract<Result, { status: 'ready' }>
 type Candidates = Extract<Result, { status: 'encoding' }>['candidates']
-type Encoding = NonNullable<CommandInput<'import.txt'>['encoding']>
+type Encoding = NonNullable<CommandInput<'import.file'>['encoding']>
 
 const languages = [
 	['zh-CN', '简体中文'],
@@ -63,9 +63,15 @@ export function ImportPage() {
 	const [title, setTitle] = useState('')
 	const [folder, setFolder] = useState<string>()
 	const [references, setReferences] = useState<string[]>([])
+	const [selectedIllustrations, setSelectedIllustrations] = useState<string[]>(
+		[],
+	)
 	const [candidates, setCandidates] = useState<Candidates>()
 	const [encoding, setEncoding] = useState<Encoding>()
 	const [wizard, setWizard] = useState<Wizard>()
+	const [joining, setJoining] = useState(false)
+	const [joinTarget, setJoinTarget] = useState<CommandOutput<'import.target'>>()
+	const [joined, setJoined] = useState<Extract<Result, { status: 'joined' }>>()
 	const [layout, setLayout] = useState<ImportLayout>()
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState('')
@@ -86,10 +92,12 @@ export function ImportPage() {
 
 	const pickSource = () =>
 		run(async () => {
-			const [path] = await window.novelive.pickFiles('txt')
+			const [path] = await window.novelive.pickFiles('source')
 			if (!path) return
 			setSource(path)
-			setTitle(fileName(path).replace(/\.txt$/i, ''))
+			setTitle(
+				fileName(path).replace(/\.(txt|epub|md|markdown|docx|pdf)$/i, ''),
+			)
 			setCandidates(undefined)
 			setEncoding(undefined)
 		})
@@ -107,36 +115,81 @@ export function ImportPage() {
 		})
 	const start = () =>
 		run(async () => {
-			const result = await window.novelive.call('import.txt', {
+			const result = await window.novelive.call('import.file', {
 				sourcePath: source,
-				folder: location,
-				title: title.trim(),
+				folder: joining ? (joinTarget?.projectDir ?? '') : location,
+				title: joining ? (joinTarget?.title ?? '') : title.trim(),
 				encoding,
-				references,
+				references: joining ? [] : references,
+				join:
+					joining && joinTarget
+						? {
+								projectDir: joinTarget.projectDir,
+								seriesId: joinTarget.seriesId,
+							}
+						: undefined,
 			}).promise
+			if (result.status === 'unsupported') {
+				setError('扫描版 PDF 无可提取文字，暂不支持 OCR')
+				return
+			}
 			if (result.status === 'encoding') {
 				setCandidates(result.candidates)
 				setEncoding(undefined)
 				return
 			}
+			if (result.status === 'joined') {
+				setJoined(result)
+				return
+			}
 			setWizard(result)
+			setSelectedIllustrations(result.selectedIllustrations)
 			setLayout(result.layout)
 		})
 	const finish = (revise: boolean) =>
 		run(async () => {
 			if (!wizard || !layout) return
-			if (revise)
+			if (revise || selectedIllustrations.length)
 				await window.novelive.call('import.revise', {
 					projectDir: wizard.projectDir,
-					layout: { ...layout, title: layout.title.trim() },
+					layout: revise
+						? { ...layout, title: layout.title.trim() }
+						: wizard.layout,
+					selectedIllustrations,
 				}).promise
 			navigate(workRoute('work', wizard.workId))
 		})
+
+	if (joined)
+		return (
+			<section className={styles.page}>
+				<header className={styles.header}>
+					<h1>已加入系列</h1>
+					<button
+						type="button"
+						className={styles.primary}
+						onClick={() => navigate(workRoute('work', joined.workId))}
+					>
+						进入作品
+					</button>
+				</header>
+				<section className={styles.card} aria-label="新增卷">
+					{joined.volumes.map((volume) => (
+						<div className={styles.row} key={volume.volumeId}>
+							<span className={styles.value}>{volume.title}</span>
+							<span>{volume.chapters} 章</span>
+						</div>
+					))}
+				</section>
+			</section>
+		)
 
 	if (wizard && layout)
 		return (
 			<Review
 				wizard={wizard}
+				selectedIllustrations={selectedIllustrations}
+				onSelectIllustrations={setSelectedIllustrations}
 				layout={layout}
 				busy={busy}
 				error={error}
@@ -146,7 +199,11 @@ export function ImportPage() {
 		)
 
 	const ready =
-		source && title.trim() && location && (!candidates || encoding) && !busy
+		source &&
+		(joining || title.trim()) &&
+		(joining ? joinTarget : location) &&
+		(!candidates || encoding) &&
+		!busy
 	return (
 		<section className={styles.page}>
 			<header className={styles.header}>
@@ -166,6 +223,29 @@ export function ImportPage() {
 				</p>
 			)}
 			<div className={styles.card}>
+				<fieldset className={styles.card}>
+					<legend className={styles.cardTitle}>导入方式</legend>
+					<label className={styles.row}>
+						<input
+							type="radio"
+							name="import-mode"
+							checked={!joining}
+							disabled={busy}
+							onChange={() => setJoining(false)}
+						/>
+						<span>新建工程</span>
+					</label>
+					<label className={styles.row}>
+						<input
+							type="radio"
+							name="import-mode"
+							checked={joining}
+							disabled={busy}
+							onChange={() => setJoining(true)}
+						/>
+						<span>加入已有系列</span>
+					</label>
+				</fieldset>
 				<div className={styles.row}>
 					<FileText aria-hidden="true" size={18} />
 					<span className={styles.label}>原文</span>
@@ -180,56 +260,104 @@ export function ImportPage() {
 						选择原文
 					</button>
 				</div>
-				<label className={styles.row}>
-					<span className={styles.label}>作品名</span>
-					<input
-						value={title}
-						onChange={(event) => setTitle(event.target.value)}
-					/>
-				</label>
-				<div className={styles.row}>
-					<FolderOpen aria-hidden="true" size={18} />
-					<span className={styles.label}>保存位置</span>
-					<span className={styles.value}>{location || '未设置'}</span>
-					<button
-						type="button"
-						disabled={busy}
-						onClick={() => void pickLocation()}
-					>
-						选择文件夹
-					</button>
-				</div>
-				<div className={styles.row}>
-					<ImagePlus aria-hidden="true" size={18} />
-					<span className={styles.label}>参考图</span>
-					<span className={styles.value}>
-						{references.length ? `${references.length} 张` : '无'}
-					</span>
-					<button
-						type="button"
-						disabled={busy || references.length >= 3}
-						onClick={() => void pickReferences()}
-					>
-						添加图片
-					</button>
-				</div>
-				{references.map((path) => (
-					<div key={path} className={`${styles.row} ${styles.sub}`}>
-						<span className={styles.value}>{fileName(path)}</span>
-						<button
-							type="button"
-							className={styles.icon}
-							aria-label={`移除 ${fileName(path)}`}
-							onClick={() =>
-								setReferences((current) =>
-									current.filter((item) => item !== path),
-								)
-							}
-						>
-							<X aria-hidden="true" size={14} />
-						</button>
-					</div>
-				))}
+				{!joining && (
+					<label className={styles.row}>
+						<span className={styles.label}>作品名</span>
+						<input
+							value={title}
+							onChange={(event) => setTitle(event.target.value)}
+						/>
+					</label>
+				)}
+				{joining ? (
+					<>
+						<div className={styles.row}>
+							<FolderOpen aria-hidden="true" size={18} />
+							<span className={styles.label}>已有工程</span>
+							<span className={styles.value}>
+								{joinTarget?.projectDir ?? '未选择'}
+							</span>
+							<button
+								type="button"
+								disabled={busy}
+								onClick={() =>
+									void run(async () => {
+										const projectDir = await window.novelive.pickFolder()
+										if (!projectDir) return
+										setJoinTarget(undefined)
+										setJoinTarget(
+											await window.novelive.call('import.target', {
+												projectDir,
+											}).promise,
+										)
+									})
+								}
+							>
+								选择已有工程
+							</button>
+						</div>
+						{joinTarget && (
+							<label className={styles.row}>
+								<span className={styles.label}>系列</span>
+								<select value={joinTarget.seriesId} disabled={busy}>
+									<option value={joinTarget.seriesId}>
+										{joinTarget.title || joinTarget.seriesId}
+									</option>
+								</select>
+							</label>
+						)}
+						<div className={styles.row}>
+							<span className={styles.label}>参考图</span>
+							<span className={styles.value}>沿用已有工程</span>
+						</div>
+					</>
+				) : (
+					<>
+						<div className={styles.row}>
+							<FolderOpen aria-hidden="true" size={18} />
+							<span className={styles.label}>保存位置</span>
+							<span className={styles.value}>{location || '未设置'}</span>
+							<button
+								type="button"
+								disabled={busy}
+								onClick={() => void pickLocation()}
+							>
+								选择文件夹
+							</button>
+						</div>
+						<div className={styles.row}>
+							<ImagePlus aria-hidden="true" size={18} />
+							<span className={styles.label}>参考图</span>
+							<span className={styles.value}>
+								{references.length ? `${references.length} 张` : '无'}
+							</span>
+							<button
+								type="button"
+								disabled={busy || references.length >= 3}
+								onClick={() => void pickReferences()}
+							>
+								添加图片
+							</button>
+						</div>
+						{references.map((path) => (
+							<div key={path} className={`${styles.row} ${styles.sub}`}>
+								<span className={styles.value}>{fileName(path)}</span>
+								<button
+									type="button"
+									className={styles.icon}
+									aria-label={`移除 ${fileName(path)}`}
+									onClick={() =>
+										setReferences((current) =>
+											current.filter((item) => item !== path),
+										)
+									}
+								>
+									<X aria-hidden="true" size={14} />
+								</button>
+							</div>
+						))}
+					</>
+				)}
 			</div>
 			{candidates && (
 				<fieldset className={styles.card} aria-label="原文编码">
@@ -256,6 +384,8 @@ export function ImportPage() {
 
 function Review({
 	wizard,
+	selectedIllustrations,
+	onSelectIllustrations,
 	layout,
 	busy,
 	error,
@@ -263,6 +393,8 @@ function Review({
 	onFinish,
 }: {
 	wizard: Wizard
+	selectedIllustrations: string[]
+	onSelectIllustrations(ids: string[]): void
 	layout: ImportLayout
 	busy: boolean
 	error: string
@@ -320,10 +452,20 @@ function Review({
 								{name}
 							</option>
 						))}
+						{!languages.some(([value]) => value === layout.language) && (
+							<option value={layout.language}>{layout.language}</option>
+						)}
 					</select>
-					<span className={styles.value}>{encodingNames[wizard.encoding]}</span>
+					<span className={styles.value}>
+						{wizard.format === 'markdown'
+							? 'Markdown'
+							: wizard.format.toUpperCase()}
+						{wizard.format === 'txt' && wizard.encoding
+							? ` · ${encodingNames[wizard.encoding]}`
+							: ''}
+					</span>
 				</label>
-				{wizard.references.length > 0 && (
+				{wizard.references.length + selectedIllustrations.length > 0 && (
 					<label className={styles.row}>
 						<input
 							type="checkbox"
@@ -336,11 +478,52 @@ function Review({
 							}
 						/>
 						<span className={styles.value}>
-							已有 {wizard.references.length} 张参考图时也停在角色设定
+							已有 {wizard.references.length + selectedIllustrations.length}{' '}
+							张参考图时也停在角色设定
 						</span>
 					</label>
 				)}
 			</div>
+			{wizard.illustrations.length > 0 && (
+				<fieldset className={styles.card}>
+					<legend className={styles.cardTitle}>插图参考（最多 3 张）</legend>
+					{wizard.illustrations.map((candidate, index) => (
+						<label key={candidate.id} className={styles.row}>
+							<input
+								type="checkbox"
+								checked={selectedIllustrations.includes(candidate.id)}
+								disabled={
+									busy ||
+									(!selectedIllustrations.includes(candidate.id) &&
+										wizard.references.length + selectedIllustrations.length >=
+											3)
+								}
+								onChange={(event) =>
+									onSelectIllustrations(
+										event.target.checked
+											? [...selectedIllustrations, candidate.id]
+											: selectedIllustrations.filter(
+													(id) => id !== candidate.id,
+												),
+									)
+								}
+							/>
+							<img
+								className={styles.illustration}
+								src={candidate.preview}
+								alt={`插图 ${index + 1}`}
+							/>
+							<span className={styles.value}>
+								使用插图 {index + 1} · 第 {candidate.volume + 1} 卷 · 第{' '}
+								{candidate.chapter + 1} 章
+								{candidate.paragraph === undefined
+									? ''
+									: ` · 第 ${candidate.paragraph + 1} 段`}
+							</span>
+						</label>
+					))}
+				</fieldset>
+			)}
 			{wizard.findings.length > 0 && (
 				<section className={styles.card} aria-label="整理建议">
 					<div className={styles.cardHeader}>

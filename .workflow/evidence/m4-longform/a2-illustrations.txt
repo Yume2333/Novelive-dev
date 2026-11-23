@@ -1,0 +1,52 @@
+Slice A2: explicit EPUB and DOCX illustration references
+
+DOCX resolves inline DrawingML embedded relationships into archive-relative
+locations and zero-based volume/chapter/paragraph indexes. DOCTYPE rejection
+and existing text/note handling remain covered by the extractor tests.
+
+The wizard performs no illustration classification/model call. Candidates
+start unselected. Up to 40 archive candidates are inspected; each source is
+capped at 20 MiB and 16 million decoded pixels. Safe PNG references are capped
+at 2048 x 2048 / 16 MiB; PNG data-URL previews at 192 x 192 / 256 KiB.
+Invalid or unsupported image data is omitted. Only selected candidates are
+copied into source/references and included in the persisted references list.
+External references plus selected embedded references cannot exceed three.
+
+pnpm typecheck
+$ tsc --noEmit
+Exit code: 0
+
+pnpm lint
+Checked 332 files in 145ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+Existing informational useTemplate suggestion: tests/fixtures/text-models/build-synthetic.ts:63.
+
+NL_REPLAY=strict pnpm test tests/unit/m4-docx.test.ts tests/unit/m4-epub.test.ts tests/unit/m4-import-contract.test.ts tests/unit/m4-import-wizard.test.ts tests/unit/m1a-txt.test.ts tests/unit/m1b-import-wizard.test.ts tests/integration/m4-series.test.ts
+ Test Files  7 passed (7)
+      Tests  146 passed | 1 skipped (147)
+   Duration  2.49s (tests 65%, import 25%, transform 9%)
+Exit code: 0
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e tests/e2e/m4-import-illustrations.spec.ts --workers=1
+The script runs pnpm build before Playwright:
+✓ built in 5.57s
+✓ built in 124ms
+✓ built in 4.43s
+Existing nonblocking Vite warning: Project is both statically and dynamically imported.
+
+  ✓  1 tests/e2e/m4-import-illustrations.spec.ts:20:2 › M4 illustration selection persists only the chosen epub candidate in real Electron (1.7s)
+  ✓  2 tests/e2e/m4-import-illustrations.spec.ts:20:2 › M4 illustration selection persists only the chosen docx candidate in real Electron (1.5s)
+  2 passed (3.8s)
+Exit code: 0
+
+Both real Electron tests use the source picker, import wizard and accessible
+checkboxes. They verify previews decoded, all candidates initially unchecked,
+the three-reference UI cap, deselection, and exactly one persisted PNG
+reference. EPUB uses Confirm; DOCX uses Skip Review. Neither strict replay
+missing-request log contains a request.
+
+Screenshots of the selected state:
+- a2-epub-selection.png
+- a2-docx-selection.png
+Appearance has not received independent visual review.

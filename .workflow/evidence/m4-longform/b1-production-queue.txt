@@ -1,0 +1,57 @@
+B1 — series handoff and global production queue
+
+Creator: one shared series preparation per project, in persisted volume order.
+Each onReady resolves that volume's waiting sessions and opens all its works;
+it does not await candidate generation or later volumes. Persisted chapter
+state skips already-started volumes on restart; preview/synthesis checkpoints
+resume unfinished volumes. Appended volumes start another shared pass after
+the previous pass, skipping started volumes. Preparation is aborted on close.
+Synthesis usage stays attributed to the volume's first work.
+
+Queue: typed production.getQueue and production.moveQueueWork commands use
+the existing service/WorkQueue. AppShell sidebar status opens a modal drawer
+with ScrollArea and ProductionQueuePanel. App-scope queue events update it;
+mount, opening, creator.ready and reconnect refetch the queue. Stop/continue
+reuse existing commands. Paused reasons include 异常退出后已暂停.
+
+pnpm typecheck
+$ tsc --noEmit
+Exit code: 0
+
+pnpm lint
+Checked 339 files in 149ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+The info is the existing build-synthetic.ts:63 lint/style/useTemplate suggestion.
+
+pnpm test tests/integration/m4-series-production.test.ts tests/integration/m4-series.test.ts tests/integration/m4-queue.test.ts tests/unit/m1b-production-contract.test.ts
+ Test Files  4 passed (4)
+      Tests  22 passed (22)
+
+New integration coverage uses deterministic synthetic text responses and
+ScriptedWorker, with no provider calls. It blocks volume two's preview while
+volume one reaches confirmation and production, shares concurrent sessions,
+checks confirmation yield/head reinsertion without preemption, completes both
+works, restarts, waits for preparation to become idle, and asserts no extra
+model requests. It also covers empty queue, invalid work and preparation retry.
+Existing queue tests cover reordering, overlap and abnormal-exit pause recovery.
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e tests/e2e/m4-production-queue.spec.ts --workers=1
+Build:
+✓ built in 5.55s
+✓ built in 133ms
+✓ built in 4.30s
+Electron:
+✓ M4 global production drawer shows paused rows, refetches and reorders a seeded two-work queue (1.4s)
+1 passed (1.8s)
+
+Electron verifies paused/crashed copy, creator generation change and fresh
+persisted status after reconnect, visible row reordering through real IPC,
+the service's resulting order, and Escape dismissal. The two queued rows are
+taskless seeded presentation state, not an end-to-end model production run;
+actual scheduling/production is covered by the integration suites above.
+The app's busy-quit confirmation is accepted by the test at teardown.
+
+Screenshot visually reviewed: b1-production-queue.png.
+Build retains the existing mixed static/dynamic Project import warning.
+No paid calls. Full M4 longform-and-queue gate not added or run in this slice.

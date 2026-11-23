@@ -1,0 +1,56 @@
+B2 — single-instance desktop and events.list chapter backfill
+
+Desktop acquires Electron's per-userData single-instance lock before startup.
+A rejected instance quits and cannot enter window/creator initialization.
+second-instance uses the existing lifecycle.show, which restores a minimized
+window, shows a tray-hidden window and focuses it.
+
+events.list merges opened sessions' records with the bounded replay ring,
+deduplicates by current-generation sequence, filters scope/scopeId/afterSeq,
+and sorts ascending. Querying records does not open projects or start models.
+App scope now returns available app events, including production.queue.
+Evicted chapter records can be recovered without a gap; evicted non-chapter
+events and missing chapter records still report a gap. Sequence numbers are
+not persisted: queue.runLog is republished under the new creator generation.
+Clients must reset afterSeq when creator generation changes.
+
+pnpm typecheck
+$ tsc --noEmit
+Exit code: 0
+
+pnpm lint
+Checked 340 files in 147ms. No fixes applied.
+Found 1 info.
+Exit code: 0
+The info is the existing build-synthetic.ts:63 lint/style/useTemplate suggestion.
+
+pnpm test tests/unit/m2-chat-events.test.ts tests/integration/m4-queue.test.ts tests/unit/creator-contract.test.ts tests/unit/m0-dev-bridge.test.ts tests/integration/m4-series-production.test.ts
+ Test Files  5 passed (5)
+      Tests  21 passed (21)
+
+After adding the generation-cursor test, only its affected suite was rerun:
+pnpm test tests/unit/m2-chat-events.test.ts
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+
+Coverage: no records, normal replay/backfill, duplicate records, scope/work
+and cursor filtering, ring eviction by another work, complete/partial repair,
+mixed-history gaps, app queue events and generation-local cursors. The existing
+actual child-process crash test now also asserts opened-session records rebuilt
+from persisted runLog, including done write and cancelled review steps.
+
+NL_REPLAY=strict xvfb-run -a pnpm test:e2e tests/e2e/m4-single-instance.spec.ts --workers=1
+Build:
+✓ built in 5.93s
+✓ built in 188ms
+✓ built in 4.58s
+Electron:
+✓ M4 same-profile second instance exits and focuses the hidden original; distinct profiles remain independent (1.2s)
+1 passed (1.6s)
+
+Electron asserts duplicate process exit code 0, original window visible/focused/
+not minimized, one original window and unchanged ready creator generation.
+A distinct userData profile launches another ready creator successfully.
+No UI layout changed; no screenshot-based visual check was needed.
+Build retains the existing mixed static/dynamic Project import warning.
+No paid calls. Full M4 gate not added or run in this slice.

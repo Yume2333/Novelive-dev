@@ -18,7 +18,8 @@ export function readQueueWork(db: DatabaseSync, work: QueueWork) {
 	const state = db
 		.prepare(
 			`SELECT status, pause_reason AS reason FROM work w WHERE work_id = ?
-			AND EXISTS (SELECT 1 FROM chapter WHERE work_id = w.work_id)`,
+			AND ((status = 'paused' AND pause_reason = 'crashed')
+				OR EXISTS (SELECT 1 FROM chapter WHERE work_id = w.work_id))`,
 		)
 		.get(work.link.workId) as
 		| Pick<Extract<QueueEntry, { reason: string }>, 'status' | 'reason'>

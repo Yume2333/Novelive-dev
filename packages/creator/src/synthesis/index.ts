@@ -47,6 +47,12 @@ import {
 	validatePatch,
 } from './patch'
 
+export class BibleChangedDuringSynthesisError extends Error {
+	constructor() {
+		super('Bible changed during synthesis')
+	}
+}
+
 const fields = {
 	overview: str(),
 	chapters: arr(obj({ chapterId: entityId, progress: str({ minLength: 1 }) })),
@@ -673,7 +679,7 @@ ${packets[packet]}`,
 	let latest = await readBible(project)
 	if (!state.ready) {
 		if (hash(latest) !== state.basis)
-			throw new Error('Bible changed during synthesis')
+			throw new BibleChangedDuringSynthesisError()
 		state.ready = true
 		await project.write(files.checkpoint, state)
 		latest = await readBible(project)

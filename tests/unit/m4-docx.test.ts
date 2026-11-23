@@ -16,6 +16,7 @@ import {
 	paragraph as p,
 	syntheticDocx,
 } from '../fixtures/source/docx/synthetic'
+import { drawing, imageRelationships } from '../fixtures/source/illustrations'
 
 const heading = (text: string, level = 1) =>
 	p(text, `<w:pStyle w:val="Heading${level}"/>`)
@@ -24,11 +25,165 @@ const extract = async (body: string, parts: Record<string, string> = {}) => {
 		await syntheticDocx({ 'word/document.xml': documentXml(body), ...parts }),
 	)
 	expect(compile(importExtractionSchema).check(result)).toBe(true)
-	if (result.status !== 'ready') throw new Error('Expected ready')
+	if (result.status !== 'ready' || result.book.format !== 'docx')
+		throw new Error('Expected ready DOCX')
 	return result.book
 }
 
 describe('DOCX extraction', () => {
+	test('offers an inline cover before the first heading at the first chapter without a paragraph', async () => {
+		const parts = {
+			'word/_rels/document.xml.rels': imageRelationships({
+				cover: 'media/cover.png',
+				inline: 'media/inline.png',
+			}),
+			'word/media/cover.png': 'cover image',
+			'word/media/inline.png': 'inline image',
+		}
+		const book = await extract(
+			drawing('cover') +
+				heading('第一卷', 1) +
+				heading('第一章', 2) +
+				p('正文。') +
+				drawing('inline'),
+			parts,
+		)
+		expect(book.illustrations).toEqual([
+			{ archivePath: 'word/media/cover.png', volume: 0, chapter: 0 },
+			{
+				archivePath: 'word/media/inline.png',
+				volume: 0,
+				chapter: 0,
+				paragraph: 0,
+			},
+		])
+		await expect(extract(drawing('cover'), parts)).rejects.toMatchObject({
+			code: 'no_extractable_text',
+		})
+	})
+
+	test('offers a standalone title-page cover at the first retained chapter', async () => {
+		const book = await extract(
+			heading('扉页') +
+				drawing('cover') +
+				heading('第一卷') +
+				heading('第一章', 2) +
+				p('正文。'),
+			{
+				'word/_rels/document.xml.rels': imageRelationships({
+					cover: 'media/cover.png',
+				}),
+				'word/media/cover.png': 'cover image',
+			},
+		)
+		expect(book.volumes.map(({ title }) => title)).toEqual(['第一卷'])
+		expect(book.illustrations).toEqual([
+			{ archivePath: 'word/media/cover.png', volume: 0, chapter: 0 },
+		])
+	})
+
+	test('locates embedded inline drawings across volumes and chapters without leaking drawing text', async () => {
+		const book = await extract(
+			heading('第一卷', 1) +
+				heading('第一章', 2) +
+				p('第一段。') +
+				drawing('one') +
+				heading('第二章', 2) +
+				drawing('two') +
+				p('第二段。') +
+				heading('第二卷', 1) +
+				heading('第三章', 2) +
+				p('第三段。') +
+				drawing('one') +
+				drawing('missing'),
+			{
+				'word/_rels/document.xml.rels': imageRelationships({
+					one: 'media/a.png',
+					two: 'media/b.png',
+				}),
+				'word/media/a.png': 'image',
+				'word/media/b.png': 'image',
+			},
+		)
+		expect(book).toMatchObject({
+			illustrations: [
+				{
+					archivePath: 'word/media/a.png',
+					volume: 0,
+					chapter: 0,
+					paragraph: 0,
+				},
+				{
+					archivePath: 'word/media/b.png',
+					volume: 0,
+					chapter: 1,
+					paragraph: 0,
+				},
+				{
+					archivePath: 'word/media/a.png',
+					volume: 1,
+					chapter: 0,
+					paragraph: 0,
+				},
+			],
+		})
+		expect(
+			book.volumes.flatMap((volume) =>
+				volume.chapters.flatMap((chapter) => chapter.paragraphs),
+			),
+		).toEqual(['第一段。', '第二段。', '第三段。'])
+	})
+
+	test('offers a later volume cover at its first chapter without a paragraph', async () => {
+		const book = await extract(
+			heading('第一卷') +
+				heading('第一章', 2) +
+				p('正文。') +
+				heading('第二卷') +
+				drawing('cover') +
+				heading('第二章', 2) +
+				p('续卷正文。'),
+			{
+				'word/_rels/document.xml.rels': imageRelationships({
+					cover: 'media/cover.png',
+				}),
+				'word/media/cover.png': 'cover image',
+			},
+		)
+		expect(book.illustrations).toEqual([
+			{ archivePath: 'word/media/cover.png', volume: 1, chapter: 0 },
+		])
+	})
+
+	test.each([
+		'../../outside.png',
+		'https://example.test/a.png',
+		'media\\a.png',
+	])('rejects unsafe image relationship %s', async (target) => {
+		await expect(
+			extract(p('正文。') + drawing('one'), {
+				'word/_rels/document.xml.rels': imageRelationships({ one: target }),
+			}),
+		).rejects.toMatchObject({ code: 'invalid_docx' })
+	})
+
+	test('ignores external, linked, missing and anchored drawings and reports empty illustrations', async () => {
+		const book = await extract(
+			p('正文。') +
+				drawing('external') +
+				drawing('missing') +
+				drawing('linked').replace('r:embed', 'r:link') +
+				drawing('anchor').replaceAll('wp:inline', 'wp:anchor'),
+			{
+				'word/_rels/document.xml.rels': imageRelationships({
+					external: 'https://example.test/image.png',
+					anchor: 'media/a.png',
+				}).replace('Id="external"', 'Id="external" TargetMode="External"'),
+				'word/media/a.png': 'image',
+			},
+		)
+		expect(book).toMatchObject({ illustrations: [] })
+	})
 	test('resolves relationship targets with case different from their ZIP entries', async () => {
 		const rels = (targets: Record<string, string>) =>
 			`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${Object.entries(
