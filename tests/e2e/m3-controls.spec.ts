@@ -558,8 +558,17 @@ test.describe('M3 player controls', () => {
 		expect(advances).toBe(1)
 		cancelUnread()
 		frame = { ...frame, pageReady: false }
-		schedulePlayback(controller, defaultPlayerSettings, true, false)()
+		const cancelUnrevealed = schedulePlayback(
+			controller,
+			{ ...defaultPlayerSettings, autoPlaySpeedMultiplier: 0.25 },
+			true,
+			false,
+		)
+		await new Promise((resolve) =>
+			setTimeout(resolve, dwellMilliseconds(0, 0.25) + 50),
+		)
 		expect(advances).toBe(1)
+		cancelUnrevealed()
 		frame = { ...frame, pageReady: true }
 		const cancelAuto = schedulePlayback(
 			controller,
