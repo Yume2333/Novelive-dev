@@ -78,7 +78,7 @@ async function rawArchive(entries: RawEntry[]) {
 async function invalidNameArchive(name: string) {
 	// Start with a same-length placeholder so the ZIP itself stays well-formed.
 	const placeholder = 'x'.repeat(name.length)
-	await rawArchive([marker, [placeholder, 'contents']])
+	await rawArchive([marker, ...releasedEntries(), [placeholder, 'contents']])
 	const zip = await readFile(destination)
 	for (let offset = zip.indexOf(placeholder); offset >= 0; ) {
 		zip.write(name, offset, 'ascii')
@@ -212,33 +212,70 @@ describe('M5 .novelive archive', () => {
 		},
 	)
 
-	it.each([
-		[
-			[marker[0], 'not Novelive', false],
-			['series.json', JSON.stringify(series)],
-		],
-		[['series.json', JSON.stringify(series)], marker],
-		[
-			[marker[0], marker[1], true],
-			['series.json', JSON.stringify(series)],
-		],
-		[marker, ['series.json', JSON.stringify(series)], ['series.json', '{}']],
-		[marker, ['project.db', 'private']],
-		[marker, ['assets/NUL.webp', 'device']],
-		[marker, ['assets/tile.webp', 'one'], ['assets/TILE.webp', 'two']],
-		[
-			marker,
-			['assets/tile.webp', 'one'],
-			['assets/tile.webp/child.webp', 'two'],
-		],
-		[marker, ['assets/tile.webp', '/outside', false, 0o120777]],
-		[marker, ['assets/tile.webp', 'compressed art', true]],
-	] as RawEntry[][])(
-		'rejects malformed or unsafe ZIP directory %#',
-		async (...entries) => {
-			await rawArchive(entries)
+	it.each<{ entries: RawEntry[]; message: string }>([
+		{
+			entries: [[marker[0], 'not Novelive', false]],
+			message: 'media type marker',
+		},
+		{ entries: [['styles.css', 'css'], marker], message: 'media type marker' },
+		{
+			entries: [[marker[0], marker[1], true]],
+			message: 'compression or encryption',
+		},
+		{
+			entries: [marker, ['series.json', '{}']],
+			message: 'conflicting entry name',
+		},
+		{
+			entries: [marker, ['project.db', 'private']],
+			message: 'unsafe entry name',
+		},
+		{
+			entries: [marker, ['assets/NUL.webp', 'device']],
+			message: 'not portable',
+		},
+		{
+			entries: [
+				marker,
+				['assets/tile.webp', 'one'],
+				['assets/TILE.webp', 'two'],
+			],
+			message: 'conflicting entry name',
+		},
+		{
+			entries: [
+				marker,
+				['assets/tile.webp', 'one'],
+				['assets/tile.webp/child.webp', 'two'],
+			],
+			message: 'conflicting entry name',
+		},
+		{
+			entries: [marker, ['assets/tile.webp', '/outside', false, 0o120777]],
+			message: 'regular ZIP file',
+		},
+		{
+			entries: [marker, ['assets/tile.webp', 'compressed art', true]],
+			message: 'compression or encryption',
+		},
+		{
+			entries: [marker, ['assets/asset-registry.json/tile.webp', 'art']],
+			message: 'file path used as a directory',
+		},
+		{
+			entries: [marker, ['assets/ASSET-REGISTRY.JSON/tile.webp', 'art']],
+			message: 'file path used as a directory',
+		},
+	])(
+		'rejects malformed or unsafe ZIP directory: $message',
+		async ({ entries, message }) => {
+			const project = releasedEntries()
+			for (const [path] of entries)
+				if (path === 'styles.css') project.delete(path)
+			await rawArchive([...entries, ...project])
 			await expect(openPackage(destination)).rejects.toMatchObject({
 				code: 'corrupt_package',
+				message: expect.stringContaining(message),
 			})
 		},
 	)

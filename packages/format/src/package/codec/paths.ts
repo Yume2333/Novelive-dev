@@ -22,6 +22,8 @@ export class PackagePaths {
 			const file = index === parts.length - 1
 			if (existing && (existing.name !== name || file || existing.file))
 				throw corrupt(path, 'duplicate or conflicting entry name')
+			if (!file && packageEntry(name.toLowerCase()))
+				throw corrupt(path, 'file path used as a directory')
 			this.paths.set(key, { name, file })
 		}
 		return rule
