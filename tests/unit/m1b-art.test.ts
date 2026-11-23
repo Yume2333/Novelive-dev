@@ -12,6 +12,7 @@ import {
 	directChapterArt,
 } from '../../packages/creator/src/pipeline/art/director'
 import * as artModels from '../../packages/creator/src/pipeline/art/models'
+import { planArt } from '../../packages/creator/src/pipeline/art/plan'
 import { Project } from '../../packages/creator/src/project'
 import {
 	bible,
@@ -299,6 +300,123 @@ test('requests repair when a staging patch adds an image absent from the manifes
 			'Repair the staging patch and manifest',
 		)
 		expect(model.mock.calls[1][1]).toContain('cg-window')
+	} finally {
+		model.mockRestore()
+	}
+})
+
+test('requests a schema repair for bare model-generated place IDs after a staging repair', async () => {
+	const patch = 'PUT <4:\n@cg cg-window'
+	const cg = { id: 'cg-window', kind: 'cg', description: '窗边' }
+	const courtyard = {
+		id: 'loc_courtyard',
+		kind: 'location',
+		description: '庭院',
+	}
+	const gate = { id: 'loc_gate', kind: 'location', description: '石门' }
+	const corrected = [
+		{ ...courtyard, id: 'loc_courtyard/day' },
+		cg,
+		{ ...gate, id: 'loc_gate/day' },
+	]
+	const answers = [
+		{ patch, items: [], merges: {} },
+		{
+			patch: 'PUT <4:\n@bg loc_courtyard\n@cg cg-window\nPUT >4:\n@bg loc_gate',
+			items: [courtyard, cg, gate],
+			merges: {},
+		},
+		{
+			patch:
+				'PUT <4:\n@bg loc_courtyard/day\n@cg cg-window\nPUT >4:\n@bg loc_gate/day',
+			items: corrected,
+			merges: {},
+		},
+	]
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		const answer = answers.shift()
+		if (!answer) throw new Error('Unexpected art-director request')
+		const chunk = {
+			choices: [
+				{
+					index: 0,
+					delta: { content: JSON.stringify(answer) },
+					finish_reason: 'stop',
+				},
+			],
+		}
+		const prompt = messages[0].content[0].text
+		if (answers.length === 1)
+			expect(prompt).toContain('Repair the staging patch and manifest')
+		if (answers.length === 0) {
+			expect(prompt).not.toContain('Repair the staging patch and manifest')
+			expect(prompt).toContain('/items/0/id')
+			expect(prompt).toContain('/items/2/id')
+			expect(prompt).toContain('location: place/variant')
+			expect(prompt).toContain('character: character/costume/expression')
+			expect(prompt).toContain('"id":"loc_courtyard"')
+			expect(prompt).toContain('"id":"loc_gate"')
+		}
+		return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+			headers: { 'content-type': 'text/event-stream' },
+		})
+	})
+	const staged = await directChapterArt(script, bible, empty, {
+		main,
+		replay: { ...replay, mode: 'replay', fetch },
+	})
+	expect(fetch).toHaveBeenCalledTimes(3)
+	expect(staged.items).toEqual(corrected)
+	const plan = planArt(staged.items, bible, empty, staged.merges)
+	const compiled = compileScript(staged.script, {
+		assets: plan.registry.entries,
+		speakers: ['ada'],
+		paragraphIds: ['p0001'],
+	})
+	expect(compiled.ok).toBe(true)
+	expect(
+		compiled.ok &&
+			compiled.scenes[0].beats
+				.flatMap(({ actions }) => actions)
+				.filter(({ name }) => name === 'bg')
+				.map(({ assets }) => assets),
+	).toEqual([[{ id: 'loc_courtyard/day' }], [{ id: 'loc_gate/day' }]])
+})
+
+test('staging repair edits the schema-corrected reply, not the original rejection', async () => {
+	const original = {
+		patch: 'PUT <4:\n@bg loc_courtyard',
+		items: [{ id: 'loc_courtyard', kind: 'location', description: '庭院' }],
+		merges: {},
+	}
+	const corrected = {
+		...original,
+		patch: 'PUT <4:\n@bg loc_courtyard/day',
+		items: [{ ...original.items[0], id: 'loc_courtyard/evening' }],
+	}
+	const staged = {
+		...corrected,
+		items: [{ ...original.items[0], id: 'loc_courtyard/day' }],
+	}
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockRejectedValueOnce(
+			new artModels.ArtResponseSchemaError('/items/0/id', original),
+		)
+		.mockResolvedValueOnce(corrected)
+		.mockResolvedValueOnce(staged)
+	try {
+		await expect(
+			directChapterArt(script, bible, empty, { main, replay }),
+		).resolves.toMatchObject({ items: staged.items })
+		expect(model).toHaveBeenCalledTimes(3)
+		expect(model.mock.calls[1][1]).toContain(JSON.stringify(original))
+		const retry = model.mock.calls[2][1]
+		expect(retry).toContain('Repair the staging patch and manifest')
+		expect(retry).toContain(JSON.stringify(corrected))
+		expect(retry).not.toContain(JSON.stringify(original))
+		expect(retry).not.toContain('Repair the JSON manifest')
 	} finally {
 		model.mockRestore()
 	}
