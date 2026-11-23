@@ -158,7 +158,7 @@ function fillCollections(shape: Shape, value: unknown): void {
 }
 
 export function synthesisOutput<T>(schema: Schema<T>) {
-	const shape = modelShape(schema)
+	const shape = modelShape(schema as Shape)
 	const validator = compile(schema)
 	return {
 		parse(value: unknown) {
