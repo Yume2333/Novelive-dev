@@ -124,6 +124,12 @@ test('normalizes source wrapping without inventing paragraph or chapter breaks',
 	])
 })
 
+test('keeps footnotes outside prose in chapter notes', async () => {
+	const { book } = await extractEpub(await epub())
+	expect(book.volumes[0].chapters[0].notes).toEqual(['Not body'])
+	expect(book.volumes[0].chapters[0].paragraphs).not.toContain('Not body')
+})
+
 test('nav wins over NCX and headings, preserves nested volume and same-file anchors', async () => {
 	const result = await extractEpub(await epub())
 	expect(compile(extractedBookSchema).validate(result.book).ok).toBe(true)

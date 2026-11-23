@@ -8,6 +8,7 @@ type Location = EpubBook['illustrations'][number]
 interface Block {
 	text: string
 	heading: boolean
+	note?: boolean
 	image?: string
 }
 interface Document {
@@ -77,6 +78,15 @@ function document(path: string, root: Element): Document {
 	const blocks: Block[] = []
 	const anchors = new Map<string, number>()
 	const visit = (node: Element) => {
+		if (
+			/(?:^|\s)(?:footnote|endnote|doc-footnote|doc-endnote|copyright-page)(?:\s|$)/.test(
+				node.attrs['epub:type'] ?? node.attrs.role ?? '',
+			)
+		) {
+			const value = text(node)
+			if (value) blocks.push({ text: value, heading: false, note: true })
+			return
+		}
 		if (
 			['head', 'script', 'style', 'nav', 'aside'].includes(node.name) ||
 			/(?:^|\s)(?:footnote|endnote|noteref)(?:\s|$)/.test(
@@ -214,7 +224,9 @@ export async function extractEpub(
 			if (!item) throw new Error('Missing EPUB spine item')
 			return document(item.path, read(item.path))
 		})
-	if (!docs.some((doc) => doc.blocks.some((block) => block.text)))
+	if (
+		!docs.some((doc) => doc.blocks.some((block) => block.text && !block.note))
+	)
 		throw new Error('EPUB has no extractable text')
 	const locate = (
 		base: string,
@@ -338,7 +350,7 @@ export async function extractEpub(
 			),
 		)
 		const paragraphs = blocks
-			.filter((block) => block.text)
+			.filter((block) => block.text && !block.note)
 			.map((block) => block.text)
 		if (!paragraphs.length) continue
 		const volumeTitle = marker.volume ?? '正文'
@@ -349,11 +361,11 @@ export async function extractEpub(
 		book.volumes[volume].chapters.push({
 			title: marker.title,
 			paragraphs,
-			notes: [],
+			notes: blocks.filter((block) => block.note).map((block) => block.text),
 		})
 		let paragraph = -1
 		for (const block of blocks) {
-			if (block.text) paragraph++
+			if (block.text && !block.note) paragraph++
 			if (!block.image) continue
 			const data = files.get(block.image)
 			if (!data) throw new Error(`Missing EPUB image: ${block.image}`)
