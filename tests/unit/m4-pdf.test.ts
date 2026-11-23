@@ -8,6 +8,21 @@ import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
 
+test('retains nonsequenced number headings in zones and bare folios with only two pages of evidence', async () => {
+	const chapters = await extractPdf(await fixture('zone-chapters'))
+	if (chapters.status !== 'ready') throw new Error('Expected text PDF')
+	expect(chapters.book.volumes[0].chapters.map(({ title }) => title)).toEqual([
+		'1',
+		'5',
+		'9',
+	])
+	const folios = await extractPdf(await fixture('two-folios'))
+	if (folios.status !== 'ready') throw new Error('Expected text PDF')
+	expect(
+		folios.book.volumes[0].chapters.flatMap(({ paragraphs }) => paragraphs),
+	).toContain('10')
+})
+
 test('keeps repeated prose at page edges without header or footer gaps', async () => {
 	const result = await extractPdf(await fixture('repeated-prose'))
 	if (result.status !== 'ready') throw new Error('Expected text PDF')
@@ -40,7 +55,7 @@ test('removes consecutive running headers and footers, keeping the first chapter
 	])
 })
 
-test('preserves bare-number chapter headings but removes sequenced offset page numbers', async () => {
+test('preserves bare-number chapter headings but removes three sequenced left-aligned zone page numbers', async () => {
 	const chapters = await extractPdf(await fixture('numbered-chapters'))
 	if (chapters.status !== 'ready') throw new Error('Expected text PDF')
 	expect(chapters.book.volumes[0].chapters.map(({ title }) => title)).toEqual([
@@ -50,9 +65,8 @@ test('preserves bare-number chapter headings but removes sequenced offset page n
 	])
 	const pages = await extractPdf(await fixture('bare-page-numbers'))
 	if (pages.status !== 'ready') throw new Error('Expected text PDF')
-	expect(pages.book.volumes[0].chapters[0].paragraphs).toEqual([
-		'The story goes on across the page.',
-	])
+	expect(pages.book.volumes[0].chapters).toHaveLength(1)
+	expect(pages.book.volumes[0].chapters[0].paragraphs).toHaveLength(8)
 })
 
 test('isolates note starts and watermarks without swallowing adjacent prose', async () => {

@@ -30,7 +30,7 @@ function lineSpacing(lines: Line[]) {
 }
 
 function pageLayout(lines: Line[]) {
-	const spacing = lineSpacing(lines)
+	const spacing = lineSpacing(lines.length >= 4 ? lines.slice(1, -1) : lines)
 	if (lines.length > 1) {
 		if (Math.abs(lines[0].y - lines[1].y) > spacing * 1.5) lines[0].zone = 'top'
 		const last = lines.length - 1
@@ -88,22 +88,19 @@ function mergeLines(lines: Line[]) {
 }
 
 function stripPageNumbers(lines: Line[]) {
-	const edges = lines.filter(
-		(line, i) =>
-			lines[i - 1]?.page !== line.page || lines[i + 1]?.page !== line.page,
-	)
+	const edges = lines.filter((line) => line.zone)
 	return lines.filter((line) => {
 		if (!edges.includes(line)) return true
 		if (/^(?:[-–—]\s*\d+\s*[-–—]|第\s*\d+\s*[页頁])$/u.test(line.text))
 			return false
-		if (!/^\d+$/u.test(line.text) || line.x - line.left <= line.height * 2)
-			return true
-		return !edges.some(
-			(other) =>
-				other.page !== line.page &&
-				/^\d+$/u.test(other.text) &&
-				other.x - other.left > other.height * 2 &&
-				Number(other.text) - other.page === Number(line.text) - line.page,
+		if (!/^\d+$/u.test(line.text)) return true
+		return (
+			edges.filter(
+				(other) =>
+					/^\d+$/u.test(other.text) &&
+					other.zone === line.zone &&
+					Number(other.text) - other.page === Number(line.text) - line.page,
+			).length < 3
 		)
 	})
 }

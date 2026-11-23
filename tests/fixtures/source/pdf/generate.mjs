@@ -49,6 +49,26 @@ function pdf(pages, image = false, cjk = false) {
 
 for (const [name, pages, image, cjk] of [
 	[
+		'zone-chapters',
+		['1', '5', '9'].map((text) => [
+			{ text, y: 380 },
+			{ text: 'A chapter begins.', y: 326 },
+			{ text: 'It continues.', y: 308 },
+			{ text: 'It ends.', y: 290 },
+		]),
+		false,
+	],
+	[
+		'two-folios',
+		['10', '11'].map((text) => [
+			{ text, y: 380 },
+			{ text: 'A sentence.', y: 326 },
+			{ text: 'Another sentence.', y: 308 },
+			{ text: 'An ending.', y: 290 },
+		]),
+		false,
+	],
+	[
 		'repeated-prose',
 		[
 			['Chapter 1', 'A first sentence.', 'The refrain.'],
@@ -161,7 +181,7 @@ for (const [name, pages, image, cjk] of [
 		false,
 	],
 ]) {
-	const layout =
+	let layout =
 		name === 'running-edges'
 			? pages.map((lines) => [
 					{ text: 'Chapter 2', y: 380 },
@@ -169,6 +189,24 @@ for (const [name, pages, image, cjk] of [
 					{ text: 'A local novel', y: 40 },
 				])
 			: pages
+	if (name === 'bare-page-numbers')
+		layout = [0, 1, 2].map((i) => [
+			{ text: String(10 + i), x: 5, y: 380 },
+			{ text: i === 0 ? 'Chapter 1' : 'The story continues.', y: 326 },
+			{ text: 'Some more prose.', y: 308 },
+			{ text: 'End of this page.', y: 290 },
+		])
+	if (name === 'english-wrap' || name === 'cjk-wrap')
+		layout = pages.map((lines) =>
+			lines.map((line, i) => ({
+				text: line,
+				y: /^(?:- \d+ -|第 \d+ 页)$/.test(line)
+					? i === 0
+						? 380
+						: 40
+					: 326 - i * 18,
+			})),
+		)
 	writeFileSync(
 		new URL(`${name}.pdf`, import.meta.url),
 		pdf(layout, image, cjk),
