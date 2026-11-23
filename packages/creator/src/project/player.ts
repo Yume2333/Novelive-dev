@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
 import { Project } from './index'
-import { resolveSeries } from './series/resolve'
+import { resolveBible, resolveRegistry } from './series/resolve'
 
 export async function loadPlayerChapter(
 	directory: string,
@@ -27,16 +27,15 @@ export async function loadPlayerChapter(
 				),
 			),
 		)
-		const effective = await resolveSeries(project, {
-			level: 'work',
-			volumeId,
-			workId,
-		})
+		const scope = { level: 'work', volumeId, workId } as const
+		const [bible, registry] = await Promise.all([
+			resolveBible(project, scope), resolveRegistry(project, scope),
+		])
 		const speakers = new Map(
-			effective.bible.character.map((entry) => [entry.id, entry.name]),
+			bible.character.map((entry) => [entry.id, entry.name]),
 		)
 		const assets = await Promise.all(
-			effective.registry.entries.map(async (entry) => {
+			registry.entries.map(async (entry) => {
 				const missing = () => ({
 					...entry,
 					path: `player/unavailable/${createHash('sha256').update(`${project.root}/${entry.id}`).digest('hex')}${extname(entry.path)}`,
