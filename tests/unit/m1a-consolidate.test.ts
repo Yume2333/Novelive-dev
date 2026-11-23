@@ -153,6 +153,47 @@ test('resolves only unique aliases and retains an owner-normalized setting ID fo
 	])
 })
 
+test('keeps existing and proposed homonyms with conflicting original names separate', () => {
+	const character = {
+		id: 'old-lin',
+		name: 'Lin',
+		originalName: '林',
+		aliases: [],
+		status: 'confirmed' as const,
+	}
+	const location = {
+		id: 'old-mill',
+		name: 'River Mill',
+		originalName: '河坊',
+		description: 'A mill',
+		status: 'confirmed' as const,
+	}
+	const patch: BiblePatch = [
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				...character,
+				id: 'new-lin',
+				originalName: '藺',
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'location',
+			op: 'add',
+			entry: {
+				...location,
+				id: 'new-mill',
+				originalName: '川廠',
+				status: 'candidate',
+			},
+		},
+	]
+	const bible = { ...emptyBible, character: [character], location: [location] }
+	expect(canonicalizeAdditions(patch, bible, ['c1'])).toEqual(patch)
+})
+
 test('groups beats only within a chapter and preserves conflicting payoff or time', () => {
 	const bible = {
 		...emptyBible,

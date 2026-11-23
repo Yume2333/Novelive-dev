@@ -19,6 +19,10 @@ const labels = (entry: Named) =>
 	[entry.name, entry.originalName, ...(entry.aliases ?? [])].filter(
 		(label): label is string => !!label && !!key(label),
 	)
+const compatibleOriginals = (a: Named, b: Named, normalize = key) =>
+	!a.originalName ||
+	!b.originalName ||
+	normalize(a.originalName) === normalize(b.originalName)
 const aliasesOf = (entry: object) =>
 	'aliases' in entry && Array.isArray(entry.aliases)
 		? entry.aliases.filter(
@@ -152,8 +156,14 @@ function normalizeNames(patch: BiblePatch, bible: Bible): BiblePatch {
 			labels(entry).flatMap((label) => existingCharacters.id(label) ?? []),
 		)
 		const target = existingCharacters.id(entry.name)
-		if (target && matches.size === 1 && !cooccurs(entry.id, target))
-			characterIds.set(entry.id, target)
+		const known = target ? characters.get(target) : undefined
+		if (
+			known &&
+			matches.size === 1 &&
+			compatibleOriginals(entry, known) &&
+			!cooccurs(entry.id, known.id)
+		)
+			characterIds.set(entry.id, known.id)
 	}
 	const character = (id: string) => characterIds.get(id) ?? id
 	const separate = new Set<string>()
@@ -211,17 +221,15 @@ function normalizeNames(patch: BiblePatch, bible: Bible): BiblePatch {
 		const label = key(name)
 		const prior = locationsByName.get(label)
 		const normalizedOwner = name !== entry.name
-		const compatible =
-			prior &&
-			(!prior.entry.originalName ||
-				!entry.originalName ||
-				key(locationName(prior.entry.originalName)) ===
-					key(locationName(entry.originalName)))
+		const originalKey = (value: string) => key(locationName(value))
 		const canonical =
-			known ??
-			(compatible && (normalizedOwner || prior.normalizedOwner)
-				? prior.entry
-				: { ...entry, name })
+			known && compatibleOriginals(entry, known, originalKey)
+				? known
+				: prior &&
+						compatibleOriginals(entry, prior.entry, originalKey) &&
+						(normalizedOwner || prior.normalizedOwner)
+					? prior.entry
+					: { ...entry, name }
 		if (label && !prior)
 			locationsByName.set(label, { entry: canonical, normalizedOwner })
 		pendingLocations.set(entry.id, canonical)
