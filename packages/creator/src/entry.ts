@@ -375,18 +375,38 @@ registry.register('model.testImage', async (_payload, signal) => {
 	})
 })
 
-async function importFile(payload: CommandInput<'import.file'>) {
-	const { importFileProject } = await import('./import/wizard')
-	const result = await importFileProject(payload)
-	if (result.status === 'ready' || result.status === 'joined') {
+async function importSource(
+	payload: CommandInput<'import.file'>,
+	txtOnly: boolean,
+) {
+	const { importFileProject, importTxtProject } = await import(
+		'./import/wizard'
+	)
+	const staged: string[] = []
+	async function register(workIds: string[], projectDir: string) {
 		const service = await getProduction()
-		for (const workId of result.workIds)
-			await service.remember(workId, result.projectDir)
+		for (const workId of workIds) {
+			staged.push(workId)
+			await service.remember(workId, projectDir)
+		}
 	}
-	return result
+	try {
+		const result = await (txtOnly ? importTxtProject : importFileProject)(
+			payload,
+			register,
+		)
+		if (result.status === 'ready')
+			await register(result.workIds, result.projectDir)
+		return result
+	} catch (error) {
+		await Promise.allSettled(
+			staged.map((id) => rm(join(dataDir, 'projects', id), { force: true })),
+		)
+		throw error
+	}
 }
-registry.register('import.file', importFile)
-registry.register('import.txt', importFile)
+registry.register('import.file', (payload) => importSource(payload, false))
+registry.register('import.txt', (payload) => importSource(payload, true))
 registry.register('import.target', async ({ projectDir }) => {
 	const { readImportTarget } = await import('./import/wizard/join')
 	return readImportTarget(projectDir)
@@ -531,7 +551,7 @@ parent.once('message', ({ ports }) => {
 		editorWorks.clear()
 	}
 	port.once('close', () => void drain())
-	parent.on('message', ({ data }) => {
+	parent.once('message', ({ data }) => {
 		if (data?.type !== 'shutdown' || data.generation !== generation) return
 		void drain().then(() => process.exit(0))
 	})

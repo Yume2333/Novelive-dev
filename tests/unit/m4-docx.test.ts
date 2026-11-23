@@ -114,6 +114,27 @@ describe('DOCX extraction', () => {
 		).toEqual(['第一段。', '第二段。', '第三段。'])
 	})
 
+	test('offers a later volume cover at its first chapter without a paragraph', async () => {
+		const book = await extract(
+			heading('第一卷') +
+				heading('第一章', 2) +
+				p('正文。') +
+				heading('第二卷') +
+				drawing('cover') +
+				heading('第二章', 2) +
+				p('续卷正文。'),
+			{
+				'word/_rels/document.xml.rels': imageRelationships({
+					cover: 'media/cover.png',
+				}),
+				'word/media/cover.png': 'cover image',
+			},
+		)
+		expect(book.illustrations).toEqual([
+			{ archivePath: 'word/media/cover.png', volume: 1, chapter: 0 },
+		])
+	})
+
 	test.each([
 		'../../outside.png',
 		'https://example.test/a.png',

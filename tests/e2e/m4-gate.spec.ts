@@ -252,6 +252,11 @@ test.describe('M4 longform and queue', () => {
 					page.getByRole('heading', { name: '核对导入' }),
 				).toBeVisible()
 				const projectDir = join(projects, book.name)
+				if (book.name.startsWith('epub')) {
+					const language = page.getByRole('combobox', { name: /原文语言/ })
+					await expect(language).toHaveValue('en-US')
+					await expect(language.locator('option:checked')).toHaveText('en-US')
+				}
 				const report = await json(join(projectDir, 'source/import-report.json'))
 				expect(report.structure.volumes).toHaveLength(1)
 				expect(report.structure.volumes[0].chapters).toHaveLength(1)
@@ -286,6 +291,7 @@ test.describe('M4 longform and queue', () => {
 					projectFiles.work(volume.volumeId, volume.workIds[0]),
 				)
 				expect(work.chapterIds).toHaveLength(1)
+				if (book.name.startsWith('epub')) expect(work.language).toBe('en-US')
 				const text = (
 					await project.readFile(projectFiles.chapterText(work.chapterIds[0]))
 				).toString()
@@ -333,6 +339,22 @@ test.describe('M4 longform and queue', () => {
 				page.getByText(/扫描版 PDF 无可提取文字，暂不支持 OCR/),
 			).toBeVisible()
 			await capture(page, 'w1-scanned-pdf')
+			const legacySource = join(root, 'legacy.md')
+			await writeFile(legacySource, first)
+			const legacy = await call(page, 'import.txt', {
+				sourcePath: legacySource,
+				folder: projects,
+				title: '旧版 TXT 入口',
+				encoding: 'utf-8',
+				references: [],
+			})
+			expect(legacy).toMatchObject({ status: 'ready', format: 'txt' })
+			expect(
+				await readFile(
+					join(projects, '旧版 TXT 入口', 'source/original.txt'),
+					'utf8',
+				),
+			).toBe(first)
 		} finally {
 			await app.close()
 			await rm(root, { recursive: true, force: true })

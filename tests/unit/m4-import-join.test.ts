@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compile } from '@earendil-works/pi-schema'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { importCommands } from '../../packages/creator/src/contract/import'
 import {
 	importFileProject,
@@ -182,6 +182,58 @@ test.each(['md', 'docx', 'txt', 'epub', 'pdf'] as const)(
 		})
 	},
 )
+
+test('does not publish any volumes if writing the second volume fails and can retry once', async () => {
+	const { root, initial, series } = await existingProject()
+	const before = await snapshot(initial.projectDir)
+	const sourcePath = join(root, 'second.md')
+	await writeFile(
+		sourcePath,
+		'# 第二卷\n\n## 新章一\n\n新的正文。\n\n# 第三卷\n\n## 新章二\n\n更远的正文。',
+	)
+	const options = {
+		sourcePath,
+		folder: root,
+		title: '续卷',
+		references: [],
+		join: { projectDir: initial.projectDir, seriesId: series.seriesId },
+	}
+	const writeProjectFile = Project.prototype.writeFile
+	let written = 0
+	const failure = vi
+		.spyOn(Project.prototype, 'writeFile')
+		.mockImplementation(async function (this: Project, path, value) {
+			if (path.endsWith('/volume.json') && ++written === 2)
+				throw new Error('Second volume write failed')
+			return writeProjectFile.call(this, path, value)
+		})
+	try {
+		await expect(importFileProject(options)).rejects.toThrow(
+			'Second volume write failed',
+		)
+	} finally {
+		failure.mockRestore()
+	}
+	using project = await Project.open(initial.projectDir)
+	expect(await project.read(projectFiles.series)).toEqual(series)
+	expect(await snapshot(initial.projectDir)).toEqual(before)
+	await expect(
+		importFileProject(options, async (workIds) => {
+			expect(workIds).toHaveLength(2)
+			expect(await project.read(projectFiles.series)).toEqual(series)
+			throw new Error('Work registration failed')
+		}),
+	).rejects.toThrow('Work registration failed')
+	expect(await project.read(projectFiles.series)).toEqual(series)
+	expect(await snapshot(initial.projectDir)).toEqual(before)
+	const result = await importFileProject(options)
+	if (result.status !== 'joined') throw new Error('Expected joined')
+	expect((await project.read(projectFiles.series)).volumeIds).toEqual([
+		...series.volumeIds,
+		...result.volumes.map(({ volumeId }) => volumeId),
+	])
+	expect(result.volumes.map(({ title }) => title)).toEqual(['第二卷', '第三卷'])
+})
 
 test.each(['en', 'ja'])(
 	'joining a declared %s source preserves the series output language',

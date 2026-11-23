@@ -452,6 +452,9 @@ function Review({
 								{name}
 							</option>
 						))}
+						{!languages.some(([value]) => value === layout.language) && (
+							<option value={layout.language}>{layout.language}</option>
+						)}
 					</select>
 					<span className={styles.value}>
 						{wizard.format === 'markdown'

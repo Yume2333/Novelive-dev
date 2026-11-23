@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
 	defaultWorkSettings,
@@ -27,10 +27,19 @@ export type JoinBook = {
 const pendingJoins = new Map<string, Promise<unknown>>()
 
 export async function joinSeries(project: Project, book: JoinBook) {
+	const [volume] = await joinSeriesVolumes(project, [book])
+	return volume
+}
+
+export async function joinSeriesVolumes(
+	project: Project,
+	books: readonly JoinBook[],
+	beforePublish?: (workIds: string[]) => Promise<void>,
+) {
 	const previous = pendingJoins.get(project.root) ?? Promise.resolve()
 	const running = previous
 		.catch(() => {})
-		.then(() => appendVolume(project, book))
+		.then(() => appendVolumes(project, books, beforePublish))
 	pendingJoins.set(project.root, running)
 	try {
 		return await running
@@ -40,7 +49,7 @@ export async function joinSeries(project: Project, book: JoinBook) {
 	}
 }
 
-async function appendVolume(project: Project, book: JoinBook) {
+function planVolume(book: JoinBook) {
 	if (
 		!book.title.trim() ||
 		!book.language.trim() ||
@@ -55,18 +64,70 @@ async function appendVolume(project: Project, book: JoinBook) {
 		throw new Error(
 			'Joining a series requires a title, language and nonempty chapters',
 		)
-	const series = await project.read(projectFiles.series)
 	const volumeId = `joined-${randomUUID()}`
 	const workId = randomUUID()
+	const chapterIds = book.chapters.map(
+		(_, index) => `${volumeId}-ch${index + 1}`,
+	)
+	return { book, volumeId, workId, chapterIds }
+}
+
+async function appendVolumes(
+	project: Project,
+	books: readonly JoinBook[],
+	beforePublish?: (workIds: string[]) => Promise<void>,
+) {
+	const volumes = books.map(planVolume)
+	const series = await project.read(projectFiles.series)
+	const staged = []
+	try {
+		for (const volume of volumes) {
+			staged.push(volume)
+			await writeVolume(project, volume)
+		}
+		await beforePublish?.(volumes.map(({ workId }) => workId))
+		await project.write(projectFiles.series, {
+			...series,
+			volumeIds: [
+				...series.volumeIds,
+				...volumes.map(({ volumeId }) => volumeId),
+			],
+		})
+	} catch (error) {
+		await Promise.allSettled(
+			staged.flatMap(({ volumeId, chapterIds }) =>
+				[
+					`volumes/${volumeId}`,
+					`source/imports/${volumeId}`,
+					...chapterIds.flatMap((chapterId) => [
+						projectFiles.chapterText(chapterId),
+						projectFiles.chapterNotes(chapterId),
+					]),
+				].map((path) =>
+					rm(join(project.root, path), { force: true, recursive: true }),
+				),
+			),
+		)
+		throw error
+	}
+	return volumes.map(({ volumeId, workId, chapterIds }) => ({
+		seriesId: series.seriesId,
+		volumeId,
+		workId,
+		chapterIds,
+	}))
+}
+
+async function writeVolume(
+	project: Project,
+	{ book, volumeId, workId, chapterIds }: ReturnType<typeof planVolume>,
+) {
 	const sourceDir = `source/imports/${volumeId}`
 	await mkdir(join(project.root, 'volumes'), { recursive: true })
 	await mkdir(join(project.root, 'volumes', volumeId))
 	await mkdir(join(project.root, 'source', 'imports'), { recursive: true })
 	await mkdir(join(project.root, sourceDir))
 	await mkdir(join(project.root, 'source', 'chapters'), { recursive: true })
-	const chapterIds = book.chapters.map(
-		(_, index) => `${volumeId}-ch${index + 1}`,
-	)
 	for (const [index, chapter] of book.chapters.entries()) {
 		const chapterId = chapterIds[index]
 		await writeFile(
@@ -113,9 +174,4 @@ async function appendVolume(project: Project, book: JoinBook) {
 		title: book.title,
 		workIds: [workId],
 	})
-	await project.write(projectFiles.series, {
-		...series,
-		volumeIds: [...series.volumeIds, volumeId],
-	})
-	return { seriesId: series.seriesId, volumeId, workId, chapterIds }
 }

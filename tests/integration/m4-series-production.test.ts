@@ -415,10 +415,11 @@ test('skipping visual confirmation selects all imported references in order', as
 		'source/second.png',
 		'source/third.png',
 	]
-	await project.write(projectFiles.importReport, {
+	const report = {
 		...(await project.read(projectFiles.importReport)),
 		references,
-	})
+	}
+	await project.write(projectFiles.importReport, report)
 	const host = production()
 	await host.remember(workId, book.projectDir)
 	await host.get(workId)

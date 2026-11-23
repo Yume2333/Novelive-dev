@@ -279,6 +279,7 @@ export async function extractDocx(
 			title: '第一卷',
 			chapters: [],
 		}
+		const openingVolume = volume
 		let title = levels.length ? '前言' : '正文'
 		let lines: { text: string; images: string[] }[] = []
 		const located: {
@@ -289,7 +290,7 @@ export async function extractDocx(
 		}[] = []
 		let archived: string[] = []
 		let pendingNotes: string[] = []
-		const covers: string[] = []
+		const covers: { archivePath: string; volume: typeof volume }[] = []
 		const flush = () => {
 			const chunks: string[][] = [[]]
 			const images: {
@@ -346,11 +347,11 @@ export async function extractDocx(
 			pendingNotes.push(...notes, ...archived)
 			for (const [index, paragraphs] of chunks.entries()) {
 				if (!paragraphs.length) {
-					if (!volumes.length && !volume.chapters.length)
+					if (!volume.chapters.length)
 						covers.push(
 							...images
 								.filter((image) => image.chunk === index)
-								.map((image) => image.archivePath),
+								.map(({ archivePath }) => ({ archivePath, volume })),
 						)
 					continue
 				}
@@ -402,11 +403,12 @@ export async function extractDocx(
 				metadata: {},
 				volumes,
 				illustrations: [
-					...covers.map((archivePath) => ({
-						archivePath,
-						volume: 0,
-						chapter: 0,
-					})),
+					...covers.flatMap(({ archivePath, volume }) => {
+						const index = volume === openingVolume ? 0 : volumes.indexOf(volume)
+						return index === -1
+							? []
+							: [{ archivePath, volume: index, chapter: 0 }]
+					}),
 					...located.map((image) => ({
 						archivePath: image.archivePath,
 						volume: volumes.indexOf(image.volume),

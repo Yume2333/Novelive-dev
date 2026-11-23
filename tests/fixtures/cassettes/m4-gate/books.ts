@@ -47,7 +47,7 @@ export async function writeFormatBooks(root: string) {
 		for (const [name, data] of Object.entries({
 			'META-INF/container.xml':
 				'<container><rootfiles><rootfile full-path="book.opf"/></rootfiles></container>',
-			'book.opf': `<package><metadata/><manifest><item id="body" href="body.xhtml" media-type="application/xhtml+xml"/><item id="img" href="image.png" media-type="image/png"/>${nav ? '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>' : ''}</manifest><spine><itemref idref="body"/></spine></package>`,
+			'book.opf': `<package><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:language>en-US</dc:language></metadata><manifest><item id="body" href="body.xhtml" media-type="application/xhtml+xml"/><item id="img" href="image.png" media-type="image/png"/>${nav ? '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>' : ''}</manifest><spine><itemref idref="body"/></spine></package>`,
 			'nav.xhtml':
 				'<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="body.xhtml">Chapter 1</a></li></ol></nav></body></html>',
 			'body.xhtml': `<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body><h1>Chapter 1</h1>${body.map((line) => `<p>${line}</p>`).join('')}<aside epub:type="footnote"><p>Translator note</p></aside><img src="image.png"/><img src="image.png"/></body></html>`,

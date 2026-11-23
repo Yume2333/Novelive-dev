@@ -1,11 +1,15 @@
 import { defaultWorkSettings, projectFiles } from '@novelive/format/model'
 import type { ExtractedBook, ImportJoined } from '../../contract/import'
 import { Project } from '../../project'
-import { joinSeries } from '../../project/series'
+import { joinSeriesVolumes } from '../../project/series'
 import { decodeTxt, parseTxt } from '../txt'
 import type { ImportWizardView, importTxtProject } from './index'
 
 const invalid = (message: string) => ({ code: 'invalid_config', message })
+export type RegisterJoined = (
+	workIds: string[],
+	projectDir: string,
+) => Promise<void>
 
 async function openTarget(projectDir: string, seriesId?: string) {
 	let project: Project
@@ -46,6 +50,7 @@ export async function joinImportedVolumes(
 	bytes: Uint8Array,
 	format: ImportWizardView['format'],
 	book?: ExtractedBook,
+	register?: RegisterJoined,
 ): Promise<ImportJoined> {
 	if (!options.join) throw invalid('请选择要加入的系列')
 	using project = await openTarget(
@@ -94,21 +99,22 @@ export async function joinImportedVolumes(
 					? 'zh-TW'
 					: 'zh-CN'
 			: 'zh-CN')
-	const joined = []
-	for (const volume of volumes) {
-		const link = await joinSeries(project, {
+	const links = await joinSeriesVolumes(
+		project,
+		volumes.map((volume) => ({
 			...volume,
 			language,
 			settings: firstWork ? firstWork.settings : defaultWorkSettings(),
 			original: { extension: format === 'markdown' ? 'md' : format, bytes },
-		})
-		joined.push({
-			volumeId: link.volumeId,
-			workId: link.workId,
-			title: volume.title,
-			chapters: volume.chapters.length,
-		})
-	}
+		})),
+		register && ((workIds) => register(workIds, project.root)),
+	)
+	const joined = links.map(({ volumeId, workId }, index) => ({
+		volumeId,
+		workId,
+		title: volumes[index].title,
+		chapters: volumes[index].chapters.length,
+	}))
 	return {
 		status: 'joined' as const,
 		format,

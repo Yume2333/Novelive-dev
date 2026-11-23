@@ -28,7 +28,7 @@ import {
 	type StoredIllustration,
 	type WizardIllustration,
 } from './illustrations'
-import { joinImportedVolumes } from './join'
+import { joinImportedVolumes, type RegisterJoined } from './join'
 
 export interface ImportLayout {
 	title: string
@@ -265,19 +265,23 @@ function folderName(title: string) {
 	)
 }
 
-export async function importTxtProject(options: {
-	sourcePath: string
-	folder: string
-	title: string
-	encoding?: TxtEncoding
-	references: string[]
-	join?: ImportJoinTarget
-}) {
-	return importProject(options, 'txt')
+export async function importTxtProject(
+	options: {
+		sourcePath: string
+		folder: string
+		title: string
+		encoding?: TxtEncoding
+		references: string[]
+		join?: ImportJoinTarget
+	},
+	register?: RegisterJoined,
+) {
+	return importProject(options, 'txt', register)
 }
 
 export async function importFileProject(
 	options: Parameters<typeof importTxtProject>[0],
+	register?: RegisterJoined,
 ) {
 	const extension = extname(options.sourcePath).toLowerCase()
 	const format =
@@ -286,12 +290,13 @@ export async function importFileProject(
 			: extension.slice(1)
 	if (!['txt', 'epub', 'markdown', 'docx', 'pdf'].includes(format))
 		throw invalid('不支持的原文格式')
-	return importProject(options, format as ImportWizardView['format'])
+	return importProject(options, format as ImportWizardView['format'], register)
 }
 
 async function importProject(
 	options: Parameters<typeof importTxtProject>[0],
 	format: ImportWizardView['format'],
+	register?: RegisterJoined,
 ) {
 	for (const path of options.references)
 		if (!referenceTypes.has(extname(path).toLowerCase()))
@@ -322,7 +327,8 @@ async function importProject(
 		if (extraction.status === 'unsupported') return extraction
 		book = extraction.book
 	}
-	if (options.join) return joinImportedVolumes(options, bytes, format, book)
+	if (options.join)
+		return joinImportedVolumes(options, bytes, format, book, register)
 	const root = join(options.folder, folderName(options.title))
 	let project: Project
 	try {
