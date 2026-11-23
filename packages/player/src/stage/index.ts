@@ -159,6 +159,18 @@ export async function mountMinimalPlayer(
 	let index = -1
 	let busy = false
 	let timer: ReturnType<typeof setTimeout> | undefined
+	function schedule(beat: (typeof beats)[number]) {
+		clearTimeout(timer)
+		if (beat.advance.kind !== 'click' && !signal.aborted)
+			timer = setTimeout(
+				() => void advance(),
+				beat.advance.kind === 'delay'
+					? beat.advance.seconds * 1000
+					: beat.cue.kind === 'text'
+						? 2000
+						: 0,
+			)
+	}
 	function renderText(text: StageState['text']) {
 		overlay.replaceChildren()
 		if (text) {
@@ -227,15 +239,7 @@ export async function mountMinimalPlayer(
 					[{ restore: 'restart-text' }],
 				)
 			}
-			if (beat.advance.kind !== 'click')
-				timer = setTimeout(
-					() => void advance(),
-					beat.advance.kind === 'delay'
-						? beat.advance.seconds * 1000
-						: beat.cue.kind === 'text'
-							? 2000
-							: 0,
-				)
+			schedule(beat)
 		} catch (error) {
 			onError(error)
 		} finally {
@@ -298,6 +302,7 @@ export async function mountMinimalPlayer(
 			try {
 				await stage.restore(saved, lookahead(beats, restoredIndex + 1))
 				index = restoredIndex
+				schedule(beats[index])
 				snapshot = captureSnapshot(
 					saved.position,
 					{ ...stage.state, text: saved.stage.text },
