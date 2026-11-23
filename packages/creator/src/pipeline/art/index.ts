@@ -673,6 +673,19 @@ export class ArtProduction {
 		}
 		const characters: VisualCandidates['characters'] = []
 		let mattingUnavailable: true | undefined
+		const saveCostumeCandidate = async (
+			drawing: Drawing,
+			path: string,
+			optionalReference = false,
+		) => {
+			try {
+				return await saveCandidate(drawing, path, true, optionalReference)
+			} catch (error) {
+				if (!(error instanceof MattingUnavailableError)) throw error
+				mattingUnavailable = true
+				return false
+			}
+		}
 		for (const character of bible.characters) {
 			if (
 				!character.major ||
@@ -701,46 +714,34 @@ export class ArtProduction {
 						keep: [],
 					}
 					const directory = `candidates/characters/${character.id}/${costume.id}`
-					try {
-						if (i === 1 && illustration) {
-							const path = cachePath(
-								`${directory}/costume-epub-${illustrationKey}.webp`,
-							)
-							const saved = await saveCandidate(
-								{
-									...drawing,
-									references: [
-										...this.styleReferences(bible.style),
-										{
-											role: 'identity',
-											path: illustration.cachePath,
-											label: `${character.id} EPUB character design reference`,
-										},
-									],
-								},
-								path,
-								true,
-								true,
-							)
-							if (saved) {
-								candidates.push({ id: 'costume-epub', cachePath: path })
-								continue
-							}
-						}
-						const id = `costume-${i}`
-						candidates.push(
-							await candidate(
-								id,
-								drawing,
-								cachePath(`${directory}/${id}.webp`),
-								true,
-							),
+					if (i === 1 && illustration) {
+						const path = cachePath(
+							`${directory}/costume-epub-${illustrationKey}.webp`,
 						)
-					} catch (error) {
-						if (!(error instanceof MattingUnavailableError)) throw error
-						mattingUnavailable = true
-						break
+						const saved = await saveCostumeCandidate(
+							{
+								...drawing,
+								references: [
+									...this.styleReferences(bible.style),
+									{
+										role: 'identity',
+										path: illustration.cachePath,
+										label: `${character.id} EPUB character design reference`,
+									},
+								],
+							},
+							path,
+							true,
+						)
+						if (saved) {
+							candidates.push({ id: 'costume-epub', cachePath: path })
+							continue
+						}
 					}
+					const id = `costume-${i}`
+					const path = cachePath(`${directory}/${id}.webp`)
+					if (await saveCostumeCandidate(drawing, path))
+						candidates.push({ id, cachePath: path })
 				}
 				if (candidates.length)
 					characters.push({

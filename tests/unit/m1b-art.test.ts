@@ -529,16 +529,24 @@ test('removes an opaque sprite background before validating and auditing the res
 	)
 	const opaque = await sharp(svg).removeAlpha().png().toBuffer()
 	const landscape = await picture(320, 180, false)
+	let nativeCandidate = false
 	const renderer = vi
 		.spyOn(artModels, 'imageRenderer')
-		.mockReturnValue(async (_prompt, _refs, _size, transparent) => ({
-			bytes: transparent ? opaque : landscape,
+		.mockReturnValue(async (prompt, _refs, { width, height }, transparent) => ({
+			bytes: !transparent
+				? landscape
+				: nativeCandidate && prompt.includes('造型候选 2')
+					? await picture(width, height, true)
+					: opaque,
 		}))
 	const model = vi
 		.spyOn(artModels, 'artJson')
 		.mockImplementation(
 			async (_connection, prompt, _schema, _options, images) => {
-				if (!prompt.startsWith('Visually audit')) return { content: 'Ada' }
+				if (!prompt.startsWith('Visually audit'))
+					return {
+						content: prompt.includes('造型候选 2') ? '造型候选 2' : 'Ada',
+					}
 				const { data, info } = await sharp(images?.[0])
 					.raw()
 					.toBuffer({ resolveWithObject: true })
@@ -561,6 +569,7 @@ test('removes an opaque sprite background before validating and auditing the res
 			expect(pool).toMatchObject({ mattingUnavailable: true, characters: [] })
 			const illustration = 'source/references/illustration-1.png'
 			await project.writeFile(illustration, landscape)
+			nativeCandidate = true
 			const withIllustration = await art.candidates(
 				bible,
 				['c1'],
@@ -570,8 +579,9 @@ test('removes an opaque sprite background before validating and auditing the res
 			)
 			expect(withIllustration).toMatchObject({
 				mattingUnavailable: true,
-				characters: [],
+				characters: [{ candidates: [{ id: 'costume-2' }] }],
 			})
+			nativeCandidate = false
 			const [fallback] = await art.register(
 				[{ id: 'ada/coat/neutral', kind: 'character', description: 'Ada' }],
 				bible,
