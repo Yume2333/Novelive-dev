@@ -8,10 +8,7 @@ import {
 	updatePolicy,
 } from '../../apps/desktop/src/main/update/policy'
 // @ts-expect-error 开发工具的 ESM 入口
-import {
-	generateNotices,
-	readPackageLicenses,
-} from '../../tools/licenses/generate.mjs'
+import * as licenses from '../../tools/licenses/generate.mjs'
 
 const feed = 'http://127.0.0.1:8080/artifacts'
 const sha512 = Buffer.alloc(64, 1).toString('base64')
@@ -106,7 +103,7 @@ it('includes the component list shipped in the Windows sharp binary README', asy
 		await writeFile(join(scratch, 'LICENSE'), 'Apache-2.0')
 		await writeFile(join(scratch, 'README.md'), component)
 		await expect(
-			readPackageLicenses(scratch, '@img/sharp-win32-x64'),
+			licenses.readPackageLicenses(scratch, '@img/sharp-win32-x64'),
 		).resolves.toEqual(['Apache-2.0', component])
 	} finally {
 		await rm(scratch, { recursive: true, force: true })
@@ -117,7 +114,7 @@ it('generates licensing from the production graph and local bundled models', asy
 	const scratch = await mkdtemp(join(tmpdir(), 'novelive-notices-'))
 	try {
 		const file = join(scratch, 'THIRD_PARTY_NOTICES.txt')
-		await generateNotices(file)
+		await licenses.generateNotices(file)
 		const notices = await readFile(file, 'utf8')
 		expect(notices).toContain('LICENSES.chromium.html')
 		expect(notices).toContain('electron-updater@')
