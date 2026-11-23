@@ -179,6 +179,7 @@ test.describe('M4 longform and queue', () => {
 
 			const { app, page } = await launch(root, true, reopenedCassette)
 			try {
+				await pick(app, [])
 				await page.evaluate((hash) => {
 					location.hash = hash
 				}, pendingRoute)
@@ -186,8 +187,9 @@ test.describe('M4 longform and queue', () => {
 				const epubCostume = character.getByRole('radio', {
 					name: 'EPUB 参考方案',
 				})
-				await character.getByRole('radio').nth(1).check()
-				await epubCostume.check()
+				await character.getByRole('radio').nth(1).press('Space')
+				await expect(epubCostume).not.toBeChecked()
+				await epubCostume.press('Space')
 				await expect(epubCostume).toBeChecked()
 				const visuals = page.getByRole('group', { name: '主视觉', exact: true })
 				await expect(
