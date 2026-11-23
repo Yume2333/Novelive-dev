@@ -49,6 +49,16 @@ function pdf(pages, image = false, cjk = false) {
 
 for (const [name, pages, image, cjk] of [
 	[
+		'sparse-folios',
+		[
+			['第一章 风起', '正文。'],
+			['跨页正文。', '- 12 -'],
+			['第 13 页', '末页正文。'],
+		],
+		false,
+		true,
+	],
+	[
 		'body-heading-header',
 		[
 			['Chapter 1', 'The tale begins', 'and travels onward'],

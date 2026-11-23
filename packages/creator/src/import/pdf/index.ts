@@ -109,10 +109,12 @@ function stripPageNumbers(lines: Line[]) {
 		sequence.add(line.page)
 		sequences.set(key(line), sequence)
 	}
-	return lines.filter((line) => {
-		if (!line.zone) return true
-		if (/^(?:[-–—]\s*\d+\s*[-–—]|第\s*\d+\s*[页頁])$/u.test(line.text))
+	return lines.filter((line, i) => {
+		const edge =
+			lines[i - 1]?.page !== line.page || lines[i + 1]?.page !== line.page
+		if (edge && /^(?:[-–—]\s*\d+\s*[-–—]|第\s*\d+\s*[页頁])$/u.test(line.text))
 			return false
+		if (!line.zone) return true
 		if (!/^\d+$/u.test(line.text)) return true
 		return (sequences.get(key(line))?.size ?? 0) < 3
 	})

@@ -8,6 +8,16 @@ import { parseTxt } from '../../packages/creator/src/import/txt/structure'
 const fixture = (name: string) =>
 	readFile(new URL(`../fixtures/source/pdf/${name}.pdf`, import.meta.url))
 
+test('removes explicit edge folios from sparse pages even without a detected zone', async () => {
+	const result = await extractPdf(await fixture('sparse-folios'))
+	if (result.status !== 'ready') throw new Error('Expected text PDF')
+	expect(result.book.volumes[0].chapters[0].paragraphs).toEqual([
+		'正文。',
+		'跨页正文。',
+		'末页正文。',
+	])
+})
+
 test('does not duplicate a body chapter heading when it later appears as a zone header', async () => {
 	const result = await extractPdf(await fixture('body-heading-header'))
 	if (result.status !== 'ready') throw new Error('Expected text PDF')
