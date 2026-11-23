@@ -13,8 +13,8 @@ the reviewed committed `tests/fixtures/cassettes/m2-gate/` cassette.
 
 ```text
 Running 1 test using 1 worker
-  ✓  1 tests/e2e/m2-gate.spec.ts:52:1 › M2 revise a work through editor and Agent in real Electron (8.3s)
-  1 passed (9.3s)
+  ✓  1 tests/e2e/m2-gate.spec.ts:52:1 › M2 revise a work through editor and Agent in real Electron (10.9s)
+  1 passed (13.1s)
 ```
 
 Full output: `strict-gate.txt`. Real Electron verifies source location from the
@@ -24,9 +24,7 @@ buttons, `propose_rewrite_scene` approval, disabled application with no checked
 hunks, selective Agent hunk application, and scene/history/approved-chat
 persistence after closing and reopening the application. The unchecked first
 Agent hunk is not applied. Screenshot capture also asserts no native scrollbars.
-The final run used `pnpm exec playwright test --grep 'M2 revise a work'` against
-the same already-built desktop artifact; the full build-and-gate command above
-also passed during this review (1 passed, 11.5s).
+The final run used the full build-and-gate command above after merging main.
 
 ## PR #57 review follow-up
 
@@ -49,6 +47,24 @@ The redraw cassette uses the same blue geometric subject as the initial image:
 revision/history assertions verify replacement, not a new artistic appearance.
 Screenshot `07-image-redrawn.png` waits for assets and player text to load.
 
+## Merge with main
+
+Merged `origin/main` at `f65bf0b`, without rebasing. The textual conflict was
+substantive but composable: main added `ignoreRecordedFailures` for replay mode,
+while this branch added successful-recording reuse. Both options and filters are
+retained. A new unit test combines them and verifies strict misses stay offline;
+main's existing test still verifies that `ignoreRecordedFailures` alone does not
+alter strict replay.
+
+Main also introduced production queue ownership and desktop quit confirmation.
+The gate now marks its manually published fixture work `done`, rather than
+leaving it queued with zero tasks. The real application still performs the full
+quit/reopen path, with no lifecycle bypass or prompt/cassette change.
+
+After installing main's newly required workspace dependencies and the local
+`mesa-vulkan-drivers` runtime, the full checks below pass. Main's CI already
+installs the Vulkan package. All recording remains disabled.
+
 ## Screenshots
 
 - `01-source-and-preview.png`: original source and minimal player.
@@ -68,13 +84,13 @@ in `ci-check.txt`. The only informational Biome finding is the existing one in
 untouched `tests/fixtures/text-models/build-synthetic.ts`.
 
 ```text
-Checked 243 files in 109ms. No fixes applied.
+Checked 303 files in 141ms. No fixes applied.
 Found 1 info.
- Test Files  29 passed (29)
-      Tests  397 passed (397)
+ Test Files  42 passed (42)
+      Tests  560 passed | 1 skipped (561)
 ```
 
-Relevant editor/chat/routes checks remain in `existing-e2e.txt`:
+Pre-merge editor/chat/routes checks remain in `existing-e2e.txt`:
 
 ```text
   12 passed (19.3s)

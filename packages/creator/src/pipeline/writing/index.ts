@@ -1,4 +1,9 @@
-import { defaultWorkSettings, type WorkSettings } from '@novelive/format/model'
+import {
+	type Character,
+	defaultWorkSettings,
+	type Location,
+	type WorkSettings,
+} from '@novelive/format/model'
 import {
 	type CompileOptions,
 	compileScript,
@@ -8,6 +13,7 @@ import {
 } from '@novelive/format/script'
 import type { TextConnection } from '../../models/text'
 import { ContextLimitError, fitUnits, promptFits } from './budget'
+import { canonicalNamesBrief } from './locale'
 import {
 	TruncatedWritingError,
 	textOf,
@@ -39,6 +45,10 @@ export type WritingChapter = ReviewContext & {
 	redLines?: readonly string[]
 	preset?: string
 	rewrite?: { instruction: string; current: string }
+	canonicalNames?: {
+		characters: readonly Character[]
+		locations: readonly Location[]
+	}
 }
 
 export type WriterOptions = WritingTransport & {
@@ -78,6 +88,16 @@ function brief(chapter: WritingChapter, speakers: string[]) {
 		instructions: [
 			...(redLines ? [`RED LINES (mandatory):\n${redLines}`] : []),
 			`Write a visual novel adaptation in ${chapter.language}.`,
+			...(chapter.canonicalNames
+				? [
+						canonicalNamesBrief(
+							chapter.language,
+							chapter.canonicalNames.characters,
+							chapter.canonicalNames.locations,
+							chapter.terms,
+						),
+					]
+				: []),
 			grammar,
 			adaptationRule,
 			`Performance density: ${density[settings.stagingDensity]}`,

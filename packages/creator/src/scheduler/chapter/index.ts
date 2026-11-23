@@ -56,6 +56,11 @@ export type SchedulerOptions = {
 	imageConcurrency?: number
 	now?: () => number
 	onChange?: () => void
+	slot?: {
+		workId: string
+		granted(): boolean
+		enqueueFirst(): void
+	}
 }
 
 export type RunLogEntry = {
@@ -121,12 +126,83 @@ const assetKind = {
 	cg: 'cg',
 } as const
 
+function transaction(db: DatabaseSync, body: () => void) {
+	if (db.isTransaction) return body()
+	db.exec('BEGIN IMMEDIATE')
+	try {
+		body()
+		db.exec('COMMIT')
+	} catch (error) {
+		db.exec('ROLLBACK')
+		throw error
+	}
+}
+
+function interruptTask(db: DatabaseSync, task: TaskRow, at: number) {
+	db.prepare("UPDATE task SET status = 'interrupted' WHERE task_id = ?").run(
+		task.task_id,
+	)
+	if (task.run_id) {
+		db.prepare(
+			`UPDATE run SET status = 'interrupted', ended_at = ?, error_type = NULL, error_message = NULL
+			WHERE run_id = ? AND status = 'running'`,
+		).run(at, task.run_id)
+		db.prepare(
+			`INSERT INTO run_step (step_id, run_id, seq, operation_name, role, purpose, status, started_at, ended_at)
+			SELECT ?, ?, COALESCE(MAX(seq), 0) + 1, ?, ?, ?, 'cancelled', ?, ? FROM run_step WHERE run_id = ?`,
+		).run(
+			randomUUID(),
+			task.run_id,
+			task.kind === 'image' ? 'generate_content' : 'chat',
+			task.kind === 'image'
+				? roles.draw
+				: (roles[task.phase as ChapterStep] ?? roles.write),
+			task.kind === 'image' ? 'draw' : task.phase,
+			at,
+			at,
+			task.run_id,
+		)
+	}
+	if (task.kind === 'image') {
+		db.prepare(
+			"UPDATE asset SET status = 'pending' WHERE work_id = ? AND asset_key = ? AND status = 'drawing'",
+		).run(task.work_id, task.ref_id)
+	}
+}
+
+export function recoverChapterWork(
+	db: DatabaseSync,
+	workId: string | null = null,
+	now = Date.now,
+) {
+	transaction(db, () => {
+		const tasks = db
+			.prepare(
+				`SELECT * FROM task WHERE status = 'running' AND kind IN ('chapter', 'image')
+			AND (? IS NULL OR work_id = ?)`,
+			)
+			.all(workId, workId) as TaskRow[]
+		for (const task of tasks) interruptTask(db, task, now())
+		db.prepare(
+			`UPDATE asset SET status = 'pending' WHERE status = 'drawing' AND (? IS NULL OR work_id = ?)
+			AND NOT EXISTS (SELECT 1 FROM task t WHERE t.work_id = asset.work_id AND t.kind = 'image'
+				AND t.ref_id = asset.asset_key AND t.status = 'running')`,
+		).run(workId, workId)
+		db.prepare(
+			`UPDATE work SET status = 'paused', pause_reason = 'crashed'
+			WHERE status IN ('active', 'queued') AND (? IS NULL OR work_id = ?)
+			AND EXISTS (SELECT 1 FROM task t WHERE t.work_id = work.work_id AND t.kind = 'chapter')`,
+		).run(workId, workId)
+	})
+}
+
 export class ChapterScheduler {
 	private readonly inflight = new Map<string, Inflight>()
 	private readonly running = new Set<Promise<void>>()
 	private imageConcurrency: number
 	private readonly now: () => number
 	private readonly onChange?: () => void
+	private readonly slot?: SchedulerOptions['slot']
 	private disposed = false
 
 	constructor(
@@ -137,7 +213,8 @@ export class ChapterScheduler {
 		this.imageConcurrency = options.imageConcurrency ?? defaultImageConcurrency
 		this.now = options.now ?? Date.now
 		this.onChange = options.onChange
-		this.recover()
+		this.slot = options.slot
+		recoverChapterWork(db, this.slot?.workId, this.now)
 	}
 
 	setImageConcurrency(limit: number) {
@@ -418,37 +495,32 @@ export class ChapterScheduler {
 		while (this.running.size > 0) await Promise.race(this.running)
 	}
 
+	get busy() {
+		return this.running.size > 0
+	}
+
+	wake() {
+		this.pump()
+	}
+
 	dispose() {
 		this.disposed = true
 		for (const { controller } of this.inflight.values()) controller.abort()
 		this.inflight.clear()
 	}
 
-	private recover() {
-		this.transaction(() => {
-			for (const task of this.all<TaskRow>(
-				"SELECT * FROM task WHERE status = 'running'",
-			)) {
-				this.interrupt(task)
-			}
-			this.exec(
-				`UPDATE asset SET status = 'pending' WHERE status = 'drawing' AND NOT EXISTS (
-					SELECT 1 FROM task t WHERE t.work_id = asset.work_id AND t.kind = 'image'
-					AND t.ref_id = asset.asset_key AND t.status = 'running')`,
-			)
-			this.exec(
-				`UPDATE work SET status = 'paused', pause_reason = 'crashed'
-				WHERE status IN ('active', 'queued')
-				AND EXISTS (SELECT 1 FROM task t WHERE t.work_id = work.work_id AND t.kind = 'chapter')`,
-			)
-		})
-	}
-
 	private pump() {
 		if (this.disposed) return
+		if (this.slot && !this.slot.granted()) {
+			this.onChange?.()
+			return
+		}
 		this.acquireSlot()
+		const workId = this.slot?.workId ?? null
 		const active = this.get<{ work_id: string }>(
-			"SELECT work_id FROM work WHERE status = 'active'",
+			"SELECT work_id FROM work WHERE status = 'active' AND (? IS NULL OR work_id = ?)",
+			workId,
+			workId,
 		)
 		if (
 			active &&
@@ -467,10 +539,14 @@ export class ChapterScheduler {
 
 	private acquireSlot() {
 		if (this.get("SELECT 1 FROM work WHERE status = 'active'")) return
+		const workId = this.slot?.workId ?? null
 		const next = this.get<{ work_id: string }>(
 			`SELECT work_id FROM work w WHERE status = 'queued'
+			AND (? IS NULL OR work_id = ?)
 			AND EXISTS (SELECT 1 FROM task t WHERE t.work_id = w.work_id AND t.kind = 'chapter')
 			ORDER BY queue_pos LIMIT 1`,
+			workId,
+			workId,
 		)
 		if (!next) return
 		this.transaction(() => {
@@ -519,11 +595,14 @@ export class ChapterScheduler {
 	}
 
 	private dispatchImages() {
+		const workId = this.slot?.workId ?? null
 		let slots =
 			this.imageConcurrency -
 			Number(
 				this.get<{ n: number }>(
-					"SELECT COUNT(*) AS n FROM task WHERE kind = 'image' AND status = 'running'",
+					"SELECT COUNT(*) AS n FROM task WHERE kind = 'image' AND status = 'running' AND (? IS NULL OR work_id = ?)",
+					workId,
+					workId,
 				)?.n,
 			)
 		const queued = this.all<TaskRow & { base_status: string | null }>(
@@ -532,8 +611,11 @@ export class ChapterScheduler {
 			JOIN asset a ON a.work_id = t.work_id AND a.asset_key = t.ref_id
 			LEFT JOIN asset b ON b.work_id = a.work_id AND b.asset_key = a.base_key
 			WHERE t.kind = 'image' AND t.status = 'queued' AND w.status IN ('active', 'awaiting_confirm')
+				AND (? IS NULL OR (t.work_id = ? AND w.status = 'active'))
 				AND (a.base_key IS NULL OR b.status IN ('drawn', 'stale', 'placeholder'))
 			ORDER BY t.priority DESC, t.seq`,
+			workId,
+			workId,
 		)
 		for (const task of queued) {
 			if (slots <= 0) break
@@ -891,34 +973,7 @@ export class ChapterScheduler {
 	private interrupt(task: TaskRow) {
 		this.inflight.get(task.task_id)?.controller.abort()
 		this.inflight.delete(task.task_id)
-		this.exec(
-			"UPDATE task SET status = 'interrupted' WHERE task_id = ?",
-			task.task_id,
-		)
-		if (task.run_id) {
-			this.endRun(task, 'interrupted')
-			this.exec(
-				`INSERT INTO run_step (step_id, run_id, seq, operation_name, role, purpose, status, started_at, ended_at)
-				SELECT ?, ?, COALESCE(MAX(seq), 0) + 1, ?, ?, ?, 'cancelled', ?, ? FROM run_step WHERE run_id = ?`,
-				randomUUID(),
-				task.run_id,
-				task.kind === 'image' ? 'generate_content' : 'chat',
-				task.kind === 'image'
-					? roles.draw
-					: (roles[task.phase as ChapterStep] ?? roles.write),
-				task.kind === 'image' ? 'draw' : task.phase,
-				this.now(),
-				this.now(),
-				task.run_id,
-			)
-		}
-		if (task.kind === 'image') {
-			this.exec(
-				"UPDATE asset SET status = 'pending' WHERE work_id = ? AND asset_key = ? AND status = 'drawing'",
-				task.work_id,
-				task.ref_id,
-			)
-		}
+		interruptTask(this.db, task, this.now())
 	}
 
 	private step(
@@ -1041,6 +1096,7 @@ export class ChapterScheduler {
 			queue_pos = (SELECT MIN(queue_pos) - 1 FROM work) WHERE work_id = ?`,
 			workId,
 		)
+		this.slot?.enqueueFirst()
 	}
 
 	private setWork(
@@ -1118,15 +1174,7 @@ export class ChapterScheduler {
 	}
 
 	private transaction(body: () => void) {
-		if (this.db.isTransaction) return body()
-		this.db.exec('BEGIN IMMEDIATE')
-		try {
-			body()
-			this.db.exec('COMMIT')
-		} catch (error) {
-			this.db.exec('ROLLBACK')
-			throw error
-		}
+		transaction(this.db, body)
 	}
 
 	private exec(sql: string, ...params: SQLInputValue[]) {

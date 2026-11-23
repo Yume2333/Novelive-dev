@@ -1,0 +1,9 @@
+$ NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-import-contract.test.ts
+
+ RUN  v5.1.1 .
+
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  02:57:52
+   Duration  409ms (import 45%, tests 44%, transform 10%, worker 1%)

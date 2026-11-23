@@ -14,10 +14,12 @@ import {
 	buildTextModel,
 	createTextStream,
 	outputTokenBudget,
+	parseModelJson,
 	type TextConnection,
 	textResultError,
 } from '../models/text'
 import type { Project } from '../project'
+import { usagePhase } from '../usage'
 
 export interface PreviewChapter {
 	chapterId: string
@@ -141,19 +143,21 @@ export async function previewBook(
 		]
 		for (let attempt = 0; ; attempt++) {
 			options.signal?.throwIfAborted()
-			const result = await stream(model, normalizeContext({ messages }), {
-				apiKey: options.connection.apiKey,
-				signal: options.signal,
-				outputLimit: outputTokens,
-				cacheRetention: 'none',
-			}).result()
+			const result = await usagePhase('preview', () =>
+				stream(model, normalizeContext({ messages }), {
+					apiKey: options.connection.apiKey,
+					signal: options.signal,
+					outputLimit: outputTokens,
+					cacheRetention: 'none',
+				}).result(),
+			)
 			if (['error', 'aborted', 'length'].includes(result.stopReason))
 				throw textResultError(result, `Preview stopped: ${result.stopReason}`)
 			const text = result.content
 				.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 				.join('')
 			try {
-				const value: unknown = JSON.parse(text)
+				const value = parseModelJson(text)
 				const checked = (digest ? digestFields : fields).validate(value)
 				if (!checked.ok) throw new Error(JSON.stringify(checked.errors))
 				return checked.value

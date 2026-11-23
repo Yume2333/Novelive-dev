@@ -37,6 +37,31 @@ test('resuming a gate recording reuses successful identities and records only mi
 	expect(upstream).toHaveBeenCalledTimes(4)
 })
 
+test('successful recording reuse composes with replay failure filtering without strict upstream calls', async () => {
+	const fetch = vi
+		.fn<typeof globalThis.fetch>()
+		.mockResolvedValueOnce(new Response('temporary', { status: 503 }))
+		.mockResolvedValueOnce(new Response('recovered'))
+	const record = createReplayFetch({ mode: 'record', directory, fetch })
+	await (await record(origin)).text()
+	await (await record(origin)).text()
+	for (const mode of ['replay', 'strict'] as const) {
+		const replay = createReplayFetch({
+			mode,
+			directory,
+			fetch,
+			reuseRecorded: true,
+			ignoreRecordedFailures: true,
+		})
+		expect(await (await replay(origin)).text()).toBe('recovered')
+		if (mode === 'strict')
+			await expect(replay(`${origin}/missing`)).rejects.toThrow(
+				'Missing strict replay cassette:',
+			)
+	}
+	expect(fetch).toHaveBeenCalledTimes(2)
+})
+
 test('gate recording reserves private usage and strict misses retain only the request identity', async () => {
 	const usage = join(directory, 'usage.csv')
 	const missing = join(directory, 'missing.txt')
@@ -366,6 +391,37 @@ test.each([
 		expect(fetch).toHaveBeenCalledTimes(1)
 	},
 )
+
+test('can skip a recorded HTTP failure in replay mode without changing strict replay', async () => {
+	const url = origin + path
+	const failed = createReplayFetch({
+		mode: 'record',
+		directory,
+		fetch: async () => new Response('temporarily unavailable', { status: 500 }),
+	})
+	await (await failed(url)).text()
+	const fetch = vi.fn<typeof globalThis.fetch>(
+		async () => new Response('recovered'),
+	)
+	const record = createReplayFetch({ mode: 'record', directory, fetch })
+	const replay = createReplayFetch({
+		mode: 'replay',
+		directory,
+		fetch: record,
+		ignoreRecordedFailures: true,
+	})
+	const strict = createReplayFetch({
+		mode: 'strict',
+		directory,
+		ignoreRecordedFailures: true,
+		fetch,
+	})
+	expect((await strict(url)).status).toBe(500)
+	expect(fetch).not.toHaveBeenCalled()
+	expect(await (await replay(url)).text()).toBe('recovered')
+	expect(await (await replay(url)).text()).toBe('recovered')
+	expect(fetch).toHaveBeenCalledOnce()
+})
 
 test('stream faults and abort during a delayed pull do not change the recording', async () => {
 	const fetch = vi.fn(

@@ -23,6 +23,7 @@ export interface ReplayOptions {
 	fallbackDirectory?: string
 	reuseRecorded?: boolean
 	reportMissing?: boolean
+	ignoreRecordedFailures?: boolean
 }
 
 const bodyLimit = 256 * 1024
@@ -434,7 +435,10 @@ export function createReplayFetch(
 			.filter(
 				(row) =>
 					row.key === identity.key &&
-					(!options.reuseRecorded || row.status < 300),
+					(!options.reuseRecorded || row.status < 300) &&
+					(mode !== 'replay' ||
+						!options.ignoreRecordedFailures ||
+						(row.status >= 200 && row.status < 300)),
 			)
 		if (rows.length === 0) {
 			if (mode === 'strict') {

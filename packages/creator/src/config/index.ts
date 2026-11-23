@@ -15,6 +15,7 @@ import {
 } from 'node:fs/promises'
 import { join } from 'node:path'
 import { compile } from '@earendil-works/pi-schema'
+import { withTextSlot } from '../usage/text-slots'
 import {
 	apiKeyMasked,
 	type Config,
@@ -71,11 +72,11 @@ function validWriter({ writer }: ProductionSettings) {
 
 function textModel(config: Config, slot: TextSlot): Config['models']['fast'] {
 	const { models } = config
-	if (slot === 'fast') return models.fast
+	if (slot === 'fast') return withTextSlot(models.fast, slot)
 	const { inheritFast, ...model } = models[slot]
-	if (!inheritFast) return model
+	if (!inheritFast) return withTextSlot(model, slot)
 	const { format, compat, baseUrl, apiKey } = models.fast
-	return { ...model, format, compat, baseUrl, apiKey }
+	return withTextSlot({ ...model, format, compat, baseUrl, apiKey }, slot)
 }
 
 function defaultConfig(): Config {

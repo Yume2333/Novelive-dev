@@ -71,6 +71,9 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			"INSERT INTO chapter (work_id, chapter_id, ord, user_state) VALUES (?, ?, 0, 'published')",
 		)
 		.run(workId, chapterId)
+	project.database
+		.prepare("UPDATE work SET status = 'done' WHERE work_id = ?")
+		.run(workId)
 	const projectDir = project.root
 	project.close()
 	const profile = join(root, 'profile')

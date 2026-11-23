@@ -16,6 +16,7 @@ import {
 } from './contract'
 import { createRegistry } from './registry'
 import { createReplayFetch, type ReplayOptions } from './replay'
+import { listUsage } from './usage'
 
 const parent = process.parentPort
 const generation = Number(process.env.NL_CREATOR_GENERATION)
@@ -284,6 +285,7 @@ async function productionSession(workId: string) {
 }
 
 registry.register('config.get', () => config.get())
+registry.register('usage.list', () => listUsage(dataDir))
 registry.register('bible.get', async (input) => {
 	using project = await openBibleProject(dataDir, input.workId)
 	return await getBible(project, input)
