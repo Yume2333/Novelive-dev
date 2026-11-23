@@ -273,6 +273,37 @@ it('reports empty playback, missing start positions and stage loading errors wit
 	abort.abort()
 })
 
+it('restarts restored text using the destination sentence advancement mode', async () => {
+	const scenes = fixture()
+	scenes[0].beats[1].advance = { kind: 'auto' }
+	const abort = new AbortController()
+	const player = await mountMinimalPlayer(
+		new Element() as unknown as HTMLElement,
+		scenes,
+		resources,
+		abort.signal,
+		vi.fn(),
+		{},
+		undefined,
+		{ chapterId: 'chapter' },
+	)
+	const first = player?.snapshot
+	if (!first || !player) throw new Error('Missing fixture snapshot')
+	await player.restore({ ...first, position })
+	expect(mountText).toHaveBeenLastCalledWith(
+		expect.anything(),
+		expect.anything(),
+		expect.objectContaining({ auto: true, continueImmediately: true }),
+	)
+	await player.restore(first)
+	expect(mountText).toHaveBeenLastCalledWith(
+		expect.anything(),
+		expect.anything(),
+		expect.objectContaining({ auto: false, continueImmediately: false }),
+	)
+	abort.abort()
+})
+
 it('holds scripted delay until text finishes and responds to text-setting and skip events', async () => {
 	vi.useFakeTimers()
 	try {

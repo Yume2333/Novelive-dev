@@ -665,6 +665,10 @@ test('M3 stage directions render the direction set and four landscape fill crops
 					'aria-busy',
 					'false',
 				)
+				await expect(page.locator('.nl-player-text')).toHaveAttribute(
+					'data-text-finished',
+					'true',
+				)
 				if (label === '移动')
 					await expect.poll(() => pixel(0.25, 0.4)).toEqual([224, 96, 48])
 				if (label === '表情')

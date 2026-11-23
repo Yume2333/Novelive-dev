@@ -416,9 +416,10 @@ export async function mountMinimalPlayer(
 			setBusy(true)
 			++scheduleId
 			clearTimeout(timer)
+			const previousIndex = index
+			index = restoredIndex
 			try {
 				await stage.restore(saved, lookahead(beats, restoredIndex + 1))
-				index = restoredIndex
 				snapshot = captureSnapshot(
 					saved.position,
 					{ ...stage.state, text: saved.stage.text },
@@ -427,6 +428,9 @@ export async function mountMinimalPlayer(
 				onBeat?.(sourceBeats[index])
 				options.onSnapshot?.(structuredClone(snapshot))
 				void schedule(beats[index])
+			} catch (error) {
+				index = previousIndex
+				throw error
 			} finally {
 				setBusy(false)
 			}
