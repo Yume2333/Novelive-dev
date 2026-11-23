@@ -13,10 +13,7 @@
 						"status": "confirmed",
 						"firstSeenChapter": "ch0001",
 						"name": "文素臣",
-						"aliases": [
-							"文白",
-							"素臣"
-						],
+						"aliases": ["文白", "素臣"],
 						"major": true,
 						"identity": "吳江名士，明代儒士，才兼文武，精通韜略、醫藥與算學",
 						"personality": "剛正不阿，嫉惡如仇，崇尚儒學正道，痛絕佛老二教，恪守禮法",
@@ -33,9 +30,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0001",
 						"name": "水夫人",
-						"aliases": [
-							"文母"
-						],
+						"aliases": ["文母"],
 						"major": false,
 						"identity": "文素臣之母，水五湖之姊",
 						"personality": "經學湛深，教子極嚴，明達事理",
@@ -50,10 +45,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0001",
 						"name": "文真",
-						"aliases": [
-							"文古心",
-							"古心"
-						],
+						"aliases": ["文古心", "古心"],
 						"major": false,
 						"identity": "文素臣長兄",
 						"personality": "拘謹純篤，孝友仁厚",
@@ -139,10 +131,7 @@
 						"firstSeenChapter": "ch0002",
 						"name": "未淡然",
 						"originalName": "未翀然",
-						"aliases": [
-							"未公",
-							"未員外"
-						],
+						"aliases": ["未公", "未員外"],
 						"major": false,
 						"identity": "原戶部員外郎，文素臣先父莫逆之交，江西豐城人",
 						"personality": "儒雅寬厚，明辨是非，極重交情"
@@ -190,9 +179,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0002",
 						"name": "未鸞吹",
-						"aliases": [
-							"鸞吹"
-						],
+						"aliases": ["鸞吹"],
 						"major": true,
 						"identity": "未淡然長女，文素臣義妹",
 						"personality": "端莊剛烈，深明大義，重節惜名",
@@ -209,9 +196,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0002",
 						"name": "未金羽",
-						"aliases": [
-							"金羽"
-						],
+						"aliases": ["金羽"],
 						"major": false,
 						"identity": "未淡然幼女",
 						"personality": "幼穉純真",
@@ -285,9 +270,7 @@
 						"firstSeenChapter": "ch0005",
 						"name": "劉大",
 						"originalName": "劉虎臣",
-						"aliases": [
-							"劉大郎"
-						],
+						"aliases": ["劉大郎"],
 						"major": false,
 						"identity": "杭州昭慶寺後鄰糕鋪掌櫃，璇姑之兄",
 						"personality": "忠厚豪爽，感恩圖報，性情急公好義",
@@ -674,10 +657,7 @@
 						"firstSeenChapter": "ch0001",
 						"name": "文素臣",
 						"originalName": "文白",
-						"aliases": [
-							"文白",
-							"素臣"
-						],
+						"aliases": ["文白", "素臣"],
 						"major": true,
 						"identity": "吳江名士，才兼文武，通曉韜略、醫數與算術的儒家正學之士",
 						"personality": "剛正不阿、極重名節禮法、嫉惡如仇、兼濟天下",
@@ -707,9 +687,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0001",
 						"name": "文真",
-						"aliases": [
-							"古心"
-						],
+						"aliases": ["古心"],
 						"major": false,
 						"identity": "文素臣長兄",
 						"personality": "拘謹純謹",
@@ -896,9 +874,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0001",
 						"name": "水五湖",
-						"aliases": [
-							"水雲"
-						],
+						"aliases": ["水雲"],
 						"major": false,
 						"identity": "水夫人之弟，文素臣舅父，隱逸之士",
 						"reuse": "reusable"
@@ -943,10 +919,7 @@
 						"firstSeenChapter": "ch0002",
 						"name": "未淡然",
 						"originalName": "未翀然",
-						"aliases": [
-							"未公",
-							"未翀然"
-						],
+						"aliases": ["未公", "未翀然"],
 						"major": true,
 						"identity": "江右豐城人，退職戶部員外郎，文素臣亡父之莫逆舊友",
 						"reuse": "reusable"
@@ -974,9 +947,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0002",
 						"name": "未鸞吹",
-						"aliases": [
-							"鸞吹"
-						],
+						"aliases": ["鸞吹"],
 						"major": true,
 						"identity": "未淡然長女，文素臣義妹",
 						"personality": "端莊剛烈、知書達禮、深明大義",
@@ -1062,10 +1033,7 @@
 						"firstSeenChapter": "ch0005",
 						"name": "劉大",
 						"originalName": "劉虎臣",
-						"aliases": [
-							"劉大郎",
-							"劉虎臣"
-						],
+						"aliases": ["劉大郎", "劉虎臣"],
 						"major": true,
 						"identity": "昭慶寺後鄰糕餅店主",
 						"personality": "身材魁梧、膂力過人、忠厚仗義、知恩圖報",
@@ -1450,10 +1418,7 @@
 						"status": "confirmed",
 						"firstSeenChapter": "ch0001",
 						"name": "文素臣",
-						"aliases": [
-							"文白",
-							"素臣"
-						],
+						"aliases": ["文白", "素臣"],
 						"major": true,
 						"identity": "蘇州府吳江縣名士，文家次子，儒門豪傑",
 						"personality": "剛正不阿、嫉惡如仇、崇儒闢佛、深明大義且恪守禮法",
@@ -1470,9 +1435,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0001",
 						"name": "水夫人",
-						"aliases": [
-							"文太夫人"
-						],
+						"aliases": ["文太夫人"],
 						"major": false,
 						"identity": "文素臣之母，通曉經史之女中大儒",
 						"personality": "嚴肅慈厚、深明大義、持家整肅"
@@ -1486,10 +1449,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0001",
 						"name": "文真",
-						"aliases": [
-							"文古心",
-							"古心"
-						],
+						"aliases": ["文古心", "古心"],
 						"major": false,
 						"identity": "文素臣胞兄，吳江士人",
 						"personality": "端謹本分、恪守孝道"
@@ -1587,10 +1547,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0002",
 						"name": "未淡然",
-						"aliases": [
-							"未公",
-							"未翀然"
-						],
+						"aliases": ["未公", "未翀然"],
 						"major": false,
 						"identity": "江右豐城名士，致仕戶部員外郎，文素臣先父故友",
 						"personality": "長厚儒雅、深悉世故、明禮知報"
@@ -1604,10 +1561,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0002",
 						"name": "未鸞吹",
-						"aliases": [
-							"鸞吹",
-							"未大小姐"
-						],
+						"aliases": ["鸞吹", "未大小姐"],
 						"major": true,
 						"identity": "未淡然長女，文素臣之義妹",
 						"personality": "端莊剛烈、知書識禮、深明大義、臨危不亂",
@@ -1624,9 +1578,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0002",
 						"name": "未金羽",
-						"aliases": [
-							"金羽"
-						],
+						"aliases": ["金羽"],
 						"major": false,
 						"identity": "未淡然幼女",
 						"personality": "天真伶俐"
@@ -1713,9 +1665,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0004",
 						"name": "何氏",
-						"aliases": [
-							"隨意之妻"
-						],
+						"aliases": ["隨意之妻"],
 						"major": false,
 						"identity": "昭慶寺僧房夥役隨意之妻，寺廟僧徒之拐帶爪牙",
 						"personality": "諂媚奸滑、助紂為虐"
@@ -1743,10 +1693,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0005",
 						"name": "劉大",
-						"aliases": [
-							"劉虎臣",
-							"大郎"
-						],
+						"aliases": ["劉虎臣", "大郎"],
 						"major": true,
 						"identity": "昭慶寺後鄰糕餅肆坊店主，璇姑之兄",
 						"personality": "雄壯勇猛、忠厚率直、重情重義、知恩必報",
@@ -1763,9 +1710,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0005",
 						"name": "石氏",
-						"aliases": [
-							"大郎之妻"
-						],
+						"aliases": ["大郎之妻"],
 						"major": false,
 						"identity": "劉大之妻，璇姑長嫂",
 						"personality": "貞烈堅守、通情達理、知恩感恩"
@@ -1779,9 +1724,7 @@
 						"status": "candidate",
 						"firstSeenChapter": "ch0005",
 						"name": "璇姑",
-						"aliases": [
-							"劉璇姑"
-						],
+						"aliases": ["劉璇姑"],
 						"major": true,
 						"identity": "劉大之妹，精通算學，後為文素臣之如夫人",
 						"personality": "穎悟絕倫、秉性端麗、重節殉義、通曉經術算籌",
