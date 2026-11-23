@@ -19,6 +19,8 @@ export interface ReplayOptions {
 	tags?: readonly string[]
 	fault?: ReplayFault
 	delayMs?: number
+	normalizeIds?: boolean
+	fallbackDirectory?: string
 }
 
 const bodyLimit = 256 * 1024
@@ -69,7 +71,7 @@ function encodedOrigin(origin: string) {
 	return new RegExp(pattern, 'gi')
 }
 
-async function requestIdentity(request: Request) {
+async function requestIdentity(request: Request, normalizeIds = false) {
 	const url = new URL(request.url)
 	const secrets = [
 		request.headers.get('authorization')?.replace(/^\S+\s+/, ''),
@@ -128,6 +130,13 @@ async function requestIdentity(request: Request) {
 			// Non-text request bodies are hashed as bytes.
 		}
 	}
+	if (normalizeIds && typeof canonical === 'string')
+		canonical = canonical
+			.replace(
+				/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+				'[uuid]',
+			)
+			.replace(/ #[0-9a-f]{4}\b/g, ' #[line]')
 	const key = createHash('sha256')
 		.update(method)
 		.update(path)
@@ -242,6 +251,12 @@ export function createReplayFetch(
 	const index = join(directory, 'cassette.jsonl')
 	const bodies = join(directory, 'cassette-files')
 	const positions = new Map<string, number>()
+	const fallback = options.fallbackDirectory
+		? createReplayFetch({
+				mode: 'strict',
+				directory: options.fallbackDirectory,
+			})
+		: undefined
 	let pending: Promise<unknown> = Promise.resolve()
 
 	async function store(
@@ -307,9 +322,31 @@ export function createReplayFetch(
 
 	return async (input, init) => {
 		const request = new Request(input, init)
-		const identity = await requestIdentity(request)
+		const identity = await requestIdentity(request, options.normalizeIds)
 		request.signal.throwIfAborted()
+		if (fallback) {
+			try {
+				return await fallback(request.clone())
+			} catch (error) {
+				if (
+					!(error instanceof Error) ||
+					!error.message.startsWith('Missing strict replay cassette:')
+				)
+					throw error
+			}
+		}
 		if (mode === 'record') {
+			if (process.env.NL_USAGE_CSV) {
+				const body = request.headers
+					.get('content-type')
+					?.includes('application/json')
+					? await request.clone().json()
+					: {}
+				await appendFile(
+					process.env.NL_USAGE_CSV,
+					`${new Date().toISOString().slice(0, 10)},${String(body.model ?? 'image').replaceAll(',', '')},1,${body.max_tokens ?? body.max_completion_tokens ?? 0},0,cassette recording (reserved output tokens)\n`,
+				)
+			}
 			const response = await upstream(request)
 			if (!response.body) {
 				await store(identity, response, Buffer.alloc(0))
@@ -375,10 +412,12 @@ export function createReplayFetch(
 			})
 			.filter((row) => row.key === identity.key)
 		if (rows.length === 0) {
-			if (mode === 'strict')
-				throw new Error(
-					`Missing strict replay cassette: ${identity.method} ${identity.key}`,
-				)
+			if (mode === 'strict') {
+				const message = `Missing strict replay cassette: ${identity.method} ${identity.key} (${directory})`
+				if (process.env.NL_REPLAY_MISSING_LOG)
+					await appendFile(process.env.NL_REPLAY_MISSING_LOG, `${message}\n`)
+				throw new Error(message)
+			}
 			return upstream(request)
 		}
 		const position = positions.get(identity.key) ?? 0

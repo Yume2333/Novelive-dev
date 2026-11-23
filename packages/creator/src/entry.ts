@@ -67,6 +67,58 @@ async function openEditorWork(workId: string) {
 	}
 }
 
+async function revisionsFor(workId: string) {
+	const session = await editorWork(workId)
+	const { CreativeRevisions } = await import('./editor/revisions')
+	return new CreativeRevisions(session.project, workId, session.editor, {
+		rewriteScene: async (...args) =>
+			(await productionSession(workId)).rewriteScene(...args),
+		redraw: async (...args) =>
+			(await productionSession(workId)).redraw(...args),
+		adoptImage: async (...args) =>
+			(await productionSession(workId)).adoptImage(...args),
+		redo: async (...args) => (await productionSession(workId)).redo(...args),
+	})
+}
+
+registry.register('editor.resolveMark', async (input) => {
+	const { editor } = await editorWork(input.workId)
+	await editor.whileCurrent(input, async () => {
+		throw { code: 'not_found', message: '找不到这个标记提议。' }
+	})
+	return editor.snapshot(input)
+})
+registry.register('editor.rewriteScene', async (input, signal) =>
+	(await revisionsFor(input.workId)).rewriteScene(input, signal),
+)
+registry.register('editor.applyRewrite', async (input) =>
+	(await revisionsFor(input.workId)).applyRewrite(input),
+)
+registry.register('editor.selectImage', async (input) =>
+	(await revisionsFor(input.workId)).selectImage(input),
+)
+registry.register('editor.regenerateImage', async (input, signal) => {
+	const result = await (await revisionsFor(input.workId)).regenerateImage(
+		input,
+		signal,
+	)
+	if (result.status !== 'candidates') return result
+	const { project } = await editorWork(input.workId)
+	return {
+		...result,
+		candidates: await Promise.all(
+			result.candidates.map(async (candidate) => {
+				const bytes = await project.readFile(candidate.cachePath)
+				const cachePath = `editor/${createHash('sha256').update(bytes).digest('hex')}${extname(candidate.cachePath)}`
+				const destination = join(cacheDir, cachePath)
+				await mkdir(dirname(destination), { recursive: true })
+				await writeFile(destination, bytes)
+				return { ...candidate, cachePath }
+			}),
+		),
+	}
+})
+
 function editorWork(workId: string) {
 	let session = editorWorks.get(workId)
 	if (!session) {
@@ -150,7 +202,9 @@ async function openChat(workId: string) {
 			workId,
 			config,
 			cacheDir,
-			strictReplayOptions(),
+			process.env.NL_CHAT_CASSETTE_DIR
+				? { directory: process.env.NL_CHAT_CASSETTE_DIR, normalizeIds: true }
+				: strictReplayOptions(),
 			(event) => {
 				const envelope: EventEnvelope = {
 					scope: 'work',
@@ -161,6 +215,7 @@ async function openChat(workId: string) {
 				}
 				publish(envelope)
 			},
+			await revisionsFor(workId),
 		)
 		return { chat, project }
 	} catch (error) {
@@ -195,7 +250,13 @@ function loadProduction() {
 		createProduction(
 			dataDir,
 			config,
-			strictReplayOptions(),
+			process.env.NL_PRODUCTION_CASSETTE_DIR
+				? {
+						directory: process.env.NL_PRODUCTION_CASSETTE_DIR,
+						fallbackDirectory: process.env.NL_PRODUCTION_FALLBACK_DIR,
+						normalizeIds: true,
+					}
+				: strictReplayOptions(),
 			publish,
 			(active) =>
 				parent.postMessage({ type: 'production.active', generation, active }),

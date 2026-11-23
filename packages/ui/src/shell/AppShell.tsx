@@ -1,4 +1,5 @@
 import type {
+	CommandInput,
 	CommandOutput,
 	ConfigUpdate,
 	MaskedConfig,
@@ -10,6 +11,7 @@ import {
 	LibraryBig,
 	MessageSquareText,
 	Moon,
+	Pencil,
 	Play,
 	Settings,
 	Sun,
@@ -36,6 +38,7 @@ const workNavigation = [
 	{ route: 'work', icon: LibraryBig, name: '概览' },
 	{ route: 'play', icon: Play, name: '游玩' },
 	{ route: 'production', icon: Workflow, name: '制作' },
+	{ route: 'editor', icon: Pencil, name: '编辑' },
 	{ route: 'bible', icon: LibraryBig, name: '设定集' },
 ] as const
 export interface SettingsHost {
@@ -55,6 +58,8 @@ export function AppShell() {
 	const workId = useMatch('/work/:id/*')?.params.id
 	const [agentOpen, setAgentOpen] = useState(false)
 	const [agentFull, setAgentFull] = useState(false)
+	const [agentPosition, setAgentPosition] =
+		useState<CommandInput<'chat.send'>['position']>()
 	const theme = config && 'theme' in config ? config.theme : 'system'
 	const updateConfig = useCallback(async (patch: ConfigUpdate) => {
 		const saved = await window.novelive.call('config.update', patch).promise
@@ -254,7 +259,14 @@ export function AppShell() {
 				<ScrollArea key={pathname} className={styles.mainScroll}>
 					<Outlet
 						context={
-							{ config, updateConfig, resetConfig } satisfies SettingsHost
+							{
+								config,
+								updateConfig,
+								resetConfig,
+								setAgentPosition,
+							} satisfies SettingsHost & {
+								setAgentPosition: typeof setAgentPosition
+							}
 						}
 					/>
 				</ScrollArea>
@@ -262,6 +274,7 @@ export function AppShell() {
 					<AgentPanel
 						key={workId}
 						workId={workId}
+						position={agentPosition}
 						full={agentFull}
 						onToggleFull={() => setAgentFull(!agentFull)}
 						onClose={() => setAgentOpen(false)}

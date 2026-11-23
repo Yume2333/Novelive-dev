@@ -1,4 +1,4 @@
-import type { CommandOutput } from '@novelive/creator/contract'
+import type { CommandOutput, RewriteProposal } from '@novelive/creator/contract'
 import {
 	Ban,
 	Check,
@@ -164,6 +164,8 @@ function ProposalCard({
 	const [reason, setReason] = useState('')
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState('')
+	const [rewrite, setRewrite] = useState<RewriteProposal>()
+	const [selected, setSelected] = useState<string[]>([])
 	const chapters = current.chapterIds.map(
 		(chapterId) => actions.chapterTitles[chapterId] ?? chapterId,
 	)
@@ -175,6 +177,10 @@ function ProposalCard({
 		try {
 			const result = await actions.resolve(current, decision)
 			setCurrent(result.proposal)
+			if (result.status === 'resolved' && result.rewrite) {
+				setRewrite(result.rewrite)
+				setSelected(result.rewrite.hunks.map((hunk) => hunk.id))
+			}
 			setStale(result.status === 'stale')
 			setRestriction(result.status === 'restricted' ? result.reason : '')
 			setRejecting(false)
@@ -187,6 +193,61 @@ function ProposalCard({
 	const { payload } = current
 	return (
 		<section className={styles.proposal} aria-label="确认卡">
+			{rewrite && (
+				<section aria-label="重写差异">
+					{rewrite.hunks.map((hunk) => (
+						<label key={hunk.id} className={styles.card}>
+							<input
+								type="checkbox"
+								checked={selected.includes(hunk.id)}
+								onChange={(event) =>
+									setSelected((ids) =>
+										event.target.checked
+											? [...ids, hunk.id]
+											: ids.filter((id) => id !== hunk.id),
+									)
+								}
+							/>
+							{hunk.id}
+							<del>{hunk.before.join('\n')}</del>
+							<ins>{hunk.after.join('\n')}</ins>
+						</label>
+					))}
+					<button
+						type="button"
+						className={styles.button}
+						disabled={busy || !selected.length}
+						onClick={async () => {
+							setBusy(true)
+							try {
+								await window.novelive.call('editor.applyRewrite', {
+									workId: rewrite.workId,
+									chapterId: rewrite.chapterId,
+									sceneId: rewrite.sceneId,
+									expectedRevision: rewrite.expectedRevision,
+									proposalId: rewrite.proposalId,
+									hunkIds: selected,
+								}).promise
+								setRewrite(undefined)
+								window.dispatchEvent(
+									new CustomEvent('novelive:chapter-changed', {
+										detail: {
+											workId: rewrite.workId,
+											chapterId: rewrite.chapterId,
+										},
+									}),
+								)
+							} catch {
+								setError('没能应用，请刷新后重试')
+							} finally {
+								setBusy(false)
+							}
+						}}
+					>
+						应用勾选差异
+					</button>
+				</section>
+			)}
 			<span className={styles.caption}>{proposalKinds[payload.kind]}</span>
 			<p className={styles.proposalPrompt}>{current.prompt}</p>
 			{payload.kind === 'requirements' && (

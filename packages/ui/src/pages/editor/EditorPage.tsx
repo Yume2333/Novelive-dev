@@ -1,8 +1,12 @@
-import type { CommandOutput, RewriteProposal } from '@novelive/creator/contract'
+import type {
+	CommandInput,
+	CommandOutput,
+	RewriteProposal,
+} from '@novelive/creator/contract'
 import { compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
 import { ScrollArea } from '../../components/ScrollArea'
 import { JumpPoints } from './JumpPoints'
@@ -15,6 +19,9 @@ type Chapter = Opening['chapter']
 
 export function EditorPage() {
 	const { id = '' } = useParams()
+	const setAgentPosition = useOutletContext<{
+		setAgentPosition(position: CommandInput<'chat.send'>['position']): void
+	}>()?.setAgentPosition
 	const [params] = useSearchParams()
 	const chapterId = params.get('chapterId') ?? 'ch0001'
 	const [opening, setOpening] = useState<Opening>()
@@ -35,10 +42,31 @@ export function EditorPage() {
 		key: number
 	}>()
 	const [preview, setPreview] = useState(0)
+	const [refresh, setRefresh] = useState(0)
+	useEffect(() => {
+		const changed = (event: Event) => {
+			const { workId, chapterId: changedChapter } = (event as CustomEvent)
+				.detail
+			if (workId === id && changedChapter === chapterId)
+				setRefresh((value) => value + 1)
+		}
+		window.addEventListener('novelive:chapter-changed', changed)
+		return () => window.removeEventListener('novelive:chapter-changed', changed)
+	}, [id, chapterId])
 	const stage = useRef<HTMLDivElement>(null)
 	const sourceViewport = useRef<HTMLDivElement>(null)
 	const chapter = opening?.chapter
 	const scene = chapter?.scenes[sceneIndex]
+	useEffect(() => {
+		if (scene)
+			setAgentPosition?.({
+				kind: 'editor',
+				chapterId,
+				sceneId: scene.sceneId,
+				sourceIds: scene.sourceIds,
+			})
+		return () => setAgentPosition?.(undefined)
+	}, [scene, chapterId, setAgentPosition])
 	const dirty =
 		!!scene &&
 		draft.replace(/\r\n?/g, '\n') !== scene.nvs.replace(/\r\n?/g, '\n')
@@ -48,6 +76,7 @@ export function EditorPage() {
 				?.querySelector('[aria-pressed="true"]')
 				?.scrollIntoView({ block: 'nearest' })
 	}, [source, scene])
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 外部应用差异后重开编辑会话
 	useEffect(() => {
 		let disposed = false
 		let opened: Opening | undefined
@@ -82,7 +111,7 @@ export function EditorPage() {
 			disposed = true
 			if (opened) void close(opened)
 		}
-	}, [id, chapterId])
+	}, [id, chapterId, refresh])
 	function accept(next: Chapter) {
 		setOpening((value) => (value ? { ...value, chapter: next } : value))
 		setDraft(next.scenes[sceneIndex]?.nvs ?? '')
