@@ -3,7 +3,7 @@ import { formatVersion, projectFiles, type Work } from '@novelive/format/model'
 import { compileScript, formatScript } from '@novelive/format/script'
 import type { createConfigStore } from '../config'
 import { withProjectEdits } from '../editor/history/storage'
-import { saveMarkSuggestions } from '../editor/marks'
+import { replaceMarkSuggestions } from '../editor/marks'
 import { TextModelError } from '../models/text'
 import {
 	type ArtBible,
@@ -264,7 +264,7 @@ export function chapterWorker(
 						draft(ctx.chapterId),
 						formatScript(result.scenes.map(({ scene }) => scene)),
 					)
-					await saveMarkSuggestions(
+					await replaceMarkSuggestions(
 						project,
 						volumeId,
 						ctx,

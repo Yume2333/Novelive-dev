@@ -20,31 +20,44 @@ export function pendingMarks(project: Project, { workId, chapterId }: Target) {
 		})
 }
 
-export async function saveMarkSuggestions(
+export async function replaceMarkSuggestions(
 	project: Project,
 	volumeId: string,
 	target: Target,
 	marks: readonly ProposedMark[],
 ) {
-	if (!marks.length) return
 	const { workId, chapterId } = target
-	const { settings } = await project.read(projectFiles.work(volumeId, workId))
-	const names = new Set(pendingMarks(project, target).map(({ name }) => name))
-	const insert = project.database.prepare(
+	const customMarks = marks.length
+		? (await project.read(projectFiles.work(volumeId, workId))).settings
+				.customMarks
+		: {}
+	const names = new Set(Object.keys(customMarks))
+	const db = project.database
+	const insert = db.prepare(
 		'INSERT INTO proposal (proposal_id, work_id, kind, prompt, payload, created_at) VALUES (?, ?, ?, ?, ?, ?)',
 	)
-	for (const mark of marks) {
-		if (Object.hasOwn(settings.customMarks, mark.name) || names.has(mark.name))
-			continue
-		insert.run(
-			randomUUID(),
-			workId,
-			markProposalKind,
-			mark.name,
-			JSON.stringify({ ...mark, chapterId } satisfies StoredMark),
-			Date.now(),
-		)
-		names.add(mark.name)
+	db.exec('BEGIN')
+	try {
+		db.prepare(
+			`DELETE FROM proposal WHERE work_id = ? AND kind = ? AND status = 'pending'
+			AND json_extract(payload, '$.chapterId') = ?`,
+		).run(workId, markProposalKind, chapterId)
+		for (const mark of marks) {
+			if (names.has(mark.name)) continue
+			insert.run(
+				randomUUID(),
+				workId,
+				markProposalKind,
+				mark.name,
+				JSON.stringify({ ...mark, chapterId } satisfies StoredMark),
+				Date.now(),
+			)
+			names.add(mark.name)
+		}
+		db.exec('COMMIT')
+	} catch (error) {
+		db.exec('ROLLBACK')
+		throw error
 	}
 }
 

@@ -14,7 +14,10 @@ import {
 	listHistory,
 	ProjectEditor,
 } from '../../packages/creator/src/editor/history'
-import { saveMarkSuggestions } from '../../packages/creator/src/editor/marks'
+import {
+	pendingMarks,
+	replaceMarkSuggestions,
+} from '../../packages/creator/src/editor/marks'
 import {
 	captureChapterRules,
 	formatChapterRules,
@@ -55,8 +58,9 @@ test('mark resolution is versioned, persistent, and does not replace a registere
 	const before = await editor.open(target)
 	const accept = { name: 'glow', css: 'color: #ffa;', perChar: true }
 	const reject = { name: 'fade', css: 'opacity: 0.8;', perChar: false }
-	await saveMarkSuggestions(project, volumeId, target, [accept, reject])
-	await saveMarkSuggestions(project, volumeId, target, [
+	await replaceMarkSuggestions(project, volumeId, target, [
+		accept,
+		reject,
 		{ ...accept, css: 'color: red;' },
 		{ ...accept, name: 'letter' },
 	])
@@ -108,6 +112,25 @@ test('mark resolution is versioned, persistent, and does not replace a registere
 		glow: { css: accept.css, perChar: accept.perChar },
 	})
 	expect(view.settingsRevision).not.toBe(before.settingsRevision)
+})
+
+test('a replacement draft supplants the pending marks only for its own chapter', async () => {
+	using project = await fixture()
+	const glow = { name: 'glow', css: 'color: #ffa;', perChar: true }
+	const fade = { name: 'fade', css: 'opacity: 0.8;', perChar: false }
+	const otherChapter = { workId, chapterId: 'ch0002' }
+	await replaceMarkSuggestions(project, volumeId, target, [glow, fade])
+	await replaceMarkSuggestions(project, volumeId, otherChapter, [glow])
+	const previous = pendingMarks(project, target)
+	const unaffected = pendingMarks(project, otherChapter)
+	const revised = { ...glow, css: 'text-shadow: 0 0 4px #ffa;', perChar: false }
+	await replaceMarkSuggestions(project, volumeId, target, [revised])
+	const replacement = pendingMarks(project, target)
+	expect(replacement).toEqual([{ id: expect.any(String), ...revised }])
+	expect(replacement[0].id).not.toBe(previous[0].id)
+	await replaceMarkSuggestions(project, volumeId, target, [])
+	expect(pendingMarks(project, target)).toEqual([])
+	expect(pendingMarks(project, otherChapter)).toEqual(unaffected)
 })
 
 async function fixture() {
