@@ -151,6 +151,102 @@ const strict = createReplayFetch({
 const options = { connection, language: 'en', fetch: strict }
 const files = synthesisFiles('v1')
 
+test('whole synthesis requests a complete chapter-by-chapter patch, not a shortlist', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const request = new Request(input, init)
+		const body = await request.clone().json()
+		expect(body.messages[0].content).toContain(
+			'Return their union across all chapters',
+		)
+		expect(body.messages[0].content).toContain('Summarize only the overview')
+		return strict(request)
+	})
+	await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		strategy: 'whole',
+		fetch,
+	})
+	expect(fetch).toHaveBeenCalledOnce()
+})
+
+test('consolidates repeated candidate additions across events and remaps references', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const guide = {
+		id: 'guide',
+		name: 'Lin',
+		aliases: ['Guide'],
+		status: 'candidate',
+	} as const
+	let calls = 0
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		const body = await request.json()
+		expect(body.messages[0].content).toContain(
+			'qualifying new facts, not repeated background',
+		)
+		const first = calls++ === 0
+		const candidate = first
+			? guide
+			: { ...guide, id: 'lin', name: 'Ｌｉｎ', aliases: ['Navigator'] }
+		const result = {
+			overview: 'A journey',
+			chapters: [
+				{ chapterId: first ? 'c1' : 'c2', progress: 'The guide helps.' },
+			],
+			event: first ? 'Meeting Lin' : 'Following Lin',
+			is_last: !first,
+			biblePatch: [
+				{ op: 'add', kind: 'character', entry: candidate },
+				...(first
+					? []
+					: [
+							{
+								op: 'add',
+								kind: 'relation',
+								entry: {
+									id: 'guiding',
+									from: 'lin',
+									to: 'ada',
+									description: 'Guides Ada',
+									status: 'candidate',
+								},
+							},
+						]),
+			],
+			glossaryPatch: [],
+		}
+		return new Response(
+			`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+			{ headers: { 'content-type': 'text/event-stream' } },
+		)
+	}
+	const result = await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		strategy: 'events',
+		fetch,
+	})
+	expect(calls).toBe(2)
+	expect(result.conflicts).toEqual([])
+	expect(result.biblePatch).toMatchObject([
+		{
+			kind: 'character',
+			entry: { id: 'guide', aliases: ['Guide', 'Navigator'] },
+		},
+		{ kind: 'relation', entry: { from: 'guide', to: 'ada' } },
+	])
+	const bible = await readBible(project)
+	expect(bible.character.filter(({ id }) => id !== 'ada')).toMatchObject([
+		{ id: 'guide', aliases: ['Guide', 'Navigator'] },
+	])
+	expect(bible.relation).toContainEqual(
+		expect.objectContaining({ from: 'guide', to: 'ada' }),
+	)
+	expect(await project.read(files.result)).toEqual(result)
+})
+
 beforeEach(async () => {
 	directory = await mkdtemp(join(tmpdir(), 'novelive-synthesis-test-'))
 	root = join(directory, 'project')

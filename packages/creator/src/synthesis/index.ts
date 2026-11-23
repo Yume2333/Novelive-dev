@@ -30,6 +30,7 @@ import {
 } from '../models/text'
 import { splitChapter } from '../preview'
 import type { Project } from '../project'
+import { reconcileNamedAdditions } from './consolidate'
 import { synthesisOutput } from './output'
 import {
 	applyPatches,
@@ -242,7 +243,7 @@ export async function synthesizeVolume(
 	if (previews.some((preview, i) => preview.chapterId !== chapterIds[i]))
 		throw new Error('Stored preview chapter ID does not match its file')
 	const fingerprint = hash({
-		packetFormat: 4,
+		packetFormat: 5,
 		previews,
 		language: options.language,
 		requirements: options.requirements,
@@ -277,7 +278,7 @@ Existing entries:
 ${JSON.stringify(bible)}`
 	const wholePrompt = `${instructions}
 ${whole.instructions}
-Synthesize the entire volume. Include progress for every chapter.
+For each chapter, include progress and exhaustively extract every distinct Bible and glossary entry that meets the inclusion rules. Return their union across all chapters. Summarize only the overview; do not abridge the patch to a volume-level shortlist.
 Chapter previews:
 ${packetText.join('\n')}`
 	const useEvents =
@@ -396,7 +397,7 @@ ${nextEvent.instructions}`
 		const packet = state.packet
 		const event = await request(
 			`${eventPrompt}
-Extract only the next event in packet ${packet + 1}/${packets.length}. A preview may be partial. Report only this event's changes and chapter progress. Set is_last when done with this packet.
+Extract only the next event in packet ${packet + 1}/${packets.length}. Include progress and qualifying new facts, not repeated background. Set is_last when done.
 Events already extracted: ${state.events.length}
 Recent event summaries: ${recentEvents(state.events, historyBudget)}
 Chapter previews:
@@ -463,8 +464,11 @@ ${packets[packet]}`,
 			proposal.chapter ? proposal : (located.get(proposal.content) ?? proposal),
 		)
 	}
-	const biblePatch = [...ordered].map(({ item, chapter }) =>
-		chapter ? { ...item, observedChapter: chapter } : item,
+	const biblePatch = reconcileNamedAdditions(
+		[...ordered].map(({ item, chapter }) =>
+			chapter ? { ...item, observedChapter: chapter } : item,
+		),
+		bible,
 	)
 	const glossaryPatch = unique(parts.flatMap((part) => part.glossaryPatch))
 	options.signal?.throwIfAborted()
@@ -484,7 +488,7 @@ ${packets[packet]}`,
 		await project.write(files.checkpoint, state)
 		latest = await readBible(project)
 	}
-	const { conflicts, glossaryConflicts } =
+	const { conflicts, glossaryConflicts, consolidatedAdds } =
 		!quarantined && hash(latest) === state.basis
 			? await applyPatches(
 					project,
@@ -495,6 +499,10 @@ ${packets[packet]}`,
 					provenance,
 				)
 			: {
+					consolidatedAdds: new Map<
+						BiblePatch[number],
+						BiblePatch[number] | null
+					>(),
 					conflicts: biblePatch
 						.filter(({ op }) => op !== 'none')
 						.map((item) => ({
@@ -513,7 +521,10 @@ ${packets[packet]}`,
 				}
 	const result: VolumeSynthesis = {
 		...skeleton,
-		biblePatch,
+		biblePatch: biblePatch.flatMap((item) => {
+			const consolidated = consolidatedAdds.get(item)
+			return consolidated === null ? [] : [consolidated ?? item]
+		}),
 		glossaryPatch,
 		conflicts,
 		glossaryConflicts,

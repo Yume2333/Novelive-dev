@@ -472,7 +472,11 @@ export async function applyPatches(
 	glossary: GlossaryPatch,
 	chapters: ReadonlySet<string>,
 	seriesChapters = chapters,
-): Promise<{ conflicts: BiblePatch; glossaryConflicts: GlossaryPatch }> {
+): Promise<{
+	conflicts: BiblePatch
+	glossaryConflicts: GlossaryPatch
+	consolidatedAdds: Map<Patch, Patch | null>
+}> {
 	const chapterOrder = new Map(
 		Array.from(seriesChapters, (id, index) => [id, index]),
 	)
@@ -482,6 +486,7 @@ export async function applyPatches(
 	const characterDeletions: (() => Promise<void>)[] = []
 	const removedCharacters = new Set<string>()
 	const accepted = new Set<Patch>()
+	const consolidatedAdds = new Map<Patch, Patch | null>()
 	let survivingCharacters = bible.character
 	let survivingRelations = bible.relation
 	const write = async <T>(
@@ -578,6 +583,33 @@ export async function applyPatches(
 				entries.set(id, normalized)
 				changed.add(id)
 			}
+		}
+		const byId = new Map<string, Patch[]>()
+		for (const item of patch) {
+			if (item.kind !== kind) continue
+			const group = byId.get(item.entry.id) ?? []
+			group.push(item)
+			byId.set(item.entry.id, group)
+		}
+		const originalIds = new Set(original.map(({ id }) => id))
+		for (const [id, group] of byId) {
+			const entry = entries.get(id)
+			if (
+				!entry ||
+				group.length < 2 ||
+				originalIds.has(id) ||
+				group.some((item) => item.op !== 'add' || !accepted.has(item))
+			)
+				continue
+			if (kind === 'character' && 'aliases' in entry) {
+				entry.aliases = unique(
+					group.flatMap((item) =>
+						item.kind === 'character' ? item.entry.aliases : [],
+					),
+				)
+			}
+			consolidatedAdds.set(group[0], { ...group[0], entry } as Patch)
+			for (const item of group.slice(1)) consolidatedAdds.set(item, null)
 		}
 		const survivors = [...entries.values()]
 		if (kind === 'character') {
@@ -703,5 +735,5 @@ export async function applyPatches(
 	for (const persist of pending) await persist()
 	for (const persist of characterDeletions) await persist()
 	if (changed) await write(projectFiles.glossary(scope), [...terms.values()])
-	return { conflicts, glossaryConflicts }
+	return { conflicts, glossaryConflicts, consolidatedAdds }
 }
