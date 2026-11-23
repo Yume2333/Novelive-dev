@@ -3,6 +3,11 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 import { arr, compile, int, obj, opt, str } from '@earendil-works/pi-schema'
+import {
+	type projectSpend,
+	quoteSpend,
+	requestedOutputTokens,
+} from '../usage/spend'
 
 export type ReplayMode = 'record' | 'replay' | 'strict'
 export type ReplayFault =
@@ -25,6 +30,7 @@ export interface ReplayOptions {
 	reuseRecorded?: boolean
 	reportMissing?: boolean
 	ignoreRecordedFailures?: boolean
+	spend?: ReturnType<typeof projectSpend>
 }
 
 const bodyLimit = 256 * 1024
@@ -274,7 +280,12 @@ export function createReplayFetch(
 	options: ReplayOptions = {},
 ): typeof globalThis.fetch {
 	const mode = options.mode ?? modeFromEnvironment()
-	const upstream = options.fetch ?? globalThis.fetch
+	const send = options.fetch ?? globalThis.fetch
+	const spend = options.spend
+	const upstream: typeof fetch = spend
+		? (input, init) =>
+				spend(new Request(input, init), (admitted) => send(admitted))
+		: send
 	if (!mode) return upstream
 	const directory =
 		options.directory ??
@@ -393,18 +404,28 @@ export function createReplayFetch(
 						fallbackDirectory: undefined,
 					})(request)
 			}
-			if (process.env.NL_USAGE_CSV) {
-				const body = request.headers
-					.get('content-type')
-					?.includes('application/json')
-					? await request.clone().json()
-					: {}
-				await appendFile(
-					process.env.NL_USAGE_CSV,
-					`${new Date().toISOString().slice(0, 10)},${String(body.model ?? 'image').replaceAll(',', '')},1,${body.max_tokens ?? body.max_completion_tokens ?? 0},0,cassette recording (reserved output tokens)\n`,
-				)
+			const recordSend = async (
+				admitted: Request,
+				quote?: Awaited<ReturnType<typeof quoteSpend>>,
+			) => {
+				if (process.env.NL_USAGE_CSV) {
+					const reservation =
+						quote ?? (await quoteSpend(admitted).catch(() => undefined))
+					const body = admitted.headers
+						.get('content-type')
+						?.includes('application/json')
+						? await admitted.clone().json()
+						: {}
+					await appendFile(
+						process.env.NL_USAGE_CSV,
+						`${new Date().toISOString().slice(0, 10)},${String(body.model ?? 'image').replaceAll(',', '')},1,${reservation?.tokens ?? requestedOutputTokens(admitted, body) ?? 0},${reservation?.images ?? 0},cassette recording (${reservation ? 'reserved tokens and images' : 'reserved output tokens'})\n`,
+					)
+				}
+				return send(admitted)
 			}
-			const response = await upstream(request)
+			const response = await (spend
+				? spend(request, recordSend)
+				: recordSend(request))
 			if (!response.body) {
 				await store(identity, response, Buffer.alloc(0))
 				return response

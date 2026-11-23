@@ -1,5 +1,5 @@
 import { EventEmitter, once } from 'node:events'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
@@ -466,6 +466,8 @@ test('a reused pending variant queues its missing base before the variant', asyn
 })
 
 test('a settings save changes the next step of an active production session', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
 	const { projectDir, workId } = await fixture()
 	const config = createConfigStore(directory)
 	await config.update(configuration)
@@ -531,7 +533,40 @@ test('a settings save changes the next step of an active production session', as
 	}
 })
 
+test('production refuses over-cap background preparation before the provider fetch', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '0')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	const ledger = join(directory, 'usage.csv')
+	vi.stubEnv('NL_USAGE_CSV', ledger)
+	const { projectDir, workId } = await fixture()
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const fetch = vi
+		.fn<typeof globalThis.fetch>()
+		.mockRejectedValue(new Error('The provider must not be called'))
+	const production = createProduction(
+		directory,
+		config,
+		{ mode: 'record', directory: join(directory, 'cassettes'), fetch },
+		() => {},
+		() => {},
+	)
+	try {
+		await production.remember(workId, projectDir)
+		await expect(production.get(workId)).rejects.toMatchObject({
+			code: 'invalid_config',
+			message: expect.stringContaining('超出工程预算'),
+		})
+		expect(fetch).not.toHaveBeenCalled()
+		await expect(readFile(ledger)).rejects.toMatchObject({ code: 'ENOENT' })
+	} finally {
+		await production.close()
+	}
+})
+
 test('creator config.update applies the new image model and concurrency to queued draws', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
 	const { projectDir, workId } = await fixture()
 	const config = createConfigStore(directory)
 	await config.update(configuration)

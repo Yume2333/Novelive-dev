@@ -20,6 +20,7 @@ import {
 import { prepareSeries } from '../synthesis/incremental'
 import { existing } from '../synthesis/patch'
 import { withUsage } from '../usage'
+import { projectSpend } from '../usage/spend'
 import { Project } from './index'
 import { loadPlayerChapter, loadPlayerStatus } from './player'
 import {
@@ -275,7 +276,10 @@ export function createProduction(
 				previewConnection: models.organizer,
 				synthesisConnection: models.director,
 				language,
-				fetch: createReplayFetch(replay),
+				fetch: createReplayFetch({
+					...replay,
+					spend: projectSpend(project.database),
+				}),
 				signal: controller.signal,
 				skipVolume: async (volumeId) => {
 					if (!volumes.has(volumeId)) return true
@@ -367,8 +371,9 @@ export function createProduction(
 			const settings = () =>
 				productionModels(config, work.settings.writerPresetId)
 			const models = await settings()
+			const projectReplay = { ...replay, spend: projectSpend(project.database) }
 			const { art, worker, setModels, rewriteScene, redraw, adoptImage } =
-				chapterWorker(project, volumeId, work, models, replay)
+				chapterWorker(project, volumeId, work, models, projectReplay)
 			const service = art(shutdown.signal)
 			const data = project.database
 			data
@@ -554,7 +559,7 @@ export function createProduction(
 							project,
 							JSON.stringify(bible),
 							() => config.resolveRoleModel('illustration-screening'),
-							{ replay, signal: shutdown.signal },
+							{ replay: projectReplay, signal: shutdown.signal },
 							bible.characters
 								.filter(
 									({ major, firstSeenChapter }) =>

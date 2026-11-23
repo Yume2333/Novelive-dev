@@ -23,6 +23,7 @@ import type { MaskedConfig } from '../../config/index.js'
 import type { CommandError } from '../../contract/index.js'
 import { createReplayFetch } from '../../replay/index.js'
 import { recordTextUsage } from '../../usage'
+import { SpendBudgetError } from '../../usage/spend'
 import { textUsageSlots } from '../../usage/text-slots'
 
 type Settings = MaskedConfig['models']['fast']
@@ -384,6 +385,7 @@ export function createTextStream(
 				let timer: ReturnType<typeof setTimeout> | undefined
 				let status: number | undefined
 				let fields = ''
+				let spendError: SpendBudgetError | undefined
 				let headersReceived = false
 				const resetWatchdog = () => {
 					clearTimeout(timer)
@@ -418,7 +420,11 @@ export function createTextStream(
 						fetch: async (input, init) => {
 							status = undefined
 							fields = ''
-							const response = await fetch(input, init)
+							if (spendError) throw spendError
+							const response = await fetch(input, init).catch((error) => {
+								if (error instanceof SpendBudgetError) spendError = error
+								throw error
+							})
 							status = response.status
 							if (
 								!response.ok &&
@@ -462,6 +468,7 @@ export function createTextStream(
 				} finally {
 					clearTimeout(timer)
 				}
+				if (spendError) return fail(spendError.code, spendError.message)
 				recordTextUsage(model.id, result.usage, textUsageSlots.get(model))
 				usage = usage ? sumUsage(usage, result.usage) : result.usage
 				if (options?.signal?.aborted)

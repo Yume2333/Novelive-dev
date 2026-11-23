@@ -39,6 +39,7 @@ export const productionQueueSchema = obj({
 				reason: oneOf([
 					'chapter_failed',
 					'image_unsupported',
+					'budget_paused',
 					'stopped',
 					'crashed',
 				]),

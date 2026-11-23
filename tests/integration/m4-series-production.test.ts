@@ -86,6 +86,8 @@ let laterEntered: ReturnType<typeof Promise.withResolvers<void>>
 let laterRelease: ReturnType<typeof Promise.withResolvers<void>> | undefined
 
 beforeEach(async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
 	root = await mkdtemp(join(tmpdir(), 'novelive-series-production-'))
 	hosts = []
 	requests = []
@@ -104,6 +106,7 @@ afterEach(async () => {
 		worker.release('write:ch0003')
 	}
 	for (const host of hosts) await host.close()
+	vi.unstubAllEnvs()
 	workers.clear()
 	await rm(root, { recursive: true, force: true })
 })

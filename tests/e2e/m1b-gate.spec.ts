@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -238,6 +239,92 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			await app.close()
 		}
 	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
+test('M1b Electron refuses a zero-budget production request before transport', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-spend-'))
+	let providerCalls = 0
+	const provider = createServer((_request, response) => {
+		providerCalls++
+		response.writeHead(400).end('Unexpected provider request')
+	})
+	try {
+		await new Promise<void>((resolve, reject) => {
+			provider.once('error', reject)
+			provider.listen(0, '127.0.0.1', resolve)
+		})
+		const address = provider.address()
+		if (!address || typeof address === 'string')
+			throw new Error('Missing stub address')
+		const baseUrl = `http://127.0.0.1:${address.port}/v1`
+		const projects = join(root, 'projects')
+		const source = join(root, '纸船与灯火.txt')
+		await mkdir(projects)
+		await writeFile(source, original)
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${join(root, 'profile')}`],
+			env: {
+				...process.env,
+				ELECTRON_RENDERER_URL: '',
+				NL_REPLAY: 'record',
+				NL_PRODUCTION_CASSETTE_DIR: join(root, 'cassette'),
+				NL_PRODUCTION_FALLBACK_DIR: '',
+				NL_IMAGE_BASE_URL: baseUrl,
+				NL_IMAGE_API_KEY: 'offline-placeholder',
+				NL_RUN_TOKEN_CAP: '0',
+				NL_RUN_IMAGE_CAP: '0',
+			},
+		})
+		try {
+			const page = await app.firstWindow()
+			await expect(page.getByText('创作端已就绪')).toBeAttached()
+			await page
+				.evaluate(
+					async ({ configuration, baseUrl, projects, source }) => {
+						const models = {
+							fast: { ...configuration.models.fast, baseUrl },
+							main: { ...configuration.models.main, baseUrl },
+							writing: { ...configuration.models.writing, baseUrl },
+							visual: { ...configuration.models.visual, baseUrl },
+							image: { ...configuration.models.image, baseUrl },
+						}
+						await window.novelive.call('config.update', { models }).promise
+						return window.novelive.call('import.txt', {
+							folder: projects,
+							sourcePath: source,
+							title: '纸船与灯火',
+							encoding: 'utf-8',
+							references: [],
+						}).promise
+					},
+					{ configuration, baseUrl, projects, source },
+				)
+				.then(async (imported) => {
+					if (imported.status !== 'ready')
+						throw new Error('Fixture import failed')
+					const result = await page.evaluate(async (workId) => {
+						try {
+							await window.novelive.call('production.get', { workId }).promise
+							return null
+						} catch (error) {
+							return error
+						}
+					}, imported.workId)
+					expect(result).toMatchObject({
+						code: 'invalid_config',
+						message: expect.stringContaining('超出工程预算'),
+					})
+				})
+			expect(providerCalls).toBe(0)
+		} finally {
+			await app.close()
+		}
+	} finally {
+		if (provider.listening)
+			await new Promise<void>((resolve) => provider.close(() => resolve()))
 		await rm(root, { recursive: true, force: true })
 	}
 })

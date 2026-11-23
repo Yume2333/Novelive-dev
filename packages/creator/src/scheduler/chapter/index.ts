@@ -7,6 +7,7 @@ import type {
 	WorkPhase,
 } from '@novelive/format/model'
 import type { ProductionSnapshot } from '../../contract/production'
+import { SpendBudgetError } from '../../usage/spend'
 
 export const transientRetries = 2
 export const defaultImageConcurrency = 8
@@ -93,6 +94,7 @@ type Inflight = { runId: string; controller: AbortController }
 type PauseReason =
 	| 'chapter_failed'
 	| 'image_unsupported'
+	| 'budget_paused'
 	| 'stopped'
 	| 'crashed'
 	| 'confirm_visual'
@@ -816,8 +818,12 @@ export class ChapterScheduler {
 		)
 		if (!result) return
 		let outcome: ImageJobResult
+		let reason: 'budget_paused' | undefined
 		if (result.ok) outcome = result.value
-		else {
+		else if (result.error instanceof SpendBudgetError) {
+			outcome = { status: 'unsupported', issue: result.error.message }
+			reason = 'budget_paused'
+		} else {
 			const signal = this.inflight.get(task.task_id)?.controller.signal
 			if (!signal) return
 			try {
@@ -839,7 +845,7 @@ export class ChapterScheduler {
 				task,
 				outcome.status,
 				'issue' in outcome ? outcome.issue : undefined,
-				outcome.status === 'placeholder' ? outcome.reason : undefined,
+				outcome.status === 'placeholder' ? outcome.reason : reason,
 			)
 			this.inflight.delete(task.task_id)
 		})
@@ -849,7 +855,7 @@ export class ChapterScheduler {
 		task: TaskRow,
 		outcome: ImageJobResult['status'],
 		issue?: string,
-		reason?: 'matting_unavailable',
+		reason?: 'matting_unavailable' | 'budget_paused',
 	) {
 		const assetStatus = outcome === 'unsupported' ? 'failed' : outcome
 		this.exec(
@@ -864,7 +870,11 @@ export class ChapterScheduler {
 			`UPDATE task SET status = ?, error_type = ?, ended_at = ?,
 			done_once = CASE WHEN ? = 'done' THEN 1 ELSE done_once END WHERE task_id = ?`,
 			outcome === 'unsupported' ? 'needs_attention' : 'done',
-			outcome === 'drawn' ? null : outcome,
+			outcome === 'drawn'
+				? null
+				: reason === 'budget_paused'
+					? reason
+					: outcome,
 			this.now(),
 			outcome === 'unsupported' ? 'needs_attention' : 'done',
 			task.task_id,
@@ -883,11 +893,17 @@ export class ChapterScheduler {
 			this.flagFromImage(task_id, task.work_id, outcome)
 			this.maybePublish(task_id)
 		}
-		if (
-			outcome === 'unsupported' &&
-			['active', 'queued'].includes(this.work(task.work_id).status)
-		) {
-			this.setWork(task.work_id, 'paused', 'image_unsupported')
+		if (outcome === 'unsupported') {
+			const work = this.work(task.work_id)
+			if (
+				['active', 'queued'].includes(work.status) ||
+				(reason === 'budget_paused' && work.reason === 'image_unsupported')
+			)
+				this.setWork(
+					task.work_id,
+					'paused',
+					reason === 'budget_paused' ? reason : 'image_unsupported',
+				)
 		}
 	}
 
@@ -1080,15 +1096,21 @@ export class ChapterScheduler {
 			)
 		) {
 			this.setWork(workId, 'done', null)
-		} else if (
-			this.get(
-				"SELECT 1 FROM task WHERE work_id = ? AND kind = 'image' AND status = 'needs_attention'",
+		} else {
+			const failure = this.get<{ error_type: string }>(
+				`SELECT error_type FROM task WHERE work_id = ? AND kind = 'image'
+				AND status = 'needs_attention' ORDER BY (error_type = 'budget_paused') DESC LIMIT 1`,
 				workId,
 			)
-		) {
-			this.setWork(workId, 'paused', 'image_unsupported')
-		} else {
-			this.requeueWork(workId)
+			if (failure)
+				this.setWork(
+					workId,
+					'paused',
+					failure.error_type === 'budget_paused'
+						? 'budget_paused'
+						: 'image_unsupported',
+				)
+			else this.requeueWork(workId)
 		}
 	}
 

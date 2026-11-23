@@ -251,6 +251,9 @@ importers:
       '@zip.js/zip.js':
         specifier: 2.24.0
         version: 2.24.0
+      js-tiktoken:
+        specifier: 1.0.21
+        version: 1.0.21
       mdast-util-from-markdown:
         specifier: 2.1.0
         version: 2.1.0(supports-color@7.2.0)

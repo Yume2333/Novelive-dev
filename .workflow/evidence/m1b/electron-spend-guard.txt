@@ -1,0 +1,10 @@
+Electron 制作预算守卫离线回执（M1b/12）
+
+专项测试：Test Files  5 passed (5)
+          Tests  86 passed | 1 skipped (87)
+后台预处理、视觉评审、图片生成与编辑超额时，传输替身调用为零；
+录制模式拒绝的请求不写入 CSV。断开的请求保留预留，重试重新预留。
+
+Electron：NL_REPLAY=strict xvfb-run -a pnpm test:e2e --grep 'M1b make and play'
+  1 passed (21.6s)
+现有 cassette 验证两次确认及制作播放链路；没有付费调用，不替代真书验收。
