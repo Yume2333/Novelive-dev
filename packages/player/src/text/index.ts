@@ -121,6 +121,7 @@ export function mountText(
 	let ends: number[] = []
 	let offsets: number[] = []
 	let heights: number[] = []
+	let minimumHeight = 0
 	let page = 0
 	let revealed = 0
 	let disposed = false
@@ -145,6 +146,7 @@ export function mountText(
 		}
 		display.style.transform = `translateY(${-offsets[page]}px)`
 		window.style.height = `${heights[page]}px`
+		host.style.height = `${Math.max(minimumHeight, heights[page])}px`
 		host.dataset.page = String(page + 1)
 		host.dataset.pages = String(ends.length)
 		host.dataset.revealed = String(revealed)
@@ -262,10 +264,7 @@ export function mountText(
 		}
 		page = ends.findIndex((end) => end > anchor)
 		if (page === -1) page = ends.length - 1
-		host.style.height = `${heights.reduce(
-			(max, height) => Math.max(max, height),
-			Math.min(lineHeight * 3, availableHeight),
-		)}px`
+		minimumHeight = Math.min(lineHeight * 3, availableHeight)
 		schedule()
 	}
 	const observer = new ResizeObserver(measure)

@@ -82,6 +82,7 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 							perChar: false,
 						},
 						char: { css: 'color: teal', perChar: false },
+						huge: { css: 'font-size: 190px', perChar: false },
 					},
 				},
 			})
@@ -108,7 +109,8 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 					`: {speed 100}{shift}${'山川'.repeat(20)}{/shift}{/speed} #0003\n` +
 					': {speed 100}萤火{wave}夜空{/wave}{/speed} #0004\n' +
 					': {speed 100}{char}名字{/char}{/speed} #0005\n' +
-					`: {speed 100}{shout}{large}${'大声'.repeat(20)}{/large}{/shout}{/speed} #0006\n`,
+					`: {speed 100}{shout}{large}${'大声'.repeat(20)}{/large}{/shout}{/speed} #0006\n` +
+					`: {speed 100}${'小字'.repeat(36)}{huge}巨{/huge}{/speed} #0007\n`,
 			)
 		}
 		await mkdir(join(profile, 'projects'), { recursive: true })
@@ -246,22 +248,39 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			await stage.evaluate((element) => {
 				element.style.height = '220px'
 			})
-			await page.getByRole('button', { name: '快捷位置', exact: true }).click()
-			await page.getByRole('menuitem', { name: /^9 ·/ }).click()
-			await page.getByRole('button', { name: '从当前句预览' }).click()
-			const previewGlyph = stage
-				.locator('.nl-text-display [data-glyph]')
-				.first()
-			await expect(previewGlyph).toHaveText('大')
-			expect(
-				await previewGlyph.evaluate((glyph) => {
-					const viewport = glyph.closest('.editor-stage')
-					return viewport
-						? glyph.getBoundingClientRect().top -
-								viewport.getBoundingClientRect().top
-						: -1
-				}),
-			).toBeGreaterThanOrEqual(0)
+			async function expectRevealedPreviewGlyph(
+				line: number,
+				character: string,
+			) {
+				await page
+					.getByRole('button', { name: '快捷位置', exact: true })
+					.click()
+				await page
+					.getByRole('menuitem', { name: new RegExp(`^${line} ·`) })
+					.click()
+				await page.getByRole('button', { name: '从当前句预览' }).click()
+				const glyph = stage.locator('.nl-text-display [data-glyph]').first()
+				await expect(glyph).toHaveText(character)
+				await expect(glyph).toHaveCSS('visibility', 'visible')
+				const inside = await glyph.evaluate((glyph) => {
+					const rect = glyph.getBoundingClientRect()
+					const win = glyph.closest('.nl-text-window')?.getBoundingClientRect()
+					const viewport = glyph
+						.closest('.editor-stage')
+						?.getBoundingClientRect()
+					return (
+						!!win &&
+						!!viewport &&
+						rect.top >= Math.max(win.top, viewport.top) &&
+						rect.bottom <= Math.min(win.bottom, viewport.bottom)
+					)
+				})
+				expect(inside, `preview line ${line} first glyph is not clipped`).toBe(
+					true,
+				)
+			}
+			await expectRevealedPreviewGlyph(9, '大')
+			await expectRevealedPreviewGlyph(10, '小')
 		} finally {
 			await app.close()
 		}
