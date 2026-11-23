@@ -15,18 +15,18 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
 endobj
 6 0 obj
-<< /Length 64 >>
+<< /Length 55 >>
 stream
-BT /F1 12 Tf 20 350 Td 18 TL (No heading on this page.) Tj T* ET
+BT /F1 12 Tf 20 350 Td (No heading on this page.) Tj ET
 endstream
 endobj
 7 0 obj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
 endobj
 8 0 obj
-<< /Length 63 >>
+<< /Length 54 >>
 stream
-BT /F1 12 Tf 20 350 Td 18 TL (Still the same chapter.) Tj T* ET
+BT /F1 12 Tf 20 350 Td (Still the same chapter.) Tj ET
 endstream
 endobj
 xref
@@ -38,10 +38,10 @@ xref
 0000000191 00000 n 
 0000000235 00000 n 
 0000000361 00000 n 
-0000000475 00000 n 
-0000000601 00000 n 
+0000000466 00000 n 
+0000000592 00000 n 
 trailer
 << /Size 9 /Root 1 0 R /Info 4 0 R >>
 startxref
-714
+696
 %%EOF

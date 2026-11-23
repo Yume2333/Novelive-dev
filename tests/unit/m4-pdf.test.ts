@@ -67,3 +67,34 @@ test('malformed and empty inputs reject rather than being mislabeled as scans', 
 		extractPdf(new TextEncoder().encode('not a PDF')),
 	).rejects.toThrow()
 })
+
+test.each([
+	[
+		'cjk-wrap',
+		['他走过长长的街道看见远处的灯火正在慢慢亮起。', '她站在门外等待。'],
+	],
+	[
+		'english-wrap',
+		[
+			'The traveler followed the international road toward the quiet village.',
+			'Another sentence.',
+		],
+	],
+	[
+		'layout',
+		[
+			'An unfinished thought with a soft wrap',
+			'A new paragraph continued here',
+			'Indented start ends here.',
+		],
+	],
+] as const)(
+	'%s preserves paragraphs rather than visual lines',
+	async (name, paragraphs) => {
+		const result = await extractPdf(await fixture(name))
+		expect(compile(importExtractionSchema).check(result)).toBe(true)
+		if (result.status !== 'ready') throw new Error('Expected text PDF')
+		expect(result.book.volumes[0].chapters).toHaveLength(1)
+		expect(result.book.volumes[0].chapters[0].paragraphs).toEqual(paragraphs)
+	},
+)

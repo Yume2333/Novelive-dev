@@ -15,9 +15,9 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 400 400] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
 endobj
 6 0 obj
-<< /Length 32 >>
+<< /Length 0 >>
 stream
-BT /F1 12 Tf 20 350 Td 18 TL  ET
+
 endstream
 endobj
 xref
@@ -32,5 +32,5 @@ xref
 trailer
 << /Size 7 /Root 1 0 R /Info 4 0 R >>
 startxref
-437
+404
 %%EOF
