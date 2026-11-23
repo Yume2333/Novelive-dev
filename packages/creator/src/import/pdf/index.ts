@@ -15,6 +15,32 @@ interface Line {
 	page: number
 	spacing: number
 	left: number
+	zone?: 'top' | 'bottom'
+}
+
+function lineSpacing(lines: Line[]) {
+	const gaps = lines
+		.slice(1)
+		.map((line, i) => Math.abs(line.y - lines[i].y))
+		.filter((gap) => gap > 0)
+		.sort((a, b) => a - b)
+	return (
+		gaps[Math.floor((gaps.length - 1) / 2)] ?? (lines[0]?.height ?? 12) * 1.5
+	)
+}
+
+function pageLayout(lines: Line[]) {
+	const spacing = lineSpacing(lines)
+	if (lines.length > 1) {
+		if (Math.abs(lines[0].y - lines[1].y) > spacing * 1.5) lines[0].zone = 'top'
+		const last = lines.length - 1
+		if (Math.abs(lines[last].y - lines[last - 1].y) > spacing * 1.5)
+			lines[last].zone = 'bottom'
+	}
+	const body = lines.filter((line) => !line.zone)
+	const left = Math.min(...body.map((line) => line.x))
+	const bodySpacing = lineSpacing(body)
+	return lines.map((line) => ({ ...line, left, spacing: bodySpacing }))
 }
 
 const heading = (text: string) =>
@@ -144,21 +170,7 @@ export async function extractPdf(bytes: Uint8Array): Promise<ImportExtraction> {
 					line.text = line.text.trim()
 					return line.text.length
 				})
-				const body = nonempty
-				const gaps = body
-					.slice(1)
-					.map((line, i) => Math.abs(line.y - body[i].y))
-					.filter((gap) => gap > 0)
-					.sort((a, b) => a - b)
-				const spacing = gaps[Math.floor((gaps.length - 1) / 2)]
-				const left = Math.min(...body.map((line) => line.x))
-				lines.push(
-					...body.map((line) => ({
-						...line,
-						left,
-						spacing: spacing ?? line.height * 1.5,
-					})),
-				)
+				lines.push(...pageLayout(nonempty))
 			} finally {
 				page.cleanup()
 			}

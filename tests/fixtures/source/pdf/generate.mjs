@@ -49,6 +49,18 @@ function pdf(pages, image = false, cjk = false) {
 
 for (const [name, pages, image, cjk] of [
 	[
+		'left-folio',
+		[
+			[
+				{ text: 'Chapter 1', x: 60, y: 320 },
+				{ text: 'The first line', x: 60, y: 302 },
+				{ text: 'continues here.', x: 60, y: 284 },
+				{ text: '- 12 -', x: 10, y: 40 },
+			],
+		],
+		false,
+	],
+	[
 		'running-edges',
 		[
 			['Chapter 2', 'The story begins', 'A local novel'],
