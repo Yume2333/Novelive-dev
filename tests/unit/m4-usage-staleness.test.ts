@@ -351,6 +351,60 @@ test('usage keeps readable history and distinguishes broken bindings from empty 
 	})
 })
 
+test('image rendering requests one image and meters all returned images', async () => {
+	await fixture(async (project) => {
+		const model = 'fixture-single-image'
+		const first = Buffer.from('first image')
+		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+			const request = new Request(input, init)
+			const pathname = new URL(request.url).pathname
+			if (pathname === '/v1/images/edits') {
+				expect((await request.formData()).get('n')).toBe('1')
+			} else {
+				expect(pathname).toBe('/v1/images/generations')
+				expect(await request.json()).toMatchObject({ n: 1 })
+			}
+			return Response.json({
+				data: [
+					{ b64_json: first.toString('base64') },
+					{ url: 'https://relay.invalid/unused-second-image.png' },
+				],
+			})
+		})
+		const render = artModels.imageRenderer(
+			{
+				...configuration.models.image,
+				model,
+				baseUrl: 'https://relay.invalid/v1',
+				upscaleTier: 'anime',
+			},
+			{
+				replay: {
+					mode: 'replay',
+					directory: join(project.root, 'offline'),
+					fetch,
+				},
+			},
+		)
+		for (const refs of [[], [Buffer.from('reference')]]) {
+			expect(
+				await withUsage(project, workId, 'draw', () =>
+					render('A sprite', refs, { width: 1024, height: 1536 }, true),
+				),
+			).toEqual({ bytes: first })
+		}
+		expect(fetch).toHaveBeenCalledTimes(2)
+		expect(
+			project.database
+				.prepare('SELECT model, image_count FROM usage ORDER BY rowid')
+				.all(),
+		).toEqual([
+			{ model, image_count: 2 },
+			{ model, image_count: 2 },
+		])
+	})
+})
+
 test('text provider usage preserves resolved slots even when every slot uses the same model', async () => {
 	vi.stubEnv('NL_REPLAY', 'strict')
 	try {

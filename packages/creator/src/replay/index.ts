@@ -111,9 +111,13 @@ async function requestIdentity(
 	}
 	const path = scrub(url.pathname + url.search)
 	const method = request.method
+	const imageRequest =
+		method === 'POST' && /\/images\/(?:generations|edits)$/.test(url.pathname)
 	let canonical: string | Uint8Array
 	if (request.headers.get('content-type')?.startsWith('multipart/form-data;')) {
 		const form = await request.clone().formData()
+		const counts = imageRequest ? form.getAll('n') : []
+		if (counts.length === 1 && counts[0] === '1') form.delete('n')
 		const parts = await Promise.all(
 			Array.from(form, async ([name, value]) => [
 				name,
@@ -133,7 +137,9 @@ async function requestIdentity(
 		try {
 			const text = new TextDecoder('utf-8', { fatal: true }).decode(body)
 			try {
-				canonical = JSON.stringify(sortJson(JSON.parse(text)))
+				const value = JSON.parse(text)
+				if (imageRequest && value?.n === 1) delete value.n
+				canonical = JSON.stringify(sortJson(value))
 			} catch {
 				canonical = text
 			}

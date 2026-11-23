@@ -187,6 +187,7 @@ export async function testImage(
 					? await client.images.edit(
 							{
 								...common,
+								n: 1,
 								quality: config.quality,
 								image: await toFile(input, 'test.png', { type: 'image/png' }),
 							},
@@ -195,6 +196,7 @@ export async function testImage(
 					: await client.images.generate(
 							{
 								...common,
+								n: 1,
 								quality: config.quality,
 								...(capability === 'transparent'
 									? {
