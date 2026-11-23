@@ -94,11 +94,15 @@
 }
 
 @keyframes editor-image-spin {
-	to { transform: rotate(360deg); }
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.editor-image-loading svg { animation: none; }
+	.editor-image-loading svg {
+		animation: none;
+	}
 }
 
 .editor-code .cm-editor {
