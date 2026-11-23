@@ -324,9 +324,14 @@ export async function extractEpub(
 						: [],
 				)
 				if (headings.length) {
-					if (doc !== proseDocs[0]) headings[0].block = 0
-					else if (headings[0].block > 0)
+					if (
+						doc === proseDocs[0] &&
+						doc.blocks
+							.slice(0, headings[0].block)
+							.some((block) => block.text && !block.note)
+					)
 						headings.unshift({ doc: index, block: 0, title: '前言' })
+					else headings[0].block = 0
 				}
 				return headings.length
 					? headings

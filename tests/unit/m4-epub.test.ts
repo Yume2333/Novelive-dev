@@ -374,6 +374,38 @@ test.each([false, true])(
 	},
 )
 
+test.each([false, true])(
+	'keeps chapter-opening art with its chapter with cover=%s',
+	async (cover) => {
+		const extraction = await extractEpub(
+			await epub({
+				'OPS/book.opf': `<package><manifest><item id="cover" href="cover.xhtml"/><item id="body" href="chapter.xhtml"/><item id="image" href="images/picture.svg" media-type="image/svg+xml"/></manifest><spine>${cover ? '<itemref idref="cover"/>' : ''}<itemref idref="body"/></spine></package>`,
+				'OPS/cover.xhtml': xhtml('<img src="images/picture.svg"/>'),
+				'OPS/chapter.xhtml': xhtml(
+					'<img src="images/picture.svg"/><h1>Chapter One</h1><p>First.</p>',
+				),
+			}),
+		)
+		expect(extraction.book.volumes).toHaveLength(1)
+		expect(extraction.book.volumes[0].chapters).toHaveLength(1)
+		expect(extraction.book.illustrations.at(-1)).toEqual({
+			archivePath: 'OPS/images/picture.svg',
+			volume: 0,
+			chapter: 0,
+			paragraph: 0,
+		})
+		for (const _ of extraction.book.illustrations)
+			vi.mocked(artJson).mockResolvedValueOnce({
+				label: 'scene',
+				reason: 'Match',
+			})
+		await classifyIllustrations(extraction, 'Bible', connection, {})
+		const prompt = vi.mocked(artJson).mock.calls.at(-1)?.[1]
+		expect(prompt).toContain('"chapter":"Chapter One"')
+		expect(prompt).toContain('First.')
+	},
+)
+
 test('keeps a later spine file epigraph with that file chapter', async () => {
 	const { book } = await extractEpub(
 		await epub({
