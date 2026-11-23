@@ -608,7 +608,7 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 			).toBeEnabled()
 			const relation = page
 				.getByRole('article')
-				.filter({ hasText: '依赖角色尚未登记' })
+				.filter({ hasText: 'Unknown character reference: unpublished' })
 			await expect(
 				relation.getByRole('button', { name: '接受候选' }),
 			).toBeDisabled()

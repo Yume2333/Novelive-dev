@@ -508,7 +508,7 @@ test('relation conflicts with unpublished character dependencies cannot be appro
 	if (!proposal) throw new Error('Missing relation conflict')
 	expect(first.proposalActions[proposal.id]).toMatchObject({
 		canApprove: false,
-		reason: expect.stringContaining('依赖角色尚未登记'),
+		reason: 'Unknown character reference: missing',
 	})
 	const before = await readBible(project)
 	const service = chat()
@@ -645,4 +645,28 @@ test('backfill may enrich pending snapshots only while the saved whole-Bible rev
 			bases: expect.any(Array),
 		})
 	}
+})
+
+test('real patch preflight blocks missing speakers without writing confirmed content', async () => {
+	const result = await publish()
+	const change = result.conflicts[0]
+	if (change.kind !== 'character')
+		throw new Error('Expected character conflict')
+	change.entry.addresses = [
+		{ speakerId: 'unpublished-speaker', name: 'Captain' },
+	]
+	await project.write(file, result)
+	const before = await readBible(project)
+	const first = await getBible(project, input)
+	const proposal = first.proposalIds
+		.map(
+			(id) => new ChatStore(project.database, ref.workId).proposal(id).proposal,
+		)
+		.find(({ payload }) => payload.kind === 'bible')
+	if (!proposal) throw new Error('Missing speaker conflict')
+	expect(first.proposalActions[proposal.id]).toMatchObject({
+		canApprove: false,
+		reason: 'Unknown character reference: unpublished-speaker',
+	})
+	expect(await readBible(project)).toEqual(before)
 })

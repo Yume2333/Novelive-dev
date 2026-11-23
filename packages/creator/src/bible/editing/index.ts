@@ -5,7 +5,7 @@ import { formatVersion, projectFiles } from '@novelive/format/model'
 import { ChatStore, type ProposalSource } from '../../chat/store'
 import type { CommandInput, CommandOutput, Proposal } from '../../contract'
 import { Project } from '../../project'
-import { existing, readBible, validatePatch } from '../../synthesis/patch'
+import { existing, readBible } from '../../synthesis/patch'
 import {
 	bridgeBibleSources,
 	fileFor,
@@ -197,24 +197,6 @@ async function apply(
 		return false
 	const workId = proposal.workId
 	await workContext(project, workId, payload.volumeId)
-	const chapters = new Set<string>()
-	const series = await project.read(projectFiles.series)
-	for (const volumeId of series.volumeIds) {
-		const volume = await project.read(projectFiles.volume(volumeId))
-		for (const id of volume.workIds)
-			for (const chapter of (
-				await project.read(projectFiles.work(volumeId, id))
-			).chapterIds)
-				chapters.add(chapter)
-	}
-	validatePatch(
-		before,
-		payload.kind === 'bible' ? payload.changes : [],
-		payload.kind === 'glossary' ? payload.changes : [],
-		chapters,
-		chapters,
-		false,
-	)
 	const after = structuredClone(before)
 	const touched = new Set<Kind>()
 	const changes =
