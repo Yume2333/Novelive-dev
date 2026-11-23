@@ -58,7 +58,8 @@ function scalar(raw: string, rest: string[]) {
 // A leading `---` block is YAML front matter only when every line reads as
 // YAML; otherwise it is a thematic break and the text stays in the body. A
 // closing `]` or `}` may sit at the margin only while the latest top-level
-// key, or a key nested under it, opened a flow collection.
+// key, or a key nested under it, opened a flow collection. A block with no
+// title or language stays in the body, so unreadable text is never dropped.
 function frontMatter(text: string) {
 	const metadata: MarkdownBook['metadata'] = {}
 	const block = text.match(
@@ -66,17 +67,15 @@ function frontMatter(text: string) {
 	)
 	const lines = block?.[1].split('\n') ?? []
 	let flow = false
-	let keys = 0
 	for (const line of lines) {
 		if (!line.trim()) continue
 		if (flow && /^[\]}][\]},\s]*(?:#.*)?$/.test(line)) continue
 		if (!yamlLine.test(line)) return { body: text, metadata }
-		if (yamlKey.test(line)) keys++
 		const opens = /^\s*[^\s#:-][^:]*:\s*[[{]/.test(line)
 		if (yamlKey.test(line)) flow = opens
 		else if (opens) flow = true
 	}
-	if (!block || !keys) return { body: text, metadata }
+	if (!block) return { body: text, metadata }
 	for (const [i, line] of lines.entries()) {
 		const field = line.match(/^(title|lang|language):[ \t]*(.+?)[ \t]*$/)
 		if (!field) continue
@@ -85,6 +84,7 @@ function frontMatter(text: string) {
 		if (field[1] === 'title') metadata.title = value
 		else metadata.language = value
 	}
+	if (!metadata.title && !metadata.language) return { body: text, metadata: {} }
 	return { body: text.slice(block[0].length), metadata }
 }
 
