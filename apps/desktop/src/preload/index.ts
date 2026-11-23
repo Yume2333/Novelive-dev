@@ -56,6 +56,8 @@ ipcRenderer.on('novelive:port', (event, current: number) => {
 		}
 		if (data.generation !== generation) return
 		if (data.type === 'event') {
+			if (data.envelope.event.type === 'production.snapshot')
+				ipcRenderer.send('novelive:production-event', data.envelope.event)
 			emit('event', data.envelope)
 			return
 		}
@@ -135,3 +137,13 @@ const api: Novelive = {
 }
 
 contextBridge.exposeInMainWorld('novelive', api)
+
+ipcRenderer.on('novelive:locate', (_event, path: string) => {
+	window.location.hash = path
+})
+window.addEventListener('novelive:player-waiting', (event) => {
+	ipcRenderer.send('novelive:player-waiting', (event as CustomEvent).detail)
+})
+window.addEventListener('hashchange', () => {
+	ipcRenderer.send('novelive:player-waiting', null)
+})

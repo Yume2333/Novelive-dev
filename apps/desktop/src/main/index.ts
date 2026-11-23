@@ -13,6 +13,8 @@ import {
 	utilityProcess,
 } from 'electron'
 import { cacheResponse } from '../../../../packages/creator/src/host-runtime/cache'
+import { installNotifications } from './notifications'
+import { installLifecycle } from './tray'
 
 let creator: Electron.UtilityProcess | undefined
 let generation = 0
@@ -20,6 +22,8 @@ let state: HostState['creator'] = 'down'
 let library: BrowserWindow | undefined
 let failures = 0
 let blocker: number | undefined
+let lifecycle: ReturnType<typeof installLifecycle>
+let closeNotifications: (() => void) | undefined
 const failureLimit = 3
 const handshakeTimeoutMs = 10_000
 
@@ -139,6 +143,7 @@ function openLibrary() {
 		},
 	})
 	library = window
+	lifecycle.attach(window)
 	window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 	window.webContents.on('will-navigate', (event) => event.preventDefault())
 	window.webContents.on('did-finish-load', () => startCreator(window))
@@ -154,6 +159,15 @@ function openLibrary() {
 }
 
 app.whenReady().then(() => {
+	lifecycle = installLifecycle({
+		window: () => library,
+		active: () => blocker !== undefined,
+		cleanup: () => {
+			closeNotifications?.()
+			stopCreator()
+		},
+	})
+	closeNotifications = installNotifications(() => library, lifecycle.show)
 	const rendererOrigin = rendererUrl ? new URL(rendererUrl).origin : 'null'
 	protocol.handle('novelive', async (request) => {
 		const response = await cacheResponse(
@@ -197,6 +211,7 @@ app.whenReady().then(() => {
 	openLibrary()
 	app.on('activate', () => {
 		if (!library) openLibrary()
+		else lifecycle.show()
 	})
 })
 app.on('window-all-closed', () => {
