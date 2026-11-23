@@ -97,8 +97,10 @@ export function mountText(
 					element.style.setProperty(property, value, priority)
 			}
 			if (layer === layout && element.style.fontSize) styledMetrics = true
-			if (element.style.transform)
+			if (element.style.transform) {
 				element.classList.add('nl-text-mark-transform')
+				if (layer === layout) element.style.removeProperty('transform')
+			}
 		}
 	}
 	const visible = Array.from(
