@@ -250,7 +250,7 @@ test('a leading thematic break is not front matter; YAML comments, escapes and b
 	).toEqual(['Mara: Stay here.', 'Take the lantern.', 'The ship left.'])
 	expect(
 		extract(
-			'---\ntitle: 港\ntags:\n- sea\nkinds: &k !!seq\n- port\nmore: !!seq &m\n- bay\nlast: !<tag:yaml.org,2002:seq>\n- cove\n---\n正文。\n',
+			'---\ntitle: 港\ntags:\n- sea\nkinds: &k !!seq\n- port\nmore: !!seq &m\n- bay\nlast: !<tag:yaml.org,2002:seq>\n- cove\n\'Subjects: primary\':\n- harbor\n"a: b": &q\n- quay\n---\n正文。\n',
 		).metadata,
 	).toEqual({ title: '港' })
 	expect(

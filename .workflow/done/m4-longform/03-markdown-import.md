@@ -12,4 +12,4 @@
 
 ## Progress
 - Check after: `NL_REPLAY=strict pnpm exec vitest run tests/unit/m4-markdown.test.ts` → 11 passed；Setext 与 ATX 两份多卷 fixture 抽取结果一致并通过导入契约校验，目录、版权、脚注、注释进 notes。真实入口 `pnpm exec tsx tests/fixtures/source/markdown/extract.ts <file>` 跑通两份 fixture。收据：`.workflow/evidence/m4-longform/03-markdown-import.txt`。无模型调用，不需要 cassette。
-- Review: pass (base bb12fa20a21b5fb537757a0b3b9e4005adebd6ff, reviewer devin-review)；PR #49 Devin Review 各轮意见均已修复并补回归测试；全量 `NL_REPLAY=strict pnpm test` 31 files / 417 passed，`pnpm typecheck`、`biome check` 通过。
+- Review: pass (base bb12fa20a21b5fb537757a0b3b9e4005adebd6ff, reviewer devin-review)；PR #49 Devin Review 各轮意见（front matter 判定、YAML 标量/流式集合/节点属性/带引号键、注释换行、标题脚注、HTML 注释、正则回溯）均已修复并补回归测试。合入 main 后全量 `NL_REPLAY=strict pnpm test` 42 files / 558 passed，仅 `tests/integration/m3-upscale.test.ts` 5 例因本机 `upscayl-bin` 报 `Invalid GPU Device` 失败（M3 环境问题，CI 通过）；`pnpm typecheck`、`biome check` 通过。

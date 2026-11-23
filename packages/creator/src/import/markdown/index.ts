@@ -30,10 +30,12 @@ const wide =
 // Marks a hard line break inside extracted text.
 const hard = '\u0000'
 
-const yamlLine = /^(?:#|\s|-(?:\s|$)|[^\s#:-][^:]*:(?:\s|$))/
-const nodeProperties =
-	/^[^\s#:-][^:]*:\s*(?:(?:&[\w-]+(?:\s+(?:!<[^>\s]*>|![\w!:/.-]*))?|(?:!<[^>\s]*>|![\w!:/.-]*)(?:\s+&[\w-]+)?)\s*)?(?:#.*)?$/
-const yamlKey = /^[^\s#:-][^:]*:(?:\s|$)/
+const key = String.raw`(?:'[^'\n]*'|"(?:[^"\\\n]|\\.)*"|[^\s#:'"-][^:]*):`
+const yamlLine = new RegExp(String.raw`^(?:#|\s|-(?:\s|$)|${key}(?:\s|$))`)
+const nodeProperties = new RegExp(
+	String.raw`^${key}\s*(?:(?:&[\w-]+(?:\s+(?:!<[^>\s]*>|![\w!:/.-]*))?|(?:!<[^>\s]*>|![\w!:/.-]*)(?:\s+&[\w-]+)?)\s*)?(?:#.*)?$`,
+)
+const yamlKey = new RegExp(String.raw`^${key}(?:\s|$)`)
 
 function scalar(raw: string, rest: string[]) {
 	if (/^[|>][-+0-9]*(?:\s+#.*)?$/.test(raw)) {
