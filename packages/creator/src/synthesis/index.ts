@@ -81,6 +81,9 @@ const checkpointSchema = obj({
 	packet: int({ minimum: 0 }),
 	events: arr(eventSchema),
 	selections: opt(arr(arr(int({ minimum: 1 })))),
+	selectedPatch: opt(
+		obj({ biblePatch: biblePatchSchema, glossaryPatch: glossaryPatchSchema }),
+	),
 	whole: nullable(outputSchema),
 	ready: bool(),
 	applied: bool(),
@@ -499,6 +502,10 @@ ${packetText.join('\n')}`
 			? 'Bible changed before synthesis publication'
 			: undefined
 	const resumable = matching?.basis === basis ? matching : undefined
+	if (quarantineReason && matching?.selections && !matching.selectedPatch)
+		throw new Error(
+			'Cannot recover saved synthesis picks against a changed Bible',
+		)
 	const eventPrompt = `${instructions}
 ${nextEvent.instructions}`
 	const outputReserve = useEvents
@@ -712,13 +719,18 @@ ${packets[packet]}`,
 			proposal.chapter ? proposal : (located.get(proposal.content) ?? proposal),
 		)
 	}
-	const reconciled = reconcileNamedAdditions(
-		[...ordered].map(({ item, chapter }) =>
-			chapter ? { ...item, observedChapter: chapter } : item,
-		),
-		bible,
-	)
-	const terms = unique(parts.flatMap((part) => part.glossaryPatch))
+	async function selectPatch() {
+		const reconciled = reconcileNamedAdditions(
+			[...ordered].map(({ item, chapter }) =>
+				chapter ? { ...item, observedChapter: chapter } : item,
+			),
+			bible,
+		)
+		const terms = unique(parts.flatMap((part) => part.glossaryPatch))
+		return state.whole || (state.ready && !state.selections)
+			? { biblePatch: reconciled, glossaryPatch: terms }
+			: selectAdditions(reconciled, terms, bible, choose)
+	}
 	const progress = fitBytes(
 		skeleton.chapters
 			.map(({ chapterId, progress }) => `${chapterId}: ${progress}`)
@@ -785,10 +797,8 @@ ${progress}
 		}
 		return kept
 	}
-	const { biblePatch, glossaryPatch } =
-		state.whole || (state.ready && !state.selections)
-			? { biblePatch: reconciled, glossaryPatch: terms }
-			: await selectAdditions(reconciled, terms, bible, choose)
+	const selectedPatch = state.selectedPatch ?? (await selectPatch())
+	const { biblePatch, glossaryPatch } = selectedPatch
 	options.signal?.throwIfAborted()
 	if (
 		hash(
@@ -799,9 +809,17 @@ ${progress}
 	)
 		throw new Error('Chapter previews changed during synthesis')
 	let latest = await readBible(project)
-	if (!state.ready) {
-		if (hash(latest) !== state.basis)
-			throw new Error('Bible changed during synthesis')
+	const basisUnchanged = hash(latest) === state.basis
+	if (!state.ready && !basisUnchanged)
+		throw new Error('Bible changed during synthesis')
+	if (
+		!state.ready ||
+		(!state.whole &&
+			!state.selectedPatch &&
+			!quarantineReason &&
+			basisUnchanged)
+	) {
+		if (!state.whole) state.selectedPatch = selectedPatch
 		state.ready = true
 		await project.write(files.checkpoint, state)
 		latest = await readBible(project)

@@ -30,6 +30,7 @@ import {
 } from '../../packages/creator/src/synthesis'
 import { projectFiles } from '../../packages/format/src/model'
 import { scoreAgainstConsensus } from './bible-patch-score'
+import { checkOwnerBookResumePrompt } from './owner-book-resume'
 import { observeOwnerBookUsage } from './owner-book-usage'
 
 const home = homedir()
@@ -254,17 +255,12 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			const request = new Request(input, init)
 			if (expectedResume) {
 				const prompt = (await request.clone().json()).messages[0]?.content
-				const packet = /Extract only the next event in packet (\d+)\/\d+/.exec(
-					prompt,
-				)
-				const events = /^Events already extracted: (\d+)$/m.exec(prompt)
 				if (
-					Number(packet?.[1]) !== expectedResume.packet ||
-					Number(events?.[1]) !== expectedResume.events
-				)
-					throw new Error('Request did not resume the saved synthesis packet')
-				stats.resumedPacket = expectedResume.packet
-				stats.resumedEvents = expectedResume.events
+					checkOwnerBookResumePrompt(prompt, expectedResume) === 'extraction'
+				) {
+					stats.resumedPacket = expectedResume.packet
+					stats.resumedEvents = expectedResume.events
+				}
 				expectedResume = undefined
 			}
 			return replay(request)
