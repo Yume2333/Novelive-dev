@@ -3,7 +3,7 @@ import { posix } from 'node:path'
 import { TextWriter, Uint8ArrayReader, ZipReader } from '@zip.js/zip.js'
 import { SaxesParser } from 'saxes'
 import type { ExtractedBook, ImportExtraction } from '../../contract/import'
-import { MAX_CHAPTER_CHARS } from '../txt/structure'
+import { MAX_CHAPTER_CHARS, parseTxt } from '../txt/structure'
 
 const wordNamespaces = new Set([
 	'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
@@ -245,11 +245,15 @@ export async function extractDocx(
 			for (const raw of lines) {
 				const line = raw.trim()
 				if (!line) continue
-				const annotation =
-					/^(?:[【[]?(?:注释|注釋|脚注|腳註|附注|附註|版权|版權|著作权|著作權|译者注|譯者註|作者注|注\s*[:：]|註\s*[:：])|[①②③④⑤⑥⑦⑧⑨⑩]|\[\d+\]\s)/
-				const watermark =
-					/^(?:(?:https?:\/\/|www\.)\S+|(?:[\w-]+\.)+(?:com|net|org|cn|io)(?:\/\S*)?|[=*_─━—\-~～·◆◇※\s]{3,})$/i
-				if (annotation.test(line) || watermark.test(line)) {
+				const classificationText = /^(?:https?:\/\/|www\.)\S+$/i.test(line)
+					? line
+					: line.replace(/(?:https?:\/\/|www\.)\S+/gi, '链接')
+				const classified = parseTxt(classificationText.replace(/\n/g, ' '), {
+					rules: [],
+				})
+				if (
+					classified.volumes[0].chapters.some((chapter) => chapter.notes.length)
+				) {
 					notes.push(line)
 					continue
 				}
