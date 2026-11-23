@@ -1,0 +1,5 @@
+date,model,calls,tokens,images,purpose
+2026-11-23,deepseek-v4.1-flash,1,173,0,M1b production-shape text probe measured
+2026-11-23,devin-swe-2,1,988,0,M1b production-shape text probe measured
+2026-11-23,gemini-3.8-flash,1,1175,0,M1b production-shape vision probe measured
+2026-11-23,gpt-image-2.6-sunburst,1,6482,1,M1b production-shape image probe measured
