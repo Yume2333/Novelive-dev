@@ -50,6 +50,7 @@ type ReviewCheckpoint = {
 	resume: boolean
 }
 type PendingReview = {
+	settingsVersion: string
 	png: string
 	prompt: string
 	attempt: number
@@ -645,6 +646,21 @@ export class ArtProduction {
 		let moderated = false
 		let attempt = 0
 		let baseOnly = false
+		const settingsVersion = checkpoint
+			? createHash('sha256')
+					.update(
+						JSON.stringify([
+							auditDrawing,
+							target,
+							transparent,
+							derived,
+							auditRefs.map((reference) =>
+								createHash('sha256').update(reference).digest('hex'),
+							),
+						]),
+					)
+					.digest('hex')
+			: ''
 		const clearReview = async () => {
 			if (checkpoint)
 				await rm(join(this.project.root, checkpoint.path), { force: true })
@@ -670,6 +686,7 @@ export class ArtProduction {
 			} catch (error) {
 				if (error instanceof SpendBudgetError && checkpoint) {
 					const pending: PendingReview = {
+						settingsVersion,
 						png: png.toString('base64'),
 						prompt,
 						attempt,
@@ -685,12 +702,18 @@ export class ArtProduction {
 			const saved = await this.file(checkpoint.path)
 			if (saved) {
 				const pending: PendingReview = JSON.parse(saved.toString())
-				attempt = pending.attempt
-				baseOnly = pending.baseOnly
-				moderated = pending.moderated
-				reviewed = Buffer.from(pending.png, 'base64')
-				if (await audit(reviewed, pending.prompt, await auditPreview(reviewed)))
-					return { png: reviewed }
+				if (pending.settingsVersion === settingsVersion) {
+					attempt = pending.attempt
+					baseOnly = pending.baseOnly
+					moderated = pending.moderated
+					reviewed = Buffer.from(pending.png, 'base64')
+					if (
+						await audit(reviewed, pending.prompt, await auditPreview(reviewed))
+					)
+						return { png: reviewed }
+				} else {
+					await clearReview()
+				}
 			}
 		} else {
 			await clearReview()

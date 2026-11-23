@@ -2,7 +2,7 @@ import { EventEmitter, once } from 'node:events'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { projectFiles } from '@novelive/format/model'
+import { formatVersion, projectFiles } from '@novelive/format/model'
 import sharp from 'sharp'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createConfigStore } from '../../packages/creator/src/config'
@@ -539,92 +539,118 @@ test('a settings save changes the next step of an active production session', as
 	}
 })
 
-test('recording resumes an image budget pause at visual review after reopening the project', async () => {
-	const { projectDir, workId } = await fixture()
-	const config = createConfigStore(directory)
-	await config.update(configuration)
-	const models = await productionModels(config)
-	const assetId = 'room/day'
-	const requests: string[] = []
-	let allowReview = false
-	const open = async () => {
-		const project = await Project.open(projectDir)
-		const work = await project.read(projectFiles.work('v0001', workId))
-		const { worker, art } = chapterWorker(project, 'v0001', work, models, {
-			mode: 'record',
-			directory: join(directory, 'cassettes'),
-			async spend(request, send) {
-				if (
-					request.url.endsWith('/chat/completions') &&
-					(await request.clone().json()).model === models.visual.model &&
-					!allowReview
+test.each([
+	{ setting: 'unchanged', redraw: false },
+	{ setting: 'changed', redraw: true },
+])(
+	'recording resumes an image budget pause with $setting approved setting',
+	async ({ redraw }) => {
+		const { projectDir, workId } = await fixture()
+		const config = createConfigStore(directory)
+		await config.update(configuration)
+		const models = await productionModels(config)
+		const assetId = 'room/day'
+		const requests: string[] = []
+		const painterPrompts: string[] = []
+		let allowReview = false
+		const open = async () => {
+			const project = await Project.open(projectDir)
+			const work = await project.read(projectFiles.work('v0001', workId))
+			const { worker, art } = chapterWorker(project, 'v0001', work, models, {
+				mode: 'record',
+				directory: join(directory, 'cassettes'),
+				async spend(request, send) {
+					if (
+						request.url.endsWith('/chat/completions') &&
+						(await request.clone().json()).model === models.visual.model &&
+						!allowReview
+					)
+						throw new SpendBudgetError('超出工程预算')
+					return send(request, await quoteSpend(request))
+				},
+				async fetch(input, init) {
+					const request = new Request(input, init)
+					const body = await request.json()
+					requests.push(body.model)
+					if (body.model === models.main.model)
+						painterPrompts.push(JSON.stringify(body.messages))
+					if (request.url.endsWith('/images/generations')) {
+						const png = await sharp({
+							create: { width: 64, height: 36, channels: 3, background: 'red' },
+						})
+							.png()
+							.toBuffer()
+						return Response.json({
+							data: [{ b64_json: png.toString('base64') }],
+						})
+					}
+					return body.model === models.visual.model
+						? completion({ pass: true, failedChecks: [], feedback: '' })
+						: completion({ content: 'A sunny room.' })
+				},
+			})
+			const queue = new ChapterScheduler(project.database, {
+				...worker,
+				write: async () => {},
+				review: async () => {},
+				stage: async () => [{ assetId, kind: 'location' }],
+			})
+			return { project, queue, art }
+		}
+		{
+			const { project, queue, art } = await open()
+			try {
+				const location = projectFiles.location({ level: 'series' }, 'room')
+				await project.write(location, {
+					formatVersion,
+					entries: bible.locations,
+				})
+				const [job] = await art().register(
+					[{ id: assetId, kind: 'location', description: 'Room in sunlight' }],
+					bible,
 				)
-					throw new SpendBudgetError('超出工程预算')
-				return send(request, await quoteSpend(request))
-			},
-			async fetch(input, init) {
-				const request = new Request(input, init)
-				const body = await request.json()
-				requests.push(body.model)
-				if (request.url.endsWith('/images/generations')) {
-					const png = await sharp({
-						create: { width: 64, height: 36, channels: 3, background: 'red' },
+				await project.writeFile(
+					`source/production/art/${job.assetId}.json`,
+					JSON.stringify({ job }),
+				)
+				project.tasks.registerWork({ workId, title: 'Paper boat' })
+				queue.start(workId, ['ch0001'])
+				queue.confirmVisual(workId)
+				await queue.idle()
+				expect(queue.snapshot(workId).chapters[0].issue).toMatch(/超出工程预算/)
+				expect(requests).toEqual([models.main.model, models.image.model])
+				if (redraw)
+					await project.write(location, {
+						formatVersion,
+						entries: [
+							{ ...bible.locations[0], description: 'A moonlit observatory' },
+						],
 					})
-						.png()
-						.toBuffer()
-					return Response.json({ data: [{ b64_json: png.toString('base64') }] })
-				}
-				return body.model === models.visual.model
-					? completion({ pass: true, failedChecks: [], feedback: '' })
-					: completion({ content: 'A sunny room.' })
-			},
-		})
-		const queue = new ChapterScheduler(project.database, {
-			...worker,
-			write: async () => {},
-			review: async () => {},
-			stage: async () => [{ assetId, kind: 'location' }],
-		})
-		return { project, queue, art }
-	}
-	{
-		const { project, queue, art } = await open()
+			} finally {
+				queue.dispose()
+				project.close()
+			}
+		}
+		allowReview = true
+		const { project, queue } = await open()
 		try {
-			const [job] = await art().register(
-				[{ id: assetId, kind: 'location', description: 'Room in sunlight' }],
-				bible,
-			)
-			await project.writeFile(
-				`source/production/art/${job.assetId}.json`,
-				JSON.stringify({ job }),
-			)
-			project.tasks.registerWork({ workId, title: 'Paper boat' })
-			queue.start(workId, ['ch0001'])
-			queue.confirmVisual(workId)
+			queue.continue(workId)
 			await queue.idle()
-			expect(queue.snapshot(workId).chapters[0].issue).toMatch(/超出工程预算/)
-			expect(requests).toEqual([models.main.model, models.image.model])
+			expect(requests).toEqual([
+				models.main.model,
+				models.image.model,
+				...(redraw ? [models.main.model, models.image.model] : []),
+				models.visual.model,
+			])
+			if (redraw)
+				expect(painterPrompts.at(-1)).toContain('A moonlit observatory')
+			expect(queue.snapshot(workId).chapters[0].status).toBe('published')
 		} finally {
 			queue.dispose()
 			project.close()
 		}
-	}
-	allowReview = true
-	const { project, queue } = await open()
-	try {
-		queue.continue(workId)
-		await queue.idle()
-		expect(requests).toEqual([
-			models.main.model,
-			models.image.model,
-			models.visual.model,
-		])
-		expect(queue.snapshot(workId).chapters[0].status).toBe('published')
-	} finally {
-		queue.dispose()
-		project.close()
-	}
-})
+	},
+)
 
 test('recording dispatches identical image requests for distinct editor candidates', async () => {
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
