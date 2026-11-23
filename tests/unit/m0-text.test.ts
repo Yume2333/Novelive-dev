@@ -139,6 +139,60 @@ describe('M0 text model adapter', () => {
 		},
 	)
 
+	it.each([true, false])(
+		'counts empty and reasoning retries together (answer on final attempt: %s)',
+		async (succeeds) => {
+			const model = buildTextModel({
+				...configured,
+				model: 'devin-swe-2',
+				contextWindow: 4096,
+			})
+			const attempts: number[] = []
+			const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+				const request = await new Request(input, init).json()
+				const attempt = attempts.push(request.max_completion_tokens)
+				const delta =
+					attempt === 2
+						? { reasoning_content: 'Thinking' }
+						: attempt === 4 && succeeds
+							? { content: 'OK' }
+							: {}
+				const chunks = [
+					{ choices: [{ index: 0, delta, finish_reason: 'stop' }] },
+					{
+						choices: [],
+						usage: {
+							prompt_tokens: 10,
+							completion_tokens: attempt,
+							completion_tokens_details: {
+								reasoning_tokens: attempt === 2 ? 2 : 0,
+							},
+						},
+					},
+				]
+				return new Response(
+					`${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
+					{ headers: { 'content-type': 'text/event-stream' } },
+				)
+			})
+			const result = await createTextStream({ fetch })(
+				model,
+				normalizeContext({
+					messages: [{ role: 'user', content: 'Reply OK', timestamp: 0 }],
+				}),
+				{ apiKey: 'offline-placeholder' },
+			).result()
+			expect(attempts).toEqual([1536, 1536, 2048, 2048])
+			expect(result.stopReason).toBe(succeeds ? 'stop' : 'error')
+			expect(result.usage).toMatchObject({
+				input: 40,
+				output: 10,
+				totalTokens: 50,
+				reasoning: 2,
+			})
+		},
+	)
+
 	it.each(smokeProfiles)(
 		'runs the $format SDK against strict replay',
 		async (profile) => {
@@ -270,17 +324,17 @@ describe('M0 text model adapter', () => {
 	)
 
 	it.each([
-		['header-retry', 3],
-		['temporary', 2],
-		['empty', 2],
-	])('recovers the %s sequence', async (fixture, calls) => {
+		['header-retry', 3, 13],
+		['temporary', 2, 13],
+		['empty', 2, 26],
+	])('recovers the %s sequence', async (fixture, calls, totalTokens) => {
 		const fetch = vi.fn(format())
 		await expect(
 			testTextConnection(
 				{ ...configured, model: `fixture-${fixture}` },
 				{ fetch, image: chat.image },
 			),
-		).resolves.toMatchObject({ usage: { totalTokens: 13 } })
+		).resolves.toMatchObject({ usage: { totalTokens } })
 		expect(fetch).toHaveBeenCalledTimes(calls)
 	})
 

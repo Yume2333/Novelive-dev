@@ -332,10 +332,11 @@ export function createTextStream(
 					? Math.max(1, Math.floor(outputLimit * 0.75))
 					: outputLimit),
 		)
-		let retryUsage: Usage | undefined
+		let usage: Usage | undefined
+		let reasoningRetried = false
 		const fail = (code: Code, detail?: string, previous?: AssistantMessage) => {
 			const error = failed(model, code, detail, previous)
-			if (retryUsage) error.usage = sumUsage(retryUsage, error.usage)
+			if (usage) error.usage = usage
 			output.push({
 				type: 'error',
 				reason: code === 'cancelled' ? 'aborted' : 'error',
@@ -430,6 +431,7 @@ export function createTextStream(
 				} finally {
 					clearTimeout(timer)
 				}
+				usage = usage ? sumUsage(usage, result.usage) : result.usage
 				if (options?.signal?.aborted)
 					return fail('cancelled', undefined, result)
 				const empty =
@@ -452,8 +454,8 @@ export function createTextStream(
 						? raised > maxTokens
 						: clampMaxTokensToContext(model, context, raised) >
 							clampMaxTokensToContext(model, context, maxTokens)
-					if (!retryUsage && !live && canRaise) {
-						retryUsage = result.usage
+					if (!reasoningRetried && !live && canRaise) {
+						reasoningRetried = true
 						maxTokens = raised
 						continue
 					}
@@ -466,9 +468,7 @@ export function createTextStream(
 					result.stopReason !== 'aborted' &&
 					result.stopReason !== 'pending'
 				) {
-					const message = retryUsage
-						? { ...result, usage: sumUsage(retryUsage, result.usage) }
-						: result
+					const message = { ...result, usage }
 					for (const event of buffered) output.push(event)
 					output.push({
 						type: 'done',
