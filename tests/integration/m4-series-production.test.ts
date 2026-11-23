@@ -247,6 +247,35 @@ test('onReady offers works before later synthesis, shares concurrent preparation
 	expect(requests).toHaveLength(count)
 })
 
+test('opening the first work prepares each volume in its own work language', async () => {
+	const book = await seed()
+	using project = await Project.open(book.projectDir)
+	const series = await project.read(projectFiles.series)
+	const path = projectFiles.work(series.volumeIds[1], book.workIds[1])
+	await project.write(path, { ...(await project.read(path)), language: 'ja' })
+	const host = production()
+	for (const id of book.workIds) await host.remember(id, book.projectDir)
+	await host.get(book.workIds[0])
+	await host.get(book.workIds[1])
+	const previews = requests.filter((prompt) =>
+		prompt.startsWith('Preview fiction'),
+	)
+	expect(
+		previews.filter((prompt) => prompt.startsWith('Preview fiction in zh-CN.')),
+	).toHaveLength(2)
+	expect(
+		previews.filter((prompt) => prompt.startsWith('Preview fiction in ja.')),
+	).toHaveLength(2)
+	expect(
+		requests
+			.filter((prompt) => prompt.startsWith('Synthesize the ordered'))
+			.map((prompt) => prompt.split('.')[0]),
+	).toEqual([
+		'Synthesize the ordered chapter previews in zh-CN',
+		'Synthesize the ordered chapter previews in ja',
+	])
+})
+
 test('later volumes inherit approved series artwork without another visual confirmation', async () => {
 	const book = await seed()
 	using project = await Project.open(book.projectDir)

@@ -24,11 +24,16 @@ export async function prepareSeries(
 		options.signal?.throwIfAborted()
 		const skip = await options.skipVolume?.(volumeId)
 		const volume = await project.read(projectFiles.volume(volumeId))
+		const language = volume.workIds.length
+			? (await project.read(projectFiles.work(volumeId, volume.workIds[0])))
+					.language
+			: options.language
 		const prepare = async () => {
 			for (let attempt = 0; ; attempt++) {
 				try {
 					return await prepareVolume(project, volumeId, {
 						...options,
+						language,
 						previousDigests: [...previousDigests],
 						incremental: series.volumeIds.indexOf(volumeId) > 0,
 					})
