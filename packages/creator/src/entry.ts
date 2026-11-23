@@ -144,24 +144,29 @@ function publish(envelope: EventEnvelope) {
 
 async function openChat(workId: string) {
 	const project = await openBibleProject(dataDir, workId)
-	const chat = projectChat(
-		project,
-		workId,
-		config,
-		cacheDir,
-		strictReplayOptions(),
-		(event) => {
-			const envelope: EventEnvelope = {
-				scope: 'work',
-				scopeId: workId,
-				seq: 0,
-				at: new Date().toISOString(),
-				event,
-			}
-			publish(envelope)
-		},
-	)
-	return { chat, project }
+	try {
+		const chat = await projectChat(
+			project,
+			workId,
+			config,
+			cacheDir,
+			strictReplayOptions(),
+			(event) => {
+				const envelope: EventEnvelope = {
+					scope: 'work',
+					scopeId: workId,
+					seq: 0,
+					at: new Date().toISOString(),
+					event,
+				}
+				publish(envelope)
+			},
+		)
+		return { chat, project }
+	} catch (error) {
+		project.close()
+		throw error
+	}
 }
 
 async function getChat(workId: string) {

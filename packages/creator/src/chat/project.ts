@@ -63,7 +63,7 @@ export function projectProposals(
 	}
 }
 
-export function projectChat(
+export async function projectChat(
 	project: Project,
 	workId: string,
 	config: ReturnType<typeof createConfigStore>,
@@ -71,6 +71,21 @@ export function projectChat(
 	replay: ReplayOptions | undefined,
 	emit: (event: ChatEvent) => void,
 ) {
+	const series = await project.read(projectFiles.series)
+	let title: string | undefined
+	for (const volumeId of series.volumeIds) {
+		const volume = await project.read(projectFiles.volume(volumeId))
+		if (!volume.workIds.includes(workId)) continue
+		title = (await project.read(projectFiles.work(volumeId, workId))).title
+		break
+	}
+	if (title === undefined)
+		throw { code: 'not_found', message: '工程中找不到这部作品' }
+	project.database
+		.prepare(
+			'INSERT OR IGNORE INTO work (work_id, title, queue_pos, created_at) VALUES (?, ?, 0, ?)',
+		)
+		.run(workId, title, Date.now())
 	return new ChatService({
 		database: project.database,
 		workId,

@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { bibleRevision } from '../../packages/creator/src/bible/editing'
-import { projectProposals } from '../../packages/creator/src/chat/project'
+import { ChatService } from '../../packages/creator/src/chat'
+import {
+	projectChat,
+	projectProposals,
+} from '../../packages/creator/src/chat/project'
+import { createConfigStore } from '../../packages/creator/src/config'
 import { Project } from '../../packages/creator/src/project'
 import { readBible } from '../../packages/creator/src/synthesis/patch'
 import { ref, seed } from '../fixtures/project-schema/seed'
@@ -18,6 +23,64 @@ beforeEach(async () => {
 afterEach(async () => {
 	project.close()
 	await rm(directory, { recursive: true, force: true })
+})
+
+test('chat opens an imported work before production and preserves existing scheduler state on reopen', async () => {
+	project.database.prepare('DELETE FROM task WHERE work_id = ?').run(ref.workId)
+	project.database.prepare('DELETE FROM work WHERE work_id = ?').run(ref.workId)
+	const options = {
+		database: project.database,
+		workId: ref.workId,
+		cacheDir: directory,
+		mainModel() {
+			throw new Error('Network forbidden')
+		},
+		emit() {},
+	}
+	const unwired = new ChatService(options)
+	expect(() => unwired.create()).toThrow('FOREIGN KEY constraint failed')
+	await unwired.close()
+	const config = createConfigStore(join(directory, 'profile'))
+	const chat = await projectChat(
+		project,
+		ref.workId,
+		config,
+		directory,
+		{ mode: 'strict' },
+		() => {},
+	)
+	try {
+		expect(chat.create('Imported work').session.title).toBe('Imported work')
+		project.database
+			.prepare('UPDATE work SET settings_rev = 7, status = ? WHERE work_id = ?')
+			.run('paused', ref.workId)
+		const reopened = await projectChat(
+			project,
+			ref.workId,
+			config,
+			directory,
+			{ mode: 'strict' },
+			() => {},
+		)
+		await reopened.close()
+		expect(
+			project.database
+				.prepare('SELECT settings_rev, status FROM work WHERE work_id = ?')
+				.get(ref.workId),
+		).toEqual({ settings_rev: 7, status: 'paused' })
+		await expect(
+			projectChat(
+				project,
+				'foreign',
+				config,
+				directory,
+				{ mode: 'strict' },
+				() => {},
+			),
+		).rejects.toMatchObject({ code: 'not_found' })
+	} finally {
+		await chat.close()
+	}
 })
 
 test('project proposal preparation stamps current Bible revision without writing, including empty patches', async () => {
