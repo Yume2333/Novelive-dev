@@ -51,20 +51,21 @@ export function direct(state: StageState, action: CompiledAction): StageState {
 			break
 		case 'show':
 			if (asset)
-				next.sprites[slot] = next.sprites[slot]
-					? { ...next.sprites[slot], assetId: asset }
-					: {
-							assetId: asset,
-							position: slot,
-							transform: {
-								x: slotX[slot],
-								y: 540,
-								scaleX: 1,
-								scaleY: 1,
-								rotation: 0,
-							},
-							layer: Object.keys(slotX).indexOf(slot),
-						}
+				next.sprites[slot] =
+					next.sprites[slot]?.assetId.split('/')[0] === asset.split('/')[0]
+						? { ...next.sprites[slot], assetId: asset }
+						: {
+								assetId: asset,
+								position: slot,
+								transform: {
+									x: slotX[slot],
+									y: 540,
+									scaleX: 1,
+									scaleY: 1,
+									rotation: 0,
+								},
+								layer: Object.keys(slotX).indexOf(slot),
+							}
 			break
 		case 'face':
 		case 'costume':

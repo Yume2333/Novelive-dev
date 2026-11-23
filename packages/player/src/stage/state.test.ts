@@ -9,6 +9,21 @@ const action = (
 ): CompiledAction => ({ type: 'action', line: 1, col: 1, name, args, assets })
 
 describe('stage direction state', () => {
+	it('resets a replacement character to its requested slot after a move', () => {
+		const moved = direct(
+			direct(
+				emptyStage(),
+				action('show', { slot: 'center' }, [{ id: 'hero/coat/calm' }]),
+			),
+			action('move', { slot: 'center', target: 'left' }),
+		)
+		expect(
+			direct(
+				moved,
+				action('show', { slot: 'center' }, [{ id: 'other/coat/calm' }]),
+			).sprites.center?.transform.x,
+		).toBe(480)
+	})
 	it('gives hide slot names precedence over character IDs', () => {
 		const state = direct(
 			emptyStage(),
