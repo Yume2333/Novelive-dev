@@ -362,7 +362,7 @@ test('incremental preparation reports volume one before later work, passes diges
 	expect(later).toContain('Earlier volume digests')
 	expect(later).toContain('Earlier arrival digest')
 	expect(later).toContain('Volume Two Lin')
-	expect(later).toContain('do not emit delete')
+	expect(later).toContain('never delete')
 	const count = requests.length
 	await prepareSeries(p, { ...options, onReady: undefined })
 	expect(requests).toHaveLength(count)
