@@ -28,7 +28,6 @@ import {
 	synthesizeVolume,
 	type VolumeSynthesis,
 } from '../../packages/creator/src/synthesis'
-import { readBible } from '../../packages/creator/src/synthesis/patch'
 import { projectFiles } from '../../packages/format/src/model'
 import { scoreBiblePatches } from './bible-patch-score'
 import { observeOwnerBookUsage } from './owner-book-usage'
@@ -55,6 +54,7 @@ const entry = {
 	aliases: ['文白'],
 	status: 'confirmed' as const,
 }
+const initialCharacters = { formatVersion: 1 as const, entries: [entry] }
 const language = 'zh-TW'
 const bookHeadingRules = headingRules.map((rule) =>
 	rule.name === 'numbered'
@@ -306,7 +306,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					encoding: 'utf-8',
 					rules: bookHeadingRules,
 				})
-				await project.write(confirmed, { formatVersion: 1, entries: [entry] })
+				await project.write(confirmed, initialCharacters)
 				expect(imported.structure.volumes).toHaveLength(20)
 				expect(
 					imported.structure.volumes.flatMap((volume) => volume.chapters),
@@ -343,7 +343,6 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					}
 				}
 				phase = 'preview and chunked synthesis'
-				const existingCharacters = (await readBible(first)).character
 				const result = await prepareVolume(first, volumeId, options)
 				chunked = result.synthesis
 				previewBytes = result.previews.reduce(
@@ -368,8 +367,12 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					fetch: fetchReplay,
 					signal: controller.signal,
 				})
-				const score = scoreBiblePatches(reference, chunked, existingCharacters)
-				const expected = { formatVersion: 1, entries: [entry] }
+				const score = scoreBiblePatches(
+					reference,
+					chunked,
+					initialCharacters.entries,
+				)
+				const expected = initialCharacters
 				const confirmedIntact =
 					JSON.stringify(await whole.read(confirmed)) ===
 						JSON.stringify(expected) &&

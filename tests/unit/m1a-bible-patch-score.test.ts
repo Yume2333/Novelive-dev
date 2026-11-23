@@ -117,4 +117,7 @@ test('matches relations whose participants include an existing character absent 
 			existing,
 		).shared,
 	).toBe(1)
+	expect(
+		scoreBiblePatches(patch([relation('wei-2')]), chunked, existing).shared,
+	).toBe(0)
 })
