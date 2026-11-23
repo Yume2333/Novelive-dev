@@ -1,3 +1,7 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import type { Context } from '@earendil-works/pi-ai'
 import { paragraphIdPattern } from '@novelive/format/model'
 import { describe, expect, test, vi } from 'vitest'
@@ -12,6 +16,7 @@ import { writingModel } from '../../packages/creator/src/pipeline/writing/reques
 import { reviewFidelity } from '../../packages/creator/src/pipeline/writing/review'
 import { scopeScene } from '../../packages/creator/src/pipeline/writing/scope'
 import { createReplayFetch } from '../../packages/creator/src/replay'
+import { projectSpend } from '../../packages/creator/src/usage/spend'
 import { defaultWorkSettings } from '../../packages/format/src/model'
 import {
 	chapter,
@@ -365,6 +370,66 @@ describe('M1b writer', () => {
 			'p0001',
 			'p0002',
 		])
+	})
+
+	test('recording reuses a completed writing batch after the run budget pauses the next batch', async () => {
+		const directory = await mkdtemp(join(tmpdir(), 'novelive-writing-resume-'))
+		using db = new DatabaseSync(':memory:')
+		const second = 'scene Shore\nsource p0002\n: The boat reached the shore.'
+		const input = {
+			...chapter,
+			settings: { ...defaultWorkSettings(), adaptation: 'faithful' as const },
+			paragraphs: [
+				{ id: 'p0001', text: 'a'.repeat(1050) },
+				{ id: 'p0002', text: 'b'.repeat(1050) },
+			],
+		}
+		const provider = responses(scene, second)
+		let firstReserve = 0
+		const fetch = () =>
+			createReplayFetch({
+				mode: 'record',
+				directory,
+				reuseRecorded: true,
+				fetch: provider.fetch,
+				spend: (request, send) =>
+					projectSpend(db)(request, async (admitted, quote) => {
+						if (!firstReserve) {
+							firstReserve = quote.tokens
+							vi.stubEnv('NL_RUN_TOKEN_CAP', String(firstReserve))
+						}
+						return send(admitted, quote)
+					}),
+			})
+		const options = () => ({
+			...provider.options,
+			fetch: fetch(),
+			writer: { ...provider.options.writer, contextWindow: 4096 },
+		})
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '100000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '1')
+		try {
+			await expect(writeChapter(input, options())).rejects.toThrow(
+				'超出工程预算',
+			)
+			expect(provider.requests).toHaveLength(1)
+			vi.stubEnv('NL_RUN_TOKEN_CAP', '100000')
+			const { scenes } = await writeChapter(input, options())
+			expect(scenes.map(({ scene }) => scene.source.from)).toEqual([
+				'p0001',
+				'p0002',
+			])
+			expect(provider.requests).toHaveLength(2)
+			expect(provider.requests[1]).toContain('p0002:')
+			expect(provider.requests[1]).toContain('A paper boat drifted')
+			expect(
+				db.prepare('SELECT COUNT(*) AS count FROM spend_reservation').get(),
+			).toEqual({ count: 2 })
+		} finally {
+			vi.unstubAllEnvs()
+			await rm(directory, { recursive: true, force: true })
+		}
 	})
 
 	test('reviews each scene separately and rejects source requests outside its scene', async () => {

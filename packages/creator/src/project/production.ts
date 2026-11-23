@@ -46,6 +46,19 @@ export function createProduction(
 	const cacheDir = join(dataDir, 'cache')
 	const bindingsDir = join(dataDir, 'projects')
 	const binding = (workId: string) => join(bindingsDir, workId)
+	const productionReplay = (project: Project): ReplayOptions => {
+		const mode = replay?.mode ?? process.env.NL_REPLAY
+		return {
+			...(mode === 'record' && !replay?.directory
+				? {
+						directory: join(project.root, '.novelive', 'production-cassettes'),
+						reuseRecorded: true,
+					}
+				: {}),
+			...replay,
+			spend: projectSpend(project.database),
+		}
+	}
 	const sessions = new Map<string, ReturnType<typeof open>>()
 	const settingsRefreshers = new Set<() => Promise<void>>()
 	const schedulers = new Set<ChapterScheduler>()
@@ -276,10 +289,7 @@ export function createProduction(
 				previewConnection: models.organizer,
 				synthesisConnection: models.director,
 				language,
-				fetch: createReplayFetch({
-					...replay,
-					spend: projectSpend(project.database),
-				}),
+				fetch: createReplayFetch(productionReplay(project)),
 				signal: controller.signal,
 				skipVolume: async (volumeId) => {
 					if (!volumes.has(volumeId)) return true
@@ -371,7 +381,7 @@ export function createProduction(
 			const settings = () =>
 				productionModels(config, work.settings.writerPresetId)
 			const models = await settings()
-			const projectReplay = { ...replay, spend: projectSpend(project.database) }
+			const projectReplay = productionReplay(project)
 			const { art, worker, setModels, rewriteScene, redraw, adoptImage } =
 				chapterWorker(project, volumeId, work, models, projectReplay)
 			const service = art(shutdown.signal)
