@@ -13,23 +13,26 @@ import { ScriptedWorker } from '../fixtures/scheduler/m1b/worker'
 
 const workers = new Map<string, ScriptedWorker>()
 const candidates = vi.fn()
-const approvedVolumes = new Set<string>()
-const approveVisual = vi.fn(async (_project: Project, _volumeId: string) => {})
+const approvedStyle = {
+	id: 'style',
+	status: 'confirmed' as const,
+	description: 'Approved',
+	references: [
+		{ path: 'assets/style/main-visual.webp', description: 'Main visual' },
+	],
+}
+const approveVisual = vi.fn(
+	async (_project: Project, _volumeId: string) => approvedStyle,
+)
 vi.mock('../../packages/creator/src/project/production-worker', () => ({
 	productionModels: async () => ({
 		organizer: connection,
 		director: connection,
 		image: { concurrency: 1 },
 	}),
-	productionBible: async (_project: Project, volumeId: string) => ({
+	productionBible: async () => ({
 		art: {
-			style: approvedVolumes.has(volumeId)
-				? {
-						id: 'style',
-						status: 'confirmed',
-						references: [{ path: 'assets/style/main-visual.webp' }],
-					}
-				: {},
+			style: { id: 'style', status: 'candidate', description: 'Candidate' },
 			characters: [],
 		},
 	}),
@@ -74,7 +77,6 @@ beforeEach(async () => {
 	laterEntered = Promise.withResolvers<void>()
 	laterRelease = undefined
 	candidates.mockClear()
-	approvedVolumes.clear()
 	approveVisual.mockReset()
 })
 afterEach(async () => {
@@ -193,12 +195,7 @@ test('onReady offers works before later synthesis, shares concurrent preparation
 	expect(laterReady).toBe(false)
 	laterRelease.resolve()
 	const second = await later
-	await second.confirm({
-		workId: b,
-		mainVisualId: 'one',
-		supplementalIds: [],
-		characters: [],
-	})
+	expect(second.snapshot().visual).toBeNull()
 	expect(
 		(await host.getQueue()).queued.map((item) => item.link.workId),
 	).toEqual([b])
@@ -229,7 +226,7 @@ test('onReady offers works before later synthesis, shares concurrent preparation
 			(await host.getQueue()).inactive.every((item) => item.status === 'done'),
 		).toBe(true),
 	)
-	expect(candidates.mock.calls.map(([id]) => id).sort()).toEqual([a, b].sort())
+	expect(candidates.mock.calls.map(([id]) => id)).toEqual([a])
 	expect(
 		requests.filter((prompt) => prompt.startsWith('Synthesize the ordered')),
 	).toHaveLength(2)
@@ -259,7 +256,12 @@ test('opening the first work prepares each volume in its own work language', asy
 	const host = production()
 	for (const id of book.workIds) await host.remember(id, book.projectDir)
 	await host.get(book.workIds[0])
-	await host.get(book.workIds[1])
+	await laterEntered.promise
+	await vi.waitFor(() =>
+		expect(
+			requests.filter((prompt) => prompt.startsWith('Synthesize the ordered')),
+		).toHaveLength(2),
+	)
 	const previews = requests.filter((prompt) =>
 		prompt.startsWith('Preview fiction'),
 	)
@@ -280,14 +282,25 @@ test('opening the first work prepares each volume in its own work language', asy
 })
 
 test.each([true, false])(
-	'later volumes inherit explicitly approved artwork without another visual confirmation (series-wide: %s)',
-	async (seriesWide) => {
+	'legacy approved artwork is inherited without replacing it (confirmation enabled: %s)',
+	async (confirmWithReferences) => {
 		const book = await seed()
 		using project = await Project.open(book.projectDir)
 		const series = await project.read(projectFiles.series)
 		const laterVolume = series.volumeIds[1]
 		const id = book.workIds[1]
-		approvedVolumes.add(laterVolume)
+		const workFile = projectFiles.work(laterVolume, id)
+		const work = await project.read(workFile)
+		await project.write(workFile, {
+			...work,
+			settings: { ...work.settings, confirmWithReferences },
+		})
+		const wizard = projectFiles.importReport
+		const report = {
+			...(await project.read(wizard)),
+			references: ['source/reference.png'],
+		}
+		await project.write(wizard, report)
 		await project.write(projectFiles.style({ level: 'series' }), {
 			formatVersion: 1,
 			entries: [
@@ -303,12 +316,6 @@ test.each([true, false])(
 					],
 				},
 			],
-			visualApprovals: [
-				{
-					styleId: 'style',
-					...(seriesWide ? {} : { volumeId: series.volumeIds[0] }),
-				},
-			],
 		})
 		const artwork = new Uint8Array([1, 2, 3])
 		await project.writeFile('assets/style/main-visual.webp', artwork)
@@ -321,58 +328,85 @@ test.each([true, false])(
 		expect(session.snapshot().visual).toBeNull()
 		await vi.waitFor(() => expect(worker.count('write:ch0003')).toBe(1))
 		expect(candidates.mock.calls.some(([workId]) => workId === id)).toBe(false)
+		expect(approveVisual).not.toHaveBeenCalled()
 		expect(await project.readFile('assets/style/main-visual.webp')).toEqual(
 			Buffer.from(artwork),
 		)
 	},
 )
 
-test('a sequel approving first does not clear the first volume visual gate after restart', async () => {
+test('a sequel cannot open a visual gate before the first volume and inherits the approved style after restart', async () => {
 	const book = await seed()
-	using project = await Project.open(book.projectDir)
-	const series = await project.read(projectFiles.series)
-	approveVisual.mockImplementation(async (project, volumeId) => {
-		for (const id of series.volumeIds) approvedVolumes.add(id)
-		await project.write(projectFiles.style({ level: 'series' }), {
-			formatVersion: 1,
-			entries: [
-				{
-					id: 'style',
-					status: 'confirmed',
-					description: 'Sequel visual',
-					references: [
-						{
-							path: 'assets/style/main-visual.webp',
-							description: 'Main visual',
-						},
-					],
-				},
-			],
-			visualApprovals: [{ styleId: 'style', volumeId }],
-		})
-	})
 	const host = production()
 	for (const id of book.workIds) await host.remember(id, book.projectDir)
+	let laterReady = false
+	const later = host.get(book.workIds[1])
+	void later.then(
+		() => {
+			laterReady = true
+		},
+		() => {},
+	)
 	const first = await host.get(book.workIds[0])
-	const later = await host.get(book.workIds[1])
+	await laterEntered.promise
+	await vi.waitFor(() => expect(hostBusy.get(host)).toBe(false))
+	expect(laterReady).toBe(false)
 	expect(first.snapshot().phase).toBe('confirm-visual')
-	await later.confirm({
-		workId: book.workIds[1],
+	expect(candidates.mock.calls.map(([id]) => id)).toEqual([book.workIds[0]])
+	expect(
+		(await host.getQueue()).inactive.map((item) => item.link.workId),
+	).toEqual([book.workIds[0]])
+	await first.confirm({
+		workId: book.workIds[0],
 		mainVisualId: 'one',
 		supplementalIds: [],
 		characters: [],
 	})
-	await later.queue.idle()
+	expect((await later).snapshot().visual).toBeNull()
+	expect(approveVisual).toHaveBeenCalledTimes(1)
 	await host.close()
 	hosts.splice(hosts.indexOf(host), 1)
 	const restarted = production()
-	expect((await restarted.get(book.workIds[0])).snapshot().phase).toBe(
-		'confirm-visual',
-	)
-	expect(workers.get(book.workIds[0])?.count('write:ch0001')).toBe(0)
-	expect((await restarted.get(book.workIds[1])).snapshot().phase).toBe(
-		'confirm-first',
-	)
+	expect((await restarted.get(book.workIds[0])).snapshot().visual).toBeNull()
+	expect((await restarted.get(book.workIds[1])).snapshot().visual).toBeNull()
+	expect(candidates).toHaveBeenCalledTimes(1)
+})
+
+test('stale or inherited visual forms are rejected rather than silently accepting unsaved choices', async () => {
+	const book = await seed()
+	const host = production()
+	for (const id of book.workIds) await host.remember(id, book.projectDir)
+	const first = await host.get(book.workIds[0])
+	const input = {
+		workId: book.workIds[0],
+		mainVisualId: 'one',
+		supplementalIds: [],
+		characters: [],
+	}
+	await first.confirm(input)
+	await expect(first.confirm(input)).rejects.toMatchObject({
+		code: 'invalid_config',
+	})
+	const later = await host.get(book.workIds[1])
+	await expect(
+		later.confirm({ ...input, workId: book.workIds[1] }),
+	).rejects.toMatchObject({ code: 'invalid_config' })
+	expect(approveVisual).toHaveBeenCalledTimes(1)
+	expect(candidates.mock.calls.map(([id]) => id)).toEqual([book.workIds[0]])
+})
+
+test('closing while a sequel waits for series approval cancels its unopened gate', async () => {
+	const book = await seed()
+	const host = production()
+	for (const id of book.workIds) await host.remember(id, book.projectDir)
+	const later = host.get(book.workIds[1])
+	const cancelled = expect(later).rejects.toMatchObject({ code: 'cancelled' })
+	await host.get(book.workIds[0])
+	await laterEntered.promise
+	await host.close()
+	await cancelled
+	hosts.splice(hosts.indexOf(host), 1)
+	expect(candidates.mock.calls.map(([id]) => id)).toEqual([book.workIds[0]])
 })
 
 test('empty queue and failed preparation reject cleanly and can retry without duplicate sessions', async () => {

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
-import { projectFiles, type Style } from '@novelive/format/model'
+import { formatVersion, projectFiles, type Style } from '@novelive/format/model'
 import type { createConfigStore } from '../config'
 import type {
 	CommandInput,
@@ -26,9 +26,11 @@ import {
 	productionBible,
 	productionModels,
 } from './production-worker'
-import { entryOwner } from './series/ownership'
 
-const fail = (code: 'not_found' | 'invalid_config', message: string): never => {
+const fail = (
+	code: 'not_found' | 'invalid_config' | 'cancelled',
+	message: string,
+): never => {
 	throw { code, message }
 }
 
@@ -46,7 +48,12 @@ export function createProduction(
 	const chapterRecords = new Map<string, EventEnvelope[]>()
 	const recoveredProjects = new Set<string>()
 	const preparations = new Map<string, ReturnType<typeof startPreparation>>()
+	const visualChanges = new Map<
+		string,
+		ReturnType<typeof Promise.withResolvers<void>>
+	>()
 	let loading = 0
+	let awaitingVisual = 0
 	let closing = false
 	let seq = 0
 	let restored: Promise<void> | undefined
@@ -54,7 +61,57 @@ export function createProduction(
 	const workQueue = new WorkQueue(publishQueue)
 
 	function publishBusy() {
-		active(!closing && (loading > 0 || workQueue.busy))
+		active(!closing && (loading > awaitingVisual || workQueue.busy))
+	}
+
+	function visualChanged(root: string) {
+		const change = visualChanges.get(root)
+		visualChanges.delete(root)
+		change?.resolve()
+	}
+
+	async function visualOwner(project: Project) {
+		const series = await project.read(projectFiles.series)
+		return (await project.read(projectFiles.volume(series.volumeIds[0])))
+			.workIds[0]
+	}
+
+	async function approvedVisual(project: Project): Promise<Style | undefined> {
+		const document = await existing(() =>
+			project.read(projectFiles.style({ level: 'series' })),
+		)
+		return document?.entries.find(
+			(style) => style.status === 'confirmed' && style.references?.length,
+		)
+	}
+
+	async function admitVisual(project: Project, workId: string) {
+		for (;;) {
+			if (closing) fail('cancelled', '创作服务正在关闭')
+			let change = visualChanges.get(project.root)
+			if (!change) {
+				change = Promise.withResolvers<void>()
+				visualChanges.set(project.root, change)
+			}
+			const approved = await approvedVisual(project)
+			if (closing) fail('cancelled', '创作服务正在关闭')
+			if (approved) {
+				visualChanged(project.root)
+				return approved
+			}
+			const owner = await visualOwner(project)
+			if (owner === workId) return undefined
+			await remember(owner, project.root)
+			if (!closing) void get(owner).catch(() => {})
+			awaitingVisual++
+			publishBusy()
+			try {
+				await change.promise
+			} finally {
+				awaitingVisual--
+				publishBusy()
+			}
+		}
 	}
 
 	function publishQueue(queue: ProductionQueue) {
@@ -275,6 +332,8 @@ export function createProduction(
 			}
 			let pool: Awaited<ReturnType<typeof service.candidates>> | undefined
 			let visual: ProductionSnapshot['visual'] = null
+			let confirmingVisual = false
+			let admitted = false
 			let summary = (
 				await existing(() => project.read(projectFiles.skeleton(volumeId)))
 			)?.overview
@@ -343,11 +402,13 @@ export function createProduction(
 			scheduler = queue
 			workQueue.attach(workId, {
 				read: () =>
-					readQueueWork(data, {
-						link,
-						title: work.title,
-						projectDir: project.root,
-					}),
+					admitted
+						? readQueueWork(data, {
+								link,
+								title: work.title,
+								projectDir: project.root,
+							})
+						: null,
 				busy: () => queue.busy,
 				wake: () => queue.wake(),
 			})
@@ -356,29 +417,23 @@ export function createProduction(
 				setModels(next)
 				queue.setImageConcurrency(next.image.concurrency)
 			}
-			async function inheritsVisual(style: Style) {
-				if (style.status !== 'confirmed' || !style.references?.length)
-					return false
-				const owner = await entryOwner(
-					project,
-					{ level: 'work', volumeId, workId },
-					{ level: 'series' },
-					projectFiles.style,
-					style.id,
-				)
-				const document = await existing(() =>
-					project.read(projectFiles.style(owner)),
-				)
-				const approval = document?.visualApprovals?.find(
-					({ styleId }) => styleId === style.id,
-				)
-				if (!approval) return false
-				if (!approval.volumeId) return true
-				const series = await project.read(projectFiles.series)
-				const approvedAt = series.volumeIds.indexOf(approval.volumeId)
-				return (
-					approvedAt >= 0 && approvedAt < series.volumeIds.indexOf(volumeId)
-				)
+			async function confirmSeriesVisual(
+				...args: Parameters<typeof service.confirmVisual>
+			) {
+				const chosen = await art().confirmVisual(...args)
+				if (!(await approvedVisual(project))) {
+					const file = projectFiles.style({ level: 'series' })
+					const document = await existing(() => project.read(file))
+					await project.write(file, {
+						...document,
+						formatVersion,
+						entries: [
+							chosen,
+							...(document?.entries ?? []).filter(({ id }) => id !== chosen.id),
+						],
+					})
+				}
+				visualChanged(project.root)
 			}
 			if (!started || queue.snapshot(workId).phase === 'confirm-visual') {
 				if (!started) {
@@ -386,15 +441,18 @@ export function createProduction(
 					summary = (await project.read(projectFiles.skeleton(volumeId)))
 						.overview
 				}
+				const inherited = await admitVisual(project, workId)
+				admitted = true
+				await refresh()
 				const bible = (await productionBible(project, volumeId, workId)).art
 				const references = (await readImportWizard(project)).references.map(
 					(cachePath, i) => ({ id: `reference-${i + 1}`, cachePath }),
 				)
-				if (await inheritsVisual(bible.style)) {
+				if (inherited) {
 					if (!started) queue.start(workId, work.chapterIds)
 					queue.confirmVisual(workId)
 				} else if (references.length && !work.settings.confirmWithReferences) {
-					await service.confirmVisual(
+					await confirmSeriesVisual(
 						bible.style,
 						{ mainVisuals: references, supplemental: [], characters: [] },
 						{
@@ -441,6 +499,7 @@ export function createProduction(
 					if (!started) queue.start(workId, work.chapterIds)
 				}
 			}
+			admitted = true
 			emit()
 			chapterRecords.set(workId, records)
 			return {
@@ -451,14 +510,35 @@ export function createProduction(
 				records,
 				refreshSettings: refresh,
 				async confirm(input: CommandInput<'production.confirmVisual'>) {
-					if (snapshot().phase !== 'confirm-visual' || !pool) return snapshot()
-					await refresh()
-					const style = (await productionBible(project, volumeId, workId)).art
-						.style
-					if (!(await inheritsVisual(style)))
-						await art().confirmVisual(style, pool, input)
-					queue.confirmVisual(workId)
-					return snapshot()
+					const choices = pool
+					if (
+						snapshot().phase !== 'confirm-visual' ||
+						!choices ||
+						confirmingVisual
+					)
+						return fail(
+							'invalid_config',
+							'当前没有可提交的主视觉确认，请刷新后重试',
+						)
+					confirmingVisual = true
+					try {
+						await refresh()
+						if (
+							(await approvedVisual(project)) ||
+							(await visualOwner(project)) !== workId
+						) {
+							visualChanged(project.root)
+							fail('invalid_config', '系列主视觉确认状态已变化，请刷新后重试')
+						}
+						const style = (await productionBible(project, volumeId, workId)).art
+							.style
+						await confirmSeriesVisual(style, choices, input)
+						queue.confirmVisual(workId)
+						visualChanged(project.root)
+						return snapshot()
+					} finally {
+						confirmingVisual = false
+					}
 				},
 				async continue() {
 					await refresh()
@@ -559,6 +639,7 @@ export function createProduction(
 		},
 		async close() {
 			closing = true
+			for (const root of visualChanges.keys()) visualChanged(root)
 			chapterRecords.clear()
 			workQueue.close()
 			for (const preparation of preparations.values())

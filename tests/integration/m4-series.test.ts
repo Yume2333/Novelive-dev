@@ -709,9 +709,6 @@ test('production updates the effective asset and style owners without hiding art
 	])
 	const confirmedStyle = (await p.read(projectFiles.style(scope))).entries[0]
 	expect(confirmedStyle.status).toBe('confirmed')
-	expect((await p.read(projectFiles.style(scope))).visualApprovals).toEqual([
-		{ styleId: 'style', volumeId: joined.volumeId },
-	])
 	expect(confirmedStyle.description).toBe('Work style')
 	expect(confirmedStyle.references?.[0].path).toContain(
 		`volumes/${joined.volumeId}/works/${joined.workId}/`,
