@@ -17,6 +17,10 @@ import {
 
 export const privateRoot = join(homedir(), '.local/novelive-epub-provider')
 
+export function providerDirectory(override: string | undefined) {
+	return override || join(privateRoot, 'cassette')
+}
+
 export function providerReplay(
 	directory: string,
 	fetch: typeof globalThis.fetch,
@@ -84,7 +88,7 @@ export async function runProviderCases(
 	const directory =
 		mode === 'synthetic'
 			? syntheticDirectory
-			: (process.env.NL_EPUB_CASSETTE_DIR ?? join(privateRoot, 'cassette'))
+			: providerDirectory(process.env.NL_EPUB_CASSETTE_DIR)
 	const ledger = join(homedir(), 'memory/poke_5b9601/files/novelive/usage.csv')
 	const receipts: object[] = []
 	const receiptPath = join(privateRoot, `receipt-${Date.now()}.json`)

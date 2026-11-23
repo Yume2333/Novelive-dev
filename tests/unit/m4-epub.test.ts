@@ -20,6 +20,7 @@ import {
 	visualConnection,
 } from '../fixtures/source/epub/classification'
 import {
+	providerDirectory,
 	providerReplay,
 	providerUsage,
 	runProviderCases,
@@ -108,6 +109,11 @@ test
 		expect(fetch).not.toHaveBeenCalled()
 	},
 )
+
+test('treats an empty provider cassette directory as unset', () => {
+	expect(providerDirectory('')).toBe(providerDirectory(undefined))
+	expect(providerDirectory('/explicit/private')).toBe('/explicit/private')
+})
 
 test('keeps usage reservation when provider token counts are incomplete', () => {
 	expect(providerUsage({})).toBeUndefined()
