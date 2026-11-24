@@ -252,6 +252,17 @@ test('a later volume publishes with the reason from a reused series placeholder'
 		workId: '7a49d711-b6f5-442f-8234-58b43df92da0',
 	}
 	await project.write(projectFiles.work('v0002', laterWork.workId), laterWork)
+	const chapterId = laterWork.chapterIds[0]
+	await project.write(
+		projectFiles.chapter({
+			volumeId: 'v0002',
+			workId: laterWork.workId,
+			chapterId,
+		}),
+		await project.read(
+			projectFiles.chapter({ volumeId: 'v0001', workId, chapterId }),
+		),
+	)
 	project.tasks.registerWork({
 		workId: laterWork.workId,
 		title: laterWork.title,
