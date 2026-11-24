@@ -33,10 +33,11 @@ import {
 import { Dropdown } from '../components/Dropdown'
 import { GradientCover } from '../components/GradientCover'
 import { ScrollArea } from '../components/ScrollArea'
-import { msg, scoped, setLocale } from '../i18n'
+import { msg, scoped } from '../i18n'
 import { AgentPanel } from '../panels/agent/AgentPanel'
 import { workRoute } from '../routes/production'
 import styles from './AppShell.module.css'
+import { useAppearance } from './appearance'
 import markLight from './brand/novelive-mark.svg'
 import markDark from './brand/novelive-mark-dark.svg'
 import { GlobalProductionQueue } from './GlobalProductionQueue'
@@ -149,8 +150,7 @@ export function AppShell() {
 	const [agentFull, setAgentFull] = useState(false)
 	const [agentPosition, setAgentPosition] =
 		useState<CommandInput<'chat.send'>['position']>()
-	const theme = config && 'theme' in config ? config.theme : 'system'
-	const language = config && 'language' in config ? config.language : undefined
+	const { theme } = useAppearance(config)
 	const { i18n } = useTranslation()
 	const updateConfig = useCallback(async (patch: ConfigUpdate) => {
 		const saved = await window.novelive.call('config.update', patch).promise
@@ -160,21 +160,6 @@ export function AppShell() {
 	const resetConfig = useCallback(async () => {
 		setConfig(await window.novelive.call('config.reset', {}).promise)
 	}, [])
-
-	useEffect(() => {
-		if (language) setLocale(language)
-	}, [language])
-
-	useEffect(() => {
-		const query = window.matchMedia('(prefers-color-scheme: dark)')
-		const apply = () => {
-			document.documentElement.dataset.theme =
-				theme === 'system' ? (query.matches ? 'dark' : 'light') : theme
-		}
-		apply()
-		query.addEventListener('change', apply)
-		return () => query.removeEventListener('change', apply)
-	}, [theme])
 
 	useEffect(() => {
 		let active = true
