@@ -47,7 +47,12 @@ type ReviewCheckpoint = {
 }
 type PaintContinuation =
 	| { prompt: string; png: string }
-	| { feedback: string; rewritten?: string; png?: string }
+	| {
+			feedback: string
+			rewritten?: string
+			expressionCue?: string
+			png?: string
+	  }
 type PendingPaint = PaintContinuation & {
 	settingsVersion: string
 	attempt: number
@@ -84,6 +89,7 @@ type Options = ModelOptions & {
 	readScope?: ProjectScope
 	resolution?: '2K' | '4K'
 	lossless?: boolean
+	desensitized?: boolean
 }
 
 const auditSchema = obj({
@@ -96,6 +102,10 @@ const auditSchema = obj({
 	styleReferenceFeedback: opt(str()),
 })
 const contentSchema = obj({ content: str({ minLength: 1 }) })
+const expressionContentSchema = obj({
+	content: str({ minLength: 1 }),
+	expressionCue: str({ minLength: 1 }),
+})
 
 function hasTextOnlyCharacterStyle(drawing: Drawing) {
 	return (
@@ -704,8 +714,14 @@ export class ArtProduction {
 				(stop === 'retries' || stop === 'moderation'),
 		})
 		let moderated = false
+		const moderationGuidance = this.options.desensitized
+			? 'Keep the adaptation non-graphic. Use implication instead of explicit detail.'
+			: undefined
+		const adaptExpression = expression && !!moderationGuidance
 		let attempt = 0
+		let legacyCheckpoint = !this.options.desensitized
 		let rewritten: string | undefined
+		let expressionCue: string | undefined
 		const settingsVersion = checkpoint
 			? createHash('sha256')
 					.update(
@@ -717,6 +733,8 @@ export class ArtProduction {
 							auditRefs.map((reference) =>
 								createHash('sha256').update(reference).digest('hex'),
 							),
+							...(moderationGuidance ? [moderationGuidance] : []),
+							...(adaptExpression ? ['adapted expression cue'] : []),
 						]),
 					)
 					.digest('hex')
@@ -780,6 +798,7 @@ export class ArtProduction {
 					if ('feedback' in pending) {
 						issue = feedback = pending.feedback
 						rewritten = pending.rewritten
+						expressionCue = pending.expressionCue
 						reviewed = pending.png
 							? Buffer.from(pending.png, 'base64')
 							: undefined
@@ -795,6 +814,7 @@ export class ArtProduction {
 							return { png: reviewed }
 					}
 				} else {
+					legacyCheckpoint = false
 					await clearReview()
 				}
 			}
@@ -805,7 +825,10 @@ export class ArtProduction {
 			let content = rewritten
 			if (content === undefined) {
 				await savePaint({ feedback, png: reviewed?.toString('base64') })
-				const rewrite = await artJson(
+				const rewrite = await artJson<{
+					content: string
+					expressionCue?: string
+				}>(
 					painter,
 					[
 						'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
@@ -813,17 +836,23 @@ export class ArtProduction {
 						expression
 							? `Character preservation context (not part of the expression cue): ${expressionPreservation(drawing)}.`
 							: undefined,
+						adaptExpression
+							? 'Also return "expressionCue": separately restate the saved expression requirement as non-graphic brow, eye and mouth movements. Preserve the requested emotion and intensity, independent of the painter content and retry feedback.'
+							: undefined,
 						feedback,
+						moderationGuidance,
 					]
 						.filter(Boolean)
 						.join('\n'),
-					contentSchema,
+					adaptExpression ? expressionContentSchema : contentSchema,
 					{ ...this.options, maxTokens: 1024 },
 				)
 				content = rewrite.content
+				expressionCue = rewrite.expressionCue
 				await savePaint({
 					feedback,
 					rewritten: content,
+					expressionCue,
 					png: reviewed?.toString('base64'),
 				})
 			}
@@ -831,12 +860,28 @@ export class ArtProduction {
 				firstReference: number,
 				issue = '',
 				input = promptDrawing,
-			) => drawingPrompt(input, content, issue, firstReference)
+			) =>
+				drawingPrompt(
+					adaptExpression && expressionCue
+						? { ...input, description: expressionCue }
+						: input,
+					content,
+					issue,
+					firstReference,
+				)
 			const result = await render(
 				describe(1, feedback),
 				refs,
 				target,
 				transparent,
+				checkpoint && this.options.replay?.checkpointDirectory
+					? {
+							job: createHash('sha256').update(checkpoint.path).digest('hex'),
+							settingsVersion,
+							ordinal: attempt,
+							legacy: legacyCheckpoint,
+						}
+					: undefined,
 			)
 			rewritten = undefined
 			feedback = ''
@@ -929,6 +974,7 @@ export class ArtProduction {
 						? 'Visually audit the first image. Image 2 is the accepted base. Check the requested facial expression against the saved cue (description); verify identity, anchors and key colors against the base and preservation context. Reject unintended changes outside the face, including pose, silhouette, framing, transparency, colors, shading and linework. Judge style only by preservation of the accepted base, not by matching any other look. Check for artifacts independently.'
 						: 'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
 					preview.transparencyHint,
+					moderationGuidance,
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
 					textOnlyStyle
 						? `Judge the blocking style check only against this written style description: ${drawing.style}`
@@ -943,7 +989,12 @@ export class ArtProduction {
 								'The painter cannot see the style images. Put differences that are not specified in the written style description in the optional styleReferenceFeedback string. Treat these as advisory only: they must not affect pass, failedChecks, or blocking feedback. Describe style differences and concrete corrections in words; do not refer to reference images by number.',
 							].join(' ')
 						: undefined,
-					`Original image brief (verify independently of the painter's rewrite): ${brief}`,
+					moderationGuidance
+						? `Adapted image brief: ${content}`
+						: `Original image brief (verify independently of the painter's rewrite): ${brief}`,
+					adaptExpression
+						? `Saved expression cue (adapted; verify independently of the painter's rewrite): ${expressionCue}`
+						: undefined,
 					expression
 						? `Character preservation context: ${expressionPreservation(drawing)}.`
 						: describe(2, '', textOnlyStyle ? promptDrawing : auditDrawing),

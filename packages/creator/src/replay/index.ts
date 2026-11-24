@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 import { arr, compile, int, obj, opt, str } from '@earendil-works/pi-schema'
 import {
-	inheritTextSettlement,
+	inheritSettlement,
 	isResponsesTerminal,
 	type projectSpend,
 	quoteSpend,
@@ -36,9 +36,22 @@ export interface ReplayOptions {
 	spend?: ReturnType<typeof projectSpend>
 	onReplay?: (request: Request, response: Response) => Promise<void>
 	checkpointDirectory?: string
+	checkpointFallbackDirectory?: string
+	checkpointFallbackClaim?: (
+		source: string,
+		key: string,
+		count: number,
+	) => number | undefined
+	checkpointResponse?: (response: Response) => boolean
+	checkpointResponseId?: string
+	normalizeCheckpointIds?: boolean
 	onCheckpointReply?: (save: () => Promise<void>) => void
 	checkpointAllowance?: { images?: number }
-	onCheckpointHit?: (allowance: ReplayOptions['checkpointAllowance']) => void
+	onCheckpointHit?: (
+		allowance: ReplayOptions['checkpointAllowance'],
+		responseId?: string,
+		source?: string,
+	) => void
 }
 
 const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
@@ -81,6 +94,7 @@ const cassette = compile(
 		case: str(),
 		tags: arr(str()),
 		checkpointAllowance: opt(obj({ images: opt(int({ minimum: 0 })) })),
+		checkpointResponseId: opt(sha),
 	}),
 )
 
@@ -224,6 +238,72 @@ function modeFromEnvironment() {
 	throw new Error('Invalid NL_REPLAY mode')
 }
 
+async function readCassetteRows(index: string) {
+	const text = await readFile(index, 'utf8').catch((error) => {
+		if (!missing(error)) throw error
+		return ''
+	})
+	return text
+		.split('\n')
+		.filter((line) => line.trim())
+		.map((line) => {
+			const row: unknown = JSON.parse(line)
+			if (
+				!cassette.check(row) ||
+				(row.body.b64 === undefined) === (row.body.sha === undefined)
+			)
+				throw new Error('Invalid cassette entry')
+			return row
+		})
+}
+
+async function readCassetteBody(
+	directory: string,
+	body: { sha?: string; b64?: string },
+) {
+	if (body.sha === undefined) return Buffer.from(body.b64 ?? '', 'base64')
+	const bytes = await readFile(join(directory, 'cassette-files', body.sha))
+	if (hash(bytes) !== body.sha)
+		throw new Error('Invalid cassette body checksum')
+	return bytes
+}
+
+export async function legacyImageDownload(directory: string, url: URL) {
+	const { key } = await requestIdentity(new Request(url))
+	const rows = (
+		await readCassetteRows(join(directory, 'cassette.jsonl'))
+	).filter(({ status }) => status < 300)
+	const downloads = rows.filter(
+		(row) => row.method === 'GET' && row.key === key,
+	)
+	if (downloads.length !== 1) return
+	let generations = 0
+	for (const row of rows) {
+		if (
+			row.method !== 'POST' ||
+			!/\/images\/(?:generations|edits)\/?(?:\?|$)/.test(row.path)
+		)
+			continue
+		const bytes = await readCassetteBody(directory, row.body)
+		let link: unknown
+		try {
+			link = JSON.parse(bytes.toString('utf8'))?.data?.[0]?.url
+		} catch {
+			continue
+		}
+		if (
+			typeof link === 'string' &&
+			URL.canParse(link) &&
+			(await requestIdentity(new Request(link))).key === key &&
+			++generations > 1
+		)
+			return
+	}
+	if (generations !== 1) return
+	const bytes = await readCassetteBody(directory, downloads[0].body)
+	if (bytes.length) return bytes
+}
+
 export function usesReplyCheckpoint(options: ReplayOptions = {}) {
 	const mode = options.mode ?? modeFromEnvironment()
 	return mode !== 'strict'
@@ -322,6 +402,7 @@ function corruptImage(bytes: Uint8Array): Uint8Array {
 
 export function createReplayFetch(
 	options: ReplayOptions = {},
+	positions?: Map<string, number>,
 ): typeof globalThis.fetch {
 	const { checkpointDirectory, ...upstream } = options
 	return checkpointDirectory && usesReplyCheckpoint(upstream)
@@ -330,19 +411,26 @@ export function createReplayFetch(
 					mode: 'record',
 					directory: checkpointDirectory,
 					reuseRecorded: true,
-					fetch: replayFetch(upstream),
+					fetch: replayFetch(upstream, false, positions),
 					onCheckpointReply: options.onCheckpointReply,
 					checkpointAllowance: options.checkpointAllowance,
 					onCheckpointHit: options.onCheckpointHit,
+					checkpointResponse: options.checkpointResponse,
+					checkpointResponseId: options.checkpointResponseId,
+					normalizeIds: options.normalizeCheckpointIds,
+					checkpointFallbackDirectory: options.checkpointFallbackDirectory,
+					checkpointFallbackClaim: options.checkpointFallbackClaim,
 				},
 				true,
+				positions,
 			)
-		: replayFetch(upstream)
+		: replayFetch(upstream, false, positions)
 }
 
 function replayFetch(
 	options: ReplayOptions,
 	checkpoint = false,
+	positions = new Map<string, number>(),
 ): typeof globalThis.fetch {
 	const mode = options.mode ?? modeFromEnvironment()
 	const send = options.fetch ?? globalThis.fetch
@@ -369,13 +457,15 @@ function replayFetch(
 		'tests/fixtures/cassettes'
 	const index = join(directory, 'cassette.jsonl')
 	const bodies = join(directory, 'cassette-files')
-	const positions = new Map<string, number>()
 	const fallback = options.fallbackDirectory
-		? createReplayFetch({
-				mode: 'strict',
-				directory: options.fallbackDirectory,
-				reportMissing: false,
-			})
+		? createReplayFetch(
+				{
+					mode: 'strict',
+					directory: options.fallbackDirectory,
+					reportMissing: false,
+				},
+				positions,
+			)
 		: undefined
 	let pending: Promise<unknown> = Promise.resolve()
 
@@ -433,6 +523,7 @@ function replayFetch(
 			case: options.case ?? '',
 			tags: options.tags ?? [],
 			...(checkpoint && { checkpointAllowance: options.checkpointAllowance }),
+			...(checkpoint && { checkpointResponseId: options.checkpointResponseId }),
 		}
 		const write = pending.then(() =>
 			appendFile(index, `${JSON.stringify(row)}\n`),
@@ -454,6 +545,48 @@ function replayFetch(
 			rebindIds,
 		)
 		request.signal.throwIfAborted()
+		const nextPosition = (source: string) => {
+			const cursorKey = JSON.stringify([source, identity.key])
+			const position = positions.get(cursorKey) ?? 0
+			positions.set(cursorKey, position + 1)
+			return position
+		}
+		const reply = async (
+			row: Awaited<ReturnType<typeof readCassetteRows>>[number],
+			source: string,
+		) => {
+			if (options.fault === 'http500')
+				return new Response('Replay HTTP 500', { status: 500 })
+			let bytes: Uint8Array = await readCassetteBody(source, row.body)
+			if (
+				rebindIds &&
+				/^(?:text\/|application\/(?:[\w.+-]*json|xml))/i.test(
+					row.headers['content-type'] ?? '',
+				)
+			)
+				bytes = Buffer.from(
+					identity.restore(Buffer.from(bytes).toString('utf8')),
+				)
+			if (options.fault === 'bad-image') bytes = corruptImage(bytes)
+			const stream =
+				request.method === 'HEAD' || [204, 205, 304].includes(row.status)
+					? null
+					: replayBody(bytes, request.signal, options.fault, options.delayMs)
+			const response = new Response(stream, {
+				status: row.status,
+				headers: row.headers,
+			})
+			if (checkpoint) {
+				checkpointReplies.add(response)
+				options.onCheckpointHit?.(
+					row.checkpointAllowance,
+					row.checkpointResponseId,
+					source,
+				)
+			}
+			await options.onReplay?.(request, response)
+			return response
+		}
 		if (fallback) {
 			try {
 				return await fallback(request.clone())
@@ -467,28 +600,22 @@ function replayFetch(
 		}
 		if (mode === 'record') {
 			if (options.reuseRecorded) {
-				const text = await readFile(index, 'utf8').catch((error) => {
-					if (!missing(error)) throw error
-					return ''
-				})
-				const recorded = text
-					.split('\n')
-					.filter(Boolean)
-					.map((line) => JSON.parse(line))
-				const hit = recorded.find(
-					(row) => row.key === identity.key && row.status < 300,
-				)
-				if (hit) {
-					const response = await createReplayFetch({
-						...options,
-						mode: 'strict',
-						fallbackDirectory: undefined,
-					})(request)
-					if (checkpoint) {
-						checkpointReplies.add(response)
-						options.onCheckpointHit?.(hit.checkpointAllowance)
-					}
-					return response
+				for (const source of [directory, options.checkpointFallbackDirectory]) {
+					if (!source) continue
+					const rows = (
+						await readCassetteRows(join(source, 'cassette.jsonl'))
+					).filter((row) => row.key === identity.key && row.status < 300)
+					if (!rows.length) continue
+					request.signal.throwIfAborted()
+					const position =
+						source !== directory && options.checkpointFallbackClaim
+							? options.checkpointFallbackClaim(
+									source,
+									identity.key,
+									rows.length,
+								)
+							: Math.min(nextPosition(source), rows.length - 1)
+					if (position !== undefined) return reply(rows[position], source)
 				}
 			}
 			const recordSend = async (
@@ -523,7 +650,9 @@ function replayFetch(
 				response.headers.get('content-type') ?? '',
 			)
 			const settled = textSettlement(response)
-			if (checkpoint && (!response.ok || !settled)) return response
+			const usable = options.checkpointResponse
+			if (checkpoint && (!response.ok || (!settled && !usable?.(response))))
+				return response
 			const chunks: Buffer[] = []
 			const reader = response.body.getReader()
 			let cancelled = false
@@ -531,7 +660,10 @@ function replayFetch(
 			const persist = (bytes: Buffer) =>
 				(writing ??= (async () => {
 					if (!checkpoint) return store(identity, response, bytes)
-					if (settled?.() && (!isSse || terminalSse(bytes)))
+					if (
+						(settled?.() || usable?.(response)) &&
+						(!isSse || terminalSse(bytes))
+					)
 						options.onCheckpointReply?.(() => store(identity, response, bytes))
 				})())
 			const stream = new ReadableStream<Uint8Array>(
@@ -559,7 +691,7 @@ function replayFetch(
 				},
 				{ highWaterMark: 0 },
 			)
-			return inheritTextSettlement(
+			return inheritSettlement(
 				response,
 				new Response(stream, {
 					status: response.status,
@@ -567,33 +699,14 @@ function replayFetch(
 				}),
 			)
 		}
-		let text = ''
-		try {
-			text = await readFile(index, 'utf8')
-		} catch (error) {
-			if (!missing(error)) throw error
-		}
-		const rows = text
-			.split('\n')
-			.filter((line) => line.trim())
-			.map((line) => {
-				const row: unknown = JSON.parse(line)
-				if (
-					!cassette.check(row) ||
-					(row.body.b64 === undefined) === (row.body.sha === undefined)
-				) {
-					throw new Error('Invalid cassette entry')
-				}
-				return row
-			})
-			.filter(
-				(row) =>
-					row.key === identity.key &&
-					(!options.reuseRecorded || row.status < 300) &&
-					(mode !== 'replay' ||
-						!options.ignoreRecordedFailures ||
-						(row.status >= 200 && row.status < 300)),
-			)
+		const rows = (await readCassetteRows(index)).filter(
+			(row) =>
+				row.key === identity.key &&
+				(!options.reuseRecorded || row.status < 300) &&
+				(mode !== 'replay' ||
+					!options.ignoreRecordedFailures ||
+					(row.status >= 200 && row.status < 300)),
+		)
 		if (rows.length === 0) {
 			if (mode === 'strict') {
 				const message = `Missing strict replay cassette: ${identity.method} ${identity.key} (${directory})`
@@ -606,37 +719,10 @@ function replayFetch(
 			}
 			return sendLive(request, input)
 		}
-		const position = positions.get(identity.key) ?? 0
-		const row = rows[Math.min(position, rows.length - 1)]
-		positions.set(identity.key, position + 1)
-		if (options.fault === 'http500')
-			return new Response('Replay HTTP 500', { status: 500 })
-		let bytes: Uint8Array
-		if (row.body.sha !== undefined) {
-			bytes = await readFile(join(bodies, row.body.sha))
-			if (hash(bytes) !== row.body.sha)
-				throw new Error('Invalid cassette body checksum')
-		} else {
-			bytes = Buffer.from(row.body.b64 ?? '', 'base64')
-		}
-		if (
-			rebindIds &&
-			/^(?:text\/|application\/(?:[\w.+-]*json|xml))/i.test(
-				row.headers['content-type'] ?? '',
-			)
+		return reply(
+			rows[Math.min(nextPosition(directory), rows.length - 1)],
+			directory,
 		)
-			bytes = Buffer.from(identity.restore(Buffer.from(bytes).toString('utf8')))
-		if (options.fault === 'bad-image') bytes = corruptImage(bytes)
-		const stream =
-			request.method === 'HEAD' || [204, 205, 304].includes(row.status)
-				? null
-				: replayBody(bytes, request.signal, options.fault, options.delayMs)
-		const response = new Response(stream, {
-			status: row.status,
-			headers: row.headers,
-		})
-		await options.onReplay?.(request, response)
-		return response
 	}
 	if (spend && mode !== 'strict') spendGuardedFetches.add(dispatch)
 	return checkpoint ? inheritSpendGuard(send, dispatch) : dispatch

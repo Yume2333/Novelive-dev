@@ -146,7 +146,13 @@ export function chapterWorker(
 	replay?: ReplayOptions,
 ) {
 	const fetch = createReplayFetch(replay)
-	const art = (signal?: AbortSignal, imageGenerationReplay?: ReplayOptions) =>
+	const legacyDrawingClaims = new Map<string, Map<string, number>>()
+	const art = (
+		signal?: AbortSignal,
+		imageGenerationReplay?: ReplayOptions,
+		drawingReplay = replay,
+		desensitized = false,
+	) =>
 		usageMethods(
 			new ArtProduction(project, {
 				main: models.main,
@@ -154,8 +160,9 @@ export function chapterWorker(
 				fast: models.fast,
 				visual: models.visual,
 				image: models.image,
-				replay,
+				replay: drawingReplay,
 				imageGenerationReplay,
+				desensitized,
 				signal,
 				resolution: work.settings.outputResolution,
 				readScope: { level: 'work', volumeId, workId: work.workId },
@@ -545,14 +552,40 @@ export function chapterWorker(
 		hasPendingReview(assetId) {
 			return art().hasPendingReview(assetId)
 		},
-		async draw(job, ctx) {
-			const metadata = await drawingMetadata(job.assetId)
-			return art(ctx.signal).draw(
-				metadata.job,
-				(await productionBible(project, volumeId, work.workId)).art,
-				metadata.cg,
-				ctx.resumingBudget,
-			)
+		draw(job, ctx) {
+			return step(async () => {
+				const metadata = await drawingMetadata(job.assetId)
+				return art(
+					ctx.signal,
+					undefined,
+					{
+						...replay,
+						checkpointDirectory: join(
+							project.root,
+							'.novelive',
+							'draw',
+							work.workId,
+						),
+						normalizeCheckpointIds: true,
+						checkpointFallbackClaim(source, fingerprint, count) {
+							const key = JSON.stringify([source, fingerprint])
+							const claims =
+								legacyDrawingClaims.get(key) ?? new Map<string, number>()
+							const position = claims.get(job.assetId) ?? claims.size
+							if (position >= count) return
+							claims.set(job.assetId, position)
+							legacyDrawingClaims.set(key, claims)
+							return position
+						},
+					},
+					ctx.desensitized,
+				).draw(
+					metadata.job,
+					(await productionBible(project, volumeId, work.workId)).art,
+					metadata.cg,
+					ctx.resumingBudget,
+				)
+			})
 		},
 		placeholder(job, issue, signal) {
 			return art(signal).savePlaceholder(job.assetId, issue)

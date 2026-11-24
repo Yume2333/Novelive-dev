@@ -40,6 +40,8 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'image-null',
 			'image-invalid-json',
 			'image-overdelivery',
+			'drawing-technical-rejection',
+			'drawing-moderation',
 			'concurrent-sunburst',
 			'download-failure',
 			'download-body-failure',
@@ -49,6 +51,11 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 	{
 		name: 'staging-during-sunburst-draw',
 		faults: ['image-overdelivery'],
+	},
+	{ name: 'reopen-mid-drawing', faults: [] },
+	{
+		name: 'drawing-rate-limit',
+		faults: ['drawing-image-missing-usage', 'drawing-rate-limit'],
 	},
 	{
 		name: 'review-cap-raise',
@@ -86,6 +93,9 @@ test.each(scenarios)(
 		const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-offline-'))
 		const overdelivery = faults.includes('image-overdelivery')
 		const overlap = name === 'staging-during-sunburst-draw'
+		const reopenDrawing = name === 'reopen-mid-drawing'
+		const auditHeld = Promise.withResolvers<void>()
+		let auditCount = 0
 		const drawing = Promise.withResolvers<void>()
 		const settleDrawing = Promise.withResolvers<void>()
 		let heldDraw = false
@@ -129,6 +139,16 @@ test.each(scenarios)(
 			({ chapter, operation }) => {
 				if (overlap && chapter === 3 && operation === 'stage')
 					imageSettlementsAtStage.push(readHeldImageSettlement?.())
+			},
+			async ({ signal }) => {
+				if (!reopenDrawing || ++auditCount !== 2) return
+				auditHeld.resolve()
+				signal.throwIfAborted()
+				await new Promise<void>((_, reject) =>
+					signal.addEventListener('abort', () => reject(signal.reason), {
+						once: true,
+					}),
+				)
 			},
 		)
 		const profile = join(root, 'profile')
@@ -188,6 +208,12 @@ test.each(scenarios)(
 						...configuration.models.image,
 						retries: 3,
 						...(name === 'concurrent-sunburst' && { concurrency: 8 }),
+						...((reopenDrawing ||
+							name === 'drawing-rate-limit' ||
+							name === 'drawing-technical-rejection' ||
+							name === 'drawing-moderation') && {
+							concurrency: 1,
+						}),
 						...((overdelivery || name === 'concurrent-sunburst') && {
 							model: 'gpt-image-2.6-sunburst',
 						}),
@@ -261,6 +287,40 @@ test.each(scenarios)(
 				await session.queue.idle()
 				expect(relay.admissions).toHaveLength(calls)
 				expect(reservations()).toEqual(previous)
+			}
+			if (reopenDrawing) {
+				await Promise.race([
+					auditHeld.promise,
+					session.queue.idle().then(() => {
+						throw new Error('Drawing finished before interruption')
+					}),
+				])
+				const settled = relay.admissions
+					.slice(0, -1)
+					.filter(
+						({ operation, chapter }) =>
+							chapter === 1 &&
+							['painter', 'image', 'visual'].includes(operation),
+					)
+				expect(settled.map(({ operation }) => operation)).toEqual([
+					'painter',
+					'image',
+					'visual',
+					'painter',
+					'image',
+				])
+				const downloads = relay.downloads
+				const boundary = relay.admissions.length
+				await reopen()
+				await session.continue()
+				await session.queue.idle()
+				for (const { requestKey } of settled)
+					expect(
+						relay.admissions
+							.slice(boundary)
+							.some((row) => row.requestKey === requestKey),
+					).toBe(false)
+				expect(relay.downloads).toBe(downloads)
 			}
 			const play = async (chapterId: string) => {
 				const player = await host.player(workId, undefined, chapterId)
@@ -495,6 +555,87 @@ test.each(scenarios)(
 					fault === 'review-rate-limit' ||
 					fault === 'review-raised-cap-rate-limit',
 			)
+			if (faults.includes('drawing-rate-limit')) {
+				const image = relay.admissions.find(
+					({ fault }) => fault === 'drawing-image-missing-usage',
+				)
+				expect(image).toMatchObject({
+					operation: 'image',
+					tokens: null,
+					images: 1,
+				})
+				expect(
+					relay.admissions.filter(
+						({ requestKey }) => requestKey === image?.requestKey,
+					),
+				).toHaveLength(1)
+				const denied = relay.admissions.find(
+					({ fault }) => fault === 'drawing-rate-limit',
+				)
+				expect(denied).toBeDefined()
+				expect(
+					relay.admissions
+						.filter(({ requestKey }) => requestKey === denied?.requestKey)
+						.map(({ fault }) => fault),
+				).toEqual(['drawing-rate-limit', undefined])
+				expect(explicitAdmissions.size).toBe(0)
+				expect(
+					session.queue
+						.runLog(workId)
+						.some(
+							({ kind, steps }) =>
+								kind === 'image' &&
+								steps.some(({ errorType }) => errorType === 'transient') &&
+								steps.some(
+									({ purpose, status }) =>
+										purpose === 'draw' && status === 'completed',
+								),
+						),
+				).toBe(true)
+			}
+			if (faults.includes('drawing-technical-rejection')) {
+				const candidates = relay.admissions.filter(
+					({ operation, chapter }) => operation === 'image' && chapter === 1,
+				)
+				expect(candidates.slice(0, 3).map(({ fault }) => fault)).toEqual([
+					'drawing-technical-rejection',
+					'drawing-technical-rejection',
+					undefined,
+				])
+				expect(candidates[2].requestKey).toBe(candidates[1].requestKey)
+			}
+			if (faults.includes('drawing-moderation')) {
+				for (const role of ['painter', 'visual']) {
+					const replies = relay.admissions.filter(
+						({ operation, chapter }) => operation === role && chapter === 1,
+					)
+					expect(
+						replies.slice(0, 2).map(({ desensitized }) => desensitized),
+					).toEqual([false, true])
+					expect(replies[1].requestKey).not.toBe(replies[0].requestKey)
+					if (role === 'visual') {
+						expect(replies[0].visualBrief).toBeTruthy()
+						expect(replies[1].visualBrief).toContain(
+							'A lantern on a quiet stone bridge at dusk.',
+						)
+						expect(replies[1].visualBrief).not.toBe(replies[0].visualBrief)
+					}
+				}
+				expect(explicitAdmissions.size).toBe(0)
+				expect(
+					session.queue
+						.runLog(workId)
+						.some(
+							({ kind, steps }) =>
+								kind === 'image' &&
+								steps.some(({ errorType }) => errorType === 'moderation') &&
+								steps.some(
+									({ purpose, status }) =>
+										purpose === 'draw' && status === 'completed',
+								),
+						),
+				).toBe(true)
+			}
 			if (reviewDenial) {
 				const denied = reviews.findIndex(({ fault }) => fault === reviewDenial)
 				const raised = faults.includes('review-reasoning')
@@ -633,7 +774,16 @@ test.each(scenarios)(
 							pair(actual_tokens, actual_images),
 						)
 						.sort(),
-				).toEqual(logged)
+				).toEqual(
+					relay.admissions
+						.filter((entry) => entry.run === run)
+						.map(({ tokens, images, fault }) =>
+							fault?.endsWith('rate-limit') || fault === 'drawing-moderation'
+								? pair(0, 0)
+								: pair(tokens, images),
+						)
+						.sort(),
+				)
 				expect(
 					rows.reduce((sum, row) => sum + (row.actual_tokens ?? row.tokens), 0),
 				).toBeLessThanOrEqual(1_600_000)

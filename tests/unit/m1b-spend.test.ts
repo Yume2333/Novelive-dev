@@ -21,6 +21,89 @@ import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
 
 afterEach(() => vi.unstubAllEnvs())
 
+test('a stop file refuses new admissions without interrupting settlement', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'm1b-stop-file-'))
+	const file = join(root, 'stop')
+	try {
+		vi.stubEnv('NL_RUN_STOP_FILE', file)
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+		using database = new DatabaseSync(':memory:')
+		const sendStarted = Promise.withResolvers<void>()
+		const reply = Promise.withResolvers<Response>()
+		const send = vi.fn(() => {
+			sendStarted.resolve()
+			return reply.promise
+		})
+		const request = () =>
+			new Request('https://relay.invalid/v1/chat/completions', {
+				method: 'POST',
+				body: JSON.stringify({
+					model: 'fixture',
+					messages: [],
+					max_tokens: 100,
+				}),
+			})
+		const spend = projectSpend(database)
+		const inFlight = spend(request(), send)
+		await sendStarted.promise
+		await writeFile(file, '')
+		await expect(spend(request(), send)).rejects.toThrow('已停止接受新请求')
+		reply.resolve(Response.json({ usage: { total_tokens: 75 } }))
+		expect((await inFlight).ok).toBe(true)
+		expect(send).toHaveBeenCalledTimes(1)
+		expect(
+			database.prepare('SELECT actual_tokens FROM spend_reservation').all(),
+		).toEqual([{ actual_tokens: 75 }])
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
+test.each([400, 403, 429, 408, 409, 503])(
+	'accounts for an HTTP %i image rejection without usage',
+	async (status) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+		using database = new DatabaseSync(':memory:')
+		await projectSpend(database)(
+			new Request('https://relay.invalid/v1/images/generations', {
+				method: 'POST',
+				body: JSON.stringify({ model: 'gpt-image-2.6-sunburst', n: 1 }),
+			}),
+			async () => new Response('rejected', { status }),
+		)
+		const actual = [400, 403, 429].includes(status) ? 0 : null
+		expect(
+			database
+				.prepare('SELECT actual_tokens, actual_images FROM spend_reservation')
+				.get(),
+		).toEqual({ actual_tokens: actual, actual_images: actual })
+	},
+)
+
+test.each([
+	{ usage: { total_tokens: 17 }, actual: 17 },
+	{ usage: { prompt_tokens: 17 }, actual: null },
+])(
+	'retains reported usage on a definite rejection ($usage)',
+	async ({ usage, actual }) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+		using database = new DatabaseSync(':memory:')
+		await projectSpend(database)(
+			new Request('https://relay.invalid/v1/chat/completions', {
+				method: 'POST',
+				body: JSON.stringify({ max_tokens: 64, messages: [] }),
+			}),
+			async () => Response.json({ usage }, { status: 429 }),
+		)
+		expect(
+			database.prepare('SELECT actual_tokens FROM spend_reservation').get(),
+		).toEqual({ actual_tokens: actual })
+	},
+)
+
 test('admits the recorded-size vision payload and exposes a settled 2× overshoot', async () => {
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
 	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
@@ -807,6 +890,156 @@ test.each([false, true])(
 		}
 	},
 )
+
+test('drawing checkpoints bind shared download URLs to their generation response', async () => {
+	vi.stubEnv('NL_REPLAY', '')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '10')
+	using database = new DatabaseSync(':memory:')
+	const root = await mkdtemp(join(tmpdir(), 'm1b-draw-replies-'))
+	try {
+		let generations = 0
+		const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+			if (new Request(input).method === 'GET')
+				return new Response(`bytes-${generations}`)
+			generations++
+			return Response.json({
+				data: [{ url: 'https://relay.invalid/v1/same-image.png' }],
+				usage: { total_tokens: 7000 },
+			})
+		})
+		const renderer = () =>
+			imageRenderer(
+				{
+					...configuration.models.image,
+					baseUrl: 'https://relay.invalid/v1',
+					model: 'gpt-image-2.6-sunburst',
+					upscaleTier: 'anime',
+				},
+				{
+					replay: {
+						checkpointDirectory: root,
+						fetch,
+						spend: projectSpend(database),
+					},
+				},
+			)
+		const size = { width: 1024, height: 1024 }
+		const first = renderer()
+		await expect(first('first', [], size, false)).resolves.toEqual({
+			bytes: Buffer.from('bytes-1'),
+		})
+		await expect(first('second', [], size, false)).resolves.toEqual({
+			bytes: Buffer.from('bytes-2'),
+		})
+		expect(fetch).toHaveBeenCalledTimes(4)
+		const reopened = renderer()
+		await expect(reopened('second', [], size, false)).resolves.toEqual({
+			bytes: Buffer.from('bytes-2'),
+		})
+		await expect(reopened('first', [], size, false)).resolves.toEqual({
+			bytes: Buffer.from('bytes-1'),
+		})
+		expect(fetch).toHaveBeenCalledTimes(4)
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
+test.each(['one match', 'duplicate download', 'shared generation URL'])(
+	'legacy checkpoints reuse bytes only when the link is unambiguous: %s',
+	async (scenario) => {
+		vi.stubEnv('NL_REPLAY', '')
+		vi.stubEnv('NL_USAGE_CSV', '')
+		const root = await mkdtemp(join(tmpdir(), 'm1b-legacy-draw-'))
+		try {
+			const baseUrl = 'https://relay.invalid/v1'
+			const url = `${baseUrl}/expired.png`
+			const config = {
+				...configuration.models.image,
+				baseUrl,
+				model: 'gpt-image-2.6-sunburst',
+				upscaleTier: 'anime' as const,
+			}
+			const fetch = vi.fn<typeof globalThis.fetch>(async (input) =>
+				new Request(input).method === 'GET'
+					? new Response('original bytes')
+					: Response.json({ data: [{ url }] }),
+			)
+			const record = { mode: 'record' as const, directory: root, fetch }
+			const size = { width: 1024, height: 1024 }
+			await imageRenderer(config, { replay: record })('prompt', [], size, false)
+			const append = createReplayFetch(record)
+			if (scenario === 'duplicate download') await (await append(url)).text()
+			if (scenario === 'shared generation URL')
+				await (
+					await append(`${baseUrl}/images/generations`, {
+						method: 'POST',
+						body: JSON.stringify({ prompt: 'other prompt' }),
+					})
+				).text()
+			const expired = vi.fn(async () => new Response(null, { status: 404 }))
+			const render = imageRenderer(config, {
+				replay: { checkpointDirectory: root, fetch: expired },
+			})
+			const reply = await render('prompt', [], size, false)
+			if (scenario === 'one match') {
+				expect(reply).toEqual({ bytes: Buffer.from('original bytes') })
+				expect(expired).not.toHaveBeenCalled()
+			} else {
+				expect(reply).toHaveProperty('error')
+				expect(expired).toHaveBeenCalledTimes(1)
+			}
+		} finally {
+			await rm(root, { recursive: true, force: true })
+		}
+	},
+)
+
+test('strict drawing replay consumes identical generation requests in recording order', async () => {
+	vi.stubEnv('NL_USAGE_CSV', '')
+	const root = await mkdtemp(join(tmpdir(), 'm1b-draw-sequence-'))
+	try {
+		const config = {
+			...configuration.models.image,
+			baseUrl: 'https://relay.invalid/v1',
+			model: 'gpt-image-2.6-sunburst',
+			upscaleTier: 'anime' as const,
+		}
+		let next = 0
+		const renderer = imageRenderer(config, {
+			replay: {
+				mode: 'record',
+				directory: root,
+				fetch: async () =>
+					Response.json({
+						data: [
+							{
+								b64_json: Buffer.from(`candidate-${++next}`).toString('base64'),
+							},
+						],
+					}),
+			},
+		})
+		const size = { width: 1024, height: 1024 }
+		await renderer('same prompt', [], size, false)
+		await renderer('same prompt', [], size, false)
+		const reopen = () =>
+			imageRenderer(config, {
+				replay: { mode: 'strict', directory: root },
+			})
+		for (const render of [reopen(), reopen()]) {
+			await expect(render('same prompt', [], size, false)).resolves.toEqual({
+				bytes: Buffer.from('candidate-1'),
+			})
+			await expect(render('same prompt', [], size, false)).resolves.toEqual({
+				bytes: Buffer.from('candidate-2'),
+			})
+		}
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
 
 test('exhausted image and token caps block image edits, generation, and visual review', async () => {
 	vi.stubEnv('NL_REPLAY', '')

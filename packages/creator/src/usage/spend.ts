@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { addAbortListener } from 'node:events'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import sharp from 'sharp'
@@ -18,14 +18,24 @@ const valid = (value: unknown): value is number =>
 	typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 
 const textSettlements = new WeakMap<Response, () => boolean>()
+const imageSettlements = new WeakSet<Response>()
+
+export function hasSettledImage(response: Response) {
+	return imageSettlements.has(response)
+}
+
+function definiteRejection(status: number) {
+	return status >= 400 && status < 500 && status !== 408 && status !== 409
+}
 
 export function textSettlement(response: Response) {
 	return textSettlements.get(response)
 }
 
-export function inheritTextSettlement(source: Response, target: Response) {
+export function inheritSettlement(source: Response, target: Response) {
 	const settlement = textSettlement(source)
 	if (settlement) textSettlements.set(target, settlement)
+	if (hasSettledImage(source)) imageSettlements.add(target)
 	return target
 }
 
@@ -505,6 +515,7 @@ export async function settledChapterImageBudget(
 
 export function projectSpend(database: DatabaseSync) {
 	const runId = spendRunId()
+	const stopFile = process.env.NL_RUN_STOP_FILE
 	return async (
 		request: Request,
 		send: (
@@ -531,8 +542,10 @@ export function projectSpend(database: DatabaseSync) {
 			WHERE used_tokens + ? <= ? AND used_images + ? <= ?
 			RETURNING id
 		`)
-		const admit = () =>
-			reserve.get(
+		const admit = () => {
+			if (stopFile && existsSync(stopFile))
+				throw new SpendBudgetError('本次运行已停止接受新请求')
+			return reserve.get(
 				tokens,
 				images,
 				runId,
@@ -544,6 +557,7 @@ export function projectSpend(database: DatabaseSync) {
 				images,
 				imageCap,
 			) as { id: number } | undefined
+		}
 		let row = admit()
 		while (!row) {
 			const live = images
@@ -609,9 +623,31 @@ export function projectSpend(database: DatabaseSync) {
 			new Request(request, { redirect: 'error' }),
 			quote,
 		)
-		if (images && !response.ok) return response
 		const type = response.headers.get('content-type') ?? ''
-		if (!images && type.includes('text/event-stream'))
+		if (
+			definiteRejection(response.status) &&
+			!type.includes('text/event-stream')
+		) {
+			const completedBody = await response
+				.clone()
+				.text()
+				.catch(() => undefined)
+			if (completedBody !== undefined) {
+				let body: Record<string, unknown> = {}
+				try {
+					body = object(JSON.parse(completedBody))
+				} catch {
+					// A complete rejection can have an empty or plain-text body.
+				}
+				const actual =
+					body.usage == null || object(body.usage).total_tokens === 0
+						? 0
+						: totalUsage(body.usage)
+				if (images) settle(actual ?? null, returnedImageCount(body) ?? 0)
+				else if (actual !== undefined) settleText(actual)
+			}
+		} else if (images && !response.ok) return response
+		else if (!images && type.includes('text/event-stream'))
 			response = observeUsage(response, settleText)
 		else if (type.includes('json')) {
 			const body = object(
@@ -622,10 +658,11 @@ export function projectSpend(database: DatabaseSync) {
 			)
 			if (images) {
 				if (Array.isArray(body.data)) {
-					settle(
-						totalUsage(body.usage) ?? null,
-						returnedImageCount(body) ?? null,
-					)
+					const tokens = totalUsage(body.usage)
+					const count = returnedImageCount(body)
+					settle(tokens ?? null, count ?? null)
+					if (tokens !== undefined && count !== undefined)
+						imageSettlements.add(response)
 				}
 			} else {
 				const actual = totalUsage(body.usage)

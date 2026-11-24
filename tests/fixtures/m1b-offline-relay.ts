@@ -40,6 +40,8 @@ export type Admission = {
 	requestKey: string
 	outputCap?: number
 	imageAllowance?: number
+	desensitized: boolean
+	visualBrief?: string
 }
 
 export type Fault =
@@ -51,6 +53,10 @@ export type Fault =
 	| 'missing-usage'
 	| 'truncated'
 	| 'rate-limit'
+	| 'drawing-rate-limit'
+	| 'drawing-image-missing-usage'
+	| 'drawing-technical-rejection'
+	| 'drawing-moderation'
 	| 'review-rate-limit'
 	| 'review-raised-cap-rate-limit'
 	| 'review-reasoning'
@@ -128,6 +134,7 @@ export function fakeRelay(
 	beforeWriting?: (chapter: number) => Promise<void> | undefined,
 	beforeImageReply?: (chapter: number) => Promise<void> | undefined,
 	onAdmission?: (admission: Admission) => void,
+	beforeAuditReply?: (request: Request) => Promise<void> | undefined,
 ) {
 	const pending = new Set(faults)
 	const admissions: Admission[] = []
@@ -135,6 +142,7 @@ export function fakeRelay(
 	const downloadAttempts = new Map<number, number>()
 	let downloads = 0
 	let currentChapter = 0
+	let rejectedCandidates = 0
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const request = new Request(input, init)
 		const url = new URL(request.url)
@@ -251,6 +259,12 @@ export function fakeRelay(
 					(candidate === 'missing-usage' && operation === 'stage') ||
 					(candidate === 'truncated' && operation === 'stage') ||
 					(candidate === 'rate-limit' && operation === 'write') ||
+					(candidate === 'drawing-rate-limit' &&
+						operation === 'visual' &&
+						currentChapter > 0) ||
+					(candidate === 'drawing-moderation' &&
+						operation === 'visual' &&
+						currentChapter > 0) ||
 					(candidate === 'review-rate-limit' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-2')) ||
@@ -267,6 +281,8 @@ export function fakeRelay(
 						'image-null',
 						'image-invalid-json',
 						'image-overdelivery',
+						'drawing-image-missing-usage',
+						'drawing-technical-rejection',
 					].includes(candidate) &&
 						operation === 'image' &&
 						currentChapter > 0) ||
@@ -277,20 +293,28 @@ export function fakeRelay(
 					(['malformed', 'over-budget'].includes(candidate) &&
 						operation === 'stage')),
 		)
-		if (fault) pending.delete(fault)
+		if (
+			fault &&
+			(fault !== 'drawing-technical-rejection' || ++rejectedCandidates === 2)
+		)
+			pending.delete(fault)
 		const status =
 			fault === 'rate-limit' ||
+			fault === 'drawing-rate-limit' ||
 			fault === 'review-rate-limit' ||
 			fault === 'review-raised-cap-rate-limit'
 				? 429
-				: fault === 'staging-503' ||
-						fault === 'writing-503' ||
-						fault === 'image-failure'
-					? 503
-					: 200
+				: fault === 'drawing-moderation'
+					? 400
+					: fault === 'staging-503' ||
+							fault === 'writing-503' ||
+							fault === 'image-failure'
+						? 503
+						: 200
 		const tokens =
 			status !== 200 ||
 			fault === 'missing-usage' ||
+			fault === 'drawing-image-missing-usage' ||
 			fault === 'image-null' ||
 			fault === 'image-invalid-json'
 				? null
@@ -302,11 +326,13 @@ export function fakeRelay(
 							: 700
 						: 2_000
 		const images =
-			tokens === null
-				? null
-				: fault === 'image-overdelivery'
-					? 3
-					: Number(image)
+			fault === 'drawing-image-missing-usage'
+				? 1
+				: tokens === null
+					? null
+					: fault === 'image-overdelivery'
+						? 3
+						: Number(image)
 		if (fault === 'image-overdelivery') assert.equal(Number(body.n), 1)
 		const run = process.env.NL_RUN_ID ?? ''
 		const attributedChapter = /(?:scene 河灯-|fixture-(?:bank|cg)-)(\d+)/.exec(
@@ -324,6 +350,15 @@ export function fakeRelay(
 			run,
 			fault,
 			outputCap,
+			desensitized: prompt.includes(
+				'Keep the adaptation non-graphic. Use implication instead of explicit detail.',
+			),
+			visualBrief:
+				operation === 'visual'
+					? /(?:Original image brief \(verify independently of the painter's rewrite\)|Adapted image brief): ([^\n]+)/.exec(
+							prompt,
+						)?.[1]
+					: undefined,
 			imageAllowance:
 				imageAllowance === undefined ? undefined : Number(imageAllowance),
 			requestKey: createHash('sha256')
@@ -338,12 +373,32 @@ export function fakeRelay(
 		onAdmission?.(admission)
 		const csv = process.env.NL_USAGE_CSV
 		assert.ok(csv, 'Offline admission needs a run-specific CSV')
-		await appendFile(
-			csv,
-			`${run},${operation},1,${tokens ?? ''},${images ?? ''},${fault ?? ''}\n`,
-		)
+		const log = () =>
+			appendFile(
+				csv,
+				`${run},${operation},1,${admission.tokens ?? ''},${admission.images ?? ''},${fault ?? ''}\n`,
+			)
+		try {
+			if (status === 200 && operation === 'visual' && chapter > 0)
+				await beforeAuditReply?.(request)
+		} catch (error) {
+			admission.tokens = admission.images = null
+			await log()
+			throw error
+		}
+		await log()
 		if (status !== 200)
-			return Response.json({ error: { message: 'Offline fault' } }, { status })
+			return Response.json(
+				{
+					error: {
+						message:
+							fault === 'drawing-moderation'
+								? 'Content moderation'
+								: 'Offline fault',
+					},
+				},
+				{ status },
+			)
 		if (fault === 'image-null') return Response.json(null)
 		if (fault === 'image-invalid-json')
 			return new Response('{', {
@@ -355,13 +410,15 @@ export function fakeRelay(
 			const [width, height] = String(body.size).split('x').map(Number)
 			imageBytes.set(
 				path,
-				await picture(width, height, body.background === 'transparent'),
+				fault === 'drawing-technical-rejection'
+					? Buffer.from('Undecodable candidate')
+					: await picture(width, height, body.background === 'transparent'),
 			)
 			return Response.json({
 				data: Array.from({ length: images ?? 0 }, (_, i) => ({
 					url: i ? `${endpoint}${path}?variant=${i}` : endpoint + path,
 				})),
-				usage: { total_tokens: tokens },
+				...(tokens !== null && { usage: { total_tokens: tokens } }),
 			})
 		}
 		const reply = (content: unknown, finish = 'stop', tool?: string) =>

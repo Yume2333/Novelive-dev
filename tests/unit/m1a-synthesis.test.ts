@@ -617,7 +617,7 @@ test.each([200, 429, 'replay miss'] as const)(
 					.all(),
 			).toEqual(
 				Array.from({ length: status === 429 ? 2 : 1 }, () => ({
-					actual_tokens: null,
+					actual_tokens: status === 429 ? 0 : null,
 				})),
 			)
 		} finally {
