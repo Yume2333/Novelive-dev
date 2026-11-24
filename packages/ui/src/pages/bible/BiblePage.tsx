@@ -1,4 +1,16 @@
 import type { CommandOutput, Proposal } from '@novelive/creator/contract'
+import {
+	ChevronRight,
+	Clock,
+	Eye,
+	Handshake,
+	Languages,
+	type LucideIcon,
+	Mountain,
+	Palette,
+	RefreshCw,
+	Users,
+} from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Collapse } from '../../components/Collapse'
@@ -24,13 +36,22 @@ type ProposalEntry = Extract<
 >['changes'][number]['entry']
 const categories = [
 	['characters', msg('角色')],
-	['locations', msg('地点')],
-	['glossary', msg('术语')],
 	['relations', msg('关系')],
+	['locations', msg('地点')],
 	['timeline', msg('时间线')],
 	['foreshadowing', msg('伏笔')],
 	['styles', msg('风格')],
+	['glossary', msg('术语')],
 ] as const
+const icons: Record<(typeof categories)[number][0], LucideIcon> = {
+	characters: Users,
+	relations: Handshake,
+	locations: Mountain,
+	timeline: Clock,
+	foreshadowing: Eye,
+	styles: Palette,
+	glossary: Languages,
+}
 const message = (error: unknown) =>
 	error && typeof error === 'object' && 'message' in error
 		? String(error.message)
@@ -249,9 +270,17 @@ function Candidate({
 	const action = bible.proposalActions[proposal.id]
 	const stale = !action.canApprove
 	return (
-		<article className={styles.card} aria-label={proposal.prompt}>
-			<h3>{proposal.prompt}</h3>
-			<p>{action.reason ?? t('待确认')}</p>
+		<article
+			className={`${styles.card} ${styles.candidate}`}
+			aria-label={proposal.prompt}
+		>
+			<header className={styles.cardHead}>
+				<h3>{proposal.prompt}</h3>
+				<span className={styles.chip} data-tone="candidate">
+					{t('候选')}
+				</span>
+			</header>
+			<p className={styles.muted}>{action.reason ?? t('待确认')}</p>
 			{changes.map(({ kind, op, entry }) => {
 				const confirmed = (bible[collection[kind]] as Entry[]).find(
 					({ id }) => id === entry.id,
@@ -318,27 +347,28 @@ function Candidate({
 					</section>
 				)
 			})}
-			<div className={styles.actions}>
+			<div className={styles.decision}>
+				<input
+					aria-label={t('拒绝理由')}
+					placeholder={t('拒绝理由')}
+					value={reason}
+					onChange={(event) => setReason(event.target.value)}
+				/>
 				<button
 					type="button"
-					disabled={busy || stale}
-					onClick={() => resolve(proposal.id)}
-				>
-					{t('接受候选')}
-				</button>
-				<label>
-					{t('拒绝理由')}
-					<input
-						value={reason}
-						onChange={(event) => setReason(event.target.value)}
-					/>
-				</label>
-				<button
-					type="button"
+					className={styles.ghost}
 					disabled={busy}
 					onClick={() => resolve(proposal.id, reason)}
 				>
 					{t('拒绝候选')}
+				</button>
+				<button
+					type="button"
+					className={styles.primary}
+					disabled={busy || stale}
+					onClick={() => resolve(proposal.id)}
+				>
+					{t('接受候选')}
 				</button>
 			</div>
 		</article>
@@ -380,6 +410,8 @@ function BibleProjection({
 	const [notice, setNotice] = useState('')
 	const [busy, setBusy] = useState(false)
 	const [volumeDraft, setVolumeDraft] = useState(volumeId)
+	const [candidatesOpen, setCandidatesOpen] = useState(true)
+	const [focused, setFocused] = useState('')
 	useEffect(() => {
 		if (!workId) return
 		let active = true
@@ -455,89 +487,207 @@ function BibleProjection({
 			setBusy(false)
 		}
 	}
+	const label = t(categories.find(([key]) => key === category)?.[1] ?? '')
+	const entries: Entry[] = bible ? bible[category] : []
+	const card = (entry: Entry) => (
+		<article
+			className={styles.card}
+			key={entry.id}
+			id={`bible-entry-${entry.id}`}
+			data-focused={focused === entry.id || undefined}
+		>
+			<header className={styles.cardHead}>
+				{category === 'characters' && (
+					<span className={styles.avatar} aria-hidden="true">
+						{title(entry).slice(0, 1)}
+					</span>
+				)}
+				<h3>{title(entry)}</h3>
+				<span
+					className={styles.chip}
+					data-tone={entry.status === 'confirmed' ? 'confirmed' : 'candidate'}
+				>
+					{entry.status === 'confirmed' ? t('已确认') : t('候选')}
+				</span>
+			</header>
+			<Fields entry={entry} />
+			<Occurrences entry={entry} />
+		</article>
+	)
+
 	return (
-		<Page title={t('设定集')}>
-			<div className={styles.layout}>
+		<Page
+			title={t('设定集')}
+			width={1200}
+			eyebrow={t('卷 {{volume}}', { volume: volumeId })}
+			actions={
 				<form
-					className={styles.actions}
+					className={styles.volume}
 					onSubmit={(event) => {
 						event.preventDefault()
 						changeVolume(volumeDraft)
 					}}
 				>
-					<label>
-						{t('卷 ID')}
-						<input
-							aria-label={t('卷 ID')}
-							value={volumeDraft}
-							onChange={(event) => setVolumeDraft(event.target.value)}
-						/>
-					</label>
-					<button type="submit" disabled={busy}>
+					<input
+						aria-label={t('卷 ID')}
+						placeholder={t('卷 ID')}
+						value={volumeDraft}
+						onChange={(event) => setVolumeDraft(event.target.value)}
+					/>
+					<button type="submit" className={styles.ghost} disabled={busy}>
 						{t('切换卷')}
 					</button>
-					<button type="button" disabled={busy} onClick={refresh}>
-						{t('刷新')}
+					<button
+						type="button"
+						className={styles.icon}
+						aria-label={t('刷新')}
+						title={t('刷新')}
+						disabled={busy}
+						onClick={refresh}
+					>
+						<RefreshCw aria-hidden="true" size={16} strokeWidth={1.8} />
 					</button>
 				</form>
-				{error && <p role="alert">{error}</p>}
-				{notice && <p role="status">{notice}</p>}
-				{!bible && !error && <p role="status">{t('正在读取设定集…')}</p>}
+			}
+		>
+			<div className={styles.root}>
+				{error && (
+					<p className={styles.alert} role="alert">
+						{error}
+					</p>
+				)}
+				{notice && (
+					<p className={styles.notice} role="status">
+						{notice}
+					</p>
+				)}
+				{!bible && !error && (
+					<p className={styles.muted} role="status">
+						{t('正在读取设定集…')}
+					</p>
+				)}
 				{bible && (
-					<>
-						<nav className={styles.actions} aria-label={t('设定分类')}>
-							{categories.map(([key, label]) => (
-								<button
-									type="button"
-									key={key}
-									aria-pressed={category === key}
-									onClick={() => setCategory(key)}
-								>
-									{t('{{label}}（{{length}}）', {
-										label: t(label),
-										length: bible[key].length,
-									})}
-								</button>
-							))}
-						</nav>
-						<ScrollArea className={styles.scroll}>
-							<div className={styles.columns}>
-								<section aria-label={t('已登记内容')}>
-									<h2>
-										{t(categories.find(([key]) => key === category)?.[1] ?? '')}
-									</h2>
-									{bible[category].length === 0 && <p>{t('暂无条目')}</p>}
-									{bible[category].map((entry) => (
-										<article className={styles.card} key={entry.id}>
-											<h3>{title(entry)}</h3>
-											<p>
-												{entry.status === 'confirmed' ? t('已确认') : t('候选')}
-											</p>
-											<Fields entry={entry} />
-											<Occurrences entry={entry} />
-										</article>
-									))}
-								</section>
-								<section aria-label={t('待确认候选')}>
-									<h2>
-										{t('待确认候选（{{length}}）', {
-											length: proposals.length,
-										})}
-									</h2>
-									{!proposals.length && <p>{t('暂无待确认候选')}</p>}
-									{proposals.map((proposal) => (
-										<Candidate
-											key={proposal.id}
-											proposal={proposal}
-											bible={bible}
-											busy={busy}
-											resolve={(id, reason) => void resolve(id, reason)}
+					<ScrollArea className={styles.scroll}>
+						<div className={styles.layout}>
+							<nav className={styles.nav} aria-label={t('设定分类')}>
+								{categories.map(([key, name]) => {
+									const Icon = icons[key]
+									return (
+										<button
+											type="button"
+											key={key}
+											className={styles.navItem}
+											title={t(name)}
+											aria-pressed={category === key}
+											onClick={() => {
+												setCategory(key)
+												setFocused('')
+											}}
+										>
+											<Icon aria-hidden="true" size={17} strokeWidth={1.8} />
+											<span className={styles.navText}>{t(name)}</span>
+											<span className={styles.navCount}>
+												{bible[key].length}
+											</span>
+										</button>
+									)
+								})}
+							</nav>
+							<div className={styles.content}>
+								<div className={styles.contentHead}>
+									<h2>{label}</h2>
+									<button
+										type="button"
+										className={styles.candidateChip}
+										aria-expanded={candidatesOpen}
+										onClick={() => setCandidatesOpen((value) => !value)}
+									>
+										{proposals.length
+											? t('候选与冲突 · {{length}} 项待处理', {
+													length: proposals.length,
+												})
+											: t('候选与冲突 · 暂无待处理')}
+										<ChevronRight
+											aria-hidden="true"
+											size={13}
+											strokeWidth={2}
+											data-open={candidatesOpen || undefined}
 										/>
-									))}
-								</section>
+									</button>
+								</div>
+								<div
+									className={styles.parts}
+									data-candidates={candidatesOpen || undefined}
+								>
+									<section
+										className={styles.entries}
+										aria-label={t('已登记内容')}
+									>
+										{entries.length === 0 && (
+											<p className={styles.empty}>{t('暂无条目')}</p>
+										)}
+										{category === 'characters' && entries.length > 0 ? (
+											<div className={styles.characters}>
+												<div className={styles.characterList}>
+													{entries.map((entry) => (
+														<button
+															type="button"
+															key={entry.id}
+															className={styles.characterItem}
+															aria-current={focused === entry.id || undefined}
+															onClick={() => {
+																setFocused(entry.id)
+																document
+																	.getElementById(`bible-entry-${entry.id}`)
+																	?.scrollIntoView({ block: 'nearest' })
+															}}
+														>
+															<span
+																className={styles.avatar}
+																aria-hidden="true"
+															>
+																{title(entry).slice(0, 1)}
+															</span>
+															<span className={styles.characterName}>
+																{title(entry)}
+															</span>
+														</button>
+													))}
+												</div>
+												<div className={styles.cards}>{entries.map(card)}</div>
+											</div>
+										) : (
+											<div className={styles.cards}>{entries.map(card)}</div>
+										)}
+									</section>
+									{candidatesOpen && (
+										<section
+											className={styles.candidates}
+											aria-label={t('待确认候选')}
+										>
+											<h2 className={styles.label}>
+												{t('待确认候选（{{length}}）', {
+													length: proposals.length,
+												})}
+											</h2>
+											{!proposals.length && (
+												<p className={styles.empty}>{t('暂无待确认候选')}</p>
+											)}
+											{proposals.map((proposal) => (
+												<Candidate
+													key={proposal.id}
+													proposal={proposal}
+													bible={bible}
+													busy={busy}
+													resolve={(id, reason) => void resolve(id, reason)}
+												/>
+											))}
+										</section>
+									)}
+								</div>
 							</div>
-						</ScrollArea>
-					</>
+						</div>
+					</ScrollArea>
 				)}
 			</div>
 		</Page>

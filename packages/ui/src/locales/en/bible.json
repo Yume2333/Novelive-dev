@@ -1,5 +1,4 @@
 {
-	"{{label}}（{{length}}）": "{{label}} ({{length}})",
 	"{{label}}：{{before}} → {{after}}": "{{label}}: {{before}} → {{after}}",
 	"{{value}}：{{value2}}": "{{value}}: {{value2}}",
 	"。": ". ",
@@ -11,6 +10,8 @@
 	"伏笔": "Foreshadowing",
 	"作品写法": "Writing style",
 	"候选": "Candidates",
+	"候选与冲突 · {{length}} 项待处理": "Candidates & conflicts · {{length}} pending",
+	"候选与冲突 · 暂无待处理": "Candidates & conflicts · none pending",
 	"候选已过期，未修改已确认内容。": "The candidate expired, so no confirmed content was changed.",
 	"关系": "Relationships",
 	"关联角色": "Related characters",
@@ -22,6 +23,7 @@
 	"刷新": "Refresh",
 	"剧情变化": "Plot changes",
 	"卷 ID": "Volume ID",
+	"卷 {{volume}}": "Volume {{volume}}",
 	"原文写法": "Source-text wording",
 	"原文名字": "Source-text name",
 	"参考图": "Reference image",
