@@ -45,9 +45,9 @@ afterEach(async () => {
 	await rm(directory, { recursive: true, force: true })
 })
 
-async function fixture() {
+async function fixture(source = original) {
 	const sourcePath = join(directory, 'paper-boat.txt')
-	await writeFile(sourcePath, original)
+	await writeFile(sourcePath, source)
 	const imported = await importTxtProject({
 		sourcePath,
 		folder: directory,
@@ -59,7 +59,7 @@ async function fixture() {
 	return imported
 }
 
-function completion(payload: unknown) {
+function completion(payload: unknown, finish = 'stop') {
 	const content =
 		typeof payload === 'string' ? payload : JSON.stringify(payload)
 	const lines = [
@@ -72,7 +72,7 @@ function completion(payload: unknown) {
 				},
 			],
 		},
-		{ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] },
+		{ choices: [{ index: 0, delta: {}, finish_reason: finish }] },
 		{ choices: [], usage: { prompt_tokens: 10, completion_tokens: 5 } },
 	]
 	return new Response(
@@ -157,6 +157,147 @@ test('staging and portrait painting dispatch to their configured role models', a
 	expect(requests).toEqual(['fixture-art-fast', 'fixture-art-visual'])
 	expect(painterOutput).toBe(1024)
 })
+
+test.each([
+	'unknown',
+	'truncated',
+	'lower allowance',
+	'higher allowance',
+	'rejected patch',
+])(
+	'explicit staging retry reuses accepted scene and repair inputs after a %s reply',
+	async (failure) => {
+		const { projectDir, workId } = await fixture(
+			'第一章 纸船\n暮色中，一只纸船从桥下漂过。\n\n桥边的灯亮了。\n',
+		)
+		const config = createConfigStore(directory)
+		await config.update(configuration)
+		const models = await productionModels(config)
+		models.artist = {
+			...models.artist,
+			contextWindow: 4096,
+			maxOutputTokens: 256,
+		}
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', failure === 'higher allowance' ? '5' : '50')
+		vi.stubEnv('NL_RUN_ID', 'before-reopen')
+		vi.stubEnv('NL_REPLAY', '')
+		const chapterId = 'ch0001'
+		const prompts: string[] = []
+		const draws: string[] = []
+		let unavailable = true
+		const fetch: typeof globalThis.fetch = async (input, init) => {
+			const { messages } = await new Request(input, init).json()
+			prompts.push(JSON.stringify(messages))
+			if (failure === 'lower allowance' && prompts.length === 1)
+				return completion({
+					patch: 'PUT <4:\n@cg cg-window',
+					items: [{ id: 'cg-window', kind: 'cg', description: 'Window' }],
+					merges: {},
+				})
+			if (failure === 'rejected patch' && unavailable && prompts.length >= 2)
+				return completion({ patch: 'CUT 999', items: [], merges: {} })
+			if (prompts.length === 2) return completion('{')
+			if (unavailable && prompts.length >= 3)
+				return failure === 'truncated'
+					? completion('{', 'length')
+					: Response.json(
+							{ error: { message: 'Unavailable' } },
+							{ status: 503 },
+						)
+			if (failure === 'higher allowance' && !unavailable)
+				return completion({
+					patch: 'PUT <4:\n@bg room/day',
+					items: [{ id: 'room/day', kind: 'location', description: 'Day' }],
+					merges: {},
+				})
+			return completion({ patch: '', items: [], merges: {} })
+		}
+		async function scheduler(project: Project) {
+			const work = await project.read(projectFiles.work('v0001', workId))
+			const { worker } = chapterWorker(project, 'v0001', work, models, {
+				fetch,
+				spend: projectSpend(project.database),
+			})
+			return new ChapterScheduler(project.database, {
+				...worker,
+				async write() {},
+				async review() {},
+				async draw(job) {
+					draws.push(job.assetId)
+					return { status: 'drawn' }
+				},
+			})
+		}
+		const reservations = (project: Project) =>
+			project.database
+				.prepare(
+					'SELECT id, run_id, actual_tokens FROM spend_reservation ORDER BY id',
+				)
+				.all()
+		let before: ReturnType<typeof reservations>
+		{
+			using project = await Project.open(projectDir)
+			await project.writeFile(
+				`source/production/${chapterId}/draft.nvs`,
+				'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n\nscene 灯火\nsource p0002\n\n: 桥边的灯亮了。\n',
+			)
+			const queue = await scheduler(project)
+			try {
+				project.tasks.registerWork({ workId, title: 'Paper boat' })
+				queue.start(workId, [chapterId])
+				queue.confirmVisual(workId)
+				await queue.idle()
+				expect(prompts).toHaveLength(3)
+				expect(prompts[2]).toContain(
+					failure === 'rejected patch'
+						? 'Repair the staging patch and manifest'
+						: 'Repair the JSON manifest',
+				)
+				before = reservations(project)
+				expect(before.map(({ actual_tokens }) => actual_tokens)).toEqual([
+					15,
+					15,
+					failure === 'truncated' || failure === 'rejected patch' ? 15 : null,
+				])
+			} finally {
+				queue.dispose()
+			}
+		}
+		unavailable = false
+		vi.stubEnv('NL_RUN_ID', 'after-reopen')
+		if (failure === 'lower allowance') vi.stubEnv('NL_RUN_IMAGE_CAP', '5')
+		if (failure === 'higher allowance') vi.stubEnv('NL_RUN_IMAGE_CAP', '6')
+		using project = await Project.open(projectDir)
+		const queue = await scheduler(project)
+		try {
+			await queue.idle()
+			expect(prompts).toHaveLength(3)
+			expect(reservations(project)).toEqual(before)
+			if (failure === 'lower allowance') {
+				expect(chapterImageBudget(project.database, workId)).toBe(0)
+				expect(prompts[2]).toContain('Hard limit for this whole chapter: 45')
+				expect(prompts[2]).toContain('cg-window')
+			}
+			if (failure === 'higher allowance') {
+				expect(chapterImageBudget(project.database, workId)).toBe(1)
+				expect(prompts[2]).toContain('Hard limit for this whole chapter: 0')
+			}
+			queue.retryChapter(workId, chapterId)
+			await queue.idle()
+			expect(prompts.slice(3)).toEqual([prompts[2]])
+			const after = reservations(project)
+			expect(after.slice(0, 3)).toEqual(before)
+			expect(after.slice(3)).toEqual([
+				{ id: 4, run_id: 'after-reopen', actual_tokens: 15 },
+			])
+			expect(queue.snapshot(workId).chapters[0].status).toBe('published')
+			expect(draws).toEqual(failure === 'higher allowance' ? ['room/day'] : [])
+		} finally {
+			queue.dispose()
+		}
+	},
+)
 
 test('a painter format error after one repair materializes both base and variant placeholders before publication', async () => {
 	const { projectDir, workId } = await fixture()

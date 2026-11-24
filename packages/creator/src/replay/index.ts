@@ -5,9 +5,11 @@ import { setTimeout } from 'node:timers/promises'
 import { arr, compile, int, obj, opt, str } from '@earendil-works/pi-schema'
 import {
 	inheritTextSettlement,
+	isResponsesTerminal,
 	type projectSpend,
 	quoteSpend,
 	requestedOutputTokens,
+	textSettlement,
 } from '../usage/spend'
 
 export type ReplayMode = 'record' | 'replay' | 'strict'
@@ -33,6 +35,10 @@ export interface ReplayOptions {
 	ignoreRecordedFailures?: boolean
 	spend?: ReturnType<typeof projectSpend>
 	onReplay?: (request: Request) => Promise<void>
+	checkpointDirectory?: string
+	onCheckpointReply?: (save: () => Promise<void>) => void
+	checkpointAllowance?: { images?: number }
+	onCheckpointHit?: (allowance: ReplayOptions['checkpointAllowance']) => void
 }
 
 const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
@@ -69,6 +75,7 @@ const cassette = compile(
 		recordedAt: str(),
 		case: str(),
 		tags: arr(str()),
+		checkpointAllowance: opt(obj({ images: opt(int({ minimum: 0 })) })),
 	}),
 )
 
@@ -212,20 +219,31 @@ function modeFromEnvironment() {
 	throw new Error('Invalid NL_REPLAY mode')
 }
 
+export function usesReplyCheckpoint(options: ReplayOptions = {}) {
+	const mode = options.mode ?? modeFromEnvironment()
+	return mode !== 'strict'
+}
+
 function terminalSse(bytes: Buffer) {
 	const lines = bytes.toString('utf8').split(/\r\n|[\r\n]/)
 	let event = ''
 	let data: string[] = []
 	for (const line of lines.slice(0, -1)) {
 		if (!line) {
+			const payload = data.join('\n')
 			if (
-				data.join('\n') === '[DONE]' ||
+				payload === '[DONE]' ||
 				(data.length > 0 &&
-					/^(?:message_stop|response\.(?:completed|failed|incomplete))$/.test(
-						event,
-					))
+					(event === 'message_stop' || isResponsesTerminal(event)))
 			)
 				return true
+			if (payload) {
+				try {
+					if (isResponsesTerminal(JSON.parse(payload)?.type)) return true
+				} catch {
+					// Only a complete SSE event can terminate a recording.
+				}
+			}
 			event = ''
 			data = []
 		} else if (line.startsWith('event:')) {
@@ -299,6 +317,27 @@ function corruptImage(bytes: Uint8Array): Uint8Array {
 
 export function createReplayFetch(
 	options: ReplayOptions = {},
+): typeof globalThis.fetch {
+	const { checkpointDirectory, ...upstream } = options
+	return checkpointDirectory && usesReplyCheckpoint(upstream)
+		? replayFetch(
+				{
+					mode: 'record',
+					directory: checkpointDirectory,
+					reuseRecorded: true,
+					fetch: replayFetch(upstream),
+					onCheckpointReply: options.onCheckpointReply,
+					checkpointAllowance: options.checkpointAllowance,
+					onCheckpointHit: options.onCheckpointHit,
+				},
+				true,
+			)
+		: replayFetch(upstream)
+}
+
+function replayFetch(
+	options: ReplayOptions,
+	checkpoint = false,
 ): typeof globalThis.fetch {
 	const mode = options.mode ?? modeFromEnvironment()
 	const send = options.fetch ?? globalThis.fetch
@@ -388,6 +427,7 @@ export function createReplayFetch(
 			recordedAt: new Date().toISOString(),
 			case: options.case ?? '',
 			tags: options.tags ?? [],
+			...(checkpoint && { checkpointAllowance: options.checkpointAllowance }),
 		}
 		const write = pending.then(() =>
 			appendFile(index, `${JSON.stringify(row)}\n`),
@@ -397,7 +437,10 @@ export function createReplayFetch(
 	}
 
 	const dispatch: typeof fetch = async (input, init) => {
-		const request = new Request(input, init)
+		const request = new Request(
+			checkpoint && input instanceof Request ? input.clone() : input,
+			init,
+		)
 		const rebindIds =
 			options.rebindIds ?? process.env.NL_REPLAY_REBIND_IDS === '1'
 		const identity = await requestIdentity(
@@ -427,14 +470,18 @@ export function createReplayFetch(
 					.split('\n')
 					.filter(Boolean)
 					.map((line) => JSON.parse(line))
-				if (
-					recorded.some((row) => row.key === identity.key && row.status < 300)
+				const hit = recorded.find(
+					(row) => row.key === identity.key && row.status < 300,
 				)
-					return createReplayFetch({
+				if (hit) {
+					const response = await createReplayFetch({
 						...options,
 						mode: 'strict',
 						fallbackDirectory: undefined,
 					})(request)
+					if (checkpoint) options.onCheckpointHit?.(hit.checkpointAllowance)
+					return response
+				}
 			}
 			const recordSend = async (
 				admitted: Request,
@@ -455,22 +502,30 @@ export function createReplayFetch(
 				}
 				return spend ? sendAdmitted(input, admitted) : send(admitted)
 			}
-			const response = await (spend
-				? spend(request, recordSend)
-				: recordSend(request))
+			const response = await (checkpoint
+				? send(input, init)
+				: spend
+					? spend(request, recordSend)
+					: recordSend(request))
 			if (!response.body) {
-				await store(identity, response, Buffer.alloc(0))
+				if (!checkpoint) await store(identity, response, Buffer.alloc(0))
 				return response
 			}
+			const isSse = /^text\/event-stream(?:[;\s]|$)/i.test(
+				response.headers.get('content-type') ?? '',
+			)
+			const settled = textSettlement(response)
+			if (checkpoint && (!response.ok || !settled)) return response
 			const chunks: Buffer[] = []
 			const reader = response.body.getReader()
 			let cancelled = false
 			let writing: Promise<void> | undefined
 			const persist = (bytes: Buffer) =>
-				(writing ??= store(identity, response, bytes))
-			const isSse = /^text\/event-stream(?:[;\s]|$)/i.test(
-				response.headers.get('content-type') ?? '',
-			)
+				(writing ??= (async () => {
+					if (!checkpoint) return store(identity, response, bytes)
+					if (settled?.() && (!isSse || terminalSse(bytes)))
+						options.onCheckpointReply?.(() => store(identity, response, bytes))
+				})())
 			const stream = new ReadableStream<Uint8Array>(
 				{
 					async pull(controller) {
@@ -572,5 +627,5 @@ export function createReplayFetch(
 		return new Response(stream, { status: row.status, headers: row.headers })
 	}
 	if (spend && mode !== 'strict') spendGuardedFetches.add(dispatch)
-	return dispatch
+	return checkpoint ? inheritSpendGuard(send, dispatch) : dispatch
 }

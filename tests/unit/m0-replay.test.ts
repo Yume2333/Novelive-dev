@@ -16,6 +16,67 @@ const rowFile = 'cassette.jsonl'
 const stream =
 	'data: {"delta":"first"}\n\ndata: {"delta":"second"}\n\ndata: [DONE]\n\n'
 
+test('strict replay requires its own recording even when a project checkpoint matches', async () => {
+	const checkpointDirectory = join(directory, 'checkpoint')
+	const upstream = vi.fn(async () => new Response('checkpoint'))
+	const record = createReplayFetch({
+		mode: 'record',
+		directory: checkpointDirectory,
+		fetch: upstream,
+	})
+	await (await record(origin)).text()
+	const strict = createReplayFetch({
+		mode: 'strict',
+		directory,
+		checkpointDirectory,
+		fetch: upstream,
+	})
+	await expect(strict(origin)).rejects.toThrow(
+		'Missing strict replay cassette:',
+	)
+	expect(upstream).toHaveBeenCalledTimes(1)
+})
+
+test('non-strict replay checkpoints a settled live miss instead of paying for it again', async () => {
+	vi.stubEnv('NL_RUN_ID', 'checkpoint-miss')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '100000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	using database = new DatabaseSync(':memory:')
+	const body = 'data: {"usage":{"total_tokens":15}}\n\ndata: [DONE]\n\n'
+	const fetch = vi.fn(
+		async () =>
+			new Response(body, {
+				headers: { 'content-type': 'text/event-stream' },
+			}),
+	)
+	let save: (() => Promise<void>) | undefined
+	const replay = () =>
+		createReplayFetch({
+			mode: 'replay',
+			directory,
+			checkpointDirectory: join(directory, 'checkpoint'),
+			fetch,
+			spend: projectSpend(database),
+			onCheckpointReply: (callback) => {
+				save = callback
+			},
+		})
+	const request = () =>
+		new Request(origin + path, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ model: 'fixture', messages: [], max_tokens: 256 }),
+		})
+	expect(await (await replay()(request())).text()).toBe(body)
+	expect(save).toBeDefined()
+	await save?.()
+	expect(await (await replay()(request())).text()).toBe(body)
+	expect(fetch).toHaveBeenCalledTimes(1)
+	expect(
+		database.prepare('SELECT actual_tokens FROM spend_reservation').all(),
+	).toEqual([{ actual_tokens: 15 }])
+})
+
 test('normalized replay rebinds UUID-bearing chapter IDs in authored responses', async () => {
 	const oldId = '11111111-1111-4111-8111-111111111111'
 	const newId = '22222222-2222-4222-8222-222222222222'
@@ -551,6 +612,10 @@ test('strict misses fail closed; replay misses and the unset mode use the inject
 test.each([
 	['OpenAI Chat Completions', 'data: [DONE]\n\n'],
 	['OpenAI Responses', 'event: response.completed\r\ndata: {}\r\n\r\n'],
+	[
+		'OpenAI Responses without event name',
+		'data: {"type":"response.completed"}\n\n',
+	],
 	['Anthropic Messages', 'event: message_stop\ndata: {}\n\n'],
 	['partial event', 'data: [DONE]\n'],
 ])(

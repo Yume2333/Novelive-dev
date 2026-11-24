@@ -26,6 +26,10 @@ import { SpendBudgetError } from '../../usage/spend'
 import type { Dimensions } from './check'
 
 export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
+type JsonOptions = ModelOptions & {
+	maxTokens?: number
+	onUsableReply?: (save: () => Promise<void>) => void
+}
 
 export class ArtResponseFormatError extends Error {
 	constructor(
@@ -42,7 +46,7 @@ export async function artJson<T>(
 	connection: TextConnection,
 	prompt: string,
 	schema: Schema<T>,
-	options: ModelOptions & { maxTokens?: number },
+	options: JsonOptions,
 	images: readonly Buffer[] = [],
 	formatRepair: 'once' | 'caller' = 'once',
 ): Promise<T> {
@@ -221,11 +225,19 @@ async function requestArtJson<T>(
 	connection: TextConnection,
 	prompt: string,
 	schema: Schema<T>,
-	options: ModelOptions & { maxTokens?: number },
+	options: JsonOptions,
 	images: readonly Buffer[],
 ): Promise<T> {
 	const model = buildTextModel(connection, images.length > 0)
-	const replay = checkedReplay(createReplayFetch(options.replay))
+	let saveReply: (() => Promise<void>) | undefined
+	const replay = checkedReplay(
+		createReplayFetch({
+			...options.replay,
+			onCheckpointReply: (save) => {
+				saveReply = save
+			},
+		}),
+	)
 	const content = [
 		{ type: 'text' as const, text: prompt },
 		...images.map((png) => ({
@@ -258,6 +270,7 @@ async function requestArtJson<T>(
 	const text = response.content
 		.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 		.join('')
+	if (text.trim() && saveReply) options.onUsableReply?.(saveReply)
 	let value: unknown
 	try {
 		value = parseModelJson(text)

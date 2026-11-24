@@ -28,7 +28,11 @@ import {
 	type WritingProgress,
 	writeChapter,
 } from '../pipeline/writing'
-import { createReplayFetch, type ReplayOptions } from '../replay'
+import {
+	createReplayFetch,
+	type ReplayOptions,
+	usesReplyCheckpoint,
+} from '../replay'
 import {
 	ProductionTaskError,
 	type ProductionWorker,
@@ -43,6 +47,8 @@ import { resolveBible } from './series/resolve'
 
 const draft = (id: string) => `source/production/${id}/draft.nvs`
 const drawing = (id: string) => `source/production/art/${id}.json`
+const stagingJournal = (workId: string, chapterId: string) =>
+	join('.novelive', 'staging', workId, chapterId)
 
 export async function productionModels(
 	config: ReturnType<typeof createConfigStore>,
@@ -289,6 +295,14 @@ export function chapterWorker(
 				const journal = `source/production/${ctx.workId}/${ctx.chapterId}/writing-resume.json`
 				const clear = () => rm(join(project.root, journal), { force: true })
 				if (!ctx.resumingBudget) await clear()
+				if (usesReplyCheckpoint(replay))
+					await rm(
+						join(project.root, stagingJournal(ctx.workId, ctx.chapterId)),
+						{
+							recursive: true,
+							force: true,
+						},
+					)
 				const progress: WritingProgress = ctx.resumingBudget
 					? ((await existing(async () =>
 							JSON.parse((await project.readFile(journal)).toString('utf8')),
@@ -351,10 +365,35 @@ export function chapterWorker(
 				const service = art(ctx.signal)
 				const script = (await project.readFile(draft(ctx.chapterId))).toString()
 				const registry = await service.registry()
+				const journal = stagingJournal(ctx.workId, ctx.chapterId)
+				const directory = join(project.root, journal)
+				const checkpoint = usesReplyCheckpoint(replay)
+				const clearJournal = async () => {
+					if (checkpoint) await rm(directory, { recursive: true, force: true })
+				}
 				const limit = chapterImageBudget(project.database, work.workId)
+				const allowance = join(journal, 'allowance.json')
+				const saved = checkpoint
+					? await existing(async () => {
+							const value: unknown = JSON.parse(
+								(await project.readFile(allowance)).toString(),
+							)
+							if (
+								value === null ||
+								(typeof value === 'number' &&
+									Number.isSafeInteger(value) &&
+									value >= 0)
+							)
+								return value
+							throw new Error('Invalid staging checkpoint allowance')
+						})
+					: undefined
+				const stagingLimit = saved === undefined ? (limit ?? null) : saved
+				if (checkpoint && saved === undefined)
+					await project.writeFile(allowance, JSON.stringify(stagingLimit))
 				const previousBases = new Map<string, string>()
 				const reusedImages = new Set<string>()
-				if (limit !== undefined) {
+				if (limit !== undefined || stagingLimit !== null) {
 					const previousDraw = project.database.prepare(
 						"SELECT error_type FROM run WHERE work_id = ? AND kind = 'image' AND ref = ? ORDER BY rowid DESC LIMIT 1",
 					)
@@ -378,21 +417,21 @@ export function chapterWorker(
 							previousBases.set(entry.id, prior.job.baseAssetId)
 					}
 				}
+				const budget = (limit: number) => ({
+					limit,
+					previousBases,
+					reusedImages,
+					paragraphIds: chapter.paragraphs.map(({ id }) => id),
+					speakers: options.script.speakers,
+				})
 				const staged = await directChapterArt(script, bible, registry, {
 					main: models.artist,
-					replay,
+					replay: { ...replay, checkpointDirectory: directory },
 					customMarks: options.script.customMarks,
 					signal: ctx.signal,
-					imageBudget:
-						limit === undefined
-							? undefined
-							: {
-									limit,
-									previousBases,
-									reusedImages,
-									paragraphIds: chapter.paragraphs.map(({ id }) => id),
-									speakers: options.script.speakers,
-								},
+					imageBudget: limit === undefined ? undefined : budget(limit),
+					stagingImageBudget:
+						stagingLimit === null ? null : budget(stagingLimit),
 				})
 				ctx.signal.throwIfAborted()
 				if (staged.trimmed.length) ctx.recordStageTrim?.(staged.trimmed)
@@ -459,6 +498,7 @@ export function chapterWorker(
 					cg: updated.cg,
 					sceneIds,
 				})
+				await clearJournal()
 				return [...dependencies.values()]
 			}),
 		async isDrawn(_workId, job) {
