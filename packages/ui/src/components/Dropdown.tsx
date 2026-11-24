@@ -48,20 +48,22 @@ export function Dropdown({
 				Home: 0,
 				End: options.length - 1,
 			}[event.key]
+			if (event.key === 'Escape') {
+				event.preventDefault()
+				setOpen(false)
+				button.current?.focus()
+				return
+			}
 			if (index === -1) return
 			if (event.key === 'Tab') {
+				button.current?.focus()
 				setOpen(false)
 				return
 			}
 			if (next !== undefined) {
 				event.preventDefault()
 				options[next].focus()
-				return
 			}
-			if (event.key !== 'Escape') return
-			event.preventDefault()
-			setOpen(false)
-			button.current?.focus()
 		}
 		const close = () => setOpen(false)
 		const onScroll = (event: Event) => {
