@@ -1,5 +1,5 @@
 import type { ProductionSnapshot } from '@novelive/creator/contract'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert, CircleCheck, Clapperboard } from 'lucide-react'
 import { msg, scoped } from '../../i18n'
 import styles from './Production.module.css'
 
@@ -12,31 +12,36 @@ export const stepName = {
 	stage: msg('演出'),
 	draw: msg('出图'),
 }
+export const steps = Object.keys(stepName) as (keyof typeof stepName)[]
+
+export function stepProgress(chapter: Chapter) {
+	if (chapter.status === 'published') return 1
+	if (chapter.status !== 'producing') return 0
+	return (steps.indexOf(chapter.step) + 0.5) / steps.length
+}
 
 export function ChapterState({ chapter }: { chapter: Chapter }) {
-	const label = {
-		waiting: t('等待'),
-		producing: t('制作中'),
-		published: t('已发布'),
-	}[chapter.status]
 	return (
-		<div className={styles.actions}>
-			<span
-				className={
-					chapter.status === 'published' ? styles.published : styles.badge
-				}
-			>
-				{label}
-			</span>
-			{chapter.status === 'producing' && (
-				<span>{t(stepName[chapter.step])}</span>
+		<span className={styles.mark}>
+			{chapter.status === 'published' ? (
+				<>
+					<CircleCheck aria-hidden="true" size={13} />
+					<span>{t('已发布')}</span>
+				</>
+			) : (
+				<span className={styles.pill} data-status={chapter.status}>
+					{chapter.status === 'producing' && (
+						<Clapperboard aria-hidden="true" size={12} />
+					)}
+					{chapter.status === 'producing' ? t('制作中') : t('等待')}
+				</span>
 			)}
 			{chapter.issue && (
-				<span className={styles.issue}>
-					<CircleAlert aria-hidden="true" size={15} />
+				<span className={styles.attention} title={chapter.issue}>
+					<CircleAlert aria-hidden="true" size={13} />
 					{t('需要处理')}
 				</span>
 			)}
-		</div>
+		</span>
 	)
 }

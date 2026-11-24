@@ -97,9 +97,9 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			await page.getByRole('link', { name: '导入原文' }).click()
 			await page.getByRole('button', { name: '选择原文' }).click()
 			await page.getByRole('button', { name: '选择文件夹' }).click()
-			await page.getByRole('button', { name: '导入', exact: true }).click()
+			await page.getByRole('button', { name: '下一步', exact: true }).click()
 			await expect(
-				page.getByRole('heading', { name: '核对导入' }),
+				page.locator('[aria-current="step"]', { hasText: '核对信息' }),
 			).toBeVisible()
 			await capture(page, '01-import')
 			const project = join(projects, '纸船与灯火')
@@ -118,11 +118,12 @@ test('M1b make and play publishes through both confirmation points in real Elect
 				original,
 			)
 			await page.getByRole('button', { name: '跳过核对' }).click()
+			await page.getByRole('button', { name: '开始制作' }).click()
 			await page
 				.getByRole('link', { name: '选择主视觉' })
 				.click({ timeout: 25_000 })
 			await expect(
-				page.getByRole('heading', { name: '确认角色与主视觉' }),
+				page.getByRole('heading', { name: /角色设定 \/ 主视觉/ }),
 			).toBeVisible()
 			const visuals = page.getByRole('group', { name: '主视觉', exact: true })
 			const costume = page.getByRole('group', { name: /Ada/ })
@@ -592,8 +593,9 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 			await page.getByRole('link', { name: '导入原文' }).click()
 			await page.getByRole('button', { name: '选择原文' }).click()
 			await page.getByRole('button', { name: '选择文件夹' }).click()
-			await page.getByRole('button', { name: '导入', exact: true }).click()
+			await page.getByRole('button', { name: '下一步', exact: true }).click()
 			await page.getByRole('button', { name: '跳过核对' }).click()
+			await page.getByRole('button', { name: '开始制作' }).click()
 			await page
 				.getByRole('link', { name: '选择主视觉' })
 				.click({ timeout: 25_000 })

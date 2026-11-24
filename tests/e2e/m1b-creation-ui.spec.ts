@@ -120,7 +120,7 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			).toBeDisabled()
 			await confirm.click()
 			await expect(
-				page.getByRole('heading', { name: '制作', exact: true }),
+				page.getByRole('heading', { name: '白塔来信 · 制作', exact: true }),
 			).toBeVisible()
 			await expect(page.getByText('写剧本', { exact: true })).toBeVisible()
 			expect(await fixture.calls('production.confirmVisual')).toEqual([
