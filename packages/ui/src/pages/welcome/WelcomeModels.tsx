@@ -108,6 +108,7 @@ export function WelcomeModels({
 		value: string,
 		change: (value: string) => void,
 		secret = false,
+		placeholder?: string,
 	) {
 		return (
 			<label className={styles.modelField}>
@@ -115,6 +116,7 @@ export function WelcomeModels({
 				<input
 					className="nl-input"
 					type={secret ? 'password' : 'text'}
+					placeholder={placeholder}
 					value={value}
 					autoComplete={secret ? 'new-password' : 'off'}
 					onFocus={(event) => {
@@ -151,13 +153,13 @@ export function WelcomeModels({
 							}}
 						/>
 					</div>
-					{field(t('接口地址'), baseUrl, setBaseUrl)}
+					{field(t('接口地址'), baseUrl, setBaseUrl, false, 'https://…')}
 				</div>
-				{field('API Key', apiKey, setApiKey, true)}
+				{field('API KEY', apiKey, setApiKey, true, 'sk-…')}
 				<div className={styles.modelTest}>
 					<Button size="sm" onClick={() => void save(true)} loading={busy}>
 						<Cable size={14} aria-hidden="true" />
-						{t('测试')}
+						{t('测试连接')}
 					</Button>
 					{tested && (
 						<span role="status">
@@ -169,8 +171,13 @@ export function WelcomeModels({
 				<div className={styles.modelGrid}>
 					{slots.map(([slot, title]) => (
 						<div key={slot}>
-							{field(t(title), names[slot], (value) =>
-								setNames((previous) => ({ ...previous, [slot]: value })),
+							{field(
+								t(title),
+								names[slot],
+								(value) =>
+									setNames((previous) => ({ ...previous, [slot]: value })),
+								false,
+								t('模型名'),
 							)}
 						</div>
 					))}
@@ -181,15 +188,22 @@ export function WelcomeModels({
 						image.baseUrl,
 						(value) =>
 							setImage((previous) => ({ ...previous, baseUrl: value })),
-					)}
-					{field(t('模型名'), image.model, (value) =>
-						setImage((previous) => ({ ...previous, model: value })),
+						false,
+						'https://…/v1',
 					)}
 					{field(
-						'API Key',
+						t('模型名'),
+						image.model,
+						(value) => setImage((previous) => ({ ...previous, model: value })),
+						false,
+						t('模型名'),
+					)}
+					{field(
+						'API KEY',
 						image.apiKey,
 						(value) => setImage((previous) => ({ ...previous, apiKey: value })),
 						true,
+						'sk-…',
 					)}
 				</div>
 			</fieldset>
