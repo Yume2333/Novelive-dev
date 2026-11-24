@@ -371,6 +371,16 @@ test.each(scenarios)(
 				expect(reviews[0].tokens).not.toBeNull()
 				expect(reviews[denied + 1].requestKey).toBe(reviews[denied].requestKey)
 				expect(reviews[denied + 1].tokens).not.toBeNull()
+				expect(
+					project.database
+						.prepare(
+							"SELECT COUNT(*) AS requests, SUM(usage_input + usage_output + usage_cache_read + usage_cache_write) AS tokens FROM usage WHERE purpose = 'review'",
+						)
+						.get(),
+				).toEqual({
+					requests: reviews.length,
+					tokens: reviews.reduce((sum, row) => sum + (row.tokens ?? 0), 0),
+				})
 			}
 			for (const failed of relay.admissions.filter(
 				({ fault }) =>
@@ -401,16 +411,20 @@ test.each(scenarios)(
 			for (let i = 1; i <= window; i++) {
 				const run = `offline-${i}`
 				const rows = ledger.filter(({ run_id }) => run_id === run)
-				const logged = (await readFile(join(root, `usage-${i}.csv`), 'utf8'))
+				const csv = (await readFile(join(root, `usage-${i}.csv`), 'utf8'))
 					.trimEnd()
 					.split('\n')
-					.map((line) => {
-						const [, , , tokens, images] = line.split(',')
-						return pair(
-							tokens ? Number(tokens) : null,
-							images ? Number(images) : null,
-						)
-					})
+				if (faults.includes('review-rate-limit'))
+					expect(
+						csv.filter((line) => line.split(',')[1] === 'review'),
+					).toHaveLength(reviews.filter((row) => row.run === run).length)
+				const logged = csv.map((line) => {
+					const [, , , tokens, images] = line.split(',')
+					return pair(
+						tokens ? Number(tokens) : null,
+						images ? Number(images) : null,
+					)
+				})
 				expect(logged.sort()).toEqual(
 					relay.admissions
 						.filter((entry) => entry.run === run)

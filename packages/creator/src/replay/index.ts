@@ -43,9 +43,14 @@ export interface ReplayOptions {
 
 const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
 const dispatchedRequests = new WeakSet<Request>()
+const checkpointReplies = new WeakSet<Response>()
 
 export function wasDispatched(request: Request) {
 	return dispatchedRequests.has(request)
+}
+
+export function isCheckpointReply(response: Response) {
+	return checkpointReplies.has(response)
 }
 
 export function isSpendGuardedFetch(fetch: typeof globalThis.fetch) {
@@ -479,7 +484,10 @@ function replayFetch(
 						mode: 'strict',
 						fallbackDirectory: undefined,
 					})(request)
-					if (checkpoint) options.onCheckpointHit?.(hit.checkpointAllowance)
+					if (checkpoint) {
+						checkpointReplies.add(response)
+						options.onCheckpointHit?.(hit.checkpointAllowance)
+					}
 					return response
 				}
 			}
