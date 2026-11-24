@@ -58,15 +58,16 @@ test('strict replay reproduces image admissions and selects the budget-specific 
 		database.exec(
 			"CREATE TABLE chapter (work_id TEXT, user_state TEXT); INSERT INTO chapter VALUES ('w', 'producing')",
 		)
-	const upstream = vi.fn(async (request: Request) =>
-		request.url.endsWith('/generations')
+	const upstream = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const request = new Request(input, init)
+		return request.url.endsWith('/generations')
 			? Response.json({ data: [{ b64_json: 'aQ==' }, { b64_json: 'aQ==' }] })
 			: Response.json({
 					patch: (await request.text()).includes('chapter: 9 ')
 						? 'nine'
 						: 'eleven',
-				}),
-	)
+				})
+	})
 	const request = (limit: number, script = 'scene first') =>
 		new Request(origin + path, {
 			method: 'POST',
