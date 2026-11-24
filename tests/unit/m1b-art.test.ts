@@ -1978,6 +1978,54 @@ ada: One. #0010
 	expect(fit?.items).toEqual([])
 })
 
+test('opens on the scene-local retained background when its inherited backdrop was folded', () => {
+	const fit = trimStagingToBudget(
+		{
+			script: `scene First
+source p0001
+
+@bg hall/day
+@bg hall/day
+@bg shared/day
+ada: One. #0010
+
+scene Second
+source p0002
+
+ada: Two. #0020
+@bg garden/day
+@bg garden/day
+ada: Three. #0030
+`,
+			items: ['hall/day', 'shared/day', 'garden/day'].map((id) => ({
+				id,
+				kind: 'location',
+				description: id,
+			})),
+			merges: {},
+		},
+		bible,
+		empty,
+		{ limit: 2, previousBases: new Map(), reusedImages: new Set() },
+		(script, { entries }) => {
+			const compiled = compileScript(script, {
+				assets: entries,
+				paragraphIds: ['p0001', 'p0002'],
+				speakers: ['ada'],
+			})
+			return compiled.ok ? compiled.scenes : undefined
+		},
+	)
+	expect(fit?.trimmed).toEqual([
+		{ id: 'shared/day', replacement: 'hall/day' },
+		{ id: 'shared/day', replacement: 'garden/day' },
+	])
+	expect(fit?.script).toContain('@bg hall/day\nada: One.')
+	expect(fit?.script).toContain(
+		'source p0002\n\n@bg garden/day none\nada: Two.',
+	)
+})
+
 test('reports the remaining image and base counts after an unsuccessful trim', async () => {
 	const response = JSON.stringify({
 		patch: 'PUT <4:\n@bg room/day\n@cg cg-window',

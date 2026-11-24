@@ -103,6 +103,7 @@ export function trimStagingToBudget(
 		state: NonNullable<ReturnType<typeof evaluate>>,
 		changes: StageTrim[],
 		sceneReplacements?: readonly ReadonlyMap<string, string>[],
+		openings?: ReadonlyMap<number, string>,
 	) {
 		const { plan, entries, scenes, actions, newImages } = state
 		const replacements = new Map(
@@ -140,6 +141,9 @@ export function trimStagingToBudget(
 					lines,
 				)
 		else remapScript(original, actions, replacements, lines)
+		if (openings)
+			for (const [line, id] of openings)
+				lines[line - 1] = `@bg ${id} none\n${lines[line - 1]}`
 		const next = {
 			script: lines.join('\n'),
 			items,
@@ -238,35 +242,41 @@ export function trimStagingToBudget(
 		let activeBackground: string | undefined
 		const backgrounds = scenes.map(({ beats }) => {
 			const counts = new Map<string, number>()
+			const inherited =
+				beats[0] && !beats[0].actions.some(({ name }) => name === 'bg')
+					? activeBackground
+					: undefined
 			function countBase(id: string | undefined) {
 				if (id && entries.get(id)?.type === 'location')
 					counts.set(id, (counts.get(id) ?? 0) + 1)
 			}
-			for (const [index, { actions }] of beats.entries()) {
+			countBase(inherited)
+			for (const { actions } of beats) {
 				const cues = actions.filter(({ name }) => name === 'bg')
-				if (index === 0 && !cues.length) countBase(activeBackground)
 				for (const { assets } of cues) {
 					activeBackground = assets[0]?.id
 					countBase(activeBackground)
 				}
 			}
-			return counts
+			return { counts, inherited }
 		})
 		const choices = newImages
 			.filter((id) => entries.get(id)?.type === 'location')
 			.sort((a, b) => (counts.get(a) ?? 0) - (counts.get(b) ?? 0) || byId(a, b))
 		let folded = false
 		for (const id of choices) {
-			if (!backgrounds.some((scene) => scene.has(id))) continue
+			if (!backgrounds.some(({ counts }) => counts.has(id))) continue
 			const replacements: Map<string, string>[] = []
+			const openings = new Map<number, string>()
+			let remappedBackground: string | undefined
 			for (const [index, scene] of scenes.entries()) {
-				const local = backgrounds[index]
+				const { counts: local, inherited } = backgrounds[index]
+				const actions = sceneActions(scene)
 				if (local.size === 1 && local.has(id)) break
 				const remap = new Map<string, string>()
 				if (
-					sceneActions(scene).some(({ assets }) =>
-						assets.some((asset) => asset.id === id),
-					)
+					inherited === id ||
+					actions.some(({ assets }) => assets.some((asset) => asset.id === id))
 				) {
 					const replacement = [...local.keys()]
 						.filter((other) => other !== id)
@@ -275,6 +285,16 @@ export function trimStagingToBudget(
 						)[0]
 					if (!replacement) break
 					remap.set(id, replacement)
+					if (inherited === id && replacement !== remappedBackground) {
+						openings.set(scene.scene.lines[0].line, replacement)
+						remappedBackground = replacement
+					}
+				}
+				for (const { name, assets } of actions) {
+					if (name === 'bg') {
+						const asset = assets[0]?.id
+						remappedBackground = asset === id ? remap.get(id) : asset
+					}
 				}
 				replacements.push(remap)
 			}
@@ -282,7 +302,7 @@ export function trimStagingToBudget(
 			const changes = [
 				...new Set(replacements.flatMap((map) => [...map.values()])),
 			].map((replacement) => ({ id, replacement }))
-			const next = attempt(current, changes, replacements)
+			const next = attempt(current, changes, replacements, openings)
 			if (!next) continue
 			current = next
 			folded = true
