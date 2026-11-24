@@ -114,6 +114,21 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const mustResume = process.env.NL_OWNER_BOOK_EXPECT_RESUME === '1'
 		const checkpointSource = process.env.NL_OWNER_BOOK_SELECTION_SOURCE
 		const runDirectory = process.env.NL_OWNER_BOOK_RUN_DIR
+		const ballotSource = process.env.NL_OWNER_BOOK_BALLOT_SOURCE
+		const rounds = Number(process.env.NL_OWNER_BOOK_SELECTION_ROUNDS ?? 1)
+		const minimumVotes = Number(
+			process.env.NL_OWNER_BOOK_SELECTION_MIN_VOTES ??
+				Math.floor(rounds / 2) + 1,
+		)
+		if (
+			!Number.isSafeInteger(rounds) ||
+			rounds < 1 ||
+			!Number.isSafeInteger(minimumVotes) ||
+			minimumVotes < 1 ||
+			minimumVotes > rounds
+		)
+			throw new Error('Invalid W4 selection round count or vote threshold')
+		const selectionConsensus = rounds > 1 ? { rounds, minimumVotes } : undefined
 		const dryRun = process.env.NL_OWNER_BOOK_SELECTION_STUB
 		const batch = process.env.NL_OWNER_BOOK_SELECTION_BATCH === '1'
 		const ledger = process.env.NL_USAGE_LEDGER
@@ -141,6 +156,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			throw new Error(
 				'Selection-only requires a separate run directory and cannot resume extraction',
 			)
+		if (ballotSource && (!checkpointSource || !selectionConsensus || dryRun))
+			throw new Error('Ballot replay requires consensus and a saved extraction')
 		const recorded: { volumeId: string; runs: WholeBookRun[] } = JSON.parse(
 			await readFile(join(fixtures, 'whole-runs.json'), 'utf8'),
 		)
@@ -416,13 +433,23 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			ignoreRecordedFailures: true,
 			fetch: upstream,
 		})
+		const ballotFetch =
+			selectionConsensus && checkpointSource
+				? createReplayFetch({
+						directory: join(ballotSource ?? run, 'selection-cassette'),
+						case: 'm1a-owner-book-selection',
+						...(ballotSource
+							? { mode: 'strict' }
+							: { mode: 'record', fetch: paid, reuseRecorded: true }),
+					})
+				: upstream
 		const fetchReplay: typeof globalThis.fetch = async (input, init) => {
 			const request = new Request(input, init)
 			if (checkpointSource) {
 				checkOwnerBookResumePrompt(
 					(await request.clone().json()).messages[0]?.content,
 				)
-				return dryRun ? paid(request) : upstream(request)
+				return dryRun ? paid(request) : ballotFetch(request)
 			}
 			if (expectedResume) {
 				const prompt = (await request.clone().json()).messages[0]?.content
@@ -441,6 +468,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			synthesisConnection: eventConnection,
 			selectionConnection,
 			selectionTargets,
+			selectionConsensus,
 			requestTimeoutMs: timeoutFor(selectionConnection),
 			language,
 			strategy: 'events' as const,
@@ -546,13 +574,13 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				expect(chapterIds).toHaveLength(7)
 				const files = synthesisFiles(volumeId)
 				phase =
-					'run model validation (use a new run directory if the saved models differ or are unknown)'
+					'run model and selection validation (use a new run directory if the saved settings differ or are unknown)'
 				const saved = await first.read(files.checkpoint).catch((error) => {
 					if (error.code !== 'ENOENT') throw error
 				})
 				await bindOwnerBookRunModels(
 					join(run, 'models.json'),
-					{ synthesisModel, selectionModel },
+					{ synthesisModel, selectionModel, selectionConsensus },
 					Boolean(
 						saved &&
 							(saved.applied ||
@@ -677,6 +705,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					events: checkpoint.events.length,
 					synthesisModel,
 					selectionModel,
+					...(selectionConsensus && { selectionConsensus }),
 					...score,
 					confirmedIntact,
 					restartRequests,
@@ -689,6 +718,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 						volumeId,
 						model: synthesisModel,
 						...(selectionModel !== synthesisModel ? { selectionModel } : {}),
+						...(selectionConsensus && { selectionConsensus }),
 						biblePatch: chunked.biblePatch,
 						glossaryPatch: chunked.glossaryPatch,
 					},

@@ -1254,6 +1254,75 @@ test.each([
 	},
 )
 
+test.each([3, 4])(
+	'keeps candidates with at least %i of five saved ballots and resumes at the next ballot',
+	async (minimumVotes) => {
+		await seed(root)
+		const controller = new AbortController()
+		const ballots = [[1, 2], [1, 3], [2, 3], [1, 3], [1]]
+		const rounds: number[] = []
+		const args = {
+			...options,
+			strategy: 'events' as const,
+			selectionConsensus: { rounds: 5, minimumVotes },
+		}
+		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+			const request = new Request(input, init)
+			const { messages } = await request.clone().json()
+			const prompt: string = messages[0].content
+			if (!candidatePositions(prompt)) return selectionFixture(request)
+			const round = Number(
+				/Independent selection ballot (\d+) of 5/.exec(prompt)?.[1],
+			)
+			expect(round).toBe(rounds.length + 1)
+			rounds.push(round)
+			return stream({ keep: ballots[round - 1] })
+		})
+		{
+			using project = await Project.open(root)
+			const write = project.write.bind(project)
+			vi.spyOn(project, 'write').mockImplementation(async (file, value) => {
+				await write(file, value)
+				if (
+					file.path === files.checkpoint.path &&
+					(value as { selections?: unknown[] }).selections?.length === 2
+				)
+					controller.abort(new Error('Stop after two saved ballots'))
+			})
+			await expect(
+				synthesizeVolume(project, 'v1', chapters, {
+					...args,
+					fetch,
+					signal: controller.signal,
+				}),
+			).rejects.toThrow('Stop after two saved ballots')
+			expect(await project.read(files.checkpoint)).toMatchObject({
+				selections: ballots.slice(0, 2),
+				applied: false,
+			})
+		}
+		let result: Awaited<ReturnType<typeof synthesizeVolume>>
+		{
+			using project = await Project.open(root)
+			result = await synthesizeVolume(project, 'v1', chapters, {
+				...args,
+				fetch,
+			})
+			expect(result.biblePatch.map(({ entry }) => entry.id)).toEqual(['guide'])
+			expect(result.glossaryPatch.map(({ id }) => id)).toEqual(
+				minimumVotes === 3 ? ['seal'] : [],
+			)
+			expect(rounds).toEqual([1, 2, 3, 4, 5])
+			expect(fetch).toHaveBeenCalledTimes(6)
+		}
+		using project = await Project.open(root)
+		expect(
+			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
+		).toEqual(result)
+		expect(fetch).toHaveBeenCalledTimes(6)
+	},
+)
+
 test('splits an oversized kind and resumes at the next global range', async () => {
 	await seed(root)
 	using project = await Project.open(root)

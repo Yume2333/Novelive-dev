@@ -2,7 +2,11 @@ import { readFile, writeFile } from 'node:fs/promises'
 
 export async function bindOwnerBookRunModels(
 	path: string,
-	models: { synthesisModel: string; selectionModel: string },
+	models: {
+		synthesisModel: string
+		selectionModel: string
+		selectionConsensus?: { rounds: number; minimumVotes: number }
+	},
 	hasSavedSelection: boolean,
 ) {
 	const stored = await readFile(path, 'utf8').catch((error) => {

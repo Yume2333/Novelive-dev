@@ -140,6 +140,7 @@ export interface SynthesisOptions {
 	connection: TextConnection
 	selectionConnection?: TextConnection
 	selectionTargets?: Readonly<Partial<Record<SelectionGroup['kind'], number>>>
+	selectionConsensus?: { rounds: number; minimumVotes?: number }
 	language: string
 	requirements?: string
 	strategy?: 'auto' | 'whole' | 'events'
@@ -494,6 +495,19 @@ export async function synthesizeVolume(
 	)
 		throw new Error('Synthesis event limit must be a positive integer')
 	const strategy = options.strategy ?? 'auto'
+	const rounds = options.selectionConsensus?.rounds ?? 1
+	const minimumVotes =
+		options.selectionConsensus?.minimumVotes ?? Math.floor(rounds / 2) + 1
+	if (
+		!Number.isSafeInteger(rounds) ||
+		rounds < 1 ||
+		!Number.isSafeInteger(minimumVotes) ||
+		minimumVotes < 1 ||
+		minimumVotes > rounds
+	)
+		throw new Error(
+			'Selection consensus needs positive rounds and a vote threshold within that range',
+		)
 	const incremental = options.incremental ?? false
 	const files = synthesisFiles(volumeId)
 	const provenance = await seriesChapterIds(project, volumeId, chapterIds)
@@ -987,7 +1001,7 @@ ${packets[packet]}`
 			)
 			return { kind, first, last: position, target, lines }
 		})
-		const promptFor = (scopes: typeof numbered) => {
+		const promptFor = (scopes: typeof numbered, round = rounds) => {
 			const targets = scopes.flatMap(({ kind, target }) =>
 				target === undefined ? [] : [`${kind}: ${target}`],
 			)
@@ -999,7 +1013,7 @@ ${packets[packet]}`
 			return `${instructions}
 ${selection.instructions}
 Select from these canonical candidates across the whole volume. Compare evidence from early and late chapters. Observations are evidence about the same entry, not separate choices. Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
-${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. Judge inclusion before counting. Cover distinct plot threads across the volume, not each stage of the same incident. ${guidance} Do not stop at the target if a distinct candidate still meets the inclusion criteria. You may exceed a kind's target only with a justification. In justifications, give each over-target kind and what distinct facts the extra entries preserve.\n` : ''}Respond with only the JSON object, with no commentary before or after it.
+${rounds > 1 ? `Independent selection ballot ${round} of ${rounds}; judge the candidates on their evidence.\n` : ''}${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. Judge inclusion before counting. Cover distinct plot threads across the volume, not each stage of the same incident. ${guidance} Do not stop at the target if a distinct candidate still meets the inclusion criteria. You may exceed a kind's target only with a justification. In justifications, give each over-target kind and what distinct facts the extra entries preserve.\n` : ''}Respond with only the JSON object, with no commentary before or after it.
 Chapter progress:
 ${progress}
 Candidates:
@@ -1041,13 +1055,15 @@ ${scopes.flatMap(({ lines }) => lines).join('\n')}`
 			]),
 		)
 		const targeted = numbered.some(({ target }) => target !== undefined)
-		const plan = hash(
+		const selectionKey =
 			targeted || selector.id !== model.id
 				? [targeted ? targetedSelectionVersion : 0, selector.id, ranges]
-				: ranges,
+				: ranges
+		const plan = hash(
+			rounds === 1 ? selectionKey : [selectionKey, rounds, minimumVotes],
 		)
 		const previousSameModelPlan =
-			targeted && selector.id === model.id
+			rounds === 1 && targeted && selector.id === model.id
 				? hash([targetedSelectionVersion, ranges])
 				: undefined
 		if (
@@ -1057,68 +1073,77 @@ ${scopes.flatMap(({ lines }) => lines).join('\n')}`
 		)
 			state.selections = []
 		state.selectionPlan = plan
-		const kept = new Set<number>()
-		const keptByKind = new Map<SelectionGroup['kind'], number>()
-		for (const [index, batch] of batches.entries()) {
-			const scopes = batch.map((scope) => ({
-				...scope,
-				target:
-					scope.target === undefined
-						? undefined
-						: Math.max(0, scope.target - (keptByKind.get(scope.kind) ?? 0)),
-			}))
-			const { first } = scopes[0]
-			const { last } = scopes[scopes.length - 1]
-			let keep = state.selections?.[index]
-			if (!keep) {
-				const answer = await request(
-					promptFor(scopes),
-					selection,
-					(value) => {
-						if (
-							new Set(value.keep).size !== value.keep.length ||
-							value.keep.some((n) => n < first || n > last)
-						)
-							throw new Error(
-								`keep must list distinct candidate numbers from ${first} to ${last}`,
-							)
-						for (const scope of scopes) {
-							const { kind, target } = scope
+		async function selectRound(round: number) {
+			const kept = new Set<number>()
+			const keptByKind = new Map<SelectionGroup['kind'], number>()
+			for (const [index, batch] of batches.entries()) {
+				const scopes = batch.map((scope) => ({
+					...scope,
+					target:
+						scope.target === undefined
+							? undefined
+							: Math.max(0, scope.target - (keptByKind.get(scope.kind) ?? 0)),
+				}))
+				const { first } = scopes[0]
+				const { last } = scopes[scopes.length - 1]
+				let keep = state.selections?.[(round - 1) * batches.length + index]
+				if (!keep) {
+					const answer = await request(
+						promptFor(scopes, round),
+						selection,
+						(value) => {
 							if (
-								target !== undefined &&
-								value.keep.filter((n) => n >= scope.first && n <= scope.last)
-									.length > target &&
-								!value.justifications?.some(
-									(item) => item.kind === kind && item.reason.trim(),
-								)
+								new Set(value.keep).size !== value.keep.length ||
+								value.keep.some((n) => n < first || n > last)
 							)
 								throw new Error(
-									`Justify keeping more than ${target} ${kind} candidates`,
+									`keep must list distinct candidate numbers from ${first} to ${last}`,
 								)
-						}
-					},
-					undefined,
-					{
-						connection: options.selectionConnection,
-						requestModel: selector,
-						inputBudget: selectionBudget,
-						requestOutputLimit: selectionOutput,
-					},
-				)
-				keep = answer.keep
-				state.selections = [...(state.selections ?? []), keep]
-				state.selectionVersion = selectionVersion
-				await project.write(files.checkpoint, state)
+							for (const scope of scopes) {
+								const { kind, target } = scope
+								if (
+									target !== undefined &&
+									value.keep.filter((n) => n >= scope.first && n <= scope.last)
+										.length > target &&
+									!value.justifications?.some(
+										(item) => item.kind === kind && item.reason.trim(),
+									)
+								)
+									throw new Error(
+										`Justify keeping more than ${target} ${kind} candidates`,
+									)
+							}
+						},
+						undefined,
+						{
+							connection: options.selectionConnection,
+							requestModel: selector,
+							inputBudget: selectionBudget,
+							requestOutputLimit: selectionOutput,
+						},
+					)
+					keep = answer.keep
+					state.selections = [...(state.selections ?? []), keep]
+					state.selectionVersion = selectionVersion
+					await project.write(files.checkpoint, state)
+				}
+				for (const n of keep) kept.add(n)
+				for (const { kind, first, last } of scopes)
+					keptByKind.set(
+						kind,
+						(keptByKind.get(kind) ?? 0) +
+							keep.filter((n) => n >= first && n <= last).length,
+					)
 			}
-			for (const n of keep) kept.add(n)
-			for (const { kind, first, last } of scopes)
-				keptByKind.set(
-					kind,
-					(keptByKind.get(kind) ?? 0) +
-						keep.filter((n) => n >= first && n <= last).length,
-				)
+			return kept
 		}
-		return kept
+		const votes = new Map<number, number>()
+		for (let round = 1; round <= rounds; round++)
+			for (const n of await selectRound(round))
+				votes.set(n, (votes.get(n) ?? 0) + 1)
+		return new Set(
+			[...votes].flatMap(([n, count]) => (count >= minimumVotes ? [n] : [])),
+		)
 	}
 	const selectedPatch = state.selectedPatch ?? (await selectPatch())
 	const { biblePatch, glossaryPatch } = selectedPatch
