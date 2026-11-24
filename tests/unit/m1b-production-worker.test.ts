@@ -1220,6 +1220,8 @@ async function verifyFreshCandidates(returnUrl: boolean) {
 test.each([false, true])(
 	'drawing tasks claim distinct legacy replies and reuse them on audit retry (%s)',
 	async (retryAudit) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
 		const { projectDir, workId } = await fixture()
 		using project = await Project.open(projectDir)
 		const work = await project.read(projectFiles.work('v0001', workId))
@@ -1254,7 +1256,7 @@ test.each([false, true])(
 			'v0001',
 			work,
 			await productionModels(config),
-			{ fetch },
+			{ fetch, spend: projectSpend(project.database) },
 		)
 		const service = art()
 		const [seed, ...jobs] = await service.register(
