@@ -361,6 +361,17 @@ test.describe('M3 player controls', () => {
 			await expect(text()).toHaveText('第二章开始。')
 			await menu()
 			await page.getByRole('button', { name: '历史记录', exact: true }).click()
+			await expect(page.locator('.nl-history-chapter')).toHaveCount(2)
+			await expect(
+				page
+					.getByRole('region', { name: /晨光/ })
+					.getByRole('button', { name: '3. 第二章开始。', exact: true }),
+			).toBeVisible()
+			await expect(
+				page
+					.getByRole('region', { name: /晨光/ })
+					.getByRole('button', { name: '1. 你好，世界。', exact: true }),
+			).toHaveCount(0)
 			await page
 				.getByRole('button', { name: '1. 你好，世界。', exact: true })
 				.click()

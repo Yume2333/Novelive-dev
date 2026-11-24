@@ -87,5 +87,6 @@
 	"返回菜单": "Back to menu",
 	"这些存档无法在当前版本读取，可以保留或删除。": "These saves can't be read in the current version. You can keep or delete them.",
 	"隐藏": "Hide",
-	"隐藏界面": "Hide UI"
+	"隐藏界面": "Hide UI",
+	"第 {{index}} 章 · {{title}}": "Chapter {{index}} · {{title}}"
 }

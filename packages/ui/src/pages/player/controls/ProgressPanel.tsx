@@ -28,17 +28,24 @@ export interface ProgressControlsProps {
 	onHistoryStep(direction: 'back' | 'forward'): void
 }
 
+interface HistoryChapter {
+	chapterId: string
+	title: string
+}
+
 export function ProgressPanel({
 	view,
 	workId,
 	progress,
 	history,
+	chapters,
 	legacySaves,
 	onSlot,
 	onHistory,
 	onHistoryStep,
 }: ProgressControlsProps & {
 	view: 'save' | 'load' | 'history'
+	chapters: readonly HistoryChapter[]
 	onSlot(slot: SaveSlot): void
 }) {
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
@@ -51,6 +58,27 @@ export function ProgressPanel({
 		occurrences.set(position, occurrence)
 		return { snapshot, key: `${position}-${occurrence}` }
 	})
+	const historyGroups: {
+		chapterId: string
+		rows: ((typeof historyEntries)[number] & { index: number })[]
+	}[] = []
+	historyEntries.forEach((entry, index) => {
+		const chapterId = entry.snapshot.position.chapterId
+		const last = historyGroups.at(-1)
+		if (last?.chapterId === chapterId) last.rows.push({ ...entry, index })
+		else historyGroups.push({ chapterId, rows: [{ ...entry, index }] })
+	})
+	const chapterLabel = (chapterId: string) => {
+		const order = chapters.findIndex(
+			(chapter) => chapter.chapterId === chapterId,
+		)
+		return order === -1
+			? chapterId
+			: t('第 {{index}} 章 · {{title}}', {
+					index: order + 1,
+					title: chapters[order].title,
+				})
+	}
 	useEffect(() => {
 		if (view === 'history') return
 		let cancelled = false
@@ -99,27 +127,38 @@ export function ProgressPanel({
 					</button>
 				</div>
 				{history.entries.length ? (
-					<div className="nl-history-list">
-						{historyEntries.map(({ snapshot, key }, index) => (
-							<button
-								type="button"
-								key={key}
-								className="nl-history-row"
-								aria-current={index === history.cursor ? 'step' : undefined}
-								onClick={() => onHistory(index)}
+					<div className="nl-history-groups">
+						{historyGroups.map(({ chapterId, rows }) => (
+							<section
+								key={rows[0].key}
+								className="nl-history-list"
+								aria-label={chapterLabel(chapterId)}
 							>
-								{snapshot.stage.text.displayName && (
-									<span className="nl-history-speaker" aria-hidden="true">
-										{snapshot.stage.text.displayName}
-									</span>
-								)}
-								<span className="nl-history-text">
-									<span className="nl-history-index">{index + 1}.</span>{' '}
-									{snapshot.stage.text.content
-										.map((part) => (part.type === 'text' ? part.text : ''))
-										.join('')}
-								</span>
-							</button>
+								<h3 className="nl-history-chapter">
+									{chapterLabel(chapterId)}
+								</h3>
+								{rows.map(({ snapshot, key, index }) => (
+									<button
+										type="button"
+										key={key}
+										className="nl-history-row"
+										aria-current={index === history.cursor ? 'step' : undefined}
+										onClick={() => onHistory(index)}
+									>
+										{snapshot.stage.text.displayName && (
+											<span className="nl-history-speaker" aria-hidden="true">
+												{snapshot.stage.text.displayName}
+											</span>
+										)}
+										<span className="nl-history-text">
+											<span className="nl-history-index">{index + 1}.</span>{' '}
+											{snapshot.stage.text.content
+												.map((part) => (part.type === 'text' ? part.text : ''))
+												.join('')}
+										</span>
+									</button>
+								))}
+							</section>
 						))}
 					</div>
 				) : (
