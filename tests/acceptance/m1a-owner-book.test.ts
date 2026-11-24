@@ -42,6 +42,7 @@ import {
 	ownerBookSelectionBatchCap,
 	ownerBookSelectionCap,
 	reserveOwnerBookSelection,
+	retryOwnerBookUnavailable,
 } from './owner-book-usage'
 
 const home = homedir()
@@ -227,10 +228,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			)
 				used += Number(tokens)
 		}
-		const paid: typeof globalThis.fetch = async (input, init) => {
+		const paidAttempt = async (request: Request, canRetry: boolean) => {
 			if (checkpointSource) await Promise.all(pendingUsage)
 			controller.signal.throwIfAborted()
-			const request = new Request(input, init)
 			if (
 				request.method !== 'POST' ||
 				!new URL(request.url).pathname.endsWith('/chat/completions')
@@ -355,7 +355,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					: await fetch(request, { signal })
 				if (!response.ok) {
 					console.log(`${model} HTTP ${response.status}`)
-					if ([401, 403, 404, 429, 503].includes(response.status))
+					if (
+						[401, 403, 404, 429].includes(response.status) ||
+						(response.status === 503 && !canRetry)
+					)
 						controller.abort()
 				}
 				const usage = observeOwnerBookUsage(response, settle, (error) =>
@@ -363,12 +366,22 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				)
 				pendingUsage.add(usage)
 				void usage.then(() => pendingUsage.delete(usage))
+				if (response.status === 503 && canRetry) await usage
 				return response
 			} catch (error) {
 				failed('headers', error)
 				await settle()
 				throw new Error(`${model} request did not complete`)
 			}
+		}
+		const paid: typeof globalThis.fetch = async (input, init) => {
+			const request = new Request(input, init)
+			const { model } = await request.clone().json()
+			return retryOwnerBookUnavailable(
+				model,
+				AbortSignal.any([controller.signal, request.signal]),
+				(canRetry) => paidAttempt(request.clone(), canRetry),
+			)
 		}
 		await mkdir(root, { recursive: true, mode: 0o700 })
 		if (stubLedger && !priorUsage)
