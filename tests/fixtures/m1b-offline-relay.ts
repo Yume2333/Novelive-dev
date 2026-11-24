@@ -42,11 +42,13 @@ export type Admission = {
 	imageAllowance?: number
 	desensitized: boolean
 	visualBrief?: string
+	stagingRepair?: string
 }
 
 export type Fault =
 	| 'malformed'
 	| 'invalid-id'
+	| 'reversed-staging-range'
 	| 'over-budget'
 	| 'staging-503'
 	| 'writing-503'
@@ -310,6 +312,9 @@ export function fakeRelay(
 						operation === 'stage' &&
 						scenes[0]?.[2] === '1') ||
 					(candidate === 'invalid-id' && operation === 'stage' && !repair) ||
+					(candidate === 'reversed-staging-range' &&
+						operation === 'stage' &&
+						!repair) ||
 					(['malformed', 'over-budget'].includes(candidate) &&
 						operation === 'stage')),
 		)
@@ -370,6 +375,9 @@ export function fakeRelay(
 			run,
 			fault,
 			outputCap,
+			stagingRepair: /^Repair the staging patch and manifest: (.+)$/m.exec(
+				prompt,
+			)?.[1],
 			desensitized: prompt.includes(
 				'Keep the adaptation non-graphic. Use implication instead of explicit detail.',
 			),
@@ -550,6 +558,8 @@ export function fakeRelay(
 			)
 		if (fault === 'malformed' || fault === 'truncated')
 			return reply('{', fault === 'truncated' ? 'length' : 'stop')
+		if (fault === 'reversed-staging-range')
+			return reply({ patch: 'PUT 4.=3:\n@bg room/day', items: [], merges: {} })
 		if (privateStaging) return reply({ patch: '', items: [], merges: {} })
 		const surplus =
 			fault === 'over-budget' ||

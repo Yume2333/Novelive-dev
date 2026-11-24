@@ -29,6 +29,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 		[
 			'malformed',
 			'invalid-id',
+			'reversed-staging-range',
 			'over-budget',
 			'staging-503',
 			'writing-503',
@@ -528,6 +529,18 @@ test.each(scenarios)(
 				).toHaveLength(faults.includes('painter-reasoning-exhausted') ? 2 : 1)
 			}
 			expect(resumedBudget).toBe(faults.includes('soft-stop'))
+			if (faults.includes('reversed-staging-range')) {
+				const first = relay.admissions.findIndex(
+					({ fault }) => fault === 'reversed-staging-range',
+				)
+				expect(first).toBeGreaterThanOrEqual(0)
+				expect(relay.admissions[first + 1]).toMatchObject({
+					operation: 'stage',
+					chapter: relay.admissions[first].chapter,
+					stagingRepair: 'Invalid staging patch operation: PUT 4.=3:',
+				})
+				expect(explicitAdmissions.size).toBe(0)
+			}
 			for (const fault of [
 				'staging-503',
 				'writing-503',

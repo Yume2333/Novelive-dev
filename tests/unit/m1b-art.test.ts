@@ -1881,6 +1881,22 @@ test('staging patches cannot replace writer dialogue', () => {
 	)
 })
 
+test.each([
+	['PUT 4.=3:\n@bg room/day', 'end line must be at or after the start line'],
+	['CUT 999', 'Use original line numbers'],
+	['PUT <4:\n@caption label', 'Insert only stage directions'],
+	[
+		'PUT <4:\n@bg room/day\nPUT <4:\n@cg cg-window',
+		'Overlapping staging patch operations PUT <4:',
+	],
+	['PUT <4:\n@bg', 'E_'],
+])(
+	'validates staging patch %s before accepting the result',
+	(patch, reason) => {
+		expect(() => applyStagingPatch(script, patch)).toThrow(reason)
+	},
+)
+
 test.each([2, 1])(
 	'trims least-used CGs first, then variants and expressions, without dropping bases at budget %i',
 	(limit) => {
@@ -2328,6 +2344,88 @@ test.each([true, false])(
 		expect(
 			JSON.stringify((await new Request(input, init).json()).messages),
 		).toContain('Repair the JSON manifest: Art model returned invalid JSON')
+	},
+)
+
+test('reuses a settled staging repair with its pre-upgrade request text', async () => {
+	await projectTest(async (project) => {
+		const rejected = { patch: 'PUT 4.=3:\n@bg room/day', items: [], merges: {} }
+		const corrected = { patch: '', items: [], merges: {} }
+		const fetch = artReplies(
+			JSON.stringify(rejected),
+			JSON.stringify(corrected),
+		)
+		const request = () =>
+			directChapterArt(script, bible, empty, {
+				main,
+				replay: {
+					mode: 'record',
+					directory: join(project.root, 'recordings'),
+					checkpointDirectory: join(project.root, 'staging'),
+					spend: projectSpend(project.database),
+					fetch,
+				},
+			})
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		try {
+			await expect(request()).resolves.toMatchObject({ script })
+			expect(fetch).toHaveBeenCalledTimes(2)
+			const prompts = await Promise.all(
+				fetch.mock.calls.map(async ([input, init]) => {
+					const { messages } = await new Request(input, init).json()
+					return messages[0].content[0].text
+				}),
+			)
+			expect(prompts[1]).toBe(
+				[
+					prompts[0],
+					'Repair the staging patch and manifest: Invalid staging patch operation: PUT 4.=3:',
+					'Return only the corrected JSON object. Apply the asset ID contract above to every item, and update affected patch and merge references together. Preserve unchanged items and stage directions.',
+					`Rejected response:\n${JSON.stringify(rejected)}`,
+				].join('\n'),
+			)
+			await expect(request()).resolves.toMatchObject({ script })
+			expect(fetch).toHaveBeenCalledTimes(2)
+			expect(
+				project.database
+					.prepare('SELECT actual_tokens FROM spend_reservation ORDER BY id')
+					.all(),
+			).toEqual([{ actual_tokens: 15 }, { actual_tokens: 15 }])
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+})
+
+test.each([
+	{
+		kind: 'reversed range',
+		reply: { patch: 'PUT 4.=3:\n@bg room/day', items: [], merges: {} },
+		repair: 'Repair the staging patch and manifest:',
+		error: 'The end line must be at or after the start line.',
+	},
+	{
+		kind: 'schema error',
+		reply: { patch: '', items: 'not an array', merges: {} },
+		repair: 'Repair the JSON manifest:',
+		error: '/items',
+	},
+])(
+	'stops after one repair that repeats a $kind',
+	async ({ reply, repair, error }) => {
+		const invalid = JSON.stringify(reply)
+		const fetch = artReplies(invalid, invalid)
+		await expect(
+			directChapterArt(script, bible, empty, {
+				main,
+				replay: { ...replay, mode: 'replay', fetch },
+			}),
+		).rejects.toThrow(error)
+		expect(fetch).toHaveBeenCalledTimes(2)
+		const [input, init] = fetch.mock.calls[1]
+		const { messages } = await new Request(input, init).json()
+		expect(messages[0].content[0].text).toContain(`\n${repair}`)
 	},
 )
 
