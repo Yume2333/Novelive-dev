@@ -9,7 +9,7 @@ import { BookOpen, Play, RotateCcw, Undo2, WandSparkles, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
-import { ScrollArea } from '../../components/ScrollArea'
+import { OverlayScrollbar, ScrollArea } from '../../components/ScrollArea'
 import { JumpPoints } from './JumpPoints'
 import { SceneImages } from './SceneImages'
 import { ScriptEditor } from './ScriptEditor'
@@ -38,6 +38,8 @@ export function EditorPage() {
 	const [source, setSource] = useState(false)
 	const [rewriteOpen, setRewriteOpen] = useState(false)
 	const rewriteDialog = useRef<HTMLDialogElement>(null)
+	const rewriteRequest = useRef(0)
+	const rewriteInput = useRef<HTMLTextAreaElement>(null)
 	const [error, setError] = useState('')
 	const [busy, setBusy] = useState(false)
 	const [undoCount, setUndoCount] = useState(0)
@@ -295,7 +297,13 @@ export function EditorPage() {
 		if (rewriting && !dialog.open) dialog.showModal()
 		else if (!rewriting && dialog.open) dialog.close()
 	}, [rewriting, hasScene])
+	const alert = (
+		<div className="editor-alert" role="alert">
+			{error}
+		</div>
+	)
 	const closeRewrite = () => {
+		rewriteRequest.current += 1
 		setRewriteOpen(false)
 		setProposal(undefined)
 	}
@@ -336,7 +344,7 @@ export function EditorPage() {
 						</button>
 						<button
 							type="button"
-							className="editor-button editor-button-primary"
+							className="editor-button"
 							disabled={!dirty || busy}
 							onClick={() => void run(save)}
 						>
@@ -381,7 +389,8 @@ export function EditorPage() {
 					<button
 						type="button"
 						className="editor-button editor-button-primary"
-						disabled={!scene || busy}
+						disabled={!scene || busy || dirty}
+						title={dirty ? t('先保存或放弃当前修改') : undefined}
 						onClick={() => setRewriteOpen(true)}
 					>
 						<WandSparkles aria-hidden="true" size={16} strokeWidth={1.8} />
@@ -391,11 +400,7 @@ export function EditorPage() {
 			}
 		>
 			<div className="editor-workbench" aria-busy={busy}>
-				{error && (
-					<div className="editor-alert" role="alert">
-						{error}
-					</div>
-				)}
+				{error && !rewriting && alert}
 				{!opening && !error && (
 					<p className="editor-muted" role="status">
 						{t('正在打开编辑器')}
@@ -607,9 +612,6 @@ export function EditorPage() {
 									<section className="editor-panel editor-source-panel">
 										<header className="editor-panel-head">
 											<span className="editor-label">{t('原文')}</span>
-											<span className="editor-muted">
-												{t('高亮段落对应当前场景')}
-											</span>
 											<button
 												type="button"
 												className="editor-icon-button editor-icon-button-small"
@@ -665,15 +667,13 @@ export function EditorPage() {
 											<X aria-hidden="true" size={16} strokeWidth={1.8} />
 										</button>
 									</header>
-									<p className="editor-muted">
-										{t('Agent 会依据原文给出逐句差异，勾选后再应用。')}
-									</p>
 									<form
 										className="editor-rewrite-form"
 										onSubmit={(event) => {
 											event.preventDefault()
 											void run(async () => {
 												if (!target) return
+												const request = ++rewriteRequest.current
 												const value = await window.novelive.call(
 													'editor.rewriteScene',
 													{
@@ -685,18 +685,25 @@ export function EditorPage() {
 														sourceIds: scene.sourceIds,
 													},
 												).promise
+												if (request !== rewriteRequest.current) return
 												setProposal(value)
 												setSelected(value.hunks.map((hunk) => hunk.id))
 											})
 										}}
 									>
-										<textarea
-											aria-label={t('重写要求')}
-											value={instruction}
-											rows={3}
-											onChange={(event) => setInstruction(event.target.value)}
-											placeholder={t('例如：节奏更快，保留所有演出指令')}
-										/>
+										{error && alert}
+										<div className="editor-rewrite-input">
+											<textarea
+												ref={rewriteInput}
+												className="nl-scroll-hidden"
+												aria-label={t('重写要求')}
+												value={instruction}
+												rows={3}
+												onChange={(event) => setInstruction(event.target.value)}
+												placeholder={t('例如：节奏更快，保留所有演出指令')}
+											/>
+											<OverlayScrollbar targetRef={rewriteInput} />
+										</div>
 										<button
 											type="submit"
 											className="editor-button editor-button-primary"

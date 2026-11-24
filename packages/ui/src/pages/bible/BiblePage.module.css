@@ -67,7 +67,7 @@
 	min-height: 34px;
 	padding: 0 var(--space-4);
 	border: 1px solid transparent;
-	border-radius: var(--radius-full);
+	border-radius: var(--radius-md);
 	font-size: 13px;
 	font-weight: 600;
 	white-space: nowrap;
@@ -116,7 +116,7 @@
 	align-items: center;
 	gap: 10px;
 	width: 100%;
-	min-height: 44px;
+	min-height: 52px;
 	padding: 8px 12px;
 	border: 0;
 	border-radius: var(--radius-lg);
@@ -178,7 +178,7 @@
 	min-height: 30px;
 	padding: 0 var(--space-3);
 	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-full);
+	border-radius: var(--radius-md);
 	background: var(--panel-75);
 	color: var(--color-on-surface-variant);
 	font-size: 12px;
@@ -241,7 +241,7 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-3);
-	min-height: 48px;
+	min-height: 52px;
 	padding: var(--space-2) var(--space-3);
 	border: 0;
 	border-radius: var(--radius-lg);
@@ -468,4 +468,15 @@
 	.characterList {
 		position: static;
 	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.navItem,
+	.candidateChip svg {
+		transition: none;
+	}
+}
+
+.candidates[hidden] {
+	display: none;
 }

@@ -1,5 +1,4 @@
 {
-	"Agent 会依据原文给出逐句差异，勾选后再应用。": "Agent proposes line-by-line diffs from the original text; check the ones to apply.",
 	"NVS 剧本": "NVS script",
 	"{ruby よみ}": "{ruby よみ}",
 	"从当前句预览": "Preview from current sentence",
@@ -9,6 +8,7 @@
 	"候选图片已生成": "Candidate images generated",
 	"候选版本 {{value}}": "Candidate version {{value}}",
 	"停顿": "Pause",
+	"先保存或放弃当前修改": "Save or discard your changes first",
 	"关闭": "Close",
 	"出一张，直接替换": "Generate one and replace it directly",
 	"剧本": "Script",
@@ -65,6 +65,5 @@
 	"重写场景": "Rewrite scene",
 	"重写差异": "Rewrite differences",
 	"重写要求": "Rewrite instructions",
-	"重绘要求": "Redraw instructions",
-	"高亮段落对应当前场景": "Highlighted paragraphs belong to this scene"
+	"重绘要求": "Redraw instructions"
 }

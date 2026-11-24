@@ -32,7 +32,7 @@
 	min-height: 36px;
 	padding: 0 var(--space-4);
 	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-full);
+	border-radius: var(--radius-md);
 	background: var(--panel-75);
 	color: var(--color-on-surface);
 	font-size: 13px;
@@ -246,7 +246,7 @@
 	min-height: 28px;
 	padding: 0 10px;
 	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-full);
+	border-radius: var(--radius-sm);
 	background: var(--white-60);
 	color: var(--color-on-surface-variant);
 	font-size: 12px;
@@ -261,7 +261,7 @@
 
 .editor-mark-select {
 	min-height: 28px;
-	border-radius: var(--radius-full);
+	border-radius: var(--radius-sm);
 	color: var(--color-on-surface-variant);
 	font-size: 12px;
 }
@@ -429,6 +429,7 @@
 }
 
 .editor-dialog {
+	scrollbar-width: none;
 	width: min(640px, calc(100vw - var(--space-7) * 2));
 	max-height: calc(100vh - var(--space-7) * 2);
 	padding: var(--space-5);
@@ -461,7 +462,13 @@
 	justify-items: end;
 }
 
+.editor-rewrite-input {
+	position: relative;
+	width: 100%;
+}
+
 .editor-rewrite-form textarea {
+	display: block;
 	width: 100%;
 	padding: var(--space-3);
 	border: 1px solid var(--glass-border);
@@ -566,4 +573,11 @@
 	align-items: center;
 	flex-wrap: wrap;
 	gap: var(--space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.editor-button,
+	.editor-icon-button {
+		transition: none;
+	}
 }

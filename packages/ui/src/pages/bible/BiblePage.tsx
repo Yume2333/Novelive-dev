@@ -600,7 +600,15 @@ function BibleProjection({
 										type="button"
 										className={styles.candidateChip}
 										aria-expanded={candidatesOpen}
-										onClick={() => setCandidatesOpen((value) => !value)}
+										onClick={() => {
+											setCandidatesOpen(!candidatesOpen)
+											if (!candidatesOpen)
+												requestAnimationFrame(() =>
+													document
+														.getElementById('bible-candidates')
+														?.scrollIntoView({ block: 'nearest' }),
+												)
+										}}
 									>
 										{proposals.length
 											? t('候选与冲突 · {{length}} 项待处理', {
@@ -660,30 +668,30 @@ function BibleProjection({
 											<div className={styles.cards}>{entries.map(card)}</div>
 										)}
 									</section>
-									{candidatesOpen && (
-										<section
-											className={styles.candidates}
-											aria-label={t('待确认候选')}
-										>
-											<h2 className={styles.label}>
-												{t('待确认候选（{{length}}）', {
-													length: proposals.length,
-												})}
-											</h2>
-											{!proposals.length && (
-												<p className={styles.empty}>{t('暂无待确认候选')}</p>
-											)}
-											{proposals.map((proposal) => (
-												<Candidate
-													key={proposal.id}
-													proposal={proposal}
-													bible={bible}
-													busy={busy}
-													resolve={(id, reason) => void resolve(id, reason)}
-												/>
-											))}
-										</section>
-									)}
+									<section
+										id="bible-candidates"
+										className={styles.candidates}
+										aria-label={t('待确认候选')}
+										hidden={!candidatesOpen}
+									>
+										<h2 className={styles.label}>
+											{t('待确认候选（{{length}}）', {
+												length: proposals.length,
+											})}
+										</h2>
+										{!proposals.length && (
+											<p className={styles.empty}>{t('暂无待确认候选')}</p>
+										)}
+										{proposals.map((proposal) => (
+											<Candidate
+												key={proposal.id}
+												proposal={proposal}
+												bible={bible}
+												busy={busy}
+												resolve={(id, reason) => void resolve(id, reason)}
+											/>
+										))}
+									</section>
 								</div>
 							</div>
 						</div>
