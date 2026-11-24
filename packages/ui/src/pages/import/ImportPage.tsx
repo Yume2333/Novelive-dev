@@ -83,6 +83,21 @@ function Stepper({ current }: { current: number }) {
 	)
 }
 
+function PickerField({
+	label,
+	children,
+}: {
+	label: string
+	children: ReactNode
+}) {
+	return (
+		<div className={styles.field}>
+			<span className={styles.label}>{label}</span>
+			<span className={styles.picker}>{children}</span>
+		</div>
+	)
+}
+
 function Field({
 	label,
 	hint,
@@ -93,12 +108,14 @@ function Field({
 	children: ReactNode
 }) {
 	return (
-		// biome-ignore lint/a11y/noLabelWithoutControl: every Field wraps its own control
-		<label className={styles.field}>
-			<span className={styles.label}>{label}</span>
-			{children}
+		<div className={styles.field}>
+			{/* biome-ignore lint/a11y/noLabelWithoutControl: every Field wraps its own control */}
+			<label className={styles.field}>
+				<span className={styles.label}>{label}</span>
+				{children}
+			</label>
 			{hint && <span className={styles.hint}>{hint}</span>}
-		</label>
+		</div>
 	)
 }
 
@@ -317,33 +334,31 @@ export function ImportPage() {
 					)}
 					{joining ? (
 						<div className={styles.grid}>
-							<Field label={t('已有工程')}>
-								<span className={styles.picker}>
-									<span className={styles.value}>
-										{joinTarget?.projectDir ?? t('未选择')}
-									</span>
-									<button
-										type="button"
-										className={styles.button}
-										disabled={busy}
-										onClick={() =>
-											void run(async () => {
-												const projectDir = await window.novelive.pickFolder()
-												if (!projectDir) return
-												setJoinTarget(undefined)
-												setJoinTarget(
-													await window.novelive.call('import.target', {
-														projectDir,
-													}).promise,
-												)
-											})
-										}
-									>
-										<FolderOpen aria-hidden="true" size={15} />
-										{t('选择已有工程')}
-									</button>
+							<PickerField label={t('已有工程')}>
+								<span className={styles.value}>
+									{joinTarget?.projectDir ?? t('未选择')}
 								</span>
-							</Field>
+								<button
+									type="button"
+									className={styles.button}
+									disabled={busy}
+									onClick={() =>
+										void run(async () => {
+											const projectDir = await window.novelive.pickFolder()
+											if (!projectDir) return
+											setJoinTarget(undefined)
+											setJoinTarget(
+												await window.novelive.call('import.target', {
+													projectDir,
+												}).promise,
+											)
+										})
+									}
+								>
+									<FolderOpen aria-hidden="true" size={15} />
+									{t('选择已有工程')}
+								</button>
+							</PickerField>
 							{joinTarget && (
 								<Field label={t('系列')} hint={t('参考图沿用已有工程')}>
 									<select
@@ -403,22 +418,20 @@ export function ImportPage() {
 										onChange={(event) => setTitle(event.target.value)}
 									/>
 								</Field>
-								<Field label={t('保存位置')}>
-									<span className={styles.picker}>
-										<span className={styles.value}>
-											{location || t('未设置')}
-										</span>
-										<button
-											type="button"
-											className={styles.button}
-											disabled={busy}
-											onClick={() => void pickLocation()}
-										>
-											<FolderOpen aria-hidden="true" size={15} />
-											{t('选择文件夹')}
-										</button>
+								<PickerField label={t('保存位置')}>
+									<span className={styles.value}>
+										{location || t('未设置')}
 									</span>
-								</Field>
+									<button
+										type="button"
+										className={styles.button}
+										disabled={busy}
+										onClick={() => void pickLocation()}
+									>
+										<FolderOpen aria-hidden="true" size={15} />
+										{t('选择文件夹')}
+									</button>
+								</PickerField>
 							</div>
 						</>
 					)}

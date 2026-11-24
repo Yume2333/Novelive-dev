@@ -117,7 +117,7 @@ export function WorkPage() {
 						<BookOpen size={28} strokeWidth={1.6} />
 					</span>
 					<div className={local.heroText}>
-						<h2 className={local.heroTitle}>{title}</h2>
+						<p className={local.heroTitle}>{title}</p>
 						<span className={styles.muted}>
 							<CircleCheck aria-hidden="true" size={13} />{' '}
 							{t('已发布 {{published}} / {{length}} 章', {
