@@ -38,6 +38,7 @@ export interface ProductionWorker {
 	review(context: StepContext): Promise<void>
 	stage(context: StepContext): Promise<ImageQueueItem[]>
 	isDrawn(workId: string, job: DrawJob): Promise<boolean>
+	hasPendingReview?(assetId: string): boolean
 	draw(job: DrawJob, context: DrawContext): Promise<ImageJobResult>
 	placeholder(
 		job: DrawJob,
@@ -1167,35 +1168,51 @@ export class ChapterScheduler {
 	private restageOversizedChapters(workId: string) {
 		const budget = this.imageBudget?.(workId)
 		if (budget === undefined) return
-		const oversized = this.all<{ task_id: string; ref_id: string }>(
-			`SELECT c.task_id, c.ref_id FROM task c
+		const pending = this.all<{
+			task_id: string
+			ref_id: string
+			asset_key: string
+			error_type: string | null
+		}>(
+			`SELECT c.task_id, c.ref_id, a.asset_key, i.error_type FROM task c
 			JOIN task_dep d ON d.task_id = c.task_id AND d.soft = 0
 			JOIN task i ON i.task_id = d.depends_on AND i.kind = 'image'
 			JOIN asset a ON a.work_id = i.work_id AND a.asset_key = i.ref_id
 			WHERE c.work_id = ? AND c.kind = 'chapter' AND c.phase = 'await_draw'
 				AND c.status NOT IN ('done', 'running') AND a.status NOT IN ('drawn', 'placeholder')
-			GROUP BY c.task_id HAVING COUNT(*) > ?`,
+			`,
 			workId,
-			budget,
 		)
-		for (const task of oversized) {
+		const byChapter = new Map<string, { ref_id: string; count: number }>()
+		for (const image of pending) {
+			if (
+				image.error_type === 'budget_paused' &&
+				this.worker.hasPendingReview?.(image.asset_key)
+			)
+				continue
+			const chapter = byChapter.get(image.task_id) ?? {
+				ref_id: image.ref_id,
+				count: 0,
+			}
+			chapter.count++
+			byChapter.set(image.task_id, chapter)
+		}
+		for (const [taskId, chapter] of byChapter) {
+			if (chapter.count <= budget) continue
 			const oldImages = this.all<{ depends_on: string }>(
 				'SELECT depends_on FROM task_dep WHERE task_id = ? AND soft = 0',
-				task.task_id,
+				taskId,
 			)
-			this.exec(
-				`DELETE FROM task_dep WHERE task_id = ? AND soft = 0`,
-				task.task_id,
-			)
+			this.exec(`DELETE FROM task_dep WHERE task_id = ? AND soft = 0`, taskId)
 			this.exec(
 				`UPDATE task SET phase = 'stage', status = 'queued', attempts = 0, desensitized = 0,
 					error_type = NULL, run_id = NULL WHERE task_id = ?`,
-				task.task_id,
+				taskId,
 			)
 			this.exec(
 				'UPDATE chapter SET flagged = 0, placeholder = 0 WHERE work_id = ? AND chapter_id = ?',
 				workId,
-				task.ref_id,
+				chapter.ref_id,
 			)
 			for (const { depends_on } of oldImages)
 				this.exec(

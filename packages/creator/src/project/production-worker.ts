@@ -353,14 +353,21 @@ export function chapterWorker(
 				const registry = await service.registry()
 				const limit = chapterImageBudget(project.database, work.workId)
 				const previousBases = new Map<string, string>()
-				const reusedPlaceholders = new Set<string>()
+				const reusedImages = new Set<string>()
 				if (limit !== undefined) {
+					const previousDraw = project.database.prepare(
+						"SELECT error_type FROM run WHERE work_id = ? AND kind = 'image' AND ref = ? ORDER BY rowid DESC LIMIT 1",
+					)
 					for (const entry of registry.entries) {
 						if (
-							entry.status === 'placeholder' &&
-							(await existing(() => project.readFile(entry.path)))
+							(entry.status === 'placeholder' &&
+								(await existing(() => project.readFile(entry.path)))) ||
+							(entry.status === 'pending' &&
+								previousDraw.get(work.workId, entry.id)?.error_type ===
+									'budget_paused' &&
+								service.hasPendingReview(entry.id))
 						)
-							reusedPlaceholders.add(entry.id)
+							reusedImages.add(entry.id)
 						if (
 							entry.status === 'drawn' ||
 							!['expression', 'variant'].includes(entry.type)
@@ -382,7 +389,7 @@ export function chapterWorker(
 							: {
 									limit,
 									previousBases,
-									reusedPlaceholders,
+									reusedImages,
 									paragraphIds: chapter.paragraphs.map(({ id }) => id),
 									speakers: options.script.speakers,
 								},
@@ -461,6 +468,9 @@ export function chapterWorker(
 				item?.status === 'drawn' &&
 				!!(await existing(() => project.readFile(item.path)))
 			)
+		},
+		hasPendingReview(assetId) {
+			return art().hasPendingReview(assetId)
 		},
 		async draw(job, ctx) {
 			const metadata = await drawingMetadata(job.assetId)

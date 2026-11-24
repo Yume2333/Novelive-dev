@@ -47,7 +47,7 @@ type ScriptOptions = NonNullable<Parameters<typeof parseScript>[1]>
 type ImageBudget = {
 	limit: number
 	previousBases: ReadonlyMap<string, string>
-	reusedPlaceholders: ReadonlySet<string>
+	reusedImages: ReadonlySet<string>
 	paragraphIds: readonly string[]
 	speakers: Iterable<string>
 }

@@ -18,7 +18,7 @@ type PlanBudget = {
 	limit: number
 	references: (registry: AssetRegistry) => Iterable<string>
 	previousBases: ReadonlyMap<string, string>
-	reusedPlaceholders?: ReadonlySet<string>
+	reusedImages?: ReadonlySet<string>
 }
 
 export function playbackAssetIds(scenes: readonly CompiledScene[]) {
@@ -207,8 +207,7 @@ export function planArt(
 		}
 		const newImages = [...needed].filter(
 			(id) =>
-				entries.get(id)?.status !== 'drawn' &&
-				!budget.reusedPlaceholders?.has(id),
+				entries.get(id)?.status !== 'drawn' && !budget.reusedImages?.has(id),
 		)
 		if (newImages.length > budget.limit)
 			throw new Error(
