@@ -156,6 +156,19 @@ export interface SynthesisOptions {
 const minimumEventLimit = 128
 const packetFormat = 7
 const selectionVersion = 12
+const targetedSelectionVersion = 1
+const targetedGuidance: Partial<Record<SelectionGroup['kind'], string>> = {
+	character:
+		'A supporting character with a consequential one-time role can qualify even without repeated appearances.',
+	relation: 'Keep enduring ties or changes in allegiance, not mere encounters.',
+	location:
+		'Prefer the setting of a consequential event to a broader place containing it.',
+	timeline:
+		'Keep turning points, not their setup and aftermath as separate entries.',
+	foreshadowing: 'Keep specific planted clues, not every open question.',
+	glossary:
+		'Prefer terms needed to understand a consequential action to generic expressions.',
+}
 const legacyPacketFormats = [1, 2, 3, 4, 5, 6]
 const hash = (value: unknown) =>
 	createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -978,10 +991,15 @@ ${packets[packet]}`
 			const targets = scopes.flatMap(({ kind, target }) =>
 				target === undefined ? [] : [`${kind}: ${target}`],
 			)
+			const guidance = scopes
+				.flatMap(({ kind, target }) =>
+					target === undefined ? [] : (targetedGuidance[kind] ?? []),
+				)
+				.join(' ')
 			return `${instructions}
 ${selection.instructions}
 Select from these canonical candidates across the whole volume. Compare evidence from early and late chapters. Observations are evidence about the same entry, not separate choices. Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
-${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. Judge inclusion before counting. When candidates compete for space, prefer a specific setting where a consequential event happens over a broader place that merely contains it, and a distinctive term needed to understand a consequential action over a generic expression. Do not stop at the target if a distinct candidate still meets the inclusion criteria. You may exceed a kind's target only with a justification. For each kind over target, return its kind and a brief reason tied to the inclusion rules in justifications.\n` : ''}Respond with only the JSON object, with no commentary before or after it.
+${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. Judge inclusion before counting. Cover distinct plot threads across the volume, not each stage of the same incident. ${guidance} Do not stop at the target if a distinct candidate still meets the inclusion criteria. You may exceed a kind's target only with a justification. In justifications, give each over-target kind and what distinct facts the extra entries preserve.\n` : ''}Respond with only the JSON object, with no commentary before or after it.
 Chapter progress:
 ${progress}
 Candidates:
@@ -1014,17 +1032,30 @@ ${scopes.flatMap(({ lines }) => lines).join('\n')}`
 		}
 		if (fits(whole)) batches.push(numbered)
 		else for (const group of numbered) addBatch(group)
-		const plan = hash(
-			batches.map((scopes) =>
-				scopes.map(({ kind, first, last, target }) => [
-					kind,
-					first,
-					last,
-					target,
-				]),
-			),
+		const ranges = batches.map((scopes) =>
+			scopes.map(({ kind, first, last, target }) => [
+				kind,
+				first,
+				last,
+				target,
+			]),
 		)
-		if (state.selectionPlan !== plan) state.selections = []
+		const targeted = numbered.some(({ target }) => target !== undefined)
+		const plan = hash(
+			targeted || selector.id !== model.id
+				? [targeted ? targetedSelectionVersion : 0, selector.id, ranges]
+				: ranges,
+		)
+		const previousSameModelPlan =
+			targeted && selector.id === model.id
+				? hash([targetedSelectionVersion, ranges])
+				: undefined
+		if (
+			state.selectionPlan !== plan &&
+			(previousSameModelPlan === undefined ||
+				state.selectionPlan !== previousSameModelPlan)
+		)
+			state.selections = []
 		state.selectionPlan = plan
 		const kept = new Set<number>()
 		const keptByKind = new Map<SelectionGroup['kind'], number>()

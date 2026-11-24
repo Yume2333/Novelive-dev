@@ -32,7 +32,10 @@ import {
 import { projectFiles } from '../../packages/format/src/model'
 import { scoreAgainstConsensus } from './bible-patch-score'
 import { writeOwnerBookEvidence } from './owner-book-evidence'
-import { checkOwnerBookResumePrompt } from './owner-book-resume'
+import {
+	bindOwnerBookRunModels,
+	checkOwnerBookResumePrompt,
+} from './owner-book-resume'
 import {
 	type WholeBookRun,
 	wholeBookSelectionTargets,
@@ -42,17 +45,15 @@ import {
 	ownerBookSelectionBatchCap,
 	ownerBookSelectionCap,
 	reserveOwnerBookSelection,
+	retryOwnerBookUnavailable,
 } from './owner-book-usage'
 
 const home = homedir()
 const source = join(home, 'novelive-testbooks', 'yesou-puyan.txt')
 const root = join(home, '.local/novelive-tools/m1a-owner-book')
-const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
-const fullPurpose = 'M1a/07 owner book with shared inclusion criteria'
-const selectionPurpose = 'M1a/07 W4 selection-only 700k'
-const batchPurpose = 'M1a/07 W4 aligned selection batch 300k'
-const savedEvents = 81
-const savedPackets = 7
+const fullPurpose = 'owner book with shared inclusion criteria'
+const selectionPurpose = 'selection-only 700k'
+const batchPurpose = 'aligned selection batch 300k'
 const previewModel = 'gemini-3.8-flash'
 const cap = 5_000_000
 const eventContextWindow = 16_384
@@ -102,24 +103,32 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 	async () => {
 		const synthesisModel =
 			process.env.NL_OWNER_BOOK_SYNTHESIS_MODEL ?? 'devin-swe-2'
+		const selectionModel =
+			process.env.NL_OWNER_BOOK_SELECTION_MODEL ?? synthesisModel
 		if (
-			synthesisModel !== 'devin-swe-2' &&
-			synthesisModel !== 'gemini-3.8-flash'
+			[synthesisModel, selectionModel].some(
+				(model) => !['devin-swe-2', 'gemini-3.8-flash'].includes(model),
+			)
 		)
-			throw new Error('Unexpected synthesis model')
+			throw new Error('Unexpected synthesis or selection model')
 		const mustResume = process.env.NL_OWNER_BOOK_EXPECT_RESUME === '1'
 		const checkpointSource = process.env.NL_OWNER_BOOK_SELECTION_SOURCE
 		const runDirectory = process.env.NL_OWNER_BOOK_RUN_DIR
 		const dryRun = process.env.NL_OWNER_BOOK_SELECTION_STUB
 		const batch = process.env.NL_OWNER_BOOK_SELECTION_BATCH === '1'
+		const ledger = process.env.NL_USAGE_LEDGER
+		if (!dryRun && !ledger)
+			throw new Error('Set NL_USAGE_LEDGER to the existing shared usage ledger')
 		const selectionCap = batch
 			? ownerBookSelectionBatchCap
 			: ownerBookSelectionCap
-		const purpose = batch
+		const purposeDetail = batch
 			? batchPurpose
 			: checkpointSource
 				? selectionPurpose
 				: fullPurpose
+		const purpose = `M1a W4 ${purposeDetail}`
+		const legacyPurpose = `M1a/07 ${checkpointSource ? 'W4 ' : ''}${purposeDetail}`
 		if (
 			(batch && !checkpointSource) ||
 			(dryRun &&
@@ -127,11 +136,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			(checkpointSource &&
 				(!runDirectory ||
 					resolve(checkpointSource) === resolve(runDirectory, 'events') ||
-					synthesisModel !== 'devin-swe-2' ||
 					mustResume))
 		)
 			throw new Error(
-				'Selection-only requires a separate run directory and the saved main model',
+				'Selection-only requires a separate run directory and cannot resume extraction',
 			)
 		const recorded: { volumeId: string; runs: WholeBookRun[] } = JSON.parse(
 			await readFile(join(fixtures, 'whole-runs.json'), 'utf8'),
@@ -141,7 +149,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			dryRun && batch && runDirectory
 				? join(dirname(runDirectory), 'stub-usage.csv')
 				: undefined
-		const usageLedger = stubLedger ?? ledger
+		const usageLedger = stubLedger ?? (dryRun ? undefined : ledger)
 		let expectedResume: { packet: number; events: number } | undefined
 		const baseUrl = dryRun
 			? 'https://relay.invalid'
@@ -174,6 +182,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		}
 		const selectionConnection = {
 			...synthesisConnection,
+			model: selectionModel,
 			maxOutputTokens: 32_768,
 		}
 		const timeoutFor = (slot: TextConnection) =>
@@ -202,21 +211,29 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const pendingUsage = new Set<Promise<void>>()
 		let ledgerFailed = false
 		let reservationExceeded = false
-		const priorUsage =
-			dryRun && !stubLedger
-				? ''
-				: await readFile(usageLedger, 'utf8').catch((error) => {
-						if (stubLedger && error.code === 'ENOENT') return ''
-						throw error
-					})
+		const priorUsage = usageLedger
+			? await readFile(usageLedger, 'utf8').catch((error) => {
+					if (stubLedger && error.code === 'ENOENT') return ''
+					throw error
+				})
+			: ''
+		if (
+			!dryRun &&
+			!priorUsage.startsWith('date,model,calls,tokens,images,purpose')
+		)
+			throw new Error('The shared usage ledger has no recognized CSV header')
 		for (const line of priorUsage.split('\n')) {
 			const [, , , tokens, , reason] = line.split(',')
-			if (reason?.startsWith(purpose)) used += Number(tokens)
+			if (
+				reason?.startsWith(purpose) ||
+				reason?.startsWith(legacyPurpose) ||
+				reason?.startsWith(`M1a W4 ${legacyPurpose}`)
+			)
+				used += Number(tokens)
 		}
-		const paid: typeof globalThis.fetch = async (input, init) => {
+		const paidAttempt = async (request: Request, canRetry: boolean) => {
 			if (checkpointSource) await Promise.all(pendingUsage)
 			controller.signal.throwIfAborted()
-			const request = new Request(input, init)
 			if (
 				request.method !== 'POST' ||
 				!new URL(request.url).pathname.endsWith('/chat/completions')
@@ -225,10 +242,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			const text = await request.clone().text()
 			const payload = JSON.parse(text)
 			const model: string = payload.model
-			if (
-				model !== synthesisModel &&
-				(checkpointSource || model !== previewModel)
-			)
+			const paidModels = checkpointSource
+				? [selectionModel]
+				: [previewModel, synthesisModel, selectionModel]
+			if (!paidModels.includes(model))
 				throw new Error('Unexpected real-book provider model')
 			const outputCap = payload.max_completion_tokens ?? payload.max_tokens
 			if (!Number.isSafeInteger(outputCap) || outputCap < 1)
@@ -301,7 +318,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				used += tokens - reserve
 				stats.tokens += tokens
 				stats.reserved += Number(measured === undefined)
-				if (dryRun && !stubLedger) return
+				if (!usageLedger) return
 				try {
 					await appendFile(
 						usageLedger,
@@ -341,7 +358,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					: await fetch(request, { signal })
 				if (!response.ok) {
 					console.log(`${model} HTTP ${response.status}`)
-					if ([401, 403, 404, 429, 503].includes(response.status))
+					if (
+						[401, 403, 404, 429].includes(response.status) ||
+						(response.status === 503 && !canRetry)
+					)
 						controller.abort()
 				}
 				const usage = observeOwnerBookUsage(response, settle, (error) =>
@@ -349,6 +369,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				)
 				pendingUsage.add(usage)
 				void usage.then(() => pendingUsage.delete(usage))
+				if (response.status === 503 && canRetry) await usage
 				return response
 			} catch (error) {
 				failed('headers', error)
@@ -356,7 +377,18 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				throw new Error(`${model} request did not complete`)
 			}
 		}
+		const paid: typeof globalThis.fetch = async (input, init) => {
+			const request = new Request(input, init)
+			const { model } = await request.clone().json()
+			return retryOwnerBookUnavailable(
+				model,
+				AbortSignal.any([controller.signal, request.signal]),
+				(canRetry) => paidAttempt(request.clone(), canRetry),
+			)
+		}
 		await mkdir(root, { recursive: true, mode: 0o700 })
+		if (stubLedger && !priorUsage)
+			await appendFile(stubLedger, 'date,model,calls,tokens,images,purpose\n')
 		const book = await readFile(source)
 		const sha256 = digest(book)
 		const manifest = JSON.parse(
@@ -442,15 +474,16 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				).toBe(sha256)
 				const { volumeIds } = await archived.read(projectFiles.series)
 				expect(volumeIds).toHaveLength(20)
+				expect(volumeIds[0]).toBe(recorded.volumeId)
 				const files = synthesisFiles(volumeIds[0])
 				const saved = await archived.read(files.checkpoint)
 				expect(saved).toMatchObject({
 					ready: true,
 					applied: true,
-					packet: savedPackets,
 					whole: null,
 				})
-				expect(saved.events).toHaveLength(savedEvents)
+				expect(saved.packet).toBeGreaterThan(1)
+				expect(saved.events.length).toBeGreaterThan(0)
 				const exclusions = [
 					'bible',
 					projectFiles.glossary({ level: 'series' }).path,
@@ -512,12 +545,27 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				).chapterIds
 				expect(chapterIds).toHaveLength(7)
 				const files = synthesisFiles(volumeId)
+				phase =
+					'run model validation (use a new run directory if the saved models differ or are unknown)'
+				const saved = await first.read(files.checkpoint).catch((error) => {
+					if (error.code !== 'ENOENT') throw error
+				})
+				await bindOwnerBookRunModels(
+					join(run, 'models.json'),
+					{ synthesisModel, selectionModel },
+					Boolean(
+						saved &&
+							(saved.applied ||
+								saved.selectedPatch ||
+								saved.selections?.length),
+					),
+				)
 				const selectionStart = checkpointSource
-					? await first.read(files.checkpoint)
+					? (saved ?? (await first.read(files.checkpoint)))
 					: undefined
 				if (selectionStart) {
-					expect(selectionStart.packet).toBe(savedPackets)
-					expect(selectionStart.events).toHaveLength(savedEvents)
+					expect(selectionStart.packet).toBeGreaterThan(1)
+					expect(selectionStart.events.length).toBeGreaterThan(0)
 					expect(selectionStart.whole).toBe(null)
 					if (!selectionStart.applied) {
 						expect(selectionStart.ready).toBe(true)
@@ -536,7 +584,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 						events: saved.events.length,
 					}
 				}
-				phase = 'preview and chunked synthesis'
+				phase = checkpointSource
+					? 'selection on the saved extraction (check NL_OWNER_BOOK_SYNTHESIS_MODEL matches the source run)'
+					: 'preview and chunked synthesis'
 				const result = await prepareVolume(first, volumeId, options).catch(
 					async (error) => {
 						if (!capReached || !selectionStart) throw error
@@ -625,6 +675,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					previewBytes,
 					packets: checkpoint.packet,
 					events: checkpoint.events.length,
+					synthesisModel,
+					selectionModel,
 					...score,
 					confirmedIntact,
 					restartRequests,
@@ -636,6 +688,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 						formatVersion: 1,
 						volumeId,
 						model: synthesisModel,
+						...(selectionModel !== synthesisModel ? { selectionModel } : {}),
 						biblePatch: chunked.biblePatch,
 						glossaryPatch: chunked.glossaryPatch,
 					},
