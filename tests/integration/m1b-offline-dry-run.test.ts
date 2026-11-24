@@ -35,7 +35,6 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'missing-usage',
 			'truncated',
 			'rate-limit',
-			'drawing-rate-limit',
 			'review-rate-limit',
 			'image-failure',
 			'image-null',
@@ -52,6 +51,10 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 		faults: ['image-overdelivery'],
 	},
 	{ name: 'reopen-mid-drawing', faults: [] },
+	{
+		name: 'drawing-rate-limit',
+		faults: ['drawing-image-missing-usage', 'drawing-rate-limit'],
+	},
 	{
 		name: 'review-cap-raise',
 		faults: ['review-reasoning', 'review-rate-limit'],
@@ -203,7 +206,9 @@ test.each(scenarios)(
 						...configuration.models.image,
 						retries: 3,
 						...(name === 'concurrent-sunburst' && { concurrency: 8 }),
-						...(reopenDrawing && { concurrency: 1 }),
+						...((reopenDrawing || name === 'drawing-rate-limit') && {
+							concurrency: 1,
+						}),
 						...((overdelivery || name === 'concurrent-sunburst') && {
 							model: 'gpt-image-2.6-sunburst',
 						}),
@@ -546,6 +551,19 @@ test.each(scenarios)(
 					fault === 'review-raised-cap-rate-limit',
 			)
 			if (faults.includes('drawing-rate-limit')) {
+				const image = relay.admissions.find(
+					({ fault }) => fault === 'drawing-image-missing-usage',
+				)
+				expect(image).toMatchObject({
+					operation: 'image',
+					tokens: null,
+					images: 1,
+				})
+				expect(
+					relay.admissions.filter(
+						({ requestKey }) => requestKey === image?.requestKey,
+					),
+				).toHaveLength(1)
 				const denied = relay.admissions.find(
 					({ fault }) => fault === 'drawing-rate-limit',
 				)

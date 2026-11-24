@@ -52,6 +52,7 @@ export type Fault =
 	| 'truncated'
 	| 'rate-limit'
 	| 'drawing-rate-limit'
+	| 'drawing-image-missing-usage'
 	| 'review-rate-limit'
 	| 'review-raised-cap-rate-limit'
 	| 'review-reasoning'
@@ -272,6 +273,7 @@ export function fakeRelay(
 						'image-null',
 						'image-invalid-json',
 						'image-overdelivery',
+						'drawing-image-missing-usage',
 					].includes(candidate) &&
 						operation === 'image' &&
 						currentChapter > 0) ||
@@ -297,6 +299,7 @@ export function fakeRelay(
 		const tokens =
 			status !== 200 ||
 			fault === 'missing-usage' ||
+			fault === 'drawing-image-missing-usage' ||
 			fault === 'image-null' ||
 			fault === 'image-invalid-json'
 				? null
@@ -308,11 +311,13 @@ export function fakeRelay(
 							: 700
 						: 2_000
 		const images =
-			tokens === null
-				? null
-				: fault === 'image-overdelivery'
-					? 3
-					: Number(image)
+			fault === 'drawing-image-missing-usage'
+				? 1
+				: tokens === null
+					? null
+					: fault === 'image-overdelivery'
+						? 3
+						: Number(image)
 		if (fault === 'image-overdelivery') assert.equal(Number(body.n), 1)
 		const run = process.env.NL_RUN_ID ?? ''
 		const attributedChapter = /(?:scene 河灯-|fixture-(?:bank|cg)-)(\d+)/.exec(
@@ -377,7 +382,7 @@ export function fakeRelay(
 				data: Array.from({ length: images ?? 0 }, (_, i) => ({
 					url: i ? `${endpoint}${path}?variant=${i}` : endpoint + path,
 				})),
-				usage: { total_tokens: tokens },
+				...(tokens !== null && { usage: { total_tokens: tokens } }),
 			})
 		}
 		const reply = (content: unknown, finish = 'stop', tool?: string) =>

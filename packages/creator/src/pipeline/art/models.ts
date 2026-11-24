@@ -116,7 +116,7 @@ function imageRequest(
 	const replay = checkedReplay(
 		createReplayFetch({
 			...generationReplay,
-			checkpointResponse: hasSettledImage,
+			checkpointResponse: (response) => response.ok,
 			checkpointResponseId: responseId,
 			onCheckpointHit: (allowance, id) => {
 				downloadResponseId = id
@@ -249,7 +249,8 @@ function imageRequest(
 					url.protocol = relay.protocol
 					url.host = relay.host
 				}
-				await saveGeneration?.()
+				const settled = hasSettledImage(raw)
+				if (settled) await saveGeneration?.()
 				const download = createReplayFetch({
 					...generationReplay,
 					checkpointDirectory:
@@ -274,7 +275,10 @@ function imageRequest(
 						})
 						if (response.ok) {
 							const bytes = Buffer.from(await response.arrayBuffer())
-							if (bytes.length) await saveDownload?.()
+							if (bytes.length) {
+								await saveDownload?.()
+								if (!settled) await saveGeneration?.()
+							}
 							return { bytes }
 						}
 						await response.body?.cancel()
