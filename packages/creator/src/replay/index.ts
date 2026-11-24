@@ -215,6 +215,11 @@ function modeFromEnvironment() {
 	throw new Error('Invalid NL_REPLAY mode')
 }
 
+export function usesReplyCheckpoint(options: ReplayOptions = {}) {
+	const mode = options.mode ?? modeFromEnvironment()
+	return mode === undefined || mode === 'record'
+}
+
 function terminalSse(bytes: Buffer) {
 	const lines = bytes.toString('utf8').split(/\r\n|[\r\n]/)
 	let event = ''
@@ -304,7 +309,7 @@ export function createReplayFetch(
 	options: ReplayOptions = {},
 ): typeof globalThis.fetch {
 	const { checkpointDirectory, ...upstream } = options
-	return checkpointDirectory
+	return checkpointDirectory && usesReplyCheckpoint(upstream)
 		? replayFetch(
 				{
 					mode: 'record',

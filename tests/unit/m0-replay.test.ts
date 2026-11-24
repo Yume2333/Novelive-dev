@@ -16,6 +16,27 @@ const rowFile = 'cassette.jsonl'
 const stream =
 	'data: {"delta":"first"}\n\ndata: {"delta":"second"}\n\ndata: [DONE]\n\n'
 
+test('strict replay requires its own recording even when a project checkpoint matches', async () => {
+	const checkpointDirectory = join(directory, 'checkpoint')
+	const upstream = vi.fn(async () => new Response('checkpoint'))
+	const record = createReplayFetch({
+		mode: 'record',
+		directory: checkpointDirectory,
+		fetch: upstream,
+	})
+	await (await record(origin)).text()
+	const strict = createReplayFetch({
+		mode: 'strict',
+		directory,
+		checkpointDirectory,
+		fetch: upstream,
+	})
+	await expect(strict(origin)).rejects.toThrow(
+		'Missing strict replay cassette:',
+	)
+	expect(upstream).toHaveBeenCalledTimes(1)
+})
+
 test('normalized replay rebinds UUID-bearing chapter IDs in authored responses', async () => {
 	const oldId = '11111111-1111-4111-8111-111111111111'
 	const newId = '22222222-2222-4222-8222-222222222222'

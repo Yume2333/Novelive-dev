@@ -28,7 +28,11 @@ import {
 	type WritingProgress,
 	writeChapter,
 } from '../pipeline/writing'
-import { createReplayFetch, type ReplayOptions } from '../replay'
+import {
+	createReplayFetch,
+	type ReplayOptions,
+	usesReplyCheckpoint,
+} from '../replay'
 import {
 	ProductionTaskError,
 	type ProductionWorker,
@@ -291,13 +295,14 @@ export function chapterWorker(
 				const journal = `source/production/${ctx.workId}/${ctx.chapterId}/writing-resume.json`
 				const clear = () => rm(join(project.root, journal), { force: true })
 				if (!ctx.resumingBudget) await clear()
-				await rm(
-					join(project.root, stagingJournal(ctx.workId, ctx.chapterId)),
-					{
-						recursive: true,
-						force: true,
-					},
-				)
+				if (usesReplyCheckpoint(replay))
+					await rm(
+						join(project.root, stagingJournal(ctx.workId, ctx.chapterId)),
+						{
+							recursive: true,
+							force: true,
+						},
+					)
 				const progress: WritingProgress = ctx.resumingBudget
 					? ((await existing(async () =>
 							JSON.parse((await project.readFile(journal)).toString('utf8')),
@@ -362,25 +367,29 @@ export function chapterWorker(
 				const registry = await service.registry()
 				const journal = stagingJournal(ctx.workId, ctx.chapterId)
 				const directory = join(project.root, journal)
-				const clearJournal = () =>
-					rm(directory, { recursive: true, force: true })
+				const checkpoint = usesReplyCheckpoint(replay)
+				const clearJournal = async () => {
+					if (checkpoint) await rm(directory, { recursive: true, force: true })
+				}
 				const limit = chapterImageBudget(project.database, work.workId)
 				const allowance = join(journal, 'allowance.json')
-				const saved = await existing(async () => {
-					const value: unknown = JSON.parse(
-						(await project.readFile(allowance)).toString(),
-					)
-					if (
-						value === null ||
-						(typeof value === 'number' &&
-							Number.isSafeInteger(value) &&
-							value >= 0)
-					)
-						return value
-					throw new Error('Invalid staging checkpoint allowance')
-				})
+				const saved = checkpoint
+					? await existing(async () => {
+							const value: unknown = JSON.parse(
+								(await project.readFile(allowance)).toString(),
+							)
+							if (
+								value === null ||
+								(typeof value === 'number' &&
+									Number.isSafeInteger(value) &&
+									value >= 0)
+							)
+								return value
+							throw new Error('Invalid staging checkpoint allowance')
+						})
+					: undefined
 				const stagingLimit = saved === undefined ? (limit ?? null) : saved
-				if (saved === undefined)
+				if (checkpoint && saved === undefined)
 					await project.writeFile(allowance, JSON.stringify(stagingLimit))
 				const previousBases = new Map<string, string>()
 				const reusedImages = new Set<string>()
