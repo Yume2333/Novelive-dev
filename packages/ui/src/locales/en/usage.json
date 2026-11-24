@@ -7,10 +7,11 @@
 	"{{projectId}}：{{reason}}": "{{projectId}}: {{reason}}",
 	"以下项目未计入统计，其他项目的记录仍然显示。": "The following projects are not included in the statistics; records for other projects are still shown.",
 	"作品": "Work",
+	"全书预览": "Full preview",
 	"全部作品": "All works",
 	"全部模型": "All models",
 	"全部阶段": "All stages",
-	"写剧本": "Script",
+	"写": "Write",
 	"出图": "Images",
 	"到": "to",
 	"参考 {{cost}}": "Reference {{cost}}",
@@ -48,6 +49,5 @@
 	"过期素材": "Expired assets",
 	"部分调用拿不到单价，未计入": "Some calls have no price and are excluded",
 	"部分项目无法读取": "Some projects could not be read",
-	"阶段": "Stage",
-	"预览": "Preview"
+	"阶段": "Stage"
 }

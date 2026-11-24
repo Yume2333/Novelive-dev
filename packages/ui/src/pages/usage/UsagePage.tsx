@@ -27,10 +27,10 @@ type Granularity = 'day' | 'month'
 
 const phaseName: Record<string, string> = {
 	import: msg('导入'),
-	preview: msg('预览'),
+	preview: msg('全书预览'),
 	synthesize: msg('综合'),
 	chat: msg('对话'),
-	write: msg('写剧本'),
+	write: msg('写'),
 	review: msg('审稿'),
 	stage: msg('演出'),
 	draw: msg('出图'),
@@ -208,7 +208,10 @@ export function UsagePage() {
 	const labelEvery = Math.ceil(perDay.length / 16)
 	const maxDay = Math.max(1, ...perDay.map(({ calls }) => calls))
 	const works = [...new Set(shown.map((r) => r.link.workId))].sort()
-	const phases = [...new Set(shown.map((r) => r.phase))].sort()
+	const phaseOrder = Object.keys(phaseName)
+	const phases = [...new Set(shown.map((r) => r.phase))].sort(
+		(a, b) => phaseOrder.indexOf(a) - phaseOrder.indexOf(b),
+	)
 	return (
 		<Page
 			title={t('用量统计')}
