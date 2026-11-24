@@ -25,9 +25,9 @@ shared_evidence,m1b-probes,deepseek-v4.1-flash,settled,1,45,128,1,173,0,0,0,m1b/
 shared_evidence,m1b-probes,devin-swe-2,settled,1,479,509,1,988,0,0,0,m1b/owner/usage.csv:3; m1b/owner/probes.md:8,
 shared_evidence,m1b-probes,gemini-3.8-flash,settled,1,1099,76,1,1175,0,0,0,m1b/owner/usage.csv:4; m1b/owner/probes.md:9,
 shared_evidence,m1b-probes,gpt-image-2.6-sunburst,settled,1,,,,6482,1,0,0,m1b/owner/usage.csv:5; m1b/owner/probes.md:10,
-shared_evidence,m1b-27ef7dc-first,deepseek-v4.1-flash,rejected,1,,,,0,0,75948,0,d217e36:m1b/owner/live-run-27ef7dc-usage.csv:2; d217e36:m1b/owner/live-run-27ef7dc.md:10-19,HTTP 404 due to missing version prefix; reserve retained
-shared_evidence,m1b-27ef7dc-resume,deepseek-v4.1-flash,settled,6,8336,9854,1,105251,0,0,0,d217e36:m1b/owner/live-resume-27ef7dc-usage.csv:2; d217e36:m1b/owner/live-resume-27ef7dc.md:25,Split for first call only
-shared_evidence,m1b-27ef7dc-resume,devin-swe-2,settled,1,14800,29908,1,44708,0,0,0,d217e36:m1b/owner/live-resume-27ef7dc-usage.csv:3; d217e36:m1b/owner/live-resume-27ef7dc.md:25,
+shared_evidence,m1b-27ef7dc-first,deepseek-v4.1-flash,rejected,1,,,,0,0,75948,0,m1b/owner/live-run-27ef7dc-usage.csv:2; m1b/owner/live-run-27ef7dc.md:10-19,HTTP 404 due to missing version prefix; reserve retained
+shared_evidence,m1b-27ef7dc-resume,deepseek-v4.1-flash,settled,6,8336,9854,1,105251,0,0,0,m1b/owner/live-resume-27ef7dc-usage.csv:2; m1b/owner/live-resume-27ef7dc.md:25,Split for first call only
+shared_evidence,m1b-27ef7dc-resume,devin-swe-2,settled,1,14800,29908,1,44708,0,0,0,m1b/owner/live-resume-27ef7dc-usage.csv:3; m1b/owner/live-resume-27ef7dc.md:25,
 shared_evidence,m1b-b424d2e,deepseek-v4.1-flash,settled,5,8336,11745,1,91353,0,0,0,m1b/owner/live-run-b424d2e-usage.csv:2; m1b/owner/live-run-b424d2e.md:17,Split for first call only
 shared_evidence,m1b-b424d2e,devin-swe-2,reservation_no_usage,2,,,,0,0,559880,0,m1b/owner/live-run-b424d2e-usage.csv:3; m1b/owner/live-run-b424d2e.md:17-28,Two 279940-token reservations; app zero is not provider usage; transport cause not proven
 shared_evidence,m1b-f143003,deepseek-v4.1-flash,settled,5,,,,89929,0,0,0,m1b/owner/live-run-f143003-usage.csv:2,
