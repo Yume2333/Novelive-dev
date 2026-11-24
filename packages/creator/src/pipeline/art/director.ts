@@ -44,6 +44,15 @@ function repairReply(phase: string, error: string, reply?: unknown) {
 	].join('\n')
 }
 
+class StagingPatchError extends Error {
+	constructor(
+		readonly repairMessage: string,
+		detail?: string,
+	) {
+		super(detail ? `${repairMessage} ${detail}` : repairMessage)
+	}
+}
+
 export type CgReferences = { costumes: readonly string[]; location?: string }
 type ScriptOptions = NonNullable<Parameters<typeof parseScript>[1]>
 type ImageBudget = {
@@ -118,18 +127,12 @@ function sceneReferences(
 	return references
 }
 
-export function applyStagingPatch(
-	script: string,
-	patch: string,
-	options?: ScriptOptions,
-) {
-	if (!patch.trim()) return script
-	const lines = script.trimEnd().split('\n')
+function parseStagingPatch(patch: string, lines: string[]) {
 	const operations =
 		/^(?:PUT ([<>]?)([1-9]\d*)(?:\.=([1-9]\d*))?:|CUT ([1-9]\d*))$/gm
 	const commands = [...patch.matchAll(operations)]
 	if (!commands.length || patch.slice(0, commands[0].index).trim())
-		throw new Error('Use PUT <N:, PUT >N:, PUT N.=M:, or CUT N.')
+		throw new StagingPatchError('Use PUT <N:, PUT >N:, PUT N.=M:, or CUT N.')
 	const changes = commands
 		.map(([header, side, start, end, cut], index) => {
 			const command = commands[index]
@@ -143,32 +146,54 @@ export function applyStagingPatch(
 			const inserted = after ? after.split('\n') : []
 			const editable = (value: string) =>
 				/^@(?!wait\b|caption\b)\w+/.test(value.trim())
-			if (
-				line >= lines.length ||
-				last >= lines.length ||
-				last < line ||
-				(side && end) ||
-				(!side && !end && !cut) ||
-				(cut ? after : !after) ||
-				inserted.some((value) => !editable(value)) ||
-				lines.slice(at, at + count).some((value) => !editable(value))
-			)
-				throw new Error(`Invalid staging patch operation: ${header}`)
-			return { at, count, inserted }
+			const invalid = (reason: string): never => {
+				throw new StagingPatchError(
+					`Invalid staging patch operation: ${header}`,
+					reason,
+				)
+			}
+			if (line >= lines.length || last >= lines.length)
+				invalid(`Use original line numbers from 1 to ${lines.length}.`)
+			if (last < line)
+				invalid('The end line must be at or after the start line.')
+			if (side && end) invalid('An insertion takes only one line number.')
+			if (!side && !end && !cut)
+				invalid('A replacement requires an explicit start and end line.')
+			if (cut && after) invalid('CUT must not be followed by stage directions.')
+			if (!cut && !after) invalid('PUT must be followed by stage directions.')
+			if (inserted.some((value) => !editable(value)))
+				invalid('Insert only stage directions, one per line.')
+			if (lines.slice(at, at + count).some((value) => !editable(value)))
+				invalid('Replace or cut only existing stage directions.')
+			return { at, count, inserted, header }
 		})
 		.sort((a, b) => a.at - b.at)
 	let previousEnd = -1
-	for (const { at, count } of changes) {
+	for (const { at, count, header } of changes) {
 		if (at <= previousEnd)
-			throw new Error('Overlapping staging patch operations')
+			throw new StagingPatchError(
+				'Overlapping staging patch operations',
+				header,
+			)
 		previousEnd = at + Math.max(0, count - 1)
 	}
+	return changes
+}
+
+export function applyStagingPatch(
+	script: string,
+	patch: string,
+	options?: ScriptOptions,
+) {
+	if (!patch.trim()) return script
+	const lines = script.trimEnd().split('\n')
+	const changes = parseStagingPatch(patch, lines)
 	for (const { at, count, inserted } of changes.reverse())
 		lines.splice(at, count, ...inserted)
 	const output = `${lines.join('\n')}\n`
 	const parsed = parseScript(output, options)
 	if (parsed.diagnostics.some((item) => item.code.startsWith('E_')))
-		throw new Error(JSON.stringify(parsed.diagnostics))
+		throw new StagingPatchError(JSON.stringify(parsed.diagnostics))
 	return output
 }
 
@@ -370,7 +395,11 @@ export async function directChapterArt(
 					triedStagingRepair = true
 					repair = repairReply(
 						'staging patch and manifest',
-						error instanceof Error ? error.message : String(error),
+						error instanceof StagingPatchError
+							? error.repairMessage
+							: error instanceof Error
+								? error.message
+								: String(error),
 						result,
 					)
 					await saveReply?.()
