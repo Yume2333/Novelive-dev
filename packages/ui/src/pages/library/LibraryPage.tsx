@@ -165,16 +165,26 @@ export function LibraryPage() {
 				},
 			)
 		}
+		const failed = () =>
+			void window.novelive.host.appState().then(
+				(state) => {
+					if (active && state.creator === 'failed') setError(true)
+				},
+				() => {},
+			)
 		const off = window.novelive.on('creator.ready', load)
+		const offDown = window.novelive.on('creator.down', failed)
 		void window.novelive.host.appState().then(
 			(state) => {
 				if (state.creator === 'ready' && !pending) load()
+				else if (active && state.creator === 'failed') setError(true)
 			},
 			() => {},
 		)
 		return () => {
 			active = false
 			off()
+			offDown()
 			pending?.cancel()
 		}
 	}, [revision])
