@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { addAbortListener } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
@@ -453,6 +454,39 @@ function returnedImageCount(value: unknown) {
 		: undefined
 }
 
+type LiveImageSpend = { runId: string | null; done: Promise<void> }
+const liveImageSpend = new Map<
+	string | DatabaseSync,
+	Map<number, LiveImageSpend>
+>()
+
+function trackImageSpend(
+	database: DatabaseSync,
+	id: number,
+	runId: string | null,
+) {
+	const key = database.location() ?? database
+	const live = liveImageSpend.get(key) ?? new Map<number, LiveImageSpend>()
+	liveImageSpend.set(key, live)
+	const done = Promise.withResolvers<void>()
+	live.set(id, { runId, done: done.promise })
+	return {
+		[Symbol.dispose]() {
+			live.delete(id)
+			if (!live.size) liveImageSpend.delete(key)
+			done.resolve()
+		},
+	}
+}
+
+async function waitForSettlement(live: LiveImageSpend[], signal: AbortSignal) {
+	signal.throwIfAborted()
+	const abort = Promise.withResolvers<never>()
+	using listener = addAbortListener(signal, () => abort.reject(signal.reason))
+	await Promise.race([...live.map(({ done }) => done), abort.promise])
+	signal.throwIfAborted()
+}
+
 export function projectSpend(database: DatabaseSync) {
 	const runId = spendRunId()
 	return async (
@@ -470,8 +504,7 @@ export function projectSpend(database: DatabaseSync) {
 		request.signal.throwIfAborted()
 		spendLedger(database)
 		const includeLegacy = includeLegacyReservations(database, runId)
-		const row = database
-			.prepare(`
+		const reserve = database.prepare(`
 			INSERT INTO spend_reservation (tokens, images, run_id)
 			SELECT ?, ?, ? FROM (
 				SELECT COALESCE(SUM(COALESCE(actual_tokens, tokens)), 0) AS used_tokens,
@@ -482,7 +515,8 @@ export function projectSpend(database: DatabaseSync) {
 			WHERE used_tokens + ? <= ? AND used_images + ? <= ?
 			RETURNING id
 		`)
-			.get(
+		const admit = () =>
+			reserve.get(
 				tokens,
 				images,
 				runId,
@@ -494,10 +528,50 @@ export function projectSpend(database: DatabaseSync) {
 				images,
 				imageCap,
 			) as { id: number } | undefined
-		if (!row)
-			throw new SpendBudgetError(
-				`超出工程预算（软停止线 ${softLimit} tokens；硬上限 ${tokenCap} tokens / ${imageCap} 张图，含未核销预留）`,
+		let row = admit()
+		while (!row) {
+			const live = images
+				? Array.from(
+						liveImageSpend.get(database.location() ?? database) ?? [],
+					).filter(
+						([, entry]) =>
+							!runId ||
+							entry.runId === runId ||
+							(includeLegacy && entry.runId === null),
+					)
+				: []
+			const fitsWithoutLive =
+				live.length &&
+				database
+					.prepare(`
+					SELECT COUNT(*) FROM spend_reservation
+					WHERE (? IS NULL OR run_id = ? OR (? AND run_id IS NULL))
+						AND id NOT IN (SELECT value FROM json_each(?))
+					HAVING COALESCE(SUM(COALESCE(actual_tokens, tokens)), 0) + ? <= ?
+						AND COALESCE(SUM(COALESCE(actual_images, images)), 0) + ? <= ?
+				`)
+					.get(
+						runId,
+						runId,
+						Number(includeLegacy),
+						JSON.stringify(live.map(([id]) => id)),
+						tokens,
+						softLimit,
+						images,
+						imageCap,
+					)
+			if (!fitsWithoutLive)
+				throw new SpendBudgetError(
+					`超出工程预算（软停止线 ${softLimit} tokens；硬上限 ${tokenCap} tokens / ${imageCap} 张图，含未核销预留）`,
+				)
+			await waitForSettlement(
+				live.map(([, entry]) => entry),
+				request.signal,
 			)
+			row = admit()
+		}
+		const { id } = row
+		using live = images ? trackImageSpend(database, id, runId) : undefined
 		const settle = (
 			actualTokens: number | null,
 			actualImages: number | null,
@@ -507,7 +581,7 @@ export function projectSpend(database: DatabaseSync) {
 				UPDATE spend_reservation SET actual_tokens = ?, actual_images = ?
 				WHERE id = ?
 			`)
-				.run(actualTokens, actualImages, row.id)
+				.run(actualTokens, actualImages, id)
 		}
 		let settledTokens: number | undefined
 		const settleText = (actual: number) => {

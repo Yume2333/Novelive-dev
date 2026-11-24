@@ -58,6 +58,7 @@ export type Fault =
 	| 'image-null'
 	| 'image-invalid-json'
 	| 'image-overdelivery'
+	| 'concurrent-sunburst'
 	| 'download-failure'
 	| 'download-body-failure'
 	| 'soft-stop'
@@ -267,6 +268,9 @@ export function fakeRelay(
 					].includes(candidate) &&
 						operation === 'image' &&
 						currentChapter > 0) ||
+					(candidate === 'concurrent-sunburst' &&
+						operation === 'stage' &&
+						scenes[0]?.[2] === '1') ||
 					(candidate === 'invalid-id' && operation === 'stage' && !repair) ||
 					(['malformed', 'over-budget'].includes(candidate) &&
 						operation === 'stage')),
@@ -444,9 +448,10 @@ export function fakeRelay(
 		const surplus =
 			fault === 'over-budget' ||
 			(repair && prompt.includes('new provider images; budget is'))
-		const cgs = surplus
+		const cgCount = fault === 'concurrent-sunburst' ? 9 : surplus ? 13 : 0
+		const cgs = cgCount
 			? Array.from(
-					{ length: 13 },
+					{ length: cgCount },
 					(_, i) => `cg-lantern-${scenes[0]?.[2]}-${scenes[0]?.[3]}-${i}`,
 				)
 			: []

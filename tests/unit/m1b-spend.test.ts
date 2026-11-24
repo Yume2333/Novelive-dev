@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { setImmediate } from 'node:timers/promises'
 import { obj } from '@earendil-works/pi-schema'
 import sharp from 'sharp'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -415,6 +416,50 @@ test('a settled one-image Sunburst response frees two slots but unresolved calls
 	await spend(request(), async () => new Response(null, { status: 503 }))
 	expect(budget()).toBe(41)
 })
+
+test.each([true, false])(
+	'concurrent Sunburst admission waits for a live quote to settle (usable: %s)',
+	async (usable) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '4')
+		using database = new DatabaseSync(':memory:')
+		const spend = projectSpend(database)
+		const request = () =>
+			new Request('https://example.invalid/v1/images/generations', {
+				method: 'POST',
+				body: JSON.stringify({ model: 'gpt-image-2.6-sunburst', n: 1 }),
+			})
+		const entered = Promise.withResolvers<void>()
+		const finish = Promise.withResolvers<void>()
+		const success = () =>
+			Response.json({
+				data: [{ b64_json: 'fixture' }],
+				usage: { total_tokens: 7000 },
+			})
+		const first = spend(request(), async () => {
+			entered.resolve()
+			await finish.promise
+			return usable ? success() : new Response(null, { status: 503 })
+		})
+		await entered.promise
+		const send = vi.fn(async () => success())
+		const second = spend(request(), send).then(
+			(response) => ({ response }),
+			(error: unknown) => ({ error }),
+		)
+		await setImmediate()
+		expect(send).not.toHaveBeenCalled()
+		finish.resolve()
+		await first
+		if (usable) {
+			expect(await second).toEqual({ response: expect.any(Response) })
+			expect(send).toHaveBeenCalledOnce()
+		} else {
+			expect(await second).toEqual({ error: expect.any(Error) })
+			expect(send).not.toHaveBeenCalled()
+		}
+	},
+)
 
 test('concurrent dispatch stops before the next reservation would cross the soft cutoff', async () => {
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')

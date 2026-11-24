@@ -39,6 +39,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'image-null',
 			'image-invalid-json',
 			'image-overdelivery',
+			'concurrent-sunburst',
 			'download-failure',
 			'download-body-failure',
 			'soft-stop',
@@ -137,7 +138,8 @@ test.each(scenarios)(
 					image: {
 						...configuration.models.image,
 						retries: 3,
-						...(overdelivery && {
+						...(name === 'concurrent-sunburst' && { concurrency: 8 }),
+						...((overdelivery || name === 'concurrent-sunburst') && {
 							model: 'gpt-image-2.6-sunburst',
 						}),
 					},
@@ -237,6 +239,13 @@ test.each(scenarios)(
 				if (snapshot.phase === 'done') break
 				if (snapshot.phase === 'confirm-first') {
 					expect(passedSecondGate).toBe(false)
+					if (name === 'concurrent-sunburst')
+						expect(
+							relay.admissions.filter(
+								({ operation, chapter }) =>
+									operation === 'image' && chapter === 1,
+							),
+						).toHaveLength(11)
 					await play(chapterIds[0])
 					expect(
 						(await host.playerStatus(workId)).chapters.map(
