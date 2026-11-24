@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { EventEmitter, once } from 'node:events'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -350,96 +349,6 @@ test('staging queues only referenced images and their bases, including reused pe
 	expect(await worker.stage({ ...ctx, chapterId: second })).toMatchObject(
 		dependencies,
 	)
-})
-
-test('continuing an image audit at zero image cap does not restage a saved candidate', async () => {
-	vi.stubEnv('NL_RUN_ID', 'review-only')
-	vi.stubEnv('NL_RUN_TOKEN_CAP', '100000')
-	vi.stubEnv('NL_RUN_IMAGE_CAP', '6')
-	const { projectDir, workId } = await fixture()
-	using project = await Project.open(projectDir)
-	const work = await project.read(projectFiles.work('v0001', workId))
-	const config = createConfigStore(directory)
-	await config.update(configuration)
-	const { art, worker } = chapterWorker(
-		project,
-		'v0001',
-		work,
-		await productionModels(config),
-	)
-	const [job] = await art().register(
-		[{ id: 'cg-retained', kind: 'cg', description: 'River' }],
-		bible,
-	)
-	const entry = (await art().registry()).entries.find(
-		({ id }) => id === job.assetId,
-	)
-	if (!entry) throw new Error('Missing candidate registry entry')
-	const checkpoint = `source/production/art/${createHash('sha256').update(entry.path).digest('hex')}.pending-review.json`
-	const stage = vi.fn(async () => [job])
-	const review = vi.fn(async () => completion({ pass: true }))
-	const draw = vi
-		.fn<typeof worker.draw>()
-		.mockImplementationOnce(async () => {
-			await project.writeFile(
-				checkpoint,
-				JSON.stringify({
-					settingsVersion: 'fixture',
-					attempt: 0,
-					moderated: false,
-					prompt: 'Review the saved candidate',
-					png: 'aQ==',
-				}),
-			)
-			throw new SpendBudgetError('审核的文字预算不足')
-		})
-		.mockImplementationOnce(async (_job, context) => {
-			expect(context.resumingBudget).toBe(true)
-			const response = await projectSpend(project.database)(
-				new Request('https://example.invalid/v1/chat/completions', {
-					method: 'POST',
-					body: JSON.stringify({
-						model: 'fixture',
-						messages: [{ role: 'user', content: 'Review the candidate' }],
-						max_tokens: 64,
-					}),
-				}),
-				review,
-			)
-			await response.text()
-			return { status: 'drawn' }
-		})
-	const queue = new ChapterScheduler(
-		project.database,
-		{
-			...worker,
-			async write() {},
-			async review() {},
-			stage,
-			draw,
-		},
-		{ imageBudget: (id) => chapterImageBudget(project.database, id) },
-	)
-	try {
-		project.tasks.registerWork({ workId, title: work.title })
-		queue.start(workId, [work.chapterIds[0]])
-		queue.confirmVisual(workId)
-		await queue.idle()
-		expect(queue.snapshot(workId).chapters[0]).toMatchObject({
-			issue: expect.stringContaining('审核的文字预算不足'),
-		})
-		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
-		queue.continue(workId)
-		await queue.idle()
-		expect(queue.snapshot(workId).chapters[0]).toMatchObject({
-			status: 'published',
-		})
-		expect(stage).toHaveBeenCalledTimes(1)
-		expect(draw).toHaveBeenCalledTimes(2)
-		expect(review).toHaveBeenCalledTimes(1)
-	} finally {
-		queue.dispose()
-	}
 })
 
 test('resume replaces an oversized drawing queue with one bounded staging repair', async () => {
@@ -797,9 +706,25 @@ test.each([
 	{ scenario: 'review rejected', reject: true },
 	{ scenario: 'first image blocked', firstImage: true },
 	{ scenario: 'local image check failed', localRejection: true },
+	{ scenario: 'accepted saved candidate at zero image cap', zero: true },
+	{
+		scenario: 'changed checkpoint settings at zero image cap',
+		zero: true,
+		redraw: true,
+	},
+	{
+		scenario: 'rejected saved candidate at zero image cap',
+		zero: true,
+		reject: true,
+	},
 ])(
 	'recording resumes an image budget pause: $scenario',
-	async ({ redraw, reject, firstImage, localRejection }) => {
+	async ({ redraw, reject, firstImage, localRejection, zero }) => {
+		if (zero) {
+			vi.stubEnv('NL_RUN_ID', 'drawing')
+			vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+			vi.stubEnv('NL_RUN_IMAGE_CAP', '7')
+		}
 		const { projectDir, workId } = await fixture()
 		const config = createConfigStore(directory)
 		await config.update(configuration)
@@ -809,12 +734,14 @@ test.each([
 		const requests: string[] = []
 		const painterPrompts: string[] = []
 		const imagePrompts: string[] = []
+		const stage = vi.fn(async () => [{ assetId, kind: 'location' as const }])
 		let allowReview = firstImage === true
 		let rejectReview = reject
 		let blockImage = firstImage === true
 		let blockRewrite = false
 		const open = async () => {
 			const project = await Project.open(projectDir)
+			const admit = projectSpend(project.database)
 			const work = await project.read(projectFiles.work('v0001', workId))
 			const { worker, art } = chapterWorker(project, 'v0001', work, models, {
 				mode: 'record',
@@ -830,7 +757,9 @@ test.each([
 						)
 							throw new SpendBudgetError('超出工程预算')
 					}
-					return send(request, await quoteSpend(request))
+					return zero
+						? admit(request, send)
+						: send(request, await quoteSpend(request))
 				},
 				async fetch(input, init) {
 					const request = new Request(input, init)
@@ -859,7 +788,7 @@ test.each([
 					}
 					if (body.model === models.visual.model && rejectReview) {
 						rejectReview = false
-						blockImage = true
+						if (!zero) blockImage = true
 						return completion({
 							pass: false,
 							failedChecks: ['description'],
@@ -876,12 +805,20 @@ test.each([
 							})
 				},
 			})
-			const queue = new ChapterScheduler(project.database, {
-				...worker,
-				write: async () => {},
-				review: async () => {},
-				stage: async () => [{ assetId, kind: 'location' }],
-			})
+			const queue = new ChapterScheduler(
+				project.database,
+				{
+					...worker,
+					write: async () => {},
+					review: async () => {},
+					stage,
+				},
+				{
+					imageBudget: zero
+						? (id) => chapterImageBudget(project.database, id)
+						: undefined,
+				},
+			)
 			return { project, queue, art }
 		}
 		{
@@ -924,6 +861,39 @@ test.each([
 		allowReview = true
 		blockImage = false
 		blockRewrite = false
+		if (zero) {
+			vi.stubEnv('NL_RUN_ID', 'review-only')
+			vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+			const { project, queue } = await open()
+			try {
+				queue.continue(workId)
+				await queue.idle()
+				expect(stage).toHaveBeenCalledTimes(1)
+				expect(imagePrompts).toHaveLength(1)
+				expect(requests.slice(2)).toEqual(
+					redraw
+						? [models.main.model]
+						: reject
+							? [models.visual.model, models.main.model]
+							: [models.visual.model],
+				)
+				const chapter = queue.snapshot(workId).chapters[0]
+				if (redraw || reject) {
+					expect(chapter.status).toBe('producing')
+					expect(chapter.issue).toMatch(/超出工程预算/)
+				} else expect(chapter.status).toBe('published')
+				const admissions = project.database
+					.prepare(
+						"SELECT SUM(images) AS images FROM spend_reservation WHERE run_id = 'review-only'",
+					)
+					.get()
+				expect(admissions).toEqual({ images: 0 })
+			} finally {
+				queue.dispose()
+				project.close()
+			}
+			return
+		}
 		if (reject) {
 			const { project, queue } = await open()
 			try {
