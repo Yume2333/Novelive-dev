@@ -395,6 +395,7 @@ export function chapterWorker(
 								},
 				})
 				ctx.signal.throwIfAborted()
+				if (staged.trimmed.length) ctx.recordStageTrim?.(staged.trimmed)
 				const dependencies = new Map<string, ArtJob>()
 				const sceneIds: string[] = []
 				await service.register(

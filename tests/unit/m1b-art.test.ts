@@ -15,7 +15,12 @@ import {
 	directChapterArt,
 } from '../../packages/creator/src/pipeline/art/director'
 import * as artModels from '../../packages/creator/src/pipeline/art/models'
-import { planArt } from '../../packages/creator/src/pipeline/art/plan'
+import {
+	type ManifestItem,
+	planArt,
+	playbackAssetIds,
+} from '../../packages/creator/src/pipeline/art/plan'
+import { trimStagingToBudget } from '../../packages/creator/src/pipeline/art/trim'
 import * as upscale from '../../packages/creator/src/pipeline/postprocess'
 import { Project } from '../../packages/creator/src/project'
 import {
@@ -1693,6 +1698,112 @@ test('staging patches cannot replace writer dialogue', () => {
 	expect(() => applyStagingPatch(script, 'PUT 4.=4:\n@bg room/day')).toThrow(
 		'Invalid staging patch',
 	)
+})
+
+test.each([2, 1])(
+	'trims least-used CGs first, then variants and expressions, without dropping bases at budget %i',
+	(limit) => {
+		const source = `scene Room
+source p0001
+
+@bg room/rain
+@show ada/uniform/furious center
+@cg cg-z
+@cg cg-a
+@fg cg-popular
+@cg cg-popular
+@face ada/angry 0.5
+ada: The rain. #0010
+`
+		const items: ManifestItem[] = [
+			{ id: 'cg-z', kind: 'cg', description: 'Z' },
+			{ id: 'cg-popular', kind: 'cg', description: 'Popular' },
+			{ id: 'cg-a', kind: 'cg', description: 'A' },
+			{ id: 'room/rain', kind: 'variant', description: 'Rain' },
+			{ id: 'ada/uniform/furious', kind: 'expression', description: 'Furious' },
+		]
+		const compile = (script: string, registry = empty) =>
+			compileScript(script, {
+				assets: registry.entries,
+				paragraphIds: ['p0001'],
+				speakers: ['ada'],
+			})
+		const fit = trimStagingToBudget(
+			{
+				script: source,
+				items,
+				merges: { 'ada/uniform/furious': 'ada/uniform/angry' },
+			},
+			bible,
+			empty,
+			{ limit, previousBases: new Map(), reusedImages: new Set() },
+			(script, registry) => {
+				const result = compile(script, registry)
+				return result.ok ? result.scenes : undefined
+			},
+		)
+		if (limit === 1) {
+			expect(fit).toBeUndefined()
+			return
+		}
+		if (!fit) throw new Error('Expected a plan within the chapter budget')
+		expect(fit.trimmed).toEqual([
+			{ id: 'cg-a' },
+			{ id: 'cg-z' },
+			{ id: 'cg-popular' },
+			{ id: 'room/rain', replacement: 'room/day' },
+			{ id: 'ada/uniform/angry', replacement: 'ada/uniform/neutral' },
+		])
+		expect(fit.merges).toEqual({})
+		expect(fit.items.map(({ id }) => id)).toEqual([
+			'room/day',
+			'ada/uniform/neutral',
+		])
+		expect(fit.script).toContain(
+			'@bg room/day\n@show ada/uniform/neutral center',
+		)
+		expect(fit.script).toContain('@fg none\n@cg none\n@face ada/neutral 0.5')
+		expect(fit.script).toContain('ada: The rain. #0010')
+		const playable = compile(
+			fit.script,
+			planArt(fit.items, bible, empty, fit.merges).registry,
+		)
+		if (!playable.ok) throw new Error(JSON.stringify(playable.diagnostics))
+		expect(playbackAssetIds(playable.scenes)).toEqual(
+			new Set(['room/day', 'ada/uniform/neutral']),
+		)
+	},
+)
+
+test('trims only after the bounded staging repair is still over budget', async () => {
+	const response = JSON.stringify({
+		patch: 'PUT <4:\n@bg room/day\n@cg cg-window',
+		items: [
+			{ id: 'room/day', kind: 'location', description: 'Classroom' },
+			{ id: 'cg-window', kind: 'cg', description: 'At the window' },
+		],
+		merges: {},
+	})
+	const fetch = artReplies(response, response)
+	const staged = await directChapterArt(script, bible, empty, {
+		main,
+		replay: { ...replay, mode: 'replay', fetch },
+		imageBudget: {
+			limit: 1,
+			paragraphIds: ['p0001'],
+			speakers: ['ada'],
+			previousBases: new Map(),
+			reusedImages: new Set(),
+		},
+	})
+	expect(fetch).toHaveBeenCalledTimes(2)
+	const [input, init] = fetch.mock.calls[1]
+	expect(
+		JSON.stringify((await new Request(input, init).json()).messages),
+	).toContain('Chapter needs 2 new provider images; budget is 1')
+	expect(staged.trimmed).toEqual([{ id: 'cg-window' }])
+	expect(staged.script).toContain('@bg room/day\n@cg none')
+	expect(staged.items.map(({ id }) => id)).toEqual(['room/day'])
 })
 
 test.each([true, false])(

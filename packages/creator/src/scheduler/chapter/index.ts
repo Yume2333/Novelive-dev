@@ -7,6 +7,7 @@ import type {
 	WorkPhase,
 } from '@novelive/format/model'
 import type { ProductionSnapshot } from '../../contract/production'
+import type { StageTrim } from '../../pipeline/art/trim'
 import { SpendBudgetError } from '../../usage/spend'
 
 export const transientRetries = 2
@@ -20,6 +21,7 @@ export type StepContext = {
 	link: ChapterLink
 	desensitized: boolean
 	resumingBudget?: boolean
+	recordStageTrim?(trimmed: readonly StageTrim[]): void
 	signal: AbortSignal
 }
 export type DrawJob = {
@@ -772,7 +774,17 @@ export class ChapterScheduler {
 					signal,
 				}
 				return name === 'stage'
-					? this.worker.stage(context)
+					? this.worker.stage({
+							...context,
+							recordStageTrim: (trimmed) => {
+								if (!this.current(task)) return
+								this.exec(
+									"UPDATE run SET meta = json_set(meta, '$.stageTrim', json(?)) WHERE run_id = ?",
+									JSON.stringify(trimmed),
+									task.run_id,
+								)
+							},
+						})
 					: this.worker[name](context).then(() => [])
 			})
 			if (!result) return
