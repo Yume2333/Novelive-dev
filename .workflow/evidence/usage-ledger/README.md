@@ -1,6 +1,6 @@
 # Real-relay usage reconciliation
 
-As of the [November 24 shared snapshot](../m1b/owner/live-run-af551d2.md#对账与释放). No paid requests were made for this reconciliation. The [CSV](reconciled-ledger.csv) is the ledger; this note explains its scope and differences from the reported balances.
+The [CSV](reconciled-ledger.csv) is the ledger. The historical tables below describe the [November 24 baseline](../m1b/owner/live-run-af551d2.md#对账与释放). The CSV also includes subsequent M1b windows through [`924433e`](../m1b/owner/live-run-924433e.md#对账与释放). Its balance is **6,885,582 settled tokens / 84 images** and **3,696,902 unresolved tokens / 22 image slots**, including historic unattributed amounts. The concurrent [W4 receipt](https://github.com/Yume2333/Novelive-dev/blob/50ada1271a8df5ede013d708b3c40a13f254428e/.workflow/owner-review.md) separately reports **500,395 settled and 65,073 unresolved tokens / 0 images**. Counting both published sources gives **7,385,977 settled tokens / 84 images** and **3,761,975 unresolved tokens / 22 image slots**, without treating W4 as an M1b window.
 
 | Model | Settled tokens / images | Known prompt / completion tokens (calls covered) | Rejected relay calls; retained tokens / images | Transport failures; retained tokens / images | Other evidenced reservations: recorded calls; tokens / images |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -15,9 +15,9 @@ As of the [November 24 shared snapshot](../m1b/owner/live-run-af551d2.md#对账�
 | --- | ---: | ---: | ---: |
 | Reconciled from window and run evidence | 4,766,011 / 19 | 2,097,920 / 1 | 13,136,069 / 480 |
 | Reported but not linked to a run or model | +140,455 / +12 | +195,450 / +1 | — |
-| **Latest reported shared balance** | **4,906,466 / 31** | **2,293,370 / 2** | **12,800,164 / 467** |
+| **Reported shared balance at baseline** | **4,906,466 / 31** | **2,293,370 / 2** | **12,800,164 / 467** |
 
-For shared-budget planning, use the current ledger balance, including the unattributed amounts, against the corrected [project cap](../../delivery-plan.md#测试模型与额度) of 2B tokens and 500 images. The historical headroom above does not authorize more spend. Provider-reported image-model tokens count toward the token cap as well as generated images counting toward the separate image cap.
+The combined CSV and W4 total of **11,147,952 tokens and 106 image slots** is a historical reconciliation only, not current exposure or authorization to spend. Before every paid batch, re-check the latest shared ledger for all settled usage and open reservations (including parallel W4 and unreconciled amounts) against the [project cap](../../delivery-plan.md#测试模型与额度) of 2B tokens and 500 images. If the batch exceeds the remaining budget, narrow its scope or record a blocker. Provider-reported image-model tokens count toward the token cap as well as generated images counting toward the separate image cap.
 
 ### Discrepancies and deduplication
 

@@ -3,7 +3,7 @@
 **Effort:** m1b-production
 **Executor:** spine (paid calls)
 **Blocked by:** 09, 10
-**Status:** blocked
+**Status:** paused
 **Covers:** W4
 **Task type:** spike
 **Files:** .workflow/evidence/m1b/owner/
@@ -16,7 +16,9 @@
 
 ## Progress
 
-M1a 恢复与综合代码已在 `f9dd863` 合入 main（[#86](https://github.com/Yume2333/Novelive-dev/pull/86)），满足本任务的代码前提。M1a/07 尚未通过 0.90 门槛，待[所有者评审](../../owner-review.md)，且不再是本任务的前置。W4 曾因费用暂停，所有者于 2026-11-24 更正额度。按最新授权，W4 立即由独立会话恢复付费调优，与本任务第 2–4 章并行，双方分别记账。本任务不再负责 W4；W4 的 0.90 门槛不变。
+M1a 恢复与综合代码已在 `f9dd863` 合入 main（[#86](https://github.com/Yume2333/Novelive-dev/pull/86)），满足本任务的代码前提。[M1a/07 W4](../m1a-project/07-m1a-owner-book.md) 未通过 0.90 门槛，但不是本任务的前置；两项独立验收、分别记账。
+
+最新真跑：[924433e 续跑记录](../../evidence/m1b/owner/live-run-924433e.md)。第一章已无占位发布并在 Electron 试玩；第二章演出已完成，因一张立绘画幅耗尽未发布；第三章暂停在审查，第四章未开始。阻塞已由 [#118](https://github.com/Yume2333/Novelive-dev/pull/118) 修复并合入 main（`047f8221`），离线验证第二章在重绘后可无占位发布；未恢复付费或完成实际真书 Check。下一窗口获准后，用修复版 Electron 打开同一私有项目副本并对第二章点「继续」触发重绘，发布并试玩后再推进第三、四章。见[交接](../../research/stopped-work-2026-11-24.md#m1b11--真书制作)。
 
 获授权的串行窗口已完成 [《浮生六記》制作前探针](../../evidence/m1b/owner/probes.md)，实测 8,818 tokens、1 张图，全部核销。主模型单字段限额 128、供应方报告输出 509；后续保留该主模型并采用 5 倍输出预留、80% 软停止线、每张 7,000 tokens 的生图／编辑估算，不将观察值冒充供应方上界。窗口已释放，等待下一次串行授权执行原 Check；未启动完整真书验收。
 
@@ -40,7 +42,7 @@ M1a 恢复与综合代码已在 `f9dd863` 合入 main（[#86](https://github.com
 
 合入 #102 后，在 `af551d2` [用新窗口恢复同一项目](../../evidence/m1b/owner/live-run-af551d2.md)。沿用第一章写作和审查。演出十笔请求核销 253,102 tokens／0 张图；第 11 笔收到 HTTP 503，结果未知，停止且未重发，保留 394,352 tokens 待对账。未触发预算停止线，未完成演出或到达绘制、发布、试玩与第二确认点。窗口未用余量已释放，本任务仍阻塞。
 
-## Blocked
+## 历史阻塞
 
 [#97](https://github.com/Yume2333/Novelive-dev/pull/97) 的离线恢复验证：在真实 Electron 中打开 `2fbd4d7` 项目副本，复用已完成的第一章写作和审查，草稿字节未变，未重新发送这两类请求。首个派发是演出；回环桩返回无效 JSON 后只派发了一次修复，第一章已发布并到达第二确认点。10 次回环请求全部核销，外部供应方请求为零。此结果仅验证离线恢复，不代替完整真书 Check。
 

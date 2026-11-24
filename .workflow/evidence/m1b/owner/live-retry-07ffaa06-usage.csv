@@ -1,0 +1,3 @@
+model,admitted_calls,settled_tokens,settled_images,unresolved_tokens,unresolved_images
+devin-swe-2,12,112100,0,0,0
+gemini-3.8-flash,15,125667,0,0,0
