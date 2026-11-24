@@ -177,6 +177,8 @@ test.skipIf(!drawingCheckpoint || !profile)(
 			const [volumeId] = series.volumeIds
 			const volume = await project.read(projectFiles.volume(volumeId))
 			const [workId] = volume.workIds
+			const work = await project.read(projectFiles.work(volumeId, workId))
+			const [chapterId] = work.chapterIds
 			const reservations = () =>
 				project.database
 					.prepare('SELECT * FROM spend_reservation ORDER BY id')
@@ -209,6 +211,35 @@ test.skipIf(!drawingCheckpoint || !profile)(
 			expect(images.length).toBeGreaterThan(0)
 			for (const image of images)
 				expect(image).toMatchObject({ tokens: 31_000, images: 3 })
+			expect(session.snapshot()).toMatchObject({
+				phase: 'confirm-first',
+				status: 'confirm',
+			})
+			expect(
+				(await host.playerStatus(workId)).chapters.find(
+					(chapter) => chapter.chapterId === chapterId,
+				)?.published,
+			).toBe(true)
+			const player = await host.player(workId, undefined, chapterId)
+			const compiled = compileScript(player.script, {
+				speakers: player.speakers,
+				assets: player.registry.entries,
+				customMarks: Object.keys(player.customMarks),
+				paragraphIds: player.chapter.paragraphIds,
+				sceneIds: player.chapter.sceneIds,
+			})
+			expect(compiled.ok).toBe(true)
+			if (!compiled.ok) throw new Error('Private chapter did not compile')
+			expect(compiled.scenes).toHaveLength(9)
+			const used = playbackAssetIds(compiled.scenes)
+			expect(used.size).toBeGreaterThan(0)
+			for (const id of used) {
+				const asset = player.registry.entries.find((entry) => entry.id === id)
+				expect(asset?.path).toMatch(/^player\/(?!unavailable\/)/)
+				expect(
+					(await readFile(join(root, 'cache', asset?.path ?? ''))).length,
+				).toBeGreaterThan(0)
+			}
 		} finally {
 			await host.close()
 			vi.unstubAllEnvs()
