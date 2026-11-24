@@ -1,0 +1,4 @@
+model,admitted_calls,settled_tokens,settled_images,unresolved_tokens,unresolved_images
+devin-swe-2,8,7860,0,6833,0
+gemini-3.8-flash,1,0,0,159346,0
+gpt-image-2.6-sunburst,8,13386,2,186000,18
