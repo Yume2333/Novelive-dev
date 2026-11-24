@@ -273,17 +273,13 @@ export class ChapterScheduler {
 
 	continue(workId: string): ProductionSnapshot {
 		const work = this.work(workId)
-		if (
-			(work.status === 'paused' ||
-				work.status === 'done' ||
-				work.reason === 'confirm_first') &&
-			this.requeueReasoningPlaceholders(workId)
-		) {
-			this.pump()
-			return this.snapshot(workId)
-		}
 		if (work.status === 'awaiting_confirm' && work.reason === 'confirm_first') {
-			this.resumeWork(workId)
+			let repaired = false
+			this.transaction(() => {
+				repaired = this.requeueReasoningPlaceholders(workId)
+				if (repaired) this.requeueWork(workId)
+			})
+			if (!repaired) this.resumeWork(workId)
 		} else if (work.status === 'paused' && work.reason !== 'chapter_failed') {
 			this.transaction(() => {
 				this.restageOversizedChapters(workId)
@@ -315,6 +311,7 @@ export class ChapterScheduler {
 						task.ref_id,
 					)
 				}
+				this.requeueReasoningPlaceholders(workId)
 				this.requeueWork(workId)
 			})
 		}
@@ -1188,32 +1185,29 @@ export class ChapterScheduler {
 			workId,
 		)
 		if (images.length === 0) return false
-		this.transaction(() => {
-			for (const { task_id, ref_id } of images) {
-				this.exec(
-					"UPDATE task SET status = 'queued', attempts = 0 WHERE task_id = ?",
-					task_id,
-				)
-				this.exec(
-					"UPDATE asset SET status = 'pending' WHERE work_id = ? AND asset_key = ?",
-					workId,
-					ref_id,
-				)
-				this.exec(
-					`UPDATE chapter SET user_state = 'producing' WHERE work_id = ? AND chapter_id IN
+		for (const { task_id, ref_id } of images) {
+			this.exec(
+				"UPDATE task SET status = 'queued', attempts = 0 WHERE task_id = ?",
+				task_id,
+			)
+			this.exec(
+				"UPDATE asset SET status = 'pending' WHERE work_id = ? AND asset_key = ?",
+				workId,
+				ref_id,
+			)
+			this.exec(
+				`UPDATE chapter SET user_state = 'producing' WHERE work_id = ? AND chapter_id IN
 					(SELECT c.ref_id FROM task c JOIN task_dep d ON d.task_id = c.task_id
 					WHERE d.depends_on = ? AND d.soft = 0 AND c.kind = 'chapter' AND c.status = 'done')`,
-					workId,
-					task_id,
-				)
-				this.exec(
-					`UPDATE task SET status = 'queued', phase = 'await_draw' WHERE kind = 'chapter' AND status = 'done'
+				workId,
+				task_id,
+			)
+			this.exec(
+				`UPDATE task SET status = 'queued', phase = 'await_draw' WHERE kind = 'chapter' AND status = 'done'
 					AND task_id IN (SELECT task_id FROM task_dep WHERE depends_on = ? AND soft = 0)`,
-					task_id,
-				)
-			}
-			this.requeueWork(workId)
-		})
+				task_id,
+			)
+		}
 		return true
 	}
 

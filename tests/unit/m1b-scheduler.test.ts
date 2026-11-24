@@ -385,6 +385,41 @@ test('image failures fall back to placeholders but unsupported capabilities paus
 	expect(worker.count('draw:hero/default')).toBe(1)
 })
 
+test('Continue repairs a legacy placeholder and resumes the task that paused the work', async () => {
+	const worker = new ScriptedWorker({
+		ch1: [cg('old-placeholder')],
+		ch2: [cg('paused-draw')],
+	})
+	const target = open(worker)
+	worker.script('draw:old-placeholder', {
+		status: 'placeholder',
+		issue: 'Historic failure',
+	})
+	worker.script('draw:paused-draw', {
+		status: 'unsupported',
+		issue: 'Unsupported',
+	})
+	target.start(workId, ['ch1', 'ch2'])
+	await throughConfirmations(target)
+	await target.idle()
+	expect(snapshot().status).toBe('stopped')
+	project.database
+		.prepare(
+			"UPDATE run SET error_message = ? WHERE kind = 'image' AND ref = 'old-placeholder'",
+		)
+		.run('[reasoning_limit] Historic failure')
+
+	target.continue(workId)
+	await target.idle()
+
+	expect(worker.count('draw:old-placeholder')).toBe(2)
+	expect(worker.count('draw:paused-draw')).toBe(2)
+	expect(snapshot().chapters).toEqual([
+		{ chapterId: 'ch1', status: 'published', priority: true },
+		{ chapterId: 'ch2', status: 'published', priority: false },
+	])
+})
+
 test('a single-chapter work still stops at the first-chapter confirmation', async () => {
 	const target = open(new ScriptedWorker())
 	target.start(workId, ['ch1'])
