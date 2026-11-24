@@ -21,6 +21,36 @@ type PlanBudget = {
 	reusedImages?: ReadonlySet<string>
 }
 
+export class ChapterImageBudgetError extends Error {
+	constructor(ids: readonly string[], limit: number) {
+		super(
+			`Chapter needs ${ids.length} new provider images; budget is ${limit}. Over-budget assets: ${ids.slice(limit).join(', ')}`,
+		)
+	}
+}
+
+export function newPlaybackImages(
+	{ registry, jobs }: { registry: AssetRegistry; jobs: readonly ArtJob[] },
+	references: Iterable<string>,
+	{ previousBases, reusedImages }: Omit<PlanBudget, 'limit' | 'references'>,
+) {
+	const entries = new Map(registry.entries.map((entry) => [entry.id, entry]))
+	const bases = new Map(
+		jobs.flatMap((job) =>
+			'baseAssetId' in job ? [[job.assetId, job.baseAssetId] as const] : [],
+		),
+	)
+	const needed = new Set(references)
+	for (const id of needed) {
+		if (entries.get(id)?.status === 'drawn') continue
+		const base = bases.get(id) ?? previousBases.get(id)
+		if (base) needed.add(base)
+	}
+	return [...needed].filter(
+		(id) => entries.get(id)?.status !== 'drawn' && !reusedImages?.has(id),
+	)
+}
+
 export function playbackAssetIds(scenes: readonly CompiledScene[]) {
 	return new Set(
 		scenes.flatMap(({ beats }) =>
@@ -195,24 +225,13 @@ export function planArt(
 		entries: [...entries.values()],
 	}
 	if (budget) {
-		const needed = new Set(budget.references(registry))
-		for (const id of needed) {
-			if (entries.get(id)?.status === 'drawn') continue
-			const job = jobs.get(id)
-			const baseId =
-				job && 'baseAssetId' in job
-					? job.baseAssetId
-					: budget.previousBases.get(id)
-			if (baseId) needed.add(baseId)
-		}
-		const newImages = [...needed].filter(
-			(id) =>
-				entries.get(id)?.status !== 'drawn' && !budget.reusedImages?.has(id),
+		const newImages = newPlaybackImages(
+			{ registry, jobs: [...jobs.values()] },
+			budget.references(registry),
+			budget,
 		)
 		if (newImages.length > budget.limit)
-			throw new Error(
-				`Chapter needs ${newImages.length} new provider images; budget is ${budget.limit}. Over-budget assets: ${newImages.slice(budget.limit).join(', ')}`,
-			)
+			throw new ChapterImageBudgetError(newImages, budget.limit)
 	}
 	return {
 		registry,

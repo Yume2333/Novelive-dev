@@ -9,12 +9,14 @@ import { buildTextModel, type TextConnection } from '../../models/text'
 import { ArtResponseFormatError, artJson, type ModelOptions } from './models'
 import {
 	type ArtBible,
+	ChapterImageBudgetError,
 	type ManifestItem,
 	manifestIdShapes,
 	planArt,
 	playbackAssetIds,
 	validateManifestIds,
 } from './plan'
+import { type StageTrim, trimStagingToBudget } from './trim'
 
 const responseSchema = obj({
 	patch: str(),
@@ -205,10 +207,26 @@ export async function directChapterArt(
 			: 0) -
 		1024
 	const batches = script.length <= budget ? [script] : scenes
-	const items: ManifestItem[] = []
-	const merges: Record<string, string> = {}
-	const staged: string[] = []
+	let items: ManifestItem[] = []
+	let merges: Record<string, string> = {}
+	let staged = ''
+	const trimmed: StageTrim[] = []
 	for (const [i, batch] of batches.entries()) {
+		const compile = (
+			candidate: string,
+			{ entries }: AssetRegistry,
+			{ paragraphIds, speakers }: ImageBudget,
+		) => {
+			const lastScene =
+				parsed.scenes[batches.length === 1 ? parsed.scenes.length - 1 : i]
+			const last = paragraphIds.indexOf(lastScene.source.to)
+			return compileScript(candidate, {
+				...scriptOptions,
+				assets: entries,
+				speakers,
+				paragraphIds: paragraphIds.slice(0, last + 1),
+			})
+		}
 		const numbered = batch
 			.trimEnd()
 			.split('\n')
@@ -250,6 +268,7 @@ export async function directChapterArt(
 				repair = repairReply('JSON manifest', error.message, error.rejected)
 			})
 			if (!result) continue
+			let candidate: Parameters<typeof trimStagingToBudget>[0] | undefined
 			try {
 				validateManifestIds(result.items)
 				const resultScript = applyStagingPatch(
@@ -257,29 +276,21 @@ export async function directChapterArt(
 					result.patch,
 					scriptOptions,
 				)
-				const candidate = [...staged, resultScript].join('\n')
+				const script = staged ? `${staged}\n${resultScript}` : resultScript
+				candidate = {
+					script,
+					items: [...items, ...result.items],
+					merges: { ...merges, ...result.merges },
+				}
 				const plan = planArt(
-					[...items, ...result.items],
+					candidate.items,
 					bible,
 					registry,
-					{
-						...merges,
-						...result.merges,
-					},
+					candidate.merges,
 					imageBudget && {
 						...imageBudget,
-						references: ({ entries }) => {
-							const lastScene =
-								parsed.scenes[
-									batches.length === 1 ? parsed.scenes.length - 1 : i
-								]
-							const last = imageBudget.paragraphIds.indexOf(lastScene.source.to)
-							const compiled = compileScript(candidate, {
-								...scriptOptions,
-								assets: entries,
-								speakers: imageBudget.speakers,
-								paragraphIds: imageBudget.paragraphIds.slice(0, last + 1),
-							})
+						references: (registry) => {
+							const compiled = compile(script, registry, imageBudget)
 							if (!compiled.ok)
 								throw new Error(
 									compiled.diagnostics.map(({ message }) => message).join('; '),
@@ -289,7 +300,7 @@ export async function directChapterArt(
 					},
 				)
 				if (!imageBudget) {
-					const { diagnostics } = compileScript(candidate, {
+					const { diagnostics } = compileScript(candidate.script, {
 						...scriptOptions,
 						assets: plan.registry.entries,
 						speakers: [],
@@ -299,27 +310,48 @@ export async function directChapterArt(
 					const missing = diagnostics.find(({ code }) => code === 'E_ASSET')
 					if (missing) throw new Error(missing.message)
 				}
-				staged.push(resultScript)
-				items.push(...result.items)
-				Object.assign(merges, result.merges)
-				break
 			} catch (error) {
-				if (triedStagingRepair) throw error
-				triedStagingRepair = true
-				repair = repairReply(
-					'staging patch and manifest',
-					error instanceof Error ? error.message : String(error),
-					result,
+				if (!triedStagingRepair) {
+					triedStagingRepair = true
+					repair = repairReply(
+						'staging patch and manifest',
+						error instanceof Error ? error.message : String(error),
+						result,
+					)
+					continue
+				}
+				if (
+					!(error instanceof ChapterImageBudgetError) ||
+					!imageBudget ||
+					!candidate
 				)
+					throw error
+				const fit = trimStagingToBudget(
+					candidate,
+					bible,
+					registry,
+					imageBudget,
+					(script, registry) => {
+						const compiled = compile(script, registry, imageBudget)
+						return compiled.ok ? compiled.scenes : undefined
+					},
+				)
+				if (!fit) throw error
+				candidate = fit
+				trimmed.push(...fit.trimmed)
 			}
+			staged = candidate.script
+			items = candidate.items
+			merges = candidate.merges
+			break
 		}
 	}
-	const output = staged.join('\n')
 	const plan = planArt(items, bible, registry, merges)
 	return {
-		script: output,
+		script: staged,
 		items,
 		merges,
-		cgReferences: sceneReferences(output, plan.registry, scriptOptions),
+		trimmed,
+		cgReferences: sceneReferences(staged, plan.registry, scriptOptions),
 	}
 }
