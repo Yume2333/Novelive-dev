@@ -25,6 +25,7 @@ import {
 import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
 import {
 	quoteSpend,
+	requestedOutputTokens,
 	SpendBudgetError,
 } from '../../packages/creator/src/usage/spend'
 import { bible } from '../fixtures/cassettes/m1b-art/fixture'
@@ -112,11 +113,15 @@ test('staging and portrait painting dispatch to their configured role models', a
 		},
 	})
 	const requests: string[] = []
+	let painterOutput: unknown
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const req = new Request(input, init)
 		if (req.url.includes('/images/'))
 			return Response.json({ data: [{ b64_json: 'dGVzdA==' }] })
-		const { model } = await req.json()
+		const body = await req.json()
+		const { model } = body
+		if (model === 'fixture-art-visual')
+			painterOutput = requestedOutputTokens(req, body)
 		requests.push(model)
 		return requests.length === 1
 			? completion({ patch: '', items: [], merges: {} })
@@ -148,6 +153,7 @@ test('staging and portrait painting dispatch to their configured role models', a
 	)
 	await service.draw(job, bible)
 	expect(requests).toEqual(['fixture-art-fast', 'fixture-art-visual'])
+	expect(painterOutput).toBe(1024)
 })
 
 test('a painter format error after one repair materializes both base and variant placeholders before publication', async () => {
@@ -267,7 +273,7 @@ test('a later volume publishes with the reason from a reused series placeholder'
 	}
 })
 
-test('staging depends on a reused pending image absent from the new manifest', async () => {
+test('staging queues only referenced images and their bases, including reused pending images', async () => {
 	const { projectDir, workId } = await fixture()
 	using project = await Project.open(projectDir)
 	const work = await project.read(projectFiles.work('v0001', workId))
@@ -276,10 +282,13 @@ test('staging depends on a reused pending image absent from the new manifest', a
 	let chapter = 0
 	const fetch: typeof globalThis.fetch = async () =>
 		completion({
-			patch: 'PUT <4:\n@bg room/day',
+			patch: 'PUT <4:\n@bg room/night',
 			items:
 				++chapter === 1
-					? [{ id: 'room/day', kind: 'location', description: 'Sunny' }]
+					? [
+							{ id: 'room/night', kind: 'variant', description: 'Night' },
+							{ id: 'cg-unused', kind: 'cg', description: 'Unreferenced' },
+						]
 					: [],
 			merges: {},
 		})
@@ -302,15 +311,21 @@ test('staging depends on a reused pending image absent from the new manifest', a
 			`source/production/${chapterId}/draft.nvs`,
 			'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n',
 		)
-	expect(await worker.stage({ ...ctx, chapterId: first })).toMatchObject([
+	const dependencies = [
+		{ assetId: 'room/night', baseAssetId: 'room/day' },
 		{ assetId: 'room/day' },
-	])
+	]
+	expect(await worker.stage({ ...ctx, chapterId: first })).toMatchObject(
+		dependencies,
+	)
 	expect((await art().registry()).entries).toMatchObject([
 		{ id: 'room/day', status: 'pending' },
+		{ id: 'room/night', status: 'pending' },
+		{ id: 'cg-unused', status: 'pending' },
 	])
-	expect(await worker.stage({ ...ctx, chapterId: second })).toMatchObject([
-		{ assetId: 'room/day' },
-	])
+	expect(await worker.stage({ ...ctx, chapterId: second })).toMatchObject(
+		dependencies,
+	)
 })
 
 test('records a manually interrupted chapter as cancelled when production reopens', async () => {

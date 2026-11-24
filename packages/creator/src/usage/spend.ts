@@ -314,10 +314,10 @@ export function projectSpend(database: DatabaseSync) {
 					COALESCE(SUM(COALESCE(actual_images, images)), 0) AS used_images
 				FROM spend_reservation
 			)
-			WHERE used_tokens < ? AND used_tokens + ? <= ? AND used_images + ? <= ?
+			WHERE used_tokens + ? <= ? AND used_images + ? <= ?
 			RETURNING id
 		`)
-			.get(tokens, images, softLimit, tokens, tokenCap, images, imageCap) as
+			.get(tokens, images, tokens, softLimit, images, imageCap) as
 			| { id: number }
 			| undefined
 		if (!row)

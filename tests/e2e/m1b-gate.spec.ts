@@ -635,6 +635,15 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 		try {
 			const page = await resumed.firstWindow()
 			await expect(page.getByText('创作端已就绪')).toBeAttached()
+			await page.evaluate(
+				(image) =>
+					window.novelive.call('config.update', { models: { image } }).promise,
+				{
+					...configuration.models.image,
+					baseUrl,
+					model: 'loopback-draw-budget',
+				},
+			)
 			const queue = await openQueue(page)
 			await expect(queue.getByText('已暂停：模型预算不足')).toBeVisible()
 			await queue

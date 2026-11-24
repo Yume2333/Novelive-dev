@@ -783,7 +783,7 @@ export class ArtProduction {
 						.filter(Boolean)
 						.join('\n'),
 					contentSchema,
-					this.options,
+					{ ...this.options, maxTokens: 1024 },
 				)
 				content = rewrite.content
 				await savePaint({

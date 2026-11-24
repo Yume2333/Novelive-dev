@@ -373,7 +373,7 @@ export function chapterWorker(
 							...options,
 							script: { ...options.script, assets: entries },
 						})
-						for (const job of jobs) dependencies.set(job.assetId, job)
+						const planned = new Map(jobs.map((job) => [job.assetId, job]))
 						const byId = new Map(entries.map((entry) => [entry.id, entry]))
 						for (const { beats } of output.scenes)
 							for (const { actions } of beats)
@@ -384,12 +384,15 @@ export function chapterWorker(
 											byId.get(id)?.status === 'drawn'
 										)
 											continue
-										const { job } = await drawingMetadata(id)
+										const job =
+											planned.get(id) ?? (await drawingMetadata(id)).job
 										dependencies.set(id, job)
 									}
 						for (const job of dependencies.values()) {
 							if ('baseAssetId' in job && !dependencies.has(job.baseAssetId)) {
-								const { job: base } = await drawingMetadata(job.baseAssetId)
+								const base =
+									planned.get(job.baseAssetId) ??
+									(await drawingMetadata(job.baseAssetId)).job
 								dependencies.set(base.assetId, base)
 							}
 						}

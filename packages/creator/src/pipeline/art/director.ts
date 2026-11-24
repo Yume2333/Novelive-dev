@@ -201,6 +201,7 @@ export async function directChapterArt(
 			'Reply with JSON {"patch":"...","items":[{"id":"asset-id","kind":"character|location|cg|expression|variant","description":"one visible description"}],"merges":{"synonymous-expression-id":"registered-expression-id"}}.',
 			'Patch operations on original 1-based lines: PUT <N:, PUT >N:, PUT N.=M: followed by stage directions on new lines; CUT N deletes a stage direction. Do not label existing/pending or invent base links.',
 			'Use @bg place/variant, @show character/costume/expression left|center|right, and @cg cg-name.',
+			'Reuse matching backgrounds, costume bases and expressions from the registry or accumulated manifest. Only request a new expression or background variant for a meaningful visual change, and reserve CGs for pivotal moments that ordinary staging cannot show. List only assets used by stage directions.',
 			assetContract,
 			`Bible and registered assets: ${context}`,
 			...(batches.length > 1

@@ -951,3 +951,11 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** [合入 #96 后的真书 Check](evidence/m1b/owner/live-run-2fbd4d7.md) 已通过首个确认点，但第一章演出因非法 JSON 停止，未发布或试玩。预算正常，调整额度不能解决解析错误。
 - **Effort:** m1b-production
 - **Decided by:** agent (m1b-production/11)
+
+## 2026-11-23 - M1b/11 绘制窗口触线后保留预留
+
+- **Decided:** [M1b/11](tasks/m1b-production/11-m1b-owner-book.md) 仍阻塞；保留已落盘的第一章演出及三笔未核销预留，先对账并离线核对剩余绘制计划和预算，再考虑继续。
+- **Instead of:** 手动重发结果未知的请求、放宽上限，或将完成演出视为真书验收。
+- **Because:** [合入 #98 的真书恢复](evidence/m1b/owner/live-run-03fcb97.md) 通过演出，但绘制开始时项目已核销加预留达到 1,808,588 tokens，正常触发监看停止线，未发布或试玩。
+- **Effort:** m1b-production
+- **Decided by:** agent (m1b-production/11)
