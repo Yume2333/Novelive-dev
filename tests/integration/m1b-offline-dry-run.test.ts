@@ -46,6 +46,10 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 		] as const
 	).map((fault) => ({ name: fault, faults: [fault] })),
 	{
+		name: 'staging-during-sunburst-draw',
+		faults: ['image-overdelivery'],
+	},
+	{
 		name: 'review-cap-raise',
 		faults: ['review-reasoning', 'review-rate-limit'],
 	},
@@ -80,6 +84,11 @@ test.each(scenarios)(
 	async ({ name, faults }) => {
 		const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-offline-'))
 		const overdelivery = faults.includes('image-overdelivery')
+		const overlap = name === 'staging-during-sunburst-draw'
+		const drawing = Promise.withResolvers<void>()
+		const settleDrawing = Promise.withResolvers<void>()
+		let heldDraw = false
+		let releaseDrawing: ReturnType<typeof setTimeout> | undefined
 		const published = new Map(
 			chapterIds.map((id) => [id, Promise.withResolvers<void>()]),
 		)
@@ -87,8 +96,17 @@ test.each(scenarios)(
 			faults,
 			false,
 			overdelivery
-				? (chapter) => published.get(chapterIds[chapter - 2])?.promise
+				? (chapter) =>
+						overlap && chapter === 3
+							? drawing.promise
+							: published.get(chapterIds[chapter - 2])?.promise
 				: undefined,
+			(chapter) => {
+				if (!overlap || chapter !== 2 || heldDraw) return
+				heldDraw = true
+				drawing.resolve()
+				return settleDrawing.promise
+			},
 		)
 		const profile = join(root, 'profile')
 		const config = createConfigStore(profile)
@@ -99,9 +117,18 @@ test.each(scenarios)(
 				{ fetch: relay.fetch },
 				({ event }) => {
 					if (!overdelivery || !productionSnapshotEvent.check(event)) return
-					for (const chapter of event.payload.chapters)
+					for (const chapter of event.payload.chapters) {
 						if (chapter.status === 'published')
 							published.get(chapter.chapterId)?.resolve()
+						if (
+							overlap &&
+							!releaseDrawing &&
+							chapter.chapterId === chapterIds[2] &&
+							chapter.status === 'producing' &&
+							chapter.step === 'stage'
+						)
+							releaseDrawing = setTimeout(settleDrawing.resolve, 100)
+					}
 				},
 				() => {},
 			)
@@ -506,10 +533,20 @@ test.each(scenarios)(
 						.filter((row) => row.operation === 'image' && row.chapter < chapter)
 						.reduce((total, row) => total + (row.images ?? 0), 0)
 					expect(stages.length).toBeGreaterThan(0)
-					for (const stage of stages)
-						expect(stage.imageAllowance, `chapter ${chapter} allowance`).toBe(
-							Math.floor((50 - 5 - images) / (5 - chapter)),
+					for (const stage of stages) {
+						const allowance = expect(
+							stage.imageAllowance,
+							`chapter ${chapter} allowance`,
 						)
+						if (overlap && chapter === 3) {
+							expect(heldDraw && releaseDrawing !== undefined).toBe(true)
+							allowance.toBeGreaterThanOrEqual(
+								Math.floor((50 - 5 - images) / 3),
+							)
+						} else {
+							allowance.toBe(Math.floor((50 - 5 - images) / (5 - chapter)))
+						}
+					}
 				}
 			}
 			const pair = (tokens: number | null, images: number | null) =>
@@ -572,6 +609,10 @@ test.each(scenarios)(
 				)
 			}
 		} finally {
+			clearTimeout(releaseDrawing)
+			drawing.resolve()
+			settleDrawing.resolve()
+			for (const gate of published.values()) gate.resolve()
 			await host.close()
 			vi.unstubAllEnvs()
 			vi.unstubAllGlobals()

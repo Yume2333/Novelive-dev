@@ -41,7 +41,7 @@ import {
 import { existing, readBible } from '../synthesis/patch'
 import { validateStyleReferences } from '../synthesis/style-references'
 import { usageMethods, withUsage } from '../usage'
-import { chapterImageBudget, SpendBudgetError } from '../usage/spend'
+import { settledChapterImageBudget, SpendBudgetError } from '../usage/spend'
 import type { Project } from './index'
 import { resolveBible } from './series/resolve'
 
@@ -392,6 +392,11 @@ export function chapterWorker(
 					.art
 				const service = art(ctx.signal)
 				const script = (await project.readFile(draft(ctx.chapterId))).toString()
+				const limit = await settledChapterImageBudget(
+					project.database,
+					work.workId,
+					ctx.signal,
+				)
 				const registry = await service.registry()
 				const journal = stagingJournal(ctx.workId, ctx.chapterId)
 				const directory = join(project.root, journal)
@@ -399,7 +404,6 @@ export function chapterWorker(
 				const clearJournal = async () => {
 					if (checkpoint) await rm(directory, { recursive: true, force: true })
 				}
-				const limit = chapterImageBudget(project.database, work.workId)
 				const allowance = join(journal, 'allowance.json')
 				const saved = checkpoint
 					? await existing(async () => {

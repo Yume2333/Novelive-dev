@@ -126,6 +126,7 @@ export function fakeRelay(
 	faults: readonly Fault[],
 	privateStaging = false,
 	beforeWriting?: (chapter: number) => Promise<void> | undefined,
+	beforeImageReply?: (chapter: number) => Promise<void> | undefined,
 ) {
 	const pending = new Set(faults)
 	const admissions: Admission[] = []
@@ -310,9 +311,13 @@ export function fakeRelay(
 		const attributedChapter = /(?:scene 河灯-|fixture-(?:bank|cg)-)(\d+)/.exec(
 			String(image ? body.prompt : prompt),
 		)?.[1]
+		const chapter = attributedChapter
+			? Number(attributedChapter)
+			: currentChapter
+		const index = admissions.length + 1
 		admissions.push({
 			operation,
-			chapter: attributedChapter ? Number(attributedChapter) : currentChapter,
+			chapter,
 			tokens,
 			images,
 			run,
@@ -342,7 +347,8 @@ export function fakeRelay(
 				headers: { 'content-type': 'application/json' },
 			})
 		if (image) {
-			const path = `/v1/download/${admissions.length}.png`
+			await beforeImageReply?.(chapter)
+			const path = `/v1/download/${index}.png`
 			const [width, height] = String(body.size).split('x').map(Number)
 			imageBytes.set(
 				path,

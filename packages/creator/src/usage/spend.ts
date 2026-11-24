@@ -487,6 +487,22 @@ async function waitForSettlement(live: LiveImageSpend[], signal: AbortSignal) {
 	signal.throwIfAborted()
 }
 
+export async function settledChapterImageBudget(
+	database: DatabaseSync,
+	workId: string,
+	signal: AbortSignal,
+) {
+	const runId = spendRunId()
+	if (!runId) return
+	for (;;) {
+		const live = Array.from(
+			liveImageSpend.get(database.location() ?? database)?.values() ?? [],
+		).filter((entry) => entry.runId === runId)
+		if (!live.length) return chapterImageBudget(database, workId)
+		await waitForSettlement(live, signal)
+	}
+}
+
 export function projectSpend(database: DatabaseSync) {
 	const runId = spendRunId()
 	return async (
