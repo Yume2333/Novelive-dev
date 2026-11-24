@@ -1,6 +1,6 @@
 # Real-relay usage reconciliation
 
-The [CSV](reconciled-ledger.csv) is the ledger. The tables below describe the [November 24 baseline](../m1b/owner/live-run-af551d2.md#对账与释放). The ledger also includes the later `d58d4bc`, `53cc1d52`, and [`fd6e94a`](../m1b/owner/live-run-fd6e94a.md#对账与释放) windows. The current shared balance is **5,362,250 settled tokens / 55 images** and **3,453,975 unresolved tokens / 22 image slots**, including the unchanged historical unattributed amounts.
+The [CSV](reconciled-ledger.csv) is the ledger. The tables below describe the [November 24 baseline](../m1b/owner/live-run-af551d2.md#对账与释放). The ledger also includes the later `d58d4bc`, `53cc1d52`, [`fd6e94a`](../m1b/owner/live-run-fd6e94a.md#对账与释放), and [`07ffaa06`](../m1b/owner/live-run-07ffaa06.md#对账与释放) windows. The current shared balance is **5,566,641 settled tokens / 56 images** and **3,696,902 unresolved tokens / 22 image slots**, including the unchanged historical unattributed amounts.
 
 | Model | Settled tokens / images | Known prompt / completion tokens (calls covered) | Rejected relay calls; retained tokens / images | Transport failures; retained tokens / images | Other evidenced reservations: recorded calls; tokens / images |
 | --- | ---: | ---: | ---: | ---: | ---: |
