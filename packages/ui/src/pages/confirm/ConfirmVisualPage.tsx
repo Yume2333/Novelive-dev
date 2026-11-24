@@ -1,5 +1,5 @@
 import type { ProductionSnapshot } from '@novelive/creator/contract'
-import { Check } from 'lucide-react'
+import { Check, Info } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Page } from '../../components/Page'
@@ -8,6 +8,7 @@ import { workRoute } from '../../routes/production'
 import styles from '../production/Production.module.css'
 import { ProductionNotice } from '../production/ProductionNotice'
 import { useWorkProduction } from '../work/WorkProduction'
+import local from './Confirm.module.css'
 
 const t = scoped('confirm')
 
@@ -34,7 +35,7 @@ function CandidateCard({
 	disabled?: boolean
 }) {
 	return (
-		<label className={styles.candidate} data-selected={checked}>
+		<label className={local.thumb} data-selected={checked}>
 			<input
 				type={multiple ? 'checkbox' : 'radio'}
 				name={name}
@@ -54,16 +55,20 @@ function CandidateCard({
 export function ConfirmVisualPage() {
 	const { snapshot } = useWorkProduction()
 	const visual = snapshot.phase === 'confirm-visual' ? snapshot.visual : null
+	if (visual) return <VisualChoices visual={visual} />
 	return (
 		<Page title={t('确认角色与主视觉')}>
-			{visual ? (
-				<VisualChoices visual={visual} />
-			) : (
-				<div className={styles.stack}>
-					<p>{t('目前没有待确认的主视觉。')}</p>
-					<Link to={workRoute('work', snapshot.workId)}>{t('返回概览')}</Link>
-				</div>
-			)}
+			<div className={styles.flow}>
+				<section className={`${styles.panel} ${styles.panelBody}`}>
+					<p className={styles.muted}>{t('目前没有待确认的主视觉。')}</p>
+					<Link
+						className={styles.ghost}
+						to={workRoute('work', snapshot.workId)}
+					>
+						{t('返回概览')}
+					</Link>
+				</section>
+			</div>
 		</Page>
 	)
 }
@@ -117,167 +122,214 @@ function VisualChoices({ visual }: { visual: Visual }) {
 	)
 	const workId = snapshot.workId
 
+	const missing = (main ? 0 : 1) + visual.characters.length - characters.length
+	const ready = !busy && missing === 0
+
 	return (
-		<form
-			className={styles.stack}
-			onSubmit={async (event) => {
-				event.preventDefault()
-				if (!main || characters.length !== visual.characters.length) return
-				if (
-					await run('production.confirmVisual', {
-						workId,
-						mainVisualId: main.id,
-						characters,
-						supplementalIds,
-					})
-				)
-					navigate(workRoute('production', workId))
-			}}
-		>
-			<p className={styles.lead}>
-				{t('确认点 1 / 2 · 选择首卷主要角色的设定和全作统一的主视觉。')}
-			</p>
-			{visual.mattingUnavailable && (
-				<ProductionNotice>
-					<span role="status">
-						{t(
-							'本地去背景不可用；无法生成透明底的角色可以使用占位图继续制作。',
-						)}
-					</span>
-				</ProductionNotice>
-			)}
-			{imported?.fallback ? (
-				<p className={styles.notice} role="status">
-					{t('未能筛选 EPUB 插图，已显示全部插图，可手动选择。')}
-				</p>
-			) : importedCandidates.some(
-					({ id }) =>
-						!recommended.includes(id) && !imported?.selected.includes(id),
-				) ? (
+		<Page
+			eyebrow={
+				snapshot.title
+					? `${snapshot.title} · ${t('确认点 1 / 2')}`
+					: t('确认点 1 / 2')
+			}
+			title={
+				<span className={local.title}>
+					{t('确认角色与主视觉')}
+					<Info
+						className={local.info}
+						size={16}
+						aria-label={t('确认后开始制作第一章；第一章做完会再停一次。')}
+					/>
+				</span>
+			}
+			actions={
 				<div className={styles.actions}>
+					{missing > 0 && (
+						<span className={local.missing}>
+							{t('还差 {{value}} 项未选定', { value: missing })}
+						</span>
+					)}
+					<Link className={styles.ghost} to={workRoute('work', workId)}>
+						{t('返回概览')}
+					</Link>
 					<button
-						className={styles.button}
-						type="button"
-						aria-pressed={showAll}
-						onClick={() => setShowAll(!showAll)}
+						className={styles.primary}
+						disabled={!ready}
+						form="visual-choices"
+						type="submit"
 					>
-						{showAll ? t('收起未推荐的 EPUB 插图') : t('显示全部 EPUB 插图')}
+						<Check aria-hidden="true" size={16} />
+						{t('确认并制作第一章')}
 					</button>
 				</div>
-			) : null}
-			<fieldset className={styles.card} disabled={busy}>
-				<legend>{t('主视觉')}</legend>
-				<div className={styles.gallery}>
-					{mainVisuals.map((candidate, index) => (
-						<CandidateCard
-							key={candidate.id}
-							candidate={candidate}
-							index={index}
-							name="main-visual"
-							label={label(candidate.id)}
-							checked={candidate.id === mainId}
-							onChange={() => {
-								setMainId(candidate.id)
-								setSupplemental((ids) =>
-									ids.filter((id) => id !== candidate.id),
-								)
-							}}
-						/>
-					))}
-				</div>
-			</fieldset>
-			{visual.characters.length > 0 && (
-				<section aria-labelledby="major-characters" className={styles.stack}>
-					<h2 id="major-characters">{t('第一卷主要角色')}</h2>
-					{visual.characters.map(
-						({
-							characterId,
-							costumeId,
-							characterName,
-							costumeName,
-							candidates,
-						}) => {
-							const key = `${characterId}/${costumeId}`
-							return (
-								<fieldset
-									key={key}
-									className={`${styles.card} ${styles.portraits}`}
-									disabled={busy}
-								>
-									<legend>
-										{characterName ?? characterId} · {costumeName ?? costumeId}
-									</legend>
-									<div className={styles.gallery}>
-										{candidates.map((candidate, index) => (
-											<CandidateCard
-												key={candidate.id}
-												candidate={candidate}
-												index={index}
-												name={key}
-												label={
-													candidate.id === 'costume-epub'
-														? t('EPUB 参考方案')
-														: undefined
-												}
-												checked={characterIds[key] === candidate.id}
-												onChange={() =>
-													setCharacterIds((choices) => ({
-														...choices,
-														[key]: candidate.id,
-													}))
-												}
-											/>
-										))}
-									</div>
-								</fieldset>
-							)
-						},
+			}
+		>
+			<form
+				id="visual-choices"
+				className={styles.flow}
+				onSubmit={async (event) => {
+					event.preventDefault()
+					if (!main || characters.length !== visual.characters.length) return
+					if (
+						await run('production.confirmVisual', {
+							workId,
+							mainVisualId: main.id,
+							characters,
+							supplementalIds,
+						})
+					)
+						navigate(workRoute('production', workId))
+				}}
+			>
+				<p className={styles.muted}>
+					{t('确认点 1 / 2 · 选择首卷主要角色的设定和全作统一的主视觉。')}
+				</p>
+				{visual.mattingUnavailable && (
+					<ProductionNotice kind="warning">
+						<span role="status">
+							{t(
+								'本地去背景不可用；无法生成透明底的角色可以使用占位图继续制作。',
+							)}
+						</span>
+					</ProductionNotice>
+				)}
+				{imported?.fallback && (
+					<ProductionNotice>
+						<span role="status">
+							{t('未能筛选 EPUB 插图，已显示全部插图，可手动选择。')}
+						</span>
+					</ProductionNotice>
+				)}
+				{!imported?.fallback &&
+					importedCandidates.some(
+						({ id }) =>
+							!recommended.includes(id) && !imported?.selected.includes(id),
+					) && (
+						<button
+							className={styles.ghost}
+							type="button"
+							aria-pressed={showAll}
+							onClick={() => setShowAll(!showAll)}
+						>
+							{showAll ? t('收起未推荐的 EPUB 插图') : t('显示全部 EPUB 插图')}
+						</button>
 					)}
-				</section>
-			)}
-			{supplementalVisuals.length > 0 && (
-				<fieldset className={styles.card} disabled={busy}>
-					<legend>{t('补充画风参考（最多两张）')}</legend>
-					<div className={styles.gallery}>
-						{supplementalVisuals.map((candidate, index) => {
-							const checked = supplementalIds.includes(candidate.id)
-							return (
-								<CandidateCard
-									key={candidate.id}
-									candidate={candidate}
-									index={index}
-									name="supplemental"
-									label={label(candidate.id)}
-									multiple
-									checked={checked}
-									disabled={!checked && supplementalIds.length >= 2}
-									onChange={() =>
-										setSupplemental(
-											checked
-												? supplementalIds.filter((id) => id !== candidate.id)
-												: [...supplementalIds, candidate.id],
-										)
-									}
-								/>
-							)
-						})}
+				<fieldset className={local.section} disabled={busy}>
+					<legend>
+						<span className={styles.sectionLabel}>{t('主视觉')}</span>
+					</legend>
+					<div className={`${styles.panel} ${styles.panelBody} ${local.grid}`}>
+						{mainVisuals.map((candidate, index) => (
+							<CandidateCard
+								key={candidate.id}
+								candidate={candidate}
+								index={index}
+								name="main-visual"
+								label={label(candidate.id)}
+								checked={candidate.id === mainId}
+								onChange={() => {
+									setMainId(candidate.id)
+									setSupplemental((ids) =>
+										ids.filter((id) => id !== candidate.id),
+									)
+								}}
+							/>
+						))}
 					</div>
 				</fieldset>
-			)}
-			<div className={styles.actions}>
-				<Link className={styles.button} to={workRoute('work', workId)}>
-					{t('返回概览')}
-				</Link>
-				<button
-					className={styles.primary}
-					disabled={
-						busy || !main || characters.length !== visual.characters.length
-					}
-					type="submit"
-				>
-					{t('确认并制作第一章')}
-				</button>
-			</div>
-		</form>
+				{visual.characters.length > 0 && (
+					<section
+						aria-labelledby="major-characters"
+						className={local.character}
+					>
+						<h2 id="major-characters" className={styles.sectionLabel}>
+							{t('第一卷主要角色')}
+						</h2>
+						{visual.characters.map(
+							({
+								characterId,
+								costumeId,
+								characterName,
+								costumeName,
+								candidates,
+							}) => {
+								const key = `${characterId}/${costumeId}`
+								return (
+									<fieldset
+										key={key}
+										className={`${styles.panel} ${styles.panelBody} ${local.section} ${local.portraits}`}
+										disabled={busy}
+									>
+										<legend className={local.character}>
+											<h3>
+												{characterName ?? characterId} ·{' '}
+												{costumeName ?? costumeId}
+											</h3>
+										</legend>
+										<div className={local.grid}>
+											{candidates.map((candidate, index) => (
+												<CandidateCard
+													key={candidate.id}
+													candidate={candidate}
+													index={index}
+													name={key}
+													label={
+														candidate.id === 'costume-epub'
+															? t('EPUB 参考方案')
+															: undefined
+													}
+													checked={characterIds[key] === candidate.id}
+													onChange={() =>
+														setCharacterIds((choices) => ({
+															...choices,
+															[key]: candidate.id,
+														}))
+													}
+												/>
+											))}
+										</div>
+									</fieldset>
+								)
+							},
+						)}
+					</section>
+				)}
+				{supplementalVisuals.length > 0 && (
+					<fieldset className={local.section} disabled={busy}>
+						<legend>
+							<span className={styles.sectionLabel}>
+								{t('补充画风参考（最多两张）')}
+							</span>
+						</legend>
+						<div
+							className={`${styles.panel} ${styles.panelBody} ${local.grid}`}
+						>
+							{supplementalVisuals.map((candidate, index) => {
+								const checked = supplementalIds.includes(candidate.id)
+								return (
+									<CandidateCard
+										key={candidate.id}
+										candidate={candidate}
+										index={index}
+										name="supplemental"
+										label={label(candidate.id)}
+										multiple
+										checked={checked}
+										disabled={!checked && supplementalIds.length >= 2}
+										onChange={() =>
+											setSupplemental(
+												checked
+													? supplementalIds.filter((id) => id !== candidate.id)
+													: [...supplementalIds, candidate.id],
+											)
+										}
+									/>
+								)
+							})}
+						</div>
+					</fieldset>
+				)}
+			</form>
+		</Page>
 	)
 }
