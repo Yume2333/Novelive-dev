@@ -482,7 +482,7 @@ function trackImageSpend(
 async function waitForSettlement(live: LiveImageSpend[], signal: AbortSignal) {
 	signal.throwIfAborted()
 	const abort = Promise.withResolvers<never>()
-	using listener = addAbortListener(signal, () => abort.reject(signal.reason))
+	using _listener = addAbortListener(signal, () => abort.reject(signal.reason))
 	await Promise.race([...live.map(({ done }) => done), abort.promise])
 	signal.throwIfAborted()
 }
@@ -587,7 +587,7 @@ export function projectSpend(database: DatabaseSync) {
 			row = admit()
 		}
 		const { id } = row
-		using live = images ? trackImageSpend(database, id, runId) : undefined
+		using _live = images ? trackImageSpend(database, id, runId) : undefined
 		const settle = (
 			actualTokens: number | null,
 			actualImages: number | null,

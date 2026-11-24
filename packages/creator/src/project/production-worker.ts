@@ -41,7 +41,7 @@ import {
 import { existing, readBible } from '../synthesis/patch'
 import { validateStyleReferences } from '../synthesis/style-references'
 import { usageMethods, withUsage } from '../usage'
-import { settledChapterImageBudget, SpendBudgetError } from '../usage/spend'
+import { SpendBudgetError, settledChapterImageBudget } from '../usage/spend'
 import type { Project } from './index'
 import { resolveBible } from './series/resolve'
 
