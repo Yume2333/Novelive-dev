@@ -138,18 +138,24 @@ export async function quoteSpend(request: Request) {
 	try {
 		if (request.method !== 'POST') throw new Error()
 		if (/\/images\/(?:generations|edits)$/.test(path)) {
-			const n = request.headers.get('content-type')?.startsWith('multipart/')
-				? ((await request.clone().formData()).get('n') ?? '1')
-				: (object(await request.clone().json()).n ?? 1)
+			const multipart = request.headers
+				.get('content-type')
+				?.startsWith('multipart/')
+			const form = multipart ? await request.clone().formData() : undefined
+			const body = form ? undefined : object(await request.clone().json())
+			const n = (form ? form.get('n') : body?.n) ?? 1
+			const model = form ? form.get('model') : body?.model
 			const count = typeof n === 'string' && /^\d+$/.test(n) ? Number(n) : n
 			if (!valid(count) || count < 1) throw new Error()
 			const perImage = cap(
 				process.env.NL_RUN_IMAGE_TOKEN_RESERVE ?? '7000',
 				'NL_RUN_IMAGE_TOKEN_RESERVE',
 			)
-			const tokens = count * perImage
-			if (!perImage || !valid(tokens)) throw new Error()
-			return { tokens, images: count }
+			const sunburst = model === 'gpt-image-2.6-sunburst'
+			const images = count * (sunburst ? 3 : 1)
+			const tokens = Math.max(images * perImage, sunburst ? count * 31_000 : 0)
+			if (!perImage || !valid(tokens) || !valid(images)) throw new Error()
+			return { tokens, images }
 		}
 		const responses = path.endsWith('/responses')
 		if (!responses && !/\/(?:chat\/completions|messages)$/.test(path))

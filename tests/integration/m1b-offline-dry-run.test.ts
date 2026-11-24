@@ -37,6 +37,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'image-failure',
 			'image-null',
 			'image-invalid-json',
+			'image-overdelivery',
 			'download-failure',
 			'download-body-failure',
 			'soft-stop',
@@ -117,7 +118,13 @@ test.each(scenarios)(
 							maxOutputTokens: null,
 						},
 					}),
-					image: { ...configuration.models.image, retries: 3 },
+					image: {
+						...configuration.models.image,
+						retries: 3,
+						...(faults.includes('image-overdelivery') && {
+							model: 'gpt-image-2.6-sunburst',
+						}),
+					},
 				},
 				production: { roleModels: { artist: 'fast' } },
 			})
@@ -460,6 +467,11 @@ test.each(scenarios)(
 			}
 			const ledger = reservations()
 			expect(ledger).toHaveLength(relay.admissions.length)
+			if (faults.includes('image-overdelivery')) {
+				expect(
+					ledger.filter(({ actual_images }) => actual_images === 3),
+				).toMatchObject([{ tokens: 31_000, images: 3, actual_tokens: 30_509 }])
+			}
 			const pair = (tokens: number | null, images: number | null) =>
 				JSON.stringify([tokens, images])
 			for (let i = 1; i <= window; i++) {

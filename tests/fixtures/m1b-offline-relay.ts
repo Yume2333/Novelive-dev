@@ -56,6 +56,7 @@ export type Fault =
 	| 'image-failure'
 	| 'image-null'
 	| 'image-invalid-json'
+	| 'image-overdelivery'
 	| 'download-failure'
 	| 'download-body-failure'
 	| 'soft-stop'
@@ -246,9 +247,12 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					(candidate === 'review-reasoning' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-1')) ||
-					(['image-failure', 'image-null', 'image-invalid-json'].includes(
-						candidate,
-					) &&
+					([
+						'image-failure',
+						'image-null',
+						'image-invalid-json',
+						'image-overdelivery',
+					].includes(candidate) &&
 						operation === 'image' &&
 						currentChapter > 0) ||
 					(candidate === 'invalid-id' && operation === 'stage' && !repair) ||
@@ -275,9 +279,17 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 				: operation === 'window-fill'
 					? Number(body.max_tokens)
 					: image
-						? 700
+						? fault === 'image-overdelivery'
+							? 30_509
+							: 700
 						: 2_000
-		const images = tokens === null ? null : Number(image)
+		const images =
+			tokens === null
+				? null
+				: fault === 'image-overdelivery'
+					? 3
+					: Number(image)
+		if (fault === 'image-overdelivery') assert.equal(Number(body.n), 1)
 		const run = process.env.NL_RUN_ID ?? ''
 		const attributedChapter = /(?:scene 河灯-|fixture-(?:bank|cg)-)(\d+)/.exec(
 			String(image ? body.prompt : prompt),
@@ -319,7 +331,9 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 				await picture(width, height, body.background === 'transparent'),
 			)
 			return Response.json({
-				data: [{ url: endpoint + path }],
+				data: Array.from({ length: images ?? 0 }, (_, i) => ({
+					url: i ? `${endpoint}${path}?variant=${i}` : endpoint + path,
+				})),
 				usage: { total_tokens: tokens },
 			})
 		}

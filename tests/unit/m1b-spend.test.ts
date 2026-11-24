@@ -666,6 +666,54 @@ test('exhausted image and token caps block image edits, generation, and visual r
 	expect(fetch).not.toHaveBeenCalled()
 })
 
+test.each(['generations', 'edits'])(
+	'Sunburst %s reserve for three outputs per requested image',
+	async (route) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '2')
+		vi.stubEnv('NL_RUN_IMAGE_TOKEN_RESERVE', '7000')
+		const request = () => {
+			const body = new FormData()
+			body.set('model', 'gpt-image-2.6-sunburst')
+			body.set('n', '1')
+			body.append('image[]', new Blob(['first']), 'first.png')
+			body.append('image[]', new Blob(['second']), 'second.png')
+			return new Request(`https://example.invalid/v1/images/${route}`, {
+				method: 'POST',
+				body:
+					route === 'edits'
+						? body
+						: JSON.stringify({ n: 1, model: 'gpt-image-2.6-sunburst' }),
+			})
+		}
+		using database = new DatabaseSync(':memory:')
+		const send = vi.fn(async () =>
+			Response.json({
+				data: Array.from({ length: 3 }, () => ({ b64_json: 'fixture' })),
+				usage: { total_tokens: 30_509 },
+			}),
+		)
+		await expect(projectSpend(database)(request(), send)).rejects.toThrow(
+			'超出工程预算',
+		)
+		expect(send).not.toHaveBeenCalled()
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '3')
+		await projectSpend(database)(request(), send)
+		expect(send).toHaveBeenCalledOnce()
+		expect(
+			database
+				.prepare(
+					'SELECT tokens, images, actual_tokens, actual_images FROM spend_reservation',
+				)
+				.all(),
+		).toEqual([
+			{ tokens: 31_000, images: 3, actual_tokens: 30_509, actual_images: 3 },
+		])
+		vi.stubEnv('NL_RUN_IMAGE_TOKEN_RESERVE', '12000')
+		expect(await quoteSpend(request())).toEqual({ tokens: 36_000, images: 3 })
+	},
+)
+
 test('image reservations settle the returned image count and any measured token usage', async () => {
 	vi.stubEnv('NL_REPLAY', '')
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')

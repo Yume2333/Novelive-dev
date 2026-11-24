@@ -15,6 +15,7 @@ const {
 	NL_M1B_DRY_RUN_CHECKPOINT: checkpoint,
 	NL_M1B_DRY_RUN_PROFILE: profile,
 	NL_M1B_DRY_RUN_RECORDINGS: recordings,
+	NL_M1B_DRY_RUN_DRAWING_CHECKPOINT: drawingCheckpoint,
 } = process.env
 
 test.skipIf(!checkpoint || !profile)(
@@ -127,6 +128,87 @@ test.skipIf(!checkpoint || !profile)(
 					(await readFile(join(root, 'cache', asset?.path ?? ''))).length,
 				).toBeGreaterThan(0)
 			}
+		} finally {
+			await host.close()
+			vi.unstubAllEnvs()
+			vi.unstubAllGlobals()
+			await rm(root, { recursive: true, force: true })
+		}
+	},
+	120_000,
+)
+
+test.skipIf(!drawingCheckpoint || !profile)(
+	'the private drawing checkpoint resumes without staging requests',
+	async () => {
+		if (!drawingCheckpoint || !profile) return
+		const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-drawing-dry-run-'))
+		const directory = join(root, 'project')
+		const relay = fakeRelay([], true)
+		const host = createProduction(
+			root,
+			createConfigStore(profile),
+			{
+				fetch: async (input, init) => {
+					const request = new Request(input, init)
+					const { pathname } = new URL(request.url)
+					return relay.fetch(
+						new Request(`https://relay.invalid${pathname}`, request),
+					)
+				},
+			},
+			() => {},
+			() => {},
+		)
+		try {
+			vi.stubGlobal('fetch', () => {
+				throw new Error('Network is forbidden in the dry run')
+			})
+			vi.stubEnv('NL_REPLAY', '')
+			vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+			vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '0.8')
+			vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+			vi.stubEnv('NL_RUN_IMAGE_TOKEN_RESERVE', '7000')
+			vi.stubEnv('NL_RUN_ID', 'offline-private-drawing')
+			vi.stubEnv('NL_USAGE_CSV', join(root, 'usage.csv'))
+			await cp(drawingCheckpoint, directory, { recursive: true })
+			using project = await Project.open(directory)
+			const series = await project.read(projectFiles.series)
+			const [volumeId] = series.volumeIds
+			const volume = await project.read(projectFiles.volume(volumeId))
+			const [workId] = volume.workIds
+			const reservations = () =>
+				project.database
+					.prepare('SELECT * FROM spend_reservation ORDER BY id')
+					.all()
+			const original = reservations()
+			expect(original).toHaveLength(134)
+			await host.remember(workId, directory)
+			const session = await host.get(workId)
+			await session.queue.idle()
+			expect(relay.admissions).toHaveLength(0)
+			expect(reservations()).toEqual(original)
+			await session.continue()
+			await session.queue.idle()
+			expect(
+				relay.admissions.some(({ operation }) => operation === 'image'),
+			).toBe(true)
+			expect(
+				relay.admissions.filter(
+					({ operation }) =>
+						operation === 'stage' ||
+						operation === 'write' ||
+						operation === 'review',
+				),
+			).toHaveLength(0)
+			const ledger = reservations()
+			expect(ledger.slice(0, original.length)).toEqual(original)
+			const images = ledger
+				.slice(original.length)
+				.filter(({ images }) => images !== 0)
+			expect(images.length).toBeGreaterThan(0)
+			for (const image of images)
+				expect(image).toMatchObject({ tokens: 31_000, images: 3 })
 		} finally {
 			await host.close()
 			vi.unstubAllEnvs()
