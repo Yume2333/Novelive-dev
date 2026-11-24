@@ -57,6 +57,7 @@ export class ProductionTaskError extends Error {
 
 export type SchedulerOptions = {
 	imageConcurrency?: number
+	imageBudget?: (workId: string) => number | undefined
 	now?: () => number
 	onChange?: () => void
 	slot?: {
@@ -211,6 +212,7 @@ export class ChapterScheduler {
 	private readonly now: () => number
 	private readonly onChange?: () => void
 	private readonly slot?: SchedulerOptions['slot']
+	private readonly imageBudget?: SchedulerOptions['imageBudget']
 	private disposed = false
 
 	constructor(
@@ -222,6 +224,7 @@ export class ChapterScheduler {
 		this.now = options.now ?? Date.now
 		this.onChange = options.onChange
 		this.slot = options.slot
+		this.imageBudget = options.imageBudget
 		recoverChapterWork(db, this.slot?.workId, this.now)
 	}
 
@@ -270,6 +273,7 @@ export class ChapterScheduler {
 			this.resumeWork(workId)
 		} else if (work.status === 'paused' && work.reason !== 'chapter_failed') {
 			this.transaction(() => {
+				this.restageOversizedChapters(workId)
 				this.exec(
 					`UPDATE chapter SET flagged = 0 WHERE work_id = ? AND chapter_id IN
 					(SELECT ref_id FROM task WHERE work_id = ? AND kind = 'chapter' AND status = 'needs_attention' AND error_type = 'budget_paused')`,
@@ -1122,6 +1126,7 @@ export class ChapterScheduler {
 	}
 
 	private resumeWork(workId: string) {
+		this.transaction(() => this.restageOversizedChapters(workId))
 		if (
 			!this.get(
 				"SELECT 1 FROM task WHERE work_id = ? AND kind = 'chapter' AND status <> 'done'",
@@ -1144,6 +1149,49 @@ export class ChapterScheduler {
 						: 'image_unsupported',
 				)
 			else this.requeueWork(workId)
+		}
+	}
+
+	private restageOversizedChapters(workId: string) {
+		const budget = this.imageBudget?.(workId)
+		if (budget === undefined) return
+		const oversized = this.all<{ task_id: string; ref_id: string }>(
+			`SELECT c.task_id, c.ref_id FROM task c
+			JOIN task_dep d ON d.task_id = c.task_id AND d.soft = 0
+			JOIN task i ON i.task_id = d.depends_on AND i.kind = 'image'
+			JOIN asset a ON a.work_id = i.work_id AND a.asset_key = i.ref_id
+			WHERE c.work_id = ? AND c.kind = 'chapter' AND c.phase = 'await_draw'
+				AND c.status NOT IN ('done', 'running') AND a.status <> 'drawn'
+			GROUP BY c.task_id HAVING COUNT(*) > ?`,
+			workId,
+			budget,
+		)
+		for (const task of oversized) {
+			const oldImages = this.all<{ depends_on: string }>(
+				'SELECT depends_on FROM task_dep WHERE task_id = ? AND soft = 0',
+				task.task_id,
+			)
+			this.exec(
+				`DELETE FROM task_dep WHERE task_id = ? AND soft = 0`,
+				task.task_id,
+			)
+			this.exec(
+				`UPDATE task SET phase = 'stage', status = 'queued', attempts = 0, desensitized = 0,
+					error_type = NULL, run_id = NULL WHERE task_id = ?`,
+				task.task_id,
+			)
+			this.exec(
+				'UPDATE chapter SET flagged = 0, placeholder = 0 WHERE work_id = ? AND chapter_id = ?',
+				workId,
+				task.ref_id,
+			)
+			for (const { depends_on } of oldImages)
+				this.exec(
+					`DELETE FROM task WHERE task_id = ? AND kind = 'image' AND status NOT IN ('running', 'done')
+					AND NOT EXISTS (SELECT 1 FROM task_dep d WHERE d.depends_on = task.task_id OR d.task_id = task.task_id)
+					AND EXISTS (SELECT 1 FROM asset a WHERE a.work_id = task.work_id AND a.asset_key = task.ref_id AND a.chapter_id IS NOT NULL)`,
+					depends_on,
+				)
 		}
 	}
 

@@ -24,6 +24,7 @@ import {
 } from '../../packages/creator/src/project/production-worker'
 import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
 import {
+	chapterImageBudget,
 	quoteSpend,
 	requestedOutputTokens,
 	SpendBudgetError,
@@ -326,6 +327,107 @@ test('staging queues only referenced images and their bases, including reused pe
 	expect(await worker.stage({ ...ctx, chapterId: second })).toMatchObject(
 		dependencies,
 	)
+})
+
+test('resume replaces an oversized drawing queue with one bounded staging repair', async () => {
+	const { projectDir, workId } = await fixture()
+	using project = await Project.open(projectDir)
+	const work = await project.read(projectFiles.work('v0001', workId))
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const chapterId = work.chapterIds[0]
+	const draft = `source/production/${chapterId}/draft.nvs`
+	const script = 'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n'
+	await project.writeFile(draft, script)
+	const previous = new ScriptedWorker({
+		[chapterId]: [
+			{ assetId: 'cg-old-first', kind: 'cg' },
+			{ assetId: 'cg-old-second', kind: 'cg' },
+		],
+	})
+	const initial = new ChapterScheduler(project.database, previous, {
+		imageConcurrency: 0,
+	})
+	project.tasks.registerWork({ workId, title: work.title })
+	initial.start(workId, [chapterId])
+	initial.confirmVisual(workId)
+	await initial.idle()
+	initial.dispose()
+	expect(previous.calls).toEqual([
+		`write:${chapterId}`,
+		`review:${chapterId}`,
+		`stage:${chapterId}`,
+	])
+
+	vi.stubEnv('NL_RUN_ID', 'offline-restage')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '6')
+	const prompts: string[] = []
+	const { worker } = chapterWorker(
+		project,
+		'v0001',
+		work,
+		await productionModels(config),
+		{
+			fetch: async (_url, init) => {
+				prompts.push(String(init?.body))
+				return prompts.length === 1
+					? completion({
+							patch: 'PUT <4:\n@bg room/night',
+							items: [
+								{ id: 'room/night', kind: 'variant', description: 'Night' },
+							],
+							merges: {},
+						})
+					: completion({
+							patch: 'PUT <4:\n@bg room/day',
+							items: [
+								{ id: 'room/day', kind: 'location', description: 'Day' },
+								{ id: 'cg-unused', kind: 'cg', description: 'Not referenced' },
+							],
+							merges: {},
+						})
+			},
+		},
+	)
+	const draws: string[] = []
+	const resumed = new ChapterScheduler(
+		project.database,
+		{
+			...worker,
+			async write() {
+				throw new Error('Writing redispatched')
+			},
+			async review() {
+				throw new Error('Review redispatched')
+			},
+			async draw(job) {
+				draws.push(job.assetId)
+				return { status: 'drawn' }
+			},
+		},
+		{ imageBudget: (id) => chapterImageBudget(project.database, id) },
+	)
+	try {
+		resumed.continue(workId)
+		await resumed.idle()
+		expect(prompts).toHaveLength(2)
+		expect(prompts[0]).toContain('Hard limit for this whole chapter: 1')
+		expect(prompts[1]).toContain(
+			'Chapter needs 2 new provider images; budget is 1. Over-budget assets: room/day',
+		)
+		expect(draws).toEqual(['room/day'])
+		expect(resumed.snapshot(workId).chapters).toMatchObject([
+			{ status: 'published' },
+		])
+		expect((await project.readFile(draft)).toString()).toBe(script)
+		expect(
+			project.database
+				.prepare("SELECT ref_id FROM task WHERE kind = 'image'")
+				.all(),
+		).toEqual([{ ref_id: 'room/day' }])
+	} finally {
+		resumed.dispose()
+	}
 })
 
 test('records a manually interrupted chapter as cancelled when production reopens', async () => {

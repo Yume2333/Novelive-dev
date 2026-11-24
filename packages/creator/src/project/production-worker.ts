@@ -20,6 +20,7 @@ import {
 	planArt,
 } from '../pipeline/art'
 import type { CgReferences } from '../pipeline/art/director'
+import { playbackAssetIds } from '../pipeline/art/plan'
 import {
 	reviewChapter,
 	type WriterOptions,
@@ -36,7 +37,7 @@ import {
 import { existing, readBible } from '../synthesis/patch'
 import { validateStyleReferences } from '../synthesis/style-references'
 import { usageMethods, withUsage } from '../usage'
-import { SpendBudgetError } from '../usage/spend'
+import { chapterImageBudget, SpendBudgetError } from '../usage/spend'
 import type { Project } from './index'
 import { resolveBible } from './series/resolve'
 
@@ -349,17 +350,36 @@ export function chapterWorker(
 					.art
 				const service = art(ctx.signal)
 				const script = (await project.readFile(draft(ctx.chapterId))).toString()
-				const staged = await directChapterArt(
-					script,
-					bible,
-					await service.registry(),
-					{
-						main: models.artist,
-						replay,
-						customMarks: options.script.customMarks,
-						signal: ctx.signal,
-					},
-				)
+				const registry = await service.registry()
+				const limit = chapterImageBudget(project.database, work.workId)
+				const previousBases = new Map<string, string>()
+				if (limit !== undefined) {
+					for (const entry of registry.entries) {
+						if (
+							entry.status === 'drawn' ||
+							!['expression', 'variant'].includes(entry.type)
+						)
+							continue
+						const prior = await existing(() => drawingMetadata(entry.id))
+						if (prior && 'baseAssetId' in prior.job)
+							previousBases.set(entry.id, prior.job.baseAssetId)
+					}
+				}
+				const staged = await directChapterArt(script, bible, registry, {
+					main: models.artist,
+					replay,
+					customMarks: options.script.customMarks,
+					signal: ctx.signal,
+					imageBudget:
+						limit === undefined
+							? undefined
+							: {
+									limit,
+									previousBases,
+									paragraphIds: chapter.paragraphs.map(({ id }) => id),
+									speakers: options.script.speakers,
+								},
+				})
 				ctx.signal.throwIfAborted()
 				const dependencies = new Map<string, ArtJob>()
 				const sceneIds: string[] = []
@@ -375,24 +395,21 @@ export function chapterWorker(
 						})
 						const planned = new Map(jobs.map((job) => [job.assetId, job]))
 						const byId = new Map(entries.map((entry) => [entry.id, entry]))
-						for (const { beats } of output.scenes)
-							for (const { actions } of beats)
-								for (const { assets } of actions)
-									for (const { id } of assets) {
-										if (
-											dependencies.has(id) ||
-											byId.get(id)?.status === 'drawn'
-										)
-											continue
-										const job =
-											planned.get(id) ?? (await drawingMetadata(id)).job
-										dependencies.set(id, job)
-									}
+						for (const id of playbackAssetIds(output.scenes)) {
+							if (byId.get(id)?.status === 'drawn') continue
+							const job = planned.get(id) ?? (await drawingMetadata(id)).job
+							dependencies.set(id, job)
+						}
 						for (const job of dependencies.values()) {
 							if ('baseAssetId' in job && !dependencies.has(job.baseAssetId)) {
 								const base =
 									planned.get(job.baseAssetId) ??
-									(await drawingMetadata(job.baseAssetId)).job
+									(
+										await existing(() => drawingMetadata(job.baseAssetId)).then(
+											(metadata) =>
+												metadata ?? confirmedPortrait(job.baseAssetId, bible),
+										)
+									).job
 								dependencies.set(base.assetId, base)
 							}
 						}

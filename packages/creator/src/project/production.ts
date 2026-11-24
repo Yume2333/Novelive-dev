@@ -20,7 +20,7 @@ import {
 import { prepareSeries } from '../synthesis/incremental'
 import { existing } from '../synthesis/patch'
 import { withUsage } from '../usage'
-import { projectSpend } from '../usage/spend'
+import { chapterImageBudget, projectSpend } from '../usage/spend'
 import { Project } from './index'
 import { loadPlayerChapter, loadPlayerStatus } from './player'
 import {
@@ -484,6 +484,7 @@ export function createProduction(
 			}
 			const queue = new ChapterScheduler(data, worker, {
 				imageConcurrency: models.image.concurrency,
+				imageBudget: (id) => chapterImageBudget(data, id),
 				onChange: emit,
 				slot: {
 					workId,

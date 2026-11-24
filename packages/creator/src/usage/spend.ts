@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import sharp from 'sharp'
 import { reserveTokenFields } from './reservation'
@@ -285,7 +287,55 @@ function observeUsage(response: Response, settle: (tokens: number) => void) {
 	})
 }
 
+function spendLedger(database: DatabaseSync) {
+	database.exec(`CREATE TABLE IF NOT EXISTS spend_reservation (
+		id INTEGER PRIMARY KEY,
+		tokens INTEGER NOT NULL,
+		images INTEGER NOT NULL,
+		actual_tokens INTEGER,
+		actual_images INTEGER,
+		run_id TEXT
+	) STRICT`)
+	if (
+		!database
+			.prepare(
+				"SELECT 1 FROM pragma_table_info('spend_reservation') WHERE name = 'run_id'",
+			)
+			.get()
+	)
+		database.exec('ALTER TABLE spend_reservation ADD COLUMN run_id TEXT')
+}
+
+function spendRunId() {
+	const csv = process.env.NL_USAGE_CSV
+	return (
+		process.env.NL_RUN_ID ||
+		(csv && createHash('sha256').update(resolve(csv)).digest('hex')) ||
+		null
+	)
+}
+
+export function chapterImageBudget(database: DatabaseSync, workId: string) {
+	const runId = spendRunId()
+	if (!runId) return
+	const imageCap = cap(process.env.NL_RUN_IMAGE_CAP, 'NL_RUN_IMAGE_CAP')
+	spendLedger(database)
+	const { images } = database
+		.prepare(
+			'SELECT COALESCE(SUM(images), 0) AS images FROM spend_reservation WHERE run_id = ?',
+		)
+		.get(runId) as { images: number }
+	const { chapters } = database
+		.prepare(
+			"SELECT COUNT(*) AS chapters FROM chapter WHERE work_id = ? AND user_state <> 'published'",
+		)
+		.get(workId) as { chapters: number }
+	if (chapters)
+		return Math.max(0, Math.floor((imageCap - images - 5) / chapters))
+}
+
 export function projectSpend(database: DatabaseSync) {
+	const runId = spendRunId()
 	return async (
 		request: Request,
 		send: (
@@ -299,27 +349,30 @@ export function projectSpend(database: DatabaseSync) {
 		const quote = await quoteSpend(request)
 		const { tokens, images } = quote
 		request.signal.throwIfAborted()
-		database.exec(`CREATE TABLE IF NOT EXISTS spend_reservation (
-			id INTEGER PRIMARY KEY,
-			tokens INTEGER NOT NULL,
-			images INTEGER NOT NULL,
-			actual_tokens INTEGER,
-			actual_images INTEGER
-		) STRICT`)
+		spendLedger(database)
 		const row = database
 			.prepare(`
-			INSERT INTO spend_reservation (tokens, images)
-			SELECT ?, ? FROM (
+			INSERT INTO spend_reservation (tokens, images, run_id)
+			SELECT ?, ?, ? FROM (
 				SELECT COALESCE(SUM(COALESCE(actual_tokens, tokens)), 0) AS used_tokens,
 					COALESCE(SUM(COALESCE(actual_images, images)), 0) AS used_images
 				FROM spend_reservation
+				WHERE (? IS NULL OR run_id = ?)
 			)
 			WHERE used_tokens + ? <= ? AND used_images + ? <= ?
 			RETURNING id
 		`)
-			.get(tokens, images, tokens, softLimit, images, imageCap) as
-			| { id: number }
-			| undefined
+			.get(
+				tokens,
+				images,
+				runId,
+				runId,
+				runId,
+				tokens,
+				softLimit,
+				images,
+				imageCap,
+			) as { id: number } | undefined
 		if (!row)
 			throw new SpendBudgetError(
 				`超出工程预算（软停止线 ${softLimit} tokens；硬上限 ${tokenCap} tokens / ${imageCap} 张图，含未核销预留）`,
