@@ -51,6 +51,7 @@ export type Fault =
 	| 'missing-usage'
 	| 'truncated'
 	| 'rate-limit'
+	| 'drawing-rate-limit'
 	| 'review-rate-limit'
 	| 'review-raised-cap-rate-limit'
 	| 'review-reasoning'
@@ -128,6 +129,7 @@ export function fakeRelay(
 	beforeWriting?: (chapter: number) => Promise<void> | undefined,
 	beforeImageReply?: (chapter: number) => Promise<void> | undefined,
 	onAdmission?: (admission: Admission) => void,
+	beforeAuditReply?: (request: Request) => Promise<void> | undefined,
 ) {
 	const pending = new Set(faults)
 	const admissions: Admission[] = []
@@ -251,6 +253,9 @@ export function fakeRelay(
 					(candidate === 'missing-usage' && operation === 'stage') ||
 					(candidate === 'truncated' && operation === 'stage') ||
 					(candidate === 'rate-limit' && operation === 'write') ||
+					(candidate === 'drawing-rate-limit' &&
+						operation === 'visual' &&
+						currentChapter > 0) ||
 					(candidate === 'review-rate-limit' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-2')) ||
@@ -280,6 +285,7 @@ export function fakeRelay(
 		if (fault) pending.delete(fault)
 		const status =
 			fault === 'rate-limit' ||
+			fault === 'drawing-rate-limit' ||
 			fault === 'review-rate-limit' ||
 			fault === 'review-raised-cap-rate-limit'
 				? 429
@@ -338,10 +344,20 @@ export function fakeRelay(
 		onAdmission?.(admission)
 		const csv = process.env.NL_USAGE_CSV
 		assert.ok(csv, 'Offline admission needs a run-specific CSV')
-		await appendFile(
-			csv,
-			`${run},${operation},1,${tokens ?? ''},${images ?? ''},${fault ?? ''}\n`,
-		)
+		const log = () =>
+			appendFile(
+				csv,
+				`${run},${operation},1,${admission.tokens ?? ''},${admission.images ?? ''},${fault ?? ''}\n`,
+			)
+		try {
+			if (status === 200 && operation === 'visual' && chapter > 0)
+				await beforeAuditReply?.(request)
+		} catch (error) {
+			admission.tokens = admission.images = null
+			await log()
+			throw error
+		}
+		await log()
 		if (status !== 200)
 			return Response.json({ error: { message: 'Offline fault' } }, { status })
 		if (fault === 'image-null') return Response.json(null)

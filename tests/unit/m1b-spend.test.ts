@@ -21,6 +21,89 @@ import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
 
 afterEach(() => vi.unstubAllEnvs())
 
+test('a stop file refuses new admissions without interrupting settlement', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'm1b-stop-file-'))
+	const file = join(root, 'stop')
+	try {
+		vi.stubEnv('NL_RUN_STOP_FILE', file)
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+		using database = new DatabaseSync(':memory:')
+		const sendStarted = Promise.withResolvers<void>()
+		const reply = Promise.withResolvers<Response>()
+		const send = vi.fn(() => {
+			sendStarted.resolve()
+			return reply.promise
+		})
+		const request = () =>
+			new Request('https://relay.invalid/v1/chat/completions', {
+				method: 'POST',
+				body: JSON.stringify({
+					model: 'fixture',
+					messages: [],
+					max_tokens: 100,
+				}),
+			})
+		const spend = projectSpend(database)
+		const inFlight = spend(request(), send)
+		await sendStarted.promise
+		await writeFile(file, '')
+		await expect(spend(request(), send)).rejects.toThrow('已停止接受新请求')
+		reply.resolve(Response.json({ usage: { total_tokens: 75 } }))
+		expect((await inFlight).ok).toBe(true)
+		expect(send).toHaveBeenCalledTimes(1)
+		expect(
+			database.prepare('SELECT actual_tokens FROM spend_reservation').all(),
+		).toEqual([{ actual_tokens: 75 }])
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
+test.each([400, 403, 429, 408, 409, 503])(
+	'accounts for an HTTP %i image rejection without usage',
+	async (status) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+		using database = new DatabaseSync(':memory:')
+		await projectSpend(database)(
+			new Request('https://relay.invalid/v1/images/generations', {
+				method: 'POST',
+				body: JSON.stringify({ model: 'gpt-image-2.6-sunburst', n: 1 }),
+			}),
+			async () => new Response('rejected', { status }),
+		)
+		const actual = [400, 403, 429].includes(status) ? 0 : null
+		expect(
+			database
+				.prepare('SELECT actual_tokens, actual_images FROM spend_reservation')
+				.get(),
+		).toEqual({ actual_tokens: actual, actual_images: actual })
+	},
+)
+
+test.each([
+	{ usage: { total_tokens: 17 }, actual: 17 },
+	{ usage: { prompt_tokens: 17 }, actual: null },
+])(
+	'retains reported usage on a definite rejection ($usage)',
+	async ({ usage, actual }) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+		using database = new DatabaseSync(':memory:')
+		await projectSpend(database)(
+			new Request('https://relay.invalid/v1/chat/completions', {
+				method: 'POST',
+				body: JSON.stringify({ max_tokens: 64, messages: [] }),
+			}),
+			async () => Response.json({ usage }, { status: 429 }),
+		)
+		expect(
+			database.prepare('SELECT actual_tokens FROM spend_reservation').get(),
+		).toEqual({ actual_tokens: actual })
+	},
+)
+
 test('admits the recorded-size vision payload and exposes a settled 2× overshoot', async () => {
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
 	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')

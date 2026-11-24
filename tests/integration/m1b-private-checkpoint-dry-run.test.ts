@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { projectFiles } from '@novelive/format/model'
@@ -16,6 +16,7 @@ const {
 	NL_M1B_DRY_RUN_PROFILE: profile,
 	NL_M1B_DRY_RUN_RECORDINGS: recordings,
 	NL_M1B_DRY_RUN_DRAWING_CHECKPOINT: drawingCheckpoint,
+	NL_M1B_DRY_RUN_DRAWING_RECORDINGS: drawingRecordings,
 } = process.env
 
 test.skipIf(!checkpoint || !profile)(
@@ -145,12 +146,38 @@ test.skipIf(!drawingCheckpoint || !profile)(
 		const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-drawing-dry-run-'))
 		const directory = join(root, 'project')
 		const relay = fakeRelay([], true)
+		const settledDrawing = drawingRecordings
+			? createReplayFetch({
+					mode: 'strict',
+					directory: drawingRecordings,
+					normalizeIds: true,
+					reportMissing: false,
+				})
+			: undefined
+		let drawingHits = 0
 		const host = createProduction(
 			root,
 			createConfigStore(profile),
 			{
+				onCheckpointHit: () => {
+					drawingHits++
+				},
 				fetch: async (input, init) => {
 					const request = new Request(input, init)
+					if (settledDrawing) {
+						let match: Response | undefined
+						try {
+							match = await settledDrawing(request.clone())
+						} catch (error) {
+							if (
+								!(error instanceof Error) ||
+								!error.message.startsWith('Missing strict replay cassette:')
+							)
+								throw error
+						}
+						if (match)
+							throw new Error('Settled drawing request reached dispatch')
+					}
 					const { pathname } = new URL(request.url)
 					return relay.fetch(
 						new Request(`https://relay.invalid${pathname}`, request),
@@ -184,7 +211,12 @@ test.skipIf(!drawingCheckpoint || !profile)(
 					.prepare('SELECT * FROM spend_reservation ORDER BY id')
 					.all()
 			const original = reservations()
-			expect(original).toHaveLength(134)
+			expect(original).toHaveLength(drawingRecordings ? 151 : 134)
+			if (drawingRecordings) {
+				const cache = join(directory, '.novelive', 'draw')
+				await mkdir(cache, { recursive: true })
+				await cp(drawingRecordings, join(cache, workId), { recursive: true })
+			}
 			await host.remember(workId, directory)
 			const session = await host.get(workId)
 			await session.queue.idle()
@@ -192,6 +224,7 @@ test.skipIf(!drawingCheckpoint || !profile)(
 			expect(reservations()).toEqual(original)
 			await session.continue()
 			await session.queue.idle()
+			if (drawingRecordings) expect(drawingHits).toBeGreaterThanOrEqual(9)
 			expect(
 				relay.admissions.some(({ operation }) => operation === 'image'),
 			).toBe(true)
@@ -209,6 +242,7 @@ test.skipIf(!drawingCheckpoint || !profile)(
 				.slice(original.length)
 				.filter(({ images }) => images !== 0)
 			expect(images.length).toBeGreaterThan(0)
+			if (drawingRecordings) expect(images).toHaveLength(10)
 			for (const image of images)
 				expect(image).toMatchObject({ tokens: 31_000, images: 3 })
 			expect(session.snapshot()).toMatchObject({

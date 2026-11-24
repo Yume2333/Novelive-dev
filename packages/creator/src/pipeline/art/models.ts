@@ -19,11 +19,12 @@ import {
 import {
 	createReplayFetch,
 	inheritSpendGuard,
+	isCheckpointReply,
 	isSpendGuardedFetch,
 	type ReplayOptions,
 } from '../../replay'
 import { recordImageUsage } from '../../usage'
-import { SpendBudgetError } from '../../usage/spend'
+import { hasSettledImage, SpendBudgetError } from '../../usage/spend'
 import type { Dimensions } from './check'
 
 export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
@@ -91,12 +92,27 @@ export function imageRenderer(
 	options: ModelOptions,
 	generationReplay = options.replay,
 ) {
+	return (...args: Parameters<ReturnType<typeof imageRequest>>) =>
+		imageRequest(config, options, generationReplay)(...args)
+}
+
+function imageRequest(
+	config: ImageConfig,
+	options: ModelOptions,
+	generationReplay = options.replay,
+) {
+	let saveGeneration: (() => Promise<void>) | undefined
+	let saveDownload: (() => Promise<void>) | undefined
 	const provider = imageProvider(config.baseUrl, config.model)
 	const timeout = 90_000
 	const upstream = generationReplay?.fetch ?? globalThis.fetch
 	const replay = checkedReplay(
 		createReplayFetch({
 			...generationReplay,
+			checkpointResponse: hasSettledImage,
+			onCheckpointReply: (save) => {
+				saveGeneration = save
+			},
 			fetch: inheritSpendGuard(upstream, (input, init) => {
 				if (!metered) return upstream(input, init)
 				const request = new Request(input, init)
@@ -114,6 +130,10 @@ export function imageRenderer(
 	const metered = isSpendGuardedFetch(replay.fetch)
 	const download = createReplayFetch({
 		...generationReplay,
+		checkpointResponse: (response) => response.ok,
+		onCheckpointReply: (save) => {
+			saveDownload = save
+		},
 		fetch: imageDownloadUpstream(config.baseUrl, generationReplay?.fetch),
 		spend: undefined,
 	})
@@ -189,13 +209,16 @@ export function imageRenderer(
 							{ ...parameters, ...output, n: 1, quality: config.quality },
 							{ signal },
 						)
-			generationSucceeded = (await generation.asResponse()).ok
+			const raw = await generation.asResponse()
+			generationSucceeded = raw.ok
+			const replayed = isCheckpointReply(raw)
 			const response = await generation
-			recordImageUsage(
-				config.model,
-				response.data?.filter((image) => image.b64_json || image.url).length ??
-					0,
-			)
+			if (!replayed)
+				recordImageUsage(
+					config.model,
+					response.data?.filter((image) => image.b64_json || image.url)
+						.length ?? 0,
+				)
 			const image = response.data?.[0] as
 				| {
 						b64_json?: string
@@ -212,20 +235,32 @@ export function imageRenderer(
 					new Headers(),
 				)
 			}
-			if (image?.b64_json)
+			if (image?.b64_json) {
+				await saveGeneration?.()
 				return { bytes: Buffer.from(image.b64_json, 'base64') }
+			}
 			if (image?.url) {
+				const url = new URL(image.url)
+				if (replayed && url.origin === 'https://relay.invalid') {
+					const relay = new URL(config.baseUrl)
+					url.protocol = relay.protocol
+					url.host = relay.host
+				}
+				await saveGeneration?.()
 				const deadline = AbortSignal.timeout(90_000)
 				const downloadSignal = signal
 					? AbortSignal.any([signal, deadline])
 					: deadline
 				for (let attempt = 0; attempt < (metered ? 2 : 1); attempt++) {
 					try {
-						const response = await download(new URL(image.url), {
+						const response = await download(url, {
 							signal: downloadSignal,
 						})
-						if (response.ok)
-							return { bytes: Buffer.from(await response.arrayBuffer()) }
+						if (response.ok) {
+							const bytes = Buffer.from(await response.arrayBuffer())
+							if (bytes.length) await saveDownload?.()
+							return { bytes }
+						}
 						await response.body?.cancel()
 						if (response.status < 500 && response.status !== 429) break
 					} catch (error) {
@@ -318,7 +353,10 @@ async function requestArtJson<T>(
 	const text = response.content
 		.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 		.join('')
-	if (text.trim() && saveReply) options.onUsableReply?.(saveReply)
+	if (text.trim() && saveReply) {
+		if (options.onUsableReply) options.onUsableReply(saveReply)
+		else await saveReply()
+	}
 	let value: unknown
 	try {
 		value = parseModelJson(text)

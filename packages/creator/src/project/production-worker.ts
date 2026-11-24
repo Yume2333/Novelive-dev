@@ -146,7 +146,11 @@ export function chapterWorker(
 	replay?: ReplayOptions,
 ) {
 	const fetch = createReplayFetch(replay)
-	const art = (signal?: AbortSignal, imageGenerationReplay?: ReplayOptions) =>
+	const art = (
+		signal?: AbortSignal,
+		imageGenerationReplay?: ReplayOptions,
+		drawingReplay = replay,
+	) =>
 		usageMethods(
 			new ArtProduction(project, {
 				main: models.main,
@@ -154,7 +158,7 @@ export function chapterWorker(
 				fast: models.fast,
 				visual: models.visual,
 				image: models.image,
-				replay,
+				replay: drawingReplay,
 				imageGenerationReplay,
 				signal,
 				resolution: work.settings.outputResolution,
@@ -545,14 +549,25 @@ export function chapterWorker(
 		hasPendingReview(assetId) {
 			return art().hasPendingReview(assetId)
 		},
-		async draw(job, ctx) {
-			const metadata = await drawingMetadata(job.assetId)
-			return art(ctx.signal).draw(
-				metadata.job,
-				(await productionBible(project, volumeId, work.workId)).art,
-				metadata.cg,
-				ctx.resumingBudget,
-			)
+		draw(job, ctx) {
+			return step(async () => {
+				const metadata = await drawingMetadata(job.assetId)
+				return art(ctx.signal, undefined, {
+					...replay,
+					checkpointDirectory: join(
+						project.root,
+						'.novelive',
+						'draw',
+						work.workId,
+					),
+					normalizeCheckpointIds: true,
+				}).draw(
+					metadata.job,
+					(await productionBible(project, volumeId, work.workId)).art,
+					metadata.cg,
+					ctx.resumingBudget,
+				)
+			})
 		},
 		placeholder(job, issue, signal) {
 			return art(signal).savePlaceholder(job.assetId, issue)

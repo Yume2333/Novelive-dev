@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 import { arr, compile, int, obj, opt, str } from '@earendil-works/pi-schema'
 import {
-	inheritTextSettlement,
+	inheritSettlement,
 	isResponsesTerminal,
 	type projectSpend,
 	quoteSpend,
@@ -36,6 +36,8 @@ export interface ReplayOptions {
 	spend?: ReturnType<typeof projectSpend>
 	onReplay?: (request: Request, response: Response) => Promise<void>
 	checkpointDirectory?: string
+	checkpointResponse?: (response: Response) => boolean
+	normalizeCheckpointIds?: boolean
 	onCheckpointReply?: (save: () => Promise<void>) => void
 	checkpointAllowance?: { images?: number }
 	onCheckpointHit?: (allowance: ReplayOptions['checkpointAllowance']) => void
@@ -334,6 +336,8 @@ export function createReplayFetch(
 					onCheckpointReply: options.onCheckpointReply,
 					checkpointAllowance: options.checkpointAllowance,
 					onCheckpointHit: options.onCheckpointHit,
+					checkpointResponse: options.checkpointResponse,
+					normalizeIds: options.normalizeCheckpointIds,
 				},
 				true,
 			)
@@ -523,7 +527,9 @@ function replayFetch(
 				response.headers.get('content-type') ?? '',
 			)
 			const settled = textSettlement(response)
-			if (checkpoint && (!response.ok || !settled)) return response
+			const usable = options.checkpointResponse
+			if (checkpoint && (!response.ok || (!settled && !usable?.(response))))
+				return response
 			const chunks: Buffer[] = []
 			const reader = response.body.getReader()
 			let cancelled = false
@@ -531,7 +537,10 @@ function replayFetch(
 			const persist = (bytes: Buffer) =>
 				(writing ??= (async () => {
 					if (!checkpoint) return store(identity, response, bytes)
-					if (settled?.() && (!isSse || terminalSse(bytes)))
+					if (
+						(settled?.() || usable?.(response)) &&
+						(!isSse || terminalSse(bytes))
+					)
 						options.onCheckpointReply?.(() => store(identity, response, bytes))
 				})())
 			const stream = new ReadableStream<Uint8Array>(
@@ -559,7 +568,7 @@ function replayFetch(
 				},
 				{ highWaterMark: 0 },
 			)
-			return inheritTextSettlement(
+			return inheritSettlement(
 				response,
 				new Response(stream, {
 					status: response.status,

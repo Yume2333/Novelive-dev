@@ -35,6 +35,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'missing-usage',
 			'truncated',
 			'rate-limit',
+			'drawing-rate-limit',
 			'review-rate-limit',
 			'image-failure',
 			'image-null',
@@ -50,6 +51,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 		name: 'staging-during-sunburst-draw',
 		faults: ['image-overdelivery'],
 	},
+	{ name: 'reopen-mid-drawing', faults: [] },
 	{
 		name: 'review-cap-raise',
 		faults: ['review-reasoning', 'review-rate-limit'],
@@ -86,6 +88,9 @@ test.each(scenarios)(
 		const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-offline-'))
 		const overdelivery = faults.includes('image-overdelivery')
 		const overlap = name === 'staging-during-sunburst-draw'
+		const reopenDrawing = name === 'reopen-mid-drawing'
+		const auditHeld = Promise.withResolvers<void>()
+		let auditCount = 0
 		const drawing = Promise.withResolvers<void>()
 		const settleDrawing = Promise.withResolvers<void>()
 		let heldDraw = false
@@ -129,6 +134,16 @@ test.each(scenarios)(
 			({ chapter, operation }) => {
 				if (overlap && chapter === 3 && operation === 'stage')
 					imageSettlementsAtStage.push(readHeldImageSettlement?.())
+			},
+			async ({ signal }) => {
+				if (!reopenDrawing || ++auditCount !== 2) return
+				auditHeld.resolve()
+				signal.throwIfAborted()
+				await new Promise<void>((_, reject) =>
+					signal.addEventListener('abort', () => reject(signal.reason), {
+						once: true,
+					}),
+				)
 			},
 		)
 		const profile = join(root, 'profile')
@@ -188,6 +203,7 @@ test.each(scenarios)(
 						...configuration.models.image,
 						retries: 3,
 						...(name === 'concurrent-sunburst' && { concurrency: 8 }),
+						...(reopenDrawing && { concurrency: 1 }),
 						...((overdelivery || name === 'concurrent-sunburst') && {
 							model: 'gpt-image-2.6-sunburst',
 						}),
@@ -261,6 +277,40 @@ test.each(scenarios)(
 				await session.queue.idle()
 				expect(relay.admissions).toHaveLength(calls)
 				expect(reservations()).toEqual(previous)
+			}
+			if (reopenDrawing) {
+				await Promise.race([
+					auditHeld.promise,
+					session.queue.idle().then(() => {
+						throw new Error('Drawing finished before interruption')
+					}),
+				])
+				const settled = relay.admissions
+					.slice(0, -1)
+					.filter(
+						({ operation, chapter }) =>
+							chapter === 1 &&
+							['painter', 'image', 'visual'].includes(operation),
+					)
+				expect(settled.map(({ operation }) => operation)).toEqual([
+					'painter',
+					'image',
+					'visual',
+					'painter',
+					'image',
+				])
+				const downloads = relay.downloads
+				const boundary = relay.admissions.length
+				await reopen()
+				await session.continue()
+				await session.queue.idle()
+				for (const { requestKey } of settled)
+					expect(
+						relay.admissions
+							.slice(boundary)
+							.some((row) => row.requestKey === requestKey),
+					).toBe(false)
+				expect(relay.downloads).toBe(downloads)
 			}
 			const play = async (chapterId: string) => {
 				const player = await host.player(workId, undefined, chapterId)
@@ -495,6 +545,31 @@ test.each(scenarios)(
 					fault === 'review-rate-limit' ||
 					fault === 'review-raised-cap-rate-limit',
 			)
+			if (faults.includes('drawing-rate-limit')) {
+				const denied = relay.admissions.find(
+					({ fault }) => fault === 'drawing-rate-limit',
+				)
+				expect(denied).toBeDefined()
+				expect(
+					relay.admissions
+						.filter(({ requestKey }) => requestKey === denied?.requestKey)
+						.map(({ fault }) => fault),
+				).toEqual(['drawing-rate-limit', undefined])
+				expect(explicitAdmissions.size).toBe(0)
+				expect(
+					session.queue
+						.runLog(workId)
+						.some(
+							({ kind, steps }) =>
+								kind === 'image' &&
+								steps.some(({ errorType }) => errorType === 'transient') &&
+								steps.some(
+									({ purpose, status }) =>
+										purpose === 'draw' && status === 'completed',
+								),
+						),
+				).toBe(true)
+			}
 			if (reviewDenial) {
 				const denied = reviews.findIndex(({ fault }) => fault === reviewDenial)
 				const raised = faults.includes('review-reasoning')
@@ -633,7 +708,14 @@ test.each(scenarios)(
 							pair(actual_tokens, actual_images),
 						)
 						.sort(),
-				).toEqual(logged)
+				).toEqual(
+					relay.admissions
+						.filter((entry) => entry.run === run)
+						.map(({ tokens, images, fault }) =>
+							fault?.endsWith('rate-limit') ? pair(0, 0) : pair(tokens, images),
+						)
+						.sort(),
+				)
 				expect(
 					rows.reduce((sum, row) => sum + (row.actual_tokens ?? row.tokens), 0),
 				).toBeLessThanOrEqual(1_600_000)
