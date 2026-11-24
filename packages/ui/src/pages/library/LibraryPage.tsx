@@ -1,19 +1,139 @@
 import type { CommandOutput } from '@novelive/creator/contract'
-import { FileUp, LibraryBig } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import {
+	CheckCircle2,
+	Clock,
+	FileUp,
+	LibraryBig,
+	NotebookPen,
+	PlayCircle,
+} from 'lucide-react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ProgressBar } from '../../components/Card'
+import { GradientCover } from '../../components/GradientCover'
 import { EmptyState, Page, PageAction } from '../../components/Page'
+import { Tabs } from '../../components/Tabs'
 import { scoped } from '../../i18n'
 import { productionRoutes, workRoute } from '../../routes/production'
+import type { LibraryWork } from '../../shell/AppShell'
 import styles from './LibraryPage.module.css'
 import { ImportPackage } from './share/ImportPackage'
 
 const t = scoped('library')
 
+type Tab = 'projects' | 'imported'
+
+interface Group {
+	key: string
+	title?: string
+	volumes: { key: string; title?: string; works: LibraryWork[] }[]
+}
+
+/** Series are grouped per project folder: different projects may reuse a series id. */
+function groupWorks(works: LibraryWork[]) {
+	const groups: Group[] = []
+	const loose: LibraryWork[] = []
+	for (const work of works) {
+		const project = work.project
+		if (!project) {
+			loose.push(work)
+			continue
+		}
+		let group = groups.find(({ key }) => key === project.directory)
+		if (!group) {
+			group = {
+				key: project.directory,
+				title: project.seriesTitle,
+				volumes: [],
+			}
+			groups.push(group)
+		}
+		let volume = group.volumes.find(({ key }) => key === project.volumeId)
+		if (!volume) {
+			volume = {
+				key: project.volumeId,
+				title: t('第 {{index}} 卷 · {{title}}', {
+					index: project.volumeIndex,
+					title: project.volumeTitle,
+				}),
+				works: [],
+			}
+			group.volumes.push(volume)
+		}
+		volume.works.push(work)
+	}
+	for (const group of groups)
+		group.volumes.sort(
+			(a, b) =>
+				(a.works[0]?.project?.volumeIndex ?? 0) -
+				(b.works[0]?.project?.volumeIndex ?? 0),
+		)
+	if (loose.length)
+		groups.push({ key: '', volumes: [{ key: '', works: loose }] })
+	return groups
+}
+
+function WorkCard({
+	id,
+	title,
+	to,
+	status,
+	icon: Icon,
+	published,
+	chapters,
+	meta,
+}: {
+	id: string
+	title: string
+	to?: string
+	status: string
+	icon: typeof Clock
+	published: number
+	chapters: number
+	meta?: ReactNode
+}) {
+	const body = (
+		<>
+			<span className={`cover-tilt ${styles.cover}`}>
+				<GradientCover seed={id} compact />
+			</span>
+			<span className={styles.cardBody}>
+				<strong className={`headline ${styles.title}`} id={`work-title-${id}`}>
+					{title}
+				</strong>
+				<span className={styles.status} id={`work-progress-${id}`}>
+					<Icon aria-hidden="true" size={12} strokeWidth={2} />
+					{status}
+				</span>
+				<span className={styles.progressRow}>
+					<ProgressBar value={chapters ? published / chapters : 0} height={5} />
+					<span>
+						{published}/{chapters}
+					</span>
+				</span>
+				{meta}
+			</span>
+		</>
+	)
+	return to ? (
+		<Link
+			className={`glass-panel nl-card-interactive ${styles.card}`}
+			to={to}
+			aria-labelledby={`work-title-${id}`}
+			aria-describedby={`work-progress-${id}`}
+		>
+			{body}
+		</Link>
+	) : (
+		<div className={`glass-panel ${styles.card}`}>{body}</div>
+	)
+}
+
 export function LibraryPage() {
 	const [library, setLibrary] = useState<CommandOutput<'library.list'>>()
 	const [error, setError] = useState(false)
 	const [revision, setRevision] = useState(0)
+	const [tab, setTab] = useState<Tab>('projects')
 	const share = window.novelive.host.share
 	const installed = window.novelive.host.installed
 	const [packages, setPackages] = useState<
@@ -96,92 +216,134 @@ export function LibraryPage() {
 			{error ? (
 				<p role="alert">{t('无法读取书库')}</p>
 			) : !library ? (
-				<p>{t('正在读取书库')}</p>
+				<p role="status">{t('正在读取书库')}</p>
 			) : library.works.length === 0 &&
 				library.unreadableCount === 0 &&
 				packages.length === 0 ? (
 				<EmptyState
 					icon={LibraryBig}
 					title={t('书库还是空的')}
-					text={t('还没有作品')}
+					text={t('导入一部小说原文，Novelive 会把它做成可以游玩的视觉小说。')}
 					card
+					actions={
+						<PageAction icon={FileUp} to={productionRoutes.import}>
+							{t('导入原文')}
+						</PageAction>
+					}
 				/>
-			) : library.works.length > 0 || library.unreadableCount > 0 ? (
-				<section aria-labelledby="library-projects" className={styles.projects}>
-					<h2 id="library-projects">{t('我的工程')}</h2>
-					{library.unreadableCount > 0 && (
-						<p role="alert">
-							{t('有 {{unreadableCount}} 部作品无法读取', {
-								unreadableCount: library.unreadableCount,
-							})}
-						</p>
-					)}
-					<ul className={styles.grid}>
-						{library.works.map(({ workId, title, published, chapters }) => (
-							<li key={workId}>
-								<Link
-									className={styles.card}
-									to={workRoute('work', workId)}
-									aria-labelledby={`work-title-${workId}`}
-									aria-describedby={`work-progress-${workId}`}
-								>
-									<span className={styles.cover}>
-										<LibraryBig size={24} aria-hidden="true" />
-									</span>
-									<span>
-										<strong id={`work-title-${workId}`}>{title}</strong>
-										<span
-											className={styles.progress}
-											id={`work-progress-${workId}`}
-										>
-											{t('已发布 {{published}} / {{chapters}} 章', {
-												published,
-												chapters,
-											})}
-										</span>
-									</span>
-								</Link>
-							</li>
-						))}
-					</ul>
-				</section>
-			) : null}
-			{packages.length > 0 && (
-				<section aria-labelledby="library-packages" className={styles.projects}>
-					<h2 id="library-packages">{t('导入的作品')}</h2>
-					<ul className={styles.grid}>
-						{packages.map(({ workId, title, version, published, chapters }) => {
-							const label = (
-								<>
-									<LibraryBig size={24} aria-hidden="true" />
-									<span>
-										<strong>{title}</strong>
-										<span className={styles.progress}>
-											{t(
-												'v{{version}} · 已发布 {{published}} / {{chapters}} 章',
-												{ version, published, chapters },
-											)}
-										</span>
-									</span>
-								</>
-							)
-							return (
-								<li key={workId}>
-									{published ? (
-										<Link
-											className={styles.card}
-											to={`/package/${workId}/${version}`}
-										>
-											{label}
-										</Link>
-									) : (
-										<div className={styles.card}>{label}</div>
+			) : (
+				<>
+					<div className={styles.tabs}>
+						<Tabs<Tab>
+							label={t('书库')}
+							active={tab}
+							onChange={setTab}
+							tabs={[
+								{ key: 'projects', label: t('我的工程'), icon: NotebookPen },
+								{ key: 'imported', label: t('导入的作品'), icon: PlayCircle },
+							]}
+						/>
+					</div>
+					{tab === 'projects' ? (
+						<section aria-label={t('我的工程')} className={styles.projects}>
+							{library.unreadableCount > 0 && (
+								<p role="alert" className={styles.alert}>
+									{t('有 {{unreadableCount}} 部作品无法读取', {
+										unreadableCount: library.unreadableCount,
+									})}
+								</p>
+							)}
+							{library.works.length === 0 ? (
+								<EmptyState icon={NotebookPen} text={t('还没有作品')} card />
+							) : (
+								groupWorks(library.works as LibraryWork[]).map((group) => (
+									<div key={group.key} className={styles.group}>
+										{group.title && (
+											<h2
+												className={`label-caps label-caps-zh ${styles.groupTitle}`}
+											>
+												{group.title}
+											</h2>
+										)}
+										{group.volumes.map((volume) => (
+											<div key={volume.key} className={styles.volume}>
+												{volume.title && (
+													<h3 className={styles.volumeTitle}>{volume.title}</h3>
+												)}
+												<ul className={styles.grid}>
+													{volume.works.map(
+														({ workId, title, published, chapters }) => (
+															<li key={workId}>
+																<WorkCard
+																	id={workId}
+																	title={title}
+																	to={workRoute('work', workId)}
+																	icon={
+																		published === chapters && chapters
+																			? CheckCircle2
+																			: Clock
+																	}
+																	status={t(
+																		'已发布 {{published}} / {{chapters}} 章',
+																		{
+																			published,
+																			chapters,
+																		},
+																	)}
+																	published={published}
+																	chapters={chapters}
+																/>
+															</li>
+														),
+													)}
+												</ul>
+											</div>
+										))}
+									</div>
+								))
+							)}
+						</section>
+					) : (
+						<section aria-label={t('导入的作品')} className={styles.projects}>
+							{packages.length === 0 ? (
+								<EmptyState
+									icon={PlayCircle}
+									text={t('还没有导入的作品')}
+									card
+								/>
+							) : (
+								<ul className={styles.grid}>
+									{packages.map(
+										({ workId, title, version, published, chapters }) => (
+											<li key={workId}>
+												<WorkCard
+													id={workId}
+													title={title}
+													to={
+														published
+															? `/package/${workId}/${version}`
+															: undefined
+													}
+													icon={PlayCircle}
+													status={t(
+														'v{{version}} · 已发布 {{published}} / {{chapters}} 章',
+														{
+															version,
+															published,
+															chapters,
+														},
+													)}
+													published={published}
+													chapters={chapters}
+												/>
+											</li>
+										),
 									)}
-								</li>
-							)
-						})}
-					</ul>
-				</section>
+								</ul>
+							)}
+						</section>
+					)}
+				</>
 			)}
 		</Page>
 	)
