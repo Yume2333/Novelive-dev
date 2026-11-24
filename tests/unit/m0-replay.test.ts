@@ -1,8 +1,14 @@
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createReplayFetch } from '../../packages/creator/src/replay'
+import {
+	chapterImageBudget,
+	noteReplayedImage,
+	projectSpend,
+} from '../../packages/creator/src/usage/spend'
 
 const origin = 'https://relay.example.test'
 const path = '/v1/chat/completions'
@@ -40,6 +46,82 @@ test('normalized replay rebinds UUID-bearing chapter IDs in authored responses',
 		chapterId: `joined-${newId}-ch1`,
 	})
 	expect(upstream).toHaveBeenCalledTimes(1)
+})
+
+test('strict replay reproduces image admissions and selects the budget-specific staging response', async () => {
+	vi.stubEnv('NL_RUN_ID', 'staging')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '16')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '100000')
+	using live = new DatabaseSync(':memory:')
+	const replayDb = join(directory, 'project.db')
+	using offline = new DatabaseSync(replayDb)
+	using laterWork = new DatabaseSync(replayDb)
+	for (const database of [live, offline])
+		database.exec(
+			"CREATE TABLE chapter (work_id TEXT, user_state TEXT); INSERT INTO chapter VALUES ('w', 'producing'), ('later', 'producing')",
+		)
+	const upstream = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+		const request = new Request(input, init)
+		return request.url.endsWith('/generations')
+			? Response.json({ data: [{ b64_json: 'aQ==' }, { b64_json: 'aQ==' }] })
+			: Response.json({
+					patch: (await request.text()).includes('chapter: 9 ')
+						? 'nine'
+						: 'eleven',
+				})
+	})
+	const request = (limit: number, script = 'scene first') =>
+		new Request(origin + path, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				messages: [
+					{
+						role: 'user',
+						content: `Hard limit for this whole chapter: ${limit} new provider images, including edits.\n${script}`,
+					},
+				],
+			}),
+		})
+	const image = () =>
+		new Request(`${origin}/v1/images/generations`, {
+			method: 'POST',
+			body: JSON.stringify({ n: 2 }),
+		})
+	const record = createReplayFetch({
+		mode: 'record',
+		directory,
+		fetch: upstream,
+		spend: projectSpend(live),
+	})
+	const recordStage = createReplayFetch({
+		mode: 'record',
+		directory,
+		fetch: upstream,
+	})
+	const staging = (database: DatabaseSync, workId = 'w') => {
+		const limit = chapterImageBudget(database, workId)
+		if (limit === undefined) throw new Error('Missing staging budget')
+		return request(limit)
+	}
+	await (await recordStage(staging(live))).text()
+	await (await record(image())).text()
+	await (await recordStage(staging(live, 'later'))).text()
+	const replay = createReplayFetch({
+		mode: 'strict',
+		directory,
+		fetch: upstream,
+		onReplay: (request) => noteReplayedImage(offline, request),
+	})
+	await (await replay(image())).text()
+	expect(await (await replay(staging(laterWork, 'later'))).json()).toEqual({
+		patch: 'nine',
+	})
+	expect(await (await replay(request(11))).json()).toEqual({ patch: 'eleven' })
+	await expect(replay(request(11, 'scene second'))).rejects.toThrow(
+		'Missing strict replay cassette:',
+	)
+	expect(upstream).toHaveBeenCalledTimes(3)
 })
 
 test('response rebinding preserves empty responses and strict misses never call upstream', async () => {
@@ -136,6 +218,19 @@ test('successful recording reuse composes with replay failure filtering without 
 			)
 	}
 	expect(fetch).toHaveBeenCalledTimes(2)
+})
+
+test('recording an image download does not write a usage reservation row', async () => {
+	const usage = join(directory, 'usage.csv')
+	vi.stubEnv('NL_USAGE_CSV', usage)
+	const fetch = vi.fn(async () => new Response('image'))
+	const record = createReplayFetch({ mode: 'record', directory, fetch })
+	expect(await (await record(`${origin}/rendered-image.png`)).text()).toBe(
+		'image',
+	)
+	await expect(readFile(usage, 'utf8')).rejects.toMatchObject({
+		code: 'ENOENT',
+	})
 })
 
 test('gate recording reserves private usage and strict misses retain only the request identity', async () => {

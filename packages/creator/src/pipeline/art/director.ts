@@ -12,6 +12,7 @@ import {
 	type ManifestItem,
 	manifestIdShapes,
 	planArt,
+	playbackAssetIds,
 	validateManifestIds,
 } from './plan'
 
@@ -43,6 +44,13 @@ function repairReply(phase: string, error: string, reply?: unknown) {
 
 export type CgReferences = { costumes: readonly string[]; location?: string }
 type ScriptOptions = NonNullable<Parameters<typeof parseScript>[1]>
+type ImageBudget = {
+	limit: number
+	previousBases: ReadonlyMap<string, string>
+	reusedImages: ReadonlySet<string>
+	paragraphIds: readonly string[]
+	speakers: Iterable<string>
+}
 
 function sceneReferences(
 	script: string,
@@ -166,13 +174,18 @@ export async function directChapterArt(
 	script: string,
 	bible: ArtBible,
 	registry: AssetRegistry,
-	options: ModelOptions & ScriptOptions & { main: TextConnection },
+	options: ModelOptions &
+		ScriptOptions & { main: TextConnection; imageBudget?: ImageBudget },
 ) {
 	const scriptOptions = { customMarks: [...(options.customMarks ?? [])] }
 	const parsed = parseScript(script, scriptOptions)
 	if (parsed.diagnostics.some((item) => item.code.startsWith('E_')))
 		throw new Error('The art director requires a valid chapter script')
 	const context = JSON.stringify({ bible, registry })
+	const imageBudget = options.imageBudget
+	const imageLimit = imageBudget
+		? `Hard limit for this whole chapter: ${imageBudget.limit} new provider images, including edits and any new bases needed by references. Reuse drawn assets whenever possible. Use one costume base per character, add expressions only for meaningful emotional beats, share backgrounds across scenes, and keep CGs rare. Every stage direction must still resolve to a registered or declared asset.`
+		: ''
 	const assetContract = [
 		`Asset ID contract — required items[].id shape by kind: ${manifestIdGuidance}.`,
 		'Each segment starts with a lowercase ASCII letter or digit; the rest may also include underscores and hyphens. Slashes separate segments. Bare character and place IDs are not asset IDs.',
@@ -185,6 +198,11 @@ export async function directChapterArt(
 		Math.floor((buildTextModel(options.main).contextWindow - 4096) / 4) -
 		context.length -
 		assetContract.length -
+		(imageBudget
+			? imageLimit.length -
+				String(imageBudget.limit).length +
+				String(Number.MAX_SAFE_INTEGER).length
+			: 0) -
 		1024
 	const batches = script.length <= budget ? [script] : scenes
 	const items: ManifestItem[] = []
@@ -203,6 +221,7 @@ export async function directChapterArt(
 			'Use @bg place/variant, @show character/costume/expression left|center|right, and @cg cg-name.',
 			'Reuse matching backgrounds, costume bases and expressions from the registry or accumulated manifest. Only request a new expression or background variant for a meaningful visual change, and reserve CGs for pivotal moments that ordinary staging cannot show. List only assets used by stage directions.',
 			assetContract,
+			...(imageLimit ? [imageLimit] : []),
 			`Bible and registered assets: ${context}`,
 			...(batches.length > 1
 				? [
@@ -238,22 +257,48 @@ export async function directChapterArt(
 					result.patch,
 					scriptOptions,
 				)
-				const plan = planArt([...items, ...result.items], bible, registry, {
-					...merges,
-					...result.merges,
-				})
-				const { diagnostics } = compileScript(
-					[...staged, resultScript].join('\n'),
+				const candidate = [...staged, resultScript].join('\n')
+				const plan = planArt(
+					[...items, ...result.items],
+					bible,
+					registry,
 					{
+						...merges,
+						...result.merges,
+					},
+					imageBudget && {
+						...imageBudget,
+						references: ({ entries }) => {
+							const lastScene =
+								parsed.scenes[
+									batches.length === 1 ? parsed.scenes.length - 1 : i
+								]
+							const last = imageBudget.paragraphIds.indexOf(lastScene.source.to)
+							const compiled = compileScript(candidate, {
+								...scriptOptions,
+								assets: entries,
+								speakers: imageBudget.speakers,
+								paragraphIds: imageBudget.paragraphIds.slice(0, last + 1),
+							})
+							if (!compiled.ok)
+								throw new Error(
+									compiled.diagnostics.map(({ message }) => message).join('; '),
+								)
+							return playbackAssetIds(compiled.scenes)
+						},
+					},
+				)
+				if (!imageBudget) {
+					const { diagnostics } = compileScript(candidate, {
 						...scriptOptions,
 						assets: plan.registry.entries,
 						speakers: [],
 						paragraphIds: [],
-					},
-				)
-				// The writer owns dialogue and source validation; only check image references here.
-				const missing = diagnostics.find(({ code }) => code === 'E_ASSET')
-				if (missing) throw new Error(missing.message)
+					})
+					// The writer owns dialogue and source validation; only check image references here.
+					const missing = diagnostics.find(({ code }) => code === 'E_ASSET')
+					if (missing) throw new Error(missing.message)
+				}
 				staged.push(resultScript)
 				items.push(...result.items)
 				Object.assign(merges, result.merges)

@@ -24,6 +24,8 @@ import {
 } from '../../packages/creator/src/project/production-worker'
 import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
 import {
+	chapterImageBudget,
+	projectSpend,
 	quoteSpend,
 	requestedOutputTokens,
 	SpendBudgetError,
@@ -218,15 +220,21 @@ test('a painter format error after one repair materializes both base and variant
 })
 
 test('a later volume publishes with the reason from a reused series placeholder', async () => {
+	vi.stubEnv('NL_RUN_ID', 'offline-placeholder')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '5')
 	const { projectDir, workId } = await fixture()
 	using project = await Project.open(projectDir)
 	const work = await project.read(projectFiles.work('v0001', workId))
 	const config = createConfigStore(directory)
 	await config.update(configuration)
 	const models = await productionModels(config)
-	const fetch = vi.fn<typeof globalThis.fetch>(async () => {
-		throw new Error('Reusing a placeholder must not call a model')
-	})
+	const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+		completion({
+			patch: 'PUT <4:\n@show ada/uniform/neutral center',
+			items: [],
+			merges: {},
+		}),
+	)
 	const first = chapterWorker(project, 'v0001', work, models, { fetch })
 	const issue = '本地去背景不可用；请使用可返回透明底的图片模型。'
 	const [job] = await first
@@ -245,6 +253,17 @@ test('a later volume publishes with the reason from a reused series placeholder'
 		workId: '7a49d711-b6f5-442f-8234-58b43df92da0',
 	}
 	await project.write(projectFiles.work('v0002', laterWork.workId), laterWork)
+	const chapterId = laterWork.chapterIds[0]
+	await project.write(
+		projectFiles.chapter({
+			volumeId: 'v0002',
+			workId: laterWork.workId,
+			chapterId,
+		}),
+		await project.read(
+			projectFiles.chapter({ volumeId: 'v0001', workId, chapterId }),
+		),
+	)
 	project.tasks.registerWork({
 		workId: laterWork.workId,
 		title: laterWork.title,
@@ -252,13 +271,14 @@ test('a later volume publishes with the reason from a reused series placeholder'
 	const { worker } = chapterWorker(project, 'v0002', laterWork, models, {
 		fetch,
 	})
+	await project.writeFile(
+		`source/production/${laterWork.chapterIds[0]}/draft.nvs`,
+		'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n',
+	)
 	const queue = new ChapterScheduler(project.database, {
 		...worker,
 		async write() {},
 		async review() {},
-		async stage() {
-			return [job]
-		},
 	})
 	try {
 		queue.start(laterWork.workId, [laterWork.chapterIds[0]])
@@ -267,7 +287,10 @@ test('a later volume publishes with the reason from a reused series placeholder'
 		expect(queue.snapshot(laterWork.workId).chapters).toMatchObject([
 			{ status: 'published', issue: `1 张图用了占位图；${issue}` },
 		])
-		expect(fetch).not.toHaveBeenCalled()
+		expect(fetch).toHaveBeenCalledTimes(1)
+		expect(String(fetch.mock.calls[0][1]?.body)).toContain(
+			'Hard limit for this whole chapter: 0',
+		)
 	} finally {
 		queue.dispose()
 	}
@@ -326,6 +349,107 @@ test('staging queues only referenced images and their bases, including reused pe
 	expect(await worker.stage({ ...ctx, chapterId: second })).toMatchObject(
 		dependencies,
 	)
+})
+
+test('resume replaces an oversized drawing queue with one bounded staging repair', async () => {
+	const { projectDir, workId } = await fixture()
+	using project = await Project.open(projectDir)
+	const work = await project.read(projectFiles.work('v0001', workId))
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const chapterId = work.chapterIds[0]
+	const draft = `source/production/${chapterId}/draft.nvs`
+	const script = 'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n'
+	await project.writeFile(draft, script)
+	const previous = new ScriptedWorker({
+		[chapterId]: [
+			{ assetId: 'cg-old-first', kind: 'cg' },
+			{ assetId: 'cg-old-second', kind: 'cg' },
+		],
+	})
+	const initial = new ChapterScheduler(project.database, previous, {
+		imageConcurrency: 0,
+	})
+	project.tasks.registerWork({ workId, title: work.title })
+	initial.start(workId, [chapterId])
+	initial.confirmVisual(workId)
+	await initial.idle()
+	initial.dispose()
+	expect(previous.calls).toEqual([
+		`write:${chapterId}`,
+		`review:${chapterId}`,
+		`stage:${chapterId}`,
+	])
+
+	vi.stubEnv('NL_RUN_ID', 'offline-restage')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '6')
+	const prompts: string[] = []
+	const { worker } = chapterWorker(
+		project,
+		'v0001',
+		work,
+		await productionModels(config),
+		{
+			fetch: async (_url, init) => {
+				prompts.push(String(init?.body))
+				return prompts.length === 1
+					? completion({
+							patch: 'PUT <4:\n@bg room/night',
+							items: [
+								{ id: 'room/night', kind: 'variant', description: 'Night' },
+							],
+							merges: {},
+						})
+					: completion({
+							patch: 'PUT <4:\n@bg room/day',
+							items: [
+								{ id: 'room/day', kind: 'location', description: 'Day' },
+								{ id: 'cg-unused', kind: 'cg', description: 'Not referenced' },
+							],
+							merges: {},
+						})
+			},
+		},
+	)
+	const draws: string[] = []
+	const resumed = new ChapterScheduler(
+		project.database,
+		{
+			...worker,
+			async write() {
+				throw new Error('Writing redispatched')
+			},
+			async review() {
+				throw new Error('Review redispatched')
+			},
+			async draw(job) {
+				draws.push(job.assetId)
+				return { status: 'drawn' }
+			},
+		},
+		{ imageBudget: (id) => chapterImageBudget(project.database, id) },
+	)
+	try {
+		resumed.continue(workId)
+		await resumed.idle()
+		expect(prompts).toHaveLength(2)
+		expect(prompts[0]).toContain('Hard limit for this whole chapter: 1')
+		expect(prompts[1]).toContain(
+			'Chapter needs 2 new provider images; budget is 1. Over-budget assets: room/day',
+		)
+		expect(draws).toEqual(['room/day'])
+		expect(resumed.snapshot(workId).chapters).toMatchObject([
+			{ status: 'published' },
+		])
+		expect((await project.readFile(draft)).toString()).toBe(script)
+		expect(
+			project.database
+				.prepare("SELECT ref_id FROM task WHERE kind = 'image'")
+				.all(),
+		).toEqual([{ ref_id: 'room/day' }])
+	} finally {
+		resumed.dispose()
+	}
 })
 
 test('records a manually interrupted chapter as cancelled when production reopens', async () => {
@@ -582,9 +706,25 @@ test.each([
 	{ scenario: 'review rejected', reject: true },
 	{ scenario: 'first image blocked', firstImage: true },
 	{ scenario: 'local image check failed', localRejection: true },
+	{ scenario: 'accepted saved candidate at zero image cap', zero: true },
+	{
+		scenario: 'changed checkpoint settings at zero image cap',
+		zero: true,
+		redraw: true,
+	},
+	{
+		scenario: 'rejected saved candidate at zero image cap',
+		zero: true,
+		reject: true,
+	},
 ])(
 	'recording resumes an image budget pause: $scenario',
-	async ({ redraw, reject, firstImage, localRejection }) => {
+	async ({ redraw, reject, firstImage, localRejection, zero }) => {
+		if (zero) {
+			vi.stubEnv('NL_RUN_ID', 'drawing')
+			vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+			vi.stubEnv('NL_RUN_IMAGE_CAP', '7')
+		}
 		const { projectDir, workId } = await fixture()
 		const config = createConfigStore(directory)
 		await config.update(configuration)
@@ -594,12 +734,14 @@ test.each([
 		const requests: string[] = []
 		const painterPrompts: string[] = []
 		const imagePrompts: string[] = []
+		const stage = vi.fn(async () => [{ assetId, kind: 'location' as const }])
 		let allowReview = firstImage === true
 		let rejectReview = reject
 		let blockImage = firstImage === true
 		let blockRewrite = false
 		const open = async () => {
 			const project = await Project.open(projectDir)
+			const admit = projectSpend(project.database)
 			const work = await project.read(projectFiles.work('v0001', workId))
 			const { worker, art } = chapterWorker(project, 'v0001', work, models, {
 				mode: 'record',
@@ -615,7 +757,9 @@ test.each([
 						)
 							throw new SpendBudgetError('超出工程预算')
 					}
-					return send(request, await quoteSpend(request))
+					return zero
+						? admit(request, send)
+						: send(request, await quoteSpend(request))
 				},
 				async fetch(input, init) {
 					const request = new Request(input, init)
@@ -644,7 +788,7 @@ test.each([
 					}
 					if (body.model === models.visual.model && rejectReview) {
 						rejectReview = false
-						blockImage = true
+						if (!zero) blockImage = true
 						return completion({
 							pass: false,
 							failedChecks: ['description'],
@@ -661,12 +805,20 @@ test.each([
 							})
 				},
 			})
-			const queue = new ChapterScheduler(project.database, {
-				...worker,
-				write: async () => {},
-				review: async () => {},
-				stage: async () => [{ assetId, kind: 'location' }],
-			})
+			const queue = new ChapterScheduler(
+				project.database,
+				{
+					...worker,
+					write: async () => {},
+					review: async () => {},
+					stage,
+				},
+				{
+					imageBudget: zero
+						? (id) => chapterImageBudget(project.database, id)
+						: undefined,
+				},
+			)
 			return { project, queue, art }
 		}
 		{
@@ -709,6 +861,39 @@ test.each([
 		allowReview = true
 		blockImage = false
 		blockRewrite = false
+		if (zero) {
+			vi.stubEnv('NL_RUN_ID', 'review-only')
+			vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+			const { project, queue } = await open()
+			try {
+				queue.continue(workId)
+				await queue.idle()
+				expect(stage).toHaveBeenCalledTimes(1)
+				expect(imagePrompts).toHaveLength(1)
+				expect(requests.slice(2)).toEqual(
+					redraw
+						? [models.main.model]
+						: reject
+							? [models.visual.model, models.main.model]
+							: [models.visual.model],
+				)
+				const chapter = queue.snapshot(workId).chapters[0]
+				if (redraw || reject) {
+					expect(chapter.status).toBe('producing')
+					expect(chapter.issue).toMatch(/超出工程预算/)
+				} else expect(chapter.status).toBe('published')
+				const admissions = project.database
+					.prepare(
+						"SELECT SUM(images) AS images FROM spend_reservation WHERE run_id = 'review-only'",
+					)
+					.get()
+				expect(admissions).toEqual({ images: 0 })
+			} finally {
+				queue.dispose()
+				project.close()
+			}
+			return
+		}
 		if (reject) {
 			const { project, queue } = await open()
 			try {

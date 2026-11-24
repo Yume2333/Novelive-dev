@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -12,6 +12,7 @@ import {
 } from '../../packages/creator/src/pipeline/art/models'
 import { createReplayFetch } from '../../packages/creator/src/replay'
 import {
+	chapterImageBudget,
 	projectSpend,
 	quoteSpend,
 } from '../../packages/creator/src/usage/spend'
@@ -256,6 +257,134 @@ test('soft cutoff stops new requests at settled plus unresolved usage across gua
 		'NL_RUN_TOKEN_SOFT_FRACTION',
 	)
 	expect(send).toHaveBeenCalledTimes(4)
+})
+
+test('a new usage window preserves unresolved history without charging it to new admissions', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+	vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '0.8')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	vi.stubEnv('NL_USAGE_CSV', '/offline/new-window/usage.csv')
+	using database = new DatabaseSync(':memory:')
+	database.exec(`
+		CREATE TABLE spend_reservation (
+			id INTEGER PRIMARY KEY, tokens INTEGER NOT NULL, images INTEGER NOT NULL,
+			actual_tokens INTEGER, actual_images INTEGER
+		) STRICT;
+		INSERT INTO spend_reservation VALUES (1, 1083614, 3, 1083614, 3), (2, 724974, 0, NULL, NULL);
+		CREATE TABLE chapter (work_id TEXT, user_state TEXT);
+		INSERT INTO chapter VALUES ('w', 'producing'), ('w', 'waiting'), ('w', 'waiting'), ('w', 'waiting'), ('other', 'waiting');
+	`)
+	expect(chapterImageBudget(database, 'w')).toBe(11)
+	const request = () =>
+		new Request('https://example.invalid/v1/images/generations', {
+			method: 'POST',
+			body: JSON.stringify({ n: 6 }),
+		})
+	const send = vi.fn(async () => new Response(null, { status: 500 }))
+	await projectSpend(database)(request(), send)
+	expect(chapterImageBudget(database, 'w')).toBe(9)
+	database.exec(
+		"UPDATE chapter SET user_state = 'published' WHERE work_id = 'w' AND user_state = 'producing'",
+	)
+	expect(chapterImageBudget(database, 'w')).toBe(13)
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '10')
+	await expect(projectSpend(database)(request(), send)).rejects.toThrow(
+		'超出工程预算',
+	)
+	vi.stubEnv('NL_USAGE_CSV', '/offline/another-window/usage.csv')
+	await projectSpend(database)(request(), send)
+	expect(send).toHaveBeenCalledTimes(2)
+	expect(
+		database
+			.prepare(
+				'SELECT * FROM spend_reservation WHERE run_id IS NULL ORDER BY id',
+			)
+			.all(),
+	).toEqual([
+		{
+			id: 1,
+			tokens: 1083614,
+			images: 3,
+			actual_tokens: 1083614,
+			actual_images: 3,
+			run_id: null,
+		},
+		{
+			id: 2,
+			tokens: 724974,
+			images: 0,
+			actual_tokens: null,
+			actual_images: null,
+			run_id: null,
+		},
+	])
+})
+
+test('continuing an existing CSV conservatively counts legacy reservations without claiming quote matches', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'novelive-spend-window-'))
+	try {
+		const csv = join(dir, 'usage.csv')
+		await writeFile(
+			csv,
+			'2026-01-01,image,1,16000,1,reservation\n2026-01-01,image,1,0,0,cassette recording (reserved output tokens)\n2026-01-01,image,1,7000,1,reservation\n',
+		)
+		vi.stubEnv('NL_USAGE_CSV', csv)
+		vi.stubEnv('NL_RUN_ID', 'continuing')
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '30000')
+		vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '0.8')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '10')
+		using database = new DatabaseSync(':memory:')
+		database.exec(`
+			CREATE TABLE spend_reservation (
+				id INTEGER PRIMARY KEY, tokens INTEGER NOT NULL, images INTEGER NOT NULL,
+				actual_tokens INTEGER, actual_images INTEGER
+			) STRICT;
+			INSERT INTO spend_reservation VALUES (1, 99000, 3, NULL, NULL),
+				(2, 16000, 1, 11000, 1), (3, 7000, 1, NULL, NULL),
+				(4, 16000, 1, 15000, 1), (5, 7000, 1, 6000, 1);
+			CREATE TABLE chapter (work_id TEXT, user_state TEXT);
+			INSERT INTO chapter VALUES ('w', 'producing');
+		`)
+		expect(chapterImageBudget(database, 'w')).toBe(0)
+		const send = vi.fn()
+		await expect(
+			projectSpend(database)(
+				new Request('https://example.invalid/v1/images/generations', {
+					method: 'POST',
+					body: '{}',
+				}),
+				send,
+			),
+		).rejects.toThrow('超出工程预算')
+		expect(send).not.toHaveBeenCalled()
+		expect(
+			database
+				.prepare(
+					'SELECT run_id, actual_tokens FROM spend_reservation ORDER BY id',
+				)
+				.all(),
+		).toEqual([
+			{ run_id: null, actual_tokens: null },
+			{ run_id: null, actual_tokens: 11000 },
+			{ run_id: null, actual_tokens: null },
+			{ run_id: null, actual_tokens: 15000 },
+			{ run_id: null, actual_tokens: 6000 },
+		])
+		await writeFile(
+			csv,
+			'2026-01-01,image,1,0,0,cassette recording (reserved output tokens)\n',
+		)
+		vi.stubEnv('NL_RUN_ID', 'fresh')
+		expect(chapterImageBudget(database, 'w')).toBe(5)
+		await writeFile(csv, '2026-01-01,image,1,7000,1,reservation\n')
+		expect(chapterImageBudget(database, 'w')).toBe(5)
+		vi.stubEnv('NL_USAGE_CSV', '')
+		expect(chapterImageBudget(database, 'w')).toBe(5)
+		vi.stubEnv('NL_RUN_ID', 'explicit-without-csv')
+		expect(chapterImageBudget(database, 'w')).toBe(0)
+	} finally {
+		await rm(dir, { recursive: true, force: true })
+	}
 })
 
 test('concurrent dispatch stops before the next reservation would cross the soft cutoff', async () => {

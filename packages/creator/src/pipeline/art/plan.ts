@@ -8,11 +8,28 @@ import {
 	type Location,
 	type Style,
 } from '@novelive/format/model'
+import type { CompiledScene } from '@novelive/format/script'
 
 type Entry = AssetRegistry['entries'][number]
 type Kind = Entry['type']
 export type ManifestItem = { id: string; kind: Kind; description: string }
 export type ArtJob = ImageQueueItem & { description: string }
+type PlanBudget = {
+	limit: number
+	references: (registry: AssetRegistry) => Iterable<string>
+	previousBases: ReadonlyMap<string, string>
+	reusedImages?: ReadonlySet<string>
+}
+
+export function playbackAssetIds(scenes: readonly CompiledScene[]) {
+	return new Set(
+		scenes.flatMap(({ beats }) =>
+			beats.flatMap(({ actions }) =>
+				actions.flatMap(({ assets }) => assets.map(({ id }) => id)),
+			),
+		),
+	)
+}
 export type ArtBible = {
 	style: Style
 	characters: readonly (Character & { major?: boolean })[]
@@ -62,6 +79,7 @@ export function planArt(
 	bible: ArtBible,
 	previous: AssetRegistry,
 	merges: Readonly<Record<string, string>> = {},
+	budget?: PlanBudget,
 ) {
 	const entries = new Map(
 		previous.entries.map((entry) => [
@@ -175,6 +193,26 @@ export function planArt(
 	const registry: AssetRegistry = {
 		formatVersion,
 		entries: [...entries.values()],
+	}
+	if (budget) {
+		const needed = new Set(budget.references(registry))
+		for (const id of needed) {
+			if (entries.get(id)?.status === 'drawn') continue
+			const job = jobs.get(id)
+			const baseId =
+				job && 'baseAssetId' in job
+					? job.baseAssetId
+					: budget.previousBases.get(id)
+			if (baseId) needed.add(baseId)
+		}
+		const newImages = [...needed].filter(
+			(id) =>
+				entries.get(id)?.status !== 'drawn' && !budget.reusedImages?.has(id),
+		)
+		if (newImages.length > budget.limit)
+			throw new Error(
+				`Chapter needs ${newImages.length} new provider images; budget is ${budget.limit}. Over-budget assets: ${newImages.slice(budget.limit).join(', ')}`,
+			)
 	}
 	return {
 		registry,

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { arr, bool, obj, oneOf, opt, str } from '@earendil-works/pi-schema'
@@ -15,7 +16,7 @@ import { type ImageConfig, imageProvider, imageSize } from '../../models/image'
 import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
 import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
-import { resolveRegistry } from '../../project/series/resolve'
+import { resolveRegistry, scopeLevels } from '../../project/series/resolve'
 import type { ReplayOptions } from '../../replay'
 import { SpendBudgetError } from '../../usage/spend'
 import {
@@ -194,6 +195,41 @@ export class ArtProduction {
 
 	async registry(): Promise<AssetRegistry> {
 		return resolveRegistry(this.project, this.options.readScope ?? this.scope)
+	}
+
+	private reviewPath(entry: RegistryEntry) {
+		return this.scoped(
+			`source/production/art/${createHash('sha256').update(entry.path).digest('hex')}.pending-review.json`,
+		)
+	}
+
+	hasPendingReview(assetId: string) {
+		const read = <T>(path: string): T | undefined => {
+			try {
+				return JSON.parse(readFileSync(join(this.project.root, path), 'utf8'))
+			} catch (error) {
+				if (isMissing(error)) return
+				throw error
+			}
+		}
+		for (const scope of scopeLevels(
+			this.options.readScope ?? this.scope,
+		).reverse()) {
+			const registry = read<AssetRegistry>(
+				projectFiles.assetRegistry(scope).path,
+			)
+			const entry = registry?.entries.find(({ id }) => id === assetId)
+			if (!entry) continue
+			const pending = read<PendingPaint>(this.reviewPath(entry))
+			return (
+				!!pending &&
+				typeof pending.settingsVersion === 'string' &&
+				'prompt' in pending &&
+				typeof pending.prompt === 'string' &&
+				!!pending.png
+			)
+		}
+		return false
 	}
 
 	private async persistRegistry(registry: AssetRegistry) {
@@ -495,9 +531,7 @@ export class ArtProduction {
 			redraw
 				? undefined
 				: {
-						path: this.scoped(
-							`source/production/art/${createHash('sha256').update(entry.path).digest('hex')}.pending-review.json`,
-						),
+						path: this.reviewPath(entry),
 						resume: resumingBudget,
 					},
 		).catch((error: unknown) => {
