@@ -52,6 +52,7 @@ export type Fault =
 	| 'review-rate-limit'
 	| 'image-failure'
 	| 'download-failure'
+	| 'download-body-failure'
 	| 'soft-stop'
 
 const endpoint = 'https://relay.invalid'
@@ -114,6 +115,7 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 	const pending = new Set(faults)
 	const admissions: Admission[] = []
 	const imageBytes = new Map<string, Buffer>()
+	const downloadAttempts = new Map<number, number>()
 	let downloads = 0
 	let currentChapter = 0
 	const fetch: typeof globalThis.fetch = async (input, init) => {
@@ -124,10 +126,31 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 			const bytes = imageBytes.get(url.pathname)
 			assert.ok(bytes, 'Requested unknown fixture image')
 			downloads++
+			const index = Number(/(\d+)\.png$/.exec(url.pathname)?.[1]) - 1
+			downloadAttempts.set(index, (downloadAttempts.get(index) ?? 0) + 1)
 			if (currentChapter && pending.delete('download-failure')) {
-				const index = Number(/(\d+)\.png$/.exec(url.pathname)?.[1]) - 1
 				admissions[index].fault = 'download-failure'
 				return new Response(null, { status: 503 })
+			}
+			if (
+				currentChapter &&
+				downloadAttempts.get(index) === 1 &&
+				pending.delete('download-body-failure')
+			) {
+				admissions[index].fault = 'download-body-failure'
+				let sent = false
+				return new Response(
+					new ReadableStream({
+						pull(controller) {
+							if (sent) controller.error(new Error('Image stream interrupted'))
+							else {
+								sent = true
+								controller.enqueue(Uint8Array.from(bytes.subarray(0, 8)))
+							}
+						},
+					}),
+					{ headers: { 'content-type': 'image/png' } },
+				)
 			}
 			return new Response(Uint8Array.from(bytes), {
 				headers: { 'content-type': 'image/png' },
@@ -392,6 +415,7 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 		fetch,
 		admissions,
 		pending,
+		downloadAttempts,
 		get downloads() {
 			return downloads
 		},

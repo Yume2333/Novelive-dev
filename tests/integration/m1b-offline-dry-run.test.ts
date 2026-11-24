@@ -36,6 +36,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'review-rate-limit',
 			'image-failure',
 			'download-failure',
+			'download-body-failure',
 			'soft-stop',
 		] as const
 	).map((fault) => ({ name: fault, faults: [fault] })),
@@ -54,6 +55,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'over-budget',
 			'soft-stop',
 			'download-failure',
+			'download-body-failure',
 		],
 	},
 ]
@@ -368,7 +370,9 @@ test.each(scenarios)(
 			}
 			for (const failed of relay.admissions.filter(
 				({ fault }) =>
-					fault === 'image-failure' || fault === 'download-failure',
+					fault === 'image-failure' ||
+					fault === 'download-failure' ||
+					fault === 'download-body-failure',
 			)) {
 				expect(
 					relay.admissions.filter(
@@ -376,6 +380,10 @@ test.each(scenarios)(
 					),
 					`${failed.fault} must not repeat a generation`,
 				).toHaveLength(1)
+				if (failed.fault !== 'image-failure')
+					expect(
+						relay.downloadAttempts.get(relay.admissions.indexOf(failed)),
+					).toBe(2)
 			}
 			const ledger = reservations()
 			expect(ledger).toHaveLength(relay.admissions.length)

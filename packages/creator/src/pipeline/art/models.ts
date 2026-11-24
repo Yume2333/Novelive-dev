@@ -198,18 +198,17 @@ export function imageRenderer(
 					? AbortSignal.any([signal, deadline])
 					: deadline
 				for (let attempt = 0; attempt < (metered ? 2 : 1); attempt++) {
-					const response = await download(new URL(image.url), {
-						signal: downloadSignal,
-					}).catch((error: unknown) => {
-						downloadSignal.throwIfAborted()
-						if (metered && attempt === 0) return undefined
-						throw error
-					})
-					if (response?.ok)
-						return { bytes: Buffer.from(await response.arrayBuffer()) }
-					if (response) {
+					try {
+						const response = await download(new URL(image.url), {
+							signal: downloadSignal,
+						})
+						if (response.ok)
+							return { bytes: Buffer.from(await response.arrayBuffer()) }
 						await response.body?.cancel()
 						if (response.status < 500 && response.status !== 429) break
+					} catch (error) {
+						downloadSignal.throwIfAborted()
+						if (!metered || attempt > 0) throw error
 					}
 				}
 				throw new OpenAI.APIConnectionError({
