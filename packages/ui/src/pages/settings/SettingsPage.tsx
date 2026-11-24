@@ -422,11 +422,11 @@ export function SettingsPage() {
 								{t('模型')}
 							</h2>
 							<ModelCards models={config.models} update={updateConfig} />
-							<ProductionSettings
-								config={config.production}
-								update={updateConfig}
-							/>
 						</section>
+						<ProductionSettings
+							config={config.production}
+							update={updateConfig}
+						/>
 						<section aria-labelledby="appearance-settings">
 							<h2 id="appearance-settings" className="label-caps label-caps-zh">
 								{t('界面')}

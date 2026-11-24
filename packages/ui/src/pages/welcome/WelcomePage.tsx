@@ -197,7 +197,7 @@ export function WelcomePage() {
 								{t('上一步')}
 							</Button>
 							<div className={styles.footerActions}>
-								<Button variant="ghost" onClick={() => navigate('/')}>
+								<Button variant="ghost" onClick={finish}>
 									{t('跳过')}
 								</Button>
 								<Button

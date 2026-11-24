@@ -23,7 +23,7 @@
 	color: var(--color-outline);
 }
 
-.title {
+.page .title {
 	font-size: 32px;
 }
 

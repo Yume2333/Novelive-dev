@@ -118,6 +118,7 @@ export function WelcomeModels({
 			<label className={styles.modelField}>
 				<span>{label}</span>
 				<input
+					className="nl-input"
 					type={secret ? 'password' : 'text'}
 					value={value}
 					autoComplete={secret ? 'new-password' : 'off'}
