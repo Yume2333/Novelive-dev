@@ -440,7 +440,7 @@ export function createReplayFetch(
 				admitted: Request,
 				quote?: Awaited<ReturnType<typeof quoteSpend>>,
 			) => {
-				if (process.env.NL_USAGE_CSV) {
+				if (process.env.NL_USAGE_CSV && admitted.method === 'POST') {
 					const reservation =
 						quote ?? (await quoteSpend(admitted).catch(() => undefined))
 					const body = admitted.headers

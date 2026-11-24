@@ -218,6 +218,19 @@ test('successful recording reuse composes with replay failure filtering without 
 	expect(fetch).toHaveBeenCalledTimes(2)
 })
 
+test('recording an image download does not write a usage reservation row', async () => {
+	const usage = join(directory, 'usage.csv')
+	vi.stubEnv('NL_USAGE_CSV', usage)
+	const fetch = vi.fn(async () => new Response('image'))
+	const record = createReplayFetch({ mode: 'record', directory, fetch })
+	expect(await (await record(`${origin}/rendered-image.png`)).text()).toBe(
+		'image',
+	)
+	await expect(readFile(usage, 'utf8')).rejects.toMatchObject({
+		code: 'ENOENT',
+	})
+})
+
 test('gate recording reserves private usage and strict misses retain only the request identity', async () => {
 	const usage = join(directory, 'usage.csv')
 	const missing = join(directory, 'missing.txt')
