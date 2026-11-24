@@ -613,6 +613,13 @@ test.each(scenarios)(
 						replies.slice(0, 2).map(({ desensitized }) => desensitized),
 					).toEqual([false, true])
 					expect(replies[1].requestKey).not.toBe(replies[0].requestKey)
+					if (role === 'visual') {
+						expect(replies[0].visualBrief).toBeTruthy()
+						expect(replies[1].visualBrief).toContain(
+							'A lantern on a quiet stone bridge at dusk.',
+						)
+						expect(replies[1].visualBrief).not.toBe(replies[0].visualBrief)
+					}
 				}
 				expect(explicitAdmissions.size).toBe(0)
 				expect(

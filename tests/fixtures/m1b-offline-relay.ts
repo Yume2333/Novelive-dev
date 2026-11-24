@@ -41,6 +41,7 @@ export type Admission = {
 	outputCap?: number
 	imageAllowance?: number
 	desensitized: boolean
+	visualBrief?: string
 }
 
 export type Fault =
@@ -352,6 +353,12 @@ export function fakeRelay(
 			desensitized: prompt.includes(
 				'Keep the adaptation non-graphic. Use implication instead of explicit detail.',
 			),
+			visualBrief:
+				operation === 'visual'
+					? /(?:Original image brief \(verify independently of the painter's rewrite\)|Adapted image brief): ([^\n]+)/.exec(
+							prompt,
+						)?.[1]
+					: undefined,
 			imageAllowance:
 				imageAllowance === undefined ? undefined : Number(imageAllowance),
 			requestKey: createHash('sha256')

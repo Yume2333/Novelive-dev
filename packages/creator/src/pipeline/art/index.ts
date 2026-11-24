@@ -839,7 +839,13 @@ export class ArtProduction {
 				firstReference: number,
 				issue = '',
 				input = promptDrawing,
-			) => drawingPrompt(input, content, issue, firstReference)
+			) =>
+				drawingPrompt(
+					moderationGuidance ? { ...input, description: content } : input,
+					content,
+					issue,
+					firstReference,
+				)
 			const result = await render(
 				describe(1, feedback),
 				refs,
@@ -960,7 +966,9 @@ export class ArtProduction {
 								'The painter cannot see the style images. Put differences that are not specified in the written style description in the optional styleReferenceFeedback string. Treat these as advisory only: they must not affect pass, failedChecks, or blocking feedback. Describe style differences and concrete corrections in words; do not refer to reference images by number.',
 							].join(' ')
 						: undefined,
-					`Original image brief (verify independently of the painter's rewrite): ${brief}`,
+					moderationGuidance
+						? `Adapted image brief: ${content}`
+						: `Original image brief (verify independently of the painter's rewrite): ${brief}`,
 					expression
 						? `Character preservation context: ${expressionPreservation(drawing)}.`
 						: describe(2, '', textOnlyStyle ? promptDrawing : auditDrawing),
