@@ -269,6 +269,7 @@ export function AppShell() {
 					try {
 						localStorage.setItem(recentWorkKey, ref)
 					} catch {}
+					if (routeWorkId) navigate('/')
 				},
 			}
 		}),
