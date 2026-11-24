@@ -210,6 +210,13 @@ test.each(scenarios)(
 			expect(phase).toBe('confirm-visual')
 			expect(visual?.mainVisuals).toHaveLength(3)
 			expect(visual?.characters).toHaveLength(1)
+			if (name === 'concurrent-sunburst') {
+				await host.close()
+				startWindow()
+				host = createHost()
+				session = await host.get(workId)
+				expect(session.snapshot().phase).toBe('confirm-visual')
+			}
 			await session.confirm({
 				workId,
 				mainVisualId: 'visual-1',
@@ -266,13 +273,20 @@ test.each(scenarios)(
 				if (snapshot.phase === 'done') break
 				if (snapshot.phase === 'confirm-first') {
 					expect(passedSecondGate).toBe(false)
-					if (name === 'concurrent-sunburst')
+					if (name === 'concurrent-sunburst') {
+						expect(
+							relay.admissions.find(
+								({ operation, chapter }) =>
+									operation === 'stage' && chapter === 1,
+							)?.imageAllowance,
+						).toBe(11)
 						expect(
 							relay.admissions.filter(
 								({ operation, chapter }) =>
 									operation === 'image' && chapter === 1,
 							),
 						).toHaveLength(11)
+					}
 					await play(chapterIds[0])
 					expect(
 						(await host.playerStatus(workId)).chapters.map(
