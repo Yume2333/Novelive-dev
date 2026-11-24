@@ -229,12 +229,20 @@ export function trimStagingToBudget(
 	}
 	while (current.newImages.length > budget.limit) {
 		const { scenes, counts, entries, newImages } = current
-		const backgrounds = scenes.map((scene) => {
+		let activeBackground: string | undefined
+		const backgrounds = scenes.map(({ beats }) => {
 			const counts = new Map<string, number>()
-			for (const action of sceneActions(scene)) {
-				const id = action.assets[0]?.id
-				if (action.name === 'bg' && id && entries.get(id)?.type === 'location')
+			function countBase(id: string | undefined) {
+				if (id && entries.get(id)?.type === 'location')
 					counts.set(id, (counts.get(id) ?? 0) + 1)
+			}
+			for (const [index, { actions }] of beats.entries()) {
+				const cues = actions.filter(({ name }) => name === 'bg')
+				if (index === 0 && !cues.length) countBase(activeBackground)
+				for (const { assets } of cues) {
+					activeBackground = assets[0]?.id
+					countBase(activeBackground)
+				}
 			}
 			return counts
 		})
@@ -247,6 +255,7 @@ export function trimStagingToBudget(
 			const replacements: Map<string, string>[] = []
 			for (const [index, scene] of scenes.entries()) {
 				const local = backgrounds[index]
+				if (local.size === 1 && local.has(id)) break
 				const remap = new Map<string, string>()
 				if (
 					sceneActions(scene).some(({ assets }) =>

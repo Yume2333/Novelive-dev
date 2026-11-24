@@ -1885,6 +1885,55 @@ ada: Three. #0030
 	},
 )
 
+test.each([
+	[
+		'protects the sole inherited background in the next scene',
+		'@bg z-hall/day\n@bg a-room/day',
+		'ada: Two. #0020',
+	],
+	[
+		'folds a mid-scene change into the inherited background',
+		'@bg a-room/day',
+		'ada: Two. #0020\n@bg z-hall/day\nada: Three. #0030',
+	],
+])('%s', (_name, opening, next) => {
+	const fit = trimStagingToBudget(
+		{
+			script: `scene First
+source p0001
+
+${opening}
+ada: One. #0010
+
+scene Second
+source p0002
+
+${next}
+`,
+			items: [
+				{ id: 'a-room/day', kind: 'location', description: 'Room' },
+				{ id: 'z-hall/day', kind: 'location', description: 'Hall' },
+			],
+			merges: {},
+		},
+		bible,
+		empty,
+		{ limit: 1, previousBases: new Map(), reusedImages: new Set() },
+		(script, { entries }) => {
+			const compiled = compileScript(script, {
+				assets: entries,
+				paragraphIds: ['p0001', 'p0002'],
+				speakers: ['ada'],
+			})
+			return compiled.ok ? compiled.scenes : undefined
+		},
+	)
+	expect(fit?.trimmed).toEqual([
+		{ id: 'z-hall/day', replacement: 'a-room/day' },
+	])
+	expect(fit?.script).not.toContain('z-hall/day')
+})
+
 test('reports the remaining image count and protected minimum after an unsuccessful trim', async () => {
 	const response = JSON.stringify({
 		patch: 'PUT <4:\n@bg room/day\n@cg cg-window',
