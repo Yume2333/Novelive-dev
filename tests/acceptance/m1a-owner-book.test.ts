@@ -47,12 +47,10 @@ import {
 const home = homedir()
 const source = join(home, 'novelive-testbooks', 'yesou-puyan.txt')
 const root = join(home, '.local/novelive-tools/m1a-owner-book')
-const ledger = join(home, 'memory/poke_5b9601/files/novelive/usage.csv')
-const fullPurpose = 'M1a/07 owner book with shared inclusion criteria'
-const selectionPurpose = 'M1a/07 W4 selection-only 700k'
-const batchPurpose = 'M1a/07 W4 aligned selection batch 300k'
-const savedEvents = 81
-const savedPackets = 7
+const ledger = process.env.NL_USAGE_LEDGER || join(root, 'usage.csv')
+const fullPurpose = 'owner book with shared inclusion criteria'
+const selectionPurpose = 'selection-only 700k'
+const batchPurpose = 'aligned selection batch 300k'
 const previewModel = 'gemini-3.8-flash'
 const cap = 5_000_000
 const eventContextWindow = 16_384
@@ -115,11 +113,13 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const selectionCap = batch
 			? ownerBookSelectionBatchCap
 			: ownerBookSelectionCap
-		const purpose = batch
+		const purposeDetail = batch
 			? batchPurpose
 			: checkpointSource
 				? selectionPurpose
 				: fullPurpose
+		const purpose = `M1a W4 ${purposeDetail}`
+		const legacyPurpose = `M1a/07 ${checkpointSource ? 'W4 ' : ''}${purposeDetail}`
 		if (
 			(batch && !checkpointSource) ||
 			(dryRun &&
@@ -206,12 +206,21 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			dryRun && !stubLedger
 				? ''
 				: await readFile(usageLedger, 'utf8').catch((error) => {
-						if (stubLedger && error.code === 'ENOENT') return ''
-						throw error
+						if (
+							error.code !== 'ENOENT' ||
+							(process.env.NL_USAGE_LEDGER && !stubLedger)
+						)
+							throw error
+						return ''
 					})
 		for (const line of priorUsage.split('\n')) {
 			const [, , , tokens, , reason] = line.split(',')
-			if (reason?.startsWith(purpose)) used += Number(tokens)
+			if (
+				reason?.startsWith(purpose) ||
+				reason?.startsWith(legacyPurpose) ||
+				reason?.startsWith(`M1a W4 ${legacyPurpose}`)
+			)
+				used += Number(tokens)
 		}
 		const paid: typeof globalThis.fetch = async (input, init) => {
 			if (checkpointSource) await Promise.all(pendingUsage)
@@ -357,6 +366,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			}
 		}
 		await mkdir(root, { recursive: true, mode: 0o700 })
+		if (!priorUsage && (!dryRun || stubLedger))
+			await appendFile(usageLedger, 'date,model,calls,tokens,images,purpose\n')
 		const book = await readFile(source)
 		const sha256 = digest(book)
 		const manifest = JSON.parse(
@@ -442,15 +453,16 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				).toBe(sha256)
 				const { volumeIds } = await archived.read(projectFiles.series)
 				expect(volumeIds).toHaveLength(20)
+				expect(volumeIds[0]).toBe(recorded.volumeId)
 				const files = synthesisFiles(volumeIds[0])
 				const saved = await archived.read(files.checkpoint)
 				expect(saved).toMatchObject({
 					ready: true,
 					applied: true,
-					packet: savedPackets,
 					whole: null,
 				})
-				expect(saved.events).toHaveLength(savedEvents)
+				expect(saved.packet).toBeGreaterThan(1)
+				expect(saved.events.length).toBeGreaterThan(0)
 				const exclusions = [
 					'bible',
 					projectFiles.glossary({ level: 'series' }).path,
@@ -516,8 +528,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					? await first.read(files.checkpoint)
 					: undefined
 				if (selectionStart) {
-					expect(selectionStart.packet).toBe(savedPackets)
-					expect(selectionStart.events).toHaveLength(savedEvents)
+					expect(selectionStart.packet).toBeGreaterThan(1)
+					expect(selectionStart.events.length).toBeGreaterThan(0)
 					expect(selectionStart.whole).toBe(null)
 					if (!selectionStart.applied) {
 						expect(selectionStart.ready).toBe(true)

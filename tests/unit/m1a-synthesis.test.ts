@@ -1122,7 +1122,13 @@ const selectionFixture = async (
 	})
 }
 
-test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
+test.each([
+	'current',
+	'previous',
+	'unversioned',
+	'changed target',
+	'old targeted prompt',
+] as const)(
 	'resumes without repeating extraction and only reuses compatible saved picks (checkpoint: %s)',
 	async (version) => {
 		await seed(root)
@@ -1156,6 +1162,23 @@ test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
 				await project.write(files.checkpoint, {
 					...old,
 					...(version === 'previous' ? { selectionVersion: 11 } : {}),
+					selections: [[2]],
+				})
+			}
+			if (version === 'old targeted prompt') {
+				const legacyPlan = createHash('sha256')
+					.update(
+						JSON.stringify([
+							[
+								['character', 1, 1, null],
+								['glossary', 2, 3, 2],
+							],
+						]),
+					)
+					.digest('hex')
+				await project.write(files.checkpoint, {
+					...checkpoint,
+					selectionPlan: legacyPlan,
 					selections: [[2]],
 				})
 			}
@@ -1194,7 +1217,7 @@ test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
 		})
 		const result = await synthesizeVolume(project, 'v1', chapters, {
 			...args,
-			...(version === 'changed target'
+			...(version === 'changed target' || version === 'old targeted prompt'
 				? { selectionTargets: { glossary: 2 } }
 				: {}),
 			fetch,
@@ -1292,6 +1315,12 @@ test('soft size targets require a reason for exceeding a kind but do not trim ju
 			'Soft size targets for kept candidates (not quotas): character: 1, glossary: 1',
 		)
 		expect(messages[0].content).toContain('Judge inclusion before counting.')
+		expect(messages[0].content).toContain(
+			'Cover distinct plot threads across the volume, not each stage of the same incident.',
+		)
+		expect(messages[0].content).toContain(
+			'A supporting character with a consequential one-time role can qualify even without repeated appearances.',
+		)
 		expect(messages[0].content).toContain(
 			'Do not stop at the target if a distinct candidate still meets the inclusion criteria.',
 		)
