@@ -47,6 +47,10 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 		faults: ['review-reasoning', 'review-rate-limit'],
 	},
 	{
+		name: 'review-raised-cap-rate-limit',
+		faults: ['review-reasoning', 'review-raised-cap-rate-limit'],
+	},
+	{
 		name: 'mixed',
 		faults: [
 			'writing-503',
@@ -374,18 +378,48 @@ test.each(scenarios)(
 				.filter(({ tokens }) => tokens !== null)
 				.map(({ requestKey }) => requestKey)
 			expect(settledReviewKeys).toHaveLength(new Set(settledReviewKeys).size)
-			if (faults.includes('review-rate-limit')) {
-				const denied = reviews.findIndex(
-					({ fault }) => fault === 'review-rate-limit',
-				)
+			const reviewDenial = faults.find(
+				(fault) =>
+					fault === 'review-rate-limit' ||
+					fault === 'review-raised-cap-rate-limit',
+			)
+			if (reviewDenial) {
+				const denied = reviews.findIndex(({ fault }) => fault === reviewDenial)
 				const raised = faults.includes('review-reasoning')
-				expect(denied).toBe(raised ? 2 : 1)
+				expect(denied).toBe(
+					raised && reviewDenial === 'review-rate-limit' ? 2 : 1,
+				)
 				expect(reviews[0].tokens).not.toBeNull()
 				if (raised) {
 					expect(reviews[0].fault).toBe('review-reasoning')
 					expect(reviews[1].outputCap).toBeGreaterThan(
 						reviews[0].outputCap ?? Infinity,
 					)
+				}
+				if (reviewDenial === 'review-raised-cap-rate-limit') {
+					expect(reviews[denied].tokens).toBeNull()
+					expect(
+						session.queue
+							.runLog(workId)
+							.filter(
+								({ kind, ref }) => kind === 'chapter' && ref === chapterIds[0],
+							)
+							.flatMap(({ steps }) => steps)
+							.filter(({ purpose }) => purpose === 'review'),
+					).toMatchObject([
+						{ status: 'failed', errorType: 'transient' },
+						{ status: 'completed', errorType: null },
+					])
+					expect(
+						reviews.filter(
+							({ requestKey }) => requestKey === reviews[0].requestKey,
+						),
+					).toHaveLength(1)
+					expect(
+						reviews.filter(
+							({ requestKey }) => requestKey === reviews[denied].requestKey,
+						),
+					).toHaveLength(2)
 				}
 				expect(reviews[denied + 1].requestKey).toBe(reviews[denied].requestKey)
 				expect(reviews[denied + 1].tokens).not.toBeNull()
@@ -432,7 +466,7 @@ test.each(scenarios)(
 				const csv = (await readFile(join(root, `usage-${i}.csv`), 'utf8'))
 					.trimEnd()
 					.split('\n')
-				if (faults.includes('review-rate-limit'))
+				if (reviewDenial)
 					expect(
 						csv.filter((line) => line.split(',')[1] === 'review'),
 					).toHaveLength(reviews.filter((row) => row.run === run).length)

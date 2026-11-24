@@ -51,6 +51,7 @@ export type Fault =
 	| 'truncated'
 	| 'rate-limit'
 	| 'review-rate-limit'
+	| 'review-raised-cap-rate-limit'
 	| 'review-reasoning'
 	| 'image-failure'
 	| 'image-null'
@@ -219,6 +220,8 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 		}
 		const scenes = [...prompt.matchAll(/^(\d+): scene 河灯-(\d+)-(\d+)$/gm)]
 		const repair = prompt.includes('\nRepair the ')
+		const outputCap = body.max_completion_tokens ?? body.max_tokens
+		const previous = admissions.at(-1)
 		const fault = faults.find(
 			(candidate) =>
 				pending.has(candidate) &&
@@ -235,6 +238,11 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					(candidate === 'review-rate-limit' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-2')) ||
+					(candidate === 'review-raised-cap-rate-limit' &&
+						operation === 'review' &&
+						prompt.includes('scene 河灯-1-1') &&
+						previous?.fault === 'review-reasoning' &&
+						outputCap > (previous.outputCap ?? Infinity)) ||
 					(candidate === 'review-reasoning' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-1')) ||
@@ -249,7 +257,9 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 		)
 		if (fault) pending.delete(fault)
 		const status =
-			fault === 'rate-limit' || fault === 'review-rate-limit'
+			fault === 'rate-limit' ||
+			fault === 'review-rate-limit' ||
+			fault === 'review-raised-cap-rate-limit'
 				? 429
 				: fault === 'staging-503' ||
 						fault === 'writing-503' ||
@@ -269,7 +279,6 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 						: 2_000
 		const images = tokens === null ? null : Number(image)
 		const run = process.env.NL_RUN_ID ?? ''
-		const outputCap = body.max_completion_tokens ?? body.max_tokens
 		const attributedChapter = /(?:scene 河灯-|fixture-(?:bank|cg)-)(\d+)/.exec(
 			String(image ? body.prompt : prompt),
 		)?.[1]
