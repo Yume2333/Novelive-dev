@@ -398,15 +398,17 @@ test.each(scenarios)(
 				}
 				if (reviewDenial === 'review-raised-cap-rate-limit') {
 					expect(reviews[denied].tokens).toBeNull()
-					expect(
-						session.queue
-							.runLog(workId)
-							.filter(
-								({ kind, ref }) => kind === 'chapter' && ref === chapterIds[0],
-							)
-							.flatMap(({ steps }) => steps)
-							.filter(({ purpose }) => purpose === 'review'),
-					).toMatchObject([
+					expect(explicitAdmissions.size).toBe(0)
+					const chapterRuns = session.queue
+						.runLog(workId)
+						.filter(
+							({ kind, ref }) => kind === 'chapter' && ref === chapterIds[0],
+						)
+					expect(chapterRuns).toHaveLength(1)
+					const reviewSteps = chapterRuns[0].steps.filter(
+						({ purpose }) => purpose === 'review',
+					)
+					expect(reviewSteps).toMatchObject([
 						{ status: 'failed', errorType: 'transient' },
 						{ status: 'completed', errorType: null },
 					])
