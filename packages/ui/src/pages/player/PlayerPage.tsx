@@ -90,7 +90,7 @@ export function PlayerPage({
 		async (
 			directory?: string,
 			chapterId?: string,
-			mode: PlaybackMode = 'main',
+			mode: PlaybackMode | 'select-chapter' = 'main',
 			waitForClick = false,
 			restore?: StageSnapshot,
 			onValidated?: () => PlaybackMode,
@@ -150,7 +150,15 @@ export function PlayerPage({
 					throw new Error(t('本章还没有可播放的剧本'))
 				if (restore && !containsSentence(result.scenes, restore.position))
 					throw new Error(t('存档中的句子已不存在'))
-				const validatedMode = onValidated?.() ?? mode
+				const validatedMode =
+					onValidated?.() ??
+					(mode === 'select-chapter'
+						? progress.current.data.read.some(
+								(position) => position.chapterId === chapter.chapterId,
+							)
+							? 'reread'
+							: 'main'
+						: mode)
 				compiledChapters.current.set(chapter.chapterId, result.scenes)
 				chapterOrder.current = chapters.map((chapter) => chapter.chapterId)
 				let rank = 0
@@ -219,11 +227,20 @@ export function PlayerPage({
 		[id, compare, progressApi, progressId, version],
 	)
 	useEffect(() => {
-		void loadProject(undefined, requestedChapter)
+		void loadProject(
+			undefined,
+			requestedChapter,
+			requestedChapter ? 'select-chapter' : 'main',
+		)
 	}, [loadProject, requestedChapter])
 	async function openProject() {
 		const directory = await window.novelive.pickFolder()
-		if (directory) await loadProject(directory)
+		if (directory)
+			await loadProject(
+				directory,
+				requestedChapter,
+				requestedChapter ? 'select-chapter' : 'main',
+			)
 	}
 	useEffect(() => {
 		if (!loaded || loaded.workId !== id || awaitingClick || !host.current)
@@ -410,15 +427,7 @@ export function PlayerPage({
 						)
 					}
 					onChapter={(chapterId) =>
-						void loadProject(
-							undefined,
-							chapterId,
-							progress.current.data.read.some(
-								(position) => position.chapterId === chapterId,
-							)
-								? 'reread'
-								: 'main',
-						)
+						void loadProject(undefined, chapterId, 'select-chapter')
 					}
 					onEditor={(position) => {
 						if (id) navigate(playerEditorRoute(id, position))

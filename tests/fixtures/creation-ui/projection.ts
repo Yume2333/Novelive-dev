@@ -1,5 +1,6 @@
 import type {
 	ClientFrame,
+	CommandInput,
 	EventEnvelope,
 	ProductionSnapshot,
 } from '@novelive/creator/contract'
@@ -176,8 +177,36 @@ export async function installProjection(app: ElectronApplication) {
 					case 'events.list':
 						respond({ events: fixture.records, gap: false, snapshot: null })
 						break
+					case 'production.playerChapter': {
+						const chapterId =
+							(data.payload as CommandInput<'production.playerChapter'>)
+								.chapterId ?? 'one'
+						const title = chapterId === 'two' ? '潮汐' : '灯塔'
+						respond({
+							linked: false,
+							chapters: snapshot.chapters.map((chapter) => ({
+								chapterId: chapter.chapterId,
+								title: chapter.chapterId === 'two' ? '潮汐' : '灯塔',
+								published: chapter.status === 'published',
+								progress: chapter.status,
+							})),
+							script: `scene ${title}\nsource p0001\n: ${title}的第一句。 #0001\n: ${title}的下一句。 #0002\n`,
+							chapter: {
+								formatVersion: 1,
+								chapterId,
+								title,
+								paragraphIds: ['p0001'],
+								sceneIds: ['aaaabbbb'],
+								cg: [],
+							},
+							registry: { formatVersion: 1, entries: [] },
+							speakers: [],
+							speakerNames: {},
+							customMarks: {},
+						})
+						break
+					}
 					case 'config.get':
-					case 'production.playerChapter':
 						port1.postMessage({
 							...base,
 							type: 'error',
