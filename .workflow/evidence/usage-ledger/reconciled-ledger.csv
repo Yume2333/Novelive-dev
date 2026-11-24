@@ -46,6 +46,19 @@ shared_evidence,m1b-0d324bd,devin-swe-2,settled,2,,,,46406,0,0,0,m1b/owner/live-
 shared_evidence,m1b-9349000,devin-swe-2,settled,10,,,,269545,0,0,0,m1b/owner/live-run-9349000.md:20-26,
 shared_evidence,m1b-af551d2,devin-swe-2,settled,10,,,,253102,0,0,0,m1b/owner/live-run-af551d2.md:13-25,
 shared_evidence,m1b-af551d2,devin-swe-2,transport_failure,1,,,,0,0,394352,0,m1b/owner/live-run-af551d2.md:13-25,HTTP 503; unknown outcome; not resent and full reserve retained
+shared_evidence,m1b-d58d4bc,devin-swe-2,settled,18,,,,217304,0,0,0,5157af5f:m1b/owner/live-run-d58d4bc-usage.csv:2,
+shared_evidence,m1b-d58d4bc,gemini-3.8-flash,reservation_no_usage,5,,,,0,0,794426,0,5157af5f:m1b/owner/live-run-d58d4bc-usage.csv:3,
+shared_evidence,m1b-d58d4bc,gpt-image-2.6-sunburst,settled,7,,,,76158,9,0,0,5157af5f:m1b/owner/live-run-d58d4bc-usage.csv:4,Includes the SQLite-only settlement of 30509 tokens and three images
+shared_evidence,m1b-d58d4bc,gpt-image-2.6-sunburst,reservation_no_usage,2,,,,0,0,14000,2,5157af5f:m1b/owner/live-run-d58d4bc-usage.csv:4,
+shared_evidence,m1b-53cc1d52,devin-swe-2,settled,7,,,,7860,0,0,0,d1063af7:m1b/owner/live-run-53cc1d52-usage.csv:2,
+shared_evidence,m1b-53cc1d52,devin-swe-2,rejected,1,,,,0,0,6833,0,d1063af7:m1b/owner/live-run-53cc1d52-usage.csv:2,Historical 429 not linked durably to a reservation for settlement; reserve retained
+shared_evidence,m1b-53cc1d52,gemini-3.8-flash,reservation_no_usage,1,,,,0,0,159346,0,d1063af7:m1b/owner/live-run-53cc1d52-usage.csv:3,
+shared_evidence,m1b-53cc1d52,gpt-image-2.6-sunburst,settled,2,,,,13386,2,0,0,d1063af7:m1b/owner/live-run-53cc1d52-usage.csv:4,
+shared_evidence,m1b-53cc1d52,gpt-image-2.6-sunburst,reservation_no_usage,6,,,,0,0,186000,18,d1063af7:m1b/owner/live-run-53cc1d52-usage.csv:4,
+shared_evidence,m1b-fd6e94a,deepseek-v4.1-flash,settled,1,,,,1194,0,0,0,m1b/owner/live-run-fd6e94a-usage.csv:2,
+shared_evidence,m1b-fd6e94a,devin-swe-2,settled,7,,,,7729,0,0,0,m1b/owner/live-run-fd6e94a-usage.csv:3,
+shared_evidence,m1b-fd6e94a,gemini-3.8-flash,settled,10,,,,34327,0,0,0,m1b/owner/live-run-fd6e94a-usage.csv:4,
+shared_evidence,m1b-fd6e94a,gpt-image-2.6-sunburst,settled,13,,,,97826,13,0,0,m1b/owner/live-run-fd6e94a-usage.csv:5,
 shared_unattributed,shared-settled-gap,unallocated,settled,,,,,140455,12,0,0,../owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported settled usage not linked to detailed rows
 shared_unattributed,shared-reserve-gap,unallocated,reservation_no_usage,,,,,0,0,195450,1,../owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported reserves not linked to detailed rows; outcome unknown
 overlap_unknown,older-m1b-yesou,gemini-3.8-flash,settled,201,,,,1098996,0,0,0,a0fe816:m1b/owner/11-real-book-gate.md,Older real-book window; not linked to latest shared baseline
