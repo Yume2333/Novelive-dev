@@ -7,7 +7,7 @@
 **Task type:** spike
 **Files:** tests/acceptance/m1a-owner-book.test.ts, .workflow/evidence/m1a/owner/
 **Read first:** `.workflow/specs/m1a-project.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
-**Check:** 离线重建带原文引用的时间线参照、重算留一基线；重建完成且付费获准后，由指定的 W4 会话设置 `NL_USAGE_LEDGER` 指向现有共享账本并执行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → 归一化分数 ≥ 0.90、已确认设定无丢失、重启零请求，写脱敏的差异、耗费和重启报告。W4 与 M1b/11 独立执行，严格回放不能替代本 Check。
+**Check:** 离线重建带原文引用的时间线参照、重算留一基线，并完成下文「恢复步骤」中的测试接线和离线核验。付费获准后，由指定的 W4 会话设置 `NL_USAGE_LEDGER` 指向现有共享账本并执行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → 归一化分数 ≥ 0.90、已确认设定无丢失、重启零请求，写脱敏的差异、耗费和重启报告。W4 与 M1b/11 独立执行，严格回放不能替代本 Check。
 
 **付费调用：** 仅由协调者明确指定的 W4 会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，每次按共享 CSV 格式追加 `M1a W4` 用量行，与并行的 M1b 分开记录。其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向指定的 W4 会话请求录制。凭据、共享账本路径和私有录制不提交。
 **Base commit:** ea99733e566c72be5873d6507a07de37ef7b40ba
@@ -36,7 +36,10 @@
 
 ## 恢复步骤
 
-固定参照没有时间线共识，最佳结果的 7 条时间线都计为多报。所有者已同意从原书引用段落重建时间线参照；停会前已开始，未找到可交接的重建结果。先离线核对引用并重算留一基线，再由指定 W4 会话复用检查点重跑；评分器和 **0.90** 门槛不变。
+固定参照没有时间线共识，最佳结果的 7 条时间线都计为多报。所有者已同意从原书引用段落重建时间线参照；停会前已开始，未找到可交接的重建结果。评分器和 **0.90** 门槛不变。
+
+1. 离线核对引用、重算留一基线；修改 `tests/acceptance/m1a-owner-book.test.ts` 的参照输入，让 W4 实际使用重建后的参照和对应基线，不再读取固定的 `whole-runs.json` 作为本轮参照。
+2. 恢复时显式提供现有运行目录（`NL_OWNER_BOOK_RUN_DIR`），并用 `NL_OWNER_BOOK_EXPECT_RESUME=1` 要求全流程续跑确实读到已有检查点，不走默认新建目录。若只重跑挑选，则以 `NL_OWNER_BOOK_SELECTION_SOURCE` 指向已有项目检查点、另设运行目录，不使用全流程续跑开关。离线确认测试读到新参照和旧检查点，不重发已完成的预览或提取；两项确认后才允许启动付费重跑。
 
 ## 历史试跑
 
