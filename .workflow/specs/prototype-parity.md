@@ -1,6 +1,7 @@
 # Prototype parity
 **Status:** in progress
 **Priority:** high
+**Integration branch:** devin/1795518395-prototype-parity-integration
 
 ## What this is for
 The production UI has diverged from the repository prototype. Restore its page structure, spacing, hierarchy, visual controls and overlay behavior without replacing working backend flows with mock data.
