@@ -144,7 +144,9 @@ export function UsagePage() {
 	const byPeriod = new Map<string, UsageRecord[]>()
 	for (const record of shown) {
 		const period = periodOf(record.at)
-		byPeriod.set(period, [...(byPeriod.get(period) ?? []), record])
+		const rows = byPeriod.get(period)
+		if (rows) rows.push(record)
+		else byPeriod.set(period, [record])
 	}
 	const perDay = [...byPeriod]
 		.sort(([a], [b]) => a.localeCompare(b))
