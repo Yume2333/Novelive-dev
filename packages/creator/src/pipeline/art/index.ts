@@ -13,7 +13,7 @@ import {
 } from '@novelive/format/model'
 import sharp from 'sharp'
 import { type ImageConfig, imageProvider, imageSize } from '../../models/image'
-import type { TextConnection } from '../../models/text'
+import { type TextConnection, TextModelError } from '../../models/text'
 import type { Project } from '../../project'
 import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
 import { resolveRegistry, scopeLevels } from '../../project/series/resolve'
@@ -308,6 +308,7 @@ export class ArtProduction {
 		bible: ArtBible,
 		cg?: CgReferences,
 		resumingBudget = false,
+		replacePlaceholder = false,
 	): Promise<ImageJobResult> {
 		const pending = this.pendingDraws.get(job.assetId)
 		if (pending) return pending
@@ -317,6 +318,7 @@ export class ArtProduction {
 			cg,
 			undefined,
 			resumingBudget,
+			replacePlaceholder,
 		).finally(() => this.pendingDraws.delete(job.assetId))
 		this.pendingDraws.set(job.assetId, task)
 		return task
@@ -399,12 +401,17 @@ export class ArtProduction {
 		cg?: CgReferences,
 		redraw?: { path: string; instruction?: string },
 		resumingBudget = false,
+		replacePlaceholder = false,
 	): Promise<ImageJobResult> {
 		const signal = this.options.signal
 		signal?.throwIfAborted()
 		const { entries } = await this.registry()
 		const entry = entries.find((item) => item.id === job.assetId)
 		if (!entry) throw new Error(`Unregistered asset: ${job.assetId}`)
+		if (replacePlaceholder && entry.status === 'placeholder') {
+			await rm(join(this.project.root, entry.path), { force: true })
+			await this.saveStatus(entry.id, 'pending')
+		}
 		if (!redraw && (await this.file(entry.path))) {
 			if (entry.status === 'placeholder')
 				return entry.mattingUnavailableIssue
@@ -825,28 +832,39 @@ export class ArtProduction {
 			let content = rewritten
 			if (content === undefined) {
 				await savePaint({ feedback, png: reviewed?.toString('base64') })
-				const rewrite = await artJson<{
-					content: string
-					expressionCue?: string
-				}>(
-					painter,
-					[
-						'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
-						`${drawing.kind}: ${brief}`,
-						expression
-							? `Character preservation context (not part of the expression cue): ${expressionPreservation(drawing)}.`
-							: undefined,
-						adaptExpression
-							? 'Also return "expressionCue": separately restate the saved expression requirement as non-graphic brow, eye and mouth movements. Preserve the requested emotion and intensity, independent of the painter content and retry feedback.'
-							: undefined,
-						feedback,
-						moderationGuidance,
-					]
-						.filter(Boolean)
-						.join('\n'),
-					adaptExpression ? expressionContentSchema : contentSchema,
-					{ ...this.options, maxTokens: 1024 },
-				)
+				const prompt = [
+					'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
+					`${drawing.kind}: ${brief}`,
+					expression
+						? `Character preservation context (not part of the expression cue): ${expressionPreservation(drawing)}.`
+						: undefined,
+					adaptExpression
+						? 'Also return "expressionCue": separately restate the saved expression requirement as non-graphic brow, eye and mouth movements. Preserve the requested emotion and intensity, independent of the painter content and retry feedback.'
+						: undefined,
+					feedback,
+					moderationGuidance,
+				]
+					.filter(Boolean)
+					.join('\n')
+				const request = (maxTokens: number) =>
+					artJson<{ content: string; expressionCue?: string }>(
+						painter,
+						prompt,
+						adaptExpression ? expressionContentSchema : contentSchema,
+						{
+							...this.options,
+							maxTokens,
+							checkpointReasoningLimit: maxTokens === 1024,
+						},
+					)
+				const rewrite = await request(1024).catch((error: unknown) => {
+					if (
+						error instanceof TextModelError &&
+						error.code === 'reasoning_limit'
+					)
+						return request(2048)
+					throw error
+				})
 				content = rewrite.content
 				expressionCue = rewrite.expressionCue
 				await savePaint({

@@ -17,6 +17,7 @@ const {
 	NL_M1B_DRY_RUN_RECORDINGS: recordings,
 	NL_M1B_DRY_RUN_DRAWING_CHECKPOINT: drawingCheckpoint,
 	NL_M1B_DRY_RUN_DRAWING_RECORDINGS: drawingRecordings,
+	NL_M1B_DRY_RUN_REPAIR_PUBLISHED: repairPublished,
 } = process.env
 
 test.skipIf(!checkpoint || !profile)(
@@ -145,7 +146,18 @@ test.skipIf(!drawingCheckpoint || !profile)(
 		if (!drawingCheckpoint || !profile) return
 		const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-drawing-dry-run-'))
 		const directory = join(root, 'project')
-		const relay = fakeRelay([], true)
+		const offlineProfile = join(root, 'profile')
+		await mkdir(offlineProfile)
+		await cp(join(profile, 'config.json'), join(offlineProfile, 'config.json'))
+		const relay = fakeRelay(
+			[],
+			true,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			!!repairPublished,
+		)
 		const settledDrawing = drawingRecordings
 			? createReplayFetch({
 					mode: 'strict',
@@ -158,7 +170,7 @@ test.skipIf(!drawingCheckpoint || !profile)(
 		let repeatedDownloads = 0
 		const host = createProduction(
 			root,
-			createConfigStore(profile),
+			createConfigStore(offlineProfile),
 			{
 				onCheckpointHit: () => {
 					drawingHits++
@@ -214,7 +226,32 @@ test.skipIf(!drawingCheckpoint || !profile)(
 					.prepare('SELECT * FROM spend_reservation ORDER BY id')
 					.all()
 			const original = reservations()
-			expect(original).toHaveLength(drawingRecordings ? 151 : 134)
+			expect(original).toHaveLength(
+				repairPublished ? 182 : drawingRecordings ? 151 : 134,
+			)
+			const publication = () =>
+				project.database
+					.prepare(
+						'SELECT user_state, placeholder FROM chapter WHERE work_id = ? AND chapter_id = ?',
+					)
+					.get(workId, chapterId)
+			const failedAsset = repairPublished
+				? project.database
+						.prepare(`SELECT t.ref_id FROM task t JOIN run r ON r.run_id = t.run_id
+						WHERE t.work_id = ? AND t.kind = 'image' AND t.error_type = 'placeholder'
+							AND r.error_message LIKE '[reasoning_limit] %'`)
+						.all(workId)
+				: []
+			const lastRun = project.database
+				.prepare('SELECT max(rowid) AS id FROM run')
+				.get()?.id
+			if (repairPublished) {
+				expect(failedAsset).toHaveLength(1)
+				expect(publication()).toEqual({
+					user_state: 'published',
+					placeholder: 1,
+				})
+			}
 			if (drawingRecordings) {
 				const cache = join(directory, '.novelive', 'draw')
 				await mkdir(cache, { recursive: true })
@@ -244,6 +281,36 @@ test.skipIf(!drawingCheckpoint || !profile)(
 			).toHaveLength(0)
 			const ledger = reservations()
 			expect(ledger.slice(0, original.length)).toEqual(original)
+			if (repairPublished) {
+				expect(relay.admissions.map(({ operation }) => operation)).toEqual([
+					'painter',
+					'image',
+					'visual',
+				])
+				const repair = project.database
+					.prepare(
+						'SELECT kind, ref AS ref_id, status, error_type FROM run WHERE rowid > ? ORDER BY rowid',
+					)
+					.all(lastRun ?? 0)
+				expect(repair).toEqual(
+					failedAsset.map((asset) => ({
+						...asset,
+						kind: 'image',
+						status: 'done',
+						error_type: null,
+					})),
+				)
+				expect(ledger.slice(original.length)).toHaveLength(3)
+				expect(
+					ledger
+						.slice(original.length)
+						.every((row) => row.actual_tokens !== null),
+				).toBe(true)
+				expect(publication()).toEqual({
+					user_state: 'published',
+					placeholder: 0,
+				})
+			}
 			const images = ledger
 				.slice(original.length)
 				.filter(({ images }) => images !== 0)

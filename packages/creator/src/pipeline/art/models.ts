@@ -33,6 +33,7 @@ import type { Dimensions } from './check'
 export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
 type JsonOptions = ModelOptions & {
 	maxTokens?: number
+	checkpointReasoningLimit?: boolean
 	onUsableReply?: (save: () => Promise<void>) => void
 }
 
@@ -428,8 +429,15 @@ async function requestArtJson<T>(
 	).result()
 	options.signal?.throwIfAborted()
 	if (replay.failure) throw replay.failure
-	if (response.stopReason !== 'stop')
-		throw textResultError(response, `Art model stopped: ${response.stopReason}`)
+	if (response.stopReason !== 'stop') {
+		const error = textResultError(
+			response,
+			`Art model stopped: ${response.stopReason}`,
+		)
+		if (options.checkpointReasoningLimit && error.code === 'reasoning_limit')
+			await saveReply?.()
+		throw error
+	}
 	const text = response.content
 		.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 		.join('')
