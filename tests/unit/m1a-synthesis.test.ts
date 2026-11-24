@@ -1129,11 +1129,17 @@ test.each([
 	'changed target',
 	'old targeted prompt',
 	'changed selector',
+	'current targeted plan',
+	'same-model targeted plan before selector keys',
 ] as const)(
 	'resumes without repeating extraction and only reuses compatible saved picks (checkpoint: %s)',
 	async (version) => {
 		await seed(root)
 		const args = { ...options, strategy: 'events' as const }
+		const sameTarget =
+			version === 'current targeted plan' ||
+			version === 'same-model targeted plan before selector keys'
+		const targets = { selectionTargets: { glossary: 2 } }
 		{
 			using project = await Project.open(root)
 			const write = project.write.bind(project)
@@ -1148,6 +1154,7 @@ test.each([
 			await expect(
 				synthesizeVolume(project, 'v1', chapters, {
 					...args,
+					...(sameTarget ? targets : {}),
 					fetch: selectionFixture,
 				}),
 			).rejects.toThrow('Selection interrupted')
@@ -1166,21 +1173,23 @@ test.each([
 					selections: [[2]],
 				})
 			}
-			if (version === 'old targeted prompt') {
+			if (
+				version === 'old targeted prompt' ||
+				version === 'same-model targeted plan before selector keys'
+			) {
+				const ranges = [
+					[
+						['character', 1, 1, null],
+						['glossary', 2, 3, 2],
+					],
+				]
 				const legacyPlan = createHash('sha256')
-					.update(
-						JSON.stringify([
-							[
-								['character', 1, 1, null],
-								['glossary', 2, 3, 2],
-							],
-						]),
-					)
+					.update(JSON.stringify(sameTarget ? [1, ranges] : ranges))
 					.digest('hex')
 				await project.write(files.checkpoint, {
 					...checkpoint,
 					selectionPlan: legacyPlan,
-					selections: [[2]],
+					selections: sameTarget ? checkpoint.selections : [[2]],
 				})
 			}
 		}
@@ -1219,8 +1228,10 @@ test.each([
 		})
 		const result = await synthesizeVolume(project, 'v1', chapters, {
 			...args,
-			...(version === 'changed target' || version === 'old targeted prompt'
-				? { selectionTargets: { glossary: 2 } }
+			...(sameTarget ||
+			version === 'changed target' ||
+			version === 'old targeted prompt'
+				? targets
 				: {}),
 			...(version === 'changed selector'
 				? {
@@ -1237,7 +1248,9 @@ test.each([
 		expect(
 			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
 		).toEqual(result)
-		expect(fetch).toHaveBeenCalledTimes(version === 'current' ? 0 : 1)
+		expect(fetch).toHaveBeenCalledTimes(
+			version === 'current' || sameTarget ? 0 : 1,
+		)
 	},
 )
 

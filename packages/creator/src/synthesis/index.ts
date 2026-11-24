@@ -1046,7 +1046,16 @@ ${scopes.flatMap(({ lines }) => lines).join('\n')}`
 				? [targeted ? targetedSelectionVersion : 0, selector.id, ranges]
 				: ranges,
 		)
-		if (state.selectionPlan !== plan) state.selections = []
+		const previousSameModelPlan =
+			targeted && selector.id === model.id
+				? hash([targetedSelectionVersion, ranges])
+				: undefined
+		if (
+			state.selectionPlan !== plan &&
+			(previousSameModelPlan === undefined ||
+				state.selectionPlan !== previousSameModelPlan)
+		)
+			state.selections = []
 		state.selectionPlan = plan
 		const kept = new Set<number>()
 		const keptByKind = new Map<SelectionGroup['kind'], number>()
