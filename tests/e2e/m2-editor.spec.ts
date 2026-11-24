@@ -521,6 +521,7 @@ test.describe('contract-render', () => {
 					page.getByRole('textbox', { name: 'NVS 剧本' }),
 				).toContainText('{em}{/em}')
 				await page.getByRole('button', { name: '撤销', exact: true }).click()
+				await page.getByRole('button', { name: '让 Agent 重写本场景' }).click()
 				await page.getByRole('textbox', { name: '重写要求' }).fill('只改第一句')
 				await page
 					.getByRole('button', { name: '重写场景', exact: true })

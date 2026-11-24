@@ -148,6 +148,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			{ useInnerText: true },
 		)
 		await capture(page, '01-source-and-preview')
+		await page.getByRole('button', { name: '让 Agent 重写本场景' }).click()
 		await page.getByRole('textbox', { name: '重写要求' }).fill(instruction)
 		await page.getByRole('button', { name: '重写场景', exact: true }).click()
 		const diffs = page.getByRole('region', { name: '重写差异' })

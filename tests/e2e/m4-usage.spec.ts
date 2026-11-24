@@ -229,6 +229,11 @@ test('M4 usage and stale assets', async () => {
 					{ workId, volumeId },
 				)
 				await page.reload()
+				{
+					const chip = page.getByRole('button', { name: /^候选与冲突/ })
+					if ((await chip.getAttribute('aria-expanded')) !== 'true')
+						await chip.click()
+				}
 				await page
 					.getByRole('article', { name: id, exact: true })
 					.getByRole('button', { name: '接受候选' })
