@@ -17,7 +17,7 @@ The [CSV](reconciled-ledger.csv) is the ledger. The historical tables below desc
 | Reported but not linked to a run or model | +140,455 / +12 | +195,450 / +1 | — |
 | **Reported shared balance at baseline** | **4,906,466 / 31** | **2,293,370 / 2** | **12,800,164 / 467** |
 
-For shared-budget planning, use the current ledger balance, including the unattributed amounts, against the corrected [project cap](../../delivery-plan.md#测试模型与额度) of 2B tokens and 500 images. The historical headroom above does not authorize more spend. Provider-reported image-model tokens count toward the token cap as well as generated images counting toward the separate image cap.
+For shared-budget planning, use the combined CSV and W4 totals above, including unattributed amounts and open reservations: **11,147,952 tokens and 106 image slots** are settled or reserved in this snapshot. Compare that exposure against the corrected [project cap](../../delivery-plan.md#测试模型与额度) of 2B tokens and 500 images. Neither the historical headroom above nor this snapshot authorizes more spend. Provider-reported image-model tokens count toward the token cap as well as generated images counting toward the separate image cap.
 
 ### Discrepancies and deduplication
 
