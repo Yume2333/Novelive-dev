@@ -13,9 +13,9 @@
 **Base commit:** ea99733e566c72be5873d6507a07de37ef7b40ba
 **Status:** blocked
 
-- [ ] W4 待[所有者评审](../../owner-review.md)：真书已测，最佳 0.76144，未达 0.90。不再付费跑 W4；恢复和综合修复已在 `f9dd863` 单独合入 main，通过的分块 fixture 仍缺，严格门槛保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。[M1b/11](../m1b-production/11-m1b-owner-book.md) 使用已落地的代码，不以本项比较验收为前置；其真书验收不算本项通过。
+- [ ] W4 待[所有者评审](../../owner-review.md)：真书已测，最佳 0.76144，未达 0.90。待 [M1b/11](../m1b-production/11-m1b-owner-book.md) 第 2–4 章完成后串行恢复付费调优。恢复和综合修复已在 `f9dd863` 单独合入 main，通过的分块 fixture 仍缺，严格门槛保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。M1b/11 不以本项比较验收为前置，其真书验收不算本项通过。
 
-所有者更新的[全项目硬上限](../../delivery-plan.md#测试模型与额度)为 **2,000 万（20M）tokens（含视觉与审稿模型）、500 张图**；下文的历史试跑额度不变，也不授权再次付费跑 W4。
+所有者更正的[全项目硬上限](../../delivery-plan.md#测试模型与额度)为 **20 亿（2B）tokens（含视觉与审稿模型）、500 张图**；下文的历史试跑额度不变。
 
 ## W4 口径
 
