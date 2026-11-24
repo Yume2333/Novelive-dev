@@ -330,7 +330,7 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 		await page.keyboard.press('Escape')
 		await page.getByRole('tab', { name: '我的工程' }).click()
 		await page
-			.getByRole('region', { name: '我的工程' })
+			.getByRole('tabpanel', { name: '我的工程' })
 			.getByRole('link', { name: '黄昏' })
 			.click()
 		const fork = join(directory, 'fork.novelive')

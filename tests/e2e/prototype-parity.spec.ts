@@ -21,6 +21,9 @@ test('prototype welcome saves the shared model form with reachable completion', 
 				BrowserWindow.getAllWindows()[0]?.setContentSize(1000, 700)
 			})
 			const page = await app.firstWindow()
+			await expect(
+				page.getByText('创作端已就绪', { exact: true }),
+			).toBeAttached()
 			await page.evaluate(async () => {
 				await window.novelive.call('config.update', {
 					models: {
