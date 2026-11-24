@@ -85,6 +85,8 @@ const selection = synthesisOutput(
 )
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
+const eventExtractionGuidance = `Timeline: write a compact chapter-level account of the main turning point and its immediate outcome, naming only the people who directly take part. Combine linked actions in the same chapter into one entry rather than one per scene; revise that entry under the same ID when a later extraction adds a linked action. Keep the chapter's concrete action words and specific names rather than paraphrasing into an abstract summary.
+Foreshadowing: record the actual clue where it is planted: the exact remark, object, ominous image, unexplained action, or absence and the concrete circumstances that give it significance. Keep distinctive source wording. Do not turn ordinary danger, an immediately explained event, or speculation about a future payoff into a clue. When resolving a clue, keep its original planted chapter and description and record the separate resolution chapter.`
 const checkpointSchema = obj({
 	...version,
 	fingerprint: str(),
@@ -143,6 +145,7 @@ export interface SynthesisOptions {
 	language: string
 	requirements?: string
 	strategy?: 'auto' | 'whole' | 'events'
+	chapterLevelFacts?: boolean
 	maxEvents?: number
 	incremental?: boolean
 	scope?: ProjectScope
@@ -508,6 +511,9 @@ export async function synthesizeVolume(
 		requirements: options.requirements,
 		strategy: mode,
 		incremental,
+		...(mode === 'events' && options.chapterLevelFacts
+			? { chapterLevelFacts: true }
+			: {}),
 		...(options.scope ? { scope: options.scope } : {}),
 		...(options.previousDigests
 			? { previousDigests: options.previousDigests }
@@ -850,8 +856,13 @@ ${packets[packet]}`
 			extractionPrompt = prompt(extract, entries, history)
 			focusedPrompt = prompt(focus, entries, history)
 		}
+		const withGuidance = (text: string) => {
+			if (!options.chapterLevelFacts) return text
+			const guided = `${eventPrompt}\n${eventExtractionGuidance}${text.slice(eventPrompt.length)}`
+			return bytes(guided) + bytes(repairPrefix) < budget ? guided : text
+		}
 		const event = await request(
-			extractionPrompt,
+			withGuidance(extractionPrompt),
 			nextEvent,
 			async (value: Event) => {
 				value.biblePatch = await validateStylePatch(project, value.biblePatch)
@@ -863,7 +874,7 @@ ${packets[packet]}`
 				if (value.is_last && packet === packets.length - 1)
 					combine(volumeId, chapterIds, [...state.events, value])
 			},
-			focusedPrompt,
+			withGuidance(focusedPrompt),
 		)
 		state.events.push(event)
 		if (event.is_last) state.packet++

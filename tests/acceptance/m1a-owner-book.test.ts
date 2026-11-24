@@ -114,6 +114,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const mustResume = process.env.NL_OWNER_BOOK_EXPECT_RESUME === '1'
 		const checkpointSource = process.env.NL_OWNER_BOOK_SELECTION_SOURCE
 		const runDirectory = process.env.NL_OWNER_BOOK_RUN_DIR
+		const chapterLevelFacts = process.env.NL_OWNER_BOOK_CHAPTER_FACTS === '1'
 		const dryRun = process.env.NL_OWNER_BOOK_SELECTION_STUB
 		const batch = process.env.NL_OWNER_BOOK_SELECTION_BATCH === '1'
 		const ledger = process.env.NL_USAGE_LEDGER
@@ -444,6 +445,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			requestTimeoutMs: timeoutFor(selectionConnection),
 			language,
 			strategy: 'events' as const,
+			chapterLevelFacts,
 			fetch: fetchReplay,
 			signal: controller.signal,
 		}
@@ -677,6 +679,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					events: checkpoint.events.length,
 					synthesisModel,
 					selectionModel,
+					...(chapterLevelFacts ? { chapterLevelFacts } : {}),
 					...score,
 					confirmedIntact,
 					restartRequests,

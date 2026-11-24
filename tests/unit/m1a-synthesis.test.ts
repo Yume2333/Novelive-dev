@@ -982,6 +982,12 @@ test('a saturated packet shows recent unique IDs from each kind and can finish w
 		if (extractions === 1) return stream(first)
 		if (extractions === 2) return stream(second)
 		expect(prompt).toContain('Extract only the next event in packet 1/1.')
+		expect(prompt).toContain('main turning point and its immediate outcome')
+		expect(prompt).toContain('Combine linked actions in the same chapter')
+		expect(prompt).toContain('record the actual clue where it is planted')
+		expect(prompt).toContain(
+			'keep its original planted chapter and description',
+		)
 		expect(prompt).toContain('Events already extracted: 2')
 		expect(prompt).toContain('use is_last:true and empty arrays')
 		expect(prompt).toContain(
@@ -997,7 +1003,12 @@ test('a saturated packet shows recent unique IDs from each kind and can finish w
 		expect(registry).toContain('glossary: "harbor signal: blue"')
 		return stream(finish)
 	}
-	const args = { ...options, strategy: 'events' as const, fetch }
+	const args = {
+		...options,
+		strategy: 'events' as const,
+		chapterLevelFacts: true,
+		fetch,
+	}
 	await expect(
 		synthesizeVolume(project, 'v1', chapters, { ...args, maxEvents: 2 }),
 	).rejects.toThrow('Synthesis reached its event limit (2)')
