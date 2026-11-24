@@ -99,11 +99,14 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 	async () => {
 		const synthesisModel =
 			process.env.NL_OWNER_BOOK_SYNTHESIS_MODEL ?? 'devin-swe-2'
+		const selectionModel =
+			process.env.NL_OWNER_BOOK_SELECTION_MODEL ?? synthesisModel
 		if (
-			synthesisModel !== 'devin-swe-2' &&
-			synthesisModel !== 'gemini-3.8-flash'
+			[synthesisModel, selectionModel].some(
+				(model) => !['devin-swe-2', 'gemini-3.8-flash'].includes(model),
+			)
 		)
-			throw new Error('Unexpected synthesis model')
+			throw new Error('Unexpected synthesis or selection model')
 		const mustResume = process.env.NL_OWNER_BOOK_EXPECT_RESUME === '1'
 		const checkpointSource = process.env.NL_OWNER_BOOK_SELECTION_SOURCE
 		const runDirectory = process.env.NL_OWNER_BOOK_RUN_DIR
@@ -175,6 +178,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		}
 		const selectionConnection = {
 			...synthesisConnection,
+			model: selectionModel,
 			maxOutputTokens: 32_768,
 		}
 		const timeoutFor = (slot: TextConnection) =>
@@ -235,10 +239,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			const text = await request.clone().text()
 			const payload = JSON.parse(text)
 			const model: string = payload.model
-			if (
-				model !== synthesisModel &&
-				(checkpointSource || model !== previewModel)
-			)
+			const paidModels = checkpointSource
+				? [selectionModel]
+				: [previewModel, synthesisModel, selectionModel]
+			if (!paidModels.includes(model))
 				throw new Error('Unexpected real-book provider model')
 			const outputCap = payload.max_completion_tokens ?? payload.max_tokens
 			if (!Number.isSafeInteger(outputCap) || outputCap < 1)
@@ -549,7 +553,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 						events: saved.events.length,
 					}
 				}
-				phase = 'preview and chunked synthesis'
+				phase = checkpointSource
+					? 'selection on the saved extraction (check NL_OWNER_BOOK_SYNTHESIS_MODEL matches the source run)'
+					: 'preview and chunked synthesis'
 				const result = await prepareVolume(first, volumeId, options).catch(
 					async (error) => {
 						if (!capReached || !selectionStart) throw error
@@ -638,6 +644,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 					previewBytes,
 					packets: checkpoint.packet,
 					events: checkpoint.events.length,
+					synthesisModel,
+					selectionModel,
 					...score,
 					confirmedIntact,
 					restartRequests,
@@ -649,6 +657,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 						formatVersion: 1,
 						volumeId,
 						model: synthesisModel,
+						...(selectionModel !== synthesisModel ? { selectionModel } : {}),
 						biblePatch: chunked.biblePatch,
 						glossaryPatch: chunked.glossaryPatch,
 					},

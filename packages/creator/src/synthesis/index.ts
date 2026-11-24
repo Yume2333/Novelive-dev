@@ -1040,9 +1040,10 @@ ${scopes.flatMap(({ lines }) => lines).join('\n')}`
 				target,
 			]),
 		)
+		const targeted = numbered.some(({ target }) => target !== undefined)
 		const plan = hash(
-			numbered.some(({ target }) => target !== undefined)
-				? [targetedSelectionVersion, ranges]
+			targeted || selector.id !== model.id
+				? [targeted ? targetedSelectionVersion : 0, selector.id, ranges]
 				: ranges,
 		)
 		if (state.selectionPlan !== plan) state.selections = []

@@ -1128,6 +1128,7 @@ test.each([
 	'unversioned',
 	'changed target',
 	'old targeted prompt',
+	'changed selector',
 ] as const)(
 	'resumes without repeating extraction and only reuses compatible saved picks (checkpoint: %s)',
 	async (version) => {
@@ -1185,7 +1186,8 @@ test.each([
 		}
 		using project = await Project.open(root)
 		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-			const { messages } = await new Request(input, init).json()
+			const { messages, model } = await new Request(input, init).json()
+			if (version === 'changed selector') expect(model).toBe('gemini-3.8-flash')
 			const prompt: string = messages[0].content
 			expect(checkOwnerBookResumePrompt(prompt, { packet: 2, events: 1 })).toBe(
 				'selection',
@@ -1219,6 +1221,14 @@ test.each([
 			...args,
 			...(version === 'changed target' || version === 'old targeted prompt'
 				? { selectionTargets: { glossary: 2 } }
+				: {}),
+			...(version === 'changed selector'
+				? {
+						selectionConnection: {
+							...args.connection,
+							model: 'gemini-3.8-flash',
+						},
+					}
 				: {}),
 			fetch,
 		})
