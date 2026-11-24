@@ -42,6 +42,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'image-invalid-json',
 			'image-overdelivery',
 			'drawing-technical-rejection',
+			'drawing-framing-exhausted',
 			'drawing-moderation',
 			'concurrent-sunburst',
 			'download-failure',
@@ -225,6 +226,7 @@ test.each(scenarios)(
 							auditReasoning ||
 							name === 'drawing-rate-limit' ||
 							name === 'drawing-technical-rejection' ||
+							name === 'drawing-framing-exhausted' ||
 							name === 'drawing-moderation') && {
 							concurrency: 1,
 						}),
@@ -361,6 +363,7 @@ test.each(scenarios)(
 			}
 			let passedSecondGate = false
 			let resumedBudget = false
+			let recoveredFraming = false
 			const retriedFaults = new Set<Fault>()
 			const explicitAdmissions = new Set<number>()
 			for (let attempts = 0; attempts < faults.length + 6; attempts++) {
@@ -435,6 +438,73 @@ test.each(scenarios)(
 						.prepare('SELECT pause_reason FROM work WHERE work_id = ?')
 						.get(workId)?.pause_reason === 'budget_paused'
 				if (
+					faults.includes('drawing-framing-exhausted') &&
+					snapshot.status === 'stopped' &&
+					!softStop
+				) {
+					expect(recoveredFraming).toBe(false)
+					expect(snapshot.chapters[1]).toMatchObject({
+						status: 'producing',
+						issue: '立绘主体缺失，或头部、侧面超出画布。',
+					})
+					expect((await host.playerStatus(workId)).chapters[1]?.published).toBe(
+						false,
+					)
+					const rejected = relay.admissions.filter(
+						({ fault }) => fault === 'drawing-framing-exhausted',
+					)
+					expect(rejected).toHaveLength(4)
+					const portraitRuns = () =>
+						project.database
+							.prepare(
+								"SELECT status, error_type FROM run WHERE kind = 'image' AND ref = 'ada/coat/neutral' ORDER BY rowid",
+							)
+							.all()
+					expect(portraitRuns()).toEqual([
+						{ status: 'needs_attention', error_type: 'portrait_framing' },
+					])
+					const settledDraws = project.database
+						.prepare(
+							"SELECT ref FROM run WHERE kind = 'image' AND status = 'done'",
+						)
+						.all()
+					const boundary = relay.admissions.length
+					const previous = reservations()
+					await reopen()
+					await session.continue()
+					await session.queue.idle()
+					expect(portraitRuns()).toEqual([
+						{ status: 'needs_attention', error_type: 'portrait_framing' },
+						{ status: 'done', error_type: null },
+					])
+					for (const { ref } of settledDraws)
+						expect(
+							project.database
+								.prepare("SELECT 1 FROM run WHERE kind = 'image' AND ref = ?")
+								.all(ref),
+						).toHaveLength(1)
+					expect(reservations().slice(0, previous.length)).toEqual(previous)
+					expect(
+						relay.admissions
+							.slice(boundary)
+							.filter(
+								({ chapter, operation }) =>
+									chapter === 2 &&
+									['write', 'review', 'stage'].includes(operation),
+							),
+					).toEqual([])
+					expect(
+						project.database
+							.prepare(
+								"SELECT status, placeholder FROM task JOIN chapter ON chapter_id = ref_id WHERE kind = 'chapter' AND chapter_id = 'ch0002'",
+							)
+							.get(),
+					).toMatchObject({ status: 'done', placeholder: 0 })
+					await play(chapterIds[1])
+					recoveredFraming = true
+					continue
+				}
+				if (
 					faults.includes('painter-reasoning-exhausted') &&
 					snapshot.status === 'stopped' &&
 					!softStop
@@ -481,6 +551,8 @@ test.each(scenarios)(
 				'done',
 			)
 			expect(passedSecondGate).toBe(true)
+			if (faults.includes('drawing-framing-exhausted'))
+				expect(recoveredFraming).toBe(true)
 			if (auditReasoning) {
 				const first = relay.admissions.findIndex(
 					({ fault }) => fault === 'audit-reasoning',

@@ -585,6 +585,7 @@ export function chapterWorker(
 					metadata.cg,
 					ctx.resumingBudget,
 					ctx.replacePlaceholder,
+					ctx.framingRecovery,
 				)
 			}).catch((error: unknown) => {
 				if (error instanceof TextModelError && error.code === 'reasoning_limit')
