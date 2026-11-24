@@ -34,7 +34,7 @@ test('M0 library and usage navigate between real empty pages and switch theme wi
 			await expect(page.getByRole('button', { name: '新建' })).toHaveCount(0)
 			await expect(
 				page.getByRole('button', { name: '导入作品包' }),
-			).toHaveCount(0)
+			).toBeVisible()
 			await page.getByRole('button', { name: '亮色' }).click()
 			await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
 			await page.screenshot({
