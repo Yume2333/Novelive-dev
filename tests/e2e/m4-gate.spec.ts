@@ -835,6 +835,11 @@ test.describe('M4 longform and queue', () => {
 			await page.evaluate((id) => {
 				location.hash = `/work/${id}/bible?volume=v0001`
 			}, a)
+			{
+				const chip = page.getByRole('button', { name: /^候选与冲突/ })
+				if ((await chip.getAttribute('aria-expanded')) !== 'true')
+					await chip.click()
+			}
 			await page
 				.getByRole('article', { name: '河岸过期提醒', exact: true })
 				.getByRole('button', { name: '接受候选' })

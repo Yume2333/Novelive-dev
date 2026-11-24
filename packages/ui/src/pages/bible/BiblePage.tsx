@@ -489,6 +489,7 @@ function BibleProjection({
 	}
 	const label = t(categories.find(([key]) => key === category)?.[1] ?? '')
 	const entries: Entry[] = bible ? bible[category] : []
+	const selected = entries.find((entry) => entry.id === focused) ?? entries[0]
 	const card = (entry: Entry) => (
 		<article
 			className={styles.card}
@@ -642,13 +643,8 @@ function BibleProjection({
 															type="button"
 															key={entry.id}
 															className={styles.characterItem}
-															aria-current={focused === entry.id || undefined}
-															onClick={() => {
-																setFocused(entry.id)
-																document
-																	.getElementById(`bible-entry-${entry.id}`)
-																	?.scrollIntoView({ block: 'nearest' })
-															}}
+															aria-current={selected === entry || undefined}
+															onClick={() => setFocused(entry.id)}
 														>
 															<span
 																className={styles.avatar}
@@ -662,7 +658,7 @@ function BibleProjection({
 														</button>
 													))}
 												</div>
-												<div className={styles.cards}>{entries.map(card)}</div>
+												<div className={styles.cards}>{card(selected)}</div>
 											</div>
 										) : category === 'glossary' && entries.length > 0 ? (
 											<div className={styles.glossary}>

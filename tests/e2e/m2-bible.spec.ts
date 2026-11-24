@@ -384,6 +384,7 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 			await expect(
 				page.getByText('已接受候选；', { exact: false }),
 			).toBeVisible()
+			await confirmed.getByRole('button', { name: '小夏', exact: true }).click()
 			await expect(confirmed.getByText('银发', { exact: false })).toBeVisible()
 			using db = new DatabaseSync(join(directory, 'project.db'))
 			const stale = db
@@ -464,7 +465,7 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 			await page.reload()
 			await openCandidates(page)
 			await expect(
-				page.getByRole('heading', { name: '小夏', exact: true }),
+				page.getByRole('button', { name: '小夏', exact: true }),
 			).toBeVisible()
 			expect(
 				(await getBible(project, { workId, volumeId })).glossary[0].written,
