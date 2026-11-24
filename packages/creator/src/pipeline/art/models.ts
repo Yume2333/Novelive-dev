@@ -133,8 +133,8 @@ export function imageRenderer(
 		let generationSucceeded = false
 		try {
 			signal?.throwIfAborted()
-			const response = seedream
-				? await client.images.generate(parameters, {
+			const generation = seedream
+				? client.images.generate(parameters, {
 						signal,
 						body: {
 							...parameters,
@@ -152,7 +152,7 @@ export function imageRenderer(
 						},
 					})
 				: refs.length
-					? await client.images.edit(
+					? client.images.edit(
 							{
 								...parameters,
 								...output,
@@ -166,10 +166,12 @@ export function imageRenderer(
 							},
 							{ signal },
 						)
-					: await client.images.generate(
+					: client.images.generate(
 							{ ...parameters, ...output, n: 1, quality: config.quality },
 							{ signal },
 						)
+			generationSucceeded = (await generation.asResponse()).ok
+			const response = await generation
 			recordImageUsage(
 				config.model,
 				response.data?.filter((image) => image.b64_json || image.url).length ??
@@ -182,14 +184,15 @@ export function imageRenderer(
 						error?: { code: string; message: string }
 				  }
 				| undefined
-			if (seedream && image?.error && !image.b64_json && !image.url)
+			if (seedream && image?.error && !image.b64_json && !image.url) {
+				generationSucceeded = false
 				throw new OpenAI.APIError(
 					400,
 					image.error,
 					image.error.message,
 					new Headers(),
 				)
-			generationSucceeded = true
+			}
 			if (image?.b64_json)
 				return { bytes: Buffer.from(image.b64_json, 'base64') }
 			if (image?.url) {

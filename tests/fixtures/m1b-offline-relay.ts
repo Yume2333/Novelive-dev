@@ -51,6 +51,8 @@ export type Fault =
 	| 'rate-limit'
 	| 'review-rate-limit'
 	| 'image-failure'
+	| 'image-null'
+	| 'image-invalid-json'
 	| 'download-failure'
 	| 'download-body-failure'
 	| 'soft-stop'
@@ -228,7 +230,9 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					(candidate === 'review-rate-limit' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-2')) ||
-					(candidate === 'image-failure' &&
+					(['image-failure', 'image-null', 'image-invalid-json'].includes(
+						candidate,
+					) &&
 						operation === 'image' &&
 						currentChapter > 0) ||
 					(candidate === 'invalid-id' && operation === 'stage' && !repair) ||
@@ -245,7 +249,10 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					? 503
 					: 200
 		const tokens =
-			status !== 200 || fault === 'missing-usage'
+			status !== 200 ||
+			fault === 'missing-usage' ||
+			fault === 'image-null' ||
+			fault === 'image-invalid-json'
 				? null
 				: operation === 'window-fill'
 					? Number(body.max_tokens)
@@ -276,6 +283,11 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 		)
 		if (status !== 200)
 			return Response.json({ error: { message: 'Offline fault' } }, { status })
+		if (fault === 'image-null') return Response.json(null)
+		if (fault === 'image-invalid-json')
+			return new Response('{', {
+				headers: { 'content-type': 'application/json' },
+			})
 		if (image) {
 			const path = `/v1/download/${admissions.length}.png`
 			const [width, height] = String(body.size).split('x').map(Number)

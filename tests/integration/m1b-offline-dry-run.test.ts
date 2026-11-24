@@ -35,6 +35,8 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'rate-limit',
 			'review-rate-limit',
 			'image-failure',
+			'image-null',
+			'image-invalid-json',
 			'download-failure',
 			'download-body-failure',
 			'soft-stop',
@@ -50,6 +52,8 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'truncated',
 			'missing-usage',
 			'image-failure',
+			'image-null',
+			'image-invalid-json',
 			'rate-limit',
 			'review-rate-limit',
 			'over-budget',
@@ -371,6 +375,8 @@ test.each(scenarios)(
 			for (const failed of relay.admissions.filter(
 				({ fault }) =>
 					fault === 'image-failure' ||
+					fault === 'image-null' ||
+					fault === 'image-invalid-json' ||
 					fault === 'download-failure' ||
 					fault === 'download-body-failure',
 			)) {
@@ -380,7 +386,10 @@ test.each(scenarios)(
 					),
 					`${failed.fault} must not repeat a generation`,
 				).toHaveLength(1)
-				if (failed.fault !== 'image-failure')
+				if (
+					failed.fault === 'download-failure' ||
+					failed.fault === 'download-body-failure'
+				)
 					expect(
 						relay.downloadAttempts.get(relay.admissions.indexOf(failed)),
 					).toBe(2)
