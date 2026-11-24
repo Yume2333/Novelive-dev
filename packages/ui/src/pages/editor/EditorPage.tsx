@@ -38,29 +38,41 @@ export function EditorPage() {
 	}>()?.setAgentPosition
 	const [params, setParams] = useSearchParams()
 	const chapterId = params.get('chapterId') ?? 'ch0001'
-	const [work, setWork] = useState<{
-		title?: string
-		chapters: { chapterId: string; index: number; title?: string }[]
-	}>()
+	const [workTitle, setWorkTitle] = useState<string>()
+	const [workChapters, setWorkChapters] = useState<
+		{ chapterId: string; index: number; title: string; published: boolean }[]
+	>([])
 	useEffect(() => {
-		const pending = window.novelive.call('production.get', { workId: id })
+		const pending = window.novelive.call('library.list', {})
 		pending.promise.then(
-			(snapshot) =>
-				setWork({
-					title: snapshot.title,
-					chapters: snapshot.chapters.flatMap((item, index) =>
-						item.status === 'published'
-							? [
-									{
-										chapterId: item.chapterId,
-										index: index + 1,
-										title: snapshot.chapterTitles?.[item.chapterId],
-									},
-								]
-							: [],
-					),
-				}),
-			() => setWork(undefined),
+			(library) => {
+				const item = library.works.find((entry) => entry.workId === id)
+				setWorkTitle(
+					item &&
+						(item.project
+							? `${item.project.seriesTitle} · ${item.title}`
+							: item.title),
+				)
+			},
+			() => setWorkTitle(undefined),
+		)
+		return () => pending.cancel()
+	}, [id])
+	useEffect(() => {
+		const pending = window.novelive.call('production.playerStatus', {
+			workId: id,
+		})
+		pending.promise.then(
+			(status) =>
+				setWorkChapters(
+					status.chapters.map((item, index) => ({
+						chapterId: item.chapterId,
+						index: index + 1,
+						title: item.title,
+						published: item.published,
+					})),
+				),
+			() => setWorkChapters([]),
 		)
 		return () => pending.cancel()
 	}, [id])
@@ -347,12 +359,16 @@ export function EditorPage() {
 			{error}
 		</div>
 	)
-	const chapters = work?.chapters.some((item) => item.chapterId === chapterId)
-		? work.chapters
-		: [
-				...(work?.chapters ?? []),
-				{ chapterId, index: 0, title: chapter?.title },
-			]
+	const listed = workChapters.filter(
+		(item) => item.published || item.chapterId === chapterId,
+	)
+	const chapters = listed.some((item) => item.chapterId === chapterId)
+		? listed.map((item) =>
+				item.chapterId === chapterId
+					? { ...item, title: item.title ?? chapter?.title }
+					: item,
+			)
+		: [...listed, { chapterId, index: 0, title: chapter?.title }]
 	const chooseChapter = (value: string) =>
 		setParams((current) => {
 			const next = new URLSearchParams(current)
@@ -369,115 +385,118 @@ export function EditorPage() {
 		<Page
 			title={t('编辑器')}
 			width="full"
-			eyebrow={work?.title}
+			eyebrow={workTitle}
 			subtitle={
-				scene &&
-				chapter && (
-					<div className="editor-subtitle">
-						<select
-							className="editor-compact-select"
-							aria-label={t('章节')}
-							value={chapterId}
-							disabled={busy || dirty}
+				<>
+					{scene && chapter && (
+						<div className="editor-subtitle">
+							<select
+								className="editor-compact-select"
+								aria-label={t('章节')}
+								value={chapterId}
+								disabled={busy || dirty}
+								title={dirty ? t('先保存或放弃当前修改') : undefined}
+								onChange={(event) => chooseChapter(event.target.value)}
+							>
+								{chapters.map((item) => (
+									<option key={item.chapterId} value={item.chapterId}>
+										{item.index
+											? t('第 {{index}} 章 {{title}}', {
+													index: item.index,
+													title: item.title ?? item.chapterId,
+												})
+											: (item.title ?? item.chapterId)}
+									</option>
+								))}
+							</select>
+							<ChevronRight
+								aria-hidden="true"
+								className="editor-subtitle-separator"
+								size={14}
+								strokeWidth={1.8}
+							/>
+							<select
+								className="editor-compact-select"
+								aria-label={t('场景')}
+								value={sceneIndex}
+								disabled={busy}
+								onChange={(event) => chooseScene(Number(event.target.value))}
+							>
+								{chapter.scenes.map((item, index) => (
+									<option key={item.sceneId} value={index}>
+										{item.nvs.match(/^scene (.+)/m)?.[1] ?? item.sceneId}
+									</option>
+								))}
+							</select>
+						</div>
+					)}
+					<div className="editor-actions editor-header-toolbar">
+						<button
+							type="button"
+							className="editor-icon-button"
+							aria-label={t('原文对照')}
+							title={t('原文对照')}
+							aria-expanded={source}
+							data-active={source || undefined}
+							disabled={!scene}
+							onClick={() => setSource((value) => !value)}
+						>
+							<BookOpen aria-hidden="true" size={18} strokeWidth={1.8} />
+						</button>
+						<button
+							type="button"
+							className="editor-icon-button"
+							aria-label={t('从当前句预览')}
+							title={t('从当前句预览')}
+							disabled={!scene || busy}
+							onClick={() => setPreview((value) => value + 1)}
+						>
+							<Play aria-hidden="true" size={18} strokeWidth={1.8} />
+						</button>
+						<button
+							type="button"
+							className="editor-icon-button"
+							aria-label={t('撤销')}
+							title={t('撤销')}
+							disabled={(!undoCount && !dirty) || busy}
+							onClick={undo}
+						>
+							<Undo2 aria-hidden="true" size={18} strokeWidth={1.8} />
+						</button>
+						<button
+							type="button"
+							className="editor-button editor-button-primary"
+							disabled={!scene || busy || dirty}
 							title={dirty ? t('先保存或放弃当前修改') : undefined}
-							onChange={(event) => chooseChapter(event.target.value)}
+							onClick={() => setRewriteOpen(true)}
 						>
-							{chapters.map((item) => (
-								<option key={item.chapterId} value={item.chapterId}>
-									{item.index
-										? t('第 {{index}} 章 {{title}}', {
-												index: item.index,
-												title: item.title ?? item.chapterId,
-											})
-										: (item.title ?? item.chapterId)}
-								</option>
-							))}
-						</select>
-						<ChevronRight
-							aria-hidden="true"
-							className="editor-subtitle-separator"
-							size={14}
-							strokeWidth={1.8}
-						/>
-						<select
-							className="editor-compact-select"
-							aria-label={t('场景')}
-							value={sceneIndex}
-							disabled={busy}
-							onChange={(event) => chooseScene(Number(event.target.value))}
-						>
-							{chapter.scenes.map((item, index) => (
-								<option key={item.sceneId} value={index}>
-									{item.nvs.match(/^scene (.+)/m)?.[1] ?? item.sceneId}
-								</option>
-							))}
-						</select>
-						{dirty && <span className="editor-chip">{t('未保存')}</span>}
-						<button
-							type="button"
-							className="editor-button editor-button-ghost"
-							disabled={(!dirty && !pendingRefresh) || busy}
-							onClick={discard}
-						>
-							<RotateCcw aria-hidden="true" size={15} strokeWidth={1.8} />
-							{t('放弃修改')}
+							<WandSparkles aria-hidden="true" size={16} strokeWidth={1.8} />
+							{t('让 Agent 重写本场景')}
 						</button>
-						<button
-							type="button"
-							className="editor-button"
-							disabled={!dirty || busy}
-							onClick={() => void run(save)}
-						>
-							{t('保存当前句')}
-						</button>
+						{(dirty || pendingRefresh) && (
+							<div className="editor-draft-actions">
+								{dirty && <span className="editor-chip">{t('未保存')}</span>}
+								<button
+									type="button"
+									className="editor-button editor-button-ghost"
+									disabled={busy}
+									onClick={discard}
+								>
+									<RotateCcw aria-hidden="true" size={15} strokeWidth={1.8} />
+									{t('放弃修改')}
+								</button>
+								<button
+									type="button"
+									className="editor-button"
+									disabled={!dirty || busy}
+									onClick={() => void run(save)}
+								>
+									{t('保存当前句')}
+								</button>
+							</div>
+						)}
 					</div>
-				)
-			}
-			actions={
-				<div className="editor-actions">
-					<button
-						type="button"
-						className="editor-icon-button"
-						aria-label={t('原文对照')}
-						title={t('原文对照')}
-						aria-expanded={source}
-						data-active={source || undefined}
-						disabled={!scene}
-						onClick={() => setSource((value) => !value)}
-					>
-						<BookOpen aria-hidden="true" size={18} strokeWidth={1.8} />
-					</button>
-					<button
-						type="button"
-						className="editor-icon-button"
-						aria-label={t('从当前句预览')}
-						title={t('从当前句预览')}
-						disabled={!scene || busy}
-						onClick={() => setPreview((value) => value + 1)}
-					>
-						<Play aria-hidden="true" size={18} strokeWidth={1.8} />
-					</button>
-					<button
-						type="button"
-						className="editor-icon-button"
-						aria-label={t('撤销')}
-						title={t('撤销')}
-						disabled={(!undoCount && !dirty) || busy}
-						onClick={undo}
-					>
-						<Undo2 aria-hidden="true" size={18} strokeWidth={1.8} />
-					</button>
-					<button
-						type="button"
-						className="editor-button editor-button-primary"
-						disabled={!scene || busy || dirty}
-						title={dirty ? t('先保存或放弃当前修改') : undefined}
-						onClick={() => setRewriteOpen(true)}
-					>
-						<WandSparkles aria-hidden="true" size={16} strokeWidth={1.8} />
-						{t('让 Agent 重写本场景')}
-					</button>
-				</div>
+				</>
 			}
 		>
 			<div className="editor-workbench" aria-busy={busy}>
@@ -742,130 +761,144 @@ export function EditorPage() {
 									aria-label={t('让 Agent 重写本场景')}
 									onClose={closeRewrite}
 								>
-									<header className="editor-dialog-head">
-										<h2>{t('让 Agent 重写本场景')}</h2>
-										<button
-											type="button"
-											className="editor-icon-button editor-icon-button-small"
-											aria-label={t('关闭')}
-											title={t('关闭')}
-											onClick={closeRewrite}
-										>
-											<X aria-hidden="true" size={16} strokeWidth={1.8} />
-										</button>
-									</header>
-									<form
-										className="editor-rewrite-form"
-										onSubmit={(event) => {
-											event.preventDefault()
-											void run(async () => {
-												if (!target) return
-												const request = ++rewriteRequest.current
-												const value = await window.novelive.call(
-													'editor.rewriteScene',
-													{
-														workId: id,
-														chapterId,
-														sceneId: scene.sceneId,
-														expectedRevision: target.expectedRevision,
-														instruction,
-														sourceIds: scene.sourceIds,
-													},
-												).promise
-												if (request !== rewriteRequest.current) return
-												setProposal(value)
-												setSelected(value.hunks.map((hunk) => hunk.id))
-											})
+									<ScrollArea
+										className="editor-dialog-scroll"
+										viewportStyle={{
+											maxHeight: 'calc(100vh - var(--space-7) * 2 - 2px)',
 										}}
 									>
-										{error && alert}
-										<div className="editor-rewrite-input">
-											<textarea
-												ref={rewriteInput}
-												className="nl-scroll-hidden"
-												aria-label={t('重写要求')}
-												value={instruction}
-												rows={3}
-												onChange={(event) => setInstruction(event.target.value)}
-												placeholder={t('例如：节奏更快，保留所有演出指令')}
-											/>
-											<OverlayScrollbar targetRef={rewriteInput} />
-										</div>
-										<button
-											type="submit"
-											className="editor-button editor-button-primary"
-											disabled={!instruction.trim() || dirty || busy}
-										>
-											<WandSparkles
-												aria-hidden="true"
-												size={16}
-												strokeWidth={1.8}
-											/>
-											{t('重写场景')}
-										</button>
-									</form>
-									{proposal && (
-										<section
-											className="editor-diffs"
-											aria-label={t('重写差异')}
-										>
-											<h3 className="editor-label">{t('差异列表')}</h3>
-											<ScrollArea className="editor-diff">
-												{proposal.hunks.map((hunk) => (
-													<label className="editor-hunk" key={hunk.id}>
-														<input
-															type="checkbox"
-															checked={selected.includes(hunk.id)}
-															onChange={(event) =>
-																setSelected((value) =>
-																	event.target.checked
-																		? [...value, hunk.id]
-																		: value.filter((id) => id !== hunk.id),
-																)
-															}
-														/>
-														<span className="editor-hunk-id">{hunk.id}</span>
-														<del>{hunk.before.join('\n')}</del>
-														<ins>{hunk.after.join('\n')}</ins>
-													</label>
-												))}
-											</ScrollArea>
-											<footer className="editor-dialog-foot">
+										<div className="editor-dialog-body">
+											<header className="editor-dialog-head">
+												<h2>{t('让 Agent 重写本场景')}</h2>
 												<button
 													type="button"
-													className="editor-button editor-button-ghost"
+													className="editor-icon-button editor-icon-button-small"
+													aria-label={t('关闭')}
+													title={t('关闭')}
 													onClick={closeRewrite}
 												>
-													{t('取消重写')}
+													<X aria-hidden="true" size={16} strokeWidth={1.8} />
 												</button>
+											</header>
+											<form
+												className="editor-rewrite-form"
+												onSubmit={(event) => {
+													event.preventDefault()
+													void run(async () => {
+														if (!target) return
+														const request = ++rewriteRequest.current
+														const value = await window.novelive.call(
+															'editor.rewriteScene',
+															{
+																workId: id,
+																chapterId,
+																sceneId: scene.sceneId,
+																expectedRevision: target.expectedRevision,
+																instruction,
+																sourceIds: scene.sourceIds,
+															},
+														).promise
+														if (request !== rewriteRequest.current) return
+														setProposal(value)
+														setSelected(value.hunks.map((hunk) => hunk.id))
+													})
+												}}
+											>
+												{error && rewriting && alert}
+												<div className="editor-rewrite-input">
+													<textarea
+														ref={rewriteInput}
+														className="nl-scroll-hidden"
+														aria-label={t('重写要求')}
+														value={instruction}
+														rows={3}
+														onChange={(event) =>
+															setInstruction(event.target.value)
+														}
+														placeholder={t('例如：节奏更快，保留所有演出指令')}
+													/>
+													<OverlayScrollbar targetRef={rewriteInput} />
+												</div>
 												<button
-													type="button"
+													type="submit"
 													className="editor-button editor-button-primary"
-													disabled={!selected.length || dirty || busy}
-													onClick={() =>
-														void run(async () => {
-															accept(
-																await window.novelive.call(
-																	'editor.applyRewrite',
-																	{
-																		workId: id,
-																		chapterId,
-																		sceneId: proposal.sceneId,
-																		expectedRevision: proposal.expectedRevision,
-																		proposalId: proposal.proposalId,
-																		hunkIds: selected,
-																	},
-																).promise,
-															)
-															setRewriteOpen(false)
-														})
-													}
+													disabled={!instruction.trim() || dirty || busy}
 												>
-													{t('应用勾选差异')}
+													<WandSparkles
+														aria-hidden="true"
+														size={16}
+														strokeWidth={1.8}
+													/>
+													{t('重写场景')}
 												</button>
-											</footer>
-										</section>
-									)}
+											</form>
+											{proposal && (
+												<section
+													className="editor-diffs"
+													aria-label={t('重写差异')}
+												>
+													<h3 className="editor-label">{t('差异列表')}</h3>
+													<ScrollArea className="editor-diff">
+														{proposal.hunks.map((hunk) => (
+															<label className="editor-hunk" key={hunk.id}>
+																<input
+																	type="checkbox"
+																	checked={selected.includes(hunk.id)}
+																	onChange={(event) =>
+																		setSelected((value) =>
+																			event.target.checked
+																				? [...value, hunk.id]
+																				: value.filter((id) => id !== hunk.id),
+																		)
+																	}
+																/>
+																<span className="editor-hunk-id">
+																	{hunk.id}
+																</span>
+																<del>{hunk.before.join('\n')}</del>
+																<ins>{hunk.after.join('\n')}</ins>
+															</label>
+														))}
+													</ScrollArea>
+													<footer className="editor-dialog-foot">
+														<button
+															type="button"
+															className="editor-button editor-button-ghost"
+															onClick={closeRewrite}
+														>
+															{t('取消重写')}
+														</button>
+														<button
+															type="button"
+															className="editor-button editor-button-primary"
+															disabled={!selected.length || dirty || busy}
+															onClick={() =>
+																void run(async () => {
+																	accept(
+																		await window.novelive.call(
+																			'editor.applyRewrite',
+																			{
+																				workId: id,
+																				chapterId,
+																				sceneId: proposal.sceneId,
+																				expectedRevision:
+																					proposal.expectedRevision,
+																				proposalId: proposal.proposalId,
+																				hunkIds: selected,
+																			},
+																		).promise,
+																	)
+																	setRewriteOpen(false)
+																})
+															}
+														>
+															{t('应用勾选差异')}
+														</button>
+													</footer>
+												</section>
+											)}
+										</div>
+									</ScrollArea>
 								</dialog>
 							</div>
 						)}

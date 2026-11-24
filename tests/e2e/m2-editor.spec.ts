@@ -44,7 +44,7 @@ async function editAndPreview(page: Page, secondLine = 4) {
 	await editor.press('End')
 	await page.keyboard.insertText(' ')
 	await page.getByRole('button', { name: '保存当前句' }).click()
-	await expect(page.getByRole('button', { name: '保存当前句' })).toBeDisabled()
+	await expect(page.getByRole('button', { name: '保存当前句' })).toHaveCount(0)
 	await expect(
 		page.getByRole('button', { name: '撤销', exact: true }),
 	).toBeDisabled()
@@ -68,7 +68,7 @@ async function editAndPreview(page: Page, secondLine = 4) {
 	await editor.press('ArrowRight')
 	await page.keyboard.insertText('改过的')
 	await page.getByRole('button', { name: '保存当前句' }).click()
-	await expect(page.getByRole('button', { name: '保存当前句' })).toBeDisabled()
+	await expect(page.getByRole('button', { name: '保存当前句' })).toHaveCount(0)
 	await expect(
 		page.getByRole('button', { name: '撤销', exact: true }),
 	).toBeEnabled()
@@ -439,7 +439,7 @@ test.describe('contract-render', () => {
 						await page.getByRole('button', { name: '保存当前句' }).click()
 						await expect(
 							page.getByRole('button', { name: '保存当前句' }),
-						).toBeDisabled()
+						).toHaveCount(0)
 						const calls = await page.evaluate(
 							() =>
 								(
@@ -487,7 +487,7 @@ test.describe('contract-render', () => {
 					).toContainText('第一句。')
 					await expect(
 						page.getByRole('button', { name: '保存当前句' }),
-					).toBeDisabled()
+					).toHaveCount(0)
 					await editAndPreview(page)
 					return
 				}
