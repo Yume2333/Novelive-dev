@@ -709,6 +709,7 @@ export class ArtProduction {
 			? 'Keep the adaptation non-graphic. Use implication instead of explicit detail.'
 			: undefined
 		let attempt = 0
+		let legacyCheckpoint = !this.options.desensitized
 		let rewritten: string | undefined
 		const settingsVersion = checkpoint
 			? createHash('sha256')
@@ -800,6 +801,7 @@ export class ArtProduction {
 							return { png: reviewed }
 					}
 				} else {
+					legacyCheckpoint = false
 					await clearReview()
 				}
 			}
@@ -843,10 +845,12 @@ export class ArtProduction {
 				refs,
 				target,
 				transparent,
-				checkpoint && attempt > 0
+				checkpoint && this.options.replay?.checkpointDirectory
 					? {
 							job: createHash('sha256').update(checkpoint.path).digest('hex'),
+							settingsVersion,
 							ordinal: attempt,
+							legacy: legacyCheckpoint,
 						}
 					: undefined,
 			)

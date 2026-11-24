@@ -101,7 +101,12 @@ export function imageRenderer(
 		refs: readonly Buffer[],
 		size: Dimensions,
 		transparent: boolean,
-		attempt?: { job: string; ordinal: number },
+		attempt?: {
+			job: string
+			settingsVersion: string
+			ordinal: number
+			legacy: boolean
+		},
 	) =>
 		imageRequest(
 			config,
@@ -113,12 +118,18 @@ export function imageRenderer(
 							generationReplay.checkpointDirectory,
 							'attempts',
 							attempt.job,
+							attempt.settingsVersion,
 							String(attempt.ordinal),
 						),
+						checkpointFallbackDirectory:
+							attempt.ordinal === 0 && attempt.legacy
+								? generationReplay.checkpointDirectory
+								: undefined,
 					}
 				: generationReplay,
 			generationPositions,
 			downloadPositions,
+			generationReplay?.checkpointDirectory,
 		)(prompt, refs, size, transparent)
 }
 
@@ -128,6 +139,7 @@ function imageRequest(
 	generationReplay: ReplayOptions | undefined,
 	generationPositions: Map<string, number>,
 	downloadPositions: Map<string, number>,
+	downloadCheckpointDirectory: string | undefined,
 ) {
 	let saveGeneration: (() => Promise<void>) | undefined
 	let saveDownload: (() => Promise<void>) | undefined
@@ -283,9 +295,14 @@ function imageRequest(
 				const download = createReplayFetch(
 					{
 						...generationReplay,
+						checkpointFallbackDirectory: undefined,
 						checkpointDirectory:
-							checkpointDirectory && downloadResponseId
-								? join(checkpointDirectory, 'downloads', downloadResponseId)
+							downloadCheckpointDirectory && downloadResponseId
+								? join(
+										downloadCheckpointDirectory,
+										'downloads',
+										downloadResponseId,
+									)
 								: undefined,
 						checkpointResponse: (response) => response.ok,
 						onCheckpointReply: (save) => {

@@ -36,6 +36,7 @@ export interface ReplayOptions {
 	spend?: ReturnType<typeof projectSpend>
 	onReplay?: (request: Request, response: Response) => Promise<void>
 	checkpointDirectory?: string
+	checkpointFallbackDirectory?: string
 	checkpointResponse?: (response: Response) => boolean
 	checkpointResponseId?: string
 	normalizeCheckpointIds?: boolean
@@ -345,6 +346,7 @@ export function createReplayFetch(
 					checkpointResponse: options.checkpointResponse,
 					checkpointResponseId: options.checkpointResponseId,
 					normalizeIds: options.normalizeCheckpointIds,
+					checkpointFallbackDirectory: options.checkpointFallbackDirectory,
 				},
 				true,
 			)
@@ -479,21 +481,25 @@ function replayFetch(
 		}
 		if (mode === 'record') {
 			if (options.reuseRecorded) {
-				const text = await readFile(index, 'utf8').catch((error) => {
-					if (!missing(error)) throw error
-					return ''
-				})
-				const recorded = text
-					.split('\n')
-					.filter(Boolean)
-					.map((line) => JSON.parse(line))
-				const hit = recorded.find(
-					(row) => row.key === identity.key && row.status < 300,
-				)
-				if (hit) {
+				for (const source of [directory, options.checkpointFallbackDirectory]) {
+					if (!source) continue
+					const text = await readFile(
+						join(source, 'cassette.jsonl'),
+						'utf8',
+					).catch((error) => {
+						if (!missing(error)) throw error
+						return ''
+					})
+					const hit = text
+						.split('\n')
+						.filter(Boolean)
+						.map((line) => JSON.parse(line))
+						.find((row) => row.key === identity.key && row.status < 300)
+					if (!hit) continue
 					const response = await createReplayFetch({
 						...options,
 						mode: 'strict',
+						directory: source,
 						fallbackDirectory: undefined,
 					})(request)
 					if (checkpoint) {
