@@ -1934,6 +1934,50 @@ ${next}
 	expect(fit?.script).not.toContain('z-hall/day')
 })
 
+test('folds into a less-used drawn costume when the favorite would not save an image', () => {
+	const drawn = 'ada/uniform/neutral'
+	const favorite = 'ada/wedding/neutral'
+	const fit = trimStagingToBudget(
+		{
+			script: `scene Room
+source p0001
+
+@show ${favorite} center
+@face ${favorite}
+@costume ada/uniform
+ada: One. #0010
+`,
+			items: [{ id: favorite, kind: 'character', description: 'Wedding' }],
+			merges: {},
+		},
+		bible,
+		{
+			...empty,
+			entries: [
+				{
+					id: drawn,
+					type: 'character',
+					status: 'drawn',
+					path: 'assets/characters/ada/uniform/neutral.webp',
+					aliases: [],
+				},
+			],
+		},
+		{ limit: 0, previousBases: new Map(), reusedImages: new Set() },
+		(script, { entries }) => {
+			const compiled = compileScript(script, {
+				assets: entries,
+				paragraphIds: ['p0001'],
+				speakers: ['ada'],
+			})
+			return compiled.ok ? compiled.scenes : undefined
+		},
+	)
+	expect(fit?.trimmed).toEqual([{ id: favorite, replacement: drawn }])
+	expect(fit?.script).toContain(`@show ${drawn} center\n@face ${drawn}`)
+	expect(fit?.items).toEqual([])
+})
+
 test('reports the remaining image count and protected minimum after an unsuccessful trim', async () => {
 	const response = JSON.stringify({
 		patch: 'PUT <4:\n@bg room/day\n@cg cg-window',

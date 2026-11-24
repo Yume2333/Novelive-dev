@@ -206,24 +206,30 @@ export function trimStagingToBudget(
 			costumes.set(character, group)
 		}
 		let folded = false
-		for (const [, group] of [...costumes].sort(([a], [b]) => byId(a, b))) {
-			const [keep, ...surplus] = [...group.values()].sort(
+		foldCharacter: for (const [, group] of [...costumes].sort(([a], [b]) =>
+			byId(a, b),
+		)) {
+			if (group.size < 2) continue
+			const ranked = [...group.values()].sort(
 				(a, b) => b.count - a.count || byId(a.id, b.id),
 			)
-			if (!surplus.length) continue
-			const foldedPrefixes = new Set(surplus.map(({ id }) => prefix(id)))
-			const changes = [...entries.values()]
-				.filter(
-					({ id, type }) =>
-						(type === 'character' || type === 'expression') &&
-						foldedPrefixes.has(prefix(id)),
+			for (const keep of ranked) {
+				const foldedPrefixes = new Set(
+					ranked.filter((other) => other !== keep).map(({ id }) => prefix(id)),
 				)
-				.map(({ id }) => ({ id, replacement: keep.id }))
-			const next = attempt(current, changes)
-			if (!next) continue
-			current = next
-			folded = true
-			break
+				const changes = [...entries.values()]
+					.filter(
+						({ id, type }) =>
+							(type === 'character' || type === 'expression') &&
+							foldedPrefixes.has(prefix(id)),
+					)
+					.map(({ id }) => ({ id, replacement: keep.id }))
+				const next = attempt(current, changes)
+				if (!next) continue
+				current = next
+				folded = true
+				break foldCharacter
+			}
 		}
 		if (!folded) break
 	}
