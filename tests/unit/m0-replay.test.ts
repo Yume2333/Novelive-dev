@@ -467,6 +467,7 @@ test('checkpoint fallback reuses successive candidates with matching response ID
 		const hit = vi.fn()
 		const replay = createReplayFetch(
 			{
+				mode: 'replay',
 				checkpointDirectory: join(directory, 'primary', String(i)),
 				checkpointFallbackDirectory: fallback,
 				onCheckpointHit: hit,
