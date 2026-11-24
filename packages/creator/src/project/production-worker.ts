@@ -424,7 +424,7 @@ export function chapterWorker(
 					paragraphIds: chapter.paragraphs.map(({ id }) => id),
 					speakers: options.script.speakers,
 				})
-				const staging = directChapterArt(script, bible, registry, {
+				const staged = await directChapterArt(script, bible, registry, {
 					main: models.artist,
 					replay: { ...replay, checkpointDirectory: directory },
 					customMarks: options.script.customMarks,
@@ -433,20 +433,11 @@ export function chapterWorker(
 					stagingImageBudget:
 						stagingLimit === null ? null : budget(stagingLimit),
 				})
-				const staged = await staging.catch(async (error: unknown) => {
-					if (
-						!ctx.signal.aborted &&
-						!(error instanceof TextModelError) &&
-						!(error instanceof SpendBudgetError)
-					)
-						await clearJournal()
-					throw error
-				})
 				ctx.signal.throwIfAborted()
 				if (staged.trimmed.length) ctx.recordStageTrim?.(staged.trimmed)
 				const dependencies = new Map<string, ArtJob>()
 				const sceneIds: string[] = []
-				const registration = service.register(
+				await service.register(
 					staged.items,
 					bible,
 					staged.merges,
@@ -498,10 +489,6 @@ export function chapterWorker(
 						ctx.signal.throwIfAborted()
 					},
 				)
-				await registration.catch(async (error: unknown) => {
-					if (!ctx.signal.aborted) await clearJournal()
-					throw error
-				})
 				const updated = await project.read(
 					projectFiles.chapter(ref(ctx.chapterId)),
 				)

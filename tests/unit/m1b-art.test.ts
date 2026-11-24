@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { bool, obj } from '@earendil-works/pi-schema'
 import { projectFiles } from '@novelive/format/model'
+import * as nvs from '@novelive/format/script'
 import { compileScript } from '@novelive/format/script'
 import sharp from 'sharp'
 import { expect, test, vi } from 'vitest'
@@ -1804,6 +1805,47 @@ test('trims only after the bounded staging repair is still over budget', async (
 	expect(staged.trimmed).toEqual([{ id: 'cg-window' }])
 	expect(staged.script).toContain('@bg room/day\n@cg none')
 	expect(staged.items.map(({ id }) => id)).toEqual(['room/day'])
+})
+
+test('a failed final-budget trim candidate does not block later alternatives', async () => {
+	const reply = JSON.stringify({
+		patch: 'PUT <4:\n@cg cg-a\n@cg cg-b',
+		items: [
+			{ id: 'cg-a', kind: 'cg', description: 'First' },
+			{ id: 'cg-b', kind: 'cg', description: 'Second' },
+		],
+		merges: {},
+	})
+	const fetch = artReplies(reply)
+	const budget = {
+		limit: 1,
+		paragraphIds: ['p0001'],
+		speakers: ['ada'],
+		previousBases: new Map(),
+		reusedImages: new Set<string>(),
+	}
+	const compile = nvs.compileScript
+	const mocked = vi
+		.spyOn(nvs, 'compileScript')
+		.mockImplementation((input, options) => {
+			const result = compile(input, options)
+			return input.includes('@cg none\n@cg cg-b')
+				? { ok: false, diagnostics: result.diagnostics }
+				: result
+		})
+	try {
+		const staged = await directChapterArt(script, bible, empty, {
+			main,
+			replay: { ...replay, mode: 'replay', fetch },
+			imageBudget: budget,
+			stagingImageBudget: { ...budget, limit: 2 },
+		})
+		expect(staged.trimmed).toEqual([{ id: 'cg-b' }])
+		expect(staged.items.map(({ id }) => id)).toEqual(['cg-a'])
+		expect(fetch).toHaveBeenCalledTimes(1)
+	} finally {
+		mocked.mockRestore()
+	}
 })
 
 test.each([6, 5, 4, 3])(

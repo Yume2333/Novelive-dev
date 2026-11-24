@@ -279,12 +279,16 @@ export async function directChapterArt(
 		let triedFormatRepair = false
 		for (;;) {
 			let responseBudget = currentBudget
+			let saveReply: (() => Promise<void>) | undefined
 			const result = await artJson(
 				options.main,
 				repair ? `${brief}\n${repair}` : brief,
 				responseSchema,
 				{
 					...options,
+					onUsableReply: (save) => {
+						saveReply = save
+					},
 					replay: {
 						...options.replay,
 						checkpointAllowance: { images: currentBudget?.limit },
@@ -301,11 +305,12 @@ export async function directChapterArt(
 				},
 				[],
 				'caller',
-			).catch((error: unknown) => {
+			).catch(async (error: unknown) => {
 				if (!(error instanceof ArtResponseFormatError) || triedFormatRepair)
 					throw error
 				triedFormatRepair = true
 				repair = repairReply('JSON manifest', error.message, error.rejected)
+				await saveReply?.()
 			})
 			if (!result) continue
 			const deferTrim =
@@ -367,6 +372,7 @@ export async function directChapterArt(
 						error instanceof Error ? error.message : String(error),
 						result,
 					)
+					await saveReply?.()
 					continue
 				}
 				if (
@@ -375,14 +381,31 @@ export async function directChapterArt(
 					!candidate
 				)
 					throw error
-				const fit = trim(candidate, imageBudget, (script, registry) => {
-					const compiled = compile(script, registry, imageBudget)
-					return compiled.ok ? compiled.scenes : undefined
-				})
+				await saveReply?.()
+				saveReply = undefined
+				const untrimmed = candidate
+				const fitCandidate = (budget: ImageBudget) =>
+					trim(untrimmed, budget, (script, registry) => {
+						const compiled = compile(script, registry, budget)
+						return compiled.ok ? compiled.scenes : undefined
+					})
+				let fit: ReturnType<typeof fitCandidate>
+				try {
+					fit = fitCandidate(imageBudget)
+				} catch (error) {
+					if (
+						!(error instanceof ChapterImageBudgetError) ||
+						!currentBudget ||
+						currentBudget.limit <= imageBudget.limit
+					)
+						throw error
+					fit = fitCandidate(currentBudget)
+				}
 				if (!fit) throw error
 				candidate = fit
 				trimmed.push(...fit.trimmed)
 			}
+			await saveReply?.()
 			staged = candidate.script
 			items = candidate.items
 			merges = candidate.merges
@@ -400,11 +423,7 @@ export async function directChapterArt(
 					speakers: currentBudget.speakers,
 					paragraphIds: currentBudget.paragraphIds,
 				})
-				if (!compiled.ok)
-					throw new Error(
-						compiled.diagnostics.map(({ message }) => message).join('; '),
-					)
-				return compiled.scenes
+				return compiled.ok ? compiled.scenes : undefined
 			},
 		)
 		if (!fit)

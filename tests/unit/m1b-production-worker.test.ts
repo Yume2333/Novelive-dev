@@ -158,7 +158,13 @@ test('staging and portrait painting dispatch to their configured role models', a
 	expect(painterOutput).toBe(1024)
 })
 
-test.each(['unknown', 'truncated', 'lower allowance', 'higher allowance'])(
+test.each([
+	'unknown',
+	'truncated',
+	'lower allowance',
+	'higher allowance',
+	'rejected patch',
+])(
 	'explicit staging retry reuses accepted scene and repair inputs after a %s reply',
 	async (failure) => {
 		const { projectDir, workId } = await fixture(
@@ -188,6 +194,8 @@ test.each(['unknown', 'truncated', 'lower allowance', 'higher allowance'])(
 					items: [{ id: 'cg-window', kind: 'cg', description: 'Window' }],
 					merges: {},
 				})
+			if (failure === 'rejected patch' && unavailable && prompts.length >= 2)
+				return completion({ patch: 'CUT 999', items: [], merges: {} })
 			if (prompts.length === 2) return completion('{')
 			if (unavailable && prompts.length >= 3)
 				return failure === 'truncated'
@@ -240,12 +248,16 @@ test.each(['unknown', 'truncated', 'lower allowance', 'higher allowance'])(
 				queue.confirmVisual(workId)
 				await queue.idle()
 				expect(prompts).toHaveLength(3)
-				expect(prompts[2]).toContain('Repair the JSON manifest')
+				expect(prompts[2]).toContain(
+					failure === 'rejected patch'
+						? 'Repair the staging patch and manifest'
+						: 'Repair the JSON manifest',
+				)
 				before = reservations(project)
 				expect(before.map(({ actual_tokens }) => actual_tokens)).toEqual([
 					15,
 					15,
-					failure === 'truncated' ? 15 : null,
+					failure === 'truncated' || failure === 'rejected patch' ? 15 : null,
 				])
 			} finally {
 				queue.dispose()
