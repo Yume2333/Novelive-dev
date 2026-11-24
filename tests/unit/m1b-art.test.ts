@@ -1806,6 +1806,40 @@ test('trims only after the bounded staging repair is still over budget', async (
 	expect(staged.items.map(({ id }) => id)).toEqual(['room/day'])
 })
 
+test('trim remaps stage assets after leading named options without changing the options', async () => {
+	const response = JSON.stringify({
+		patch: [
+			'PUT <4:',
+			'@bg transition fade duration 0.6 room/rain',
+			'@show duration 0.7 ada/uniform/angry center',
+			'@face duration 0.8 ada/angry',
+		].join('\n'),
+		items: [
+			{ id: 'room/rain', kind: 'variant', description: 'Rain' },
+			{ id: 'ada/uniform/angry', kind: 'expression', description: 'Angry' },
+		],
+		merges: {},
+	})
+	const fetch = artReplies(response, response)
+	const staged = await directChapterArt(script, bible, empty, {
+		main,
+		replay: { ...replay, mode: 'replay', fetch },
+		imageBudget: {
+			limit: 2,
+			paragraphIds: ['p0001'],
+			speakers: ['ada'],
+			previousBases: new Map(),
+			reusedImages: new Set(),
+		},
+	})
+	expect(fetch).toHaveBeenCalledTimes(2)
+	expect(staged.script).toContain(
+		'@bg transition fade duration 0.6 room/day\n' +
+			'@show duration 0.7 ada/uniform/neutral center\n' +
+			'@face duration 0.8 ada/neutral',
+	)
+})
+
 test.each([true, false])(
 	'uses the staging manifest repair once for invalid JSON (valid repair: %s)',
 	async (valid) => {

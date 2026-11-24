@@ -35,7 +35,9 @@ function remapScript(
 		if (!assets.some((asset) => asset.id === id)) continue
 		const original = lines[line - 1]
 		const withAsset = (asset: string) =>
-			original.replace(/^(\s*@\w+\s+)\S+/, `$1${asset}`)
+			original.replace(/\S+/g, (token) =>
+				token === args.asset ? asset : token,
+			)
 		if (
 			replacement &&
 			name === 'face' &&
