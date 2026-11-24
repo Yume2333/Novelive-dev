@@ -424,6 +424,38 @@ test('a budget refusal pauses the queue explicitly and retains the image for con
 	expect(snapshot().chapters[0]).toMatchObject({ status: 'published' })
 })
 
+test('restaging restores the audit continuation for a retained budget-paused image', async () => {
+	const retained = cg('cg-retained')
+	const obsolete = cg('cg-obsolete')
+	const worker = new ScriptedWorker({ ch1: [retained, obsolete] })
+	const draw = vi
+		.spyOn(worker, 'draw')
+		.mockRejectedValueOnce(new SpendBudgetError('超出工程预算'))
+	const stage = vi.spyOn(worker, 'stage')
+	const target = new ChapterScheduler(project.database, worker, {
+		imageConcurrency: 1,
+		imageBudget: () => 1,
+	})
+	scheduler = target
+	target.start(workId, ['ch1'])
+	target.confirmVisual(workId)
+	await target.idle()
+	expect(snapshot().chapters[0]).toMatchObject({
+		issue: expect.stringContaining('超出工程预算'),
+	})
+	expect(draw).toHaveBeenCalledTimes(1)
+	stage.mockResolvedValueOnce([retained])
+	target.continue(workId)
+	await target.idle()
+	expect(stage).toHaveBeenCalledTimes(2)
+	expect(draw).toHaveBeenCalledTimes(2)
+	expect(draw).toHaveBeenLastCalledWith(
+		expect.objectContaining({ assetId: retained.assetId }),
+		expect.objectContaining({ resumingBudget: true }),
+	)
+	expect(snapshot().chapters[0]).toMatchObject({ status: 'published' })
+})
+
 test('a refused writing request surfaces the budget pause and continues the same step', async () => {
 	const worker = new ScriptedWorker()
 	const refused = new SpendBudgetError(

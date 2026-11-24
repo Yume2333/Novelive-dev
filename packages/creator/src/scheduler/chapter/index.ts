@@ -1093,7 +1093,19 @@ export class ChapterScheduler {
 			workId,
 			item.assetId,
 		)
-		return existing?.task_id ?? this.insertTask(workId, 'image', item.assetId)
+		if (existing) return existing.task_id
+		const taskId = this.insertTask(workId, 'image', item.assetId)
+		const previous = this.get<{ error_type: string | null }>(
+			"SELECT error_type FROM run WHERE work_id = ? AND kind = 'image' AND ref = ? ORDER BY rowid DESC LIMIT 1",
+			workId,
+			item.assetId,
+		)
+		if (previous?.error_type === 'budget_paused')
+			this.exec(
+				"UPDATE task SET error_type = 'budget_paused' WHERE task_id = ?",
+				taskId,
+			)
+		return taskId
 	}
 
 	private insertTask(
