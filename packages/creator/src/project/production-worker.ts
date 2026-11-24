@@ -353,16 +353,37 @@ export function chapterWorker(
 			step(async () => {
 				const { chapter, options } = await input(ctx)
 				const script = (await project.readFile(draft(ctx.chapterId))).toString()
+				const checkpointDirectory = usesReplyCheckpoint(replay)
+					? join(project.root, '.novelive', 'review', ctx.workId, ctx.chapterId)
+					: undefined
+				const clear = async () => {
+					if (checkpointDirectory)
+						await rm(checkpointDirectory, { recursive: true, force: true })
+				}
 				const result = await reviewChapter(
 					chapter,
 					compiled(script, chapter, options),
-					options,
-				)
+					{
+						...options,
+						checkpoint: checkpointDirectory
+							? { ...replay, checkpointDirectory }
+							: undefined,
+					},
+				).catch(async (error: unknown) => {
+					if (
+						!ctx.signal.aborted &&
+						!(error instanceof TextModelError) &&
+						!(error instanceof SpendBudgetError)
+					)
+						await clear()
+					throw error
+				})
 				ctx.signal.throwIfAborted()
 				await project.writeFile(
 					draft(ctx.chapterId),
 					formatScript(result.scenes.map(({ scene }) => scene)),
 				)
+				await clear()
 			}),
 		stage: (ctx) =>
 			step(async () => {

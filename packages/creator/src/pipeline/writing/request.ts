@@ -9,11 +9,13 @@ import {
 	TextModelError,
 	textResultError,
 } from '../../models/text'
+import { createReplayFetch, type ReplayOptions } from '../../replay'
 import { ContextLimitError, fitPrompt, promptFits } from './budget'
 
 export type WritingTransport = {
 	signal?: AbortSignal
 	fetch?: typeof globalThis.fetch
+	checkpoint?: ReplayOptions
 }
 
 export class TruncatedWritingError extends TextModelError {
@@ -33,8 +35,18 @@ export function writingModel(
 			? { requestRetries: 0, streamRetries: 0 }
 			: {}),
 	}
+	const reply: { save?: () => Promise<void> } = {}
+	const checkpoint = options.checkpoint
 	const stream = createTextStream({
 		...policy,
+		...(checkpoint && {
+			fetch: createReplayFetch({
+				...checkpoint,
+				onCheckpointReply: (save) => {
+					reply.save = save
+				},
+			}),
+		}),
 		stopOnUnknownOutcome: true,
 	})
 	const outputLimit = outputTokenBudget(model)
@@ -55,6 +67,7 @@ export function writingModel(
 			outputEstimate = 0,
 		) {
 			options.signal?.throwIfAborted()
+			delete reply.save
 			const normalized = normalizeContext(context)
 			const result = await stream(
 				model,
@@ -73,6 +86,7 @@ export function writingModel(
 			}
 			if (result.stopReason === 'length')
 				throw new TruncatedWritingError(result.usage)
+			await reply.save?.()
 			return result
 		},
 	}

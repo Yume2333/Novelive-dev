@@ -33,6 +33,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'missing-usage',
 			'truncated',
 			'rate-limit',
+			'review-rate-limit',
 			'image-failure',
 			'download-failure',
 			'soft-stop',
@@ -49,6 +50,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'missing-usage',
 			'image-failure',
 			'rate-limit',
+			'review-rate-limit',
 			'over-budget',
 			'soft-stop',
 			'download-failure',
@@ -348,6 +350,22 @@ test.each(scenarios)(
 				)
 				.map(({ requestKey }) => requestKey)
 			expect(writeKeys).toHaveLength(new Set(writeKeys).size)
+			const reviews = relay.admissions.filter(
+				({ operation }) => operation === 'review',
+			)
+			const settledReviewKeys = reviews
+				.filter(({ tokens }) => tokens !== null)
+				.map(({ requestKey }) => requestKey)
+			expect(settledReviewKeys).toHaveLength(new Set(settledReviewKeys).size)
+			if (faults.includes('review-rate-limit')) {
+				const denied = reviews.findIndex(
+					({ fault }) => fault === 'review-rate-limit',
+				)
+				expect(denied).toBe(1)
+				expect(reviews[0].tokens).not.toBeNull()
+				expect(reviews[denied + 1].requestKey).toBe(reviews[denied].requestKey)
+				expect(reviews[denied + 1].tokens).not.toBeNull()
+			}
 			for (const failed of relay.admissions.filter(
 				({ fault }) =>
 					fault === 'image-failure' || fault === 'download-failure',

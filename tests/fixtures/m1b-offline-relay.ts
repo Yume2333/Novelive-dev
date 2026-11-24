@@ -49,6 +49,7 @@ export type Fault =
 	| 'missing-usage'
 	| 'truncated'
 	| 'rate-limit'
+	| 'review-rate-limit'
 	| 'image-failure'
 	| 'download-failure'
 	| 'soft-stop'
@@ -201,6 +202,9 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					(candidate === 'missing-usage' && operation === 'stage') ||
 					(candidate === 'truncated' && operation === 'stage') ||
 					(candidate === 'rate-limit' && operation === 'write') ||
+					(candidate === 'review-rate-limit' &&
+						operation === 'review' &&
+						prompt.includes('scene 河灯-1-2')) ||
 					(candidate === 'image-failure' &&
 						operation === 'image' &&
 						currentChapter > 0) ||
@@ -210,7 +214,7 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 		)
 		if (fault) pending.delete(fault)
 		const status =
-			fault === 'rate-limit'
+			fault === 'rate-limit' || fault === 'review-rate-limit'
 				? 429
 				: fault === 'staging-503' ||
 						fault === 'writing-503' ||
