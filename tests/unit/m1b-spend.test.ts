@@ -946,6 +946,56 @@ test('drawing checkpoints bind shared download URLs to their generation response
 	}
 })
 
+test.each(['one match', 'duplicate download', 'shared generation URL'])(
+	'legacy checkpoints reuse bytes only when the link is unambiguous: %s',
+	async (scenario) => {
+		vi.stubEnv('NL_REPLAY', '')
+		vi.stubEnv('NL_USAGE_CSV', '')
+		const root = await mkdtemp(join(tmpdir(), 'm1b-legacy-draw-'))
+		try {
+			const baseUrl = 'https://relay.invalid/v1'
+			const url = baseUrl + '/expired.png'
+			const config = {
+				...configuration.models.image,
+				baseUrl,
+				model: 'gpt-image-2.6-sunburst',
+				upscaleTier: 'anime' as const,
+			}
+			const fetch = vi.fn<typeof globalThis.fetch>(async (input) =>
+				new Request(input).method === 'GET'
+					? new Response('original bytes')
+					: Response.json({ data: [{ url }] }),
+			)
+			const record = { mode: 'record' as const, directory: root, fetch }
+			const size = { width: 1024, height: 1024 }
+			await imageRenderer(config, { replay: record })('prompt', [], size, false)
+			const append = createReplayFetch(record)
+			if (scenario === 'duplicate download') await (await append(url)).text()
+			if (scenario === 'shared generation URL')
+				await (
+					await append(baseUrl + '/images/generations', {
+						method: 'POST',
+						body: JSON.stringify({ prompt: 'other prompt' }),
+					})
+				).text()
+			const expired = vi.fn(async () => new Response(null, { status: 404 }))
+			const render = imageRenderer(config, {
+				replay: { checkpointDirectory: root, fetch: expired },
+			})
+			const reply = await render('prompt', [], size, false)
+			if (scenario === 'one match') {
+				expect(reply).toEqual({ bytes: Buffer.from('original bytes') })
+				expect(expired).not.toHaveBeenCalled()
+			} else {
+				expect(reply).toHaveProperty('error')
+				expect(expired).toHaveBeenCalledTimes(1)
+			}
+		} finally {
+			await rm(root, { recursive: true, force: true })
+		}
+	},
+)
+
 test('strict drawing replay consumes identical generation requests in recording order', async () => {
 	vi.stubEnv('NL_USAGE_CSV', '')
 	const root = await mkdtemp(join(tmpdir(), 'm1b-draw-sequence-'))

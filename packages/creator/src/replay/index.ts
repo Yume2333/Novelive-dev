@@ -45,6 +45,7 @@ export interface ReplayOptions {
 	onCheckpointHit?: (
 		allowance: ReplayOptions['checkpointAllowance'],
 		responseId?: string,
+		source?: string,
 	) => void
 }
 
@@ -230,6 +231,72 @@ function modeFromEnvironment() {
 	if (!mode) return undefined
 	if (mode === 'record' || mode === 'replay' || mode === 'strict') return mode
 	throw new Error('Invalid NL_REPLAY mode')
+}
+
+async function readCassetteRows(index: string) {
+	const text = await readFile(index, 'utf8').catch((error) => {
+		if (!missing(error)) throw error
+		return ''
+	})
+	return text
+		.split('\n')
+		.filter((line) => line.trim())
+		.map((line) => {
+			const row: unknown = JSON.parse(line)
+			if (
+				!cassette.check(row) ||
+				(row.body.b64 === undefined) === (row.body.sha === undefined)
+			)
+				throw new Error('Invalid cassette entry')
+			return row
+		})
+}
+
+async function readCassetteBody(
+	directory: string,
+	body: { sha?: string; b64?: string },
+) {
+	if (body.sha === undefined) return Buffer.from(body.b64 ?? '', 'base64')
+	const bytes = await readFile(join(directory, 'cassette-files', body.sha))
+	if (hash(bytes) !== body.sha)
+		throw new Error('Invalid cassette body checksum')
+	return bytes
+}
+
+export async function legacyImageDownload(directory: string, url: URL) {
+	const { key } = await requestIdentity(new Request(url))
+	const rows = (
+		await readCassetteRows(join(directory, 'cassette.jsonl'))
+	).filter(({ status }) => status < 300)
+	const downloads = rows.filter(
+		(row) => row.method === 'GET' && row.key === key,
+	)
+	if (downloads.length !== 1) return
+	let generations = 0
+	for (const row of rows) {
+		if (
+			row.method !== 'POST' ||
+			!/\/images\/(?:generations|edits)\/?(?:\?|$)/.test(row.path)
+		)
+			continue
+		const bytes = await readCassetteBody(directory, row.body)
+		let link: unknown
+		try {
+			link = JSON.parse(bytes.toString('utf8'))?.data?.[0]?.url
+		} catch {
+			continue
+		}
+		if (
+			typeof link === 'string' &&
+			URL.canParse(link) &&
+			(await requestIdentity(new Request(link))).key === key &&
+			++generations > 1
+		)
+			return
+	}
+	if (generations !== 1) return
+	const bytes = await readCassetteBody(directory, downloads[0].body)
+	if (bytes.length) return bytes
 }
 
 export function usesReplyCheckpoint(options: ReplayOptions = {}) {
@@ -507,6 +574,7 @@ function replayFetch(
 						options.onCheckpointHit?.(
 							hit.checkpointAllowance,
 							hit.checkpointResponseId,
+							source,
 						)
 					}
 					return response

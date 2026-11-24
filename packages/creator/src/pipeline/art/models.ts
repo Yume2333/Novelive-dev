@@ -23,6 +23,7 @@ import {
 	inheritSpendGuard,
 	isCheckpointReply,
 	isSpendGuardedFetch,
+	legacyImageDownload,
 	type ReplayOptions,
 } from '../../replay'
 import { recordImageUsage } from '../../usage'
@@ -148,6 +149,7 @@ function imageRequest(
 		? randomBytes(32).toString('hex')
 		: undefined
 	let downloadResponseId = responseId
+	let legacySource: string | undefined
 	const provider = imageProvider(config.baseUrl, config.model)
 	const timeout = 90_000
 	const upstream = generationReplay?.fetch ?? globalThis.fetch
@@ -157,9 +159,10 @@ function imageRequest(
 				...generationReplay,
 				checkpointResponse: (response) => response.ok,
 				checkpointResponseId: responseId,
-				onCheckpointHit: (allowance, id) => {
+				onCheckpointHit: (allowance, id, source) => {
 					downloadResponseId = id
-					generationReplay?.onCheckpointHit?.(allowance, id)
+					if (!id) legacySource = source
+					generationReplay?.onCheckpointHit?.(allowance, id, source)
 				},
 				onCheckpointReply: (save) => {
 					saveGeneration = save
@@ -285,6 +288,11 @@ function imageRequest(
 			}
 			if (image?.url) {
 				const url = new URL(image.url)
+				if (legacySource) {
+					const bytes = await legacyImageDownload(legacySource, url)
+					signal?.throwIfAborted()
+					if (bytes) return { bytes }
+				}
 				if (replayed && url.origin === 'https://relay.invalid') {
 					const relay = new URL(config.baseUrl)
 					url.protocol = relay.protocol
