@@ -751,7 +751,7 @@ test.describe('M4 longform and queue', () => {
 				location.hash = '/usage'
 			})
 			await expect(
-				page.getByRole('heading', { name: '用量', exact: true }),
+				page.getByRole('heading', { name: '用量统计', exact: true }),
 			).toBeVisible()
 			await app.evaluate(({ app }) =>
 				(

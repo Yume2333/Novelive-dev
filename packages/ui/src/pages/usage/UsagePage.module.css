@@ -4,20 +4,6 @@
 	font-family: var(--font-body);
 }
 
-.disclosure {
-	display: flex;
-	align-items: center;
-	gap: var(--space-2);
-	padding: var(--space-2) var(--space-3);
-	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-md);
-	background: var(--panel-70);
-	color: var(--color-on-surface-variant);
-	font: inherit;
-	font-size: 13px;
-	cursor: pointer;
-}
-
 .filters {
 	display: flex;
 	flex-wrap: wrap;
@@ -25,7 +11,8 @@
 	gap: var(--space-3);
 }
 
-.filters select {
+.filters select,
+.granularity select {
 	min-height: 34px;
 	padding: var(--space-px-7) var(--space-px-10);
 	border: 1px solid var(--glass-border);
@@ -81,6 +68,15 @@
 	height: 100%;
 	color: var(--color-outline);
 	font-size: 11px;
+}
+
+.dense {
+	gap: var(--space-px-2);
+}
+
+.dense .bar time[hidden] {
+	display: block;
+	visibility: hidden;
 }
 
 .bar:hover {
@@ -176,4 +172,23 @@
 .row > time {
 	grid-column: 2;
 	grid-row: 1;
+}
+
+.range {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-6);
+	color: var(--color-outline);
+	font-size: 12px;
+}
+
+.range input {
+	width: 136px;
+	padding: var(--space-px-7) var(--space-px-10);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-md);
+	background: var(--panel-70);
+	color: var(--color-on-surface);
+	font: inherit;
+	font-size: 13px;
 }

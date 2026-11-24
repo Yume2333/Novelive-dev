@@ -2,7 +2,6 @@ import type { CommandOutput } from '@novelive/creator/contract'
 import {
 	ArrowUpRight,
 	BarChart3,
-	ChevronDown,
 	FileText,
 	Image,
 	type LucideIcon,
@@ -10,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Card, SectionLabel } from '../../components/Card'
-import { Collapse } from '../../components/Collapse'
+import { InfoTooltip } from '../../components/InfoTooltip'
 import { EmptyState, Page } from '../../components/Page'
 import { scoped } from '../../i18n'
 import { Select } from '../settings/ModelFields'
@@ -23,6 +22,8 @@ type UsageRecord = CommandOutput<'usage.list'>['records'][number]['usage']
 const all = ''
 
 const dayOf = (at: number) => new Date(at).toLocaleDateString('sv')
+
+type Granularity = 'day' | 'month'
 
 function totals(records: UsageRecord[]) {
 	let input = 0
@@ -58,12 +59,15 @@ function Stat({
 }
 
 export function UsagePage() {
-	const [showExplanation, setShowExplanation] = useState(false)
+	const [granularity, setGranularity] = useState<Granularity>('day')
+	const [from, setFrom] = useState('')
+	const [to, setTo] = useState('')
 	const [data, setData] = useState<CommandOutput<'usage.list'>>()
 	const [error, setError] = useState('')
 	const [workId, setWorkId] = useState(all)
 	const [phase, setPhase] = useState(all)
 	const [model, setModel] = useState(all)
+	const [titles, setTitles] = useState(new Map<string, string>())
 	useEffect(() => {
 		let active = true
 		let request:
@@ -84,8 +88,20 @@ export function UsagePage() {
 				},
 			)
 		}
-		const off = window.novelive.on('creator.ready', load)
+		const off = window.novelive.on('creator.ready', () => {
+			load()
+			loadTitles()
+		})
+		function loadTitles() {
+			window.novelive.call('library.list', {}).promise.then(
+				({ works }) => {
+					if (active) setTitles(new Map(works.map((w) => [w.workId, w.title])))
+				},
+				() => {},
+			)
+		}
 		load()
+		loadTitles()
 		return () => {
 			active = false
 			off()
@@ -96,45 +112,68 @@ export function UsagePage() {
 		() => data?.records.map(({ usage }) => usage) ?? [],
 		[data],
 	)
-	const options = (pick: (record: UsageRecord) => string, label: string) =>
+	const titleOf = (workId: string) => titles.get(workId) ?? workId
+	const options = (
+		pick: (record: UsageRecord) => string,
+		label: string,
+		name: (value: string) => string = (value) => value,
+	) =>
 		[
 			[all, label] as const,
-			...[...new Set(records.map(pick))].sort().map((v) => [v, v] as const),
+			...[...new Set(records.map(pick))]
+				.sort()
+				.map((v) => [v, name(v)] as const),
 		] as const
-	const shown = records.filter(
-		(record) =>
+	const periodOf = (at: number) =>
+		granularity === 'month' ? dayOf(at).slice(0, 7) : dayOf(at)
+	const periods = records.map((r) => periodOf(r.at)).sort()
+	const first = periods[0] ?? ''
+	const last = periods.at(-1) ?? ''
+	const shown = records.filter((record) => {
+		const period = periodOf(record.at)
+		return (
 			(!workId || record.link.workId === workId) &&
 			(!phase || record.phase === phase) &&
-			(!model || record.model === model),
-	)
+			(!model || record.model === model) &&
+			(!from || period >= from) &&
+			(!to || period <= to)
+		)
+	})
 	const sum = totals(shown)
-	const days = [...new Set(shown.map((r) => dayOf(r.at)))].sort()
-	const perDay = days.map((day) => ({
-		day,
-		...totals(shown.filter((r) => dayOf(r.at) === day)),
-	}))
+	const byPeriod = new Map<string, UsageRecord[]>()
+	for (const record of shown) {
+		const period = periodOf(record.at)
+		byPeriod.set(period, [...(byPeriod.get(period) ?? []), record])
+	}
+	const perDay = [...byPeriod]
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([day, rows]) => ({ day, ...totals(rows) }))
+	const labelEvery = Math.ceil(perDay.length / 16)
 	const maxDay = Math.max(1, ...perDay.map(({ calls }) => calls))
 	const works = [...new Set(shown.map((r) => r.link.workId))].sort()
 	const phases = [...new Set(shown.map((r) => r.phase))].sort()
 	return (
-		<Page title={t('用量')}>
+		<Page
+			title={t('用量统计')}
+			actions={
+				<span className={styles.granularity}>
+					<Select<Granularity>
+						label={t('统计粒度')}
+						options={[
+							['day', t('按天')],
+							['month', t('按月')],
+						]}
+						value={granularity}
+						onChange={(value) => {
+							setGranularity(value)
+							setFrom('')
+							setTo('')
+						}}
+					/>
+				</span>
+			}
+		>
 			<div className={styles.content}>
-				<div>
-					<button
-						type="button"
-						className={styles.disclosure}
-						aria-expanded={showExplanation}
-						onClick={() => setShowExplanation((open) => !open)}
-					>
-						<ChevronDown size={16} aria-hidden="true" />
-						{t('用量说明')}
-					</button>
-					<Collapse open={showExplanation}>
-						{t(
-							'仅供参考，统计已发生的调用；不估算费用，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
-						)}
-					</Collapse>
-				</div>
 				{error && <p role="alert">{error}</p>}
 				{!data && !error && <p role="status">{t('正在读取用量')}</p>}
 				{data && (
@@ -158,7 +197,7 @@ export function UsagePage() {
 						<div className={styles.filters}>
 							<Select<string>
 								label={t('作品')}
-								options={options((r) => r.link.workId, t('全部作品'))}
+								options={options((r) => r.link.workId, t('全部作品'), titleOf)}
 								value={workId}
 								onChange={setWorkId}
 							/>
@@ -173,6 +212,29 @@ export function UsagePage() {
 								options={options((r) => r.model, t('全部模型'))}
 								value={model}
 								onChange={setModel}
+							/>
+							<span className={styles.range}>
+								<input
+									type={granularity === 'month' ? 'month' : 'date'}
+									aria-label={t('开始日期')}
+									value={from || first}
+									max={to || last || undefined}
+									onChange={(event) => setFrom(event.target.value)}
+								/>
+								<span>{t('到')}</span>
+								<input
+									type={granularity === 'month' ? 'month' : 'date'}
+									aria-label={t('结束日期')}
+									value={to || last}
+									min={from || first || undefined}
+									onChange={(event) => setTo(event.target.value)}
+								/>
+							</span>
+							<InfoTooltip
+								label={t('用量说明')}
+								text={t(
+									'仅供参考，统计已发生的调用；不估算费用，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
+								)}
 							/>
 						</div>
 						{!shown.length ? (
@@ -203,35 +265,54 @@ export function UsagePage() {
 									<Stat icon={Image} label={t('图片数量')} value={sum.images} />
 								</div>
 								<Card className={styles.panel}>
-									<SectionLabel>{t('各天调用量')}</SectionLabel>
-									<div className={styles.chart}>
-										{perDay.map(({ day, calls, input, output, images }) => (
-											<div
-												key={day}
-												className={styles.bar}
-												title={t(
-													'{{day}}：{{calls}} 次 · 输入 {{input}} / 输出 {{output}} · {{images}} 张图片',
-													{
-														day,
-														calls,
-														input,
-														output,
-														images,
-													},
-												)}
-											>
-												<span>{calls}</span>
-												<span className={styles.barTrack}>
-													<span
-														className={styles.barFill}
-														style={{
-															height: `${Math.max(4, (calls / maxDay) * 100)}%`,
-														}}
-													/>
-												</span>
-												<time dateTime={day}>{day.slice(5)}</time>
-											</div>
-										))}
+									<SectionLabel>
+										{granularity === 'month'
+											? t('各月调用量')
+											: t('各天调用量')}
+									</SectionLabel>
+									<div
+										className={
+											labelEvery > 1
+												? `${styles.chart} ${styles.dense}`
+												: styles.chart
+										}
+									>
+										{perDay.map(
+											({ day, calls, input, output, images }, index) => (
+												<div
+													key={day}
+													className={styles.bar}
+													title={t(
+														'{{day}}：{{calls}} 次 · 输入 {{input}} / 输出 {{output}} · {{images}} 张图片',
+														{
+															day,
+															calls,
+															input,
+															output,
+															images,
+														},
+													)}
+												>
+													<span>{labelEvery > 1 ? '' : calls}</span>
+													<span className={styles.barTrack}>
+														<span
+															className={styles.barFill}
+															style={{
+																height: `${Math.max(4, (calls / maxDay) * 100)}%`,
+															}}
+														/>
+													</span>
+													<time
+														dateTime={day}
+														hidden={index % labelEvery !== 0}
+													>
+														{granularity === 'month'
+															? day
+															: day.slice(5).replace('-', '/')}
+													</time>
+												</div>
+											),
+										)}
 									</div>
 								</Card>
 								<Card className={styles.panel}>
@@ -249,7 +330,7 @@ export function UsagePage() {
 											<tbody>
 												{works.map((work) => (
 													<tr key={work} className="hover-row">
-														<td>{work}</td>
+														<td>{titleOf(work)}</td>
 														{phases.map((p) => {
 															const cell = totals(
 																shown.filter(
@@ -287,8 +368,8 @@ export function UsagePage() {
 												<li className={styles.row} key={id}>
 													<strong>{record.model}</strong>
 													<span>
-														{record.link.workId} · {record.link.volumeId} ·{' '}
-														{record.phase}
+														{titleOf(record.link.workId)} ·{' '}
+														{record.link.volumeId} · {record.phase}
 													</span>
 													<span>
 														{record.kind === 'image'
