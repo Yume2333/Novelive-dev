@@ -48,7 +48,12 @@ export function Dropdown({
 				Home: 0,
 				End: options.length - 1,
 			}[event.key]
-			if (next !== undefined && options.length) {
+			if (index === -1) return
+			if (event.key === 'Tab') {
+				setOpen(false)
+				return
+			}
+			if (next !== undefined) {
 				event.preventDefault()
 				options[next].focus()
 				return
