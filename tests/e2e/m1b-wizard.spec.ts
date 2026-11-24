@@ -109,16 +109,16 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 	try {
 		await answerDialogs(app, [[source], [image], [projects]])
 		await page.getByRole('link', { name: '导入原文' }).click()
-		await expect(page.getByRole('heading', { name: '导入原文' })).toBeVisible()
+		await expect(page.getByRole('heading', { name: '新建工程' })).toBeVisible()
 		await page.getByRole('button', { name: '选择原文' }).click()
 		await expect(page.getByLabel('作品名')).toHaveValue('风')
 		await page.getByRole('button', { name: '添加图片' }).click()
 		await expect(page.getByText('ref.png')).toBeVisible()
 		await page.getByRole('button', { name: '选择文件夹' }).click()
 		await expect(page.getByText(projects, { exact: true })).toBeVisible()
-		await page.getByRole('button', { name: '导入', exact: true }).click()
+		await page.getByRole('button', { name: '下一步', exact: true }).click()
 
-		await expect(page.getByRole('heading', { name: '核对导入' })).toBeVisible()
+		await expect(page.locator('[aria-current="step"]', { hasText: '核对信息' })).toBeVisible()
 		const root = join(projects, '风')
 		expect(await readFile(join(root, 'source/original.txt'))).toEqual(
 			await readFile(source),
@@ -157,11 +157,12 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 		await page.getByLabel('第 1 卷标题').fill('上卷')
 		await page.getByLabel('第 2 卷标题').fill('风起')
 		await expect(page.getByLabel('第 3 卷标题')).toHaveValue('第二卷 风止')
+		await page.getByRole('button', { name: '下一步', exact: true }).click()
 		await page
 			.getByRole('checkbox', { name: /参考图时也停在角色设定/ })
 			.uncheck()
-		await page.getByRole('button', { name: '确认' }).click()
-		await expect(page.getByRole('heading', { name: '核对导入' })).toBeHidden()
+		await page.getByRole('button', { name: '开始制作' }).click()
+		await expect(page.locator('[aria-current="step"]', { hasText: '核对信息' })).toBeHidden()
 
 		const { series, result } = await chapters(root)
 		expect(series.volumeIds).toEqual(['v0001', 'v0002', 'v0003'])
@@ -208,19 +209,20 @@ test('M1b TXT wizard asks for an ambiguous encoding and can skip review', async 
 		await page.getByRole('link', { name: '导入原文' }).click()
 		await page.getByRole('button', { name: '选择原文' }).click()
 		await page.getByRole('button', { name: '选择文件夹' }).click()
-		await page.getByRole('button', { name: '导入', exact: true }).click()
+		await page.getByRole('button', { name: '下一步', exact: true }).click()
 		const encodings = page.getByRole('group', { name: '原文编码' })
 		await expect(encodings.getByRole('radio')).not.toHaveCount(0)
 		await expect(
-			page.getByRole('button', { name: '导入', exact: true }),
+			page.getByRole('button', { name: '下一步', exact: true }),
 		).toBeDisabled()
 		expect(await readdir(workspace)).not.toContain('中')
 		await encodings.getByRole('radio', { name: /Big5/ }).check()
-		await page.getByRole('button', { name: '导入', exact: true }).click()
-		await expect(page.getByRole('heading', { name: '核对导入' })).toBeVisible()
+		await page.getByRole('button', { name: '下一步', exact: true }).click()
+		await expect(page.locator('[aria-current="step"]', { hasText: '核对信息' })).toBeVisible()
 		await expect(page.getByText('Big5（繁体）')).toBeVisible()
 		await page.getByRole('button', { name: '跳过核对' }).click()
-		await expect(page.getByRole('heading', { name: '核对导入' })).toBeHidden()
+		await page.getByRole('button', { name: '开始制作' }).click()
+		await expect(page.locator('[aria-current="step"]', { hasText: '核对信息' })).toBeHidden()
 		const root = join(workspace, '中')
 		const { result } = await chapters(root)
 		expect(result).toEqual([['第一卷', '正文', '中\n']])
