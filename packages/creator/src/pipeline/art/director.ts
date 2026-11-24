@@ -198,7 +198,11 @@ export async function directChapterArt(
 		Math.floor((buildTextModel(options.main).contextWindow - 4096) / 4) -
 		context.length -
 		assetContract.length -
-		imageLimit.length -
+		(imageBudget
+			? imageLimit.length -
+				String(imageBudget.limit).length +
+				String(Number.MAX_SAFE_INTEGER).length
+			: 0) -
 		1024
 	const batches = script.length <= budget ? [script] : scenes
 	const items: ManifestItem[] = []

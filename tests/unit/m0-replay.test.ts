@@ -42,6 +42,39 @@ test('normalized replay rebinds UUID-bearing chapter IDs in authored responses',
 	expect(upstream).toHaveBeenCalledTimes(1)
 })
 
+test('strict replay keeps staging identity stable across live image allowances', async () => {
+	const upstream = vi.fn(async () => Response.json({ patch: '' }))
+	const request = (limit: number, script = 'scene first') =>
+		new Request(origin + path, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				messages: [
+					{
+						role: 'user',
+						content: `Hard limit for this whole chapter: ${limit} new provider images, including edits.\n${script}`,
+					},
+				],
+			}),
+		})
+	const record = createReplayFetch({
+		mode: 'record',
+		directory,
+		fetch: upstream,
+	})
+	await (await record(request(9))).text()
+	const replay = createReplayFetch({
+		mode: 'strict',
+		directory,
+		fetch: upstream,
+	})
+	expect(await (await replay(request(11))).json()).toEqual({ patch: '' })
+	await expect(replay(request(11, 'scene second'))).rejects.toThrow(
+		'Missing strict replay cassette:',
+	)
+	expect(upstream).toHaveBeenCalledTimes(1)
+})
+
 test('response rebinding preserves empty responses and strict misses never call upstream', async () => {
 	const upstream = vi.fn(async () => new Response(null, { status: 204 }))
 	const options = {

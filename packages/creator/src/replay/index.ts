@@ -174,6 +174,11 @@ async function requestIdentity(
 			// Non-text request bodies are hashed as bytes.
 		}
 	}
+	if (typeof canonical === 'string')
+		canonical = canonical.replace(
+			/(Hard limit for this whole chapter: )\d+( new provider images,)/g,
+			'$1[chapter-image-budget]$2',
+		)
 	if (normalizeIds && typeof canonical === 'string') {
 		if (rebindIds)
 			ids.push(
