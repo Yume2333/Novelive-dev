@@ -317,7 +317,7 @@ export async function directChapterArt(
 				responseBudget !== undefined &&
 				promptBudget !== undefined &&
 				responseBudget.limit < promptBudget.limit
-			const imageBudget = deferTrim
+			const imageBudget = responseBudget && deferTrim
 				? { ...responseBudget, limit: Number.MAX_SAFE_INTEGER }
 				: responseBudget
 			needsFinalBudget ||=

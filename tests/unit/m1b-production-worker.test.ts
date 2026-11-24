@@ -184,6 +184,7 @@ test.each([
 		vi.stubEnv('NL_REPLAY', '')
 		const chapterId = 'ch0001'
 		const prompts: string[] = []
+		const draws: string[] = []
 		let unavailable = true
 		const fetch: typeof globalThis.fetch = async (input, init) => {
 			const { messages } = await new Request(input, init).json()
@@ -222,9 +223,9 @@ test.each([
 				...worker,
 				async write() {},
 				async review() {},
-				async draw(_workId, job) {
-					if (failure !== 'higher allowance' || job.assetId !== 'room/day')
-						throw new Error('Unexpected drawing request')
+				async draw(job) {
+					draws.push(job.assetId)
+					return { status: 'drawn' }
 				},
 			})
 		}
@@ -291,6 +292,7 @@ test.each([
 				{ id: 4, run_id: 'after-reopen', actual_tokens: 15 },
 			])
 			expect(queue.snapshot(workId).chapters[0].status).toBe('published')
+			expect(draws).toEqual(failure === 'higher allowance' ? ['room/day'] : [])
 		} finally {
 			queue.dispose()
 		}
