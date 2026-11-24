@@ -133,16 +133,13 @@ export function AppShell() {
 	const routeWorkId = useMatch('/work/:id/*')?.params.id
 	const navigate = useNavigate()
 	const [works, setWorks] = useState<LibraryWork[]>([])
+	const [libraryRevision, setLibraryRevision] = useState(0)
 	const [recentWorkId, setRecentWorkId] = useState(readRecentWork)
 	const installed = window.novelive.host.installed
 	const [packages, setPackages] = useState<InstalledWork[]>([])
 	const packageRef = routeWorkId ? undefined : parsePackageRef(recentWorkId)
 	const recentPackage = packageRef
-		? packages.find(
-				(item) =>
-					item.workId === packageRef.workId &&
-					String(item.version) === packageRef.version,
-			)
+		? packages.find((item) => item.workId === packageRef.workId)
 		: undefined
 	const workId = routeWorkId ?? (packageRef ? undefined : recentWorkId)
 	const work = works.find((item) => item.workId === workId)
@@ -234,7 +231,7 @@ export function AppShell() {
 			() => {},
 		)
 		return () => request.cancel()
-	}, [ready, pathname])
+	}, [ready, pathname, libraryRevision])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: refresh after navigation
 	useEffect(() => {
 		if (!installed) return
@@ -248,7 +245,7 @@ export function AppShell() {
 		return () => {
 			active = false
 		}
-	}, [installed, pathname])
+	}, [installed, pathname, libraryRevision])
 	const showWork = Boolean(routeWorkId || work)
 	const switchItems = [
 		...works.map((item) => ({
@@ -494,8 +491,10 @@ export function AppShell() {
 								updateConfig,
 								resetConfig,
 								setAgentPosition,
+								refreshLibrary: () => setLibraryRevision((n) => n + 1),
 							} satisfies SettingsHost & {
 								setAgentPosition: typeof setAgentPosition
+								refreshLibrary(): void
 							}
 						}
 					/>

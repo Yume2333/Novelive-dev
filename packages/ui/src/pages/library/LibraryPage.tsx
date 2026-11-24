@@ -8,7 +8,7 @@ import {
 	PlayCircle,
 } from 'lucide-react'
 import { type ReactNode, useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
 import { ProgressBar } from '../../components/Card'
 import { GradientCover } from '../../components/GradientCover'
 import { EmptyState, Page, PageAction } from '../../components/Page'
@@ -130,6 +130,7 @@ function WorkCard({
 }
 
 export function LibraryPage() {
+	const { refreshLibrary } = useOutletContext<{ refreshLibrary(): void }>()
 	const [library, setLibrary] = useState<CommandOutput<'library.list'>>()
 	const [error, setError] = useState(false)
 	const [revision, setRevision] = useState(0)
@@ -207,7 +208,10 @@ export function LibraryPage() {
 								(await window.novelive.pickFiles('package'))[0]
 							}
 							pickProjectFolder={() => window.novelive.pickFolder()}
-							onImported={() => setRevision((n) => n + 1)}
+							onImported={() => {
+								setRevision((n) => n + 1)
+								refreshLibrary()
+							}}
 						/>
 					)}
 					<PageAction icon={FileUp} to={productionRoutes.import}>
