@@ -2398,6 +2398,37 @@ test('reuses a settled staging repair with its pre-upgrade request text', async 
 	})
 })
 
+test.each([
+	{
+		kind: 'reversed range',
+		reply: { patch: 'PUT 4.=3:\n@bg room/day', items: [], merges: {} },
+		repair: 'Repair the staging patch and manifest:',
+		error: 'The end line must be at or after the start line.',
+	},
+	{
+		kind: 'schema error',
+		reply: { patch: '', items: 'not an array', merges: {} },
+		repair: 'Repair the JSON manifest:',
+		error: '/items',
+	},
+])(
+	'stops after one repair that repeats a $kind',
+	async ({ reply, repair, error }) => {
+		const invalid = JSON.stringify(reply)
+		const fetch = artReplies(invalid, invalid)
+		await expect(
+			directChapterArt(script, bible, empty, {
+				main,
+				replay: { ...replay, mode: 'replay', fetch },
+			}),
+		).rejects.toThrow(error)
+		expect(fetch).toHaveBeenCalledTimes(2)
+		const [input, init] = fetch.mock.calls[1]
+		const { messages } = await new Request(input, init).json()
+		expect(messages[0].content[0].text).toContain(`\n${repair}`)
+	},
+)
+
 test('requests repair when a staging patch adds an image absent from the manifest', async () => {
 	const patch = 'PUT <4:\n@cg cg-window'
 	const item = { id: 'cg-window', kind: 'cg', description: '窗边' }
