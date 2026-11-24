@@ -64,6 +64,8 @@ shared_evidence,m1b-07ffaa06,devin-swe-2,settled,29,,,,134017,0,0,0,m1b/owner/li
 shared_evidence,m1b-07ffaa06,devin-swe-2,transport_failure,1,,,,0,0,242927,0,m1b/owner/live-run-07ffaa06-usage.csv:3,HTTP 503; unknown outcome; not resent and full reserve retained
 shared_evidence,m1b-07ffaa06,gemini-3.8-flash,settled,3,,,,59122,0,0,0,m1b/owner/live-run-07ffaa06-usage.csv:4,
 shared_evidence,m1b-07ffaa06,gpt-image-2.6-sunburst,settled,1,,,,9014,1,0,0,m1b/owner/live-run-07ffaa06-usage.csv:5,
+shared_evidence,m1b-retry-07ffaa06,devin-swe-2,settled,12,,,,112100,0,0,0,m1b/owner/live-retry-07ffaa06-usage.csv:2,
+shared_evidence,m1b-retry-07ffaa06,gemini-3.8-flash,settled,15,,,,125667,0,0,0,m1b/owner/live-retry-07ffaa06-usage.csv:3,
 shared_unattributed,shared-settled-gap,unallocated,settled,,,,,140455,12,0,0,../owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported settled usage not linked to detailed rows
 shared_unattributed,shared-reserve-gap,unallocated,reservation_no_usage,,,,,0,0,195450,1,../owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported reserves not linked to detailed rows; outcome unknown
 overlap_unknown,older-m1b-yesou,gemini-3.8-flash,settled,201,,,,1098996,0,0,0,a0fe816:m1b/owner/11-real-book-gate.md,Older real-book window; not linked to latest shared baseline
