@@ -20,6 +20,7 @@ export function ConfirmFirstPage() {
 
 	return (
 		<Page
+			width={760}
 			eyebrow={
 				snapshot.title
 					? `${snapshot.title} · ${t('确认点 2 / 2')}`
@@ -67,23 +68,25 @@ export function ConfirmFirstPage() {
 								{t('已发布，可以试玩，准备好后再手动继续制作。')}
 							</span>
 						</p>
-						<section
-							className={`${styles.panel} ${local.chapter}`}
-							aria-label={t('第一章成品')}
-						>
-							<span className={local.art} aria-hidden="true">
-								<span>{t('第一章')}</span>
-							</span>
-							<div className={styles.panelBody}>
-								<div className={styles.sectionHead}>
-									<h2 className={local.cardTitle}>
-										{chapterTitle(snapshot, first.chapterId)}
-									</h2>
-									<ChapterState chapter={first} />
+						<div className={local.scenes}>
+							<section
+								className={`${styles.panel} ${local.chapter}`}
+								aria-label={t('第一章成品')}
+							>
+								<span className={local.art} aria-hidden="true">
+									<span>{t('第一章')}</span>
+								</span>
+								<div className={styles.panelBody}>
+									<div className={styles.sectionHead}>
+										<h2 className={local.cardTitle}>
+											{chapterTitle(snapshot, first.chapterId)}
+										</h2>
+										<ChapterState chapter={first} />
+									</div>
+									{first.issue && <p className={styles.muted}>{first.issue}</p>}
 								</div>
-								{first.issue && <p className={styles.muted}>{first.issue}</p>}
-							</div>
-						</section>
+							</section>
+						</div>
 					</>
 				) : (
 					<section className={`${styles.panel} ${styles.panelBody}`}>

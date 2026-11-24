@@ -32,14 +32,16 @@ export function ExportPackage({
 	projectRoot,
 	volumeId,
 	workId,
+	onClose,
 }: {
+	onClose?: () => void
 	api: DesktopShareApi
 	pickDestination(): Promise<string | null>
 	projectRoot: string
 	volumeId: string
 	workId: string
 }) {
-	const [open, setOpen] = useState(false)
+	const [open, setOpen] = useState(Boolean(onClose))
 	const [level, setLevel] = useState<Scope['level']>('work')
 	const [includeSource, setIncludeSource] = useState(false)
 	const [warnings, setWarnings] = useState<Warnings>()
@@ -91,24 +93,26 @@ export function ExportPackage({
 
 	return (
 		<>
-			<button
-				type="button"
-				className={styles.button}
-				onClick={() => {
-					setLevel('work')
-					setIncludeSource(false)
-					setVersions(undefined)
-					resetReview()
-					setOpen(true)
-				}}
-			>
-				{t('导出作品包')}
-			</button>
+			{!onClose && (
+				<button
+					type="button"
+					className={styles.button}
+					onClick={() => {
+						setLevel('work')
+						setIncludeSource(false)
+						setVersions(undefined)
+						resetReview()
+						setOpen(true)
+					}}
+				>
+					{t('导出作品包')}
+				</button>
+			)}
 			{open && (
 				<ShareDialog
 					title={t('导出作品包')}
 					busy={busy}
-					onClose={() => setOpen(false)}
+					onClose={onClose ?? (() => setOpen(false))}
 					actions={
 						!versions && (
 							<button

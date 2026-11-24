@@ -1,7 +1,16 @@
-import { BookOpen, CircleCheck, Palette, Play } from 'lucide-react'
+import {
+	BookOpen,
+	CircleCheck,
+	Clapperboard,
+	Ellipsis,
+	Package,
+	Palette,
+	Play,
+} from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ProgressBar } from '../../components/Card'
+import { Dropdown } from '../../components/Dropdown'
 import { Page } from '../../components/Page'
 import { scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
@@ -88,19 +97,46 @@ export function WorkPage() {
 	).length
 	const title = snapshot.title ?? t('作品概览')
 	const visible = chapters.slice(page * pageSize, (page + 1) * pageSize)
+	const navigate = useNavigate()
+	const [exporting, setExporting] = useState(false)
+	const canExport = Boolean(share && pickDestination && exportTarget)
 	return (
 		<Page
 			title={title}
 			actions={
 				<div className={styles.actions}>
-					<Link className={styles.button} to={workRoute('production', workId)}>
-						{t('查看制作')}
-					</Link>
-					{share && pickDestination && exportTarget && (
+					<Dropdown
+						label={t('更多')}
+						className={styles.button}
+						trigger={
+							<>
+								<Ellipsis aria-hidden="true" size={16} />
+								{t('更多')}
+							</>
+						}
+						items={[
+							{
+								label: t('查看制作'),
+								icon: Clapperboard,
+								onSelect: () => navigate(workRoute('production', workId)),
+							},
+							...(canExport
+								? [
+										{
+											label: t('导出作品包'),
+											icon: Package,
+											onSelect: () => setExporting(true),
+										},
+									]
+								: []),
+						]}
+					/>
+					{exporting && share && pickDestination && exportTarget && (
 						<ExportPackage
 							api={share}
 							pickDestination={pickDestination}
 							workId={workId}
+							onClose={() => setExporting(false)}
 							{...exportTarget}
 						/>
 					)}
