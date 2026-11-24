@@ -37,6 +37,8 @@ export interface ReplayOptions {
 	onReplay?: (request: Request) => Promise<void>
 	checkpointDirectory?: string
 	onCheckpointReply?: (save: () => Promise<void>) => void
+	checkpointAllowance?: { images?: number }
+	onCheckpointHit?: (allowance: ReplayOptions['checkpointAllowance']) => void
 }
 
 const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
@@ -73,6 +75,7 @@ const cassette = compile(
 		recordedAt: str(),
 		case: str(),
 		tags: arr(str()),
+		checkpointAllowance: opt(obj({ images: opt(int({ minimum: 0 })) })),
 	}),
 )
 
@@ -324,6 +327,8 @@ export function createReplayFetch(
 					reuseRecorded: true,
 					fetch: replayFetch(upstream),
 					onCheckpointReply: options.onCheckpointReply,
+					checkpointAllowance: options.checkpointAllowance,
+					onCheckpointHit: options.onCheckpointHit,
 				},
 				true,
 			)
@@ -422,6 +427,7 @@ function replayFetch(
 			recordedAt: new Date().toISOString(),
 			case: options.case ?? '',
 			tags: options.tags ?? [],
+			...(checkpoint && { checkpointAllowance: options.checkpointAllowance }),
 		}
 		const write = pending.then(() =>
 			appendFile(index, `${JSON.stringify(row)}\n`),
@@ -464,14 +470,18 @@ function replayFetch(
 					.split('\n')
 					.filter(Boolean)
 					.map((line) => JSON.parse(line))
-				if (
-					recorded.some((row) => row.key === identity.key && row.status < 300)
+				const hit = recorded.find(
+					(row) => row.key === identity.key && row.status < 300,
 				)
-					return createReplayFetch({
+				if (hit) {
+					const response = await createReplayFetch({
 						...options,
 						mode: 'strict',
 						fallbackDirectory: undefined,
 					})(request)
+					if (checkpoint) options.onCheckpointHit?.(hit.checkpointAllowance)
+					return response
+				}
 			}
 			const recordSend = async (
 				admitted: Request,

@@ -158,7 +158,7 @@ test('staging and portrait painting dispatch to their configured role models', a
 	expect(painterOutput).toBe(1024)
 })
 
-test.each(['unknown', 'truncated', 'lower allowance'])(
+test.each(['unknown', 'truncated', 'lower allowance', 'higher allowance'])(
 	'explicit staging retry reuses accepted scene and repair inputs after a %s reply',
 	async (failure) => {
 		const { projectDir, workId } = await fixture(
@@ -173,7 +173,7 @@ test.each(['unknown', 'truncated', 'lower allowance'])(
 			maxOutputTokens: 256,
 		}
 		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
-		vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', failure === 'higher allowance' ? '5' : '50')
 		vi.stubEnv('NL_RUN_ID', 'before-reopen')
 		vi.stubEnv('NL_REPLAY', '')
 		const chapterId = 'ch0001'
@@ -196,6 +196,12 @@ test.each(['unknown', 'truncated', 'lower allowance'])(
 							{ error: { message: 'Unavailable' } },
 							{ status: 503 },
 						)
+			if (failure === 'higher allowance' && !unavailable)
+				return completion({
+					patch: 'PUT <4:\n@bg room/day',
+					items: [{ id: 'room/day', kind: 'location', description: 'Day' }],
+					merges: {},
+				})
 			return completion({ patch: '', items: [], merges: {} })
 		}
 		async function scheduler(project: Project) {
@@ -208,8 +214,9 @@ test.each(['unknown', 'truncated', 'lower allowance'])(
 				...worker,
 				async write() {},
 				async review() {},
-				async draw() {
-					throw new Error('Unexpected drawing request')
+				async draw(_workId, job) {
+					if (failure !== 'higher allowance' || job.assetId !== 'room/day')
+						throw new Error('Unexpected drawing request')
 				},
 			})
 		}
@@ -247,6 +254,7 @@ test.each(['unknown', 'truncated', 'lower allowance'])(
 		unavailable = false
 		vi.stubEnv('NL_RUN_ID', 'after-reopen')
 		if (failure === 'lower allowance') vi.stubEnv('NL_RUN_IMAGE_CAP', '5')
+		if (failure === 'higher allowance') vi.stubEnv('NL_RUN_IMAGE_CAP', '6')
 		using project = await Project.open(projectDir)
 		const queue = await scheduler(project)
 		try {
@@ -257,6 +265,10 @@ test.each(['unknown', 'truncated', 'lower allowance'])(
 				expect(chapterImageBudget(project.database, workId)).toBe(0)
 				expect(prompts[2]).toContain('Hard limit for this whole chapter: 45')
 				expect(prompts[2]).toContain('cg-window')
+			}
+			if (failure === 'higher allowance') {
+				expect(chapterImageBudget(project.database, workId)).toBe(1)
+				expect(prompts[2]).toContain('Hard limit for this whole chapter: 0')
 			}
 			queue.retryChapter(workId, chapterId)
 			await queue.idle()

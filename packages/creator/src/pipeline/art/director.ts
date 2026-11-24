@@ -188,12 +188,13 @@ export async function directChapterArt(
 	if (parsed.diagnostics.some((item) => item.code.startsWith('E_')))
 		throw new Error('The art director requires a valid chapter script')
 	const context = JSON.stringify({ bible, registry })
-	const imageBudget =
+	const currentBudget = options.imageBudget
+	const promptBudget =
 		options.stagingImageBudget === undefined
-			? options.imageBudget
+			? currentBudget
 			: (options.stagingImageBudget ?? undefined)
-	const imageLimit = imageBudget
-		? `Hard limit for this whole chapter: ${imageBudget.limit} new provider images, including edits and any new bases needed by references. Reuse drawn assets whenever possible. Use one costume base per character, add expressions only for meaningful emotional beats, share backgrounds across scenes, and keep CGs rare. Every stage direction must still resolve to a registered or declared asset.`
+	const imageLimit = promptBudget
+		? `Hard limit for this whole chapter: ${promptBudget.limit} new provider images, including edits and any new bases needed by references. Reuse drawn assets whenever possible. Use one costume base per character, add expressions only for meaningful emotional beats, share backgrounds across scenes, and keep CGs rare. Every stage direction must still resolve to a registered or declared asset.`
 		: ''
 	const assetContract = [
 		`Asset ID contract — required items[].id shape by kind: ${manifestIdGuidance}.`,
@@ -207,9 +208,9 @@ export async function directChapterArt(
 		Math.floor((buildTextModel(options.main).contextWindow - 4096) / 4) -
 		context.length -
 		assetContract.length -
-		(imageBudget
+		(promptBudget
 			? imageLimit.length -
-				String(imageBudget.limit).length +
+				String(promptBudget.limit).length +
 				String(Number.MAX_SAFE_INTEGER).length
 			: 0) -
 		1024
@@ -218,6 +219,7 @@ export async function directChapterArt(
 	let merges: Record<string, string> = {}
 	let staged = ''
 	const trimmed: StageTrim[] = []
+	let needsFinalBudget = false
 	const trim = (
 		candidate: Parameters<typeof trimStagingToBudget>[0],
 		budget: ImageBudget,
@@ -276,11 +278,27 @@ export async function directChapterArt(
 		let triedStagingRepair = false
 		let triedFormatRepair = false
 		for (;;) {
+			let responseBudget = currentBudget
 			const result = await artJson(
 				options.main,
 				repair ? `${brief}\n${repair}` : brief,
 				responseSchema,
-				options,
+				{
+					...options,
+					replay: {
+						...options.replay,
+						checkpointAllowance: { images: currentBudget?.limit },
+						onCheckpointHit: (allowance) => {
+							const context = promptBudget ?? currentBudget
+							responseBudget =
+								allowance === undefined
+									? promptBudget
+									: context && allowance.images !== undefined
+										? { ...context, limit: allowance.images }
+										: undefined
+						},
+					},
+				},
 				[],
 				'caller',
 			).catch((error: unknown) => {
@@ -290,6 +308,15 @@ export async function directChapterArt(
 				repair = repairReply('JSON manifest', error.message, error.rejected)
 			})
 			if (!result) continue
+			const deferTrim =
+				responseBudget !== undefined &&
+				promptBudget !== undefined &&
+				responseBudget.limit < promptBudget.limit
+			const imageBudget = deferTrim
+				? { ...responseBudget, limit: Number.MAX_SAFE_INTEGER }
+				: responseBudget
+			needsFinalBudget ||=
+				deferTrim || imageBudget?.limit !== currentBudget?.limit
 			let candidate: Parameters<typeof trimStagingToBudget>[0] | undefined
 			try {
 				validateManifestIds(result.items)
@@ -362,11 +389,7 @@ export async function directChapterArt(
 			break
 		}
 	}
-	const currentBudget = options.imageBudget
-	if (
-		currentBudget &&
-		(!imageBudget || currentBudget.limit < imageBudget.limit)
-	) {
+	if (currentBudget && needsFinalBudget) {
 		const fit = trim(
 			{ script: staged, items, merges },
 			currentBudget,
