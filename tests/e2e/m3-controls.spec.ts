@@ -735,7 +735,9 @@ test.describe('M3 player controls', () => {
 						.press('End')
 					await page.getByLabel('瞬间显示').check()
 					await range('自动播放倍率', 2)
-					await page.getByLabel('对话框样式').selectOption('paper')
+					await page
+						.getByRole('button', { name: '浅色纸笺', exact: true })
+						.click()
 					await expect(page.locator('.nl-player-textbox')).toHaveCSS(
 						'font-size',
 						'36px',
@@ -823,7 +825,7 @@ test.describe('M3 player controls', () => {
 					await page.getByRole('button', { name: '返回游戏' }).focus()
 					await page.keyboard.press('Shift+Tab')
 					await expect(
-						page.getByRole('button', { name: '设置', exact: true }),
+						page.getByRole('button', { name: '隐藏界面', exact: true }),
 					).toBeFocused()
 					await page.keyboard.press('Tab')
 					await expect(
