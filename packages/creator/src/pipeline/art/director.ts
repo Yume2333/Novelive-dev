@@ -177,14 +177,21 @@ export async function directChapterArt(
 	bible: ArtBible,
 	registry: AssetRegistry,
 	options: ModelOptions &
-		ScriptOptions & { main: TextConnection; imageBudget?: ImageBudget },
+		ScriptOptions & {
+			main: TextConnection
+			imageBudget?: ImageBudget
+			stagingImageBudget?: ImageBudget | null
+		},
 ) {
 	const scriptOptions = { customMarks: [...(options.customMarks ?? [])] }
 	const parsed = parseScript(script, scriptOptions)
 	if (parsed.diagnostics.some((item) => item.code.startsWith('E_')))
 		throw new Error('The art director requires a valid chapter script')
 	const context = JSON.stringify({ bible, registry })
-	const imageBudget = options.imageBudget
+	const imageBudget =
+		options.stagingImageBudget === undefined
+			? options.imageBudget
+			: (options.stagingImageBudget ?? undefined)
 	const imageLimit = imageBudget
 		? `Hard limit for this whole chapter: ${imageBudget.limit} new provider images, including edits and any new bases needed by references. Reuse drawn assets whenever possible. Use one costume base per character, add expressions only for meaningful emotional beats, share backgrounds across scenes, and keep CGs rare. Every stage direction must still resolve to a registered or declared asset.`
 		: ''
@@ -211,6 +218,21 @@ export async function directChapterArt(
 	let merges: Record<string, string> = {}
 	let staged = ''
 	const trimmed: StageTrim[] = []
+	const trim = (
+		candidate: Parameters<typeof trimStagingToBudget>[0],
+		budget: ImageBudget,
+		compile: Parameters<typeof trimStagingToBudget>[4],
+	) =>
+		trimStagingToBudget(
+			candidate,
+			bible,
+			registry,
+			budget,
+			compile,
+			(images, remainingBases) => {
+				throw new ChapterImageBudgetError(images, budget.limit, remainingBases)
+			},
+		)
 	for (const [i, batch] of batches.entries()) {
 		const compile = (
 			candidate: string,
@@ -326,23 +348,10 @@ export async function directChapterArt(
 					!candidate
 				)
 					throw error
-				const fit = trimStagingToBudget(
-					candidate,
-					bible,
-					registry,
-					imageBudget,
-					(script, registry) => {
-						const compiled = compile(script, registry, imageBudget)
-						return compiled.ok ? compiled.scenes : undefined
-					},
-					(images, remainingBases) => {
-						throw new ChapterImageBudgetError(
-							images,
-							imageBudget.limit,
-							remainingBases,
-						)
-					},
-				)
+				const fit = trim(candidate, imageBudget, (script, registry) => {
+					const compiled = compile(script, registry, imageBudget)
+					return compiled.ok ? compiled.scenes : undefined
+				})
 				if (!fit) throw error
 				candidate = fit
 				trimmed.push(...fit.trimmed)
@@ -352,6 +361,37 @@ export async function directChapterArt(
 			merges = candidate.merges
 			break
 		}
+	}
+	const currentBudget = options.imageBudget
+	if (
+		currentBudget &&
+		(!imageBudget || currentBudget.limit < imageBudget.limit)
+	) {
+		const fit = trim(
+			{ script: staged, items, merges },
+			currentBudget,
+			(script, { entries }) => {
+				const compiled = compileScript(script, {
+					...scriptOptions,
+					assets: entries,
+					speakers: currentBudget.speakers,
+					paragraphIds: currentBudget.paragraphIds,
+				})
+				if (!compiled.ok)
+					throw new Error(
+						compiled.diagnostics.map(({ message }) => message).join('; '),
+					)
+				return compiled.scenes
+			},
+		)
+		if (!fit)
+			throw new Error(
+				'Staged chapter could not be trimmed to the current image budget',
+			)
+		staged = fit.script
+		items = fit.items
+		merges = fit.merges
+		trimmed.push(...fit.trimmed)
 	}
 	const plan = planArt(items, bible, registry, merges)
 	return {

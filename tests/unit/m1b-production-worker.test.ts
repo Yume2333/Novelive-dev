@@ -158,7 +158,7 @@ test('staging and portrait painting dispatch to their configured role models', a
 	expect(painterOutput).toBe(1024)
 })
 
-test.each(['unknown', 'truncated'])(
+test.each(['unknown', 'truncated', 'lower allowance'])(
 	'explicit staging retry reuses accepted scene and repair inputs after a %s reply',
 	async (failure) => {
 		const { projectDir, workId } = await fixture(
@@ -182,6 +182,12 @@ test.each(['unknown', 'truncated'])(
 		const fetch: typeof globalThis.fetch = async (input, init) => {
 			const { messages } = await new Request(input, init).json()
 			prompts.push(JSON.stringify(messages))
+			if (failure === 'lower allowance' && prompts.length === 1)
+				return completion({
+					patch: 'PUT <4:\n@cg cg-window',
+					items: [{ id: 'cg-window', kind: 'cg', description: 'Window' }],
+					merges: {},
+				})
 			if (prompts.length === 2) return completion('{')
 			if (unavailable && prompts.length >= 3)
 				return failure === 'truncated'
@@ -202,6 +208,9 @@ test.each(['unknown', 'truncated'])(
 				...worker,
 				async write() {},
 				async review() {},
+				async draw() {
+					throw new Error('Unexpected drawing request')
+				},
 			})
 		}
 		const reservations = (project: Project) =>
@@ -237,12 +246,18 @@ test.each(['unknown', 'truncated'])(
 		}
 		unavailable = false
 		vi.stubEnv('NL_RUN_ID', 'after-reopen')
+		if (failure === 'lower allowance') vi.stubEnv('NL_RUN_IMAGE_CAP', '5')
 		using project = await Project.open(projectDir)
 		const queue = await scheduler(project)
 		try {
 			await queue.idle()
 			expect(prompts).toHaveLength(3)
 			expect(reservations(project)).toEqual(before)
+			if (failure === 'lower allowance') {
+				expect(chapterImageBudget(project.database, workId)).toBe(0)
+				expect(prompts[2]).toContain('Hard limit for this whole chapter: 45')
+				expect(prompts[2]).toContain('cg-window')
+			}
 			queue.retryChapter(workId, chapterId)
 			await queue.idle()
 			expect(prompts.slice(3)).toEqual([prompts[2]])

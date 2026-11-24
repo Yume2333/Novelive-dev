@@ -43,8 +43,8 @@ import { resolveBible } from './series/resolve'
 
 const draft = (id: string) => `source/production/${id}/draft.nvs`
 const drawing = (id: string) => `source/production/art/${id}.json`
-const stagingJournal = (root: string, workId: string, chapterId: string) =>
-	join(root, '.novelive', 'staging', workId, chapterId)
+const stagingJournal = (workId: string, chapterId: string) =>
+	join('.novelive', 'staging', workId, chapterId)
 
 export async function productionModels(
 	config: ReturnType<typeof createConfigStore>,
@@ -291,10 +291,13 @@ export function chapterWorker(
 				const journal = `source/production/${ctx.workId}/${ctx.chapterId}/writing-resume.json`
 				const clear = () => rm(join(project.root, journal), { force: true })
 				if (!ctx.resumingBudget) await clear()
-				await rm(stagingJournal(project.root, ctx.workId, ctx.chapterId), {
-					recursive: true,
-					force: true,
-				})
+				await rm(
+					join(project.root, stagingJournal(ctx.workId, ctx.chapterId)),
+					{
+						recursive: true,
+						force: true,
+					},
+				)
 				const progress: WritingProgress = ctx.resumingBudget
 					? ((await existing(async () =>
 							JSON.parse((await project.readFile(journal)).toString('utf8')),
@@ -357,12 +360,31 @@ export function chapterWorker(
 				const service = art(ctx.signal)
 				const script = (await project.readFile(draft(ctx.chapterId))).toString()
 				const registry = await service.registry()
-				const journal = stagingJournal(project.root, ctx.workId, ctx.chapterId)
-				const clearJournal = () => rm(journal, { recursive: true, force: true })
+				const journal = stagingJournal(ctx.workId, ctx.chapterId)
+				const directory = join(project.root, journal)
+				const clearJournal = () =>
+					rm(directory, { recursive: true, force: true })
 				const limit = chapterImageBudget(project.database, work.workId)
+				const allowance = join(journal, 'allowance.json')
+				const saved = await existing(async () => {
+					const value: unknown = JSON.parse(
+						(await project.readFile(allowance)).toString(),
+					)
+					if (
+						value === null ||
+						(typeof value === 'number' &&
+							Number.isSafeInteger(value) &&
+							value >= 0)
+					)
+						return value
+					throw new Error('Invalid staging checkpoint allowance')
+				})
+				const stagingLimit = saved === undefined ? (limit ?? null) : saved
+				if (saved === undefined)
+					await project.writeFile(allowance, JSON.stringify(stagingLimit))
 				const previousBases = new Map<string, string>()
 				const reusedImages = new Set<string>()
-				if (limit !== undefined) {
+				if (limit !== undefined || stagingLimit !== null) {
 					const previousDraw = project.database.prepare(
 						"SELECT error_type FROM run WHERE work_id = ? AND kind = 'image' AND ref = ? ORDER BY rowid DESC LIMIT 1",
 					)
@@ -386,21 +408,21 @@ export function chapterWorker(
 							previousBases.set(entry.id, prior.job.baseAssetId)
 					}
 				}
+				const budget = (limit: number) => ({
+					limit,
+					previousBases,
+					reusedImages,
+					paragraphIds: chapter.paragraphs.map(({ id }) => id),
+					speakers: options.script.speakers,
+				})
 				const staging = directChapterArt(script, bible, registry, {
 					main: models.artist,
-					replay: { ...replay, checkpointDirectory: journal },
+					replay: { ...replay, checkpointDirectory: directory },
 					customMarks: options.script.customMarks,
 					signal: ctx.signal,
-					imageBudget:
-						limit === undefined
-							? undefined
-							: {
-									limit,
-									previousBases,
-									reusedImages,
-									paragraphIds: chapter.paragraphs.map(({ id }) => id),
-									speakers: options.script.speakers,
-								},
+					imageBudget: limit === undefined ? undefined : budget(limit),
+					stagingImageBudget:
+						stagingLimit === null ? null : budget(stagingLimit),
 				})
 				const staged = await staging.catch(async (error: unknown) => {
 					if (
