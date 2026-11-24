@@ -420,6 +420,43 @@ test('Continue repairs a legacy placeholder and resumes the task that paused the
 	])
 })
 
+test('Continue redraws a variant that inherited its repaired base placeholder', async () => {
+	const worker = new ScriptedWorker({
+		ch1: [
+			{ assetId: 'yard/night', kind: 'variant', baseAssetId: 'yard/day' },
+			{ assetId: 'yard/day', kind: 'location' },
+		],
+	})
+	const target = open(worker, 4)
+	worker.script('draw:yard/day', {
+		status: 'placeholder',
+		issue: '[reasoning_limit] Historic failure',
+	})
+	target.start(workId, ['ch1'])
+	target.confirmVisual(workId)
+	await target.idle()
+	expect(snapshot().chapters[0]).toMatchObject({
+		status: 'published',
+		issue: '2 张图用了占位图',
+	})
+	expect(worker.count('placeholder:yard/night')).toBe(1)
+
+	const before = worker.calls.length
+	target.continue(workId)
+	await target.idle()
+
+	expect(worker.calls.slice(before)).toEqual([
+		'draw:yard/day',
+		'draw:yard/night',
+	])
+	expect(snapshot()).toMatchObject({ phase: 'confirm-first' })
+	expect(snapshot().chapters[0]).toEqual({
+		chapterId: 'ch1',
+		status: 'published',
+		priority: true,
+	})
+})
+
 test('a single-chapter work still stops at the first-chapter confirmation', async () => {
 	const target = open(new ScriptedWorker())
 	target.start(workId, ['ch1'])

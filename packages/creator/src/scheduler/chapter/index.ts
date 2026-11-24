@@ -36,6 +36,8 @@ export type DrawContext = {
 	replacePlaceholder?: boolean
 	signal: AbortSignal
 }
+const basePlaceholderIssue = '基准图没画成，差分改用占位图'
+
 export interface ProductionWorker {
 	write(context: StepContext): Promise<void>
 	review(context: StepContext): Promise<void>
@@ -856,7 +858,7 @@ export class ChapterScheduler {
 			'draw',
 			async (desensitized, signal) =>
 				basePlaceholder
-					? this.worker.placeholder(job, '基准图没画成，差分改用占位图', signal)
+					? this.worker.placeholder(job, basePlaceholderIssue, signal)
 					: (await this.worker.isDrawn(task.work_id, job))
 						? ({ status: 'drawn' } as const)
 						: this.worker.draw(job, {
@@ -1176,13 +1178,24 @@ export class ChapterScheduler {
 
 	private requeueReasoningPlaceholders(workId: string) {
 		const images = this.all<{ task_id: string; ref_id: string }>(
-			`SELECT i.task_id, i.ref_id FROM task i JOIN run r ON r.run_id = i.run_id
-			WHERE i.work_id = ? AND i.kind = 'image' AND i.status = 'done'
-				AND i.error_type = 'placeholder' AND r.error_type = 'placeholder'
-				AND r.error_message LIKE '[reasoning_limit] %'
-				AND EXISTS (SELECT 1 FROM task_dep d JOIN task c ON c.task_id = d.task_id
-					WHERE d.depends_on = i.task_id AND d.soft = 0 AND c.kind = 'chapter')`,
+			`WITH RECURSIVE placeholders AS (
+				SELECT i.task_id, i.ref_id, a.base_key, r.error_message
+				FROM task i JOIN run r ON r.run_id = i.run_id
+				JOIN asset a ON a.work_id = i.work_id AND a.asset_key = i.ref_id
+				WHERE i.work_id = ? AND i.kind = 'image' AND i.status = 'done'
+					AND i.error_type = 'placeholder' AND r.error_type = 'placeholder' AND a.status = 'placeholder'
+			), repair(task_id, ref_id) AS (
+				SELECT i.task_id, i.ref_id FROM placeholders i
+				WHERE i.error_message LIKE '[reasoning_limit] %'
+					AND EXISTS (SELECT 1 FROM task_dep d JOIN task c ON c.task_id = d.task_id
+						WHERE d.depends_on = i.task_id AND d.soft = 0 AND c.kind = 'chapter')
+				UNION
+				SELECT i.task_id, i.ref_id FROM placeholders i JOIN repair b ON i.base_key = b.ref_id
+				WHERE i.error_message = ?
+			)
+			SELECT task_id, ref_id FROM repair`,
 			workId,
+			basePlaceholderIssue,
 		)
 		if (images.length === 0) return false
 		for (const { task_id, ref_id } of images) {
