@@ -11,13 +11,13 @@ As of the [November 24 shared snapshot](../m1b/owner/live-run-af551d2.md#对账�
 | Joint style usage, no model split | 33,412 / 0 | — | — | — | — |
 | **Reconciled from window and run evidence** | **4,766,011 / 19** | **61,906 / 76,569 (30)** | **4; 175,948 / 1** | **4; 506,046 / 0** | **5; 1,415,926 / 0** |
 
-| Basis | Settled tokens / images | Retained tokens / images (all outcomes) | Headroom after reserves, out of 20M tokens / 500 images |
+| Basis | Settled tokens / images | Retained tokens / images (all outcomes) | Historical headroom at the then-reported 20M tokens / 500 images |
 | --- | ---: | ---: | ---: |
 | Reconciled from window and run evidence | 4,766,011 / 19 | 2,097,920 / 1 | 13,136,069 / 480 |
 | Reported but not linked to a run or model | +140,455 / +12 | +195,450 / +1 | — |
 | **Latest reported shared balance** | **4,906,466 / 31** | **2,293,370 / 2** | **12,800,164 / 467** |
 
-Use the reported balance, including the unattributed amounts, for shared-budget planning. Neither headroom figure authorizes more spend. Following the [project cap](../../delivery-plan.md#测试模型与额度), provider-reported image-model tokens count toward the token cap as well as generated images counting toward the separate image cap.
+For shared-budget planning, use the current ledger balance, including the unattributed amounts, against the corrected [project cap](../../delivery-plan.md#测试模型与额度) of 2B tokens and 500 images. The historical headroom above does not authorize more spend. Provider-reported image-model tokens count toward the token cap as well as generated images counting toward the separate image cap.
 
 ### Discrepancies and deduplication
 
