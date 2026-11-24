@@ -378,6 +378,10 @@ test('continuing an existing CSV conservatively counts legacy reservations witho
 		expect(chapterImageBudget(database, 'w')).toBe(5)
 		await writeFile(csv, '2026-01-01,image,1,7000,1,reservation\n')
 		expect(chapterImageBudget(database, 'w')).toBe(5)
+		vi.stubEnv('NL_USAGE_CSV', '')
+		expect(chapterImageBudget(database, 'w')).toBe(5)
+		vi.stubEnv('NL_RUN_ID', 'explicit-without-csv')
+		expect(chapterImageBudget(database, 'w')).toBe(0)
 	} finally {
 		await rm(dir, { recursive: true, force: true })
 	}

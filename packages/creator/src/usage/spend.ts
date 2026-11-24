@@ -314,7 +314,6 @@ function includeLegacyReservations(
 	const csv = process.env.NL_USAGE_CSV
 	if (
 		!runId ||
-		!csv ||
 		!database
 			.prepare('SELECT 1 FROM spend_reservation WHERE run_id IS NULL LIMIT 1')
 			.get()
@@ -328,23 +327,26 @@ function includeLegacyReservations(
 	)
 	const previous = selection.get(runId)
 	if (previous) return previous.include_legacy === 1
-	let usage: string
-	try {
-		usage = readFileSync(csv, 'utf8').trim()
-	} catch (error) {
-		if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
-			throw error
-		usage = ''
-	}
-	// Legacy CSV quotes have no reservation ID; don't assign ownership by matching amounts.
-	const includeLegacy = usage.split(/\r?\n/).some((line) => {
-		const [tokens, images] = line.split(',').slice(3, 5)
-		return Number(tokens) > 0 || Number(images) > 0
-	})
+	const includeLegacy = !csv || hasBillableUsage(csv)
 	database
 		.prepare('INSERT INTO spend_window VALUES (?, ?) ON CONFLICT DO NOTHING')
 		.run(runId, Number(includeLegacy))
 	return selection.get(runId)?.include_legacy === 1
+}
+
+function hasBillableUsage(csv: string) {
+	try {
+		return readFileSync(csv, 'utf8')
+			.split(/\r?\n/)
+			.some((line) => {
+				const [tokens, images] = line.split(',').slice(3, 5)
+				return Number(tokens) > 0 || Number(images) > 0
+			})
+	} catch (error) {
+		if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+			return false
+		throw error
+	}
 }
 
 function spendRunId() {
