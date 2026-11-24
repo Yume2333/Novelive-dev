@@ -1,5 +1,5 @@
 import type { ProductionSnapshot } from '@novelive/creator/contract'
-import { Check } from 'lucide-react'
+import { Check, CircleCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { InfoTooltip } from '../../components/InfoTooltip'
@@ -85,6 +85,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 	const [characterIds, setCharacterIds] = useState<Record<string, string>>({})
 	const [supplemental, setSupplemental] = useState(() => defaults.slice(1, 3))
 	const [showAll, setShowAll] = useState(false)
+	const [selectedKey, setSelectedKey] = useState('')
 	const visibleImported = importedCandidates.filter(
 		({ id }) =>
 			showAll ||
@@ -122,6 +123,17 @@ function VisualChoices({ visual }: { visual: Visual }) {
 		},
 	)
 	const workId = snapshot.workId
+	const keyOf = ({
+		characterId,
+		costumeId,
+	}: {
+		characterId: string
+		costumeId: string
+	}) => `${characterId}/${costumeId}`
+	const active =
+		visual.characters.find((character) => keyOf(character) === selectedKey) ??
+		visual.characters[0]
+	const activeKey = active ? keyOf(active) : ''
 
 	const missing = (main ? 0 : 1) + visual.characters.length - characters.length
 	const ready = !busy && missing === 0
@@ -237,61 +249,79 @@ function VisualChoices({ visual }: { visual: Visual }) {
 						))}
 					</div>
 				</fieldset>
-				{visual.characters.length > 0 && (
+				{active && (
 					<section
 						aria-labelledby="major-characters"
-						className={local.character}
+						className={local.characters}
 					>
 						<h2 id="major-characters" className={styles.sectionLabel}>
 							{t('第一卷主要角色')}
 						</h2>
-						{visual.characters.map(
-							({
-								characterId,
-								costumeId,
-								characterName,
-								costumeName,
-								candidates,
-							}) => {
-								const key = `${characterId}/${costumeId}`
-								return (
-									<fieldset
-										key={key}
-										className={`${styles.panel} ${styles.panelBody} ${local.section} ${local.portraits}`}
-										disabled={busy}
-									>
-										<legend className={local.character}>
-											<h3>
-												{characterName ?? characterId} ·{' '}
-												{costumeName ?? costumeId}
-											</h3>
-										</legend>
-										<div className={local.grid}>
-											{candidates.map((candidate, index) => (
-												<CandidateCard
-													key={candidate.id}
-													candidate={candidate}
-													index={index}
-													name={key}
-													label={
-														candidate.id === 'costume-epub'
-															? t('EPUB 参考方案')
-															: undefined
-													}
-													checked={characterIds[key] === candidate.id}
-													onChange={() =>
-														setCharacterIds((choices) => ({
-															...choices,
-															[key]: candidate.id,
-														}))
-													}
-												/>
-											))}
-										</div>
-									</fieldset>
-								)
-							},
-						)}
+						<div className={local.characterLayout}>
+							<div className={local.characterList}>
+								{visual.characters.map(
+									({ characterId, costumeId, characterName, costumeName }) => {
+										const key = `${characterId}/${costumeId}`
+										const done = characters.some(
+											(choice) =>
+												`${choice.characterId}/${choice.costumeId}` === key,
+										)
+										return (
+											<button
+												key={key}
+												type="button"
+												className={local.characterTab}
+												aria-pressed={key === activeKey}
+												onClick={() => setSelectedKey(key)}
+											>
+												<span>
+													<strong>{characterName ?? characterId}</strong>
+													<small>
+														{costumeName ?? costumeId} ·{' '}
+														{done ? t('已选定') : t('未选定')}
+													</small>
+												</span>
+												{done && <CircleCheck aria-hidden="true" size={16} />}
+											</button>
+										)
+									},
+								)}
+							</div>
+							<fieldset
+								key={activeKey}
+								className={`${styles.panel} ${styles.panelBody} ${local.section} ${local.portraits}`}
+								disabled={busy}
+							>
+								<legend className={local.character}>
+									<h3>
+										{active.characterName ?? active.characterId} ·{' '}
+										{active.costumeName ?? active.costumeId}
+									</h3>
+								</legend>
+								<div className={local.grid}>
+									{active.candidates.map((candidate, index) => (
+										<CandidateCard
+											key={candidate.id}
+											candidate={candidate}
+											index={index}
+											name={activeKey}
+											label={
+												candidate.id === 'costume-epub'
+													? t('EPUB 参考方案')
+													: undefined
+											}
+											checked={characterIds[activeKey] === candidate.id}
+											onChange={() =>
+												setCharacterIds((choices) => ({
+													...choices,
+													[activeKey]: candidate.id,
+												}))
+											}
+										/>
+									))}
+								</div>
+							</fieldset>
+						</div>
 					</section>
 				)}
 				{supplementalVisuals.length > 0 && (

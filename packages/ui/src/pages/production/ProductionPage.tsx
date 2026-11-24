@@ -9,7 +9,7 @@ import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import { chapterTitle, useWorkProduction } from '../work/WorkProduction'
 import { ChapterRecords } from './ChapterRecords'
-import { ChapterState, stepName, stepProgress } from './ChapterState'
+import { ChapterState, stepName, stepProgress, steps } from './ChapterState'
 import styles from './Production.module.css'
 import { ProductionNotice } from './ProductionNotice'
 
@@ -43,6 +43,15 @@ function ChapterRow({
 			<div className={styles.chapterRow}>
 				<span className={styles.index}>{chapterIndex(index)}</span>
 				<span className={styles.name}>{title}</span>
+				{chapter.status === 'producing' && (
+					<span className={styles.steps}>
+						{steps.map((step) => (
+							<span key={step} data-current={step === chapter.step}>
+								{t(stepName[step])}
+							</span>
+						))}
+					</span>
+				)}
 				{priority && status === 'waiting' && (
 					<Chip>
 						<ChevronsUp aria-hidden="true" size={12} />
@@ -142,8 +151,7 @@ export function ProductionPage() {
 
 	return (
 		<Page
-			eyebrow={snapshot.title}
-			title={t('制作')}
+			title={snapshot.title ? `${snapshot.title} · ${t('制作')}` : t('制作')}
 			actions={
 				<div className={styles.actions}>
 					{running && (

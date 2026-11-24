@@ -118,7 +118,9 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 		await expect(page.getByText(projects, { exact: true })).toBeVisible()
 		await page.getByRole('button', { name: '下一步', exact: true }).click()
 
-		await expect(page.locator('[aria-current="step"]', { hasText: '核对信息' })).toBeVisible()
+		await expect(
+			page.locator('[aria-current="step"]', { hasText: '核对信息' }),
+		).toBeVisible()
 		const root = join(projects, '风')
 		expect(await readFile(join(root, 'source/original.txt'))).toEqual(
 			await readFile(source),
@@ -162,7 +164,7 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 			.getByRole('checkbox', { name: /参考图时也停在角色设定/ })
 			.uncheck()
 		await page.getByRole('button', { name: '开始制作' }).click()
-		await expect(page.locator('[aria-current="step"]', { hasText: '核对信息' })).toBeHidden()
+		await expect(page).toHaveURL(/#\/work\//)
 
 		const { series, result } = await chapters(root)
 		expect(series.volumeIds).toEqual(['v0001', 'v0002', 'v0003'])
@@ -218,11 +220,13 @@ test('M1b TXT wizard asks for an ambiguous encoding and can skip review', async 
 		expect(await readdir(workspace)).not.toContain('中')
 		await encodings.getByRole('radio', { name: /Big5/ }).check()
 		await page.getByRole('button', { name: '下一步', exact: true }).click()
-		await expect(page.locator('[aria-current="step"]', { hasText: '核对信息' })).toBeVisible()
+		await expect(
+			page.locator('[aria-current="step"]', { hasText: '核对信息' }),
+		).toBeVisible()
 		await expect(page.getByText('Big5（繁体）')).toBeVisible()
 		await page.getByRole('button', { name: '跳过核对' }).click()
 		await page.getByRole('button', { name: '开始制作' }).click()
-		await expect(page.locator('[aria-current="step"]', { hasText: '核对信息' })).toBeHidden()
+		await expect(page).toHaveURL(/#\/work\//)
 		const root = join(workspace, '中')
 		const { result } = await chapters(root)
 		expect(result).toEqual([['第一卷', '正文', '中\n']])

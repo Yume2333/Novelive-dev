@@ -287,6 +287,7 @@ test.describe('M4 longform and queue', () => {
 			await importBook(app, page, join(root, '纸船.txt'), projects)
 			await page.getByRole('button', { name: '跳过核对' }).click()
 			await page.getByRole('button', { name: '开始制作' }).click()
+			await expect(page).toHaveURL(/#\/work\//)
 			const project = join(projects, '纸船')
 			const {
 				workIds: [workId],
@@ -548,6 +549,7 @@ test.describe('M4 longform and queue', () => {
 			await importBook(app, page, join(root, '纸船.txt'), projects)
 			await page.getByRole('button', { name: '跳过核对' }).click()
 			await page.getByRole('button', { name: '开始制作' }).click()
+			await expect(page).toHaveURL(/#\/work\//)
 			const a = (await json(join(projectA, 'volumes/v0001/volume.json')))
 				.workIds[0] as string
 			const snapshot = (workId: string) =>
@@ -622,6 +624,7 @@ test.describe('M4 longform and queue', () => {
 			await importBook(app, page, join(root, '山路.txt'), projects)
 			await page.getByRole('button', { name: '跳过核对' }).click()
 			await page.getByRole('button', { name: '开始制作' }).click()
+			await expect(page).toHaveURL(/#\/work\//)
 			const projectB = join(projects, '山路')
 			const b = (await json(join(projectB, 'volumes/v0001/volume.json')))
 				.workIds[0] as string

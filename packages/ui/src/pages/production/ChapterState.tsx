@@ -12,7 +12,7 @@ export const stepName = {
 	stage: msg('演出'),
 	draw: msg('出图'),
 }
-const steps = Object.keys(stepName) as (keyof typeof stepName)[]
+export const steps = Object.keys(stepName) as (keyof typeof stepName)[]
 
 export function stepProgress(chapter: Chapter) {
 	if (chapter.status === 'published') return 1
