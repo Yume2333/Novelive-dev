@@ -918,7 +918,8 @@ test('M3 stage directions render the direction set and four landscape fill crops
 						left: Math.floor(width / 2),
 						top: 8,
 						width: Math.floor(width / 2) - 8,
-						height: height - 16,
+						// Sample the upper half so the quick menu strip stays out of it.
+						height: Math.floor(height / 2),
 					})
 					.removeAlpha()
 					.raw()

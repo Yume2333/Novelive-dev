@@ -11,11 +11,38 @@
 	flex-direction: column;
 	width: min(420px, calc(100% - var(--space-6)));
 	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-xl);
-	background: var(--panel-75);
+	overflow: hidden;
+	border-radius: var(--radius-2xl);
+	background: var(--veil-95);
 	box-shadow: var(--shadow-pop);
-	backdrop-filter: blur(24px) saturate(1.2);
+	backdrop-filter: blur(16px);
 	transition: width var(--dur-slow) var(--ease-out);
+	animation: drawerIn var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes drawerIn {
+	from {
+		opacity: 0;
+		transform: translateX(16px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.badge {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-full);
+	color: var(--color-primary);
+	background: var(--panel-70);
+	box-shadow: var(--shadow-glass);
 }
 
 .panel[data-full="true"] {
@@ -26,8 +53,8 @@
 	position: relative;
 	display: flex;
 	align-items: center;
-	gap: var(--space-1);
-	padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
+	gap: var(--space-2);
+	padding: var(--space-4) var(--space-4) var(--space-3);
 	border-bottom: 1px solid var(--divider);
 }
 
@@ -144,13 +171,14 @@
 .thread {
 	flex: 1;
 	min-height: 0;
+	mask-image: linear-gradient(180deg, transparent, black 20px);
 }
 
 .messages {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-4);
-	padding: var(--space-4);
+	padding: var(--space-5) var(--space-4) var(--space-3);
 }
 
 .empty {
@@ -180,11 +208,15 @@
 }
 
 .message[data-role="user"] .bubble {
-	max-width: 85%;
-	padding: var(--space-2) var(--space-3);
-	border-radius: var(--radius-lg);
-	background: var(--color-secondary-container);
-	color: var(--color-on-secondary-container);
+	max-width: 88%;
+	padding: 9px 13px;
+	border: 1px solid var(--color-primary-container);
+	border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm)
+		var(--radius-lg);
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+	font-size: 13px;
+	line-height: 1.65;
 }
 
 .messageTools {
@@ -568,7 +600,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2);
-	padding: var(--space-3);
+	padding: var(--space-2) var(--space-3) var(--space-3);
 	border-top: 1px solid var(--divider);
 }
 
@@ -667,9 +699,10 @@
 	flex-shrink: 0;
 	align-items: center;
 	justify-content: center;
-	padding: 0;
+	width: auto;
+	padding: 0 12px;
 	border: 0;
-	border-radius: var(--radius-full);
+	border-radius: var(--radius-md);
 	color: var(--color-on-primary);
 	background: var(--color-primary);
 	cursor: pointer;

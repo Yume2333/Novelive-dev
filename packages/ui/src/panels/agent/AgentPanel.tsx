@@ -6,6 +6,7 @@ import {
 	Minimize2,
 	Pencil,
 	Plus,
+	Sparkles,
 	Trash2,
 	X,
 } from 'lucide-react'
@@ -248,6 +249,9 @@ export function AgentPanel({
 			}}
 		>
 			<header className={styles.header}>
+				<span className={styles.badge} aria-hidden="true">
+					<Sparkles size={17} strokeWidth={1.8} />
+				</span>
 				<button
 					type="button"
 					className={styles.sessionButton}
