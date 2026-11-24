@@ -1,0 +1,43 @@
+.card {
+	overflow: hidden;
+	border-radius: var(--radius-2xl);
+}
+
+.track {
+	width: 100%;
+	overflow: hidden;
+	border-radius: var(--radius-full);
+	background: var(--color-surface-container-high);
+	box-shadow: var(--shadow-inset);
+}
+
+.fill {
+	height: 100%;
+	border-radius: var(--radius-full);
+	background: var(--color-primary);
+	transition: width var(--dur-slow) var(--ease-out);
+}
+
+.chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 3px 8px;
+	border-radius: var(--radius-sm);
+	background: var(--color-tertiary-fixed);
+	color: var(--color-on-secondary-container);
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	line-height: 1.35;
+	white-space: nowrap;
+}
+
+.chipActive {
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+}
+
+.section {
+	margin-bottom: var(--space-2);
+	color: var(--color-on-surface-variant);
+}

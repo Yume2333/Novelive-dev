@@ -89,9 +89,9 @@ export function GlobalProductionQueue() {
 			setBusy(false)
 		}
 	}
-	const status =
+	const tone =
 		queue?.active || queue?.queued.length
-			? t('制作中')
+			? 'producing'
 			: queue?.inactive.some(
 						(work) =>
 							work.status === 'awaiting_confirm' ||
@@ -99,15 +99,32 @@ export function GlobalProductionQueue() {
 								work.reason !== 'stopped' &&
 								work.reason !== 'crashed'),
 					)
-				? t('待确认')
+				? 'confirm'
 				: queue?.inactive.some((work) => work.status === 'paused')
-					? t('已停止')
-					: t('空闲')
+					? 'stopped'
+					: 'idle'
+	const status = {
+		producing: t('制作中'),
+		confirm: t('待确认'),
+		stopped: t('已停止'),
+		idle: t('空闲'),
+	}[tone]
+	const waiting =
+		queue?.inactive.filter((work) => work.status === 'awaiting_confirm')
+			.length ?? 0
+	const detail = queue?.active
+		? queue.active.title
+		: tone === 'confirm'
+			? t('{{count}} 部作品等你确认', { count: waiting })
+			: queue?.queued.length
+				? t('{{count}} 部作品在排队', { count: queue.queued.length })
+				: t('没有排队的作品')
 	return (
 		<>
 			<button
 				type="button"
-				className={styles.status}
+				className={`glass-panel ${styles.status}`}
+				data-tone={tone}
 				aria-label={t('全局制作状态：{{status}}', { status })}
 				aria-expanded={open}
 				onClick={() => {
@@ -116,8 +133,21 @@ export function GlobalProductionQueue() {
 					setOpen(true)
 				}}
 			>
-				<Workflow aria-hidden="true" size={19} strokeWidth={1.8} />
-				{status}
+				<Workflow
+					aria-hidden="true"
+					size={18}
+					strokeWidth={1.8}
+					className={styles.statusIcon}
+				/>
+				<span className={styles.statusText}>
+					<span className={styles.statusLabel}>{status}</span>
+					<span className={styles.statusDetail}>{detail}</span>
+				</span>
+				{tone !== 'confirm' && waiting > 0 && (
+					<span className={styles.badge} title={t('待确认')}>
+						{waiting}
+					</span>
+				)}
 			</button>
 			<dialog
 				ref={dialog}

@@ -1,13 +1,43 @@
 .page {
-	width: min(100%, 1120px);
+	width: 100%;
 	margin: 0 auto;
-	padding: var(--space-7);
+	padding: var(--space-7) var(--space-7) var(--space-8);
 }
 
 .header {
 	display: flex;
-	align-items: center;
+	flex-wrap: wrap;
+	align-items: flex-end;
 	justify-content: space-between;
+	gap: var(--space-5);
+	margin-bottom: var(--space-7);
+}
+
+.heading {
+	flex: 1 1 320px;
+	min-width: 0;
+}
+
+.eyebrow {
+	margin-bottom: 10px;
+	color: var(--color-outline);
+}
+
+.title {
+	font-size: 32px;
+}
+
+.subtitle {
+	margin-top: var(--space-3);
+	color: var(--color-on-surface-variant);
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
 	gap: var(--space-3);
 }
 
@@ -34,49 +64,47 @@
 	box-shadow: var(--shadow-focus);
 }
 
-.page h1 {
-	margin: 0;
-	font-family: var(--font-display);
-	font-size: 28px;
+.empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	padding: var(--space-8) var(--space-5);
+	color: var(--color-on-surface-variant);
+	text-align: center;
 }
 
-.empty {
-	display: grid;
-	justify-items: center;
-	gap: var(--space-3);
-	padding: var(--space-8) var(--space-4);
-	color: var(--color-on-surface-variant);
+.empty h2 {
+	color: var(--color-on-surface);
+	font-size: 20px;
 }
 
 .empty p {
+	max-width: 420px;
 	margin: 0;
+	line-height: 1.6;
 }
 
 .emptyCard {
-	margin-top: var(--space-7);
 	border: 1px solid var(--glass-border);
 	border-radius: var(--radius-2xl);
 	background: var(--panel-70);
 	box-shadow: var(--shadow-glass);
 }
 
-.emptyCard h2 {
-	margin: 0;
-	color: var(--color-on-surface);
-	font: 700 20px var(--font-display);
+.emptyActions {
+	display: flex;
+	gap: var(--space-3);
+	margin-top: 20px;
 }
 
 .icon {
-	display: grid;
-	place-items: center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	width: var(--space-8);
 	height: var(--space-8);
-	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-xl);
-	background: var(--panel-70);
-	box-shadow: var(--shadow-glass);
-}
-
-.emptyCard .icon {
+	margin-bottom: var(--space-3);
 	border-radius: var(--radius-full);
 }

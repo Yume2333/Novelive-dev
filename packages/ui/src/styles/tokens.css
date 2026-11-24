@@ -238,3 +238,32 @@
 		"Hanken Grotesk", "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo",
 		"Noto Sans CJK JP", "Source Han Sans JP", sans-serif;
 }
+
+/* Printed cover ink: artwork colors that intentionally ignore the UI theme. */
+:root {
+	--cover-0: linear-gradient(160deg, #5b7a99 0%, #8fa9c2 55%, #c9d6e2 100%);
+	--cover-1: linear-gradient(160deg, #8a6a3f 0%, #c7a46c 55%, #e8d5b0 100%);
+	--cover-2: linear-gradient(160deg, #3f6b5e 0%, #6f9c8c 55%, #c3d9cf 100%);
+	--cover-3: linear-gradient(160deg, #c97b5a 0%, #e6a77f 50%, #f5dcc4 100%);
+	--cover-4: linear-gradient(160deg, #2f3550 0%, #59608a 55%, #a9acc9 100%);
+	--cover-5: linear-gradient(160deg, #6d6a73 0%, #a8a3ad 55%, #e4e1e6 100%);
+	--cover-spine-shade: linear-gradient(
+		90deg,
+		rgba(0, 0, 0, 0.28),
+		rgba(0, 0, 0, 0.05) 70%,
+		transparent
+	);
+	--cover-spine-line: rgba(255, 255, 255, 0.28);
+	--cover-gloss:
+		radial-gradient(
+			ellipse at 30% 15%,
+			rgba(255, 255, 255, 0.28),
+			transparent 55%
+		),
+		linear-gradient(200deg, rgba(255, 255, 255, 0.1), transparent 40%),
+		radial-gradient(ellipse at 80% 95%, rgba(0, 0, 0, 0.18), transparent 55%);
+	--cover-frame: rgba(255, 255, 255, 0.35);
+	--cover-motif: rgba(255, 255, 255, 0.8);
+	--cover-title: rgba(255, 255, 255, 0.92);
+	--cover-title-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
