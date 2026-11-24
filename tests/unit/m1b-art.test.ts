@@ -1806,6 +1806,112 @@ test('trims only after the bounded staging repair is still over budget', async (
 	expect(staged.items.map(({ id }) => id)).toEqual(['room/day'])
 })
 
+test.each([6, 5, 4, 3])(
+	'folds costumes before scene-local backgrounds at budget %i',
+	(limit) => {
+		const source = `scene First
+source p0001
+
+@bg room/day
+@bg garden/day
+@bg hall/day
+@bg hall/day
+@show ada/wedding/neutral center
+@costume ada/uniform
+@face ada/uniform/neutral
+@costume ada/wedding
+@show ben/coats/neutral left
+@cg cg-window
+ada: One. #0010
+
+scene Second
+source p0002
+
+@bg room/day
+ada: Two. #0020
+
+scene Third
+source p0003
+
+@bg hall/day
+ada: Three. #0030
+`
+		const items: ManifestItem[] = [
+			{ id: 'room/day', kind: 'location', description: 'Room' },
+			{ id: 'garden/day', kind: 'location', description: 'Garden' },
+			{ id: 'hall/day', kind: 'location', description: 'Hall' },
+			{ id: 'ada/wedding/neutral', kind: 'character', description: 'Wedding' },
+			{ id: 'ada/uniform/neutral', kind: 'character', description: 'Uniform' },
+			{ id: 'ben/coats/neutral', kind: 'character', description: 'Coat' },
+			{ id: 'cg-window', kind: 'cg', description: 'Window' },
+		]
+		const failure = vi.fn()
+		const fit = trimStagingToBudget(
+			{ script: source, items, merges: {} },
+			bible,
+			empty,
+			{ limit, previousBases: new Map(), reusedImages: new Set() },
+			(script, { entries }) => {
+				const compiled = compileScript(script, {
+					assets: entries,
+					paragraphIds: ['p0001', 'p0002', 'p0003'],
+					speakers: ['ada'],
+				})
+				return compiled.ok ? compiled.scenes : undefined
+			},
+			failure,
+		)
+		if (limit === 3) {
+			expect(fit).toBeUndefined()
+			expect(failure).toHaveBeenCalledWith(
+				['room/day', 'hall/day', 'ada/uniform/neutral', 'ben/coats/neutral'],
+				4,
+			)
+			return
+		}
+		expect(fit?.trimmed).toEqual([
+			{ id: 'cg-window' },
+			...(limit < 6
+				? [{ id: 'ada/wedding/neutral', replacement: 'ada/uniform/neutral' }]
+				: []),
+			...(limit < 5 ? [{ id: 'garden/day', replacement: 'hall/day' }] : []),
+		])
+		expect(fit?.script).toContain('scene Second\nsource p0002\n\n@bg room/day')
+		expect(fit?.script).toContain('@show ben/coats/neutral left')
+		if (limit < 6) {
+			expect(fit?.script).toContain('@show ada/uniform/neutral center')
+			expect(fit?.script).not.toContain('@costume ada/wedding')
+		}
+	},
+)
+
+test('reports the remaining image count and protected minimum after an unsuccessful trim', async () => {
+	const response = JSON.stringify({
+		patch: 'PUT <4:\n@bg room/day\n@cg cg-window',
+		items: [
+			{ id: 'room/day', kind: 'location', description: 'Room' },
+			{ id: 'cg-window', kind: 'cg', description: 'Window' },
+		],
+		merges: {},
+	})
+	const fetch = artReplies(response, response)
+	await expect(
+		directChapterArt(script, bible, empty, {
+			main,
+			replay: { ...replay, mode: 'replay', fetch },
+			imageBudget: {
+				limit: 0,
+				paragraphIds: ['p0001'],
+				speakers: ['ada'],
+				previousBases: new Map(),
+				reusedImages: new Set(),
+			},
+		}),
+	).rejects.toThrow(
+		'Chapter needs 1 new provider images after trimming; budget is 0. Protected minimum: 1.',
+	)
+})
+
 test('trim remaps stage assets after leading named options without changing the options', async () => {
 	const response = JSON.stringify({
 		patch: [

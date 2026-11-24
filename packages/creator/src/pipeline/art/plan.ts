@@ -22,9 +22,13 @@ type PlanBudget = {
 }
 
 export class ChapterImageBudgetError extends Error {
-	constructor(ids: readonly string[], limit: number) {
+	constructor(
+		ids: readonly string[],
+		limit: number,
+		protectedMinimum?: number,
+	) {
 		super(
-			`Chapter needs ${ids.length} new provider images; budget is ${limit}. Over-budget assets: ${ids.slice(limit).join(', ')}`,
+			`Chapter needs ${ids.length} new provider images${protectedMinimum === undefined ? '' : ' after trimming'}; budget is ${limit}.${protectedMinimum === undefined ? '' : ` Protected minimum: ${protectedMinimum}.`} Over-budget assets: ${ids.slice(limit).join(', ')}`,
 		)
 	}
 }
