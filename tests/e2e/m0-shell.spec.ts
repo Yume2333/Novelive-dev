@@ -43,7 +43,9 @@ test('M0 desktop shell renders the empty library and connects to a real creator'
 		await expect(
 			page.getByRole('heading', { name: '书库还是空的' }),
 		).toBeVisible()
-		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 
 		const result = await page.evaluate(async () => {
 			const state = await window.novelive.host.appState()
@@ -73,7 +75,9 @@ test('M0 desktop shell does not register debug commands without NL_E2E', async (
 	const run = await launch(false)
 	try {
 		const page = await run.desktop.firstWindow()
-		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 		for (const command of ['debug.sqliteSmoke', 'debug.sharpSmoke'] as const) {
 			const result = await page.evaluate(
 				(name) =>

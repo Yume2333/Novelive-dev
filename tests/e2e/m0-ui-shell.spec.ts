@@ -29,7 +29,9 @@ test('M0 library and usage navigate between real empty pages and switch theme wi
 				'aria-current',
 				'page',
 			)
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await expect(page.getByRole('button', { name: '新建' })).toHaveCount(0)
 			await expect(
 				page.getByRole('button', { name: '导入作品包' }),
