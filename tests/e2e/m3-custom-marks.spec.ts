@@ -122,7 +122,9 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 		})
 		try {
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await page.evaluate(({ workId, chapterId }) => {
 				window.location.hash = `/work/${workId}/edit?chapterId=${chapterId}`
 			}, playerRef)

@@ -105,7 +105,9 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 	})
 	try {
 		const page = await app.firstWindow()
-		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 		await page.evaluate(
 			(Array.isArray(bundle) ? bundle[0] : bundle).output[0].code,
 		)
@@ -886,7 +888,9 @@ test('M3 stage directions render the direction set and four landscape fill crops
 			page.on('console', (message) => {
 				if (message.type() === 'error') console.error(message.text())
 			})
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await app.evaluate(({ dialog }, path) => {
 				dialog.showOpenDialog = async () => ({
 					canceled: false,

@@ -127,7 +127,9 @@ async function launch(
 		},
 	})
 	const page = await app.firstWindow()
-	await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+	await expect(
+		page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+	).toHaveText('创作端已就绪')
 	return { app, page }
 }
 
@@ -277,7 +279,9 @@ test.describe('M4 longform and queue', () => {
 							.generation,
 				)
 				.toBeGreaterThan(before.generation)
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await call(page, 'config.update', configuration)
 			await importBook(app, page, join(root, '纸船.txt'), projects)
 			await page.getByRole('button', { name: '跳过核对' }).click()
@@ -905,7 +909,9 @@ test.describe('M4 longform and queue', () => {
 		})
 		try {
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			const before = await page.evaluate(() => window.novelive.host.appState())
 			await app.evaluate(({ app, BrowserWindow, Tray }) => {
 				const state = app as typeof app & {

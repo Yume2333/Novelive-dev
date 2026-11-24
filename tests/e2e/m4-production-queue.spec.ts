@@ -52,7 +52,9 @@ test('M4 global production drawer shows paused rows, refetches and reorders a se
 			BrowserWindow.getAllWindows()[0].setContentSize(1280, 900),
 		)
 		const page = await app.firstWindow()
-		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 		await page.evaluate(
 			(patch) => window.novelive.call('config.update', patch).promise,
 			{

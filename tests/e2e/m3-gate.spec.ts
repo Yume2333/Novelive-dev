@@ -122,7 +122,9 @@ listener (inner): 演出已经清除。 #0002
 			})
 			try {
 				const page = await app.firstWindow()
-				await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+				await expect(
+					page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+				).toHaveText('创作端已就绪')
 				if (packaged)
 					console.log(
 						`AppImage creator ready: ${Math.round(performance.now() - start)} ms`,

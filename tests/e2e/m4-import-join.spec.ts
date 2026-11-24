@@ -44,7 +44,9 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 			[first, projects, second, root, projectDir],
 		)
 		const page = await app.firstWindow()
-		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 		await page.getByRole('link', { name: '导入原文' }).click()
 		await page.getByRole('button', { name: '选择原文', exact: true }).click()
 		await page.getByRole('button', { name: '选择文件夹' }).click()
