@@ -140,6 +140,7 @@ export function UsagePage() {
 		)
 	})
 	const sum = totals(shown)
+	const shownSet = new Set(shown)
 	const byPeriod = new Map<string, UsageRecord[]>()
 	for (const record of shown) {
 		const period = periodOf(record.at)
@@ -317,53 +318,54 @@ export function UsagePage() {
 								</Card>
 								<Card className={styles.panel}>
 									<SectionLabel>{t('按作品 × 阶段')}</SectionLabel>
-									<div className={styles.tableScroll}>
-										<table className={styles.table}>
-											<thead>
-												<tr>
-													<th>{t('作品')}</th>
-													{phases.map((p) => (
-														<th key={p}>{p}</th>
-													))}
-												</tr>
-											</thead>
-											<tbody>
-												{works.map((work) => (
-													<tr key={work} className="hover-row">
-														<td>{titleOf(work)}</td>
-														{phases.map((p) => {
-															const cell = totals(
-																shown.filter(
-																	(r) =>
-																		r.link.workId === work && r.phase === p,
-																),
-															)
-															return (
-																<td key={p}>
-																	{cell.calls ? (
-																		t('{{calls}} 次', { calls: cell.calls }) +
-																		(cell.images
-																			? t(' · {{images}} 张', {
-																					images: cell.images,
-																				})
-																			: '')
-																	) : (
-																		<span className={styles.none}>—</span>
-																	)}
-																</td>
-															)
-														})}
-													</tr>
+									<table className={styles.table}>
+										<thead>
+											<tr>
+												<th>{t('作品')}</th>
+												{phases.map((p) => (
+													<th key={p}>{p}</th>
 												))}
-											</tbody>
-										</table>
-									</div>
+											</tr>
+										</thead>
+										<tbody>
+											{works.map((work) => (
+												<tr key={work} className="hover-row">
+													<td>{titleOf(work)}</td>
+													{phases.map((p) => {
+														const cell = totals(
+															shown.filter(
+																(r) => r.link.workId === work && r.phase === p,
+															),
+														)
+														return (
+															<td key={p}>
+																{cell.calls ? (
+																	t('{{calls}} 次', { calls: cell.calls }) +
+																	(cell.images
+																		? t(' · {{images}} 张', {
+																				images: cell.images,
+																			})
+																		: '')
+																) : (
+																	<span className={styles.none}>—</span>
+																)}
+															</td>
+														)
+													})}
+												</tr>
+											))}
+										</tbody>
+									</table>
 								</Card>
-								<Card className={styles.panel}>
+								<Card
+									className={styles.panel}
+									role="region"
+									aria-label={t('已发生用量')}
+								>
 									<SectionLabel>{t('已发生用量')}</SectionLabel>
 									<ul className={styles.list}>
 										{data.records
-											.filter(({ usage }) => shown.includes(usage))
+											.filter(({ usage }) => shownSet.has(usage))
 											.map(({ id, usage: record }) => (
 												<li className={styles.row} key={id}>
 													<strong>{record.model}</strong>
@@ -393,7 +395,11 @@ export function UsagePage() {
 								</Card>
 							</>
 						)}
-						<Card className={styles.panel}>
+						<Card
+							className={styles.panel}
+							role="region"
+							aria-label={t('过期素材')}
+						>
 							<SectionLabel>{t('过期素材')}</SectionLabel>
 							{!data.staleAssets.length ? (
 								<p>{t('暂无过期素材')}</p>
