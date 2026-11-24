@@ -1,0 +1,13 @@
+# Authoring flow parity audit
+
+Every pair is 1280 × 1000, light and dark. `*-prototype.jpg` comes from `prototype/` (Vite, mock data). `*-result.jpg` comes from the real Electron app (`NL_REPLAY=strict`): import uses the m1b-wizard TXT fixture; work, production and confirm use the m1b-creation-ui projection fixture.
+
+| Page | Matches prototype | Residual differences (data/contract) |
+| --- | --- | --- |
+| Import · 选择文件 | `从原文开始` eyebrow, `新建工程` title at width 760, three-step stepper, side-by-side source / reference drop zones, file rows with tags, folder field and `放进哪里` radios beneath, `下一步` outside the card. | The prototype has no `作品名` field; the real flow keeps it because `import.file` needs a title. |
+| Import · 核对信息 | Stepper on step 2, field grid, `分卷 · N 卷 M 章` label, one volume box per volume with indexed chapter rows and split/merge/start-volume actions. | The prototype has author, work-language and chapter-title inputs, which have no layout fields. The encoding/findings panel is real-data only. |
+| Import · 改编设置 | Stepper on step 3, settings card, reference-image toggle, `上一步` and `开始制作` outside the card. Draft state carries over from step 2, and step 3 sends a single `import.revise`. | Adaptation strength, density and requirements have no contract fields, so only the reference toggle is shown. |
+| Work overview | Title header with a `更多` menu (查看制作, 导出作品包) and `开始游玩` as the primary action. Hero card with cover, title, publish count and expandable synopsis. Phase card. `章节目录 · 共 N 章` list with status pills and pagination. | The cover is a fallback because the snapshot has no cover art. The series/author line is absent because those fields don't exist. |
+| Production | `<作品> · 制作` title, `立即停止` with the danger-container style, current-chapter card with status chip and progress, indexed rows with a step trail (写剧本 › 审稿 › 演出 › 出图), progress bar, `制作中`/`等待` pills and hover row actions. | The series/volume eyebrow is absent because the snapshot has no series data. There is no 全部重试 because no command exists for it. |
+| Confirm visual | `确认点 1 / 2` eyebrow, `<作品> · 角色设定 / 主视觉` title with info tooltip, missing count, confirm action, main-visual gallery card, left character selector with the costume gallery on the right, supplemental references. | Regenerate and appearance editing have no command. The candidate art in the result is fixture placeholder colour. |
+| Confirm first | `确认点 2 / 2` eyebrow, `<作品> · 第一章成品` title with info tooltip, `试玩第一章` and `继续制作`, scene cards in a 3-column grid at the prototype width of 760 (one card stays one column wide). | The contract exposes a single chapter card, not per-scene cards. There is no `更多` menu because no actions are wired. |
