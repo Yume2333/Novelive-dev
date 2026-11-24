@@ -329,6 +329,7 @@ function corruptImage(bytes: Uint8Array): Uint8Array {
 
 export function createReplayFetch(
 	options: ReplayOptions = {},
+	positions?: Map<string, number>,
 ): typeof globalThis.fetch {
 	const { checkpointDirectory, ...upstream } = options
 	return checkpointDirectory && usesReplyCheckpoint(upstream)
@@ -337,7 +338,7 @@ export function createReplayFetch(
 					mode: 'record',
 					directory: checkpointDirectory,
 					reuseRecorded: true,
-					fetch: replayFetch(upstream),
+					fetch: replayFetch(upstream, false, positions),
 					onCheckpointReply: options.onCheckpointReply,
 					checkpointAllowance: options.checkpointAllowance,
 					onCheckpointHit: options.onCheckpointHit,
@@ -347,12 +348,13 @@ export function createReplayFetch(
 				},
 				true,
 			)
-		: replayFetch(upstream)
+		: replayFetch(upstream, false, positions)
 }
 
 function replayFetch(
 	options: ReplayOptions,
 	checkpoint = false,
+	positions = new Map<string, number>(),
 ): typeof globalThis.fetch {
 	const mode = options.mode ?? modeFromEnvironment()
 	const send = options.fetch ?? globalThis.fetch
@@ -379,7 +381,6 @@ function replayFetch(
 		'tests/fixtures/cassettes'
 	const index = join(directory, 'cassette.jsonl')
 	const bodies = join(directory, 'cassette-files')
-	const positions = new Map<string, number>()
 	const fallback = options.fallbackDirectory
 		? createReplayFetch({
 				mode: 'strict',

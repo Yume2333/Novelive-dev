@@ -946,6 +946,51 @@ test('drawing checkpoints bind shared download URLs to their generation response
 	}
 })
 
+test('strict drawing replay consumes identical generation requests in recording order', async () => {
+	vi.stubEnv('NL_USAGE_CSV', '')
+	const root = await mkdtemp(join(tmpdir(), 'm1b-draw-sequence-'))
+	try {
+		const config = {
+			...configuration.models.image,
+			baseUrl: 'https://relay.invalid/v1',
+			model: 'gpt-image-2.6-sunburst',
+			upscaleTier: 'anime' as const,
+		}
+		let next = 0
+		const renderer = imageRenderer(config, {
+			replay: {
+				mode: 'record',
+				directory: root,
+				fetch: async () =>
+					Response.json({
+						data: [
+							{
+								b64_json: Buffer.from(`candidate-${++next}`).toString('base64'),
+							},
+						],
+					}),
+			},
+		})
+		const size = { width: 1024, height: 1024 }
+		await renderer('same prompt', [], size, false)
+		await renderer('same prompt', [], size, false)
+		const reopen = () =>
+			imageRenderer(config, {
+				replay: { mode: 'strict', directory: root },
+			})
+		for (const render of [reopen(), reopen()]) {
+			await expect(render('same prompt', [], size, false)).resolves.toEqual({
+				bytes: Buffer.from('candidate-1'),
+			})
+			await expect(render('same prompt', [], size, false)).resolves.toEqual({
+				bytes: Buffer.from('candidate-2'),
+			})
+		}
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
 test('exhausted image and token caps block image edits, generation, and visual review', async () => {
 	vi.stubEnv('NL_REPLAY', '')
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '0')

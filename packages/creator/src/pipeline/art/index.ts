@@ -837,6 +837,12 @@ export class ArtProduction {
 				refs,
 				target,
 				transparent,
+				checkpoint && attempt > 0
+					? {
+							job: createHash('sha256').update(checkpoint.path).digest('hex'),
+							ordinal: attempt,
+						}
+					: undefined,
 			)
 			rewritten = undefined
 			feedback = ''

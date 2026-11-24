@@ -53,6 +53,7 @@ export type Fault =
 	| 'rate-limit'
 	| 'drawing-rate-limit'
 	| 'drawing-image-missing-usage'
+	| 'drawing-technical-rejection'
 	| 'review-rate-limit'
 	| 'review-raised-cap-rate-limit'
 	| 'review-reasoning'
@@ -138,6 +139,7 @@ export function fakeRelay(
 	const downloadAttempts = new Map<number, number>()
 	let downloads = 0
 	let currentChapter = 0
+	let rejectedCandidates = 0
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const request = new Request(input, init)
 		const url = new URL(request.url)
@@ -274,6 +276,7 @@ export function fakeRelay(
 						'image-invalid-json',
 						'image-overdelivery',
 						'drawing-image-missing-usage',
+						'drawing-technical-rejection',
 					].includes(candidate) &&
 						operation === 'image' &&
 						currentChapter > 0) ||
@@ -284,7 +287,11 @@ export function fakeRelay(
 					(['malformed', 'over-budget'].includes(candidate) &&
 						operation === 'stage')),
 		)
-		if (fault) pending.delete(fault)
+		if (
+			fault &&
+			(fault !== 'drawing-technical-rejection' || ++rejectedCandidates === 2)
+		)
+			pending.delete(fault)
 		const status =
 			fault === 'rate-limit' ||
 			fault === 'drawing-rate-limit' ||
@@ -376,7 +383,9 @@ export function fakeRelay(
 			const [width, height] = String(body.size).split('x').map(Number)
 			imageBytes.set(
 				path,
-				await picture(width, height, body.background === 'transparent'),
+				fault === 'drawing-technical-rejection'
+					? Buffer.from('Undecodable candidate')
+					: await picture(width, height, body.background === 'transparent'),
 			)
 			return Response.json({
 				data: Array.from({ length: images ?? 0 }, (_, i) => ({

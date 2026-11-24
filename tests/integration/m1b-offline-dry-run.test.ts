@@ -40,6 +40,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'image-null',
 			'image-invalid-json',
 			'image-overdelivery',
+			'drawing-technical-rejection',
 			'concurrent-sunburst',
 			'download-failure',
 			'download-body-failure',
@@ -206,7 +207,9 @@ test.each(scenarios)(
 						...configuration.models.image,
 						retries: 3,
 						...(name === 'concurrent-sunburst' && { concurrency: 8 }),
-						...((reopenDrawing || name === 'drawing-rate-limit') && {
+						...((reopenDrawing ||
+							name === 'drawing-rate-limit' ||
+							name === 'drawing-technical-rejection') && {
 							concurrency: 1,
 						}),
 						...((overdelivery || name === 'concurrent-sunburst') && {
@@ -587,6 +590,17 @@ test.each(scenarios)(
 								),
 						),
 				).toBe(true)
+			}
+			if (faults.includes('drawing-technical-rejection')) {
+				const candidates = relay.admissions.filter(
+					({ operation, chapter }) => operation === 'image' && chapter === 1,
+				)
+				expect(candidates.slice(0, 3).map(({ fault }) => fault)).toEqual([
+					'drawing-technical-rejection',
+					'drawing-technical-rejection',
+					undefined,
+				])
+				expect(candidates[2].requestKey).toBe(candidates[1].requestKey)
 			}
 			if (reviewDenial) {
 				const denied = reviews.findIndex(({ fault }) => fault === reviewDenial)

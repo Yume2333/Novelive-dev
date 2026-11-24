@@ -94,14 +94,40 @@ export function imageRenderer(
 	options: ModelOptions,
 	generationReplay = options.replay,
 ) {
-	return (...args: Parameters<ReturnType<typeof imageRequest>>) =>
-		imageRequest(config, options, generationReplay)(...args)
+	const generationPositions = new Map<string, number>()
+	const downloadPositions = new Map<string, number>()
+	return (
+		prompt: string,
+		refs: readonly Buffer[],
+		size: Dimensions,
+		transparent: boolean,
+		attempt?: { job: string; ordinal: number },
+	) =>
+		imageRequest(
+			config,
+			options,
+			attempt && generationReplay?.checkpointDirectory
+				? {
+						...generationReplay,
+						checkpointDirectory: join(
+							generationReplay.checkpointDirectory,
+							'attempts',
+							attempt.job,
+							String(attempt.ordinal),
+						),
+					}
+				: generationReplay,
+			generationPositions,
+			downloadPositions,
+		)(prompt, refs, size, transparent)
 }
 
 function imageRequest(
 	config: ImageConfig,
 	options: ModelOptions,
-	generationReplay = options.replay,
+	generationReplay: ReplayOptions | undefined,
+	generationPositions: Map<string, number>,
+	downloadPositions: Map<string, number>,
 ) {
 	let saveGeneration: (() => Promise<void>) | undefined
 	let saveDownload: (() => Promise<void>) | undefined
@@ -114,30 +140,33 @@ function imageRequest(
 	const timeout = 90_000
 	const upstream = generationReplay?.fetch ?? globalThis.fetch
 	const replay = checkedReplay(
-		createReplayFetch({
-			...generationReplay,
-			checkpointResponse: (response) => response.ok,
-			checkpointResponseId: responseId,
-			onCheckpointHit: (allowance, id) => {
-				downloadResponseId = id
-				generationReplay?.onCheckpointHit?.(allowance, id)
+		createReplayFetch(
+			{
+				...generationReplay,
+				checkpointResponse: (response) => response.ok,
+				checkpointResponseId: responseId,
+				onCheckpointHit: (allowance, id) => {
+					downloadResponseId = id
+					generationReplay?.onCheckpointHit?.(allowance, id)
+				},
+				onCheckpointReply: (save) => {
+					saveGeneration = save
+				},
+				fetch: inheritSpendGuard(upstream, (input, init) => {
+					if (!metered) return upstream(input, init)
+					const request = new Request(input, init)
+					return upstream(
+						new Request(request, {
+							signal: AbortSignal.any([
+								request.signal,
+								AbortSignal.timeout(timeout),
+							]),
+						}),
+					)
+				}),
 			},
-			onCheckpointReply: (save) => {
-				saveGeneration = save
-			},
-			fetch: inheritSpendGuard(upstream, (input, init) => {
-				if (!metered) return upstream(input, init)
-				const request = new Request(input, init)
-				return upstream(
-					new Request(request, {
-						signal: AbortSignal.any([
-							request.signal,
-							AbortSignal.timeout(timeout),
-						]),
-					}),
-				)
-			}),
-		}),
+			generationPositions,
+		),
 	)
 	const metered = isSpendGuardedFetch(replay.fetch)
 	const client = new OpenAI({
@@ -251,19 +280,25 @@ function imageRequest(
 				}
 				const settled = hasSettledImage(raw)
 				if (settled) await saveGeneration?.()
-				const download = createReplayFetch({
-					...generationReplay,
-					checkpointDirectory:
-						checkpointDirectory && downloadResponseId
-							? join(checkpointDirectory, 'downloads', downloadResponseId)
-							: undefined,
-					checkpointResponse: (response) => response.ok,
-					onCheckpointReply: (save) => {
-						saveDownload = save
+				const download = createReplayFetch(
+					{
+						...generationReplay,
+						checkpointDirectory:
+							checkpointDirectory && downloadResponseId
+								? join(checkpointDirectory, 'downloads', downloadResponseId)
+								: undefined,
+						checkpointResponse: (response) => response.ok,
+						onCheckpointReply: (save) => {
+							saveDownload = save
+						},
+						fetch: imageDownloadUpstream(
+							config.baseUrl,
+							generationReplay?.fetch,
+						),
+						spend: undefined,
 					},
-					fetch: imageDownloadUpstream(config.baseUrl, generationReplay?.fetch),
-					spend: undefined,
-				})
+					downloadPositions,
+				)
 				const deadline = AbortSignal.timeout(90_000)
 				const downloadSignal = signal
 					? AbortSignal.any([signal, deadline])
