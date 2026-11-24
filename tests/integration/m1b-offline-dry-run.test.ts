@@ -11,6 +11,7 @@ import { playbackAssetIds } from '../../packages/creator/src/pipeline/art/plan'
 import { Project } from '../../packages/creator/src/project'
 import { createProduction } from '../../packages/creator/src/project/production'
 import { createReplayFetch } from '../../packages/creator/src/replay'
+import * as spend from '../../packages/creator/src/usage/spend'
 import { projectSpend } from '../../packages/creator/src/usage/spend'
 import { evaluate } from '../../tools/quality/scorer'
 import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
@@ -88,7 +89,25 @@ test.each(scenarios)(
 		const drawing = Promise.withResolvers<void>()
 		const settleDrawing = Promise.withResolvers<void>()
 		let heldDraw = false
-		let releaseDrawing: ReturnType<typeof setTimeout> | undefined
+		let enteredOverlapStage = false
+		const stageBudgetStarted = Promise.withResolvers<{
+			allowance: ReturnType<typeof spend.settledChapterImageBudget>
+		}>()
+		let readHeldImageSettlement: (() => number | null | undefined) | undefined
+		const imageSettlementsAtStage: (number | null | undefined)[] = []
+		const settledBudget = spend.settledChapterImageBudget
+		const stagingBudget = overlap
+			? vi
+					.spyOn(spend, 'settledChapterImageBudget')
+					.mockImplementation((...args) => {
+						const allowance = settledBudget(...args)
+						if (enteredOverlapStage) {
+							enteredOverlapStage = false
+							stageBudgetStarted.resolve({ allowance })
+						}
+						return allowance
+					})
+			: undefined
 		const published = new Map(
 			chapterIds.map((id) => [id, Promise.withResolvers<void>()]),
 		)
@@ -107,6 +126,10 @@ test.each(scenarios)(
 				drawing.resolve()
 				return settleDrawing.promise
 			},
+			({ chapter, operation }) => {
+				if (overlap && chapter === 3 && operation === 'stage')
+					imageSettlementsAtStage.push(readHeldImageSettlement?.())
+			},
 		)
 		const profile = join(root, 'profile')
 		const config = createConfigStore(profile)
@@ -122,12 +145,11 @@ test.each(scenarios)(
 							published.get(chapter.chapterId)?.resolve()
 						if (
 							overlap &&
-							!releaseDrawing &&
 							chapter.chapterId === chapterIds[2] &&
 							chapter.status === 'producing' &&
 							chapter.step === 'stage'
 						)
-							releaseDrawing = setTimeout(settleDrawing.resolve, 100)
+							enteredOverlapStage = true
 					}
 				},
 				() => {},
@@ -315,6 +337,23 @@ test.each(scenarios)(
 						expect(fill.ok).toBe(true)
 					}
 					await session.continue()
+					if (overlap) {
+						const { allowance } = await stageBudgetStarted.promise
+						expect(heldDraw).toBe(true)
+						const live = reservations().filter(
+							(row) => row.images > 0 && row.actual_images === null,
+						)
+						expect(live).toHaveLength(1)
+						expect(live[0].images).toBe(3)
+						readHeldImageSettlement = () =>
+							reservations().find((row) => row.id === live[0].id)?.actual_images
+						expect(
+							await Promise.race([allowance, Promise.resolve('waiting')]),
+						).toBe('waiting')
+						expect(imageSettlementsAtStage).toEqual([])
+						settleDrawing.resolve()
+						await allowance
+					}
 					continue
 				}
 				const softStop =
@@ -553,7 +592,7 @@ test.each(scenarios)(
 							`chapter ${chapter} allowance`,
 						)
 						if (overlap && chapter === 3) {
-							expect(heldDraw && releaseDrawing !== undefined).toBe(true)
+							expect(imageSettlementsAtStage).toEqual(stages.map(() => 1))
 							allowance.toBeGreaterThanOrEqual(
 								Math.floor((50 - 5 - images) / 3),
 							)
@@ -623,11 +662,11 @@ test.each(scenarios)(
 				)
 			}
 		} finally {
-			clearTimeout(releaseDrawing)
 			drawing.resolve()
 			settleDrawing.resolve()
 			for (const gate of published.values()) gate.resolve()
 			await host.close()
+			stagingBudget?.mockRestore()
 			vi.unstubAllEnvs()
 			vi.unstubAllGlobals()
 			await rm(root, { recursive: true, force: true })

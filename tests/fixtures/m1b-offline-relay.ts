@@ -127,6 +127,7 @@ export function fakeRelay(
 	privateStaging = false,
 	beforeWriting?: (chapter: number) => Promise<void> | undefined,
 	beforeImageReply?: (chapter: number) => Promise<void> | undefined,
+	onAdmission?: (admission: Admission) => void,
 ) {
 	const pending = new Set(faults)
 	const admissions: Admission[] = []
@@ -315,7 +316,7 @@ export function fakeRelay(
 			? Number(attributedChapter)
 			: currentChapter
 		const index = admissions.length + 1
-		admissions.push({
+		const admission = {
 			operation,
 			chapter,
 			tokens,
@@ -332,7 +333,9 @@ export function fakeRelay(
 					),
 				)
 				.digest('hex'),
-		})
+		}
+		admissions.push(admission)
+		onAdmission?.(admission)
 		const csv = process.env.NL_USAGE_CSV
 		assert.ok(csv, 'Offline admission needs a run-specific CSV')
 		await appendFile(
