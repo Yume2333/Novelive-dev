@@ -22,9 +22,9 @@ type PlanBudget = {
 }
 
 export class ChapterImageBudgetError extends Error {
-	constructor(ids: readonly string[], limit: number) {
+	constructor(ids: readonly string[], limit: number, remainingBases?: number) {
 		super(
-			`Chapter needs ${ids.length} new provider images; budget is ${limit}. Over-budget assets: ${ids.slice(limit).join(', ')}`,
+			`Chapter needs ${ids.length} new provider images${remainingBases === undefined ? '' : ' after trimming'}; budget is ${limit}.${remainingBases === undefined ? '' : ` Costume and background bases remaining after trim: ${remainingBases}.`} Over-budget assets: ${ids.slice(limit).join(', ')}`,
 		)
 	}
 }
