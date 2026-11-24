@@ -11,7 +11,7 @@ import { compileScript, formatScript } from '@novelive/format/script'
 import type { createConfigStore } from '../config'
 import { withProjectEdits } from '../editor/history/storage'
 import { replaceMarkSuggestions } from '../editor/marks'
-import { TextModelError } from '../models/text'
+import { TextModelError, UnknownTextOutcomeError } from '../models/text'
 import {
 	type ArtBible,
 	type ArtJob,
@@ -294,8 +294,9 @@ export function chapterWorker(
 				const { chapter, options } = await input(ctx)
 				const journal = `source/production/${ctx.workId}/${ctx.chapterId}/writing-resume.json`
 				const clear = () => rm(join(project.root, journal), { force: true })
-				if (!ctx.resumingBudget) await clear()
-				if (usesReplyCheckpoint(replay))
+				const checkpoint = usesReplyCheckpoint(replay)
+				if (!checkpoint && !ctx.resumingBudget) await clear()
+				if (checkpoint)
 					await rm(
 						join(project.root, stagingJournal(ctx.workId, ctx.chapterId)),
 						{
@@ -303,25 +304,31 @@ export function chapterWorker(
 							force: true,
 						},
 					)
-				const progress: WritingProgress = ctx.resumingBudget
-					? ((await existing(async () =>
-							JSON.parse((await project.readFile(journal)).toString('utf8')),
-						)) ?? [])
-					: []
+				const progress: WritingProgress =
+					checkpoint || ctx.resumingBudget
+						? ((await existing(async () =>
+								JSON.parse((await project.readFile(journal)).toString('utf8')),
+							)) ?? [])
+						: []
+				const saveProgress = (current: WritingProgress) =>
+					project.writeFile(journal, JSON.stringify(current))
 				const result = await writeChapter(
 					chapter,
 					{ ...options, proposeMarks: true },
 					progress,
+					checkpoint ? saveProgress : undefined,
 				).catch(async (error: unknown) => {
 					if (
 						error instanceof SpendBudgetError ||
 						(error instanceof Error &&
 							error.cause instanceof SpendBudgetError) ||
-						(ctx.resumingBudget &&
+						error instanceof UnknownTextOutcomeError ||
+						ctx.signal.aborted ||
+						((checkpoint || ctx.resumingBudget) &&
 							error instanceof TextModelError &&
 							error.code === 'network')
 					) {
-						await project.writeFile(journal, JSON.stringify(progress))
+						await saveProgress(progress)
 					} else {
 						await clear()
 					}

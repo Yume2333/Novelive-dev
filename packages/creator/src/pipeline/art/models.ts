@@ -19,6 +19,7 @@ import {
 import {
 	createReplayFetch,
 	inheritSpendGuard,
+	isSpendGuardedFetch,
 	type ReplayOptions,
 } from '../../replay'
 import { recordImageUsage } from '../../usage'
@@ -92,6 +93,7 @@ export function imageRenderer(
 ) {
 	const provider = imageProvider(config.baseUrl, config.model)
 	const replay = checkedReplay(createReplayFetch(generationReplay))
+	const metered = isSpendGuardedFetch(replay.fetch)
 	const download = createReplayFetch({
 		...generationReplay,
 		fetch: imageDownloadUpstream(config.baseUrl, generationReplay?.fetch),
@@ -110,7 +112,8 @@ export function imageRenderer(
 		size: Dimensions,
 		transparent: boolean,
 	): Promise<
-		{ bytes: Buffer } | { error: CommandError; referenceModerated?: true }
+		| { bytes: Buffer }
+		| { error: CommandError; referenceModerated?: true; doNotRegenerate?: true }
 	> => {
 		const capability: ImageCapability = refs.length
 			? 'edit'
@@ -127,6 +130,7 @@ export function imageRenderer(
 			? ({ background: 'transparent', output_format: 'png' } as const)
 			: {}
 		const seedream = provider !== 'openai'
+		let generationSucceeded = false
 		try {
 			signal?.throwIfAborted()
 			const response = seedream
@@ -185,15 +189,29 @@ export function imageRenderer(
 					image.error.message,
 					new Headers(),
 				)
+			generationSucceeded = true
 			if (image?.b64_json)
 				return { bytes: Buffer.from(image.b64_json, 'base64') }
 			if (image?.url) {
 				const deadline = AbortSignal.timeout(90_000)
-				const response = await download(new URL(image.url), {
-					signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
-				})
-				if (response.ok)
-					return { bytes: Buffer.from(await response.arrayBuffer()) }
+				const downloadSignal = signal
+					? AbortSignal.any([signal, deadline])
+					: deadline
+				for (let attempt = 0; attempt < (metered ? 2 : 1); attempt++) {
+					const response = await download(new URL(image.url), {
+						signal: downloadSignal,
+					}).catch((error: unknown) => {
+						downloadSignal.throwIfAborted()
+						if (metered && attempt === 0) return undefined
+						throw error
+					})
+					if (response?.ok)
+						return { bytes: Buffer.from(await response.arrayBuffer()) }
+					if (response) {
+						await response.body?.cancel()
+						if (response.status < 500 && response.status !== 429) break
+					}
+				}
 				throw new OpenAI.APIConnectionError({
 					message: 'Image download failed',
 				})
@@ -207,6 +225,14 @@ export function imageRenderer(
 			)
 				throw error
 			const failure = imageError(error, capability, signal)
+			const status = error instanceof OpenAI.APIError ? error.status : undefined
+			const doNotRegenerate =
+				metered &&
+				(generationSucceeded ||
+					error instanceof OpenAI.APIConnectionError ||
+					status === 408 ||
+					status === 409 ||
+					(status ?? 0) >= 500)
 			const referenceModerated =
 				failure.code === 'moderation' &&
 				error instanceof OpenAI.APIError &&
@@ -215,6 +241,7 @@ export function imageRenderer(
 				)
 			return {
 				error: failure,
+				...(doNotRegenerate && { doNotRegenerate: true }),
 				...(referenceModerated && { referenceModerated: true }),
 			}
 		}

@@ -61,6 +61,7 @@ type PaintStop =
 	| 'matting'
 	| 'unsupported'
 	| 'provider-unsupported'
+	| 'provider-outcome'
 type Candidate = { id: string; cachePath: string }
 type VisualCandidates = {
 	mainVisuals: Candidate[]
@@ -842,6 +843,7 @@ export class ArtProduction {
 			if ('error' in result) {
 				this.options.signal?.throwIfAborted()
 				issue = result.error.message
+				if (result.doNotRegenerate) return stopped('provider-outcome')
 				if (result.error.code === 'unsupported')
 					return stopped('provider-unsupported')
 				if (result.error.code === 'moderation') {

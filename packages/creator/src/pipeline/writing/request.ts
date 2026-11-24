@@ -33,8 +33,7 @@ export function writingModel(
 			? { requestRetries: 0, streamRetries: 0 }
 			: {}),
 	}
-	const stream = createTextStream(policy)
-	const guardedStream = createTextStream({
+	const stream = createTextStream({
 		...policy,
 		stopOnUnknownOutcome: true,
 	})
@@ -54,12 +53,10 @@ export function writingModel(
 			context: Context,
 			phase = 'Writing prompt',
 			outputEstimate = 0,
-			reply: 'script' | 'json' = 'script',
 		) {
 			options.signal?.throwIfAborted()
 			const normalized = normalizeContext(context)
-			const dispatch = reply === 'json' ? guardedStream : stream
-			const result = await dispatch(
+			const result = await stream(
 				model,
 				fitPrompt(limits, normalized, phase, outputEstimate),
 				{
@@ -123,7 +120,7 @@ export async function requestWritingJson<T>(
 	const request = async (
 		context: Context,
 	): Promise<{ issue: string } | { value: T }> => {
-		const result = await model.request(context, phase, 0, 'json')
+		const result = await model.request(context, phase)
 		let value: unknown
 		try {
 			value = parseModelJson(textOf(result))
