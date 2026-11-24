@@ -47,7 +47,6 @@ import {
 const home = homedir()
 const source = join(home, 'novelive-testbooks', 'yesou-puyan.txt')
 const root = join(home, '.local/novelive-tools/m1a-owner-book')
-const ledger = process.env.NL_USAGE_LEDGER || join(root, 'usage.csv')
 const fullPurpose = 'owner book with shared inclusion criteria'
 const selectionPurpose = 'selection-only 700k'
 const batchPurpose = 'aligned selection batch 300k'
@@ -110,6 +109,9 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const runDirectory = process.env.NL_OWNER_BOOK_RUN_DIR
 		const dryRun = process.env.NL_OWNER_BOOK_SELECTION_STUB
 		const batch = process.env.NL_OWNER_BOOK_SELECTION_BATCH === '1'
+		const ledger = process.env.NL_USAGE_LEDGER
+		if (!dryRun && !ledger)
+			throw new Error('Set NL_USAGE_LEDGER to the existing shared usage ledger')
 		const selectionCap = batch
 			? ownerBookSelectionBatchCap
 			: ownerBookSelectionCap
@@ -140,7 +142,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			dryRun && batch && runDirectory
 				? join(dirname(runDirectory), 'stub-usage.csv')
 				: undefined
-		const usageLedger = stubLedger ?? ledger
+		const usageLedger = stubLedger ?? (dryRun ? undefined : ledger)
 		let expectedResume: { packet: number; events: number } | undefined
 		const baseUrl = dryRun
 			? 'https://relay.invalid'
@@ -201,17 +203,17 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const pendingUsage = new Set<Promise<void>>()
 		let ledgerFailed = false
 		let reservationExceeded = false
-		const priorUsage =
-			dryRun && !stubLedger
-				? ''
-				: await readFile(usageLedger, 'utf8').catch((error) => {
-						if (
-							error.code !== 'ENOENT' ||
-							(process.env.NL_USAGE_LEDGER && !stubLedger)
-						)
-							throw error
-						return ''
-					})
+		const priorUsage = usageLedger
+			? await readFile(usageLedger, 'utf8').catch((error) => {
+					if (stubLedger && error.code === 'ENOENT') return ''
+					throw error
+				})
+			: ''
+		if (
+			!dryRun &&
+			!priorUsage.startsWith('date,model,calls,tokens,images,purpose')
+		)
+			throw new Error('The shared usage ledger has no recognized CSV header')
 		for (const line of priorUsage.split('\n')) {
 			const [, , , tokens, , reason] = line.split(',')
 			if (
@@ -309,7 +311,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				used += tokens - reserve
 				stats.tokens += tokens
 				stats.reserved += Number(measured === undefined)
-				if (dryRun && !stubLedger) return
+				if (!usageLedger) return
 				try {
 					await appendFile(
 						usageLedger,
@@ -365,8 +367,8 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			}
 		}
 		await mkdir(root, { recursive: true, mode: 0o700 })
-		if (!priorUsage && (!dryRun || stubLedger))
-			await appendFile(usageLedger, 'date,model,calls,tokens,images,purpose\n')
+		if (stubLedger && !priorUsage)
+			await appendFile(stubLedger, 'date,model,calls,tokens,images,purpose\n')
 		const book = await readFile(source)
 		const sha256 = digest(book)
 		const manifest = JSON.parse(
