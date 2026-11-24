@@ -32,6 +32,7 @@ type Reply =
 	| string
 	| { tool: string; arguments: object }
 	| { truncated: string }
+	| { script: string; tokens: number }
 function responses(...replies: Reply[]) {
 	const requests: string[] = []
 	const toolSchemas: unknown[] = []
@@ -43,6 +44,7 @@ function responses(...replies: Reply[]) {
 		if (reply === undefined) throw new Error('Unexpected model request')
 		const tool = typeof reply !== 'string' && 'tool' in reply
 		const truncated = typeof reply !== 'string' && 'truncated' in reply
+		const settled = typeof reply !== 'string' && 'script' in reply
 		const delta = tool
 			? {
 					tool_calls: [
@@ -57,7 +59,9 @@ function responses(...replies: Reply[]) {
 						},
 					],
 				}
-			: { content: truncated ? reply.truncated : reply }
+			: {
+					content: truncated ? reply.truncated : settled ? reply.script : reply,
+				}
 		const events = [
 			{
 				choices: [
@@ -77,6 +81,14 @@ function responses(...replies: Reply[]) {
 					},
 				],
 			},
+			...(settled
+				? [
+						{
+							choices: [],
+							usage: { prompt_tokens: reply.tokens - 1, completion_tokens: 1 },
+						},
+					]
+				: []),
 		]
 		return new Response(
 			events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join('') +
@@ -477,7 +489,10 @@ describe('M1b writer', () => {
 				{ id: 'p0002', text: 'b'.repeat(1050) },
 			],
 		}
-		const provider = responses(scene, second)
+		const provider = responses(
+			{ script: scene, tokens: 1500 },
+			{ script: second, tokens: 1500 },
+		)
 		let firstReserve = 0
 		const fetch = () =>
 			createReplayFetch({

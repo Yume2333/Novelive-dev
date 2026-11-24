@@ -19,6 +19,7 @@ import {
 import {
 	createReplayFetch,
 	inheritSpendGuard,
+	isSpendGuardedFetch,
 	type ReplayOptions,
 } from '../../replay'
 import { recordImageUsage } from '../../usage'
@@ -92,6 +93,7 @@ export function imageRenderer(
 ) {
 	const provider = imageProvider(config.baseUrl, config.model)
 	const replay = checkedReplay(createReplayFetch(generationReplay))
+	const metered = isSpendGuardedFetch(replay.fetch)
 	const download = createReplayFetch({
 		...generationReplay,
 		fetch: imageDownloadUpstream(config.baseUrl, generationReplay?.fetch),
@@ -110,7 +112,8 @@ export function imageRenderer(
 		size: Dimensions,
 		transparent: boolean,
 	): Promise<
-		{ bytes: Buffer } | { error: CommandError; referenceModerated?: true }
+		| { bytes: Buffer }
+		| { error: CommandError; referenceModerated?: true; doNotRegenerate?: true }
 	> => {
 		const capability: ImageCapability = refs.length
 			? 'edit'
@@ -127,10 +130,11 @@ export function imageRenderer(
 			? ({ background: 'transparent', output_format: 'png' } as const)
 			: {}
 		const seedream = provider !== 'openai'
+		let generationSucceeded = false
 		try {
 			signal?.throwIfAborted()
-			const response = seedream
-				? await client.images.generate(parameters, {
+			const generation = seedream
+				? client.images.generate(parameters, {
 						signal,
 						body: {
 							...parameters,
@@ -148,7 +152,7 @@ export function imageRenderer(
 						},
 					})
 				: refs.length
-					? await client.images.edit(
+					? client.images.edit(
 							{
 								...parameters,
 								...output,
@@ -162,10 +166,12 @@ export function imageRenderer(
 							},
 							{ signal },
 						)
-					: await client.images.generate(
+					: client.images.generate(
 							{ ...parameters, ...output, n: 1, quality: config.quality },
 							{ signal },
 						)
+			generationSucceeded = (await generation.asResponse()).ok
+			const response = await generation
 			recordImageUsage(
 				config.model,
 				response.data?.filter((image) => image.b64_json || image.url).length ??
@@ -178,22 +184,36 @@ export function imageRenderer(
 						error?: { code: string; message: string }
 				  }
 				| undefined
-			if (seedream && image?.error && !image.b64_json && !image.url)
+			if (seedream && image?.error && !image.b64_json && !image.url) {
+				generationSucceeded = false
 				throw new OpenAI.APIError(
 					400,
 					image.error,
 					image.error.message,
 					new Headers(),
 				)
+			}
 			if (image?.b64_json)
 				return { bytes: Buffer.from(image.b64_json, 'base64') }
 			if (image?.url) {
 				const deadline = AbortSignal.timeout(90_000)
-				const response = await download(new URL(image.url), {
-					signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
-				})
-				if (response.ok)
-					return { bytes: Buffer.from(await response.arrayBuffer()) }
+				const downloadSignal = signal
+					? AbortSignal.any([signal, deadline])
+					: deadline
+				for (let attempt = 0; attempt < (metered ? 2 : 1); attempt++) {
+					try {
+						const response = await download(new URL(image.url), {
+							signal: downloadSignal,
+						})
+						if (response.ok)
+							return { bytes: Buffer.from(await response.arrayBuffer()) }
+						await response.body?.cancel()
+						if (response.status < 500 && response.status !== 429) break
+					} catch (error) {
+						downloadSignal.throwIfAborted()
+						if (!metered || attempt > 0) throw error
+					}
+				}
 				throw new OpenAI.APIConnectionError({
 					message: 'Image download failed',
 				})
@@ -207,6 +227,14 @@ export function imageRenderer(
 			)
 				throw error
 			const failure = imageError(error, capability, signal)
+			const status = error instanceof OpenAI.APIError ? error.status : undefined
+			const doNotRegenerate =
+				metered &&
+				(generationSucceeded ||
+					error instanceof OpenAI.APIConnectionError ||
+					status === 408 ||
+					status === 409 ||
+					(status ?? 0) >= 500)
 			const referenceModerated =
 				failure.code === 'moderation' &&
 				error instanceof OpenAI.APIError &&
@@ -215,6 +243,7 @@ export function imageRenderer(
 				)
 			return {
 				error: failure,
+				...(doNotRegenerate && { doNotRegenerate: true }),
 				...(referenceModerated && { referenceModerated: true }),
 			}
 		}

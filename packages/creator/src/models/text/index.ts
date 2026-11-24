@@ -23,6 +23,7 @@ import type { MaskedConfig } from '../../config/index.js'
 import type { CommandError } from '../../contract/index.js'
 import {
 	createReplayFetch,
+	isCheckpointReply,
 	isSpendGuardedFetch,
 	wasDispatched,
 } from '../../replay/index.js'
@@ -337,6 +338,7 @@ type StreamPolicy = {
 	requestRetries?: number
 	streamRetries?: number
 	streaming?: boolean
+	onReasoningRetry?: () => Promise<void>
 }
 
 type TextStreamOptions = SimpleStreamOptions & { outputLimit?: number }
@@ -417,6 +419,7 @@ export function createTextStream(
 					: idle.signal
 				let timer: ReturnType<typeof setTimeout> | undefined
 				let status: number | undefined
+				let replayedCheckpoint = false
 				let fields = ''
 				let spendError: SpendBudgetError | undefined
 				let headersReceived = false
@@ -455,6 +458,7 @@ export function createTextStream(
 						maxRetries: guarded ? 0 : (policy.requestRetries ?? 2),
 						fetch: async (input, init) => {
 							status = undefined
+							replayedCheckpoint = false
 							fields = ''
 							if (spendError) throw spendError
 							request = guarded ? new Request(input, init) : undefined
@@ -464,6 +468,7 @@ export function createTextStream(
 								throw error
 							})
 							status = response.status
+							replayedCheckpoint = isCheckpointReply(response)
 							settlement = guarded ? textSettlement(response) : undefined
 							if (
 								!response.ok &&
@@ -514,7 +519,8 @@ export function createTextStream(
 						undefined,
 						spendError,
 					)
-				recordTextUsage(model.id, result.usage, textUsageSlots.get(model))
+				if (!replayedCheckpoint)
+					recordTextUsage(model.id, result.usage, textUsageSlots.get(model))
 				usage = usage ? sumUsage(usage, result.usage) : result.usage
 				const empty =
 					(result.stopReason === 'stop' || result.stopReason === 'length') &&
@@ -593,6 +599,7 @@ export function createTextStream(
 						: clampMaxTokensToContext(model, context, raised) >
 							clampMaxTokensToContext(model, context, maxTokens)
 					if (!reasoningRetried && !live && canRaise) {
+						await policy.onReasoningRetry?.()
 						reasoningRetried = true
 						maxTokens = raised
 						continue

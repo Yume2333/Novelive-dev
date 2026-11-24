@@ -306,6 +306,7 @@ export async function writeChapter(
 	chapter: WritingChapter,
 	options: WriterOptions,
 	progress?: WritingProgress,
+	saveProgress?: (progress: WritingProgress) => Promise<void>,
 ) {
 	const model: Writer = writingModel(options.writer, options)
 	if (progress) {
@@ -327,11 +328,13 @@ export async function writeChapter(
 				const text = await send()
 				progress.push({ key, text })
 				position++
+				await saveProgress?.(progress)
 				return text
 			} catch (error) {
 				if (error instanceof TruncatedWritingError) {
 					progress.push({ key, text: null })
 					position++
+					await saveProgress?.(progress)
 				}
 				throw error
 			}

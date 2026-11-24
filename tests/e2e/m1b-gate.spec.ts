@@ -452,7 +452,7 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 	const source = join(root, '纸船与灯火.txt')
 	const project = join(projects, '纸船与灯火')
 	const writer = 'loopback-writing-budget'
-	const malformedAttempts = 3
+	const malformedAttempts = 1
 	const script = 'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。'
 	const calls: unknown[] = []
 	const unexpected: string[] = []
@@ -478,8 +478,8 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 		const initial = calls.length === malformedAttempts + 1
 		if (calls.length === malformedAttempts + 2) {
 			response
-				.writeHead(503, { 'content-type': 'application/json' })
-				.end(JSON.stringify({ error: { message: 'Service unavailable' } }))
+				.writeHead(429, { 'content-type': 'application/json' })
+				.end(JSON.stringify({ error: { message: 'Rate limited' } }))
 			return
 		}
 		const events = [
