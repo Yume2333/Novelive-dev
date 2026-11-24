@@ -12,6 +12,7 @@ import { PlayerPage } from './pages/player/PlayerPage'
 import { ProductionPage } from './pages/production/ProductionPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
 import { UsagePage } from './pages/usage/UsagePage'
+import { WelcomePage } from './pages/welcome/WelcomePage'
 import { WorkPage } from './pages/work/WorkPage'
 import { WorkProduction } from './pages/work/WorkProduction'
 import { productionRoutes } from './routes/production'
@@ -43,6 +44,7 @@ if (root)
 				<Routes>
 					<Route path={productionRoutes.play} element={<PlayerPage />} />
 					<Route path="/package/:id/:version" element={<PlayerPage />} />
+					<Route path="/welcome" element={<WelcomePage />} />
 					<Route element={<AppShell />}>
 						<Route index element={<LibraryPage />} />
 						<Route path="import" element={<ImportPage />} />
