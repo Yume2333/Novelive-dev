@@ -148,9 +148,11 @@ function reasoningReply() {
 	})
 }
 
-test('does not dispatch a painter retry when the effective cap cannot increase', async () => {
+test('does not retry a live capped rewrite, but a later request can recover past its reasoning-only checkpoint', async () => {
 	await projectTest(async (project) => {
-		const fetch = vi.fn<typeof globalThis.fetch>(async () => reasoningReply())
+		const fetch = artReplies('{"pass":true}').mockImplementationOnce(async () =>
+			reasoningReply(),
+		)
 		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
 		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
 		try {
@@ -172,13 +174,16 @@ test('does not dispatch a painter retry when the effective cap cannot increase',
 					},
 				)
 			await expect(request()).rejects.toMatchObject({ code: 'reasoning_limit' })
-			await expect(request()).rejects.toMatchObject({ code: 'reasoning_limit' })
 			expect(fetch).toHaveBeenCalledTimes(1)
+			await expect(request()).resolves.toEqual({ pass: true })
+			expect(fetch).toHaveBeenCalledTimes(2)
+			await expect(request()).resolves.toEqual({ pass: true })
+			expect(fetch).toHaveBeenCalledTimes(2)
 			expect(
 				project.database
 					.prepare('SELECT actual_tokens FROM spend_reservation')
 					.all(),
-			).toEqual([{ actual_tokens: 15 }])
+			).toEqual([{ actual_tokens: 15 }, { actual_tokens: 15 }])
 		} finally {
 			vi.unstubAllEnvs()
 		}

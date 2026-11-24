@@ -56,7 +56,7 @@ export interface ReplayOptions {
 
 const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
 const dispatchedRequests = new WeakSet<Request>()
-const checkpointReplies = new WeakSet<Response>()
+const checkpointReplies = new WeakMap<Response, () => void>()
 
 export function wasDispatched(request: Request) {
 	return dispatchedRequests.has(request)
@@ -64,6 +64,10 @@ export function wasDispatched(request: Request) {
 
 export function isCheckpointReply(response: Response) {
 	return checkpointReplies.has(response)
+}
+
+export function checkpointReplyRejection(response: Response) {
+	return checkpointReplies.get(response)
 }
 
 export function isSpendGuardedFetch(fetch: typeof globalThis.fetch) {
@@ -468,6 +472,11 @@ function replayFetch(
 			)
 		: undefined
 	let pending: Promise<unknown> = Promise.resolve()
+	const rejectedReplies = new Set<string>()
+	const replyKey = (
+		source: string,
+		row: Awaited<ReturnType<typeof readCassetteRows>>[number],
+	) => JSON.stringify([source, row.key, row.body.sha ?? row.body.b64])
 
 	async function store(
 		identity: Awaited<ReturnType<typeof requestIdentity>>,
@@ -545,10 +554,11 @@ function replayFetch(
 			rebindIds,
 		)
 		request.signal.throwIfAborted()
+		const cursorKey = (source: string) => JSON.stringify([source, identity.key])
 		const nextPosition = (source: string) => {
-			const cursorKey = JSON.stringify([source, identity.key])
-			const position = positions.get(cursorKey) ?? 0
-			positions.set(cursorKey, position + 1)
+			const key = cursorKey(source)
+			const position = positions.get(key) ?? 0
+			positions.set(key, position + 1)
 			return position
 		}
 		const reply = async (
@@ -577,7 +587,11 @@ function replayFetch(
 				headers: row.headers,
 			})
 			if (checkpoint) {
-				checkpointReplies.add(response)
+				checkpointReplies.set(response, () => {
+					rejectedReplies.add(replyKey(source, row))
+					const key = cursorKey(source)
+					positions.set(key, Math.max(0, (positions.get(key) ?? 0) - 1))
+				})
 				options.onCheckpointHit?.(
 					row.checkpointAllowance,
 					row.checkpointResponseId,
@@ -604,7 +618,13 @@ function replayFetch(
 					if (!source) continue
 					const rows = (
 						await readCassetteRows(join(source, 'cassette.jsonl'))
-					).filter((row) => row.key === identity.key && row.status < 300)
+					).filter(
+						(row) =>
+							row.key === identity.key &&
+							row.status < 300 &&
+							(!rejectedReplies.size ||
+								!rejectedReplies.has(replyKey(source, row))),
+					)
 					if (!rows.length) continue
 					request.signal.throwIfAborted()
 					const position =
