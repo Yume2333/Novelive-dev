@@ -3,19 +3,21 @@
 **Effort:** m1a-project
 **Blocked by:** 06
 **Covers:** W4
-**Executor:** spine (paid calls)
+**Executor:** W4 专用会话（付费调用）
 **Task type:** spike
 **Files:** tests/acceptance/m1a-owner-book.test.ts, .workflow/evidence/m1a/owner/
 **Read first:** `.workflow/specs/m1a-project.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
 **Check:** 指定现有共享账本 `NL_USAGE_LEDGER` 后执行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → 按 W4 写脱敏的差异、耗费和重启报告。W4 的比较口径见下文“W4 口径”。严格回放不能替代本 Check。
 
-**付费调用：** 只由协调者在交接中明确指定的串行主线会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
+**付费调用：** 仅本轮获授权的 W4 会话发出 W4 付费调用，每次按共享 CSV 格式追加 `M1a W4` 用量行，与并行的 M1b 分开记录。其他会话使用 `NL_REPLAY=strict` 回放；凭据、共享账本路径和私有录制不提交。
 **Base commit:** ea99733e566c72be5873d6507a07de37ef7b40ba
-**Status:** blocked
+**Status:** active
 
-- [ ] W4 待[所有者评审](../../owner-review.md)：真书已测，最佳 0.76144，未达 0.90。不再付费跑 W4；恢复和综合修复已在 `f9dd863` 单独合入 main，通过的分块 fixture 仍缺，严格门槛保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。[M1b/11](../m1b-production/11-m1b-owner-book.md) 使用已落地的代码，不以本项比较验收为前置；其真书验收不算本项通过。
+- [ ] W4：历史最佳 0.76144，未达 0.90。用重新取得的《野叟曝言》首卷继续付费验证，在固定共识上达到门槛，保全已确认条目，重开零请求，并生成 `evidence/m1a/owner/chunked-run.json` 和重启报告。[M1b/11](../m1b-production/11-m1b-owner-book.md) 的真书验收不算本项通过。
 
-所有者更新的[全项目硬上限](../../delivery-plan.md#测试模型与额度)为 **2,000 万（20M）tokens（含视觉与审稿模型）、500 张图**；下文的历史试跑额度不变，也不授权再次付费跑 W4。
+2026-11-24，所有者将全项目硬上限提高到 **20 亿（2B）tokens、500 张图**，并授权 W4 与 M1b 并行；此更新取代历史用量计划的全项目上限及停止 W4 付费的决定。本轮 W4 只使用文本模型，不生成图片；复用可用预览和已完成的提取检查点。
+
+选取重跑设置 `NL_OWNER_BOOK_SELECTION_SOURCE` 与不同的 `NL_OWNER_BOOK_RUN_DIR`。`NL_OWNER_BOOK_SYNTHESIS_MODEL` 保持为存档的提取模型（默认 `devin-swe-2`）；可用 `NL_OWNER_BOOK_SELECTION_MODEL` 单独试用另一支持的模型。恢复不得重新请求预览或提取。
 
 ## W4 口径
 
@@ -31,7 +33,7 @@
 - Check after: `6f47b58` 上运行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → `Tests  1 failed (1)`，两次都停在第二包。分块比较、已确认设定保全与完成后重启零调用未验证；未生成严格回放 fixture。
 - 从维基文库 EPUB 重建同一目录版本的公版《野叟曝言》TXT。首卷 7 回正文逐段与网页一致，但新 TXT 的 SHA-256 不等同于旧收据。实际导入 20 卷／154 回；用量与断点见下文。
 
-## Blocked
+## 历史试跑
 
 从 73 事件续跑完成 7 包、81 事件，原 W4 归一化得分 0.08435。离线从原设定基线复用 63 组挑选记录，重建相同的冻结补丁并重新发布：重复 kind/ID 补丁行从 774 降为 0，已确认角色保持不变，重开零请求、结果一致。W4 得分 0.26530（37 条共识中匹配 30 条，输出 311 条），仍低于 0.90；本次只验证相同挑选记录下的修复效果，不提交 fixture，不开启付费窗口。
 
