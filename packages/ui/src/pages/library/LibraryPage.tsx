@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom'
 import { ProgressBar } from '../../components/Card'
 import { GradientCover } from '../../components/GradientCover'
 import { EmptyState, Page, PageAction } from '../../components/Page'
-import { Tabs } from '../../components/Tabs'
+import { Tabs, tabPanel } from '../../components/Tabs'
 import { scoped } from '../../i18n'
 import { productionRoutes, workRoute } from '../../routes/production'
 import type { LibraryWork } from '../../shell/AppShell'
@@ -225,16 +225,12 @@ export function LibraryPage() {
 					title={t('书库还是空的')}
 					text={t('导入一部小说原文，Novelive 会把它做成可以游玩的视觉小说。')}
 					card
-					actions={
-						<PageAction icon={FileUp} to={productionRoutes.import}>
-							{t('导入原文')}
-						</PageAction>
-					}
 				/>
 			) : (
 				<>
 					<div className={styles.tabs}>
 						<Tabs<Tab>
+							id="library"
 							label={t('书库')}
 							active={tab}
 							onChange={setTab}
@@ -245,7 +241,10 @@ export function LibraryPage() {
 						/>
 					</div>
 					{tab === 'projects' ? (
-						<section aria-label={t('我的工程')} className={styles.projects}>
+						<section
+							{...tabPanel('library', 'projects')}
+							className={styles.projects}
+						>
 							{library.unreadableCount > 0 && (
 								<p role="alert" className={styles.alert}>
 									{t('有 {{unreadableCount}} 部作品无法读取', {
@@ -304,7 +303,10 @@ export function LibraryPage() {
 							)}
 						</section>
 					) : (
-						<section aria-label={t('导入的作品')} className={styles.projects}>
+						<section
+							{...tabPanel('library', 'imported')}
+							className={styles.projects}
+						>
 							{packages.length === 0 ? (
 								<EmptyState
 									icon={PlayCircle}

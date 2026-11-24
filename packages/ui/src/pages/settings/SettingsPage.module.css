@@ -27,8 +27,8 @@
 .warning {
 	display: flex;
 	align-items: center;
-	gap: 14px;
-	padding: 14px 18px;
+	gap: var(--space-px-14);
+	padding: var(--space-px-14) var(--space-px-18);
 }
 
 .cardHeader {
