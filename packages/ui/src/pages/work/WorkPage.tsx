@@ -17,7 +17,7 @@ const pageSize = 8
 
 function PhaseCard() {
 	const { snapshot } = useWorkProduction()
-	const { workId, phase, chapters } = snapshot
+	const { workId, phase, chapters, status } = snapshot
 	const published = chapters.filter(
 		(chapter) => chapter.status === 'published',
 	).length
@@ -52,7 +52,9 @@ function PhaseCard() {
 	return (
 		<section className={`${styles.panel} ${local.phase}`}>
 			<div>
-				<p className={styles.sectionLabel}>{t('制作中')}</p>
+				<p className={styles.sectionLabel}>
+					{status === 'stopped' ? t('已停止') : t('制作中')}
+				</p>
 				<p className={local.phaseText}>
 					{t('已发布 {{published}} / {{length}} 章', {
 						published,
@@ -130,7 +132,7 @@ export function WorkPage() {
 								{summary}
 							</p>
 						)}
-						{summary && summary.length > 120 && (
+						{summary && (
 							<button
 								className={styles.ghost}
 								type="button"
@@ -158,18 +160,6 @@ export function WorkPage() {
 										<span className={styles.name}>{name}</span>
 										<span className={styles.spacer} />
 										<ChapterState chapter={chapter} />
-										<span className={styles.rowActions}>
-											{chapter.status === 'published' && (
-												<Link
-													className={styles.ghost}
-													to={workRoute('play', workId)}
-													aria-label={t('游玩 {{value}}', { value: name })}
-												>
-													<Play aria-hidden="true" size={14} />
-													{t('游玩')}
-												</Link>
-											)}
-										</span>
 									</li>
 								)
 							})}

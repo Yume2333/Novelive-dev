@@ -1,7 +1,8 @@
 import type { ProductionSnapshot } from '@novelive/creator/contract'
-import { Check, Info } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { InfoTooltip } from '../../components/InfoTooltip'
 import { Page } from '../../components/Page'
 import { scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
@@ -135,10 +136,9 @@ function VisualChoices({ visual }: { visual: Visual }) {
 			title={
 				<span className={local.title}>
 					{t('确认角色与主视觉')}
-					<Info
-						className={local.info}
-						size={16}
-						aria-label={t('确认后开始制作第一章；第一章做完会再停一次。')}
+					<InfoTooltip
+						label={t('确认点说明')}
+						text={t('确认后开始制作第一章；第一章做完会再停一次。')}
 					/>
 				</span>
 			}

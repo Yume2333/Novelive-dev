@@ -1,5 +1,5 @@
 import type { ProductionSnapshot } from '@novelive/creator/contract'
-import { CircleAlert, CircleCheck, LoaderCircle } from 'lucide-react'
+import { CircleAlert, CircleCheck, Clapperboard } from 'lucide-react'
 import { msg, scoped } from '../../i18n'
 import styles from './Production.module.css'
 
@@ -31,15 +31,9 @@ export function ChapterState({ chapter }: { chapter: Chapter }) {
 			) : (
 				<span className={styles.pill} data-status={chapter.status}>
 					{chapter.status === 'producing' && (
-						<LoaderCircle
-							className={styles.spin}
-							aria-hidden="true"
-							size={12}
-						/>
+						<Clapperboard aria-hidden="true" size={12} />
 					)}
-					{chapter.status === 'producing'
-						? t(stepName[chapter.step])
-						: t('等待')}
+					{chapter.status === 'producing' ? t('制作中') : t('等待')}
 				</span>
 			)}
 			{chapter.issue && (

@@ -1,5 +1,6 @@
-import { Info, Play } from 'lucide-react'
+import { Play } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import { InfoTooltip } from '../../components/InfoTooltip'
 import { Page } from '../../components/Page'
 import { scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
@@ -27,10 +28,9 @@ export function ConfirmFirstPage() {
 			title={
 				<span className={local.title}>
 					{t('第一章成品')}
-					<Info
-						className={local.info}
-						size={16}
-						aria-label={t('确认后其余章节在后台按卷连续做，做完一章即可游玩。')}
+					<InfoTooltip
+						label={t('确认点说明')}
+						text={t('确认后其余章节在后台按卷连续做，做完一章即可游玩。')}
 					/>
 				</span>
 			}
