@@ -217,6 +217,14 @@ export async function quoteSpend(request: Request) {
 	}
 }
 
+export function isResponsesTerminal(type: unknown) {
+	return (
+		type === 'response.completed' ||
+		type === 'response.incomplete' ||
+		type === 'response.failed'
+	)
+}
+
 function observeUsage(response: Response, settle: (tokens: number) => void) {
 	if (!response.body) return response
 	let pending = ''
@@ -235,11 +243,7 @@ function observeUsage(response: Response, settle: (tokens: number) => void) {
 		}
 		const usage = totalUsage(row.usage)
 		if (usage !== undefined) settle(usage)
-		if (
-			row.type === 'response.completed' ||
-			row.type === 'response.incomplete' ||
-			row.type === 'response.failed'
-		) {
+		if (isResponsesTerminal(row.type)) {
 			const total = totalUsage(object(row.response).usage)
 			if (total !== undefined) settle(total)
 		}

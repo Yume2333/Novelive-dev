@@ -572,6 +572,10 @@ test('strict misses fail closed; replay misses and the unset mode use the inject
 test.each([
 	['OpenAI Chat Completions', 'data: [DONE]\n\n'],
 	['OpenAI Responses', 'event: response.completed\r\ndata: {}\r\n\r\n'],
+	[
+		'OpenAI Responses without event name',
+		'data: {"type":"response.completed"}\n\n',
+	],
 	['Anthropic Messages', 'event: message_stop\ndata: {}\n\n'],
 	['partial event', 'data: [DONE]\n'],
 ])(

@@ -5,6 +5,7 @@ import { setTimeout } from 'node:timers/promises'
 import { arr, compile, int, obj, opt, str } from '@earendil-works/pi-schema'
 import {
 	inheritTextSettlement,
+	isResponsesTerminal,
 	type projectSpend,
 	quoteSpend,
 	requestedOutputTokens,
@@ -226,14 +227,20 @@ function terminalSse(bytes: Buffer) {
 	let data: string[] = []
 	for (const line of lines.slice(0, -1)) {
 		if (!line) {
+			const payload = data.join('\n')
 			if (
-				data.join('\n') === '[DONE]' ||
+				payload === '[DONE]' ||
 				(data.length > 0 &&
-					/^(?:message_stop|response\.(?:completed|failed|incomplete))$/.test(
-						event,
-					))
+					(event === 'message_stop' || isResponsesTerminal(event)))
 			)
 				return true
+			if (payload) {
+				try {
+					if (isResponsesTerminal(JSON.parse(payload)?.type)) return true
+				} catch {
+					// Only a complete SSE event can terminate a recording.
+				}
+			}
 			event = ''
 			data = []
 		} else if (line.startsWith('event:')) {
