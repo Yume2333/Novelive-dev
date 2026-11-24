@@ -7,13 +7,13 @@
 **Task type:** spike
 **Files:** tests/acceptance/m1a-owner-book.test.ts, .workflow/evidence/m1a/owner/
 **Read first:** `.workflow/specs/m1a-project.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
-**Check:** 离线重建带原文引用的时间线参照、重算留一基线，并完成下文「恢复步骤」中的测试接线和离线核验。付费获准后，由指定的 W4 会话设置 `NL_USAGE_LEDGER` 指向现有共享账本并执行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → 归一化分数 ≥ 0.90、已确认设定无丢失、重启零请求，写脱敏的差异、耗费和重启报告。W4 与 M1b/11 独立执行，严格回放不能替代本 Check。
+**Check:** 离线重建带原文引用的时间线参照、重算留一基线，先用此前最佳运行的已保存结果复评。如果仍需付费重跑，按下文「恢复步骤」完成测试接线和离线核验；获准后，由指定的 W4 会话设置 `NL_USAGE_LEDGER` 指向现有共享账本并执行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts`。验收要求归一化分数 ≥ 0.90、已确认设定无丢失、重启零请求；记录脱敏差异、耗费和重启结果。W4 与 M1b/11 独立执行，严格回放不能替代真卷证据。
 
 **付费调用：** 仅由协调者明确指定的 W4 会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，每次按共享 CSV 格式追加 `M1a W4` 用量行，与并行的 M1b 分开记录。其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向指定的 W4 会话请求录制。凭据、共享账本路径和私有录制不提交。
 **Base commit:** ea99733e566c72be5873d6507a07de37ef7b40ba
 **Status:** paused
 
-- [ ] 按[所有者选定的方案](../../owner-review.md)重建《野叟曝言》首卷的时间线参照并重跑 W4。原最佳 **0.89461** 未达 **0.90**；重建不改评分器或门槛。严格门槛测试保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。[M1b/11](../m1b-production/11-m1b-owner-book.md) 独立验收和记账，不以本项为前置，也不能替代本项验收。
+- [ ] 按[所有者选定的方案](../../owner-review.md)重建《野叟曝言》首卷的时间线参照，先离线复评已保存的最佳运行，再决定是否需要重跑 W4。原最佳 **0.89461** 未达 **0.90**；重建不改评分器或门槛。严格门槛测试保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。[M1b/11](../m1b-production/11-m1b-owner-book.md) 独立验收和记账，不以本项为前置，也不能替代本项验收。
 
 2026-11-24，所有者将[全项目硬上限](../../delivery-plan.md#测试模型与额度)提高到 **20 亿（2B）tokens（含视觉与审稿模型）、500 张图**，并授权 W4 与 M1b 并行；下文的历史试跑额度不变。已完成的本轮 W4 只使用文本模型，不生成图片，复用了可用预览和已完成的提取检查点。额度不代表当前授权恢复付费。
 
@@ -38,8 +38,11 @@
 
 固定参照没有时间线共识，最佳结果的 7 条时间线都计为多报。所有者已同意从原书引用段落重建时间线参照；停会前已开始，未找到可交接的重建结果。评分器和 **0.90** 门槛不变。
 
-1. 离线核对引用、重算留一基线；修改 `tests/acceptance/m1a-owner-book.test.ts` 的参照输入，让 W4 实际使用重建后的参照和对应基线，不再读取固定的 `whole-runs.json` 作为本轮参照。
-2. 恢复时显式提供现有运行目录（`NL_OWNER_BOOK_RUN_DIR`），并用 `NL_OWNER_BOOK_EXPECT_RESUME=1` 要求全流程续跑确实读到已有检查点，不走默认新建目录。若只重跑挑选，则以 `NL_OWNER_BOOK_SELECTION_SOURCE` 指向已有项目检查点、另设运行目录，不使用全流程续跑开关。离线确认测试读到新参照和旧检查点，不重发已完成的预览或提取；两项确认后才允许启动付费重跑。
+1. **下一步：离线复评已完成的最佳运行。** 从私有存档取回已发布到工程内的综合结果补丁及当时的初始已确认人物，用现有 `scoreAgainstConsensus` 针对重建参照重算留一基线及分数。不重开制作、不发请求。该运行的补丁已应用，不能当作未完成断点；若私有存档不可用，先记录缺失，不用旧分数代替复评。
+2. **仅续跑未完成的提取。** 如果另有未应用（`applied: false`）且已保存提取事件的断点，用 `NL_OWNER_BOOK_RUN_DIR` 指向其现有运行目录，并设 `NL_OWNER_BOOK_EXPECT_RESUME=1`，不走默认新建目录。这不是复评最佳运行的路径。
+3. **仅重跑挑选。** 若复评后仍需新的挑选结果，用 `NL_OWNER_BOOK_SELECTION_SOURCE` 指向已完成提取、已应用补丁的原项目，另设 `NL_OWNER_BOOK_RUN_DIR` 保存派生运行，不设全流程续跑开关。不重发预览或提取。
+
+任何付费重跑前，修改 `tests/acceptance/m1a-owner-book.test.ts` 的参照输入，使测试使用重建参照而非固定的 `whole-runs.json`；离线确认评分使用新参照，所选路径加载了正确的旧检查点。
 
 ## 历史试跑
 
