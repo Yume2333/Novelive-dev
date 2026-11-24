@@ -326,7 +326,7 @@ test('continuing an existing CSV claims only its matching legacy reservations', 
 		const csv = join(dir, 'usage.csv')
 		await writeFile(
 			csv,
-			'2026-01-01,image,1,16000,1,reservation\n2026-01-01,image,1,7000,1,reservation\n',
+			'2026-01-01,image,1,16000,1,reservation\n2026-01-01,image,1,0,0,cassette recording (reserved output tokens)\n2026-01-01,image,1,7000,1,reservation\n',
 		)
 		vi.stubEnv('NL_USAGE_CSV', csv)
 		vi.stubEnv('NL_RUN_ID', 'continuing')

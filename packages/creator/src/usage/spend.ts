@@ -323,7 +323,11 @@ function spendLedger(database: DatabaseSync, runId: string | null) {
 		throw error
 	}
 	if (!usage) return
-	const quotes = usage.split(/\r?\n/).map((line) => line.split(',').slice(3, 5))
+	const quotes = usage
+		.split(/\r?\n/)
+		.map((line) => line.split(',').slice(3, 5))
+		.filter(([tokens, images]) => tokens !== '0' || images !== '0')
+	if (!quotes.length) return
 	const suffix = database
 		.prepare(
 			'SELECT id, tokens, images, run_id FROM spend_reservation ORDER BY id DESC LIMIT ?',
