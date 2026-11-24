@@ -58,7 +58,7 @@ export function WelcomePage() {
 		return saved
 	}, [])
 	const finish = () =>
-		navigate(path === 'create' ? productionRoutes.import : '/')
+		navigate(path === 'create' ? productionRoutes.import : '/?tab=imported')
 
 	return (
 		<main className={styles.page}>

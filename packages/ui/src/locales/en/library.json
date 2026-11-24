@@ -17,6 +17,7 @@
 	"已发布 {{published}} / {{chapters}} 章": "Published {{published}} / {{chapters}} chapters",
 	"已导入为新工程，可以在书库中编辑。": "Imported as a new project. You can edit it in the library.",
 	"已导入或更新 {{count}} 部作品。": "{{count}} work(s) imported or updated.",
+	"开始引导": "Start setup",
 	"我的工程": "My projects",
 	"无法导入为工程，请重试。": "Couldn't import as a project. Please try again.",
 	"无法导入作品包，请重试。": "Couldn't import the work package. Please try again.",
