@@ -613,6 +613,7 @@ export function PlayerControls({
 									workId={workId}
 									progress={progress}
 									history={history}
+									chapters={chapters}
 									legacySaves={legacySaves}
 									onSave={onSave}
 									onLoad={onLoad}
