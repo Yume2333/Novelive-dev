@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto'
+import { join } from 'node:path'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import { compile, type Schema } from '@earendil-works/pi-schema'
 import OpenAI, { toFile } from 'openai'
@@ -103,6 +105,11 @@ function imageRequest(
 ) {
 	let saveGeneration: (() => Promise<void>) | undefined
 	let saveDownload: (() => Promise<void>) | undefined
+	const checkpointDirectory = generationReplay?.checkpointDirectory
+	const responseId = checkpointDirectory
+		? randomBytes(32).toString('hex')
+		: undefined
+	let downloadResponseId = responseId
 	const provider = imageProvider(config.baseUrl, config.model)
 	const timeout = 90_000
 	const upstream = generationReplay?.fetch ?? globalThis.fetch
@@ -110,6 +117,11 @@ function imageRequest(
 		createReplayFetch({
 			...generationReplay,
 			checkpointResponse: hasSettledImage,
+			checkpointResponseId: responseId,
+			onCheckpointHit: (allowance, id) => {
+				downloadResponseId = id
+				generationReplay?.onCheckpointHit?.(allowance, id)
+			},
 			onCheckpointReply: (save) => {
 				saveGeneration = save
 			},
@@ -128,15 +140,6 @@ function imageRequest(
 		}),
 	)
 	const metered = isSpendGuardedFetch(replay.fetch)
-	const download = createReplayFetch({
-		...generationReplay,
-		checkpointResponse: (response) => response.ok,
-		onCheckpointReply: (save) => {
-			saveDownload = save
-		},
-		fetch: imageDownloadUpstream(config.baseUrl, generationReplay?.fetch),
-		spend: undefined,
-	})
 	const client = new OpenAI({
 		baseURL: config.baseUrl,
 		apiKey: config.apiKey,
@@ -247,6 +250,19 @@ function imageRequest(
 					url.host = relay.host
 				}
 				await saveGeneration?.()
+				const download = createReplayFetch({
+					...generationReplay,
+					checkpointDirectory:
+						checkpointDirectory && downloadResponseId
+							? join(checkpointDirectory, 'downloads', downloadResponseId)
+							: undefined,
+					checkpointResponse: (response) => response.ok,
+					onCheckpointReply: (save) => {
+						saveDownload = save
+					},
+					fetch: imageDownloadUpstream(config.baseUrl, generationReplay?.fetch),
+					spend: undefined,
+				})
 				const deadline = AbortSignal.timeout(90_000)
 				const downloadSignal = signal
 					? AbortSignal.any([signal, deadline])

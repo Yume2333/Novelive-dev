@@ -891,6 +891,61 @@ test.each([false, true])(
 	},
 )
 
+test('drawing checkpoints bind shared download URLs to their generation response', async () => {
+	vi.stubEnv('NL_REPLAY', '')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '10')
+	using database = new DatabaseSync(':memory:')
+	const root = await mkdtemp(join(tmpdir(), 'm1b-draw-replies-'))
+	try {
+		let generations = 0
+		const fetch = vi.fn<typeof globalThis.fetch>(async (input) => {
+			if (new Request(input).method === 'GET')
+				return new Response(`bytes-${generations}`)
+			generations++
+			return Response.json({
+				data: [{ url: 'https://relay.invalid/v1/same-image.png' }],
+				usage: { total_tokens: 7000 },
+			})
+		})
+		const renderer = () =>
+			imageRenderer(
+				{
+					...configuration.models.image,
+					baseUrl: 'https://relay.invalid/v1',
+					model: 'gpt-image-2.6-sunburst',
+					upscaleTier: 'anime',
+				},
+				{
+					replay: {
+						checkpointDirectory: root,
+						fetch,
+						spend: projectSpend(database),
+					},
+				},
+			)
+		const size = { width: 1024, height: 1024 }
+		const first = renderer()
+		await expect(first('first', [], size, false)).resolves.toEqual({
+			bytes: Buffer.from('bytes-1'),
+		})
+		await expect(first('second', [], size, false)).resolves.toEqual({
+			bytes: Buffer.from('bytes-2'),
+		})
+		expect(fetch).toHaveBeenCalledTimes(4)
+		const reopened = renderer()
+		await expect(reopened('second', [], size, false)).resolves.toEqual({
+			bytes: Buffer.from('bytes-2'),
+		})
+		await expect(reopened('first', [], size, false)).resolves.toEqual({
+			bytes: Buffer.from('bytes-1'),
+		})
+		expect(fetch).toHaveBeenCalledTimes(4)
+	} finally {
+		await rm(root, { recursive: true, force: true })
+	}
+})
+
 test('exhausted image and token caps block image edits, generation, and visual review', async () => {
 	vi.stubEnv('NL_REPLAY', '')
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '0')
