@@ -18,6 +18,7 @@ type PlanBudget = {
 	limit: number
 	references: (registry: AssetRegistry) => Iterable<string>
 	previousBases: ReadonlyMap<string, string>
+	reusedPlaceholders?: ReadonlySet<string>
 }
 
 export function playbackAssetIds(scenes: readonly CompiledScene[]) {
@@ -194,10 +195,9 @@ export function planArt(
 		entries: [...entries.values()],
 	}
 	if (budget) {
-		const reused = (id: string) => entries.get(id)?.status === 'drawn'
 		const needed = new Set(budget.references(registry))
 		for (const id of needed) {
-			if (reused(id)) continue
+			if (entries.get(id)?.status === 'drawn') continue
 			const job = jobs.get(id)
 			const baseId =
 				job && 'baseAssetId' in job
@@ -205,7 +205,11 @@ export function planArt(
 					: budget.previousBases.get(id)
 			if (baseId) needed.add(baseId)
 		}
-		const newImages = [...needed].filter((id) => !reused(id))
+		const newImages = [...needed].filter(
+			(id) =>
+				entries.get(id)?.status !== 'drawn' &&
+				!budget.reusedPlaceholders?.has(id),
+		)
 		if (newImages.length > budget.limit)
 			throw new Error(
 				`Chapter needs ${newImages.length} new provider images; budget is ${budget.limit}. Over-budget assets: ${newImages.slice(budget.limit).join(', ')}`,

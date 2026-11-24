@@ -1173,7 +1173,7 @@ export class ChapterScheduler {
 			JOIN task i ON i.task_id = d.depends_on AND i.kind = 'image'
 			JOIN asset a ON a.work_id = i.work_id AND a.asset_key = i.ref_id
 			WHERE c.work_id = ? AND c.kind = 'chapter' AND c.phase = 'await_draw'
-				AND c.status NOT IN ('done', 'running') AND a.status <> 'drawn'
+				AND c.status NOT IN ('done', 'running') AND a.status NOT IN ('drawn', 'placeholder')
 			GROUP BY c.task_id HAVING COUNT(*) > ?`,
 			workId,
 			budget,

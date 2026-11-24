@@ -353,8 +353,14 @@ export function chapterWorker(
 				const registry = await service.registry()
 				const limit = chapterImageBudget(project.database, work.workId)
 				const previousBases = new Map<string, string>()
+				const reusedPlaceholders = new Set<string>()
 				if (limit !== undefined) {
 					for (const entry of registry.entries) {
+						if (
+							entry.status === 'placeholder' &&
+							(await existing(() => project.readFile(entry.path)))
+						)
+							reusedPlaceholders.add(entry.id)
 						if (
 							entry.status === 'drawn' ||
 							!['expression', 'variant'].includes(entry.type)
@@ -376,6 +382,7 @@ export function chapterWorker(
 							: {
 									limit,
 									previousBases,
+									reusedPlaceholders,
 									paragraphIds: chapter.paragraphs.map(({ id }) => id),
 									speakers: options.script.speakers,
 								},

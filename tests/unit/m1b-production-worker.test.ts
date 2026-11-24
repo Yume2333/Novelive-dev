@@ -219,15 +219,21 @@ test('a painter format error after one repair materializes both base and variant
 })
 
 test('a later volume publishes with the reason from a reused series placeholder', async () => {
+	vi.stubEnv('NL_RUN_ID', 'offline-placeholder')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '5')
 	const { projectDir, workId } = await fixture()
 	using project = await Project.open(projectDir)
 	const work = await project.read(projectFiles.work('v0001', workId))
 	const config = createConfigStore(directory)
 	await config.update(configuration)
 	const models = await productionModels(config)
-	const fetch = vi.fn<typeof globalThis.fetch>(async () => {
-		throw new Error('Reusing a placeholder must not call a model')
-	})
+	const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+		completion({
+			patch: 'PUT <4:\n@show ada/uniform/neutral center',
+			items: [],
+			merges: {},
+		}),
+	)
 	const first = chapterWorker(project, 'v0001', work, models, { fetch })
 	const issue = '本地去背景不可用；请使用可返回透明底的图片模型。'
 	const [job] = await first
@@ -253,13 +259,14 @@ test('a later volume publishes with the reason from a reused series placeholder'
 	const { worker } = chapterWorker(project, 'v0002', laterWork, models, {
 		fetch,
 	})
+	await project.writeFile(
+		`source/production/${laterWork.chapterIds[0]}/draft.nvs`,
+		'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n',
+	)
 	const queue = new ChapterScheduler(project.database, {
 		...worker,
 		async write() {},
 		async review() {},
-		async stage() {
-			return [job]
-		},
 	})
 	try {
 		queue.start(laterWork.workId, [laterWork.chapterIds[0]])
@@ -268,7 +275,10 @@ test('a later volume publishes with the reason from a reused series placeholder'
 		expect(queue.snapshot(laterWork.workId).chapters).toMatchObject([
 			{ status: 'published', issue: `1 张图用了占位图；${issue}` },
 		])
-		expect(fetch).not.toHaveBeenCalled()
+		expect(fetch).toHaveBeenCalledTimes(1)
+		expect(String(fetch.mock.calls[0][1]?.body)).toContain(
+			'Hard limit for this whole chapter: 0',
+		)
 	} finally {
 		queue.dispose()
 	}
