@@ -46,7 +46,9 @@ test.describe('M3 player controls', () => {
 		})
 		try {
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await app.evaluate(({ dialog }, path) => {
 				dialog.showOpenDialog = async () => ({
 					canceled: false,
@@ -113,7 +115,9 @@ test.describe('M3 player controls', () => {
 		})
 		try {
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await app.evaluate(({ dialog }, path) => {
 				dialog.showOpenDialog = async () => ({
 					canceled: false,
@@ -247,7 +251,9 @@ test.describe('M3 player controls', () => {
 				env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
 			})
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await page.evaluate((id) => {
 				window.location.hash = `/work/${id}/play`
 			}, playerWorkId)
@@ -667,7 +673,9 @@ test.describe('M3 player controls', () => {
 			})
 			try {
 				const page = await app.firstWindow()
-				await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+				await expect(
+					page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+				).toHaveText('创作端已就绪')
 				await page.evaluate(() => {
 					document.body.dataset.playerWaitEntries = '0'
 					window.addEventListener('novelive:player-waiting', (event) => {

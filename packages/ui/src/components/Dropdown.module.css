@@ -2,7 +2,7 @@
 	position: fixed;
 	z-index: 150;
 	min-width: 180px;
-	padding: 6px;
+	padding: var(--space-px-6);
 	border-radius: var(--radius-lg);
 	background: var(--veil-95);
 	animation: fade-up var(--dur-fast) var(--ease-out);
@@ -11,9 +11,9 @@
 .item {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: var(--space-px-10);
 	width: 100%;
-	padding: 9px var(--space-3);
+	padding: var(--space-px-9) var(--space-3);
 	border-radius: var(--radius-md);
 	color: var(--color-on-surface);
 	font-size: 13px;

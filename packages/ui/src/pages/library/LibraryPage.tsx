@@ -8,11 +8,11 @@ import {
 	PlayCircle,
 } from 'lucide-react'
 import { type ReactNode, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ProgressBar } from '../../components/Card'
 import { GradientCover } from '../../components/GradientCover'
 import { EmptyState, Page, PageAction } from '../../components/Page'
-import { Tabs } from '../../components/Tabs'
+import { Tabs, tabPanel } from '../../components/Tabs'
 import { scoped } from '../../i18n'
 import { productionRoutes, workRoute } from '../../routes/production'
 import type { LibraryWork } from '../../shell/AppShell'
@@ -133,7 +133,10 @@ export function LibraryPage() {
 	const [library, setLibrary] = useState<CommandOutput<'library.list'>>()
 	const [error, setError] = useState(false)
 	const [revision, setRevision] = useState(0)
-	const [tab, setTab] = useState<Tab>('projects')
+	const [searchParams] = useSearchParams()
+	const [tab, setTab] = useState<Tab>(
+		searchParams.get('tab') === 'imported' ? 'imported' : 'projects',
+	)
 	const share = window.novelive.host.share
 	const installed = window.novelive.host.installed
 	const [packages, setPackages] = useState<
@@ -226,15 +229,16 @@ export function LibraryPage() {
 					text={t('导入一部小说原文，Novelive 会把它做成可以游玩的视觉小说。')}
 					card
 					actions={
-						<PageAction icon={FileUp} to={productionRoutes.import}>
-							{t('导入原文')}
-						</PageAction>
+						<Link className="nl-btn nl-btn-ghost" to="/welcome">
+							{t('开始引导')}
+						</Link>
 					}
 				/>
 			) : (
 				<>
 					<div className={styles.tabs}>
 						<Tabs<Tab>
+							id="library"
 							label={t('书库')}
 							active={tab}
 							onChange={setTab}
@@ -245,7 +249,10 @@ export function LibraryPage() {
 						/>
 					</div>
 					{tab === 'projects' ? (
-						<section aria-label={t('我的工程')} className={styles.projects}>
+						<section
+							{...tabPanel('library', 'projects')}
+							className={styles.projects}
+						>
 							{library.unreadableCount > 0 && (
 								<p role="alert" className={styles.alert}>
 									{t('有 {{unreadableCount}} 部作品无法读取', {
@@ -263,6 +270,7 @@ export function LibraryPage() {
 												className={`label-caps label-caps-zh ${styles.groupTitle}`}
 											>
 												{group.title}
+												<span className={styles.groupPath}>{group.key}</span>
 											</h2>
 										)}
 										{group.volumes.map((volume) => (
@@ -304,7 +312,10 @@ export function LibraryPage() {
 							)}
 						</section>
 					) : (
-						<section aria-label={t('导入的作品')} className={styles.projects}>
+						<section
+							{...tabPanel('library', 'imported')}
+							className={styles.projects}
+						>
 							{packages.length === 0 ? (
 								<EmptyState
 									icon={PlayCircle}

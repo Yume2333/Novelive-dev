@@ -3,7 +3,7 @@
 	align-items: center;
 	justify-content: center;
 	gap: var(--space-2);
-	padding: 10px 20px;
+	padding: var(--space-px-10) var(--space-px-20);
 	border-radius: var(--radius-md);
 	font-size: 12px;
 	font-weight: 600;
@@ -19,8 +19,8 @@
 }
 
 .sm {
-	gap: 5px;
-	padding: 5px 10px;
+	gap: var(--space-px-5);
+	padding: var(--space-px-5) var(--space-px-10);
 	font-size: 11px;
 }
 
@@ -62,5 +62,5 @@
 }
 
 .spin {
-	animation: spin 1.2s linear infinite;
+	animation: spin var(--dur-spin) linear infinite;
 }

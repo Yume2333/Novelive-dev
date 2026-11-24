@@ -46,7 +46,9 @@ for (const format of ['epub', 'docx'] as const) {
 				[source, projects],
 			)
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await page.getByRole('link', { name: '导入原文' }).click()
 			await page.getByRole('button', { name: '选择原文', exact: true }).click()
 			await page.getByRole('button', { name: '选择文件夹' }).click()

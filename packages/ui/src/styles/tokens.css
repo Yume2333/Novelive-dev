@@ -267,3 +267,23 @@
 	--cover-title: rgba(255, 255, 255, 0.92);
 	--cover-title-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
+
+/* Off-scale spacing kept from the prototype for exact parity. */
+:root {
+	--space-px-2: 2px;
+	--space-px-3: 3px;
+	--space-px-5: 5px;
+	--space-px-6: 6px;
+	--space-px-7: 7px;
+	--space-px-9: 9px;
+	--space-px-10: 10px;
+	--space-px-11: 11px;
+	--space-px-14: 14px;
+	--space-px-18: 18px;
+	--space-px-20: 20px;
+	--dur-cover: 300ms;
+	--dur-spin: 1200ms;
+	--dur-blink: 1100ms;
+	--dur-sheen: 2400ms;
+	--dur-pulse: 4000ms;
+}

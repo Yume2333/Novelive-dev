@@ -125,6 +125,7 @@
 	"鉴权失败，请检查接口地址、API Key 和模型名。": "Authentication failed; check the API endpoint, API Key, and model name.",
 	"预设名称": "Preset name",
 	"高": "High",
+	"高级": "Advanced",
 	"高级设置": "Advanced settings",
 	"高级设置已保存": "Advanced settings saved",
 	"默认工程位置": "Default project location"

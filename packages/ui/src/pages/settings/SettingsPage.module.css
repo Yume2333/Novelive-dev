@@ -27,8 +27,8 @@
 .warning {
 	display: flex;
 	align-items: center;
-	gap: 14px;
-	padding: 14px 18px;
+	gap: var(--space-px-14);
+	padding: var(--space-px-14) var(--space-px-18);
 }
 
 .cardHeader {
@@ -389,4 +389,17 @@
 	.postProcess {
 		grid-template-columns: minmax(0, 1fr);
 	}
+}
+
+.page h2.advanced {
+	margin: 0 0 var(--space-2);
+	font-size: inherit;
+}
+
+.advanced .expand {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-6);
+	color: var(--color-on-surface-variant);
 }

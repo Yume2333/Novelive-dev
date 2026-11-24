@@ -11,6 +11,7 @@ import en_production from './en/production.json'
 import en_settings from './en/settings.json'
 import en_shell from './en/shell.json'
 import en_usage from './en/usage.json'
+import en_welcome from './en/welcome.json'
 import en_work from './en/work.json'
 import ja_agent from './ja/agent.json'
 import ja_bible from './ja/bible.json'
@@ -25,6 +26,7 @@ import ja_production from './ja/production.json'
 import ja_settings from './ja/settings.json'
 import ja_shell from './ja/shell.json'
 import ja_usage from './ja/usage.json'
+import ja_welcome from './ja/welcome.json'
 import ja_work from './ja/work.json'
 import zhCN_agent from './zh-CN/agent.json'
 import zhCN_bible from './zh-CN/bible.json'
@@ -39,6 +41,7 @@ import zhCN_production from './zh-CN/production.json'
 import zhCN_settings from './zh-CN/settings.json'
 import zhCN_shell from './zh-CN/shell.json'
 import zhCN_usage from './zh-CN/usage.json'
+import zhCN_welcome from './zh-CN/welcome.json'
 import zhCN_work from './zh-CN/work.json'
 import zhTW_agent from './zh-TW/agent.json'
 import zhTW_bible from './zh-TW/bible.json'
@@ -53,6 +56,7 @@ import zhTW_production from './zh-TW/production.json'
 import zhTW_settings from './zh-TW/settings.json'
 import zhTW_shell from './zh-TW/shell.json'
 import zhTW_usage from './zh-TW/usage.json'
+import zhTW_welcome from './zh-TW/welcome.json'
 import zhTW_work from './zh-TW/work.json'
 
 export const locales = ['zh-CN', 'zh-TW', 'en', 'ja'] as const
@@ -71,6 +75,7 @@ export const namespaces = [
 	'settings',
 	'shell',
 	'usage',
+	'welcome',
 	'work',
 ] as const
 
@@ -89,6 +94,7 @@ export const resources = {
 		settings: zhCN_settings,
 		shell: zhCN_shell,
 		usage: zhCN_usage,
+		welcome: zhCN_welcome,
 		work: zhCN_work,
 	},
 	'zh-TW': {
@@ -105,6 +111,7 @@ export const resources = {
 		settings: zhTW_settings,
 		shell: zhTW_shell,
 		usage: zhTW_usage,
+		welcome: zhTW_welcome,
 		work: zhTW_work,
 	},
 	en: {
@@ -121,6 +128,7 @@ export const resources = {
 		settings: en_settings,
 		shell: en_shell,
 		usage: en_usage,
+		welcome: en_welcome,
 		work: en_work,
 	},
 	ja: {
@@ -137,6 +145,7 @@ export const resources = {
 		settings: ja_settings,
 		shell: ja_shell,
 		usage: ja_usage,
+		welcome: ja_welcome,
 		work: ja_work,
 	},
 }

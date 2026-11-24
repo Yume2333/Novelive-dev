@@ -33,10 +33,11 @@ import {
 import { Dropdown } from '../components/Dropdown'
 import { GradientCover } from '../components/GradientCover'
 import { ScrollArea } from '../components/ScrollArea'
-import { msg, scoped, setLocale } from '../i18n'
+import { msg, scoped } from '../i18n'
 import { AgentPanel } from '../panels/agent/AgentPanel'
 import { workRoute } from '../routes/production'
 import styles from './AppShell.module.css'
+import { useAppearance } from './appearance'
 import markLight from './brand/novelive-mark.svg'
 import markDark from './brand/novelive-mark-dark.svg'
 import { GlobalProductionQueue } from './GlobalProductionQueue'
@@ -73,6 +74,16 @@ export type LibraryWork = CommandOutput<'library.list'>['works'][number] & {
 		volumeTitle: string
 		volumeIndex: number
 	}
+}
+
+type InstalledWork = Awaited<
+	ReturnType<NonNullable<typeof window.novelive.host.installed>['list']>
+>[number]
+
+/** Recent imported packages are stored as `package:<workId>:<version>`. */
+function parsePackageRef(ref: string | undefined) {
+	const match = ref?.match(/^package:([^:]+):(.+)$/)
+	return match ? { workId: match[1], version: match[2] } : undefined
 }
 
 function readRecentWork() {
@@ -123,14 +134,23 @@ export function AppShell() {
 	const navigate = useNavigate()
 	const [works, setWorks] = useState<LibraryWork[]>([])
 	const [recentWorkId, setRecentWorkId] = useState(readRecentWork)
-	const workId = routeWorkId ?? recentWorkId
+	const installed = window.novelive.host.installed
+	const [packages, setPackages] = useState<InstalledWork[]>([])
+	const packageRef = routeWorkId ? undefined : parsePackageRef(recentWorkId)
+	const recentPackage = packageRef
+		? packages.find(
+				(item) =>
+					item.workId === packageRef.workId &&
+					String(item.version) === packageRef.version,
+			)
+		: undefined
+	const workId = routeWorkId ?? (packageRef ? undefined : recentWorkId)
 	const work = works.find((item) => item.workId === workId)
 	const [agentOpen, setAgentOpen] = useState(false)
 	const [agentFull, setAgentFull] = useState(false)
 	const [agentPosition, setAgentPosition] =
 		useState<CommandInput<'chat.send'>['position']>()
-	const theme = config && 'theme' in config ? config.theme : 'system'
-	const language = config && 'language' in config ? config.language : undefined
+	const { theme } = useAppearance(config)
 	const { i18n } = useTranslation()
 	const updateConfig = useCallback(async (patch: ConfigUpdate) => {
 		const saved = await window.novelive.call('config.update', patch).promise
@@ -140,21 +160,6 @@ export function AppShell() {
 	const resetConfig = useCallback(async () => {
 		setConfig(await window.novelive.call('config.reset', {}).promise)
 	}, [])
-
-	useEffect(() => {
-		if (language) setLocale(language)
-	}, [language])
-
-	useEffect(() => {
-		const query = window.matchMedia('(prefers-color-scheme: dark)')
-		const apply = () => {
-			document.documentElement.dataset.theme =
-				theme === 'system' ? (query.matches ? 'dark' : 'light') : theme
-		}
-		apply()
-		query.addEventListener('change', apply)
-		return () => query.removeEventListener('change', apply)
-	}, [theme])
 
 	useEffect(() => {
 		let active = true
@@ -230,7 +235,54 @@ export function AppShell() {
 		)
 		return () => request.cancel()
 	}, [ready, pathname])
+	// biome-ignore lint/correctness/useExhaustiveDependencies: refresh after navigation
+	useEffect(() => {
+		if (!installed) return
+		let active = true
+		void installed.list().then(
+			(list) => {
+				if (active) setPackages(list)
+			},
+			() => {},
+		)
+		return () => {
+			active = false
+		}
+	}, [installed, pathname])
 	const showWork = Boolean(routeWorkId || work)
+	const switchItems = [
+		...works.map((item) => ({
+			label: item.title,
+			icon: item.workId === workId ? Check : NotebookPen,
+			onSelect: () => navigate(workRoute('work', item.workId)),
+		})),
+		...packages.map((item) => {
+			const ref = `package:${item.workId}:${item.version}`
+			return {
+				label: t('{{title}} · v{{version}}', {
+					title: item.title,
+					version: item.version,
+				}),
+				icon: recentPackage === item ? Check : PlayCircle,
+				onSelect: () => {
+					setRecentWorkId(ref)
+					try {
+						localStorage.setItem(recentWorkKey, ref)
+					} catch {}
+				},
+			}
+		}),
+	]
+	const switcher = switchItems.length > 1 && (
+		<Dropdown
+			label={t('换一部作品')}
+			className={`nl-icon-btn ${styles.switcher}`}
+			trigger={
+				<ChevronsUpDown aria-hidden="true" size={17} strokeWidth={1.8} />
+			}
+			items={switchItems}
+		/>
+	)
 	useEffect(() => {
 		if (!showWork) return
 		const toggle = (event: KeyboardEvent) => {
@@ -277,6 +329,46 @@ export function AppShell() {
 								</NavItem>
 							))}
 						</nav>
+						{recentPackage && (
+							<>
+								<div
+									className={`label-caps label-caps-zh ${styles.sectionTitle}`}
+								>
+									{t('最近打开')}
+								</div>
+								<div className={styles.currentWork}>
+									<div className={styles.workCover}>
+										<GradientCover seed={recentPackage.workId} compact />
+									</div>
+									<div className={styles.workText}>
+										<div className={styles.workTitle}>
+											{recentPackage.title}
+										</div>
+										<div className={styles.workMeta}>
+											{t(
+												'v{{version}} · 已发布 {{published}} / {{chapters}} 章',
+												{
+													version: recentPackage.version,
+													published: recentPackage.published,
+													chapters: recentPackage.chapters,
+												},
+											)}
+										</div>
+									</div>
+									{switcher}
+								</div>
+								{recentPackage.published > 0 && (
+									<nav aria-label={t('作品导航')} className={styles.navigation}>
+										<NavItem
+											to={`/package/${recentPackage.workId}/${recentPackage.version}`}
+											icon={PlayCircle}
+										>
+											{t('游玩')}
+										</NavItem>
+									</nav>
+								)}
+							</>
+						)}
 						{workId && showWork && (
 							<>
 								<div
@@ -306,25 +398,7 @@ export function AppShell() {
 											</div>
 										)}
 									</div>
-									{works.length > 1 && (
-										<Dropdown
-											label={t('换一部作品')}
-											className={`nl-icon-btn ${styles.switcher}`}
-											trigger={
-												<ChevronsUpDown
-													aria-hidden="true"
-													size={17}
-													strokeWidth={1.8}
-												/>
-											}
-											items={works.map((item) => ({
-												label: item.title,
-												icon: item.workId === workId ? Check : NotebookPen,
-												onSelect: () =>
-													navigate(workRoute('work', item.workId)),
-											}))}
-										/>
-									)}
+									{switcher}
 								</div>
 								<nav aria-label={t('作品导航')} className={styles.navigation}>
 									{workNavigation.map(({ route, icon, name }) => (

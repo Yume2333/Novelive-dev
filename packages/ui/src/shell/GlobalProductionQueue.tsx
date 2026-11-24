@@ -89,16 +89,18 @@ export function GlobalProductionQueue() {
 			setBusy(false)
 		}
 	}
+	const waiting =
+		queue?.inactive.filter(
+			(work) =>
+				work.status === 'awaiting_confirm' ||
+				(work.status === 'paused' &&
+					work.reason !== 'stopped' &&
+					work.reason !== 'crashed'),
+		).length ?? 0
 	const tone =
 		queue?.active || queue?.queued.length
 			? 'producing'
-			: queue?.inactive.some(
-						(work) =>
-							work.status === 'awaiting_confirm' ||
-							(work.status === 'paused' &&
-								work.reason !== 'stopped' &&
-								work.reason !== 'crashed'),
-					)
+			: waiting
 				? 'confirm'
 				: queue?.inactive.some((work) => work.status === 'paused')
 					? 'stopped'
@@ -109,9 +111,6 @@ export function GlobalProductionQueue() {
 		stopped: t('已停止'),
 		idle: t('空闲'),
 	}[tone]
-	const waiting =
-		queue?.inactive.filter((work) => work.status === 'awaiting_confirm')
-			.length ?? 0
 	const detail = queue?.active
 		? queue.active.title
 		: tone === 'confirm'
