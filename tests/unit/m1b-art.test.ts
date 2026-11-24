@@ -923,6 +923,74 @@ test('an expression uses only the base and retries composition and blocking audi
 	}
 })
 
+test('a reduced-sensitivity expression audit checks the adapted saved cue independently', async () => {
+	const renderer = vi
+		.spyOn(artModels, 'imageRenderer')
+		.mockReturnValue(async (_prompt, _refs, { width, height }) => ({
+			bytes: await picture(width, height, true),
+		}))
+	const model = vi
+		.spyOn(artModels, 'artJson')
+		.mockImplementation(async (_connection, prompt) =>
+			prompt.startsWith('Visually audit')
+				? { pass: true, failedChecks: [], feedback: '' }
+				: prompt.includes('expression:')
+					? {
+							content: 'Ada tilts her head.',
+							expressionCue: 'One brow raised, eyes wide, lips parted.',
+						}
+					: { content: 'Ada in a blue uniform.' },
+		)
+	try {
+		await projectTest(async (project) => {
+			const baseArt = service(project, replay)
+			const originalCue = 'Morbid curiosity at a bloody sight'
+			const [base, expression] = await baseArt.register(
+				[
+					{ id: 'ada/uniform/neutral', kind: 'character', description: 'Ada' },
+					{
+						id: 'ada/uniform/curious',
+						kind: 'expression',
+						description: originalCue,
+					},
+				],
+				bible,
+			)
+			expect(await baseArt.draw(base, bible)).toEqual({ status: 'drawn' })
+			const art = new ArtProduction(project, {
+				main,
+				fast: main,
+				visual: main,
+				replay,
+				desensitized: true,
+				image: {
+					baseUrl: main.baseUrl,
+					apiKey: main.apiKey,
+					model: 'fixture-art-image',
+					nativeMaxEdge: 1536,
+					concurrency: 2,
+					retries: 1,
+					quality: 'medium',
+					postProcess: 'off',
+					upscaleTier: 'anime',
+				},
+			})
+			expect(await art.draw(expression, bible)).toEqual({ status: 'drawn' })
+			const audit = model.mock.calls.find(([, prompt]) =>
+				prompt.includes('Image 2 is the accepted base.'),
+			)?.[1]
+			expect(audit).toContain('Adapted image brief: Ada tilts her head.')
+			expect(audit).toContain(
+				"Saved expression cue (adapted; verify independently of the painter's rewrite): One brow raised, eyes wide, lips parted.",
+			)
+			expect(audit).not.toContain(originalCue)
+		})
+	} finally {
+		renderer.mockRestore()
+		model.mockRestore()
+	}
+})
+
 test('removes an opaque sprite background before validating and auditing the result', async () => {
 	const svg = Buffer.from(
 		'<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><path fill="#e8dfd7" d="M0 0h300v450H0z"/><ellipse fill="#3d2536" cx="150" cy="122" rx="49" ry="63"/><ellipse fill="#e1a07f" cx="150" cy="126" rx="36" ry="48"/><path fill="#5230a0" d="M112 175q-44 12-51 81l18 92 22-14 2 116h94l2-116 22 14 18-92q-7-69-51-81z"/></svg>',

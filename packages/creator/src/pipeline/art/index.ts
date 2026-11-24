@@ -47,7 +47,12 @@ type ReviewCheckpoint = {
 }
 type PaintContinuation =
 	| { prompt: string; png: string }
-	| { feedback: string; rewritten?: string; png?: string }
+	| {
+			feedback: string
+			rewritten?: string
+			expressionCue?: string
+			png?: string
+	  }
 type PendingPaint = PaintContinuation & {
 	settingsVersion: string
 	attempt: number
@@ -97,6 +102,10 @@ const auditSchema = obj({
 	styleReferenceFeedback: opt(str()),
 })
 const contentSchema = obj({ content: str({ minLength: 1 }) })
+const expressionContentSchema = obj({
+	content: str({ minLength: 1 }),
+	expressionCue: str({ minLength: 1 }),
+})
 
 function hasTextOnlyCharacterStyle(drawing: Drawing) {
 	return (
@@ -708,9 +717,11 @@ export class ArtProduction {
 		const moderationGuidance = this.options.desensitized
 			? 'Keep the adaptation non-graphic. Use implication instead of explicit detail.'
 			: undefined
+		const adaptExpression = expression && !!moderationGuidance
 		let attempt = 0
 		let legacyCheckpoint = !this.options.desensitized
 		let rewritten: string | undefined
+		let expressionCue: string | undefined
 		const settingsVersion = checkpoint
 			? createHash('sha256')
 					.update(
@@ -723,6 +734,7 @@ export class ArtProduction {
 								createHash('sha256').update(reference).digest('hex'),
 							),
 							...(moderationGuidance ? [moderationGuidance] : []),
+							...(adaptExpression ? ['adapted expression cue'] : []),
 						]),
 					)
 					.digest('hex')
@@ -786,6 +798,7 @@ export class ArtProduction {
 					if ('feedback' in pending) {
 						issue = feedback = pending.feedback
 						rewritten = pending.rewritten
+						expressionCue = pending.expressionCue
 						reviewed = pending.png
 							? Buffer.from(pending.png, 'base64')
 							: undefined
@@ -812,7 +825,10 @@ export class ArtProduction {
 			let content = rewritten
 			if (content === undefined) {
 				await savePaint({ feedback, png: reviewed?.toString('base64') })
-				const rewrite = await artJson(
+				const rewrite = await artJson<{
+					content: string
+					expressionCue?: string
+				}>(
 					painter,
 					[
 						'Write only visible content for the image; return JSON {"content":"..."}. Write positive factual prose, never negative prompts. Describe facial expression through brow, eye and mouth movements. For dark scenes use light, shadow and silhouettes. If moderation declined, omit graphic detail and use non-graphic visual atmosphere instead.',
@@ -820,18 +836,23 @@ export class ArtProduction {
 						expression
 							? `Character preservation context (not part of the expression cue): ${expressionPreservation(drawing)}.`
 							: undefined,
+						adaptExpression
+							? 'Also return "expressionCue": separately restate the saved expression requirement as non-graphic brow, eye and mouth movements. Preserve the requested emotion and intensity, independent of the painter content and retry feedback.'
+							: undefined,
 						feedback,
 						moderationGuidance,
 					]
 						.filter(Boolean)
 						.join('\n'),
-					contentSchema,
+					adaptExpression ? expressionContentSchema : contentSchema,
 					{ ...this.options, maxTokens: 1024 },
 				)
 				content = rewrite.content
+				expressionCue = rewrite.expressionCue
 				await savePaint({
 					feedback,
 					rewritten: content,
+					expressionCue,
 					png: reviewed?.toString('base64'),
 				})
 			}
@@ -841,7 +862,9 @@ export class ArtProduction {
 				input = promptDrawing,
 			) =>
 				drawingPrompt(
-					moderationGuidance ? { ...input, description: content } : input,
+					adaptExpression && expressionCue
+						? { ...input, description: expressionCue }
+						: input,
 					content,
 					issue,
 					firstReference,
@@ -969,6 +992,9 @@ export class ArtProduction {
 					moderationGuidance
 						? `Adapted image brief: ${content}`
 						: `Original image brief (verify independently of the painter's rewrite): ${brief}`,
+					adaptExpression
+						? `Saved expression cue (adapted; verify independently of the painter's rewrite): ${expressionCue}`
+						: undefined,
 					expression
 						? `Character preservation context: ${expressionPreservation(drawing)}.`
 						: describe(2, '', textOnlyStyle ? promptDrawing : auditDrawing),
