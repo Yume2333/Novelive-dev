@@ -770,14 +770,21 @@ test.each([false, true])(
 			})
 		try {
 			const result = render('fixture', [], { width: 1024, height: 1024 }, false)
-			await admitted.promise
+			const beforeRenderSettles = (milestone: Promise<void>, name: string) =>
+				Promise.race([
+					milestone,
+					result.then(() => {
+						throw new Error(`Image render finished before ${name}`)
+					}),
+				])
+			await beforeRenderSettles(admitted.promise, 'budget admission')
 			await setImmediate()
 			await vi.advanceTimersByTimeAsync(90_001)
 			expect(send).not.toHaveBeenCalled()
 			expect(deadline).not.toHaveBeenCalled()
 			release.resolve()
 			await first
-			await dispatched.promise
+			await beforeRenderSettles(dispatched.promise, 'provider dispatch')
 			expect(deadline).toHaveBeenCalledExactlyOnceWith(90_000)
 			await vi.advanceTimersByTimeAsync(90_000)
 			expect(await result).toEqual(
