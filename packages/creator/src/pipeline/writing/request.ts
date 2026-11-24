@@ -35,7 +35,7 @@ export function writingModel(
 			? { requestRetries: 0, streamRetries: 0 }
 			: {}),
 	}
-	const reply: { save?: () => Promise<void> } = {}
+	let reply: { save?: () => Promise<void> } = {}
 	const checkpoint = options.checkpoint
 	const stream = createTextStream({
 		...policy,
@@ -67,7 +67,7 @@ export function writingModel(
 			outputEstimate = 0,
 		) {
 			options.signal?.throwIfAborted()
-			delete reply.save
+			reply = {}
 			const normalized = normalizeContext(context)
 			const result = await stream(
 				model,
