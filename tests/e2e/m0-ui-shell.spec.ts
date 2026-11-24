@@ -43,7 +43,7 @@ test('M0 library and usage navigate between real empty pages and switch theme wi
 			})
 			await nav.getByRole('link', { name: '用量' }).click()
 			await expect(
-				page.getByRole('heading', { name: '用量', level: 1, exact: true }),
+				page.getByRole('heading', { name: '用量统计', level: 1, exact: true }),
 			).toBeVisible()
 			await expect(page.getByText('暂无用量记录')).toBeVisible()
 			await page.getByRole('button', { name: '暗色' }).click()

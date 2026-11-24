@@ -131,7 +131,7 @@ function WorkCard({
 
 export function LibraryPage() {
 	const { refreshLibrary } = useOutletContext<{ refreshLibrary(): void }>()
-	const [library, setLibrary] = useState<CommandOutput<'library.list'>>()
+	const [loaded, setLibrary] = useState<CommandOutput<'library.list'>>()
 	const [error, setError] = useState(false)
 	const [revision, setRevision] = useState(0)
 	const [searchParams] = useSearchParams()
@@ -196,6 +196,10 @@ export function LibraryPage() {
 		}
 	}, [revision, installed])
 
+	const library =
+		loaded ??
+		(packages.length > 0 ? { works: [], unreadableCount: 0 } : undefined)
+
 	return (
 		<Page
 			title={t('书库')}
@@ -211,6 +215,7 @@ export function LibraryPage() {
 							onImported={() => {
 								setRevision((n) => n + 1)
 								refreshLibrary()
+								setTab('imported')
 							}}
 						/>
 					)}
@@ -220,7 +225,7 @@ export function LibraryPage() {
 				</div>
 			}
 		>
-			{error ? (
+			{error && !library ? (
 				<p role="alert">{t('无法读取书库')}</p>
 			) : !library ? (
 				<p role="status">{t('正在读取书库')}</p>
@@ -264,7 +269,13 @@ export function LibraryPage() {
 									})}
 								</p>
 							)}
-							{library.works.length === 0 ? (
+							{!loaded ? (
+								error ? (
+									<p role="alert">{t('无法读取书库')}</p>
+								) : (
+									<p role="status">{t('正在读取书库')}</p>
+								)
+							) : library.works.length === 0 ? (
 								<EmptyState icon={NotebookPen} text={t('还没有作品')} card />
 							) : (
 								groupWorks(library.works as LibraryWork[]).map((group) => (

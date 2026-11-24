@@ -27,6 +27,7 @@ import { Page } from '../../components/Page'
 import { localeNames, locales, msg, scoped } from '../../i18n'
 import type { SettingsHost } from '../../shell/AppShell'
 import {
+	formatLabel,
 	type ModelDraft,
 	Select,
 	themes,
@@ -286,7 +287,15 @@ function TextCard({
 		<ModelCard
 			title={title}
 			icon={icon}
-			summary={[model.model, connection.baseUrl].filter(Boolean).join(' · ')}
+			summary={[
+				model.model || t('未填模型'),
+				formatLabel(connection.format),
+				slot !== 'fast' && 'inheritFast' in model && model.inheritFast
+					? t('同快速模型')
+					: '',
+			]
+				.filter(Boolean)
+				.join(' · ')}
 			configured={Boolean(
 				model.model && connection.baseUrl && connection.apiKeyMasked,
 			)}
@@ -308,7 +317,7 @@ function ImageCard({
 		<ModelCard
 			title={t('图片模型')}
 			icon={Image}
-			summary={[model.model, model.baseUrl].filter(Boolean).join(' · ')}
+			summary={model.model || t('未填模型')}
 			configured={Boolean(model.model && model.baseUrl && model.apiKeyMasked)}
 			draft={draft}
 			testModel={() => window.novelive.call('model.testImage', {})}
