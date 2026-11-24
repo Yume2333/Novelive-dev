@@ -108,7 +108,7 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 	const { app, page } = await launch(join(workspace, 'profile'))
 	try {
 		await answerDialogs(app, [[source], [image], [projects]])
-		await page.getByRole('link', { name: '导入原文' }).click()
+		await page.getByRole('link', { name: '新建工程' }).click()
 		await expect(page.getByRole('heading', { name: '新建工程' })).toBeVisible()
 		await page.getByRole('button', { name: '选择原文' }).click()
 		await expect(page.getByLabel('作品名')).toHaveValue('风')
@@ -208,7 +208,7 @@ test('M1b TXT wizard asks for an ambiguous encoding and can skip review', async 
 	const { app, page } = await launch(join(workspace, 'profile'))
 	try {
 		await answerDialogs(app, [[source], [workspace]])
-		await page.getByRole('link', { name: '导入原文' }).click()
+		await page.getByRole('link', { name: '新建工程' }).click()
 		await page.getByRole('button', { name: '选择原文' }).click()
 		await page.getByRole('button', { name: '选择文件夹' }).click()
 		await page.getByRole('button', { name: '下一步', exact: true }).click()

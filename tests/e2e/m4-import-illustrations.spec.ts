@@ -49,7 +49,7 @@ for (const format of ['epub', 'docx'] as const) {
 			await expect(
 				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
 			).toHaveText('创作端已就绪')
-			await page.getByRole('link', { name: '导入原文' }).click()
+			await page.getByRole('link', { name: '新建工程' }).click()
 			await page.getByRole('button', { name: '选择原文', exact: true }).click()
 			await page.getByRole('button', { name: '选择文件夹' }).click()
 			await page.getByRole('button', { name: '下一步', exact: true }).click()

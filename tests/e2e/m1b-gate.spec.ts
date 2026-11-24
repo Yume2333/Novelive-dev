@@ -94,7 +94,7 @@ test('M1b make and play publishes through both confirmation points in real Elect
 				(patch) => window.novelive.call('config.update', patch).promise,
 				configuration,
 			)
-			await page.getByRole('link', { name: '导入原文' }).click()
+			await page.getByRole('link', { name: '新建工程' }).click()
 			await page.getByRole('button', { name: '选择原文' }).click()
 			await page.getByRole('button', { name: '选择文件夹' }).click()
 			await page.getByRole('button', { name: '下一步', exact: true }).click()
@@ -590,7 +590,7 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 					},
 				},
 			)
-			await page.getByRole('link', { name: '导入原文' }).click()
+			await page.getByRole('link', { name: '新建工程' }).click()
 			await page.getByRole('button', { name: '选择原文' }).click()
 			await page.getByRole('button', { name: '选择文件夹' }).click()
 			await page.getByRole('button', { name: '下一步', exact: true }).click()

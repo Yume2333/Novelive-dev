@@ -3,6 +3,12 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { _electron as electron, expect, test } from '@playwright/test'
+import { Project } from '../../packages/creator/src/project'
+import {
+	defaultWorkSettings,
+	formatVersion,
+	projectFiles,
+} from '../../packages/format/src/model'
 
 const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
@@ -119,5 +125,96 @@ test('prototype sidebar resolves a replaced recent package to its installed vers
 		}
 	} finally {
 		await rm(profile, { recursive: true, force: true })
+	}
+})
+
+test('prototype sidebar switches from a project to an installed work', async () => {
+	const root = await mkdtemp(join(tmpdir(), 'novelive-package-switch-'))
+	const directory = join(root, 'project')
+	const profile = join(root, 'profile')
+	const projectWorkId = '00000000-0000-0000-0000-000000000114'
+	const packageWorkId = '6f1e2d3c-4b5a-4987-8a6b-5c4d3e2f1a0b'
+	try {
+		using project = await Project.create(directory, {
+			formatVersion,
+			seriesId: 'switch',
+			title: '切换验收',
+			volumeIds: ['v1'],
+		})
+		await project.write(projectFiles.volume('v1'), {
+			formatVersion,
+			volumeId: 'v1',
+			title: '第一卷',
+			workIds: [projectWorkId],
+		})
+		await project.write(projectFiles.work('v1', projectWorkId), {
+			formatVersion,
+			workId: projectWorkId,
+			title: '工程作品',
+			chapterIds: [],
+			version: 1,
+			minReaderVersion: 1,
+			appVersion: '0.1.0',
+			language: 'zh-CN',
+			settings: defaultWorkSettings(),
+		})
+		project.tasks.registerWork({ workId: projectWorkId, title: '工程作品' })
+		await mkdir(join(profile, 'projects'), { recursive: true })
+		await writeFile(join(profile, 'projects', projectWorkId), directory)
+		await mkdir(join(profile, 'installed-works'))
+		await writeFile(
+			join(profile, 'installed-works/library.json'),
+			JSON.stringify([
+				{
+					workId: packageWorkId,
+					version: 3,
+					title: '导入的作品包',
+					installation: join(profile, 'installed-works/v3'),
+					chapters: 2,
+					published: 2,
+				},
+			]),
+		)
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${profile}`],
+			env: { ...process.env, NL_REPLAY: 'strict', ELECTRON_RENDERER_URL: '' },
+		})
+		try {
+			await app.evaluate(({ BrowserWindow }) => {
+				BrowserWindow.getAllWindows()[0]?.setContentSize(1280, 800)
+			})
+			const page = await app.firstWindow()
+			await expect(page.getByText('创作端已就绪')).toBeAttached()
+			await page.evaluate((id) => {
+				location.hash = `/work/${id}`
+			}, projectWorkId)
+			const sidebar = page.locator('aside')
+			await expect(sidebar.getByText('工程作品', { exact: true })).toBeVisible()
+			await sidebar.getByRole('button', { name: '换一部作品' }).click()
+			await page.getByRole('menuitem', { name: '导入的作品包 · v3' }).click()
+			await expect(page).toHaveURL(/#\/$/)
+			const play = page
+				.getByRole('navigation', { name: '作品导航' })
+				.getByRole('link', { name: '游玩' })
+			await expect(play).toHaveAttribute('href', `#/package/${packageWorkId}/3`)
+			await expect(
+				sidebar.getByText('导入的作品包', { exact: true }),
+			).toBeVisible()
+			await expect(sidebar.getByText('工程作品', { exact: true })).toHaveCount(
+				0,
+			)
+			await page.screenshot({
+				path: '.workflow/evidence/prototype-parity/shell-library/shell-package-switch-production-light-1280x800.png',
+			})
+			await page.reload()
+			await expect(play).toHaveAttribute('href', `#/package/${packageWorkId}/3`)
+			await play.click()
+			await expect(page).toHaveURL(new RegExp(`#/package/${packageWorkId}/3$`))
+		} finally {
+			await app.close()
+		}
+	} finally {
+		await rm(root, { recursive: true, force: true })
 	}
 })
