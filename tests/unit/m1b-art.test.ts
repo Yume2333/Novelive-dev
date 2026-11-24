@@ -165,6 +165,7 @@ test('does not dispatch a painter retry when the effective cap cannot increase',
 						reasoningRetry: true,
 						replay: {
 							mode: 'record',
+							directory: join(project.root, 'rewrite-recordings'),
 							checkpointDirectory: join(project.root, 'rewrite'),
 							fetch,
 							spend: projectSpend(project.database),

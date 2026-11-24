@@ -59,6 +59,7 @@ export type Fault =
 	| 'drawing-moderation'
 	| 'painter-reasoning'
 	| 'painter-reasoning-exhausted'
+	| 'audit-reasoning'
 	| 'review-rate-limit'
 	| 'review-raised-cap-rate-limit'
 	| 'review-reasoning'
@@ -281,6 +282,9 @@ export function fakeRelay(
 						operation === 'painter' &&
 						outputCap === 2048 &&
 						previous?.fault === 'painter-reasoning') ||
+					(candidate === 'audit-reasoning' &&
+						operation === 'visual' &&
+						currentChapter === 1) ||
 					(candidate === 'review-rate-limit' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-2')) ||
@@ -465,7 +469,15 @@ export function fakeRelay(
 					)
 				: reply({ issues: [] }, 'stop', 'submit_review')
 		if (operation === 'visual')
-			return reply({ pass: true, failedChecks: [], feedback: '' })
+			return fault === 'audit-reasoning'
+				? completion(
+						'Checking the candidate.',
+						tokens,
+						'length',
+						undefined,
+						true,
+					)
+				: reply({ pass: true, failedChecks: [], feedback: '' })
 		if (operation === 'painter')
 			return fault === 'painter-reasoning' ||
 				fault === 'painter-reasoning-exhausted'

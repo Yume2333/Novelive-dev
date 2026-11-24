@@ -459,7 +459,6 @@ async function requestArtJson<T>(
 		if (
 			options.reasoningRetry &&
 			error.code === 'reasoning_limit' &&
-			options.maxTokens !== undefined &&
 			replay === initialReplay
 		)
 			await saveReply?.()

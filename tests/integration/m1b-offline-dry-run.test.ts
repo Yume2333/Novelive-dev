@@ -62,6 +62,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 		name: 'painter-reasoning-exhausted',
 		faults: ['painter-reasoning', 'painter-reasoning-exhausted'],
 	},
+	{ name: 'audit-reasoning', faults: ['audit-reasoning'] },
 	{
 		name: 'review-cap-raise',
 		faults: ['review-reasoning', 'review-rate-limit'],
@@ -100,6 +101,7 @@ test.each(scenarios)(
 		const overlap = name === 'staging-during-sunburst-draw'
 		const reopenDrawing = name === 'reopen-mid-drawing'
 		const painterReasoning = faults.includes('painter-reasoning')
+		const auditReasoning = faults.includes('audit-reasoning')
 		const auditHeld = Promise.withResolvers<void>()
 		let auditCount = 0
 		const drawing = Promise.withResolvers<void>()
@@ -210,12 +212,16 @@ test.each(scenarios)(
 							maxOutputTokens: null,
 						},
 					}),
+					...(auditReasoning && {
+						visual: { ...configuration.models.visual, model: 'devin-swe-2' },
+					}),
 					image: {
 						...configuration.models.image,
 						retries: 3,
 						...(name === 'concurrent-sunburst' && { concurrency: 8 }),
 						...((reopenDrawing ||
 							painterReasoning ||
+							auditReasoning ||
 							name === 'drawing-rate-limit' ||
 							name === 'drawing-technical-rejection' ||
 							name === 'drawing-moderation') && {
@@ -474,6 +480,32 @@ test.each(scenarios)(
 				'done',
 			)
 			expect(passedSecondGate).toBe(true)
+			if (auditReasoning) {
+				const first = relay.admissions.findIndex(
+					({ fault }) => fault === 'audit-reasoning',
+				)
+				expect(first).toBeGreaterThanOrEqual(0)
+				const [low, high] = relay.admissions.slice(first, first + 2)
+				expect(high).toMatchObject({
+					operation: 'visual',
+					chapter: low.chapter,
+					visualBrief: low.visualBrief,
+				})
+				expect(high.outputCap).toBeGreaterThan(low.outputCap ?? Infinity)
+				expect(reservations()[first + 1].tokens).toBeGreaterThan(
+					reservations()[first].tokens,
+				)
+				expect(
+					relay.admissions.filter(
+						({ requestKey }) => requestKey === low.requestKey,
+					),
+				).toHaveLength(1)
+				expect(
+					relay.admissions.filter(
+						({ requestKey }) => requestKey === high.requestKey,
+					),
+				).toHaveLength(1)
+			}
 			if (painterReasoning) {
 				const first = relay.admissions.findIndex(
 					({ fault }) => fault === 'painter-reasoning',

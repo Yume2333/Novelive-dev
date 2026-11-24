@@ -776,7 +776,7 @@ export class ArtProduction {
 					this.options.visual,
 					prompt,
 					auditSchema,
-					this.options,
+					{ ...this.options, reasoningRetry: true },
 					[preview.png, ...(await boundedRefs)],
 				)
 				if (judge.pass && judge.failedChecks.length === 0) {
