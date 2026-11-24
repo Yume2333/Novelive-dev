@@ -69,13 +69,20 @@ export function Dropdown({
 		const onScroll = (event: Event) => {
 			if (!menu.current?.contains(event.target as Node)) close()
 		}
+		const onFocus = (event: FocusEvent) => {
+			const target = event.target as Node
+			if (!button.current?.contains(target) && !menu.current?.contains(target))
+				setOpen(false)
+		}
 		document.addEventListener('mousedown', onPointer)
+		document.addEventListener('focusin', onFocus)
 		window.addEventListener('keydown', onKey)
 		window.addEventListener('scroll', onScroll, true)
 		window.addEventListener('resize', close)
 		menu.current?.querySelector<HTMLButtonElement>('button')?.focus()
 		return () => {
 			document.removeEventListener('mousedown', onPointer)
+			document.removeEventListener('focusin', onFocus)
 			window.removeEventListener('keydown', onKey)
 			window.removeEventListener('scroll', onScroll, true)
 			window.removeEventListener('resize', close)
