@@ -584,7 +584,12 @@ export function chapterWorker(
 					(await productionBible(project, volumeId, work.workId)).art,
 					metadata.cg,
 					ctx.resumingBudget,
+					ctx.replacePlaceholder,
 				)
+			}).catch((error: unknown) => {
+				if (error instanceof TextModelError && error.code === 'reasoning_limit')
+					throw new ProductionTaskError('reasoning_limit', error.message)
+				throw error
 			})
 		},
 		placeholder(job, issue, signal) {

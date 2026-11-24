@@ -132,6 +132,118 @@ async function projectTest(run: (project: Project) => Promise<void>) {
 	}
 }
 
+function reasoningReply() {
+	const chunk = {
+		choices: [
+			{
+				index: 0,
+				delta: { reasoning_content: 'Thinking about the brief' },
+				finish_reason: 'length',
+			},
+		],
+		usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+	}
+	return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+		headers: { 'content-type': 'text/event-stream' },
+	})
+}
+
+test('does not retry a live capped rewrite, but a later request can recover past its reasoning-only checkpoint', async () => {
+	await projectTest(async (project) => {
+		const fetch = artReplies('{"pass":true}').mockImplementationOnce(async () =>
+			reasoningReply(),
+		)
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		try {
+			const request = () =>
+				artModels.artJson(
+					{ ...main, maxOutputTokens: 1024 },
+					'Rewrite the image brief.',
+					obj({ pass: bool() }),
+					{
+						maxTokens: 1024,
+						reasoningRetry: true,
+						replay: {
+							mode: 'record',
+							directory: join(project.root, 'rewrite-recordings'),
+							checkpointDirectory: join(project.root, 'rewrite'),
+							fetch,
+							spend: projectSpend(project.database),
+						},
+					},
+				)
+			await expect(request()).rejects.toMatchObject({ code: 'reasoning_limit' })
+			expect(fetch).toHaveBeenCalledTimes(1)
+			await expect(request()).resolves.toEqual({ pass: true })
+			expect(fetch).toHaveBeenCalledTimes(2)
+			await expect(request()).resolves.toEqual({ pass: true })
+			expect(fetch).toHaveBeenCalledTimes(2)
+			expect(
+				project.database
+					.prepare('SELECT actual_tokens FROM spend_reservation')
+					.all(),
+			).toEqual([{ actual_tokens: 15 }, { actual_tokens: 15 }])
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+})
+
+test('a raised-cap visual audit reuses the legacy checkpoint without a new reservation', async () => {
+	await projectTest(async (project) => {
+		const connection = { ...main, model: 'devin-swe-2', maxOutputTokens: 2048 }
+		const prompt = 'Visually audit the first image.'
+		const schema = obj({ pass: bool() })
+		const images = [await picture(32, 32, false)]
+		const replay = {
+			mode: 'record' as const,
+			directory: join(project.root, 'audit-recordings'),
+			checkpointDirectory: join(project.root, 'audit'),
+			spend: projectSpend(project.database),
+		}
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		try {
+			const seed = artReplies('{"pass":true}')
+			await artModels.artJson(
+				connection,
+				prompt,
+				schema,
+				{
+					maxTokens: 2048,
+					replay: { ...replay, fetch: seed },
+				},
+				images,
+			)
+			expect(seed).toHaveBeenCalledTimes(1)
+
+			const fetch = vi.fn<typeof globalThis.fetch>(async () => reasoningReply())
+			const request = () =>
+				artModels.artJson(
+					connection,
+					prompt,
+					schema,
+					{
+						reasoningRetry: true,
+						replay: { ...replay, fetch },
+					},
+					images,
+				)
+			await expect(request()).resolves.toEqual({ pass: true })
+			await expect(request()).resolves.toEqual({ pass: true })
+			expect(fetch).toHaveBeenCalledTimes(1)
+			expect(
+				project.database
+					.prepare('SELECT actual_tokens FROM spend_reservation')
+					.all(),
+			).toEqual([{ actual_tokens: 15 }, { actual_tokens: 15 }])
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+})
+
 test('stops without a staging repair when the malformed reply did not settle', async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'novelive-staging-usage-'))
 	using db = new DatabaseSync(':memory:')

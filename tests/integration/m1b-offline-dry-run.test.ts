@@ -57,6 +57,12 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 		name: 'drawing-rate-limit',
 		faults: ['drawing-image-missing-usage', 'drawing-rate-limit'],
 	},
+	{ name: 'painter-reasoning', faults: ['painter-reasoning'] },
+	{
+		name: 'painter-reasoning-exhausted',
+		faults: ['painter-reasoning', 'painter-reasoning-exhausted'],
+	},
+	{ name: 'audit-reasoning', faults: ['audit-reasoning'] },
 	{
 		name: 'review-cap-raise',
 		faults: ['review-reasoning', 'review-rate-limit'],
@@ -94,6 +100,8 @@ test.each(scenarios)(
 		const overdelivery = faults.includes('image-overdelivery')
 		const overlap = name === 'staging-during-sunburst-draw'
 		const reopenDrawing = name === 'reopen-mid-drawing'
+		const painterReasoning = faults.includes('painter-reasoning')
+		const auditReasoning = faults.includes('audit-reasoning')
 		const auditHeld = Promise.withResolvers<void>()
 		let auditCount = 0
 		const drawing = Promise.withResolvers<void>()
@@ -204,11 +212,16 @@ test.each(scenarios)(
 							maxOutputTokens: null,
 						},
 					}),
+					...(auditReasoning && {
+						visual: { ...configuration.models.visual, model: 'devin-swe-2' },
+					}),
 					image: {
 						...configuration.models.image,
 						retries: 3,
 						...(name === 'concurrent-sunburst' && { concurrency: 8 }),
 						...((reopenDrawing ||
+							painterReasoning ||
+							auditReasoning ||
 							name === 'drawing-rate-limit' ||
 							name === 'drawing-technical-rejection' ||
 							name === 'drawing-moderation') && {
@@ -420,6 +433,30 @@ test.each(scenarios)(
 					project.database
 						.prepare('SELECT pause_reason FROM work WHERE work_id = ?')
 						.get(workId)?.pause_reason === 'budget_paused'
+				if (
+					faults.includes('painter-reasoning-exhausted') &&
+					snapshot.status === 'stopped' &&
+					!softStop
+				) {
+					expect(snapshot.chapters[0]).toMatchObject({
+						status: 'producing',
+						issue: '[reasoning_limit] Model generated reasoning but no answer',
+					})
+					expect((await host.playerStatus(workId)).chapters[0]?.published).toBe(
+						false,
+					)
+					const before = relay.admissions.length
+					await reopen()
+					await session.continue()
+					await session.queue.idle()
+					const repair = relay.admissions.slice(before)
+					expect(repair[0]).toMatchObject({
+						operation: 'painter',
+						outputCap: 2048,
+					})
+					expect(session.snapshot().chapters[0]).not.toHaveProperty('issue')
+					continue
+				}
 				if (!snapshot.blockedChapterId && !softStop)
 					throw new Error(
 						`Unexpected offline state: ${JSON.stringify(snapshot)}`,
@@ -443,6 +480,53 @@ test.each(scenarios)(
 				'done',
 			)
 			expect(passedSecondGate).toBe(true)
+			if (auditReasoning) {
+				const first = relay.admissions.findIndex(
+					({ fault }) => fault === 'audit-reasoning',
+				)
+				expect(first).toBeGreaterThanOrEqual(0)
+				const [low, high] = relay.admissions.slice(first, first + 2)
+				expect(high).toMatchObject({
+					operation: 'visual',
+					chapter: low.chapter,
+					visualBrief: low.visualBrief,
+				})
+				expect(high.outputCap).toBeGreaterThan(low.outputCap ?? Infinity)
+				expect(reservations()[first + 1].tokens).toBeGreaterThan(
+					reservations()[first].tokens,
+				)
+				expect(
+					relay.admissions.filter(
+						({ requestKey }) => requestKey === low.requestKey,
+					),
+				).toHaveLength(1)
+				expect(
+					relay.admissions.filter(
+						({ requestKey }) => requestKey === high.requestKey,
+					),
+				).toHaveLength(1)
+			}
+			if (painterReasoning) {
+				const first = relay.admissions.findIndex(
+					({ fault }) => fault === 'painter-reasoning',
+				)
+				expect(first).toBeGreaterThanOrEqual(0)
+				const [low, high] = relay.admissions.slice(first, first + 2)
+				expect([low.outputCap, high.outputCap]).toEqual([1024, 2048])
+				expect(reservations()[first + 1].tokens).toBeGreaterThan(
+					reservations()[first].tokens,
+				)
+				expect(
+					relay.admissions.filter(
+						({ requestKey }) => requestKey === low.requestKey,
+					),
+				).toHaveLength(1)
+				expect(
+					relay.admissions.filter(
+						({ requestKey }) => requestKey === high.requestKey,
+					),
+				).toHaveLength(faults.includes('painter-reasoning-exhausted') ? 2 : 1)
+			}
 			expect(resumedBudget).toBe(faults.includes('soft-stop'))
 			for (const fault of [
 				'staging-503',

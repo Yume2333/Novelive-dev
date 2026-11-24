@@ -22,6 +22,7 @@ import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import type { MaskedConfig } from '../../config/index.js'
 import type { CommandError } from '../../contract/index.js'
 import {
+	checkpointReplyRejection,
 	createReplayFetch,
 	isCheckpointReply,
 	isSpendGuardedFetch,
@@ -420,6 +421,7 @@ export function createTextStream(
 				let timer: ReturnType<typeof setTimeout> | undefined
 				let status: number | undefined
 				let replayedCheckpoint = false
+				let rejectCheckpoint: (() => void) | undefined
 				let fields = ''
 				let spendError: SpendBudgetError | undefined
 				let headersReceived = false
@@ -459,6 +461,7 @@ export function createTextStream(
 						fetch: async (input, init) => {
 							status = undefined
 							replayedCheckpoint = false
+							rejectCheckpoint = undefined
 							fields = ''
 							if (spendError) throw spendError
 							request = guarded ? new Request(input, init) : undefined
@@ -469,6 +472,7 @@ export function createTextStream(
 							})
 							status = response.status
 							replayedCheckpoint = isCheckpointReply(response)
+							rejectCheckpoint = checkpointReplyRejection(response)
 							settlement = guarded ? textSettlement(response) : undefined
 							if (
 								!response.ok &&
@@ -521,6 +525,7 @@ export function createTextStream(
 					)
 				if (!replayedCheckpoint)
 					recordTextUsage(model.id, result.usage, textUsageSlots.get(model))
+				const previousUsage = usage
 				usage = usage ? sumUsage(usage, result.usage) : result.usage
 				const empty =
 					(result.stopReason === 'stop' || result.stopReason === 'length') &&
@@ -602,6 +607,11 @@ export function createTextStream(
 						await policy.onReasoningRetry?.()
 						reasoningRetried = true
 						maxTokens = raised
+						continue
+					}
+					if (rejectCheckpoint) {
+						rejectCheckpoint()
+						usage = previousUsage
 						continue
 					}
 					return fail('reasoning_limit', undefined, result)

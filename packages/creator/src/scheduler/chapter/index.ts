@@ -33,8 +33,11 @@ export type DrawContext = {
 	workId: string
 	desensitized: boolean
 	resumingBudget?: boolean
+	replacePlaceholder?: boolean
 	signal: AbortSignal
 }
+const basePlaceholderIssue = '基准图没画成，差分改用占位图'
+
 export interface ProductionWorker {
 	write(context: StepContext): Promise<void>
 	review(context: StepContext): Promise<void>
@@ -51,7 +54,7 @@ export interface ProductionWorker {
 
 export class ProductionTaskError extends Error {
 	constructor(
-		readonly kind: 'transient' | 'moderation' | 'final',
+		readonly kind: 'transient' | 'moderation' | 'final' | 'reasoning_limit',
 		message: string,
 	) {
 		super(message)
@@ -273,7 +276,12 @@ export class ChapterScheduler {
 	continue(workId: string): ProductionSnapshot {
 		const work = this.work(workId)
 		if (work.status === 'awaiting_confirm' && work.reason === 'confirm_first') {
-			this.resumeWork(workId)
+			let repaired = false
+			this.transaction(() => {
+				repaired = this.requeueReasoningPlaceholders(workId)
+				if (repaired) this.requeueWork(workId)
+			})
+			if (!repaired) this.resumeWork(workId)
 		} else if (work.status === 'paused' && work.reason !== 'chapter_failed') {
 			this.transaction(() => {
 				this.restageOversizedChapters(workId)
@@ -294,7 +302,9 @@ export class ChapterScheduler {
 					workId,
 				)) {
 					this.exec(
-						"UPDATE task SET status = 'queued', attempts = 0, desensitized = 0, error_type = CASE WHEN error_type = 'budget_paused' THEN error_type END WHERE task_id = ?",
+						`UPDATE task SET status = 'queued', attempts = 0,
+						desensitized = CASE WHEN error_type = 'reasoning_limit' THEN desensitized ELSE 0 END,
+						error_type = CASE WHEN error_type = 'budget_paused' THEN error_type END WHERE task_id = ?`,
 						task.task_id,
 					)
 					this.exec(
@@ -303,6 +313,7 @@ export class ChapterScheduler {
 						task.ref_id,
 					)
 				}
+				this.requeueReasoningPlaceholders(workId)
 				this.requeueWork(workId)
 			})
 		}
@@ -847,23 +858,30 @@ export class ChapterScheduler {
 			'draw',
 			async (desensitized, signal) =>
 				basePlaceholder
-					? this.worker.placeholder(job, '基准图没画成，差分改用占位图', signal)
+					? this.worker.placeholder(job, basePlaceholderIssue, signal)
 					: (await this.worker.isDrawn(task.work_id, job))
 						? ({ status: 'drawn' } as const)
 						: this.worker.draw(job, {
 								workId: task.work_id,
 								desensitized,
 								resumingBudget: task.error_type === 'budget_paused',
+								replacePlaceholder: task.error_type === 'placeholder',
 								signal,
 							}),
 		)
 		if (!result) return
 		let outcome: ImageJobResult
-		let reason: 'budget_paused' | undefined
+		let reason: 'budget_paused' | 'reasoning_limit' | undefined
 		if (result.ok) outcome = result.value
 		else if (budgetRefusal(result.error)) {
 			outcome = { status: 'unsupported', issue: result.error.message }
 			reason = 'budget_paused'
+		} else if (
+			result.error instanceof ProductionTaskError &&
+			result.error.kind === 'reasoning_limit'
+		) {
+			outcome = { status: 'unsupported', issue: result.error.message }
+			reason = 'reasoning_limit'
 		} else {
 			const signal = this.inflight.get(task.task_id)?.controller.signal
 			if (!signal) return
@@ -896,7 +914,7 @@ export class ChapterScheduler {
 		task: TaskRow,
 		outcome: ImageJobResult['status'],
 		issue?: string,
-		reason?: 'matting_unavailable' | 'budget_paused',
+		reason?: 'matting_unavailable' | 'budget_paused' | 'reasoning_limit',
 	) {
 		const assetStatus = outcome === 'unsupported' ? 'failed' : outcome
 		this.exec(
@@ -913,7 +931,7 @@ export class ChapterScheduler {
 			outcome === 'unsupported' ? 'needs_attention' : 'done',
 			outcome === 'drawn'
 				? null
-				: reason === 'budget_paused'
+				: reason === 'budget_paused' || reason === 'reasoning_limit'
 					? reason
 					: outcome,
 			this.now(),
@@ -1010,8 +1028,16 @@ export class ChapterScheduler {
 			this.now(),
 			chapterTaskId,
 		)
+		const placeholder = this.get(
+			`SELECT 1 FROM task_dep d JOIN task i ON i.task_id = d.depends_on
+			JOIN asset a ON a.work_id = i.work_id AND a.asset_key = i.ref_id
+			WHERE d.task_id = ? AND i.kind = 'image' AND a.status = 'placeholder'`,
+			task.task_id,
+		)
 		this.exec(
-			"UPDATE chapter SET user_state = 'published' WHERE work_id = ? AND chapter_id = ?",
+			"UPDATE chapter SET user_state = 'published', placeholder = ?, flagged = ? WHERE work_id = ? AND chapter_id = ?",
+			Number(!!placeholder),
+			Number(!!placeholder),
 			task.work_id,
 			task.ref_id,
 		)
@@ -1148,6 +1174,54 @@ export class ChapterScheduler {
 			dependsOn,
 			soft ? 1 : 0,
 		)
+	}
+
+	private requeueReasoningPlaceholders(workId: string) {
+		const images = this.all<{ task_id: string; ref_id: string }>(
+			`WITH RECURSIVE placeholders AS (
+				SELECT i.task_id, i.ref_id, a.base_key, r.error_message
+				FROM task i JOIN run r ON r.run_id = i.run_id
+				JOIN asset a ON a.work_id = i.work_id AND a.asset_key = i.ref_id
+				WHERE i.work_id = ? AND i.kind = 'image' AND i.status = 'done'
+					AND i.error_type = 'placeholder' AND r.error_type = 'placeholder' AND a.status = 'placeholder'
+			), repair(task_id, ref_id) AS (
+				SELECT i.task_id, i.ref_id FROM placeholders i
+				WHERE i.error_message LIKE '[reasoning_limit] %'
+					AND EXISTS (SELECT 1 FROM task_dep d JOIN task c ON c.task_id = d.task_id
+						WHERE d.depends_on = i.task_id AND d.soft = 0 AND c.kind = 'chapter')
+				UNION
+				SELECT i.task_id, i.ref_id FROM placeholders i JOIN repair b ON i.base_key = b.ref_id
+				WHERE i.error_message = ?
+			)
+			SELECT task_id, ref_id FROM repair`,
+			workId,
+			basePlaceholderIssue,
+		)
+		if (images.length === 0) return false
+		for (const { task_id, ref_id } of images) {
+			this.exec(
+				"UPDATE task SET status = 'queued', attempts = 0 WHERE task_id = ?",
+				task_id,
+			)
+			this.exec(
+				"UPDATE asset SET status = 'pending' WHERE work_id = ? AND asset_key = ?",
+				workId,
+				ref_id,
+			)
+			this.exec(
+				`UPDATE chapter SET user_state = 'producing' WHERE work_id = ? AND chapter_id IN
+					(SELECT c.ref_id FROM task c JOIN task_dep d ON d.task_id = c.task_id
+					WHERE d.depends_on = ? AND d.soft = 0 AND c.kind = 'chapter' AND c.status = 'done')`,
+				workId,
+				task_id,
+			)
+			this.exec(
+				`UPDATE task SET status = 'queued', phase = 'await_draw' WHERE kind = 'chapter' AND status = 'done'
+					AND task_id IN (SELECT task_id FROM task_dep WHERE depends_on = ? AND soft = 0)`,
+				task_id,
+			)
+		}
+		return true
 	}
 
 	private resumeWork(workId: string) {

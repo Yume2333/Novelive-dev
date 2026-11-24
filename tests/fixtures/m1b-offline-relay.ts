@@ -57,6 +57,9 @@ export type Fault =
 	| 'drawing-image-missing-usage'
 	| 'drawing-technical-rejection'
 	| 'drawing-moderation'
+	| 'painter-reasoning'
+	| 'painter-reasoning-exhausted'
+	| 'audit-reasoning'
 	| 'review-rate-limit'
 	| 'review-raised-cap-rate-limit'
 	| 'review-reasoning'
@@ -135,6 +138,7 @@ export function fakeRelay(
 	beforeImageReply?: (chapter: number) => Promise<void> | undefined,
 	onAdmission?: (admission: Admission) => void,
 	beforeAuditReply?: (request: Request) => Promise<void> | undefined,
+	reuseEditInput = false,
 ) {
 	const pending = new Set(faults)
 	const admissions: Admission[] = []
@@ -187,9 +191,10 @@ export function fakeRelay(
 			image || url.pathname === '/v1/chat/completions',
 			'Unknown fixture route',
 		)
-		const body = request.headers.get('content-type')?.startsWith('multipart/')
-			? Object.fromEntries(await request.formData())
-			: await request.json()
+		const form = request.headers.get('content-type')?.startsWith('multipart/')
+			? await request.formData()
+			: undefined
+		const body = form ? Object.fromEntries(form) : await request.json()
 		const messages: string[] = (body.messages ?? []).map(
 			({ content }: { content: string | { text?: string }[] }) =>
 				typeof content === 'string'
@@ -265,6 +270,21 @@ export function fakeRelay(
 					(candidate === 'drawing-moderation' &&
 						operation === 'visual' &&
 						currentChapter > 0) ||
+					(candidate === 'painter-reasoning' &&
+						operation === 'painter' &&
+						outputCap === 1024 &&
+						currentChapter === 1 &&
+						admissions.some(
+							({ chapter, operation }) =>
+								chapter === 1 && operation === 'visual',
+						)) ||
+					(candidate === 'painter-reasoning-exhausted' &&
+						operation === 'painter' &&
+						outputCap === 2048 &&
+						previous?.fault === 'painter-reasoning') ||
+					(candidate === 'audit-reasoning' &&
+						operation === 'visual' &&
+						currentChapter === 1) ||
 					(candidate === 'review-rate-limit' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-2')) ||
@@ -408,11 +428,14 @@ export function fakeRelay(
 			await beforeImageReply?.(chapter)
 			const path = `/v1/download/${index}.png`
 			const [width, height] = String(body.size).split('x').map(Number)
+			const reference = form?.get('image[]') ?? form?.get('image')
 			imageBytes.set(
 				path,
 				fault === 'drawing-technical-rejection'
 					? Buffer.from('Undecodable candidate')
-					: await picture(width, height, body.background === 'transparent'),
+					: reuseEditInput && reference instanceof File
+						? Buffer.from(await reference.arrayBuffer())
+						: await picture(width, height, body.background === 'transparent'),
 			)
 			return Response.json({
 				data: Array.from({ length: images ?? 0 }, (_, i) => ({
@@ -446,11 +469,28 @@ export function fakeRelay(
 					)
 				: reply({ issues: [] }, 'stop', 'submit_review')
 		if (operation === 'visual')
-			return reply({ pass: true, failedChecks: [], feedback: '' })
+			return fault === 'audit-reasoning'
+				? completion(
+						'Checking the candidate.',
+						tokens,
+						'length',
+						undefined,
+						true,
+					)
+				: reply({ pass: true, failedChecks: [], feedback: '' })
 		if (operation === 'painter')
-			return reply({
-				content: `A lantern on a quiet stone bridge at dusk. ${/fixture-(?:bank|cg)-[\d-]+/.exec(prompt)?.[0] ?? ''}`,
-			})
+			return fault === 'painter-reasoning' ||
+				fault === 'painter-reasoning-exhausted'
+				? completion(
+						'Considering the drawing brief.',
+						tokens,
+						'length',
+						undefined,
+						true,
+					)
+				: reply({
+						content: `A lantern on a quiet stone bridge at dusk. ${/fixture-(?:bank|cg)-[\d-]+/.exec(prompt)?.[0] ?? ''}`,
+					})
 		if (operation === 'preview')
 			return reply({
 				summary: 'A paper boat drifts beneath a bridge.',
