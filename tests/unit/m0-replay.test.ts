@@ -455,10 +455,10 @@ test('checkpoint fallback reuses successive candidates with matching response ID
 		rows
 			.map(
 				(row, i) =>
-				`${JSON.stringify({
-					...JSON.parse(row),
-					checkpointResponseId: ids[i],
-				})}\n`,
+					`${JSON.stringify({
+						...JSON.parse(row),
+						checkpointResponseId: ids[i],
+					})}\n`,
 			)
 			.join(''),
 	)
