@@ -288,7 +288,7 @@ function observeUsage(response: Response, settle: (tokens: number) => void) {
 	})
 }
 
-function spendLedger(database: DatabaseSync, runId: string | null) {
+function spendLedger(database: DatabaseSync) {
 	database.exec(`CREATE TABLE IF NOT EXISTS spend_reservation (
 		id INTEGER PRIMARY KEY,
 		tokens INTEGER NOT NULL,
@@ -305,55 +305,34 @@ function spendLedger(database: DatabaseSync, runId: string | null) {
 			.get()
 	)
 		database.exec('ALTER TABLE spend_reservation ADD COLUMN run_id TEXT')
+}
+
+function includeLegacyReservations(
+	database: DatabaseSync,
+	runId: string | null,
+) {
 	const csv = process.env.NL_USAGE_CSV
 	if (
 		!runId ||
 		!csv ||
-		database
-			.prepare('SELECT 1 FROM spend_reservation WHERE run_id = ? LIMIT 1')
-			.get(runId)
+		!database
+			.prepare('SELECT 1 FROM spend_reservation WHERE run_id IS NULL LIMIT 1')
+			.get()
 	)
-		return
+		return false
 	let usage: string
 	try {
 		usage = readFileSync(csv, 'utf8').trim()
 	} catch (error) {
 		if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
-			return
+			return false
 		throw error
 	}
-	if (!usage) return
-	const quotes = usage
-		.split(/\r?\n/)
-		.map((line) => line.split(',').slice(3, 5))
-		.filter(([tokens, images]) => tokens !== '0' || images !== '0')
-	if (!quotes.length) return
-	const suffix = database
-		.prepare(
-			'SELECT id, tokens, images, run_id FROM spend_reservation ORDER BY id DESC LIMIT ?',
-		)
-		.all(quotes.length)
-		.reverse() as {
-		id: number
-		tokens: number
-		images: number
-		run_id: string | null
-	}[]
-	if (
-		suffix.length !== quotes.length ||
-		suffix.some(
-			(row, index) =>
-				row.run_id !== null ||
-				String(row.tokens) !== quotes[index][0] ||
-				String(row.images) !== quotes[index][1],
-		)
-	)
-		throw new SpendBudgetError('现有窗口用量 CSV 与项目历史预留不匹配')
-	database
-		.prepare(
-			'UPDATE spend_reservation SET run_id = ? WHERE id >= ? AND run_id IS NULL',
-		)
-		.run(runId, suffix[0].id)
+	// Legacy CSV quotes have no reservation ID; don't assign ownership by matching amounts.
+	return usage.split(/\r?\n/).some((line) => {
+		const [tokens, images] = line.split(',').slice(3, 5)
+		return Number(tokens) > 0 || Number(images) > 0
+	})
 }
 
 function spendRunId() {
@@ -369,12 +348,13 @@ export function chapterImageBudget(database: DatabaseSync, workId: string) {
 	const runId = spendRunId()
 	if (!runId) return
 	const imageCap = cap(process.env.NL_RUN_IMAGE_CAP, 'NL_RUN_IMAGE_CAP')
-	spendLedger(database, runId)
+	spendLedger(database)
+	const includeLegacy = includeLegacyReservations(database, runId)
 	const { images } = database
 		.prepare(
-			'SELECT COALESCE(SUM(images), 0) AS images FROM spend_reservation WHERE run_id = ?',
+			'SELECT COALESCE(SUM(images), 0) AS images FROM spend_reservation WHERE run_id = ? OR (? AND run_id IS NULL)',
 		)
-		.get(runId) as { images: number }
+		.get(runId, Number(includeLegacy)) as { images: number }
 	const { chapters } = database
 		.prepare(
 			"SELECT COUNT(*) AS chapters FROM chapter WHERE work_id = ? AND user_state <> 'published'",
@@ -399,7 +379,8 @@ export function projectSpend(database: DatabaseSync) {
 		const quote = await quoteSpend(request)
 		const { tokens, images } = quote
 		request.signal.throwIfAborted()
-		spendLedger(database, runId)
+		spendLedger(database)
+		const includeLegacy = includeLegacyReservations(database, runId)
 		const row = database
 			.prepare(`
 			INSERT INTO spend_reservation (tokens, images, run_id)
@@ -407,7 +388,7 @@ export function projectSpend(database: DatabaseSync) {
 				SELECT COALESCE(SUM(COALESCE(actual_tokens, tokens)), 0) AS used_tokens,
 					COALESCE(SUM(COALESCE(actual_images, images)), 0) AS used_images
 				FROM spend_reservation
-				WHERE (? IS NULL OR run_id = ?)
+				WHERE (? IS NULL OR run_id = ? OR (? AND run_id IS NULL))
 			)
 			WHERE used_tokens + ? <= ? AND used_images + ? <= ?
 			RETURNING id
@@ -418,6 +399,7 @@ export function projectSpend(database: DatabaseSync) {
 				runId,
 				runId,
 				runId,
+				Number(includeLegacy),
 				tokens,
 				softLimit,
 				images,

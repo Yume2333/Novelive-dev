@@ -320,7 +320,7 @@ test('a new usage window preserves unresolved history without charging it to new
 	])
 })
 
-test('continuing an existing CSV claims only its matching legacy reservations', async () => {
+test('continuing an existing CSV conservatively counts legacy reservations without claiming quote matches', async () => {
 	const dir = await mkdtemp(join(tmpdir(), 'novelive-spend-window-'))
 	try {
 		const csv = join(dir, 'usage.csv')
@@ -340,11 +340,12 @@ test('continuing an existing CSV claims only its matching legacy reservations', 
 				actual_tokens INTEGER, actual_images INTEGER
 			) STRICT;
 			INSERT INTO spend_reservation VALUES (1, 99000, 3, NULL, NULL),
-				(2, 16000, 1, 11000, 1), (3, 7000, 1, NULL, NULL);
+				(2, 16000, 1, 11000, 1), (3, 7000, 1, NULL, NULL),
+				(4, 16000, 1, 15000, 1), (5, 7000, 1, 6000, 1);
 			CREATE TABLE chapter (work_id TEXT, user_state TEXT);
 			INSERT INTO chapter VALUES ('w', 'producing');
 		`)
-		expect(chapterImageBudget(database, 'w')).toBe(3)
+		expect(chapterImageBudget(database, 'w')).toBe(0)
 		const send = vi.fn()
 		await expect(
 			projectSpend(database)(
@@ -364,9 +365,16 @@ test('continuing an existing CSV claims only its matching legacy reservations', 
 				.all(),
 		).toEqual([
 			{ run_id: null, actual_tokens: null },
-			{ run_id: 'continuing', actual_tokens: 11000 },
-			{ run_id: 'continuing', actual_tokens: null },
+			{ run_id: null, actual_tokens: 11000 },
+			{ run_id: null, actual_tokens: null },
+			{ run_id: null, actual_tokens: 15000 },
+			{ run_id: null, actual_tokens: 6000 },
 		])
+		await writeFile(
+			csv,
+			'2026-01-01,image,1,0,0,cassette recording (reserved output tokens)\n',
+		)
+		expect(chapterImageBudget(database, 'w')).toBe(5)
 	} finally {
 		await rm(dir, { recursive: true, force: true })
 	}
