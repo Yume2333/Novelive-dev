@@ -27,7 +27,12 @@ import {
 	recordProfile,
 } from '../postprocess'
 import { MattingUnavailableError, removeBackground } from './background'
-import { checkImage, type Dimensions, placeholder } from './check'
+import {
+	checkImage,
+	type Dimensions,
+	placeholder,
+	spriteFrameIssue,
+} from './check'
 import type { CgReferences } from './director'
 import { artJson, imageRenderer, type ModelOptions } from './models'
 import { type ArtBible, type ArtJob, type ManifestItem, planArt } from './plan'
@@ -44,6 +49,7 @@ type CostumeCandidateBudget = {
 type ReviewCheckpoint = {
 	path: string
 	resume: boolean
+	framingRecovery?: string
 }
 type PaintContinuation =
 	| { prompt: string; png: string }
@@ -309,6 +315,7 @@ export class ArtProduction {
 		cg?: CgReferences,
 		resumingBudget = false,
 		replacePlaceholder = false,
+		framingRecovery?: string,
 	): Promise<ImageJobResult> {
 		const pending = this.pendingDraws.get(job.assetId)
 		if (pending) return pending
@@ -319,6 +326,7 @@ export class ArtProduction {
 			undefined,
 			resumingBudget,
 			replacePlaceholder,
+			framingRecovery,
 		).finally(() => this.pendingDraws.delete(job.assetId))
 		this.pendingDraws.set(job.assetId, task)
 		return task
@@ -402,6 +410,7 @@ export class ArtProduction {
 		redraw?: { path: string; instruction?: string },
 		resumingBudget = false,
 		replacePlaceholder = false,
+		framingRecovery?: string,
 	): Promise<ImageJobResult> {
 		const signal = this.options.signal
 		signal?.throwIfAborted()
@@ -551,6 +560,7 @@ export class ArtProduction {
 				: {
 						path: this.reviewPath(entry),
 						resume: resumingBudget,
+						framingRecovery,
 					},
 		).catch((error: unknown) => {
 			if (!(error instanceof MattingUnavailableError)) throw error
@@ -563,7 +573,9 @@ export class ArtProduction {
 					: this.savePlaceholder(entry.id, result.issue, result.reason)
 			}
 			const unsupported =
-				result.stop === 'unsupported' || result.stop === 'provider-unsupported'
+				result.stop === 'unsupported' ||
+				result.stop === 'provider-unsupported' ||
+				(result.stop === 'retries' && result.issue === spriteFrameIssue)
 			return unsupported || redraw
 				? {
 						status: unsupported ? 'unsupported' : 'placeholder',
@@ -709,7 +721,9 @@ export class ArtProduction {
 				? (this.options.portrait ?? this.options.main)
 				: this.options.main
 		let issue = '没有生成可用图片。'
-		let feedback = ''
+		let feedback = checkpoint?.framingRecovery
+			? 'Keep the entire head and both sides of the character inside the canvas, with clear transparent margins at the top and sides.'
+			: ''
 		let reviewed: Buffer | undefined
 		let neededUnavailableMatting = false
 		const stopped = (stop: PaintStop, message = issue) => ({
@@ -726,7 +740,8 @@ export class ArtProduction {
 			: undefined
 		const adaptExpression = expression && !!moderationGuidance
 		let attempt = 0
-		let legacyCheckpoint = !this.options.desensitized
+		let legacyCheckpoint =
+			!this.options.desensitized && !checkpoint?.framingRecovery
 		let rewritten: string | undefined
 		let expressionCue: string | undefined
 		const settingsVersion = checkpoint
@@ -742,6 +757,9 @@ export class ArtProduction {
 							),
 							...(moderationGuidance ? [moderationGuidance] : []),
 							...(adaptExpression ? ['adapted expression cue'] : []),
+							...(checkpoint.framingRecovery
+								? [checkpoint.framingRecovery]
+								: []),
 						]),
 					)
 					.digest('hex')

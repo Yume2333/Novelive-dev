@@ -109,10 +109,15 @@ export function service(
 	})
 }
 
-export function picture(width: number, height: number, transparent: boolean) {
+export function picture(
+	width: number,
+	height: number,
+	transparent: boolean,
+	clipped = false,
+) {
 	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
 	${transparent ? '' : `<rect width="${width}" height="${height}" fill="#567"/>`}
-	<rect x="${width / 3}" y="${height / 8}" width="${width / 3}" height="${(height * 7) / 8}" fill="#456def"/>
+	<rect x="${width / 3}" y="${clipped ? 0 : height / 8}" width="${width / 3}" height="${(height * 7) / 8}" fill="#456def"/>
 	</svg>`
 	const image = sharp(Buffer.from(svg))
 	return (transparent ? image : image.removeAlpha()).png().toBuffer()

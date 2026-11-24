@@ -7,6 +7,7 @@ import type {
 	WorkPhase,
 } from '@novelive/format/model'
 import type { ProductionSnapshot } from '../../contract/production'
+import { spriteFrameIssue } from '../../pipeline/art/check'
 import type { StageTrim } from '../../pipeline/art/trim'
 import { SpendBudgetError } from '../../usage/spend'
 
@@ -34,6 +35,7 @@ export type DrawContext = {
 	desensitized: boolean
 	resumingBudget?: boolean
 	replacePlaceholder?: boolean
+	framingRecovery?: string
 	signal: AbortSignal
 }
 const basePlaceholderIssue = '基准图没画成，差分改用占位图'
@@ -99,6 +101,7 @@ type TaskRow = {
 	desensitized: number
 	error_type: string | null
 	run_id: string | null
+	framingRecovery?: string
 }
 type Inflight = { runId: string; controller: AbortController }
 const budgetRefusal = (error: Error) =>
@@ -278,7 +281,7 @@ export class ChapterScheduler {
 		if (work.status === 'awaiting_confirm' && work.reason === 'confirm_first') {
 			let repaired = false
 			this.transaction(() => {
-				repaired = this.requeueReasoningPlaceholders(workId)
+				repaired = this.requeueRecoverablePlaceholders(workId)
 				if (repaired) this.requeueWork(workId)
 			})
 			if (!repaired) this.resumeWork(workId)
@@ -304,7 +307,7 @@ export class ChapterScheduler {
 					this.exec(
 						`UPDATE task SET status = 'queued', attempts = 0,
 						desensitized = CASE WHEN error_type = 'reasoning_limit' THEN desensitized ELSE 0 END,
-						error_type = CASE WHEN error_type = 'budget_paused' THEN error_type END WHERE task_id = ?`,
+						error_type = CASE WHEN error_type IN ('budget_paused', 'portrait_framing') THEN error_type END WHERE task_id = ?`,
 						task.task_id,
 					)
 					this.exec(
@@ -313,7 +316,7 @@ export class ChapterScheduler {
 						task.ref_id,
 					)
 				}
-				this.requeueReasoningPlaceholders(workId)
+				this.requeueRecoverablePlaceholders(workId)
 				this.requeueWork(workId)
 			})
 		}
@@ -667,6 +670,21 @@ export class ChapterScheduler {
 		const runId = randomUUID()
 		const controller = new AbortController()
 		const kind = task.kind
+		if (kind === 'image' && task.run_id) {
+			const prior = this.get<{
+				error_type: string | null
+				framingRecovery: string | null
+			}>(
+				"SELECT error_type, json_extract(meta, '$.framingRecovery') AS framingRecovery FROM run WHERE run_id = ?",
+				task.run_id,
+			)
+			task.framingRecovery =
+				task.error_type === 'portrait_framing' &&
+				(prior?.error_type === 'portrait_framing' ||
+					prior?.error_type === 'placeholder')
+					? runId
+					: (prior?.framingRecovery ?? undefined)
+		}
 		this.transaction(() => {
 			this.exec(
 				`INSERT INTO run (run_id, work_id, kind, ref, status, started_at, meta)
@@ -676,7 +694,11 @@ export class ChapterScheduler {
 				kind,
 				task.ref_id,
 				this.now(),
-				JSON.stringify({ taskId: task.task_id, phase: task.phase }),
+				JSON.stringify({
+					taskId: task.task_id,
+					phase: task.phase,
+					framingRecovery: task.framingRecovery,
+				}),
 			)
 			this.exec(
 				`UPDATE task SET status = 'running', run_id = ?, starts = starts + 1,
@@ -865,15 +887,28 @@ export class ChapterScheduler {
 								workId: task.work_id,
 								desensitized,
 								resumingBudget: task.error_type === 'budget_paused',
-								replacePlaceholder: task.error_type === 'placeholder',
+								replacePlaceholder:
+									task.error_type === 'placeholder' ||
+									task.error_type === 'portrait_framing',
+								framingRecovery: task.framingRecovery,
 								signal,
 							}),
 		)
 		if (!result) return
 		let outcome: ImageJobResult
-		let reason: 'budget_paused' | 'reasoning_limit' | undefined
-		if (result.ok) outcome = result.value
-		else if (budgetRefusal(result.error)) {
+		let reason:
+			| 'budget_paused'
+			| 'reasoning_limit'
+			| 'portrait_framing'
+			| undefined
+		if (result.ok) {
+			outcome = result.value
+			if (
+				outcome.status === 'unsupported' &&
+				outcome.issue === spriteFrameIssue
+			)
+				reason = 'portrait_framing'
+		} else if (budgetRefusal(result.error)) {
 			outcome = { status: 'unsupported', issue: result.error.message }
 			reason = 'budget_paused'
 		} else if (
@@ -914,7 +949,11 @@ export class ChapterScheduler {
 		task: TaskRow,
 		outcome: ImageJobResult['status'],
 		issue?: string,
-		reason?: 'matting_unavailable' | 'budget_paused' | 'reasoning_limit',
+		reason?:
+			| 'matting_unavailable'
+			| 'budget_paused'
+			| 'reasoning_limit'
+			| 'portrait_framing',
 	) {
 		const assetStatus = outcome === 'unsupported' ? 'failed' : outcome
 		this.exec(
@@ -931,7 +970,7 @@ export class ChapterScheduler {
 			outcome === 'unsupported' ? 'needs_attention' : 'done',
 			outcome === 'drawn'
 				? null
-				: reason === 'budget_paused' || reason === 'reasoning_limit'
+				: reason && reason !== 'matting_unavailable'
 					? reason
 					: outcome,
 			this.now(),
@@ -1176,31 +1215,40 @@ export class ChapterScheduler {
 		)
 	}
 
-	private requeueReasoningPlaceholders(workId: string) {
-		const images = this.all<{ task_id: string; ref_id: string }>(
+	private requeueRecoverablePlaceholders(workId: string) {
+		const images = this.all<{
+			task_id: string
+			ref_id: string
+			recovery: string
+		}>(
 			`WITH RECURSIVE placeholders AS (
 				SELECT i.task_id, i.ref_id, a.base_key, r.error_message
 				FROM task i JOIN run r ON r.run_id = i.run_id
 				JOIN asset a ON a.work_id = i.work_id AND a.asset_key = i.ref_id
 				WHERE i.work_id = ? AND i.kind = 'image' AND i.status = 'done'
 					AND i.error_type = 'placeholder' AND r.error_type = 'placeholder' AND a.status = 'placeholder'
-			), repair(task_id, ref_id) AS (
-				SELECT i.task_id, i.ref_id FROM placeholders i
-				WHERE i.error_message LIKE '[reasoning_limit] %'
+			), repair(task_id, ref_id, recovery) AS (
+				SELECT i.task_id, i.ref_id,
+					CASE WHEN i.error_message = ? THEN 'portrait_framing' ELSE 'placeholder' END
+				FROM placeholders i
+				WHERE (i.error_message LIKE '[reasoning_limit] %' OR i.error_message = ?)
 					AND EXISTS (SELECT 1 FROM task_dep d JOIN task c ON c.task_id = d.task_id
 						WHERE d.depends_on = i.task_id AND d.soft = 0 AND c.kind = 'chapter')
 				UNION
-				SELECT i.task_id, i.ref_id FROM placeholders i JOIN repair b ON i.base_key = b.ref_id
+				SELECT i.task_id, i.ref_id, 'placeholder' FROM placeholders i JOIN repair b ON i.base_key = b.ref_id
 				WHERE i.error_message = ?
 			)
-			SELECT task_id, ref_id FROM repair`,
+			SELECT task_id, ref_id, recovery FROM repair`,
 			workId,
+			spriteFrameIssue,
+			spriteFrameIssue,
 			basePlaceholderIssue,
 		)
 		if (images.length === 0) return false
-		for (const { task_id, ref_id } of images) {
+		for (const { task_id, ref_id, recovery } of images) {
 			this.exec(
-				"UPDATE task SET status = 'queued', attempts = 0 WHERE task_id = ?",
+				"UPDATE task SET status = 'queued', attempts = 0, error_type = ? WHERE task_id = ?",
+				recovery,
 				task_id,
 			)
 			this.exec(

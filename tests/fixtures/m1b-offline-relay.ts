@@ -58,6 +58,7 @@ export type Fault =
 	| 'drawing-rate-limit'
 	| 'drawing-image-missing-usage'
 	| 'drawing-technical-rejection'
+	| 'drawing-framing-exhausted'
 	| 'drawing-moderation'
 	| 'painter-reasoning'
 	| 'painter-reasoning-exhausted'
@@ -149,6 +150,7 @@ export function fakeRelay(
 	let downloads = 0
 	let currentChapter = 0
 	let rejectedCandidates = 0
+	let clippedPortraits = 0
 	const fetch: typeof globalThis.fetch = async (input, init) => {
 		const request = new Request(input, init)
 		const url = new URL(request.url)
@@ -298,6 +300,10 @@ export function fakeRelay(
 					(candidate === 'review-reasoning' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-1')) ||
+					(candidate === 'drawing-framing-exhausted' &&
+						operation === 'image' &&
+						body.background === 'transparent' &&
+						String(body.prompt).includes('fixture-framing-portrait')) ||
 					([
 						'image-failure',
 						'image-null',
@@ -320,7 +326,8 @@ export function fakeRelay(
 		)
 		if (
 			fault &&
-			(fault !== 'drawing-technical-rejection' || ++rejectedCandidates === 2)
+			(fault !== 'drawing-technical-rejection' || ++rejectedCandidates === 2) &&
+			(fault !== 'drawing-framing-exhausted' || ++clippedPortraits === 4)
 		)
 			pending.delete(fault)
 		const status =
@@ -443,7 +450,12 @@ export function fakeRelay(
 					? Buffer.from('Undecodable candidate')
 					: reuseEditInput && reference instanceof File
 						? Buffer.from(await reference.arrayBuffer())
-						: await picture(width, height, body.background === 'transparent'),
+						: await picture(
+								width,
+								height,
+								body.background === 'transparent',
+								fault === 'drawing-framing-exhausted',
+							),
 			)
 			return Response.json({
 				data: Array.from({ length: images ?? 0 }, (_, i) => ({
@@ -497,7 +509,7 @@ export function fakeRelay(
 						true,
 					)
 				: reply({
-						content: `A lantern on a quiet stone bridge at dusk. ${/fixture-(?:bank|cg)-[\d-]+/.exec(prompt)?.[0] ?? ''}`,
+						content: `A lantern on a quiet stone bridge at dusk. ${/fixture-(?:(?:bank|cg)-[\d-]+|framing-portrait)/.exec(prompt)?.[0] ?? ''}`,
 					})
 		if (operation === 'preview')
 			return reply({
@@ -579,16 +591,28 @@ export function fakeRelay(
 			line: Number(line) + 3,
 			bg: fault === 'invalid-id' ? 'room' : `bank-${chapter}-${scene}/day`,
 		}))
+		const framingPortrait =
+			faults.includes('drawing-framing-exhausted') && scenes[0]?.[2] === '2'
 		return reply({
 			patch: placements
 				.flatMap(({ line, bg }, i) => [
 					`PUT <${line}:`,
 					`@bg ${bg}`,
-					'@show ada/uniform/neutral center',
+					`@show ada/${framingPortrait ? 'coat' : 'uniform'}/neutral center`,
 					...(i === 0 ? cgs.map((id) => `@cg ${id}`) : []),
 				])
 				.join('\n'),
 			items: [
+				...(framingPortrait
+					? [
+							{
+								id: 'ada/coat/neutral',
+								kind: 'character',
+								description:
+									'Ada wearing her raincoat (fixture-framing-portrait).',
+							},
+						]
+					: []),
 				...placements.map(({ bg }) => ({
 					id: bg,
 					kind: 'location',
