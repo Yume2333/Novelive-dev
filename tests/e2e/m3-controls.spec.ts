@@ -735,6 +735,11 @@ test.describe('M3 player controls', () => {
 					const viewport = page.locator('.nl-player-text')
 					if (await viewport.count())
 						await expect(viewport).toHaveAttribute('data-text-finished', 'true')
+					// A click during a stage transition completes it instead of advancing.
+					await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+						'aria-busy',
+						'false',
+					)
 					await canvas.click({ position: { x: 20, y: 20 } })
 				}
 				async function range(label: string, value: number) {
