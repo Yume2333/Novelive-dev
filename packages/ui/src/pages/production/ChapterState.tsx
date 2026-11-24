@@ -26,7 +26,7 @@ export function ChapterState({ chapter }: { chapter: Chapter }) {
 			{chapter.status === 'published' ? (
 				<>
 					<CircleCheck aria-hidden="true" size={13} />
-					{t('已发布')}
+					<span>{t('已发布')}</span>
 				</>
 			) : (
 				<span className={styles.pill} data-status={chapter.status}>
