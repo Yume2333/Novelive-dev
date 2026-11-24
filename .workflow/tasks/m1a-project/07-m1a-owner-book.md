@@ -7,13 +7,13 @@
 **Task type:** spike
 **Files:** tests/acceptance/m1a-owner-book.test.ts, .workflow/evidence/m1a/owner/
 **Read first:** `.workflow/specs/m1a-project.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
-**Check:** 仅串行主线执行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → 按 W4 写脱敏的差异、耗费和重启报告。W4 的比较口径见下文“W4 口径”。并行会话不领取本任务，严格回放不能替代本 Check。
+**Check:** 仅由指定的 W4 会话执行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → 按 W4 写脱敏的差异、耗费和重启报告。W4 的比较口径见下文“W4 口径”。W4 与 M1b/11 独立执行，严格回放不能替代本 Check。
 
-**付费调用：** 只由协调者在交接中明确指定的串行主线会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
+**付费调用：** 只由协调者在交接中明确指定的 W4 会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向指定的 W4 会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
 **Base commit:** ea99733e566c72be5873d6507a07de37ef7b40ba
 **Status:** blocked
 
-- [ ] W4 待[所有者评审](../../owner-review.md)：真书已测，最佳 0.76144，未达 0.90。待 [M1b/11](../m1b-production/11-m1b-owner-book.md) 第 2–4 章完成后串行恢复付费调优。恢复和综合修复已在 `f9dd863` 单独合入 main，通过的分块 fixture 仍缺，严格门槛保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。M1b/11 不以本项比较验收为前置，其真书验收不算本项通过。
+- [ ] W4 待[所有者评审](../../owner-review.md)：真书已测，最佳 0.76144，未达 0.90。按所有者授权立即在独立会话恢复付费调优，与 [M1b/11](../m1b-production/11-m1b-owner-book.md) 第 2–4 章并行，分别记账。恢复和综合修复已在 `f9dd863` 单独合入 main，通过的分块 fixture 仍缺，严格门槛保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。M1b/11 不以本项比较验收为前置，其真书验收不算本项通过。
 
 所有者更正的[全项目硬上限](../../delivery-plan.md#测试模型与额度)为 **20 亿（2B）tokens（含视觉与审稿模型）、500 张图**；下文的历史试跑额度不变。
 
