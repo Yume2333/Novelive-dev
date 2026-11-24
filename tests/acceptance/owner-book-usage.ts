@@ -1,7 +1,25 @@
+import { setTimeout } from 'node:timers/promises'
 import { reserveTokenFields } from '../../packages/creator/src/usage/reservation'
 
 export const ownerBookSelectionCap = 700_000
 export const ownerBookSelectionBatchCap = 300_000
+
+export async function retryOwnerBookUnavailable(
+	model: string,
+	signal: AbortSignal,
+	send: (canRetry: boolean) => Promise<Response>,
+	pause: (ms: number) => Promise<void> = (ms) =>
+		setTimeout(ms, undefined, { signal }),
+) {
+	for (const ms of model === 'devin-swe-2' ? [5_000, 15_000] : []) {
+		const response = await send(true)
+		if (response.status !== 503) return response
+		await response.body?.cancel()
+		await pause(ms)
+		signal.throwIfAborted()
+	}
+	return send(false)
+}
 
 export function reserveOwnerBookSelection(
 	used: number,

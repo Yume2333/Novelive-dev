@@ -4,7 +4,53 @@ import {
 	ownerBookSelectionBatchCap,
 	ownerBookSelectionCap,
 	reserveOwnerBookSelection,
+	retryOwnerBookUnavailable,
 } from '../acceptance/owner-book-usage'
+
+test.each([
+	[200, [true, true]],
+	[503, [true, true, false]],
+] as const)(
+	'backs off only after HTTP 503 and stops after at most three devin attempts (last HTTP %s)',
+	async (status, canRetry) => {
+		const responses = status === 200 ? [503, 200] : [503, 503, 503]
+		const send = vi.fn(
+			async (_canRetry: boolean) =>
+				new Response(null, { status: responses.shift() }),
+		)
+		const pause = vi.fn(async (_ms: number) => {})
+		const result = await retryOwnerBookUnavailable(
+			'devin-swe-2',
+			new AbortController().signal,
+			send,
+			pause,
+		)
+		expect(result.status).toBe(status)
+		expect(send.mock.calls.flat()).toEqual(canRetry)
+		expect(pause.mock.calls.flat()).toEqual(
+			status === 200 ? [5_000] : [5_000, 15_000],
+		)
+	},
+)
+
+test.each([
+	['gemini-3.8-flash', 503],
+	['devin-swe-2', 429],
+] as const)('does not retry %s on HTTP %s', async (model, status) => {
+	const send = vi.fn(
+		async (_canRetry: boolean) => new Response(null, { status }),
+	)
+	const pause = vi.fn(async (_ms: number) => {})
+	const result = await retryOwnerBookUnavailable(
+		model,
+		new AbortController().signal,
+		send,
+		pause,
+	)
+	expect(result.status).toBe(status)
+	expect(send).toHaveBeenCalledTimes(1)
+	expect(pause).not.toHaveBeenCalled()
+})
 
 test('selection reserves decoded input and maximum output before spending the last tokens', () => {
 	const messages = [{ role: 'user', content: '小說' }]

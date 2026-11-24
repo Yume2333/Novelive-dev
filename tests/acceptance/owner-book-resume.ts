@@ -1,3 +1,22 @@
+import { readFile, writeFile } from 'node:fs/promises'
+
+export async function bindOwnerBookRunModels(
+	path: string,
+	models: { synthesisModel: string; selectionModel: string },
+	hasSavedSelection: boolean,
+) {
+	const stored = await readFile(path, 'utf8').catch((error) => {
+		if (error.code !== 'ENOENT') throw error
+	})
+	const expected = `${JSON.stringify(models)}\n`
+	if (stored === expected) return
+	if (stored !== undefined || hasSavedSelection)
+		throw new Error(
+			'Use a new W4 run directory when saved model provenance is missing or different',
+		)
+	await writeFile(path, expected, { flag: 'wx', mode: 0o600 })
+}
+
 export function checkOwnerBookResumePrompt(
 	prompt: unknown,
 	expected?: { packet: number; events: number },

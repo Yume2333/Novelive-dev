@@ -1122,11 +1122,24 @@ const selectionFixture = async (
 	})
 }
 
-test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
+test.each([
+	'current',
+	'previous',
+	'unversioned',
+	'changed target',
+	'old targeted prompt',
+	'changed selector',
+	'current targeted plan',
+	'same-model targeted plan before selector keys',
+] as const)(
 	'resumes without repeating extraction and only reuses compatible saved picks (checkpoint: %s)',
 	async (version) => {
 		await seed(root)
 		const args = { ...options, strategy: 'events' as const }
+		const sameTarget =
+			version === 'current targeted plan' ||
+			version === 'same-model targeted plan before selector keys'
+		const targets = { selectionTargets: { glossary: 2 } }
 		{
 			using project = await Project.open(root)
 			const write = project.write.bind(project)
@@ -1141,6 +1154,7 @@ test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
 			await expect(
 				synthesizeVolume(project, 'v1', chapters, {
 					...args,
+					...(sameTarget ? targets : {}),
 					fetch: selectionFixture,
 				}),
 			).rejects.toThrow('Selection interrupted')
@@ -1159,10 +1173,30 @@ test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
 					selections: [[2]],
 				})
 			}
+			if (
+				version === 'old targeted prompt' ||
+				version === 'same-model targeted plan before selector keys'
+			) {
+				const ranges = [
+					[
+						['character', 1, 1, null],
+						['glossary', 2, 3, 2],
+					],
+				]
+				const legacyPlan = createHash('sha256')
+					.update(JSON.stringify(sameTarget ? [1, ranges] : ranges))
+					.digest('hex')
+				await project.write(files.checkpoint, {
+					...checkpoint,
+					selectionPlan: legacyPlan,
+					selections: sameTarget ? checkpoint.selections : [[2]],
+				})
+			}
 		}
 		using project = await Project.open(root)
 		const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-			const { messages } = await new Request(input, init).json()
+			const { messages, model } = await new Request(input, init).json()
+			if (version === 'changed selector') expect(model).toBe('gemini-3.8-flash')
 			const prompt: string = messages[0].content
 			expect(checkOwnerBookResumePrompt(prompt, { packet: 2, events: 1 })).toBe(
 				'selection',
@@ -1194,8 +1228,18 @@ test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
 		})
 		const result = await synthesizeVolume(project, 'v1', chapters, {
 			...args,
-			...(version === 'changed target'
-				? { selectionTargets: { glossary: 2 } }
+			...(sameTarget ||
+			version === 'changed target' ||
+			version === 'old targeted prompt'
+				? targets
+				: {}),
+			...(version === 'changed selector'
+				? {
+						selectionConnection: {
+							...args.connection,
+							model: 'gemini-3.8-flash',
+						},
+					}
 				: {}),
 			fetch,
 		})
@@ -1204,7 +1248,9 @@ test.each(['current', 'previous', 'unversioned', 'changed target'] as const)(
 		expect(
 			await synthesizeVolume(project, 'v1', chapters, { ...args, fetch }),
 		).toEqual(result)
-		expect(fetch).toHaveBeenCalledTimes(version === 'current' ? 0 : 1)
+		expect(fetch).toHaveBeenCalledTimes(
+			version === 'current' || sameTarget ? 0 : 1,
+		)
 	},
 )
 
@@ -1292,6 +1338,12 @@ test('soft size targets require a reason for exceeding a kind but do not trim ju
 			'Soft size targets for kept candidates (not quotas): character: 1, glossary: 1',
 		)
 		expect(messages[0].content).toContain('Judge inclusion before counting.')
+		expect(messages[0].content).toContain(
+			'Cover distinct plot threads across the volume, not each stage of the same incident.',
+		)
+		expect(messages[0].content).toContain(
+			'A supporting character with a consequential one-time role can qualify even without repeated appearances.',
+		)
 		expect(messages[0].content).toContain(
 			'Do not stop at the target if a distinct candidate still meets the inclusion criteria.',
 		)
