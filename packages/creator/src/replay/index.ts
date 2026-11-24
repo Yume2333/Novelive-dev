@@ -8,6 +8,7 @@ import {
 	type projectSpend,
 	quoteSpend,
 	requestedOutputTokens,
+	textSettlement,
 } from '../usage/spend'
 
 export type ReplayMode = 'record' | 'replay' | 'strict'
@@ -33,6 +34,7 @@ export interface ReplayOptions {
 	ignoreRecordedFailures?: boolean
 	spend?: ReturnType<typeof projectSpend>
 	onReplay?: (request: Request) => Promise<void>
+	checkpointDirectory?: string
 }
 
 const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
@@ -300,6 +302,24 @@ function corruptImage(bytes: Uint8Array): Uint8Array {
 export function createReplayFetch(
 	options: ReplayOptions = {},
 ): typeof globalThis.fetch {
+	const { checkpointDirectory, ...upstream } = options
+	return checkpointDirectory
+		? replayFetch(
+				{
+					mode: 'record',
+					directory: checkpointDirectory,
+					reuseRecorded: true,
+					fetch: replayFetch(upstream),
+				},
+				true,
+			)
+		: replayFetch(upstream)
+}
+
+function replayFetch(
+	options: ReplayOptions,
+	checkpoint = false,
+): typeof globalThis.fetch {
 	const mode = options.mode ?? modeFromEnvironment()
 	const send = options.fetch ?? globalThis.fetch
 	const spend = options.spend
@@ -397,7 +417,10 @@ export function createReplayFetch(
 	}
 
 	const dispatch: typeof fetch = async (input, init) => {
-		const request = new Request(input, init)
+		const request = new Request(
+			checkpoint && input instanceof Request ? input.clone() : input,
+			init,
+		)
 		const rebindIds =
 			options.rebindIds ?? process.env.NL_REPLAY_REBIND_IDS === '1'
 		const identity = await requestIdentity(
@@ -455,22 +478,29 @@ export function createReplayFetch(
 				}
 				return spend ? sendAdmitted(input, admitted) : send(admitted)
 			}
-			const response = await (spend
-				? spend(request, recordSend)
-				: recordSend(request))
+			const response = await (checkpoint
+				? send(input, init)
+				: spend
+					? spend(request, recordSend)
+					: recordSend(request))
 			if (!response.body) {
-				await store(identity, response, Buffer.alloc(0))
+				if (!checkpoint) await store(identity, response, Buffer.alloc(0))
 				return response
 			}
+			const isSse = /^text\/event-stream(?:[;\s]|$)/i.test(
+				response.headers.get('content-type') ?? '',
+			)
+			const settled = textSettlement(response)
+			if (checkpoint && (!response.ok || !settled)) return response
 			const chunks: Buffer[] = []
 			const reader = response.body.getReader()
 			let cancelled = false
 			let writing: Promise<void> | undefined
 			const persist = (bytes: Buffer) =>
-				(writing ??= store(identity, response, bytes))
-			const isSse = /^text\/event-stream(?:[;\s]|$)/i.test(
-				response.headers.get('content-type') ?? '',
-			)
+				(writing ??=
+					checkpoint && (!settled?.() || (isSse && !terminalSse(bytes)))
+						? Promise.resolve()
+						: store(identity, response, bytes))
 			const stream = new ReadableStream<Uint8Array>(
 				{
 					async pull(controller) {
@@ -572,5 +602,5 @@ export function createReplayFetch(
 		return new Response(stream, { status: row.status, headers: row.headers })
 	}
 	if (spend && mode !== 'strict') spendGuardedFetches.add(dispatch)
-	return dispatch
+	return checkpoint ? inheritSpendGuard(send, dispatch) : dispatch
 }

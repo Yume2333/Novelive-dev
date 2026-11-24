@@ -45,9 +45,9 @@ afterEach(async () => {
 	await rm(directory, { recursive: true, force: true })
 })
 
-async function fixture() {
+async function fixture(source = original) {
 	const sourcePath = join(directory, 'paper-boat.txt')
-	await writeFile(sourcePath, original)
+	await writeFile(sourcePath, source)
 	const imported = await importTxtProject({
 		sourcePath,
 		folder: directory,
@@ -156,6 +156,101 @@ test('staging and portrait painting dispatch to their configured role models', a
 	await service.draw(job, bible)
 	expect(requests).toEqual(['fixture-art-fast', 'fixture-art-visual'])
 	expect(painterOutput).toBe(1024)
+})
+
+test('explicit staging retry reuses settled scene and repair inputs without reusing an unknown reservation', async () => {
+	const { projectDir, workId } = await fixture(
+		'第一章 纸船\n暮色中，一只纸船从桥下漂过。\n\n桥边的灯亮了。\n',
+	)
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const models = await productionModels(config)
+	models.artist = {
+		...models.artist,
+		contextWindow: 4096,
+		maxOutputTokens: 256,
+	}
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	vi.stubEnv('NL_RUN_ID', 'before-reopen')
+	vi.stubEnv('NL_REPLAY', '')
+	const chapterId = 'ch0001'
+	const prompts: string[] = []
+	let unavailable = true
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		prompts.push(JSON.stringify(messages))
+		if (prompts.length === 2) return completion('{')
+		if (unavailable && prompts.length >= 3)
+			return Response.json(
+				{ error: { message: 'Unavailable' } },
+				{ status: 503 },
+			)
+		return completion({ patch: '', items: [], merges: {} })
+	}
+	async function scheduler(project: Project) {
+		const work = await project.read(projectFiles.work('v0001', workId))
+		const { worker } = chapterWorker(project, 'v0001', work, models, {
+			fetch,
+			spend: projectSpend(project.database),
+		})
+		return new ChapterScheduler(project.database, {
+			...worker,
+			async write() {},
+			async review() {},
+		})
+	}
+	const reservations = (project: Project) =>
+		project.database
+			.prepare(
+				'SELECT id, run_id, actual_tokens FROM spend_reservation ORDER BY id',
+			)
+			.all()
+	let before: ReturnType<typeof reservations>
+	{
+		using project = await Project.open(projectDir)
+		await project.writeFile(
+			`source/production/${chapterId}/draft.nvs`,
+			'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。\n\nscene 灯火\nsource p0002\n\n: 桥边的灯亮了。\n',
+		)
+		const queue = await scheduler(project)
+		try {
+			project.tasks.registerWork({ workId, title: 'Paper boat' })
+			queue.start(workId, [chapterId])
+			queue.confirmVisual(workId)
+			await queue.idle()
+			expect(prompts).toHaveLength(3)
+			expect(prompts[2]).toContain('Repair the JSON manifest')
+			before = reservations(project)
+			expect(before.map(({ actual_tokens }) => actual_tokens)).toEqual([
+				15,
+				15,
+				null,
+			])
+		} finally {
+			queue.dispose()
+		}
+	}
+	unavailable = false
+	vi.stubEnv('NL_RUN_ID', 'after-reopen')
+	using project = await Project.open(projectDir)
+	const queue = await scheduler(project)
+	try {
+		await queue.idle()
+		expect(prompts).toHaveLength(3)
+		expect(reservations(project)).toEqual(before)
+		queue.retryChapter(workId, chapterId)
+		await queue.idle()
+		expect(prompts.slice(3)).toEqual([prompts[2]])
+		const after = reservations(project)
+		expect(after.slice(0, 3)).toEqual(before)
+		expect(after.slice(3)).toEqual([
+			{ id: 4, run_id: 'after-reopen', actual_tokens: 15 },
+		])
+		expect(queue.snapshot(workId).chapters[0].status).toBe('published')
+	} finally {
+		queue.dispose()
+	}
 })
 
 test('a painter format error after one repair materializes both base and variant placeholders before publication', async () => {

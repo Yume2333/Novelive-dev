@@ -43,6 +43,8 @@ import { resolveBible } from './series/resolve'
 
 const draft = (id: string) => `source/production/${id}/draft.nvs`
 const drawing = (id: string) => `source/production/art/${id}.json`
+const stagingJournal = (root: string, workId: string, chapterId: string) =>
+	join(root, '.novelive', 'staging', workId, chapterId)
 
 export async function productionModels(
 	config: ReturnType<typeof createConfigStore>,
@@ -289,6 +291,10 @@ export function chapterWorker(
 				const journal = `source/production/${ctx.workId}/${ctx.chapterId}/writing-resume.json`
 				const clear = () => rm(join(project.root, journal), { force: true })
 				if (!ctx.resumingBudget) await clear()
+				await rm(stagingJournal(project.root, ctx.workId, ctx.chapterId), {
+					recursive: true,
+					force: true,
+				})
 				const progress: WritingProgress = ctx.resumingBudget
 					? ((await existing(async () =>
 							JSON.parse((await project.readFile(journal)).toString('utf8')),
@@ -351,6 +357,8 @@ export function chapterWorker(
 				const service = art(ctx.signal)
 				const script = (await project.readFile(draft(ctx.chapterId))).toString()
 				const registry = await service.registry()
+				const journal = stagingJournal(project.root, ctx.workId, ctx.chapterId)
+				const clearJournal = () => rm(journal, { recursive: true, force: true })
 				const limit = chapterImageBudget(project.database, work.workId)
 				const previousBases = new Map<string, string>()
 				const reusedImages = new Set<string>()
@@ -378,9 +386,9 @@ export function chapterWorker(
 							previousBases.set(entry.id, prior.job.baseAssetId)
 					}
 				}
-				const staged = await directChapterArt(script, bible, registry, {
+				const staging = directChapterArt(script, bible, registry, {
 					main: models.artist,
-					replay,
+					replay: { ...replay, checkpointDirectory: journal },
 					customMarks: options.script.customMarks,
 					signal: ctx.signal,
 					imageBudget:
@@ -394,11 +402,20 @@ export function chapterWorker(
 									speakers: options.script.speakers,
 								},
 				})
+				const staged = await staging.catch(async (error: unknown) => {
+					if (
+						!ctx.signal.aborted &&
+						!(error instanceof TextModelError) &&
+						!(error instanceof SpendBudgetError)
+					)
+						await clearJournal()
+					throw error
+				})
 				ctx.signal.throwIfAborted()
 				if (staged.trimmed.length) ctx.recordStageTrim?.(staged.trimmed)
 				const dependencies = new Map<string, ArtJob>()
 				const sceneIds: string[] = []
-				await service.register(
+				const registration = service.register(
 					staged.items,
 					bible,
 					staged.merges,
@@ -450,6 +467,10 @@ export function chapterWorker(
 						ctx.signal.throwIfAborted()
 					},
 				)
+				await registration.catch(async (error: unknown) => {
+					if (!ctx.signal.aborted) await clearJournal()
+					throw error
+				})
 				const updated = await project.read(
 					projectFiles.chapter(ref(ctx.chapterId)),
 				)
@@ -459,6 +480,7 @@ export function chapterWorker(
 					cg: updated.cg,
 					sceneIds,
 				})
+				await clearJournal()
 				return [...dependencies.values()]
 			}),
 		async isDrawn(_workId, job) {
