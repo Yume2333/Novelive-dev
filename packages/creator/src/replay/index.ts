@@ -416,6 +416,7 @@ export function createReplayFetch(
 					checkpointFallbackDirectory: options.checkpointFallbackDirectory,
 				},
 				true,
+				positions,
 			)
 		: replayFetch(upstream, false, positions)
 }
@@ -451,11 +452,14 @@ function replayFetch(
 	const index = join(directory, 'cassette.jsonl')
 	const bodies = join(directory, 'cassette-files')
 	const fallback = options.fallbackDirectory
-		? createReplayFetch({
-				mode: 'strict',
-				directory: options.fallbackDirectory,
-				reportMissing: false,
-			})
+		? createReplayFetch(
+				{
+					mode: 'strict',
+					directory: options.fallbackDirectory,
+					reportMissing: false,
+				},
+				positions,
+			)
 		: undefined
 	let pending: Promise<unknown> = Promise.resolve()
 
@@ -550,34 +554,19 @@ function replayFetch(
 			if (options.reuseRecorded) {
 				for (const source of [directory, options.checkpointFallbackDirectory]) {
 					if (!source) continue
-					const text = await readFile(
-						join(source, 'cassette.jsonl'),
-						'utf8',
-					).catch((error) => {
-						if (!missing(error)) throw error
-						return ''
-					})
-					const hit = text
-						.split('\n')
-						.filter(Boolean)
-						.map((line) => JSON.parse(line))
-						.find((row) => row.key === identity.key && row.status < 300)
-					if (!hit) continue
-					const response = await createReplayFetch({
-						...options,
-						mode: 'strict',
-						directory: source,
-						fallbackDirectory: undefined,
-					})(request)
-					if (checkpoint) {
-						checkpointReplies.add(response)
-						options.onCheckpointHit?.(
-							hit.checkpointAllowance,
-							hit.checkpointResponseId,
-							source,
-						)
-					}
-					return response
+					const rows = await readCassetteRows(join(source, 'cassette.jsonl'))
+					if (!rows.some((row) => row.key === identity.key && row.status < 300))
+						continue
+					return replayFetch(
+						{
+							...options,
+							mode: 'strict',
+							directory: source,
+							fallbackDirectory: undefined,
+						},
+						checkpoint,
+						positions,
+					)(request)
 				}
 			}
 			const recordSend = async (
@@ -661,33 +650,14 @@ function replayFetch(
 				}),
 			)
 		}
-		let text = ''
-		try {
-			text = await readFile(index, 'utf8')
-		} catch (error) {
-			if (!missing(error)) throw error
-		}
-		const rows = text
-			.split('\n')
-			.filter((line) => line.trim())
-			.map((line) => {
-				const row: unknown = JSON.parse(line)
-				if (
-					!cassette.check(row) ||
-					(row.body.b64 === undefined) === (row.body.sha === undefined)
-				) {
-					throw new Error('Invalid cassette entry')
-				}
-				return row
-			})
-			.filter(
-				(row) =>
-					row.key === identity.key &&
-					(!options.reuseRecorded || row.status < 300) &&
-					(mode !== 'replay' ||
-						!options.ignoreRecordedFailures ||
-						(row.status >= 200 && row.status < 300)),
-			)
+		const rows = (await readCassetteRows(index)).filter(
+			(row) =>
+				row.key === identity.key &&
+				(!options.reuseRecorded || row.status < 300) &&
+				(mode !== 'replay' ||
+					!options.ignoreRecordedFailures ||
+					(row.status >= 200 && row.status < 300)),
+		)
 		if (rows.length === 0) {
 			if (mode === 'strict') {
 				const message = `Missing strict replay cassette: ${identity.method} ${identity.key} (${directory})`
@@ -700,19 +670,13 @@ function replayFetch(
 			}
 			return sendLive(request, input)
 		}
-		const position = positions.get(identity.key) ?? 0
+		const cursorKey = JSON.stringify([directory, identity.key])
+		const position = positions.get(cursorKey) ?? 0
 		const row = rows[Math.min(position, rows.length - 1)]
-		positions.set(identity.key, position + 1)
+		positions.set(cursorKey, position + 1)
 		if (options.fault === 'http500')
 			return new Response('Replay HTTP 500', { status: 500 })
-		let bytes: Uint8Array
-		if (row.body.sha !== undefined) {
-			bytes = await readFile(join(bodies, row.body.sha))
-			if (hash(bytes) !== row.body.sha)
-				throw new Error('Invalid cassette body checksum')
-		} else {
-			bytes = Buffer.from(row.body.b64 ?? '', 'base64')
-		}
+		let bytes: Uint8Array = await readCassetteBody(directory, row.body)
 		if (
 			rebindIds &&
 			/^(?:text\/|application\/(?:[\w.+-]*json|xml))/i.test(
@@ -729,6 +693,14 @@ function replayFetch(
 			status: row.status,
 			headers: row.headers,
 		})
+		if (checkpoint) {
+			checkpointReplies.add(response)
+			options.onCheckpointHit?.(
+				row.checkpointAllowance,
+				row.checkpointResponseId,
+				directory,
+			)
+		}
 		await options.onReplay?.(request, response)
 		return response
 	}

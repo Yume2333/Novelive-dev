@@ -435,6 +435,38 @@ test('gate fallback reuses existing cassettes before recording and a missing fal
 })
 let directory: string
 
+test('checkpoint fallback reuses successive candidates with matching response IDs', async () => {
+	const fallback = join(directory, 'fallback')
+	const candidates = ['first', 'second', 'third']
+	const ids = candidates.map((_, i) => String(i + 1).repeat(64))
+	const upstream = vi.fn(async () => new Response('unexpected dispatch'))
+	for (const [i, candidate] of candidates.entries()) {
+		const record = createReplayFetch({
+			mode: 'record',
+			directory: fallback,
+			checkpointResponseId: ids[i],
+			fetch: async () => new Response(candidate),
+		})
+		await (await record(origin)).text()
+	}
+	const positions = new Map<string, number>()
+	for (const [i, candidate] of candidates.entries()) {
+		const hit = vi.fn()
+		const replay = createReplayFetch(
+			{
+				checkpointDirectory: join(directory, 'primary', String(i)),
+				checkpointFallbackDirectory: fallback,
+				onCheckpointHit: hit,
+				fetch: upstream,
+			},
+			positions,
+		)
+		expect(await (await replay(origin)).text()).toBe(candidate)
+		expect(hit).toHaveBeenCalledWith(undefined, ids[i], fallback)
+	}
+	expect(upstream).not.toHaveBeenCalled()
+})
+
 beforeEach(async () => {
 	directory = await mkdtemp(join(tmpdir(), 'novelive-replay-'))
 })
