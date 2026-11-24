@@ -1,0 +1,60 @@
+basis,run,model,status,relay_calls,prompt_tokens,completion_tokens,calls_with_token_split,settled_tokens,settled_images,reserved_tokens,reserved_images,source,detail
+shared_evidence,w4-preview,gemini-3.8-flash,settled,8,,,,85634,0,0,0,m1a/owner/usage.csv:2; budget:4-11,
+shared_evidence,w4-extract-select,devin-swe-2,settled,204,,,,1678838,0,0,0,"m1a/owner/usage.csv:3; budget:12-13,17-40,45-105,107-126,128-174,176-225",
+shared_evidence,w4-http-401,gemini-3.8-flash,rejected,2,,,,0,0,0,0,m1a/owner/usage.csv:4; budget:2-3,HTTP 401 before inference; 150034 tokens released
+shared_evidence,w4-pilot-cutoffs,devin-swe-2,rejected,0,,,,0,0,0,0,m1a/owner/usage.csv:5; budget:14-16,Three local cutoffs before dispatch; 52158 tokens released
+shared_evidence,w4-possible-interruption,devin-swe-2,reservation_no_usage,0,,,,0,0,131072,0,m1a/owner/usage.csv:6; budget:41,One reservation; source records zero calls and dispatch is unverified
+shared_evidence,w4-pre-resume-timeouts,devin-swe-2,transport_failure,2,,,,0,0,32782,0,"m1a/owner/usage.csv:7; budget:106,127",Two timeouts; no provider usage
+shared_evidence,w4-resume-timeout,devin-swe-2,transport_failure,1,,,,0,0,78912,0,m1a/owner/usage.csv:8; budget:175,One timeout; no provider usage
+shared_evidence,w4-selection-ebcdeaa,devin-swe-2,settled,76,,,,347495,0,0,0,m1a/owner/usage.csv:15; budget:226-301,
+shared_evidence,w4-selection-b3cca62,devin-swe-2,settled,35,,,,185670,0,0,0,m1a/owner/usage.csv:16; budget:302-336,
+shared_evidence,w4-selection-9b2e274,devin-swe-2,settled,1,,,,68396,0,0,0,m1a/owner/usage.csv:17; budget:337,
+shared_evidence,w4-selection-c8ae66d,devin-swe-2,settled,1,,,,80047,0,0,0,m1a/owner/usage.csv:18; budget:338,
+shared_evidence,w4-selection-0990bec,devin-swe-2,settled,1,,,,67799,0,0,0,m1a/owner/usage.csv:19; budget:339,
+shared_evidence,m4-electron-smoke,deepseek-v4.1-flash,settled,2,428,1996,2,2424,0,0,0,m1a/owner/usage.csv:9; budget:42; m4-longform/paid-smoke.txt:31-35,
+shared_evidence,m4-electron-smoke,devin-swe-2,settled,18,24333,20661,18,44994,0,0,0,m1a/owner/usage.csv:10; budget:43; m4-longform/paid-smoke.txt:31-35,
+shared_evidence,m4-electron-smoke,gpt-image-2.6-sunburst,settled,4,4050,1692,4,5742,4,0,0,m1a/owner/usage.csv:11; budget:44; m4-longform/paid-smoke.txt:31-35,
+shared_evidence,m4-full-artwork,devin-swe-2,settled,23,,,,86790,0,0,0,m1a/owner/usage.csv:12; m4-longform/paid-smoke.txt:65-68,
+shared_evidence,m4-full-artwork,deepseek-v4.1-flash,settled,2,,,,1675,0,0,0,m1a/owner/usage.csv:13; m4-longform/paid-smoke.txt:65-68,
+shared_evidence,m4-full-artwork,gpt-image-2.6-sunburst,settled,7,,,,13051,7,0,0,m1a/owner/usage.csv:14; m4-longform/paid-smoke.txt:65-68,
+shared_evidence,m1b-style-404,gpt-image-2.6-sunburst,rejected,1,,,,0,0,100000,1,m1b/style/receipt.txt:17-32,HTTP 404 with no usage or image; reserve retained
+shared_evidence,m1b-style,gpt-image-2.6-sunburst,settled,3,,,,,3,0,0,m1b/style/receipt.txt:17-32,Tokens are in the joint model row
+shared_evidence,m1b-style,gemini-3.8-flash,settled,1,,,,,0,0,0,m1b/style/receipt.txt:17-32,Tokens are in the joint model row
+shared_evidence,m1b-style,unallocated,settled,,,,,33412,0,0,0,m1b/style/receipt.txt:17-32,Joint Sunburst and Gemini total; calls and images already in model rows
+shared_evidence,m1b-probes,deepseek-v4.1-flash,settled,1,45,128,1,173,0,0,0,m1b/owner/usage.csv:2; m1b/owner/probes.md:7,
+shared_evidence,m1b-probes,devin-swe-2,settled,1,479,509,1,988,0,0,0,m1b/owner/usage.csv:3; m1b/owner/probes.md:8,
+shared_evidence,m1b-probes,gemini-3.8-flash,settled,1,1099,76,1,1175,0,0,0,m1b/owner/usage.csv:4; m1b/owner/probes.md:9,
+shared_evidence,m1b-probes,gpt-image-2.6-sunburst,settled,1,,,,6482,1,0,0,m1b/owner/usage.csv:5; m1b/owner/probes.md:10,
+shared_evidence,m1b-27ef7dc-first,deepseek-v4.1-flash,rejected,1,,,,0,0,75948,0,d217e36:m1b/owner/live-run-27ef7dc-usage.csv:2; d217e36:m1b/owner/live-run-27ef7dc.md:10-19,HTTP 404 due to missing version prefix; reserve retained
+shared_evidence,m1b-27ef7dc-resume,deepseek-v4.1-flash,settled,6,8336,9854,1,105251,0,0,0,d217e36:m1b/owner/live-resume-27ef7dc-usage.csv:2; d217e36:m1b/owner/live-resume-27ef7dc.md:25,Split for first call only
+shared_evidence,m1b-27ef7dc-resume,devin-swe-2,settled,1,14800,29908,1,44708,0,0,0,d217e36:m1b/owner/live-resume-27ef7dc-usage.csv:3; d217e36:m1b/owner/live-resume-27ef7dc.md:25,
+shared_evidence,m1b-b424d2e,deepseek-v4.1-flash,settled,5,8336,11745,1,91353,0,0,0,m1b/owner/live-run-b424d2e-usage.csv:2; m1b/owner/live-run-b424d2e.md:17,Split for first call only
+shared_evidence,m1b-b424d2e,devin-swe-2,reservation_no_usage,2,,,,0,0,559880,0,m1b/owner/live-run-b424d2e-usage.csv:3; m1b/owner/live-run-b424d2e.md:17-28,Two 279940-token reservations; app zero is not provider usage; transport cause not proven
+shared_evidence,m1b-f143003,deepseek-v4.1-flash,settled,5,,,,89929,0,0,0,m1b/owner/live-run-f143003-usage.csv:2,
+shared_evidence,m1b-f143003,devin-swe-2,settled,2,,,,64481,0,0,0,m1b/owner/live-run-f143003-usage.csv:3,
+shared_evidence,m1b-f143003,gpt-image-2.6-sunburst,settled,1,,,,6837,1,0,0,m1b/owner/live-run-f143003-usage.csv:5,
+shared_evidence,m1b-f143003-vision-gate,gemini-3.8-flash,rejected,0,,,,0,0,0,0,m1b/owner/live-run-f143003.md:18-24,Local vision admission rejection before relay dispatch
+shared_evidence,m1b-2fbd4d7,deepseek-v4.1-flash,settled,6,,,,98050,0,0,0,m1b/owner/live-run-2fbd4d7-usage.csv:2,
+shared_evidence,m1b-2fbd4d7,devin-swe-2,settled,34,,,,297136,0,0,0,m1b/owner/live-run-2fbd4d7-usage.csv:3,
+shared_evidence,m1b-2fbd4d7,gemini-3.8-flash,settled,17,,,,329437,0,0,0,m1b/owner/live-run-2fbd4d7-usage.csv:4,
+shared_evidence,m1b-2fbd4d7,gpt-image-2.6-sunburst,settled,3,,,,20808,3,0,0,m1b/owner/live-run-2fbd4d7-usage.csv:5,
+shared_evidence,m1b-bc2266f,devin-swe-2,settled,3,,,,48224,0,0,0,m1b/owner/live-run-bc2266f.md:24-28,
+shared_evidence,m1b-03fcb97,devin-swe-2,settled,13,,,,289959,0,0,0,m1b/owner/live-run-03fcb97.md:20-28,
+shared_evidence,m1b-03fcb97,devin-swe-2,reservation_no_usage,3,,,,0,0,724974,0,m1b/owner/live-run-03fcb97.md:20-28,Three drawing-stage text reservations; no terminal usage before monitoring stop
+shared_evidence,m1b-03fcb97-budget-gate,unallocated,rejected,0,,,,0,0,0,0,m1b/owner/live-run-03fcb97.md:20,Local budget_paused; rejected request model not reported
+shared_evidence,m1b-0d324bd,devin-swe-2,settled,2,,,,46406,0,0,0,m1b/owner/live-run-0d324bd.md:22-27,
+shared_evidence,m1b-9349000,devin-swe-2,settled,10,,,,269545,0,0,0,m1b/owner/live-run-9349000.md:20-26,
+shared_evidence,m1b-af551d2,devin-swe-2,settled,10,,,,253102,0,0,0,m1b/owner/live-run-af551d2.md:13-25,
+shared_evidence,m1b-af551d2,devin-swe-2,transport_failure,1,,,,0,0,394352,0,m1b/owner/live-run-af551d2.md:13-25,HTTP 503; unknown outcome; not resent and full reserve retained
+shared_unattributed,shared-settled-gap,unallocated,settled,,,,,140455,12,0,0,../owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported settled usage not linked to detailed rows
+shared_unattributed,shared-reserve-gap,unallocated,reservation_no_usage,,,,,0,0,195450,1,../owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported reserves not linked to detailed rows; outcome unknown
+overlap_unknown,older-m1b-yesou,gemini-3.8-flash,settled,201,,,,1098996,0,0,0,a0fe816:m1b/owner/11-real-book-gate.md,Older real-book window; not linked to latest shared baseline
+overlap_unknown,older-m1b-yesou,gpt-image-2.6-sunburst,settled,22,,,,94708,22,0,0,a0fe816:m1b/owner/11-real-book-gate.md,Model-specific rows only; excludes mixed handoff row
+overlap_unknown,older-m1b-yesou,gpt-image-2.6-flare,settled,1,,,,7004,1,0,0,a0fe816:m1b/owner/11-real-book-gate.md,
+overlap_unknown,older-m1b-yesou-handoff,gpt-image-2.6-sunburst,settled,,,,,,2,0,0,a0fe816:m1b/owner/11-real-book-gate.md,Images are Sunburst; calls and tokens in joint row
+overlap_unknown,older-m1b-yesou-handoff,unallocated,settled,6,,,,20360,0,0,0,a0fe816:m1b/owner/11-real-book-gate.md,Joint Sunburst and Gemini usage; 2 images already in model row
+overlap_unknown,older-m1b-yesou-handoff,gpt-image-2.6-sunburst,transport_failure,1,,,,0,0,65536,1,a0fe816:m1b/owner/11-real-book-gate.md,In-flight image interrupted at handoff; unknown supplier usage
+overlap_unknown,m0-image-smoke,gpt-image-2.6-sunburst,settled,3,35,19160,3,19195,3,0,0,m0-skeleton/12-image-smoke-check.txt:17-21; ../../tests/fixtures/image-models/smoke/cassette.jsonl,Three live calls; split from the response sidecars; later strict replay adds none
+overlap_unknown,m1b-art-provider-smoke,unallocated,settled,25,,,,75554,,0,0,m1b-production/03-image-production.txt:39-53,Mixed models; receipt gives 9 image requests but not generated image count
+overlap_unknown,m4-paid-spot,devin-swe-2,settled,1,702,118,1,820,0,0,0,m4-longform/spot-check.txt:31-41,
+overlap_unknown,m4-paid-spot,gemini-3.8-flash,settled,1,1228,218,1,1446,0,0,0,m4-longform/spot-check.txt:31-46,
