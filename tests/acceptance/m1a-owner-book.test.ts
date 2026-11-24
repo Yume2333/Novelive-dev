@@ -127,11 +127,10 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			(checkpointSource &&
 				(!runDirectory ||
 					resolve(checkpointSource) === resolve(runDirectory, 'events') ||
-					synthesisModel !== 'devin-swe-2' ||
 					mustResume))
 		)
 			throw new Error(
-				'Selection-only requires a separate run directory and the saved main model',
+				'Selection-only requires a separate run directory and cannot resume extraction',
 			)
 		const recorded: { volumeId: string; runs: WholeBookRun[] } = JSON.parse(
 			await readFile(join(fixtures, 'whole-runs.json'), 'utf8'),
