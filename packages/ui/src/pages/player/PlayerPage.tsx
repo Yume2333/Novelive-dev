@@ -175,6 +175,10 @@ export function PlayerPage({
 				)
 				setEnded(false)
 				setAwaitingClick(waitForClick)
+				localStorage.setItem(
+					'novelive.recentWork',
+					version ? `package:${id}:${version}` : id,
+				)
 				setLoaded({
 					workId: id,
 					restore,
