@@ -218,7 +218,7 @@ function modeFromEnvironment() {
 
 export function usesReplyCheckpoint(options: ReplayOptions = {}) {
 	const mode = options.mode ?? modeFromEnvironment()
-	return mode === undefined || mode === 'record'
+	return mode !== 'strict'
 }
 
 function terminalSse(bytes: Buffer) {
