@@ -36,6 +36,23 @@ export function Dropdown({
 				setOpen(false)
 		}
 		const onKey = (event: KeyboardEvent) => {
+			const options = [
+				...(menu.current?.querySelectorAll<HTMLButtonElement>(
+					'button:not(:disabled)',
+				) ?? []),
+			]
+			const index = options.indexOf(document.activeElement as HTMLButtonElement)
+			const next = {
+				ArrowDown: (index + 1) % options.length,
+				ArrowUp: (index - 1 + options.length) % options.length,
+				Home: 0,
+				End: options.length - 1,
+			}[event.key]
+			if (next !== undefined && options.length) {
+				event.preventDefault()
+				options[next].focus()
+				return
+			}
 			if (event.key !== 'Escape') return
 			event.preventDefault()
 			setOpen(false)
