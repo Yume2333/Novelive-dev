@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { setImmediate } from 'node:timers/promises'
 import { obj } from '@earendil-works/pi-schema'
 import sharp from 'sharp'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -387,6 +388,79 @@ test('continuing an existing CSV conservatively counts legacy reservations witho
 	}
 })
 
+test('a settled one-image Sunburst response frees two slots but unresolved calls keep all three', async () => {
+	vi.stubEnv('NL_RUN_ID', 'staging')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	vi.stubEnv('NL_RUN_IMAGE_TOKEN_RESERVE', '7000')
+	using database = new DatabaseSync(':memory:')
+	database.exec(
+		"CREATE TABLE chapter (work_id TEXT, user_state TEXT); INSERT INTO chapter VALUES ('w', 'producing')",
+	)
+	const request = () =>
+		new Request('https://example.invalid/v1/images/generations', {
+			method: 'POST',
+			body: JSON.stringify({ model: 'gpt-image-2.6-sunburst', n: 1 }),
+		})
+	const budget = () => chapterImageBudget(database, 'w')
+	const spend = projectSpend(database)
+	expect(budget()).toBe(45)
+	await spend(request(), async () => {
+		expect(budget()).toBe(42)
+		return Response.json({
+			data: [{ b64_json: 'fixture' }],
+			usage: { total_tokens: 7000 },
+		})
+	})
+	expect(budget()).toBe(44)
+	await spend(request(), async () => new Response(null, { status: 503 }))
+	expect(budget()).toBe(41)
+})
+
+test.each([true, false])(
+	'concurrent Sunburst admission waits for a live quote to settle (usable: %s)',
+	async (usable) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '4')
+		using database = new DatabaseSync(':memory:')
+		const spend = projectSpend(database)
+		const request = () =>
+			new Request('https://example.invalid/v1/images/generations', {
+				method: 'POST',
+				body: JSON.stringify({ model: 'gpt-image-2.6-sunburst', n: 1 }),
+			})
+		const entered = Promise.withResolvers<void>()
+		const finish = Promise.withResolvers<void>()
+		const success = () =>
+			Response.json({
+				data: [{ b64_json: 'fixture' }],
+				usage: { total_tokens: 7000 },
+			})
+		const first = spend(request(), async () => {
+			entered.resolve()
+			await finish.promise
+			return usable ? success() : new Response(null, { status: 503 })
+		})
+		await entered.promise
+		const send = vi.fn(async () => success())
+		const second = spend(request(), send).then(
+			(response) => ({ response }),
+			(error: unknown) => ({ error }),
+		)
+		await setImmediate()
+		expect(send).not.toHaveBeenCalled()
+		finish.resolve()
+		await first
+		if (usable) {
+			expect(await second).toEqual({ response: expect.any(Response) })
+			expect(send).toHaveBeenCalledOnce()
+		} else {
+			expect(await second).toEqual({ error: expect.any(Error) })
+			expect(send).not.toHaveBeenCalled()
+		}
+	},
+)
+
 test('concurrent dispatch stops before the next reservation would cross the soft cutoff', async () => {
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
 	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
@@ -629,6 +703,111 @@ test.each([
 	},
 )
 
+test.each([false, true])(
+	'the image timeout starts at dispatch, not while waiting for budget (times out: %s)',
+	async (timesOut) => {
+		vi.stubEnv('NL_REPLAY', '')
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '4')
+		using database = new DatabaseSync(':memory:')
+		const admit = projectSpend(database)
+		const request = () =>
+			new Request('https://example.invalid/v1/images/generations', {
+				method: 'POST',
+				body: JSON.stringify({ model: 'gpt-image-2.6-sunburst', n: 1 }),
+			})
+		const reply = () =>
+			Response.json({
+				data: [{ b64_json: Buffer.from('fixture').toString('base64') }],
+				usage: { total_tokens: 7000 },
+			})
+		const held = Promise.withResolvers<void>()
+		const release = Promise.withResolvers<void>()
+		const first = admit(request(), async () => {
+			held.resolve()
+			await release.promise
+			return reply()
+		})
+		await held.promise
+		const admitted = Promise.withResolvers<void>()
+		const dispatched = Promise.withResolvers<void>()
+		const send = vi.fn(async (input: RequestInfo | URL) => {
+			dispatched.resolve()
+			if (!timesOut) return reply()
+			const { signal } = input as Request
+			return new Promise<Response>((_, reject) => {
+				signal.addEventListener('abort', () => reject(signal.reason), {
+					once: true,
+				})
+			})
+		})
+		const render = imageRenderer(
+			{
+				...configuration.models.image,
+				model: 'gpt-image-2.6-sunburst',
+				upscaleTier: 'anime',
+			},
+			{
+				replay: {
+					fetch: send,
+					spend: (request, fetch) => {
+						admitted.resolve()
+						return admit(request, fetch)
+					},
+				},
+			},
+		)
+		vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+		const deadline = vi
+			.spyOn(AbortSignal, 'timeout')
+			.mockImplementation((ms) => {
+				const controller = new AbortController()
+				setTimeout(
+					() => controller.abort(new DOMException('Timed out', 'TimeoutError')),
+					ms,
+				)
+				return controller.signal
+			})
+		try {
+			const result = render('fixture', [], { width: 1024, height: 1024 }, false)
+			const beforeRenderSettles = (milestone: Promise<void>, name: string) =>
+				Promise.race([
+					milestone,
+					result.then(() => {
+						throw new Error(`Image render finished before ${name}`)
+					}),
+				])
+			await beforeRenderSettles(admitted.promise, 'budget admission')
+			await setImmediate()
+			await vi.advanceTimersByTimeAsync(90_001)
+			expect(send).not.toHaveBeenCalled()
+			expect(deadline).not.toHaveBeenCalled()
+			release.resolve()
+			await first
+			await beforeRenderSettles(dispatched.promise, 'provider dispatch')
+			expect(deadline).toHaveBeenCalledExactlyOnceWith(90_000)
+			await vi.advanceTimersByTimeAsync(90_000)
+			expect(await result).toEqual(
+				timesOut
+					? {
+							error: expect.objectContaining({ code: 'network' }),
+							doNotRegenerate: true,
+						}
+					: { bytes: Buffer.from('fixture') },
+			)
+			expect(
+				database
+					.prepare('SELECT actual_images FROM spend_reservation ORDER BY id')
+					.all(),
+			).toEqual([{ actual_images: 1 }, { actual_images: timesOut ? null : 1 }])
+		} finally {
+			release.resolve()
+			deadline.mockRestore()
+			vi.useRealTimers()
+		}
+	},
+)
+
 test('exhausted image and token caps block image edits, generation, and visual review', async () => {
 	vi.stubEnv('NL_REPLAY', '')
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '0')
@@ -665,6 +844,54 @@ test('exhausted image and token caps block image edits, generation, and visual r
 	).rejects.toThrow('超出工程预算')
 	expect(fetch).not.toHaveBeenCalled()
 })
+
+test.each(['generations', 'edits'])(
+	'Sunburst %s reserve for three outputs per requested image',
+	async (route) => {
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '2')
+		vi.stubEnv('NL_RUN_IMAGE_TOKEN_RESERVE', '7000')
+		const request = () => {
+			const body = new FormData()
+			body.set('model', 'gpt-image-2.6-sunburst')
+			body.set('n', '1')
+			body.append('image[]', new Blob(['first']), 'first.png')
+			body.append('image[]', new Blob(['second']), 'second.png')
+			return new Request(`https://example.invalid/v1/images/${route}`, {
+				method: 'POST',
+				body:
+					route === 'edits'
+						? body
+						: JSON.stringify({ n: 1, model: 'gpt-image-2.6-sunburst' }),
+			})
+		}
+		using database = new DatabaseSync(':memory:')
+		const send = vi.fn(async () =>
+			Response.json({
+				data: Array.from({ length: 3 }, () => ({ b64_json: 'fixture' })),
+				usage: { total_tokens: 30_509 },
+			}),
+		)
+		await expect(projectSpend(database)(request(), send)).rejects.toThrow(
+			'超出工程预算',
+		)
+		expect(send).not.toHaveBeenCalled()
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '3')
+		await projectSpend(database)(request(), send)
+		expect(send).toHaveBeenCalledOnce()
+		expect(
+			database
+				.prepare(
+					'SELECT tokens, images, actual_tokens, actual_images FROM spend_reservation',
+				)
+				.all(),
+		).toEqual([
+			{ tokens: 31_000, images: 3, actual_tokens: 30_509, actual_images: 3 },
+		])
+		vi.stubEnv('NL_RUN_IMAGE_TOKEN_RESERVE', '12000')
+		expect(await quoteSpend(request())).toEqual({ tokens: 36_000, images: 3 })
+	},
+)
 
 test('image reservations settle the returned image count and any measured token usage', async () => {
 	vi.stubEnv('NL_REPLAY', '')

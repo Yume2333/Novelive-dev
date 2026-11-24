@@ -5,11 +5,13 @@ import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
 import { expect, test, vi } from 'vitest'
 import { createConfigStore } from '../../packages/creator/src/config'
+import { productionSnapshotEvent } from '../../packages/creator/src/contract/production'
 import { importTxtProject } from '../../packages/creator/src/import/wizard'
 import { playbackAssetIds } from '../../packages/creator/src/pipeline/art/plan'
 import { Project } from '../../packages/creator/src/project'
 import { createProduction } from '../../packages/creator/src/project/production'
 import { createReplayFetch } from '../../packages/creator/src/replay'
+import * as spend from '../../packages/creator/src/usage/spend'
 import { projectSpend } from '../../packages/creator/src/usage/spend'
 import { evaluate } from '../../tools/quality/scorer'
 import { configuration } from '../fixtures/cassettes/m1b-gate/fixture'
@@ -37,11 +39,17 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'image-failure',
 			'image-null',
 			'image-invalid-json',
+			'image-overdelivery',
+			'concurrent-sunburst',
 			'download-failure',
 			'download-body-failure',
 			'soft-stop',
 		] as const
 	).map((fault) => ({ name: fault, faults: [fault] })),
+	{
+		name: 'staging-during-sunburst-draw',
+		faults: ['image-overdelivery'],
+	},
 	{
 		name: 'review-cap-raise',
 		faults: ['review-reasoning', 'review-rate-limit'],
@@ -76,7 +84,53 @@ test.each(scenarios)(
 	'offline four-chapter production: $name',
 	async ({ name, faults }) => {
 		const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-offline-'))
-		const relay = fakeRelay(faults)
+		const overdelivery = faults.includes('image-overdelivery')
+		const overlap = name === 'staging-during-sunburst-draw'
+		const drawing = Promise.withResolvers<void>()
+		const settleDrawing = Promise.withResolvers<void>()
+		let heldDraw = false
+		let enteredOverlapStage = false
+		const stageBudgetStarted = Promise.withResolvers<{
+			allowance: ReturnType<typeof spend.settledChapterImageBudget>
+		}>()
+		let readHeldImageSettlement: (() => number | null | undefined) | undefined
+		const imageSettlementsAtStage: (number | null | undefined)[] = []
+		const settledBudget = spend.settledChapterImageBudget
+		const stagingBudget = overlap
+			? vi
+					.spyOn(spend, 'settledChapterImageBudget')
+					.mockImplementation((...args) => {
+						const allowance = settledBudget(...args)
+						if (enteredOverlapStage) {
+							enteredOverlapStage = false
+							stageBudgetStarted.resolve({ allowance })
+						}
+						return allowance
+					})
+			: undefined
+		const published = new Map(
+			chapterIds.map((id) => [id, Promise.withResolvers<void>()]),
+		)
+		const relay = fakeRelay(
+			faults,
+			false,
+			overdelivery
+				? (chapter) =>
+						overlap && chapter === 3
+							? drawing.promise
+							: published.get(chapterIds[chapter - 2])?.promise
+				: undefined,
+			(chapter) => {
+				if (!overlap || chapter !== 2 || heldDraw) return
+				heldDraw = true
+				drawing.resolve()
+				return settleDrawing.promise
+			},
+			({ chapter, operation }) => {
+				if (overlap && chapter === 3 && operation === 'stage')
+					imageSettlementsAtStage.push(readHeldImageSettlement?.())
+			},
+		)
 		const profile = join(root, 'profile')
 		const config = createConfigStore(profile)
 		const createHost = () =>
@@ -84,7 +138,20 @@ test.each(scenarios)(
 				profile,
 				config,
 				{ fetch: relay.fetch },
-				() => {},
+				({ event }) => {
+					if (!overdelivery || !productionSnapshotEvent.check(event)) return
+					for (const chapter of event.payload.chapters) {
+						if (chapter.status === 'published')
+							published.get(chapter.chapterId)?.resolve()
+						if (
+							overlap &&
+							chapter.chapterId === chapterIds[2] &&
+							chapter.status === 'producing' &&
+							chapter.step === 'stage'
+						)
+							enteredOverlapStage = true
+					}
+				},
 				() => {},
 			)
 		let host = createHost()
@@ -117,7 +184,14 @@ test.each(scenarios)(
 							maxOutputTokens: null,
 						},
 					}),
-					image: { ...configuration.models.image, retries: 3 },
+					image: {
+						...configuration.models.image,
+						retries: 3,
+						...(name === 'concurrent-sunburst' && { concurrency: 8 }),
+						...((overdelivery || name === 'concurrent-sunburst') && {
+							model: 'gpt-image-2.6-sunburst',
+						}),
+					},
 				},
 				production: { roleModels: { artist: 'fast' } },
 			})
@@ -158,6 +232,13 @@ test.each(scenarios)(
 			expect(phase).toBe('confirm-visual')
 			expect(visual?.mainVisuals).toHaveLength(3)
 			expect(visual?.characters).toHaveLength(1)
+			if (name === 'concurrent-sunburst') {
+				await host.close()
+				startWindow()
+				host = createHost()
+				session = await host.get(workId)
+				expect(session.snapshot().phase).toBe('confirm-visual')
+			}
 			await session.confirm({
 				workId,
 				mainVisualId: 'visual-1',
@@ -214,6 +295,20 @@ test.each(scenarios)(
 				if (snapshot.phase === 'done') break
 				if (snapshot.phase === 'confirm-first') {
 					expect(passedSecondGate).toBe(false)
+					if (name === 'concurrent-sunburst') {
+						expect(
+							relay.admissions.find(
+								({ operation, chapter }) =>
+									operation === 'stage' && chapter === 1,
+							)?.imageAllowance,
+						).toBe(11)
+						expect(
+							relay.admissions.filter(
+								({ operation, chapter }) =>
+									operation === 'image' && chapter === 1,
+							),
+						).toHaveLength(11)
+					}
 					await play(chapterIds[0])
 					expect(
 						(await host.playerStatus(workId)).chapters.map(
@@ -242,6 +337,23 @@ test.each(scenarios)(
 						expect(fill.ok).toBe(true)
 					}
 					await session.continue()
+					if (overlap) {
+						const { allowance } = await stageBudgetStarted.promise
+						expect(heldDraw).toBe(true)
+						const live = reservations().filter(
+							(row) => row.images > 0 && row.actual_images === null,
+						)
+						expect(live).toHaveLength(1)
+						expect(live[0].images).toBe(3)
+						readHeldImageSettlement = () =>
+							reservations().find((row) => row.id === live[0].id)?.actual_images
+						expect(
+							await Promise.race([allowance, Promise.resolve('waiting')]),
+						).toBe('waiting')
+						expect(imageSettlementsAtStage).toEqual([])
+						settleDrawing.resolve()
+						await allowance
+					}
 					continue
 				}
 				const softStop =
@@ -460,6 +572,36 @@ test.each(scenarios)(
 			}
 			const ledger = reservations()
 			expect(ledger).toHaveLength(relay.admissions.length)
+			if (overdelivery) {
+				expect(
+					ledger.filter(({ actual_images }) => actual_images === 3),
+				).toMatchObject([{ tokens: 31_000, images: 3, actual_tokens: 30_509 }])
+				expect(
+					relay.admissions.find(({ fault }) => fault === 'image-overdelivery')
+						?.chapter,
+				).toBe(1)
+				for (const chapter of [2, 3, 4]) {
+					const stages = stageKeys.filter((row) => row.chapter === chapter)
+					const images = relay.admissions
+						.filter((row) => row.operation === 'image' && row.chapter < chapter)
+						.reduce((total, row) => total + (row.images ?? 0), 0)
+					expect(stages.length).toBeGreaterThan(0)
+					for (const stage of stages) {
+						const allowance = expect(
+							stage.imageAllowance,
+							`chapter ${chapter} allowance`,
+						)
+						if (overlap && chapter === 3) {
+							expect(imageSettlementsAtStage).toEqual(stages.map(() => 1))
+							allowance.toBeGreaterThanOrEqual(
+								Math.floor((50 - 5 - images) / 3),
+							)
+						} else {
+							allowance.toBe(Math.floor((50 - 5 - images) / (5 - chapter)))
+						}
+					}
+				}
+			}
 			const pair = (tokens: number | null, images: number | null) =>
 				JSON.stringify([tokens, images])
 			for (let i = 1; i <= window; i++) {
@@ -520,7 +662,11 @@ test.each(scenarios)(
 				)
 			}
 		} finally {
+			drawing.resolve()
+			settleDrawing.resolve()
+			for (const gate of published.values()) gate.resolve()
 			await host.close()
+			stagingBudget?.mockRestore()
 			vi.unstubAllEnvs()
 			vi.unstubAllGlobals()
 			await rm(root, { recursive: true, force: true })

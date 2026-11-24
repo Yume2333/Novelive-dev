@@ -39,6 +39,7 @@ export type Admission = {
 	fault?: Fault
 	requestKey: string
 	outputCap?: number
+	imageAllowance?: number
 }
 
 export type Fault =
@@ -56,6 +57,8 @@ export type Fault =
 	| 'image-failure'
 	| 'image-null'
 	| 'image-invalid-json'
+	| 'image-overdelivery'
+	| 'concurrent-sunburst'
 	| 'download-failure'
 	| 'download-body-failure'
 	| 'soft-stop'
@@ -119,7 +122,13 @@ function completion(
 	)
 }
 
-export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
+export function fakeRelay(
+	faults: readonly Fault[],
+	privateStaging = false,
+	beforeWriting?: (chapter: number) => Promise<void> | undefined,
+	beforeImageReply?: (chapter: number) => Promise<void> | undefined,
+	onAdmission?: (admission: Admission) => void,
+) {
 	const pending = new Set(faults)
 	const admissions: Admission[] = []
 	const imageBytes = new Map<string, Buffer>()
@@ -216,11 +225,18 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					lines.some((line) => paragraphs.some(([, , text]) => line === text)),
 				) + 1
 			assert.ok(chapter, 'Writing prompt did not cite a fixture chapter')
+			if (beforeWriting) await beforeWriting(chapter)
 			currentChapter = chapter
 		}
 		const scenes = [...prompt.matchAll(/^(\d+): scene 河灯-(\d+)-(\d+)$/gm)]
 		const repair = prompt.includes('\nRepair the ')
 		const outputCap = body.max_completion_tokens ?? body.max_tokens
+		const imageAllowance =
+			operation === 'stage'
+				? /Hard limit for this whole chapter: (\d+) new provider images/.exec(
+						prompt,
+					)?.[1]
+				: undefined
 		const previous = admissions.at(-1)
 		const fault = faults.find(
 			(candidate) =>
@@ -246,11 +262,17 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					(candidate === 'review-reasoning' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-1')) ||
-					(['image-failure', 'image-null', 'image-invalid-json'].includes(
-						candidate,
-					) &&
+					([
+						'image-failure',
+						'image-null',
+						'image-invalid-json',
+						'image-overdelivery',
+					].includes(candidate) &&
 						operation === 'image' &&
 						currentChapter > 0) ||
+					(candidate === 'concurrent-sunburst' &&
+						operation === 'stage' &&
+						scenes[0]?.[2] === '1') ||
 					(candidate === 'invalid-id' && operation === 'stage' && !repair) ||
 					(['malformed', 'over-budget'].includes(candidate) &&
 						operation === 'stage')),
@@ -275,21 +297,35 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 				: operation === 'window-fill'
 					? Number(body.max_tokens)
 					: image
-						? 700
+						? fault === 'image-overdelivery'
+							? 30_509
+							: 700
 						: 2_000
-		const images = tokens === null ? null : Number(image)
+		const images =
+			tokens === null
+				? null
+				: fault === 'image-overdelivery'
+					? 3
+					: Number(image)
+		if (fault === 'image-overdelivery') assert.equal(Number(body.n), 1)
 		const run = process.env.NL_RUN_ID ?? ''
 		const attributedChapter = /(?:scene 河灯-|fixture-(?:bank|cg)-)(\d+)/.exec(
 			String(image ? body.prompt : prompt),
 		)?.[1]
-		admissions.push({
+		const chapter = attributedChapter
+			? Number(attributedChapter)
+			: currentChapter
+		const index = admissions.length + 1
+		const admission = {
 			operation,
-			chapter: attributedChapter ? Number(attributedChapter) : currentChapter,
+			chapter,
 			tokens,
 			images,
 			run,
 			fault,
 			outputCap,
+			imageAllowance:
+				imageAllowance === undefined ? undefined : Number(imageAllowance),
 			requestKey: createHash('sha256')
 				.update(
 					JSON.stringify(
@@ -297,7 +333,9 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					),
 				)
 				.digest('hex'),
-		})
+		}
+		admissions.push(admission)
+		onAdmission?.(admission)
 		const csv = process.env.NL_USAGE_CSV
 		assert.ok(csv, 'Offline admission needs a run-specific CSV')
 		await appendFile(
@@ -312,14 +350,17 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 				headers: { 'content-type': 'application/json' },
 			})
 		if (image) {
-			const path = `/v1/download/${admissions.length}.png`
+			await beforeImageReply?.(chapter)
+			const path = `/v1/download/${index}.png`
 			const [width, height] = String(body.size).split('x').map(Number)
 			imageBytes.set(
 				path,
 				await picture(width, height, body.background === 'transparent'),
 			)
 			return Response.json({
-				data: [{ url: endpoint + path }],
+				data: Array.from({ length: images ?? 0 }, (_, i) => ({
+					url: i ? `${endpoint}${path}?variant=${i}` : endpoint + path,
+				})),
 				usage: { total_tokens: tokens },
 			})
 		}
@@ -416,9 +457,10 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 		const surplus =
 			fault === 'over-budget' ||
 			(repair && prompt.includes('new provider images; budget is'))
-		const cgs = surplus
+		const cgCount = fault === 'concurrent-sunburst' ? 9 : surplus ? 13 : 0
+		const cgs = cgCount
 			? Array.from(
-					{ length: 13 },
+					{ length: cgCount },
 					(_, i) => `cg-lantern-${scenes[0]?.[2]}-${scenes[0]?.[3]}-${i}`,
 				)
 			: []
