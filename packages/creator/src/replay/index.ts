@@ -37,6 +37,11 @@ export interface ReplayOptions {
 	onReplay?: (request: Request, response: Response) => Promise<void>
 	checkpointDirectory?: string
 	checkpointFallbackDirectory?: string
+	checkpointFallbackClaim?: (
+		source: string,
+		key: string,
+		count: number,
+	) => number | undefined
 	checkpointResponse?: (response: Response) => boolean
 	checkpointResponseId?: string
 	normalizeCheckpointIds?: boolean
@@ -414,6 +419,7 @@ export function createReplayFetch(
 					checkpointResponseId: options.checkpointResponseId,
 					normalizeIds: options.normalizeCheckpointIds,
 					checkpointFallbackDirectory: options.checkpointFallbackDirectory,
+					checkpointFallbackClaim: options.checkpointFallbackClaim,
 				},
 				true,
 				positions,
@@ -539,6 +545,48 @@ function replayFetch(
 			rebindIds,
 		)
 		request.signal.throwIfAborted()
+		const nextPosition = (source: string) => {
+			const cursorKey = JSON.stringify([source, identity.key])
+			const position = positions.get(cursorKey) ?? 0
+			positions.set(cursorKey, position + 1)
+			return position
+		}
+		const reply = async (
+			row: Awaited<ReturnType<typeof readCassetteRows>>[number],
+			source: string,
+		) => {
+			if (options.fault === 'http500')
+				return new Response('Replay HTTP 500', { status: 500 })
+			let bytes: Uint8Array = await readCassetteBody(source, row.body)
+			if (
+				rebindIds &&
+				/^(?:text\/|application\/(?:[\w.+-]*json|xml))/i.test(
+					row.headers['content-type'] ?? '',
+				)
+			)
+				bytes = Buffer.from(
+					identity.restore(Buffer.from(bytes).toString('utf8')),
+				)
+			if (options.fault === 'bad-image') bytes = corruptImage(bytes)
+			const stream =
+				request.method === 'HEAD' || [204, 205, 304].includes(row.status)
+					? null
+					: replayBody(bytes, request.signal, options.fault, options.delayMs)
+			const response = new Response(stream, {
+				status: row.status,
+				headers: row.headers,
+			})
+			if (checkpoint) {
+				checkpointReplies.add(response)
+				options.onCheckpointHit?.(
+					row.checkpointAllowance,
+					row.checkpointResponseId,
+					source,
+				)
+			}
+			await options.onReplay?.(request, response)
+			return response
+		}
 		if (fallback) {
 			try {
 				return await fallback(request.clone())
@@ -554,19 +602,20 @@ function replayFetch(
 			if (options.reuseRecorded) {
 				for (const source of [directory, options.checkpointFallbackDirectory]) {
 					if (!source) continue
-					const rows = await readCassetteRows(join(source, 'cassette.jsonl'))
-					if (!rows.some((row) => row.key === identity.key && row.status < 300))
-						continue
-					return replayFetch(
-						{
-							...options,
-							mode: 'strict',
-							directory: source,
-							fallbackDirectory: undefined,
-						},
-						checkpoint,
-						positions,
-					)(request)
+					const rows = (
+						await readCassetteRows(join(source, 'cassette.jsonl'))
+					).filter((row) => row.key === identity.key && row.status < 300)
+					if (!rows.length) continue
+					request.signal.throwIfAborted()
+					const position =
+						source !== directory && options.checkpointFallbackClaim
+							? options.checkpointFallbackClaim(
+									source,
+									identity.key,
+									rows.length,
+								)
+							: Math.min(nextPosition(source), rows.length - 1)
+					if (position !== undefined) return reply(rows[position], source)
 				}
 			}
 			const recordSend = async (
@@ -670,39 +719,10 @@ function replayFetch(
 			}
 			return sendLive(request, input)
 		}
-		const cursorKey = JSON.stringify([directory, identity.key])
-		const position = positions.get(cursorKey) ?? 0
-		const row = rows[Math.min(position, rows.length - 1)]
-		positions.set(cursorKey, position + 1)
-		if (options.fault === 'http500')
-			return new Response('Replay HTTP 500', { status: 500 })
-		let bytes: Uint8Array = await readCassetteBody(directory, row.body)
-		if (
-			rebindIds &&
-			/^(?:text\/|application\/(?:[\w.+-]*json|xml))/i.test(
-				row.headers['content-type'] ?? '',
-			)
+		return reply(
+			rows[Math.min(nextPosition(directory), rows.length - 1)],
+			directory,
 		)
-			bytes = Buffer.from(identity.restore(Buffer.from(bytes).toString('utf8')))
-		if (options.fault === 'bad-image') bytes = corruptImage(bytes)
-		const stream =
-			request.method === 'HEAD' || [204, 205, 304].includes(row.status)
-				? null
-				: replayBody(bytes, request.signal, options.fault, options.delayMs)
-		const response = new Response(stream, {
-			status: row.status,
-			headers: row.headers,
-		})
-		if (checkpoint) {
-			checkpointReplies.add(response)
-			options.onCheckpointHit?.(
-				row.checkpointAllowance,
-				row.checkpointResponseId,
-				directory,
-			)
-		}
-		await options.onReplay?.(request, response)
-		return response
 	}
 	if (spend && mode !== 'strict') spendGuardedFetches.add(dispatch)
 	return checkpoint ? inheritSpendGuard(send, dispatch) : dispatch

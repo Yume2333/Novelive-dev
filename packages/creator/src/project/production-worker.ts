@@ -146,13 +146,12 @@ export function chapterWorker(
 	replay?: ReplayOptions,
 ) {
 	const fetch = createReplayFetch(replay)
-	const imageReplayPositions = new Map<string, number>()
+	const legacyDrawingClaims = new Map<string, Map<string, number>>()
 	const art = (
 		signal?: AbortSignal,
 		imageGenerationReplay?: ReplayOptions,
 		drawingReplay = replay,
 		desensitized = false,
-		drawingPositions?: Map<string, number>,
 	) =>
 		usageMethods(
 			new ArtProduction(project, {
@@ -163,7 +162,6 @@ export function chapterWorker(
 				image: models.image,
 				replay: drawingReplay,
 				imageGenerationReplay,
-				imageReplayPositions: drawingPositions,
 				desensitized,
 				signal,
 				resolution: work.settings.outputResolution,
@@ -569,9 +567,18 @@ export function chapterWorker(
 							work.workId,
 						),
 						normalizeCheckpointIds: true,
+						checkpointFallbackClaim(source, fingerprint, count) {
+							const key = JSON.stringify([source, fingerprint])
+							const claims =
+								legacyDrawingClaims.get(key) ?? new Map<string, number>()
+							const position = claims.get(job.assetId) ?? claims.size
+							if (position >= count) return
+							claims.set(job.assetId, position)
+							legacyDrawingClaims.set(key, claims)
+							return position
+						},
 					},
 					ctx.desensitized,
-					imageReplayPositions,
 				).draw(
 					metadata.job,
 					(await productionBible(project, volumeId, work.workId)).art,
