@@ -132,26 +132,25 @@ async function projectTest(run: (project: Project) => Promise<void>) {
 	}
 }
 
+function reasoningReply() {
+	const chunk = {
+		choices: [
+			{
+				index: 0,
+				delta: { reasoning_content: 'Thinking about the brief' },
+				finish_reason: 'length',
+			},
+		],
+		usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+	}
+	return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+		headers: { 'content-type': 'text/event-stream' },
+	})
+}
+
 test('does not dispatch a painter retry when the effective cap cannot increase', async () => {
 	await projectTest(async (project) => {
-		const fetch = vi.fn<typeof globalThis.fetch>(async () => {
-			const chunk = {
-				choices: [
-					{
-						index: 0,
-						delta: { reasoning_content: 'Thinking about the brief' },
-						finish_reason: 'length',
-					},
-				],
-				usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-			}
-			return new Response(
-				`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
-				{
-					headers: { 'content-type': 'text/event-stream' },
-				},
-			)
-		})
+		const fetch = vi.fn<typeof globalThis.fetch>(async () => reasoningReply())
 		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
 		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
 		try {
@@ -180,6 +179,60 @@ test('does not dispatch a painter retry when the effective cap cannot increase',
 					.prepare('SELECT actual_tokens FROM spend_reservation')
 					.all(),
 			).toEqual([{ actual_tokens: 15 }])
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+})
+
+test('a raised-cap visual audit reuses the legacy checkpoint without a new reservation', async () => {
+	await projectTest(async (project) => {
+		const connection = { ...main, model: 'devin-swe-2', maxOutputTokens: 2048 }
+		const prompt = 'Visually audit the first image.'
+		const schema = obj({ pass: bool() })
+		const images = [await picture(32, 32, false)]
+		const replay = {
+			mode: 'record' as const,
+			directory: join(project.root, 'audit-recordings'),
+			checkpointDirectory: join(project.root, 'audit'),
+			spend: projectSpend(project.database),
+		}
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		try {
+			const seed = artReplies('{"pass":true}')
+			await artModels.artJson(
+				connection,
+				prompt,
+				schema,
+				{
+					maxTokens: 2048,
+					replay: { ...replay, fetch: seed },
+				},
+				images,
+			)
+			expect(seed).toHaveBeenCalledTimes(1)
+
+			const fetch = vi.fn<typeof globalThis.fetch>(async () => reasoningReply())
+			const request = () =>
+				artModels.artJson(
+					connection,
+					prompt,
+					schema,
+					{
+						reasoningRetry: true,
+						replay: { ...replay, fetch },
+					},
+					images,
+				)
+			await expect(request()).resolves.toEqual({ pass: true })
+			await expect(request()).resolves.toEqual({ pass: true })
+			expect(fetch).toHaveBeenCalledTimes(1)
+			expect(
+				project.database
+					.prepare('SELECT actual_tokens FROM spend_reservation')
+					.all(),
+			).toEqual([{ actual_tokens: 15 }, { actual_tokens: 15 }])
 		} finally {
 			vi.unstubAllEnvs()
 		}

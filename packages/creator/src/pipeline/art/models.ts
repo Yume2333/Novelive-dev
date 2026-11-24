@@ -404,6 +404,8 @@ async function requestArtJson<T>(
 							options.replay.checkpointDirectory,
 							`reasoning-retry-${attempt}`,
 						),
+						checkpointFallbackDirectory: options.replay.checkpointDirectory,
+						checkpointFallbackClaim: undefined,
 					}),
 				onCheckpointReply: (save) => {
 					saveReply = save
