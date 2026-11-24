@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -318,6 +318,58 @@ test('a new usage window preserves unresolved history without charging it to new
 			run_id: null,
 		},
 	])
+})
+
+test('continuing an existing CSV claims only its matching legacy reservations', async () => {
+	const dir = await mkdtemp(join(tmpdir(), 'novelive-spend-window-'))
+	try {
+		const csv = join(dir, 'usage.csv')
+		await writeFile(
+			csv,
+			'2026-01-01,image,1,16000,1,reservation\n2026-01-01,image,1,7000,1,reservation\n',
+		)
+		vi.stubEnv('NL_USAGE_CSV', csv)
+		vi.stubEnv('NL_RUN_ID', 'continuing')
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '30000')
+		vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '0.8')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '10')
+		using database = new DatabaseSync(':memory:')
+		database.exec(`
+			CREATE TABLE spend_reservation (
+				id INTEGER PRIMARY KEY, tokens INTEGER NOT NULL, images INTEGER NOT NULL,
+				actual_tokens INTEGER, actual_images INTEGER
+			) STRICT;
+			INSERT INTO spend_reservation VALUES (1, 99000, 3, NULL, NULL),
+				(2, 16000, 1, 11000, 1), (3, 7000, 1, NULL, NULL);
+			CREATE TABLE chapter (work_id TEXT, user_state TEXT);
+			INSERT INTO chapter VALUES ('w', 'producing');
+		`)
+		expect(chapterImageBudget(database, 'w')).toBe(3)
+		const send = vi.fn()
+		await expect(
+			projectSpend(database)(
+				new Request('https://example.invalid/v1/images/generations', {
+					method: 'POST',
+					body: '{}',
+				}),
+				send,
+			),
+		).rejects.toThrow('超出工程预算')
+		expect(send).not.toHaveBeenCalled()
+		expect(
+			database
+				.prepare(
+					'SELECT run_id, actual_tokens FROM spend_reservation ORDER BY id',
+				)
+				.all(),
+		).toEqual([
+			{ run_id: null, actual_tokens: null },
+			{ run_id: 'continuing', actual_tokens: 11000 },
+			{ run_id: 'continuing', actual_tokens: null },
+		])
+	} finally {
+		await rm(dir, { recursive: true, force: true })
+	}
 })
 
 test('concurrent dispatch stops before the next reservation would cross the soft cutoff', async () => {

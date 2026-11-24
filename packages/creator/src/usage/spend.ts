@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import sharp from 'sharp'
@@ -287,7 +288,7 @@ function observeUsage(response: Response, settle: (tokens: number) => void) {
 	})
 }
 
-function spendLedger(database: DatabaseSync) {
+function spendLedger(database: DatabaseSync, runId: string | null) {
 	database.exec(`CREATE TABLE IF NOT EXISTS spend_reservation (
 		id INTEGER PRIMARY KEY,
 		tokens INTEGER NOT NULL,
@@ -304,6 +305,51 @@ function spendLedger(database: DatabaseSync) {
 			.get()
 	)
 		database.exec('ALTER TABLE spend_reservation ADD COLUMN run_id TEXT')
+	const csv = process.env.NL_USAGE_CSV
+	if (
+		!runId ||
+		!csv ||
+		database
+			.prepare('SELECT 1 FROM spend_reservation WHERE run_id = ? LIMIT 1')
+			.get(runId)
+	)
+		return
+	let usage: string
+	try {
+		usage = readFileSync(csv, 'utf8').trim()
+	} catch (error) {
+		if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+			return
+		throw error
+	}
+	if (!usage) return
+	const quotes = usage.split(/\r?\n/).map((line) => line.split(',').slice(3, 5))
+	const suffix = database
+		.prepare(
+			'SELECT id, tokens, images, run_id FROM spend_reservation ORDER BY id DESC LIMIT ?',
+		)
+		.all(quotes.length)
+		.reverse() as {
+		id: number
+		tokens: number
+		images: number
+		run_id: string | null
+	}[]
+	if (
+		suffix.length !== quotes.length ||
+		suffix.some(
+			(row, index) =>
+				row.run_id !== null ||
+				String(row.tokens) !== quotes[index][0] ||
+				String(row.images) !== quotes[index][1],
+		)
+	)
+		throw new SpendBudgetError('现有窗口用量 CSV 与项目历史预留不匹配')
+	database
+		.prepare(
+			'UPDATE spend_reservation SET run_id = ? WHERE id >= ? AND run_id IS NULL',
+		)
+		.run(runId, suffix[0].id)
 }
 
 function spendRunId() {
@@ -319,7 +365,7 @@ export function chapterImageBudget(database: DatabaseSync, workId: string) {
 	const runId = spendRunId()
 	if (!runId) return
 	const imageCap = cap(process.env.NL_RUN_IMAGE_CAP, 'NL_RUN_IMAGE_CAP')
-	spendLedger(database)
+	spendLedger(database, runId)
 	const { images } = database
 		.prepare(
 			'SELECT COALESCE(SUM(images), 0) AS images FROM spend_reservation WHERE run_id = ?',
@@ -349,7 +395,7 @@ export function projectSpend(database: DatabaseSync) {
 		const quote = await quoteSpend(request)
 		const { tokens, images } = quote
 		request.signal.throwIfAborted()
-		spendLedger(database)
+		spendLedger(database, runId)
 		const row = database
 			.prepare(`
 			INSERT INTO spend_reservation (tokens, images, run_id)
