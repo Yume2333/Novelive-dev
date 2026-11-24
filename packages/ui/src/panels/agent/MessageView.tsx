@@ -184,9 +184,23 @@ function ProposalCard({
 		try {
 			const result = await actions.resolve(current, decision)
 			setCurrent(result.proposal)
-			if (result.status === 'resolved' && result.rewrite) {
-				setRewrite(result.rewrite)
-				setSelected(result.rewrite.hunks.map((hunk) => hunk.id))
+			if (result.status === 'resolved') {
+				if (result.rewrite) {
+					setRewrite(result.rewrite)
+					setSelected(result.rewrite.hunks.map((hunk) => hunk.id))
+				}
+				if (
+					decision.kind === 'approve' &&
+					result.proposal.payload.kind === 'redrawImage'
+				)
+					window.dispatchEvent(
+						new CustomEvent('novelive:asset-changed', {
+							detail: {
+								workId: result.proposal.workId,
+								assetId: result.proposal.payload.assetId,
+							},
+						}),
+					)
 			}
 			setStale(result.status === 'stale')
 			setRestriction(result.status === 'restricted' ? result.reason : '')

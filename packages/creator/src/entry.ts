@@ -176,6 +176,9 @@ registry.register('editor.editLine', async (input) =>
 registry.register('editor.undo', async (input) =>
 	(await editorWork(input.workId)).editor.undo(input),
 )
+registry.register('editor.snapshot', async (input) =>
+	(await editorWork(input.workId)).editor.snapshotDetails(input),
+)
 registry.register('editor.history', async (input) => {
 	const { project } = await editorWork(input.workId)
 	const { listHistory, withProjectEdits } = await import('./editor/history')

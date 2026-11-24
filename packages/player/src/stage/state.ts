@@ -1,6 +1,9 @@
 import type { CompiledAction } from '@novelive/format/script'
-import type { StageSlot, StageState } from '../contract/stage'
-
+import type {
+	ActivePerformance,
+	StageSlot,
+	StageState,
+} from '../contract/stage'
 export const slotX = { left: 240, center: 480, right: 720 } as const
 
 export function emptyStage(): StageState {
@@ -137,6 +140,20 @@ export function direct(state: StageState, action: CompiledAction): StageState {
 			break
 	}
 	return next
+}
+
+const relativeActions: Record<string, true> = { move: true, shake: true }
+
+export function activePerformances(
+	actions: readonly CompiledAction[],
+	stage: StageState,
+): ActivePerformance[] {
+	return actions.map((action) =>
+		relativeActions[action.name] ||
+		JSON.stringify(direct(stage, action)) !== JSON.stringify(stage)
+			? { restore: 'skip-relative' as const }
+			: { restore: 'replay-state' as const, action },
+	)
 }
 
 export function previewOpening(

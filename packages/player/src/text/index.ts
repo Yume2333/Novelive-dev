@@ -204,10 +204,22 @@ export function mountText(
 		const top = layout.getBoundingClientRect().top
 		const lines: { start: number; top: number; bottom: number }[] = []
 		const range = styledMetrics ? document.createRange() : undefined
+		const annotations = new Map<HTMLElement, number>()
 		glyphs.forEach((glyph, index) => {
 			range?.selectNodeContents(glyph)
 			const rect =
 				range?.getBoundingClientRect() ?? glyph.getBoundingClientRect()
+			const ruby = glyph.closest('ruby')
+			let overhang = 0
+			if (ruby) {
+				let cached = annotations.get(ruby)
+				if (cached === undefined) {
+					const rt = ruby.querySelector('rt')?.getBoundingClientRect()
+					cached = rt ? Math.max(0, rect.top - rt.top) : 0
+					annotations.set(ruby, cached)
+				}
+				overhang = cached
+			}
 			const y = rect.top - top
 			const bottom = rect.bottom - top
 			const previous = lines.at(-1)
@@ -217,20 +229,20 @@ export function mountText(
 					? y >= previous.bottom
 					: y - previous.top > lineHeight / 2)
 			)
-				lines.push({ start: index, top: y, bottom })
-			else if (styledMetrics) {
-				previous.top = Math.min(previous.top, y)
-				previous.bottom = Math.max(previous.bottom, bottom)
+				lines.push({ start: index, top: y - overhang, bottom })
+			else {
+				previous.top = Math.min(previous.top, y - overhang)
+				if (styledMetrics) previous.bottom = Math.max(previous.bottom, bottom)
 			}
 		})
 		ends = []
 		offsets = []
 		heights = []
 		function edge(line: number) {
-			if (line === 0) return 0
 			if (line === lines.length)
 				return Math.max(layout.clientHeight, lines[line - 1].bottom)
-			return Math.max(lines[line - 1].bottom, lines[line].top - lines[0].top)
+			if (line === 0) return lines[0].top
+			return Math.max(lines[line - 1].bottom, lines[line].top)
 		}
 		for (let line = 0; line < lines.length; ) {
 			let next = Math.min(line + 3, lines.length)
@@ -245,16 +257,10 @@ export function mountText(
 				)
 			)
 				next--
-			const offset = styledMetrics
-				? edge(line)
-				: line === 0
-					? 0
-					: lines[line].top - lines[0].top
+			const offset = edge(line)
 			offsets.push(offset)
 			ends.push(lines[next]?.start ?? glyphs.length)
-			heights.push(
-				styledMetrics ? edge(next) - offset : (next - line) * lineHeight,
-			)
+			heights.push(edge(next) - offset)
 			line = next
 		}
 		if (!ends.length) {

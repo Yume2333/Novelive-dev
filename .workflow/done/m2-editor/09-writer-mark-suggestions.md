@@ -3,7 +3,6 @@
 **Effort:** m2-editor
 **Blocked by:** None
 **Base commit:** 84345daf87313a81be7d63a9e2f7e8b4f950a1c1
-**Status:** active
 **Covers:** W1
 **Files:** packages/creator/src/pipeline/writing/, packages/creator/src/project/production-worker.ts, packages/creator/src/editor/, packages/ui/src/pages/editor/, tests/unit/, tests/e2e/m1b-gate.spec.ts, .workflow/evidence/m2-editor/
 **Read first:** `.workflow/specs/m2-editor.md`、`.workflow/decisions.md` 的文本效果决策、`docs/creation-pipeline.md`、`docs/ux.md`。
@@ -15,5 +14,6 @@
 
 ## Progress
 
-- Check after: 严格回放 M1b gate、M2 editor、M2 gate，`11 passed (28.5s)`；`NL_REPLAY=strict pnpm check`，`45 passed (45)` 文件、`583 passed | 1 skipped (584)` 测试。
-- 真实写手录制一次，严格重放零上游调用。用量和打开编辑器时的横幅截图见 [验收回执](../../evidence/m2-editor/09-writer-mark-suggestions.md)；独立审查在 PR 中完成。
+- Check after: `NL_REPLAY=strict xvfb-run -a -s "-screen 0 1920x1080x24" pnpm exec playwright test --grep 'M1b make and play publishes'` → `1 passed (21.0s)`；`NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-*.test.ts tests/unit/m1b-writer.test.ts` → `9 files / 104 passed`。原 PR #61 记录：严格回放 M1b gate、M2 editor、M2 gate `11 passed (28.5s)`、`NL_REPLAY=strict pnpm check` 45 文件 583 passed / 1 skipped。
+- 真实写手录制一次，严格重放零上游调用。用量和打开编辑器时的横幅截图见 [验收回执](../../evidence/m2-editor/09-writer-mark-suggestions.md)。
+- Review: pass (base 433a5ab564947c79f14aea96b7dd08973c717460, task base 84345daf87313a81be7d63a9e2f7e8b4f950a1c1, reviewer w01-m2-close.ReviewM2Task09) — clean verdict, no findings across all 19 PR #61 paths and screenshots.

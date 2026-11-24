@@ -1,6 +1,7 @@
 # M4 长篇、调度与桌面运行
 
-**Status:** in progress
+**Status:** done
+**Accepted:** 2026-11-24 by agent (omp-vibe-windows)
 **Priority:** high
 **Blocked by:** m3-playback/07
 

@@ -11,6 +11,7 @@ import { compileScript, formatScript } from '@novelive/format/script'
 import type { createConfigStore } from '../config'
 import { withProjectEdits } from '../editor/history/storage'
 import { replaceMarkSuggestions } from '../editor/marks'
+import { type CapturedChapterRules, captureChapterRules } from '../editor/rules'
 import { TextModelError, UnknownTextOutcomeError } from '../models/text'
 import {
 	type ArtBible,
@@ -176,11 +177,43 @@ export function chapterWorker(
 		workId: work.workId,
 		chapterId,
 	})
-	async function input(ctx: StepContext) {
+	const frozenRules = new Map<string, CapturedChapterRules | undefined>()
+	async function rulesFor(
+		chapterId: string,
+		hasWorkRow: boolean,
+		fresh: boolean,
+	) {
+		if (fresh) frozenRules.delete(chapterId)
+		if (frozenRules.has(chapterId)) return frozenRules.get(chapterId)
+		const captured: CapturedChapterRules | undefined = hasWorkRow
+			? await captureChapterRules(project, volumeId, work.workId, chapterId)
+			: undefined
+		frozenRules.set(chapterId, captured)
+		return captured
+	}
+	async function input(
+		ctx: StepContext,
+		fresh = false,
+		freshRulesPerCall = false,
+	) {
 		const { chapterId, signal } = ctx
-		const { settings } = await project.read(
-			projectFiles.work(volumeId, work.workId),
+		const hasWorkRow = Boolean(
+			project.database
+				.prepare('SELECT 1 FROM work WHERE work_id = ?')
+				.get(work.workId),
 		)
+		const { settings, chapterIds } = await withProjectEdits(project, () =>
+			project.read(projectFiles.work(volumeId, work.workId)),
+		)
+		const capturedRules =
+			hasWorkRow && chapterIds.includes(chapterId)
+				? freshRulesPerCall
+					? // A scene rewrite is a new call, not an in-flight run: capture the
+						// rules as they are now without touching the running write's
+						// per-run freeze.
+						await captureChapterRules(project, volumeId, work.workId, chapterId)
+					: await rulesFor(chapterId, hasWorkRow, fresh)
+				: undefined
 		const current = await project.read(projectFiles.chapter(ref(chapterId)))
 		const body = (await project.readFile(projectFiles.chapterText(chapterId)))
 			.toString('utf8')
@@ -219,7 +252,16 @@ export function chapterWorker(
 				id,
 				text: body.split('\n\n')[i],
 			})),
-			settings,
+			settings: capturedRules
+				? {
+						...settings,
+						rules: capturedRules.workRules,
+						chapterRules: {
+							...settings.chapterRules,
+							[chapterId]: capturedRules.chapterRules,
+						},
+					}
+				: settings,
 			preview: preview?.summary,
 			preset: [models.preset.style, models.preset.constraints]
 				.filter(Boolean)
@@ -298,7 +340,7 @@ export function chapterWorker(
 	const worker: ProductionWorker = {
 		write: (ctx) =>
 			step(async () => {
-				const { chapter, options } = await input(ctx)
+				const { chapter, options } = await input(ctx, !ctx.resumingBudget)
 				const journal = `source/production/${ctx.workId}/${ctx.chapterId}/writing-resume.json`
 				const clear = () => rm(join(project.root, journal), { force: true })
 				const checkpoint = usesReplyCheckpoint(replay)
@@ -625,13 +667,17 @@ export function chapterWorker(
 		) =>
 			withUsage(project, work.workId, 'write', () =>
 				step(async () => {
-					const { chapter, options } = await input({
-						workId: work.workId,
-						chapterId,
-						link: 'none',
-						desensitized: false,
-						signal,
-					})
+					const { chapter, options } = await input(
+						{
+							workId: work.workId,
+							chapterId,
+							link: 'none',
+							desensitized: false,
+							signal,
+						},
+						false,
+						true,
+					)
 					const result = await writeChapter(
 						{
 							...chapter,

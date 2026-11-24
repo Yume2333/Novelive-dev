@@ -19,7 +19,13 @@ import {
 import { mountText } from '../text'
 import { AssetWindow, lookahead } from './assets'
 import { PixiStage } from './renderer'
-import { direct, emptyStage, previewOpening, stageAssets } from './state'
+import {
+	activePerformances,
+	direct,
+	emptyStage,
+	previewOpening,
+	stageAssets,
+} from './state'
 
 export { AssetWindow, lookahead } from './assets'
 export { PixiStage } from './renderer'
@@ -313,7 +319,10 @@ export async function mountMinimalPlayer(
 					snapshot = captureSnapshot(
 						beat.cue.position,
 						{ ...stage.state, text: stage.state.text ?? beat.cue.text },
-						[{ restore: 'restart-text' }],
+						[
+							...activePerformances(beat.actions, stage.state),
+							{ restore: 'restart-text' },
+						],
 					)
 					progress.record(snapshot)
 					options.onSnapshot?.(structuredClone(snapshot))

@@ -5,14 +5,15 @@ import type {
 } from '@novelive/creator/contract'
 import { compileScript } from '@novelive/format/script'
 import { effectiveMarkCss, mountMinimalPlayer } from '@novelive/player'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
 import { ScrollArea } from '../../components/ScrollArea'
+import { EditorPanels } from './EditorPanels'
 import { JumpPoints } from './JumpPoints'
 import { SceneImages } from './SceneImages'
 import { ScriptEditor } from './ScriptEditor'
-import { sceneAssets } from './scene-assets'
+import { lineExpression, sceneAssets } from './scene-assets'
 import '../player/player.css'
 import './editor.css'
 import { scoped } from '../../i18n'
@@ -37,7 +38,7 @@ export function EditorPage() {
 	const [source, setSource] = useState(false)
 	const [error, setError] = useState('')
 	const [busy, setBusy] = useState(false)
-	const [undoCount, setUndoCount] = useState(0)
+	const [undoLines, setUndoLines] = useState<string[]>([])
 	const [instruction, setInstruction] = useState('')
 	const [proposal, setProposal] = useState<RewriteProposal>()
 	const [selected, setSelected] = useState<string[]>([])
@@ -54,6 +55,18 @@ export function EditorPage() {
 	const dirty =
 		!!scene &&
 		draft.replace(/\r\n?/g, '\n') !== scene.nvs.replace(/\r\n?/g, '\n')
+	const expression = useMemo(
+		() =>
+			opening && chapter && scene && !dirty
+				? lineExpression(chapter.scenes, sceneIndex, line, {
+						paragraphIds: chapter.paragraphs.map((p) => p.id),
+						assets: opening.registry.entries,
+						speakers: Object.keys(opening.speakerNames),
+						customMarks: Object.keys(opening.settings.customMarks),
+					})
+				: undefined,
+		[opening, chapter, scene, dirty, sceneIndex, line],
+	)
 	useEffect(() => {
 		const changed = (event: Event) => {
 			const { workId, chapterId: changedChapter } = (event as CustomEvent)
@@ -62,12 +75,66 @@ export function EditorPage() {
 				if (dirty) {
 					setPendingRefresh(true)
 					setError(t('章节已更新，当前修改已保留；放弃修改后加载新版本'))
-				} else setRefresh((value) => value + 1)
+				} else
+					void window.novelive
+						.call('editor.snapshot', {
+							workId: id,
+							chapterId,
+							editorId: opening?.editorId,
+						})
+						.promise.then((fresh) => {
+							setOpening((value) =>
+								value
+									? {
+											...value,
+											chapter: fresh.chapter,
+											settings: fresh.settings,
+											settingsRevision: fresh.settingsRevision,
+										}
+									: value,
+							)
+							setDraft(fresh.chapter.scenes[sceneIndex]?.nvs ?? '')
+							setUndoLines(fresh.undoLines)
+							setProposal(undefined)
+						})
+						.catch(() => setRefresh((value) => value + 1))
 			}
 		}
+		const assetChanged = (event: Event) => {
+			const { workId, assetId } = (event as CustomEvent).detail as {
+				workId: string
+				assetId: string
+			}
+			if (workId !== id) return
+			void window.novelive
+				.call('production.resolveAsset', { workId: id, assetId })
+				.promise.then((asset) => {
+					if (!asset) return
+					setOpening((value) =>
+						value
+							? {
+									...value,
+									registry: {
+										...value.registry,
+										entries: value.registry.entries.map((entry) =>
+											entry.id === assetId
+												? { ...entry, path: asset.cachePath }
+												: entry,
+										),
+									},
+								}
+							: value,
+					)
+				})
+				.catch(() => {})
+		}
 		window.addEventListener('novelive:chapter-changed', changed)
-		return () => window.removeEventListener('novelive:chapter-changed', changed)
-	}, [id, chapterId, dirty])
+		window.addEventListener('novelive:asset-changed', assetChanged)
+		return () => {
+			window.removeEventListener('novelive:chapter-changed', changed)
+			window.removeEventListener('novelive:asset-changed', assetChanged)
+		}
+	}, [id, chapterId, dirty, opening, sceneIndex])
 	const stage = useRef<HTMLDivElement>(null)
 	const sourceViewport = useRef<HTMLDivElement>(null)
 	useEffect(() => {
@@ -92,7 +159,7 @@ export function EditorPage() {
 		let opened: Opening | undefined
 		setOpening(undefined)
 		setError('')
-		setUndoCount(0)
+		setUndoLines([])
 		setSceneIndex(0)
 		setProposal(undefined)
 		const close = (value: Opening) =>
@@ -201,7 +268,7 @@ export function EditorPage() {
 		}).promise
 		accept(saved)
 		if (saved.revision !== target.expectedRevision)
-			setUndoCount((count) => count + 1)
+			setUndoLines((lines) => [...lines, `${scene.sceneId}:${lineId}`])
 	}
 	function discard() {
 		if (pendingRefresh) {
@@ -214,10 +281,10 @@ export function EditorPage() {
 			discard()
 			return
 		}
-		if (!target || !undoCount) return
+		if (!target || !undoLines.length) return
 		void run(async () => {
 			accept(await window.novelive.call('editor.undo', target).promise)
-			setUndoCount((count) => count - 1)
+			setUndoLines((lines) => lines.slice(0, -1))
 		})
 	}
 	useEffect(() => {
@@ -330,24 +397,25 @@ export function EditorPage() {
 															decision,
 														}).promise,
 													)
-													if (decision === 'accept')
+													if (decision === 'accept') {
+														const fresh = await window.novelive.call(
+															'editor.snapshot',
+															{
+																workId: id,
+																chapterId,
+																editorId: opening?.editorId,
+															},
+														).promise
 														setOpening((value) =>
 															value
 																? {
 																		...value,
-																		settings: {
-																			...value.settings,
-																			customMarks: {
-																				...value.settings.customMarks,
-																				[mark.name]: {
-																					css: mark.css,
-																					perChar: mark.perChar,
-																				},
-																			},
-																		},
+																		settings: fresh.settings,
+																		settingsRevision: fresh.settingsRevision,
 																	}
 																: value,
 														)
+													}
 												}
 											})
 										}
@@ -402,7 +470,7 @@ export function EditorPage() {
 									</button>
 									<button
 										type="button"
-										disabled={(!undoCount && !dirty) || busy}
+										disabled={(!undoLines.length && !dirty) || busy}
 										onClick={undo}
 									>
 										{t('撤销')}
@@ -513,6 +581,48 @@ export function EditorPage() {
 											))}
 										</select>
 									</label>
+									{expression && (
+										<label>
+											{t('表情')}
+											<select
+												aria-label={t('表情')}
+												value={expression.current}
+												disabled={busy || dirty}
+												onChange={(event) => {
+													const next = event.target.value
+													if (!target || !scene || next === expression.current)
+														return
+													void run(async () => {
+														const saved = await window.novelive.call(
+															'editor.editLine',
+															{
+																...target,
+																sceneId: scene.sceneId,
+																edit: {
+																	kind: 'expression',
+																	lineId: expression.lineId,
+																	previous: expression.current,
+																	next,
+																},
+															},
+														).promise
+														accept(saved)
+														if (saved.revision !== target.expectedRevision)
+															setUndoLines((lines) => [
+																...lines,
+																`${scene.sceneId}:${expression.lineId}`,
+															])
+													})
+												}}
+											>
+												{expression.choices.map((id) => (
+													<option key={id} value={id}>
+														{id}
+													</option>
+												))}
+											</select>
+										</label>
+									)}
 									<JumpPoints
 										script={draft}
 										disabled={busy}
@@ -620,16 +730,27 @@ export function EditorPage() {
 											disabled={!selected.length || dirty || busy}
 											onClick={() =>
 												void run(async () => {
-													accept(
-														await window.novelive.call('editor.applyRewrite', {
+													const applied = await window.novelive.call(
+														'editor.applyRewrite',
+														{
 															workId: id,
 															chapterId,
 															sceneId: proposal.sceneId,
 															expectedRevision: proposal.expectedRevision,
 															proposalId: proposal.proposalId,
 															hunkIds: selected,
-														}).promise,
-													)
+														},
+													).promise
+													const fresh = await window.novelive.call(
+														'editor.snapshot',
+														{
+															workId: id,
+															chapterId,
+															editorId: opening?.editorId,
+														},
+													).promise
+													setUndoLines(fresh.undoLines)
+													accept(applied)
 												})
 											}
 										>
@@ -643,6 +764,37 @@ export function EditorPage() {
 										</button>
 									</section>
 								)}
+								<EditorPanels
+									workId={id}
+									chapterId={chapterId}
+									rulesRevision={opening.settingsRevision}
+									workRules={opening.settings.rules}
+									chapterRules={opening.settings.chapterRules[chapterId] ?? []}
+									disabled={busy}
+									revision={chapter?.revision ?? ''}
+									run={run}
+									onSavedRules={(targetScope, nextRevision, rules) =>
+										setOpening((value) =>
+											value
+												? {
+														...value,
+														settingsRevision: nextRevision,
+														settings: {
+															...value.settings,
+															...(targetScope === 'work'
+																? { rules }
+																: {
+																		chapterRules: {
+																			...value.settings.chapterRules,
+																			[chapterId]: rules,
+																		},
+																	}),
+														},
+													}
+												: value,
+										)
+									}
+								/>
 							</>
 						)}
 					</>

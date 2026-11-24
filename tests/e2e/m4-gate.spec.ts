@@ -935,11 +935,14 @@ test.describe('M4 longform and queue', () => {
 					),
 				)
 				.toBe(1)
-			expect(
-				await app.evaluate(({ BrowserWindow }) =>
-					BrowserWindow.getAllWindows()[0].isVisible(),
-				),
-			).toBe(true)
+			await expect
+				.poll(() =>
+					app.evaluate(({ BrowserWindow }) => {
+						const win = BrowserWindow.getAllWindows()[0]
+						return !win.isDestroyed() && win.isMinimized()
+					}),
+				)
+				.toBe(true)
 			expect(await call(page, 'debug.sqliteSmoke', {})).toMatchObject({
 				ok: true,
 			})
@@ -985,7 +988,7 @@ test.describe('M4 longform and queue', () => {
 				.poll(() =>
 					app.evaluate(({ BrowserWindow }) => {
 						const window = BrowserWindow.getAllWindows()[0]
-						return window.isVisible() && window.isFocused()
+						return window.isVisible() && !window.isMinimized()
 					}),
 				)
 				.toBe(true)

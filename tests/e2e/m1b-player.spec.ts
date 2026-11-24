@@ -38,11 +38,25 @@ for (const missingAsset of [false, true]) {
 			}
 			const app = await electron.launch({
 				executablePath: require('electron'),
-				args: ['apps/desktop', `--user-data-dir=${join(directory, 'profile')}`],
+				args: [
+					'apps/desktop',
+					'--enable-unsafe-swiftshader',
+					'--use-gl=angle',
+					'--use-angle=swiftshader',
+					`--user-data-dir=${join(directory, 'profile')}`,
+				],
 				env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
 			})
 			try {
 				const page = await app.firstWindow()
+				await app.evaluate(({ BrowserWindow }) =>
+					BrowserWindow.getAllWindows()[0].setContentSize(960, 540),
+				)
+				// setContentSize resolves before the compositor applies the new
+				// size; wait until the viewport actually reaches it.
+				await page.waitForFunction(
+					() => innerWidth === 960 && innerHeight === 540,
+				)
 				await expect(page).toHaveURL(/^file:.*\/out\/renderer\/index\.html$/)
 				await expect(page.getByRole('status')).toHaveText('创作端已就绪')
 				await app.evaluate(({ dialog }, path) => {
@@ -73,8 +87,32 @@ for (const missingAsset of [false, true]) {
 						pixels.info.channels
 					return Array.from(pixels.data.subarray(offset, offset + 3))
 				}
-				await expect.poll(() => at(0.02, 0.02)).toEqual([32, 48, 96])
-				await expect.poll(() => at(0.5, 0.4)).toEqual([224, 96, 48])
+				// The environment's compositor can shrink the window after
+				// setContentSize; keep re-asserting the size until the viewport is
+				// at the target and the stage pixels are visible.
+				const settle = async () => {
+					if (
+						(await page.evaluate(
+							() => innerWidth === 960 && innerHeight === 540,
+						)) !== true
+					) {
+						await app.evaluate(({ BrowserWindow }) =>
+							BrowserWindow.getAllWindows()[0].setContentSize(960, 540),
+						)
+						return false
+					}
+					return true
+				}
+				await expect
+					.poll(async () => ((await settle()) ? at(0.02, 0.02) : null), {
+						timeout: 20_000,
+					})
+					.toEqual([32, 48, 96])
+				await expect
+					.poll(async () => ((await settle()) ? at(0.5, 0.4) : null), {
+						timeout: 20_000,
+					})
+					.toEqual([224, 96, 48])
 				const evidence = '.workflow/evidence/m1b-production'
 				await mkdir(evidence, { recursive: true })
 				if (!missingAsset)

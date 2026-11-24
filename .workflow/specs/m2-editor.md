@@ -1,6 +1,7 @@
 # M2 编辑器与 Agent 对话
 
-**Status:** in progress
+**Status:** done
+**Accepted:** 2026-11-24 by agent (omp-vibe-windows)
 **Priority:** high
 **Blocked by:** m1b-production/09
 

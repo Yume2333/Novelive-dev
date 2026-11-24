@@ -125,6 +125,15 @@ export const editorCommands = {
 		input: obj({ ...openEditor, ...versioned }),
 		output: chapterSnapshot,
 	},
+	'editor.snapshot': {
+		input: obj({ ...chapterTarget, editorId: opt(text) }),
+		output: obj({
+			chapter: chapterSnapshot,
+			settings: workSettingsSchema,
+			settingsRevision: revisionSchema,
+			undoLines: arr(text),
+		}),
+	},
 	'editor.history': {
 		input: obj({ ...workTarget, chapterId: opt(entityId) }),
 		output: obj({ entries: arr(historyEntry) }),

@@ -86,10 +86,45 @@ export class ProjectEditor {
 		}))
 	}
 
-	snapshot(input: CommandInput<'editor.open'>): Promise<Snapshot> {
+	snapshot(
+		input: CommandInput<'editor.open'> & { editorId?: string },
+	): Promise<Snapshot> {
+		return this.snapshotDetails(input).then(({ chapter }) => chapter)
+	}
+
+	/** Chapter snapshot plus settings, syncing an open session's revision. */
+	async snapshotDetails(
+		input: CommandInput<'editor.open'> & { editorId?: string },
+	): Promise<{
+		chapter: Snapshot
+		settings: CommandOutput<'editor.open'>['settings']
+		settingsRevision: string
+		undoLines: string[]
+	}> {
 		return withProjectEdits(this.project, async () => {
 			this.checkWork(input.workId)
-			return (await this.loadChapter(input.chapterId)).snapshot
+			const model = await this.loadChapter(input.chapterId)
+			const editor = input.editorId
+				? this.editors.get(input.editorId)
+				: undefined
+			if (editor && editor.chapterId === input.chapterId)
+				// Syncing keeps undo valid across revision bumps that left scenes
+				// untouched (e.g. mark resolution); a stale step still fails
+				// `stale_revision` in `applyScriptLinePatch` rather than corrupting.
+				editor.revision = model.snapshot.revision
+			return {
+				chapter: model.snapshot,
+				settings: model.settings,
+				settingsRevision: settingsRevision(
+					this.project,
+					this.workId,
+					model.settings,
+				),
+				undoLines:
+					editor?.chapterId === input.chapterId
+						? editor.undo.map((step) => `${step.sceneId}:${step.lineId}`)
+						: [],
+			}
 		})
 	}
 
@@ -295,8 +330,82 @@ export class ProjectEditor {
 						next: nvs,
 					}),
 			)
-			return (await this.loadChapter(chapterId)).snapshot
+			const { snapshot } = await this.loadChapter(chapterId)
+			for (const editor of this.editors.values()) {
+				if (editor.chapterId !== chapterId) continue
+				if (editor.revision !== model.snapshot.revision) continue
+				editor.revision = snapshot.revision
+				if (!sceneId) continue
+				const oldLines = scene.nvs.split(/\r?\n/)
+				const newLines = nvs.split(/\r?\n/)
+				const unchangedIds = new Set(
+					oldLines
+						.filter((line) => newLines.includes(line))
+						.map((line) => line.match(/ #([0-9a-f]{4})\s*$/)?.[1])
+						.filter((id): id is string => Boolean(id)),
+				)
+				const rebased: UndoStep[] = []
+				let currentScene = nvs
+				let broken = false
+				for (const step of [...editor.undo].reverse()) {
+					if (step.sceneId !== sceneId) {
+						rebased.push(step)
+						continue
+					}
+					if (broken || !unchangedIds.has(step.lineId)) continue
+					const shifted = this.rebaseUndoStep(currentScene, step)
+					if (!shifted) {
+						broken = true
+						continue
+					}
+					try {
+						currentScene = applyScriptLinePatch(currentScene, shifted.patch)
+						rebased.push(shifted)
+					} catch {
+						broken = true
+					}
+				}
+				editor.undo = rebased.reverse()
+			}
+			return snapshot
 		})
+	}
+
+	private rebaseUndoStep(nvs: string, step: UndoStep): UndoStep | undefined {
+		if (step.kind === 'text') {
+			const lines = nvs.split(/(\r\n?|\n)/)
+			const lineIndex = lines.findIndex(
+				(raw, i) =>
+					i % 2 === 0 &&
+					raw.trim() === step.previous &&
+					raw.trim().endsWith(`#${step.lineId}`),
+			)
+			if (lineIndex < 0) return undefined
+			const raw = lines[lineIndex]
+			const after = raw.replace(raw.trim(), () => step.next)
+			return {
+				...step,
+				patch: {
+					offset: lines.slice(0, lineIndex).join('').length,
+					before: raw,
+					after,
+				},
+			}
+		}
+		if (
+			nvs.slice(
+				step.patch.offset,
+				step.patch.offset + step.patch.before.length,
+			) === step.patch.before
+		)
+			return step
+		const pos = nvs.indexOf(step.patch.before)
+		if (pos < 0 || nvs.indexOf(step.patch.before, pos + 1) >= 0)
+			return undefined
+		return {
+			...step,
+			patch: { ...step.patch, offset: pos },
+		}
 	}
 
 	private checkWork(workId: string) {

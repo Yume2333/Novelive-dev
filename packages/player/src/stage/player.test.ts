@@ -173,7 +173,7 @@ it('starts at the requested sentence, reconstructs prior state, and delivers ori
 	expect(player?.state.sprites.center?.transform.x).toBe(240)
 	expect(snapshots.mock.calls[0][0]).toMatchObject({
 		position,
-		active: [{ restore: 'restart-text' }],
+		active: [{ restore: 'skip-relative' }, { restore: 'restart-text' }],
 	})
 	host.dispatchEvent(new Event('click'))
 	await vi.waitFor(() =>
@@ -214,7 +214,10 @@ it('publishes the new canonical save and history while its move is still animati
 	expect(stage?.ariaBusy).toBe('true')
 	expect(saved.position).toEqual(position)
 	expect(saved.stage.sprites.center?.transform.x).toBe(240)
-	expect(saved.active).toEqual([{ restore: 'restart-text' }])
+	expect(saved.active).toEqual([
+		{ restore: 'skip-relative' },
+		{ restore: 'restart-text' },
+	])
 	expect(player?.snapshot).toEqual(saved)
 	expect(player?.progress.history.entries).toHaveLength(2)
 	expect(player?.progress.history.entries.at(-1)).toEqual(saved)
@@ -229,6 +232,52 @@ it('publishes the new canonical save and history while its move is still animati
 	expect(player?.progress.history.entries).toHaveLength(2)
 	await player?.restore(saved)
 	expect(player?.state).toEqual(saved.stage)
+	abort.abort()
+})
+
+it('captures the live unfinished performances on a save and replays only state directions on restore', async () => {
+	const host = new Element()
+	const abort = new AbortController()
+	const scenes = fixture()
+	const snapshots = vi.fn()
+	const player = await mountMinimalPlayer(
+		host as unknown as HTMLElement,
+		scenes,
+		resources,
+		abort.signal,
+		vi.fn(),
+		{},
+		undefined,
+		{ chapterId: 'chapter', onSnapshot: snapshots },
+	)
+	const first = snapshots.mock.calls[0][0] as StageSnapshot
+	expect(first.active).toEqual([
+		{
+			restore: 'replay-state',
+			action: expect.objectContaining({ name: 'bg' }),
+		},
+		{
+			restore: 'replay-state',
+			action: expect.objectContaining({ name: 'show' }),
+		},
+		{ restore: 'restart-text' },
+	])
+	host.dispatchEvent(new Event('click'))
+	await vi.waitFor(() => expect(snapshots).toHaveBeenCalledTimes(2))
+	const second = snapshots.mock.calls[1][0] as StageSnapshot
+	expect(second.active).toEqual([
+		{ restore: 'skip-relative' },
+		{ restore: 'restart-text' },
+	])
+	const commit = vi.spyOn(PixiStage.prototype, 'commit')
+	await player?.restore(first)
+	const replayed = commit.mock.calls.map((call) => call[2] ?? [])
+	expect(replayed).toContainEqual([expect.objectContaining({ name: 'bg' })])
+	expect(replayed).toContainEqual([expect.objectContaining({ name: 'show' })])
+	commit.mockClear()
+	await player?.restore(second)
+	expect(commit.mock.calls.every((call) => !(call[2] ?? []).length)).toBe(true)
+	expect(player?.state).toEqual(second.stage)
 	abort.abort()
 })
 

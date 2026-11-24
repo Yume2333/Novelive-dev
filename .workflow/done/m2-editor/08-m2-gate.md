@@ -8,6 +8,7 @@
 **Check:** `NL_REPLAY=strict pnpm test:e2e --grep 'M2 revise a work'` → 真实 Electron 从脚本定位原文，分别经两个入口重写，重开验证持久记录。
 
 **付费调用：** 只由协调者在交接中明确指定的串行主线会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
+**Base commit:** f8845c6994fda793f8f83400274450691702888b
 
 - [x] 接线并比对原型，CJK 文本效果和最小播放器预览保留；严格回放，不新增付费调用。
 
@@ -27,3 +28,7 @@
 - 录制因真实测试失败续跑：修正同时匹配工具详情的代码块定位器，将模型等待与已有 90 秒模型超时对齐；录制恢复时复用已成功响应，避免重复付费。初次编辑器重写仍复用 M2/07 的既有离线 cassette。后续截图和验证均严格离线。
 - 隐私审查解码了三份 SSE 及元数据：只含 `content-type` 响应头和 `/v1/chat/completions` 路径，无 key、auth header、relay host/URL、绝对 home 路径。录制与配置说明在 `tests/fixtures/cassettes/m2-gate/README.md`。
 - `NL_REPLAY=strict pnpm check` → **29 files / 394 tests passed**，覆盖 typecheck / lint / unit；既有 editor / chat / routes Electron 结果为 12 passed。完整检查输出和用量明细见 `.workflow/evidence/m2/receipt.md`；新增中文确认卡、Agent 勾选差异、应用后和重开截图，保留最小播放器与自定义滚动条。
+- Check after: `NL_REPLAY=strict xvfb-run -a -s "-screen 0 1920x1080x24" pnpm exec playwright test --grep 'M2 revise a work'` → `1 passed (11.8s)`（默认 640x480 Xvfb 下 Agent 侧面板会遮挡主编辑器按钮，需 1920x1080 屏幕）；M2 单元测试 `NL_REPLAY=strict pnpm exec vitest run tests/unit/m2-*.test.ts tests/unit/m1b-writer.test.ts` → `9 files / 104 passed`。
+- Review: blocked (base f8845c6994fda793f8f83400274450691702888b, reviewer w01-m2-close.ReviewM2Task08) — 5 项阻断发现：1) 编辑器重写后未更新本地 undo 栈修订号导致 Undo 报 `stale_revision`；2) Agent `propose_redraw_image` 确认重画后未刷新编辑器资产缓存路径；3) `sceneAssets` 未包含前序场景延续到当前场的舞台素材；4) `m2-gate.spec.ts` 单场景未验证脚本定位原文；5) `m2-gate.spec.ts` 未验证 CJK 文本效果（如 ruby）在最小播放器中的渲染。
+- Closeout verification (2026-11-25): `pnpm typecheck` clean; `pnpm lint` 2 pre-existing warnings (unrelated share/project.ts); unit `vitest tests/unit/m2-* tests/unit/m5-locales` → 9 files / 114 passed; e2e all 15 m2 specs passed (m2-bible, m2-chat, m2-contract-routes, m2-editor, m2-gate `1 passed` 17.7s each file). Pixel failure root-caused to M3 `clipViewport` clipping the preview canvas under the textbox (in the small editor stage the textbox covers ~90%); fixed via software-GL launch flags matching m3 specs + sampling inside the visible top strip. UI undo stack now synced from backend `editor.snapshot` `undoLines` so it mirrors surviving entries exactly.
+- Review: pass (independent read-only reviewer w01-reviewer-m2, 2026-11-24, window 01) — 1 blocking finding fixed: `rewriteScene` now captures fresh chapter rules per call via `captureChapterRules` without touching `frozenRules` (a rule saved between two rewrites reaches the second rewrite's prompt; a budget-resumed write still uses the run's frozen capture — unit-tested in `m1b-production-worker.test.ts`). Non-blocking fixed: history drawer maps `origin`/`kind` through `t()` and decodes JSON `previous`/`next` for rules/resolve-mark entries; `lineExpression` memoized with `useMemo`; comment added on `editor.snapshot` revision-sync caveat.

@@ -333,3 +333,127 @@ test('stale bases with an old image stay usable and a redo reruns only that chap
 		project.close()
 	}
 })
+
+test('reconciles compatible open-editor undo steps across a partial rewrite and discards overwritten line undo', async () => {
+	const run = await revisionProject(directory, {
+		directory: cassettes,
+		mode: 'strict',
+	})
+	try {
+		const target = { workId: run.workId, chapterId }
+		// Give the chapter a second scene so an undo step outside the rewritten
+		// scene can be proven to survive a partial rewrite.
+		const secondSceneId = '11223344'
+		const chapterFile = projectFiles.chapter(run.ref)
+		const chapterRecord = await run.project.read(chapterFile)
+		await run.project.write(chapterFile, {
+			...chapterRecord,
+			paragraphIds: ['p0001', 'p0002'],
+			sceneIds: [sceneId, secondSceneId],
+		})
+		await run.project.writeFile(
+			projectFiles.chapterText(chapterId),
+			'暮色中，一只纸船从桥下漂过。\n\n夜风吹过岸边。',
+		)
+		await run.project.writeFile(
+			projectFiles.scene(run.ref, secondSceneId),
+			'scene 岸边\nsource p0002\n\n: 夜风吹过岸边。 #0003\n',
+		)
+		const opened = await run.editor.open(target)
+		const session = { ...target, editorId: opened.editorId }
+		const otherSceneEdit = await run.editor.editLine({
+			...session,
+			sceneId: secondSceneId,
+			expectedRevision: opened.chapter.revision,
+			edit: {
+				kind: 'text',
+				lineId: '0003',
+				previous: ': 夜风吹过岸边。',
+				next: ': 夜风依然吹过岸边。',
+			},
+		})
+		const edited = await run.editor.editLine({
+			...session,
+			sceneId,
+			expectedRevision: otherSceneEdit.revision,
+			edit: {
+				kind: 'text',
+				lineId: '0002',
+				previous: ': 桥下很安静。',
+				next: ': 桥下依然很安静。',
+			},
+		})
+		const revisions = new CreativeRevisions(
+			run.project,
+			run.workId,
+			run.editor,
+			{
+				rewriteScene: async (_chapterId, current) =>
+					parseScript(
+						current.nvs.includes('依然') && current.nvs.includes('0002')
+							? rewritten.replace(': 桥下很安静。', ': 桥下依然很安静。')
+							: rewritten,
+					).scenes[0],
+				redraw: vi.fn(),
+				adoptImage: vi.fn(),
+				redo: vi.fn(),
+			},
+		)
+		const proposal = await revisions.rewriteScene({
+			...target,
+			sceneId,
+			expectedRevision: edited.revision,
+			instruction: 'test',
+		})
+		const firstHunkOnly = await revisions.applyRewrite({
+			...proposal,
+			hunkIds: [proposal.hunks[0].id],
+		})
+		expect(firstHunkOnly.scenes[0].nvs).toContain('慢慢')
+		expect(firstHunkOnly.scenes[0].nvs).toContain(': 桥下依然很安静。 #0002')
+		const undone = await run.editor.undo({
+			...session,
+			expectedRevision: firstHunkOnly.revision,
+		})
+		expect(undone.scenes[0].nvs).toContain('慢慢')
+		expect(undone.scenes[0].nvs).toContain(': 桥下很安静。 #0002')
+
+		const secondEdit = await run.editor.editLine({
+			...session,
+			sceneId,
+			expectedRevision: undone.revision,
+			edit: {
+				kind: 'text',
+				lineId: '0002',
+				previous: ': 桥下很安静。',
+				next: ': 桥下不再安静。',
+			},
+		})
+		const fullProposal = await revisions.rewriteScene({
+			...target,
+			sceneId,
+			expectedRevision: secondEdit.revision,
+			instruction: 'test',
+		})
+		const appliedFull = await revisions.applyRewrite({
+			...fullProposal,
+			hunkIds: fullProposal.hunks.map(({ id }) => id),
+		})
+		const undoneOtherScene = await run.editor.undo({
+			...session,
+			expectedRevision: appliedFull.revision,
+		})
+		// The rewritten scene's own overwritten edit was dropped, but the edit in
+		// the untouched second scene survived and undoes cleanly.
+		expect(undoneOtherScene.scenes[0].nvs).toBe(appliedFull.scenes[0].nvs)
+		expect(undoneOtherScene.scenes[1].nvs).toContain(': 夜风吹过岸边。 #0003')
+		expect(undoneOtherScene.scenes[1].nvs).not.toContain('依然')
+		const emptyUndo = await run.editor.undo({
+			...session,
+			expectedRevision: undoneOtherScene.revision,
+		})
+		expect(emptyUndo).toEqual(undoneOtherScene)
+	} finally {
+		run.project.close()
+	}
+})

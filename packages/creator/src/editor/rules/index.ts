@@ -31,12 +31,18 @@ function chapterRules(settings: WorkSettings, chapterId: string) {
 		: []
 }
 
+export interface CapturedChapterRules {
+	revision: string
+	chapterRules: string[]
+	workRules: string[]
+}
+
 export async function captureChapterRules(
 	project: Project,
 	volumeId: string,
 	workId: string,
 	chapterId: string,
-) {
+): Promise<CapturedChapterRules> {
 	return withProjectEdits(project, async () => {
 		const { settings, chapterIds } = await project.read(
 			projectFiles.work(volumeId, workId),

@@ -98,12 +98,22 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			.png()
 			.toBuffer()
 	).toString('base64')
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-m3-stage-'))
 	const app = await electron.launch({
 		executablePath: require('electron'),
-		args: ['apps/desktop'],
+		args: [
+			'apps/desktop',
+			'--enable-unsafe-swiftshader',
+			'--use-gl=angle',
+			'--use-angle=swiftshader',
+			`--user-data-dir=${join(directory, 'profile')}`,
+		],
 		env: { ...process.env, NL_REPLAY: 'strict', ELECTRON_RENDERER_URL: '' },
 	})
 	try {
+		await app.evaluate(({ BrowserWindow }) =>
+			BrowserWindow.getAllWindows()[0].setContentSize(960, 540),
+		)
 		const page = await app.firstWindow()
 		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
 		await page.evaluate(
@@ -248,13 +258,22 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			'Dim',
 		)
 		await expect
-			.poll(async () => [
-				...(await sharp(await page.screenshot())
-					.extract({ left: 20, top: 100, width: 1, height: 1 })
-					.removeAlpha()
-					.raw()
-					.toBuffer()),
-			])
+			.poll(async () => {
+				const shot = sharp(await page.screenshot())
+				const { width = 960, height = 540 } = await shot.metadata()
+				return [
+					...(await shot
+						.extract({
+							left: Math.round((20 / 960) * width),
+							top: Math.round((100 / 540) * height),
+							width: 1,
+							height: 1,
+						})
+						.removeAlpha()
+						.raw()
+						.toBuffer()),
+				]
+			})
 			.toEqual([16, 24, 48])
 		await expect(page.locator('.nl-player-stage')).toHaveAttribute(
 			'aria-busy',
@@ -453,12 +472,21 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 				const { preview } = globalThis as unknown as StageHarness
 				preview.app.render()
 				const bounds = preview.app.canvas.getBoundingClientRect()
+				// page.screenshot() captures device pixels, so convert the
+				// CSS-space point by devicePixelRatio.
+				const dpr = devicePixelRatio
 				return {
 					left: Math.round(
-						bounds.left + preview.app.stage.x + x * preview.app.stage.scale.x,
+						(bounds.left +
+							preview.app.stage.x +
+							x * preview.app.stage.scale.x) *
+							dpr,
 					),
 					top: Math.round(
-						bounds.top + preview.app.stage.y + 270 * preview.app.stage.scale.y,
+						(bounds.top +
+							preview.app.stage.y +
+							270 * preview.app.stage.scale.y) *
+							dpr,
 					),
 				}
 			}, x)
@@ -602,7 +630,15 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			scripted: true,
 		})
 		expect(duringAnimation.saved.position.sentenceId).toBe('0002')
-		expect(duringAnimation.saved.active).toEqual([{ restore: 'restart-text' }])
+		expect(duringAnimation.saved.active).toEqual([
+			{ restore: 'skip-relative' },
+			{
+				restore: 'replay-state',
+				action: expect.objectContaining({ name: 'show' }),
+			},
+			{ restore: 'skip-relative' },
+			{ restore: 'restart-text' },
+		])
 		expect(duringAnimation.history).toHaveLength(2)
 		expect(duringAnimation.history.at(-1)).toEqual(duringAnimation.saved)
 		await expect(page.locator('.nl-player-text')).toHaveAttribute(
@@ -767,6 +803,7 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 		)
 	} finally {
 		await app.close()
+		await rm(directory, { recursive: true, force: true })
 	}
 })
 
@@ -949,6 +986,12 @@ test('M3 stage directions render the direction set and four landscape fill crops
 							size.height,
 						)
 					},
+					{ width, height },
+				)
+				// setContentSize resolves before the compositor applies the new
+				// size; wait until the viewport actually reaches it.
+				await page.waitForFunction(
+					(size) => innerWidth === size.width && innerHeight === size.height,
 					{ width, height },
 				)
 				await expect.poll(() => pixel(0.02, 0.02)).toEqual([32, 48, 96])

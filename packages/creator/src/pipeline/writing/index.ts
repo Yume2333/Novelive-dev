@@ -12,6 +12,7 @@ import {
 	formatScene,
 	type Scene,
 } from '@novelive/format/script'
+import { formatChapterRules } from '../../editor/rules'
 import type { TextConnection } from '../../models/text'
 import { ContextLimitError, fitUnits, promptFits } from './budget'
 import { canonicalNamesBrief } from './locale'
@@ -90,7 +91,10 @@ function brief(chapter: WritingChapter, speakers: string[]) {
 	const redLines = (chapter.redLines ?? []).join('\n')
 	const adaptationRule = `Adaptation: ${adaptation[settings.adaptation]}`
 	const requirements = `Requirements: ${settings.requirements}`
-	const rules = `Rules: ${[...settings.rules, ...(settings.chapterRules[chapter.chapterId] ?? [])].join('; ')}`
+	const rules = formatChapterRules({
+		chapterRules: settings.chapterRules[chapter.chapterId] ?? [],
+		workRules: settings.rules,
+	})
 	return {
 		instructions: [
 			...(redLines ? [`RED LINES (mandatory):\n${redLines}`] : []),

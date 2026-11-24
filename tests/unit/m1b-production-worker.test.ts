@@ -14,6 +14,10 @@ import type {
 import { productionChapterRecordEvent } from '../../packages/creator/src/contract/production'
 import { ProjectEditor } from '../../packages/creator/src/editor/history'
 import { CreativeRevisions } from '../../packages/creator/src/editor/revisions'
+import {
+	captureChapterRules,
+	saveRules,
+} from '../../packages/creator/src/editor/rules'
 import { importTxtProject } from '../../packages/creator/src/import/wizard'
 import { Project } from '../../packages/creator/src/project'
 import { createProduction } from '../../packages/creator/src/project/production'
@@ -1540,4 +1544,62 @@ test('creator config.update applies the new image model and concurrency to queue
 		else Reflect.deleteProperty(process, 'parentPort')
 		vi.unstubAllGlobals()
 	}
+})
+
+test('a rule saved between two scene rewrites reaches the second rewrite but not a running write’s later steps', async () => {
+	const { projectDir, workId } = await fixture()
+	using project = await Project.open(projectDir)
+	const work = await project.read(projectFiles.work('v0001', workId))
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const models = await productionModels(config)
+	const chapterId = work.chapterIds[0]
+	const prompts: string[] = []
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		prompts.push(JSON.stringify(messages))
+		return completion(
+			'scene 纸船\nsource p0001\n\n: 暮色中，一只纸船从桥下漂过。',
+		)
+	}
+	project.tasks.registerWork({ workId, title: work.title })
+	const worker = chapterWorker(project, 'v0001', work, models, { fetch })
+	const signal = new AbortController().signal
+	const write = {
+		workId,
+		chapterId,
+		link: 'none',
+		desensitized: false,
+		signal,
+	} as const
+	const scene = { sourceIds: ['p0001'], nvs: ': 暮色中。\n', instruction: 'x' }
+	// A normal write freezes the work's rules for that run's later steps.
+	await worker.worker.write(write)
+	await worker.rewriteScene(chapterId, scene, signal)
+	expect(prompts.at(-1)).not.toContain('灯是')
+	const rule = '灯是蓝色的'
+	const captured = await captureChapterRules(
+		project,
+		'v0001',
+		workId,
+		chapterId,
+	)
+	const saved = await saveRules(project, 'v0001', {
+		workId,
+		target: { scope: 'work' },
+		expectedRevision: captured.revision,
+		previous: captured.workRules,
+		next: [rule],
+	})
+	expect(saved.rules).toEqual([rule])
+	// A second rewrite is a new call, so it sees the rule the creator just saved.
+	await worker.rewriteScene(chapterId, scene, signal)
+	expect(prompts.at(-1)).toContain(rule)
+	// But a budget-resumed write belongs to the run that already froze its
+	// rules at write time, so it still prompts with the older capture.
+	const before = prompts.length
+	await worker.worker.write({ ...write, resumingBudget: true })
+	expect(prompts.slice(before).some((prompt) => prompt.includes(rule))).toBe(
+		false,
+	)
 })

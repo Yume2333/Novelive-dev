@@ -120,7 +120,13 @@ test('M2 editor preview locates source and current line, edits, undoes and previ
 		await writeFile(join(profile, 'projects', playerWorkId), root)
 		const app = await electron.launch({
 			executablePath: require('electron'),
-			args: ['apps/desktop', `--user-data-dir=${profile}`],
+			args: [
+				'apps/desktop',
+				'--enable-unsafe-swiftshader',
+				'--use-gl=angle',
+				'--use-angle=swiftshader',
+				`--user-data-dir=${profile}`,
+			],
 			env: {
 				...process.env,
 				NL_E2E: '1',
@@ -129,6 +135,9 @@ test('M2 editor preview locates source and current line, edits, undoes and previ
 			},
 		})
 		try {
+			await app.evaluate(({ BrowserWindow }) =>
+				BrowserWindow.getAllWindows()[0].setContentSize(1440, 1000),
+			)
 			const page = await app.firstWindow()
 			await expect(page.getByText('创作端已就绪')).toBeAttached()
 			await page.evaluate(({ workId, chapterId }) => {
@@ -142,8 +151,11 @@ test('M2 editor preview locates source and current line, edits, undoes and previ
 					)
 						.raw()
 						.toBuffer({ resolveWithObject: true })
+					// The textbox overlays and clips the bottom of the preview
+					// canvas (clipPath on the stage viewport), so only the top strip
+					// is guaranteed to show the background. Sample within that strip.
 					const offset =
-						(Math.floor(info.height * 0.1) * info.width +
+						(Math.floor(info.height * 0.04) * info.width +
 							Math.floor(info.width * 0.1)) *
 						info.channels
 					return Array.from(data.subarray(offset, offset + 3))
@@ -295,6 +307,7 @@ test.describe('contract-render', () => {
 				else if (command === 'editor.resolveMark') { chapter={...chapter,revision:'r'+(++revision),markSuggestions:chapter.markSuggestions.filter(mark=>mark.id!==input.suggestionId)}; result=chapter; }
 				else if (command === 'editor.rewriteScene') result={workId,chapterId:'ch1',sceneId:input.sceneId,expectedRevision:input.expectedRevision,proposalId:'rewrite1',hunks:[{id:'h1',afterLineId:null,before:[': 第一句。 #0001'],after:[': 重写第一句。 #0001']},{id:'h2',afterLineId:'0001',before:[': 第二句。 #0002'],after:[': 重写第二句。 #0002']}]};
 				else if (command === 'editor.applyRewrite') { chapter=structuredClone(chapter); for(const h of input.hunkIds) chapter.scenes[0].nvs=chapter.scenes[0].nvs.replace(h==='h1'?'第一句。':'第二句。',h==='h1'?'重写第一句。':'重写第二句。'); chapter.revision='r'+(++revision); result=chapter; }
+				else if (command === 'editor.snapshot') result={chapter,settings:defaultWorkSettings(),settingsRevision:'s1',undoLines:history.map(()=>'aaaabbbb:0001')};
 				else throw Error('unhandled fixture command '+command);
 				if (!compile(commands[command].output).check(result)) throw Error('fixture output schema: '+command);
 				return result;

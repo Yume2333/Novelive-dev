@@ -1,4 +1,5 @@
 export * from './compile'
+export * from './editing/portraits'
 export * from './format'
 export * from './identity'
 export * from './parse'
