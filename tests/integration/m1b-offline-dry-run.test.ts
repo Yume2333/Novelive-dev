@@ -537,8 +537,7 @@ test.each(scenarios)(
 				expect(relay.admissions[first + 1]).toMatchObject({
 					operation: 'stage',
 					chapter: relay.admissions[first].chapter,
-					stagingRepair:
-						'Invalid staging patch operation: PUT 4.=3: The end line must be at or after the start line.',
+					stagingRepair: 'Invalid staging patch operation: PUT 4.=3:',
 				})
 				expect(explicitAdmissions.size).toBe(0)
 			}

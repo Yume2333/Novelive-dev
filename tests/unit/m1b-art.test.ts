@@ -1887,7 +1887,7 @@ test.each([
 	['PUT <4:\n@caption label', 'Insert only stage directions'],
 	[
 		'PUT <4:\n@bg room/day\nPUT <4:\n@cg cg-window',
-		'Overlapping staging patch operations: PUT <4:',
+		'Overlapping staging patch operations PUT <4:',
 	],
 	['PUT <4:\n@bg', 'E_'],
 ])(
@@ -2346,6 +2346,57 @@ test.each([true, false])(
 		).toContain('Repair the JSON manifest: Art model returned invalid JSON')
 	},
 )
+
+test('reuses a settled staging repair with its pre-upgrade request text', async () => {
+	await projectTest(async (project) => {
+		const rejected = { patch: 'PUT 4.=3:\n@bg room/day', items: [], merges: {} }
+		const corrected = { patch: '', items: [], merges: {} }
+		const fetch = artReplies(
+			JSON.stringify(rejected),
+			JSON.stringify(corrected),
+		)
+		const request = () =>
+			directChapterArt(script, bible, empty, {
+				main,
+				replay: {
+					mode: 'record',
+					directory: join(project.root, 'recordings'),
+					checkpointDirectory: join(project.root, 'staging'),
+					spend: projectSpend(project.database),
+					fetch,
+				},
+			})
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		try {
+			await expect(request()).resolves.toMatchObject({ script })
+			expect(fetch).toHaveBeenCalledTimes(2)
+			const prompts = await Promise.all(
+				fetch.mock.calls.map(async ([input, init]) => {
+					const { messages } = await new Request(input, init).json()
+					return messages[0].content[0].text
+				}),
+			)
+			expect(prompts[1]).toBe(
+				[
+					prompts[0],
+					'Repair the staging patch and manifest: Invalid staging patch operation: PUT 4.=3:',
+					'Return only the corrected JSON object. Apply the asset ID contract above to every item, and update affected patch and merge references together. Preserve unchanged items and stage directions.',
+					`Rejected response:\n${JSON.stringify(rejected)}`,
+				].join('\n'),
+			)
+			await expect(request()).resolves.toMatchObject({ script })
+			expect(fetch).toHaveBeenCalledTimes(2)
+			expect(
+				project.database
+					.prepare('SELECT actual_tokens FROM spend_reservation ORDER BY id')
+					.all(),
+			).toEqual([{ actual_tokens: 15 }, { actual_tokens: 15 }])
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+})
 
 test('requests repair when a staging patch adds an image absent from the manifest', async () => {
 	const patch = 'PUT <4:\n@cg cg-window'

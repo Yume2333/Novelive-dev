@@ -44,7 +44,14 @@ function repairReply(phase: string, error: string, reply?: unknown) {
 	].join('\n')
 }
 
-class StagingPatchError extends Error {}
+class StagingPatchError extends Error {
+	constructor(
+		readonly repairMessage: string,
+		detail?: string,
+	) {
+		super(detail ? `${repairMessage} ${detail}` : repairMessage)
+	}
+}
 
 export type CgReferences = { costumes: readonly string[]; location?: string }
 type ScriptOptions = NonNullable<Parameters<typeof parseScript>[1]>
@@ -141,7 +148,8 @@ function parseStagingPatch(patch: string, lines: string[]) {
 				/^@(?!wait\b|caption\b)\w+/.test(value.trim())
 			const invalid = (reason: string): never => {
 				throw new StagingPatchError(
-					`Invalid staging patch operation: ${header} ${reason}`,
+					`Invalid staging patch operation: ${header}`,
+					reason,
 				)
 			}
 			if (line >= lines.length || last >= lines.length)
@@ -164,7 +172,8 @@ function parseStagingPatch(patch: string, lines: string[]) {
 	for (const { at, count, header } of changes) {
 		if (at <= previousEnd)
 			throw new StagingPatchError(
-				`Overlapping staging patch operations: ${header}`,
+				'Overlapping staging patch operations',
+				header,
 			)
 		previousEnd = at + Math.max(0, count - 1)
 	}
@@ -386,12 +395,13 @@ export async function directChapterArt(
 					triedStagingRepair = true
 					repair = repairReply(
 						'staging patch and manifest',
-						error instanceof Error ? error.message : String(error),
+						error instanceof StagingPatchError
+							? error.repairMessage
+							: error instanceof Error
+								? error.message
+								: String(error),
 						result,
 					)
-					if (error instanceof StagingPatchError)
-						repair +=
-							'\nCheck each operation against the original numbered script. Use PUT <N: or PUT >N: to add directions without replacing original content; replacement ranges must be ascending and contain only existing stage directions. If no changes are needed, return an empty patch.'
 					await saveReply?.()
 					continue
 				}
