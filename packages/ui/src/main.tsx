@@ -17,12 +17,17 @@ import { WorkProduction } from './pages/work/WorkProduction'
 import { productionRoutes } from './routes/production'
 import { AppShell } from './shell/AppShell'
 import '@fontsource/hanken-grotesk/400.css'
+import '@fontsource/hanken-grotesk/500.css'
+import '@fontsource/hanken-grotesk/600.css'
+import '@fontsource/manrope/400.css'
+import '@fontsource/manrope/600.css'
 import '@fontsource/manrope/700.css'
 import '@fontsource/noto-sans-sc/chinese-simplified-400.css'
 import '@fontsource/noto-sans-tc/chinese-traditional-400.css'
 import '@fontsource/noto-sans-jp/japanese-400.css'
 import './styles/tokens.css'
 import './styles/shell.css'
+import './styles/base.css'
 
 declare global {
 	interface Window {

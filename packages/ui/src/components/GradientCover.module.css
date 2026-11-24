@@ -1,0 +1,94 @@
+.cover {
+	position: relative;
+	display: flex;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	background: var(--cover-0);
+}
+
+.cover[data-palette="1"] {
+	background: var(--cover-1);
+}
+
+.cover[data-palette="2"] {
+	background: var(--cover-2);
+}
+
+.cover[data-palette="3"] {
+	background: var(--cover-3);
+}
+
+.cover[data-palette="4"] {
+	background: var(--cover-4);
+}
+
+.cover[data-palette="5"] {
+	background: var(--cover-5);
+}
+
+.spine {
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 14px;
+	background: var(--cover-spine-shade);
+}
+
+.spineLine {
+	position: absolute;
+	inset: 0 auto 0 14px;
+	width: 1.5px;
+	background: var(--cover-spine-line);
+}
+
+.gloss {
+	position: absolute;
+	inset: 0;
+	background: var(--cover-gloss);
+}
+
+.frame {
+	position: relative;
+	display: flex;
+	flex: 1;
+	align-self: stretch;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	margin: 12% 14% 12% calc(14% + 8px);
+	padding: 12px;
+	border: 1px solid var(--cover-frame);
+	border-radius: 3px;
+}
+
+.motif {
+	color: var(--cover-motif);
+}
+
+.title {
+	margin-right: -0.3em;
+	color: var(--cover-title);
+	font: 600 16px / 1.6 var(--font-display);
+	letter-spacing: 0.3em;
+	text-align: center;
+	text-shadow: var(--cover-title-shadow);
+}
+
+.compact .spine {
+	width: 8px;
+}
+
+.compact .spineLine {
+	left: 8px;
+	width: 1px;
+}
+
+.compact .frame {
+	gap: 0;
+	margin: 10% 10% 10% calc(10% + 5px);
+	padding: 6px;
+}
