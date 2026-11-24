@@ -95,7 +95,23 @@ export function UsagePage() {
 		function loadTitles() {
 			window.novelive.call('library.list', {}).promise.then(
 				({ works }) => {
-					if (active) setTitles(new Map(works.map((w) => [w.workId, w.title])))
+					if (!active) return
+					const count = new Map<string, number>()
+					for (const w of works) count.set(w.title, (count.get(w.title) ?? 0) + 1)
+					setTitles(
+						new Map(
+							works.map((w) => {
+								const volume = (w as { project?: { volumeTitle?: string } })
+									.project?.volumeTitle
+								return [
+									w.workId,
+									(count.get(w.title) ?? 0) > 1 && volume
+										? `${w.title} · ${volume}`
+										: w.title,
+								]
+							}),
+						),
+					)
 				},
 				() => {},
 			)
