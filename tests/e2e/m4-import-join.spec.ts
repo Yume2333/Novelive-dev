@@ -47,7 +47,7 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 		await expect(
 			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
 		).toHaveText('创作端已就绪')
-		await page.getByRole('link', { name: '导入原文' }).click()
+		await page.getByRole('link', { name: '新建工程' }).click()
 		await page.getByRole('button', { name: '选择原文', exact: true }).click()
 		await page.getByRole('button', { name: '选择文件夹' }).click()
 		await page.getByRole('button', { name: '下一步', exact: true }).click()
@@ -58,7 +58,7 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 		await page.getByRole('button', { name: '开始制作', exact: true }).click()
 		await expect(page).toHaveURL(/#\/work\/[0-9a-f-]+$/)
 		await page.getByRole('link', { name: '书库', exact: true }).click()
-		await page.getByRole('link', { name: '导入原文' }).click()
+		await page.getByRole('link', { name: '新建工程' }).click()
 		await page.getByRole('button', { name: '选择原文', exact: true }).click()
 		await page.getByRole('textbox', { name: '作品名' }).fill('')
 		await expect(

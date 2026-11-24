@@ -2,10 +2,10 @@ import type { CommandOutput } from '@novelive/creator/contract'
 import {
 	CheckCircle2,
 	Clock,
-	FileUp,
 	LibraryBig,
 	NotebookPen,
 	PlayCircle,
+	Plus,
 } from 'lucide-react'
 import { type ReactNode, useEffect, useState } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
@@ -229,8 +229,8 @@ export function LibraryPage() {
 							}}
 						/>
 					)}
-					<PageAction icon={FileUp} to={productionRoutes.import}>
-						{t('导入原文')}
+					<PageAction icon={Plus} to={productionRoutes.import}>
+						{t('新建工程')}
 					</PageAction>
 				</div>
 			}
