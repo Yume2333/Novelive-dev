@@ -78,7 +78,7 @@ export function trimStagingToBudget(
 	registry: AssetRegistry,
 	budget: TrimBudget,
 	compile: Compile,
-	onFailure?: (images: readonly string[], protectedMinimum: number) => void,
+	onFailure?: (images: readonly string[], remainingBases: number) => void,
 ) {
 	function evaluate(candidate: Candidate) {
 		const plan = planArt(candidate.items, bible, registry, candidate.merges)

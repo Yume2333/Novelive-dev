@@ -335,11 +335,11 @@ export async function directChapterArt(
 						const compiled = compile(script, registry, imageBudget)
 						return compiled.ok ? compiled.scenes : undefined
 					},
-					(images, protectedMinimum) => {
+					(images, remainingBases) => {
 						throw new ChapterImageBudgetError(
 							images,
 							imageBudget.limit,
-							protectedMinimum,
+							remainingBases,
 						)
 					},
 				)

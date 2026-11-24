@@ -1978,7 +1978,7 @@ ada: One. #0010
 	expect(fit?.items).toEqual([])
 })
 
-test('reports the remaining image count and protected minimum after an unsuccessful trim', async () => {
+test('reports the remaining image and base counts after an unsuccessful trim', async () => {
 	const response = JSON.stringify({
 		patch: 'PUT <4:\n@bg room/day\n@cg cg-window',
 		items: [
@@ -2001,7 +2001,7 @@ test('reports the remaining image count and protected minimum after an unsuccess
 			},
 		}),
 	).rejects.toThrow(
-		'Chapter needs 1 new provider images after trimming; budget is 0. Protected minimum: 1.',
+		'Chapter needs 1 new provider images after trimming; budget is 0. Costume and background bases remaining after trim: 1.',
 	)
 })
 
