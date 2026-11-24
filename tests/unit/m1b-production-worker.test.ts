@@ -1269,6 +1269,11 @@ test.each([false, true])(
 		)
 		expect(await service.draw(seed, drawingBible)).toEqual({ status: 'drawn' })
 		expect(generationRequests).toHaveLength(1)
+		const imageReservations = project.database.prepare(
+			'SELECT * FROM spend_reservation WHERE images > 0 ORDER BY id',
+		)
+		const initialImageReservations = imageReservations.all()
+		expect(initialImageReservations).toHaveLength(1)
 		const legacyDirectory = join(projectDir, '.novelive', 'draw', workId)
 		for (const png of [red, blue]) {
 			const record = createReplayFetch({
@@ -1296,8 +1301,10 @@ test.each([false, true])(
 			if (i === 0 && retryAudit) {
 				rateLimitAudit = true
 				await expect(draw()).rejects.toMatchObject({ kind: 'transient' })
+				expect(imageReservations.all()).toEqual(initialImageReservations)
 			}
 			expect(await draw()).toEqual({ status: 'drawn' })
+			expect(imageReservations.all()).toEqual(initialImageReservations)
 		}
 		expect(generationRequests).toHaveLength(1)
 		const entries = (await service.registry()).entries
