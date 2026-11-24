@@ -150,6 +150,7 @@ export function chapterWorker(
 		signal?: AbortSignal,
 		imageGenerationReplay?: ReplayOptions,
 		drawingReplay = replay,
+		desensitized = false,
 	) =>
 		usageMethods(
 			new ArtProduction(project, {
@@ -160,6 +161,7 @@ export function chapterWorker(
 				image: models.image,
 				replay: drawingReplay,
 				imageGenerationReplay,
+				desensitized,
 				signal,
 				resolution: work.settings.outputResolution,
 				readScope: { level: 'work', volumeId, workId: work.workId },
@@ -552,16 +554,21 @@ export function chapterWorker(
 		draw(job, ctx) {
 			return step(async () => {
 				const metadata = await drawingMetadata(job.assetId)
-				return art(ctx.signal, undefined, {
-					...replay,
-					checkpointDirectory: join(
-						project.root,
-						'.novelive',
-						'draw',
-						work.workId,
-					),
-					normalizeCheckpointIds: true,
-				}).draw(
+				return art(
+					ctx.signal,
+					undefined,
+					{
+						...replay,
+						checkpointDirectory: join(
+							project.root,
+							'.novelive',
+							'draw',
+							work.workId,
+						),
+						normalizeCheckpointIds: true,
+					},
+					ctx.desensitized,
+				).draw(
 					metadata.job,
 					(await productionBible(project, volumeId, work.workId)).art,
 					metadata.cg,

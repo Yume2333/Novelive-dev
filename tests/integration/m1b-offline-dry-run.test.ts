@@ -41,6 +41,7 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 			'image-invalid-json',
 			'image-overdelivery',
 			'drawing-technical-rejection',
+			'drawing-moderation',
 			'concurrent-sunburst',
 			'download-failure',
 			'download-body-failure',
@@ -209,7 +210,8 @@ test.each(scenarios)(
 						...(name === 'concurrent-sunburst' && { concurrency: 8 }),
 						...((reopenDrawing ||
 							name === 'drawing-rate-limit' ||
-							name === 'drawing-technical-rejection') && {
+							name === 'drawing-technical-rejection' ||
+							name === 'drawing-moderation') && {
 							concurrency: 1,
 						}),
 						...((overdelivery || name === 'concurrent-sunburst') && {
@@ -602,6 +604,31 @@ test.each(scenarios)(
 				])
 				expect(candidates[2].requestKey).toBe(candidates[1].requestKey)
 			}
+			if (faults.includes('drawing-moderation')) {
+				for (const role of ['painter', 'visual']) {
+					const replies = relay.admissions.filter(
+						({ operation, chapter }) => operation === role && chapter === 1,
+					)
+					expect(
+						replies.slice(0, 2).map(({ desensitized }) => desensitized),
+					).toEqual([false, true])
+					expect(replies[1].requestKey).not.toBe(replies[0].requestKey)
+				}
+				expect(explicitAdmissions.size).toBe(0)
+				expect(
+					session.queue
+						.runLog(workId)
+						.some(
+							({ kind, steps }) =>
+								kind === 'image' &&
+								steps.some(({ errorType }) => errorType === 'moderation') &&
+								steps.some(
+									({ purpose, status }) =>
+										purpose === 'draw' && status === 'completed',
+								),
+						),
+				).toBe(true)
+			}
 			if (reviewDenial) {
 				const denied = reviews.findIndex(({ fault }) => fault === reviewDenial)
 				const raised = faults.includes('review-reasoning')
@@ -744,7 +771,9 @@ test.each(scenarios)(
 					relay.admissions
 						.filter((entry) => entry.run === run)
 						.map(({ tokens, images, fault }) =>
-							fault?.endsWith('rate-limit') ? pair(0, 0) : pair(tokens, images),
+							fault?.endsWith('rate-limit') || fault === 'drawing-moderation'
+								? pair(0, 0)
+								: pair(tokens, images),
 						)
 						.sort(),
 				)

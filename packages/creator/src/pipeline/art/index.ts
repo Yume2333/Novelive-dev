@@ -84,6 +84,7 @@ type Options = ModelOptions & {
 	readScope?: ProjectScope
 	resolution?: '2K' | '4K'
 	lossless?: boolean
+	desensitized?: boolean
 }
 
 const auditSchema = obj({
@@ -704,6 +705,9 @@ export class ArtProduction {
 				(stop === 'retries' || stop === 'moderation'),
 		})
 		let moderated = false
+		const moderationGuidance = this.options.desensitized
+			? 'Keep the adaptation non-graphic. Use implication instead of explicit detail.'
+			: undefined
 		let attempt = 0
 		let rewritten: string | undefined
 		const settingsVersion = checkpoint
@@ -717,6 +721,7 @@ export class ArtProduction {
 							auditRefs.map((reference) =>
 								createHash('sha256').update(reference).digest('hex'),
 							),
+							...(moderationGuidance ? [moderationGuidance] : []),
 						]),
 					)
 					.digest('hex')
@@ -814,6 +819,7 @@ export class ArtProduction {
 							? `Character preservation context (not part of the expression cue): ${expressionPreservation(drawing)}.`
 							: undefined,
 						feedback,
+						moderationGuidance,
 					]
 						.filter(Boolean)
 						.join('\n'),
@@ -935,6 +941,7 @@ export class ArtProduction {
 						? 'Visually audit the first image. Image 2 is the accepted base. Check the requested facial expression against the saved cue (description); verify identity, anchors and key colors against the base and preservation context. Reject unintended changes outside the face, including pose, silhouette, framing, transparency, colors, shading and linework. Judge style only by preservation of the accepted base, not by matching any other look. Check for artifacts independently.'
 						: 'Visually audit the first image. Compare identity against costume/base images, not unrelated style characters. Verify each anchor feature and key color, description and composition, style, and artifacts independently.',
 					preview.transparencyHint,
+					moderationGuidance,
 					'Return JSON {"pass":boolean,"failedChecks":[],"feedback":"..."}. Valid failedChecks: identity, anchors, description, style, artifacts.',
 					textOnlyStyle
 						? `Judge the blocking style check only against this written style description: ${drawing.style}`

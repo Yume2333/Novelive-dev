@@ -40,6 +40,7 @@ export type Admission = {
 	requestKey: string
 	outputCap?: number
 	imageAllowance?: number
+	desensitized: boolean
 }
 
 export type Fault =
@@ -54,6 +55,7 @@ export type Fault =
 	| 'drawing-rate-limit'
 	| 'drawing-image-missing-usage'
 	| 'drawing-technical-rejection'
+	| 'drawing-moderation'
 	| 'review-rate-limit'
 	| 'review-raised-cap-rate-limit'
 	| 'review-reasoning'
@@ -259,6 +261,9 @@ export function fakeRelay(
 					(candidate === 'drawing-rate-limit' &&
 						operation === 'visual' &&
 						currentChapter > 0) ||
+					(candidate === 'drawing-moderation' &&
+						operation === 'visual' &&
+						currentChapter > 0) ||
 					(candidate === 'review-rate-limit' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-2')) ||
@@ -298,11 +303,13 @@ export function fakeRelay(
 			fault === 'review-rate-limit' ||
 			fault === 'review-raised-cap-rate-limit'
 				? 429
-				: fault === 'staging-503' ||
-						fault === 'writing-503' ||
-						fault === 'image-failure'
-					? 503
-					: 200
+				: fault === 'drawing-moderation'
+					? 400
+					: fault === 'staging-503' ||
+							fault === 'writing-503' ||
+							fault === 'image-failure'
+						? 503
+						: 200
 		const tokens =
 			status !== 200 ||
 			fault === 'missing-usage' ||
@@ -342,6 +349,9 @@ export function fakeRelay(
 			run,
 			fault,
 			outputCap,
+			desensitized: prompt.includes(
+				'Keep the adaptation non-graphic. Use implication instead of explicit detail.',
+			),
 			imageAllowance:
 				imageAllowance === undefined ? undefined : Number(imageAllowance),
 			requestKey: createHash('sha256')
@@ -371,7 +381,17 @@ export function fakeRelay(
 		}
 		await log()
 		if (status !== 200)
-			return Response.json({ error: { message: 'Offline fault' } }, { status })
+			return Response.json(
+				{
+					error: {
+						message:
+							fault === 'drawing-moderation'
+								? 'Content moderation'
+								: 'Offline fault',
+					},
+				},
+				{ status },
+			)
 		if (fault === 'image-null') return Response.json(null)
 		if (fault === 'image-invalid-json')
 			return new Response('{', {
