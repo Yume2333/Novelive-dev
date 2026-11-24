@@ -36,10 +36,16 @@ export function writingModel(
 			: {}),
 	}
 	let reply: { save?: () => Promise<void> } = {}
+	const saveReply = async () => {
+		const save = reply.save
+		reply = {}
+		await save?.()
+	}
 	const checkpoint = options.checkpoint
 	const stream = createTextStream({
 		...policy,
 		...(checkpoint && {
+			onReasoningRetry: saveReply,
 			fetch: createReplayFetch({
 				...checkpoint,
 				onCheckpointReply: (save) => {
@@ -86,7 +92,7 @@ export function writingModel(
 			}
 			if (result.stopReason === 'length')
 				throw new TruncatedWritingError(result.usage)
-			await reply.save?.()
+			await saveReply()
 			return result
 		},
 	}

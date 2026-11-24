@@ -43,6 +43,10 @@ const scenarios: { name: string; faults: Fault[] }[] = [
 		] as const
 	).map((fault) => ({ name: fault, faults: [fault] })),
 	{
+		name: 'review-cap-raise',
+		faults: ['review-reasoning', 'review-rate-limit'],
+	},
+	{
 		name: 'mixed',
 		faults: [
 			'writing-503',
@@ -102,6 +106,13 @@ test.each(scenarios)(
 				models: {
 					...configuration.models,
 					fast: { ...configuration.models.fast, contextWindow: 8192 },
+					...(faults.includes('review-reasoning') && {
+						main: {
+							...configuration.models.main,
+							model: 'devin-swe-2',
+							maxOutputTokens: null,
+						},
+					}),
 					image: { ...configuration.models.image, retries: 3 },
 				},
 				production: { roleModels: { artist: 'fast' } },
@@ -367,8 +378,15 @@ test.each(scenarios)(
 				const denied = reviews.findIndex(
 					({ fault }) => fault === 'review-rate-limit',
 				)
-				expect(denied).toBe(1)
+				const raised = faults.includes('review-reasoning')
+				expect(denied).toBe(raised ? 2 : 1)
 				expect(reviews[0].tokens).not.toBeNull()
+				if (raised) {
+					expect(reviews[0].fault).toBe('review-reasoning')
+					expect(reviews[1].outputCap).toBeGreaterThan(
+						reviews[0].outputCap ?? Infinity,
+					)
+				}
 				expect(reviews[denied + 1].requestKey).toBe(reviews[denied].requestKey)
 				expect(reviews[denied + 1].tokens).not.toBeNull()
 				expect(

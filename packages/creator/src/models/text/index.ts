@@ -338,6 +338,7 @@ type StreamPolicy = {
 	requestRetries?: number
 	streamRetries?: number
 	streaming?: boolean
+	onReasoningRetry?: () => Promise<void>
 }
 
 type TextStreamOptions = SimpleStreamOptions & { outputLimit?: number }
@@ -598,6 +599,7 @@ export function createTextStream(
 						: clampMaxTokensToContext(model, context, raised) >
 							clampMaxTokensToContext(model, context, maxTokens)
 					if (!reasoningRetried && !live && canRaise) {
+						await policy.onReasoningRetry?.()
 						reasoningRetried = true
 						maxTokens = raised
 						continue

@@ -38,6 +38,7 @@ export type Admission = {
 	run: string
 	fault?: Fault
 	requestKey: string
+	outputCap?: number
 }
 
 export type Fault =
@@ -50,6 +51,7 @@ export type Fault =
 	| 'truncated'
 	| 'rate-limit'
 	| 'review-rate-limit'
+	| 'review-reasoning'
 	| 'image-failure'
 	| 'image-null'
 	| 'image-invalid-json'
@@ -64,6 +66,7 @@ function completion(
 	tokens: number | null,
 	finish = 'stop',
 	tool?: string,
+	reasoning = false,
 ) {
 	const text = typeof content === 'string' ? content : JSON.stringify(content)
 	const delta = tool
@@ -77,7 +80,9 @@ function completion(
 					},
 				],
 			}
-		: { content: text }
+		: reasoning
+			? { reasoning_content: text }
+			: { content: text }
 	const frames = [
 		{
 			choices: [
@@ -230,6 +235,9 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					(candidate === 'review-rate-limit' &&
 						operation === 'review' &&
 						prompt.includes('scene 河灯-1-2')) ||
+					(candidate === 'review-reasoning' &&
+						operation === 'review' &&
+						prompt.includes('scene 河灯-1-1')) ||
 					(['image-failure', 'image-null', 'image-invalid-json'].includes(
 						candidate,
 					) &&
@@ -261,6 +269,7 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 						: 2_000
 		const images = tokens === null ? null : Number(image)
 		const run = process.env.NL_RUN_ID ?? ''
+		const outputCap = body.max_completion_tokens ?? body.max_tokens
 		const attributedChapter = /(?:scene 河灯-|fixture-(?:bank|cg)-)(\d+)/.exec(
 			String(image ? body.prompt : prompt),
 		)?.[1]
@@ -271,8 +280,13 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 			images,
 			run,
 			fault,
+			outputCap,
 			requestKey: createHash('sha256')
-				.update(JSON.stringify(image ? [body.prompt, body.size] : messages))
+				.update(
+					JSON.stringify(
+						image ? [body.prompt, body.size] : [messages, outputCap],
+					),
+				)
 				.digest('hex'),
 		})
 		const csv = process.env.NL_USAGE_CSV
@@ -315,7 +329,15 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 				'submit_quality',
 			)
 		if (operation === 'review')
-			return reply({ issues: [] }, 'stop', 'submit_review')
+			return fault === 'review-reasoning'
+				? completion(
+						'Considering the cited source.',
+						tokens,
+						'length',
+						undefined,
+						true,
+					)
+				: reply({ issues: [] }, 'stop', 'submit_review')
 		if (operation === 'visual')
 			return reply({ pass: true, failedChecks: [], feedback: '' })
 		if (operation === 'painter')
