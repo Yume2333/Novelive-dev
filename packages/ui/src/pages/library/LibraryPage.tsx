@@ -8,7 +8,7 @@ import {
 	PlayCircle,
 } from 'lucide-react'
 import { type ReactNode, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ProgressBar } from '../../components/Card'
 import { GradientCover } from '../../components/GradientCover'
 import { EmptyState, Page, PageAction } from '../../components/Page'
@@ -133,7 +133,10 @@ export function LibraryPage() {
 	const [library, setLibrary] = useState<CommandOutput<'library.list'>>()
 	const [error, setError] = useState(false)
 	const [revision, setRevision] = useState(0)
-	const [tab, setTab] = useState<Tab>('projects')
+	const [searchParams] = useSearchParams()
+	const [tab, setTab] = useState<Tab>(
+		searchParams.get('tab') === 'imported' ? 'imported' : 'projects',
+	)
 	const share = window.novelive.host.share
 	const installed = window.novelive.host.installed
 	const [packages, setPackages] = useState<
@@ -225,6 +228,11 @@ export function LibraryPage() {
 					title={t('书库还是空的')}
 					text={t('导入一部小说原文，Novelive 会把它做成可以游玩的视觉小说。')}
 					card
+					actions={
+						<Link className="nl-btn nl-btn-ghost" to="/welcome">
+							{t('开始引导')}
+						</Link>
+					}
 				/>
 			) : (
 				<>
@@ -262,6 +270,7 @@ export function LibraryPage() {
 												className={`label-caps label-caps-zh ${styles.groupTitle}`}
 											>
 												{group.title}
+												<span className={styles.groupPath}>{group.key}</span>
 											</h2>
 										)}
 										{group.volumes.map((volume) => (

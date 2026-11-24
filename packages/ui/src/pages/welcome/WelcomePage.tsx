@@ -1,10 +1,11 @@
 import type { CommandOutput, ConfigUpdate } from '@novelive/creator/contract'
 import { BookOpen, Info, PlayCircle } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { localeNames, locales, scoped, setLocale } from '../../i18n'
-import { productionRoutes } from '../../routes/production'
+import { useAppearance } from '../../shell/appearance'
 import markLight from '../../shell/brand/novelive-mark.svg'
 import markDark from '../../shell/brand/novelive-mark-dark.svg'
 import { ModelCards } from '../settings/SettingsPage'
@@ -25,11 +26,12 @@ function Dots({ current }: { current: number }) {
 }
 
 export function WelcomePage() {
+	useTranslation('welcome')
 	const navigate = useNavigate()
 	const [step, setStep] = useState(0)
 	const [path, setPath] = useState<'create' | 'play'>('create')
 	const [config, setConfig] = useState<CommandOutput<'config.get'>>()
-	const language = config && 'language' in config ? config.language : undefined
+	const { language } = useAppearance(config)
 
 	useEffect(() => {
 		let active = true
@@ -57,8 +59,7 @@ export function WelcomePage() {
 		setConfig(saved)
 		return saved
 	}, [])
-	const finish = () =>
-		navigate(path === 'create' ? productionRoutes.import : '/')
+	const finish = () => navigate(path === 'create' ? '/' : '/?tab=imported')
 
 	return (
 		<main className={styles.page}>
