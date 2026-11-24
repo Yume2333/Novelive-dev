@@ -32,7 +32,10 @@ import {
 import { projectFiles } from '../../packages/format/src/model'
 import { scoreAgainstConsensus } from './bible-patch-score'
 import { writeOwnerBookEvidence } from './owner-book-evidence'
-import { checkOwnerBookResumePrompt } from './owner-book-resume'
+import {
+	bindOwnerBookRunModels,
+	checkOwnerBookResumePrompt,
+} from './owner-book-resume'
 import {
 	type WholeBookRun,
 	wholeBookSelectionTargets,
@@ -542,8 +545,23 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				).chapterIds
 				expect(chapterIds).toHaveLength(7)
 				const files = synthesisFiles(volumeId)
+				phase =
+					'run model validation (use a new run directory if the saved models differ or are unknown)'
+				const saved = await first.read(files.checkpoint).catch((error) => {
+					if (error.code !== 'ENOENT') throw error
+				})
+				await bindOwnerBookRunModels(
+					join(run, 'models.json'),
+					{ synthesisModel, selectionModel },
+					Boolean(
+						saved &&
+							(saved.applied ||
+								saved.selectedPatch ||
+								saved.selections?.length),
+					),
+				)
 				const selectionStart = checkpointSource
-					? await first.read(files.checkpoint)
+					? (saved ?? (await first.read(files.checkpoint)))
 					: undefined
 				if (selectionStart) {
 					expect(selectionStart.packet).toBeGreaterThan(1)
