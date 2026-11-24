@@ -1,6 +1,6 @@
 # Real-relay usage reconciliation
 
-As of the [November 24 shared snapshot](../m1b/owner/live-run-af551d2.md#对账与释放). No paid requests were made for this reconciliation. The [CSV](reconciled-ledger.csv) is the ledger; this note explains its scope and differences from the reported balances.
+The [CSV](reconciled-ledger.csv) is the ledger. The tables below describe the [November 24 baseline](../m1b/owner/live-run-af551d2.md#对账与释放). The ledger also includes the later `d58d4bc`, `53cc1d52`, and [`fd6e94a`](../m1b/owner/live-run-fd6e94a.md#对账与释放) windows. The current shared balance is **5,362,250 settled tokens / 55 images** and **3,453,975 unresolved tokens / 22 image slots**, including the unchanged historical unattributed amounts.
 
 | Model | Settled tokens / images | Known prompt / completion tokens (calls covered) | Rejected relay calls; retained tokens / images | Transport failures; retained tokens / images | Other evidenced reservations: recorded calls; tokens / images |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -15,9 +15,9 @@ As of the [November 24 shared snapshot](../m1b/owner/live-run-af551d2.md#对账�
 | --- | ---: | ---: | ---: |
 | Reconciled from window and run evidence | 4,766,011 / 19 | 2,097,920 / 1 | 13,136,069 / 480 |
 | Reported but not linked to a run or model | +140,455 / +12 | +195,450 / +1 | — |
-| **Latest reported shared balance** | **4,906,466 / 31** | **2,293,370 / 2** | **12,800,164 / 467** |
+| **Reported shared balance at baseline** | **4,906,466 / 31** | **2,293,370 / 2** | **12,800,164 / 467** |
 
-Use the reported balance, including the unattributed amounts, for shared-budget planning. Neither headroom figure authorizes more spend. Following the [project cap](../../delivery-plan.md#测试模型与额度), provider-reported image-model tokens count toward the token cap as well as generated images counting toward the separate image cap.
+Use the current balance above, including the unattributed amounts, for shared-budget planning. Headroom is not an authorization to spend. Following the [project cap](../../delivery-plan.md#测试模型与额度), provider-reported image-model tokens count toward the token cap as well as generated images counting toward the separate image cap.
 
 ### Discrepancies and deduplication
 
