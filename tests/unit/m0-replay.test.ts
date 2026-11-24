@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -440,15 +440,28 @@ test('checkpoint fallback reuses successive candidates with matching response ID
 	const candidates = ['first', 'second', 'third']
 	const ids = candidates.map((_, i) => String(i + 1).repeat(64))
 	const upstream = vi.fn(async () => new Response('unexpected dispatch'))
-	for (const [i, candidate] of candidates.entries()) {
+	for (const candidate of candidates) {
 		const record = createReplayFetch({
 			mode: 'record',
 			directory: fallback,
-			checkpointResponseId: ids[i],
 			fetch: async () => new Response(candidate),
 		})
 		await (await record(origin)).text()
 	}
+	const index = join(fallback, rowFile)
+	const rows = (await readFile(index, 'utf8')).trimEnd().split('\n')
+	await writeFile(
+		index,
+		rows
+			.map(
+				(row, i) =>
+				`${JSON.stringify({
+					...JSON.parse(row),
+					checkpointResponseId: ids[i],
+				})}\n`,
+			)
+			.join(''),
+	)
 	const positions = new Map<string, number>()
 	for (const [i, candidate] of candidates.entries()) {
 		const hit = vi.fn()

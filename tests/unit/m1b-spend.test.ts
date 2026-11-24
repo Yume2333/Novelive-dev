@@ -954,7 +954,7 @@ test.each(['one match', 'duplicate download', 'shared generation URL'])(
 		const root = await mkdtemp(join(tmpdir(), 'm1b-legacy-draw-'))
 		try {
 			const baseUrl = 'https://relay.invalid/v1'
-			const url = baseUrl + '/expired.png'
+			const url = `${baseUrl}/expired.png`
 			const config = {
 				...configuration.models.image,
 				baseUrl,
@@ -973,7 +973,7 @@ test.each(['one match', 'duplicate download', 'shared generation URL'])(
 			if (scenario === 'duplicate download') await (await append(url)).text()
 			if (scenario === 'shared generation URL')
 				await (
-					await append(baseUrl + '/images/generations', {
+					await append(`${baseUrl}/images/generations`, {
 						method: 'POST',
 						body: JSON.stringify({ prompt: 'other prompt' }),
 					})

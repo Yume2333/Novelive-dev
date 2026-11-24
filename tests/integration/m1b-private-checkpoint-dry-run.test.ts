@@ -155,6 +155,7 @@ test.skipIf(!drawingCheckpoint || !profile)(
 				})
 			: undefined
 		let drawingHits = 0
+		let repeatedDownloads = 0
 		const host = createProduction(
 			root,
 			createConfigStore(profile),
@@ -175,8 +176,10 @@ test.skipIf(!drawingCheckpoint || !profile)(
 							)
 								throw error
 						}
-						if (match)
+						if (match) {
+							if (request.method === 'GET') repeatedDownloads++
 							throw new Error('Settled drawing request reached dispatch')
+						}
 					}
 					const { pathname } = new URL(request.url)
 					return relay.fetch(
@@ -224,7 +227,10 @@ test.skipIf(!drawingCheckpoint || !profile)(
 			expect(reservations()).toEqual(original)
 			await session.continue()
 			await session.queue.idle()
-			if (drawingRecordings) expect(drawingHits).toBeGreaterThanOrEqual(9)
+			if (drawingRecordings) {
+				expect(drawingHits).toBeGreaterThanOrEqual(9)
+				expect(repeatedDownloads).toBe(0)
+			}
 			expect(
 				relay.admissions.some(({ operation }) => operation === 'image'),
 			).toBe(true)
