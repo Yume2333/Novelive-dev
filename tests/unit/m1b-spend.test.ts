@@ -703,6 +703,104 @@ test.each([
 	},
 )
 
+test.each([false, true])(
+	'the image timeout starts at dispatch, not while waiting for budget (times out: %s)',
+	async (timesOut) => {
+		vi.stubEnv('NL_REPLAY', '')
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '4')
+		using database = new DatabaseSync(':memory:')
+		const admit = projectSpend(database)
+		const request = () =>
+			new Request('https://example.invalid/v1/images/generations', {
+				method: 'POST',
+				body: JSON.stringify({ model: 'gpt-image-2.6-sunburst', n: 1 }),
+			})
+		const reply = () =>
+			Response.json({
+				data: [{ b64_json: Buffer.from('fixture').toString('base64') }],
+				usage: { total_tokens: 7000 },
+			})
+		const held = Promise.withResolvers<void>()
+		const release = Promise.withResolvers<void>()
+		const first = admit(request(), async () => {
+			held.resolve()
+			await release.promise
+			return reply()
+		})
+		await held.promise
+		const admitted = Promise.withResolvers<void>()
+		const dispatched = Promise.withResolvers<void>()
+		const send = vi.fn(async (input: RequestInfo | URL) => {
+			dispatched.resolve()
+			if (!timesOut) return reply()
+			const { signal } = input as Request
+			return new Promise<Response>((_, reject) => {
+				signal.addEventListener('abort', () => reject(signal.reason), {
+					once: true,
+				})
+			})
+		})
+		const render = imageRenderer(
+			{
+				...configuration.models.image,
+				model: 'gpt-image-2.6-sunburst',
+				upscaleTier: 'anime',
+			},
+			{
+				replay: {
+					fetch: send,
+					spend: (request, fetch) => {
+						admitted.resolve()
+						return admit(request, fetch)
+					},
+				},
+			},
+		)
+		vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+		const deadline = vi
+			.spyOn(AbortSignal, 'timeout')
+			.mockImplementation((ms) => {
+				const controller = new AbortController()
+				setTimeout(
+					() => controller.abort(new DOMException('Timed out', 'TimeoutError')),
+					ms,
+				)
+				return controller.signal
+			})
+		try {
+			const result = render('fixture', [], { width: 1024, height: 1024 }, false)
+			await admitted.promise
+			await setImmediate()
+			await vi.advanceTimersByTimeAsync(90_001)
+			expect(send).not.toHaveBeenCalled()
+			expect(deadline).not.toHaveBeenCalled()
+			release.resolve()
+			await first
+			await dispatched.promise
+			expect(deadline).toHaveBeenCalledExactlyOnceWith(90_000)
+			await vi.advanceTimersByTimeAsync(90_000)
+			expect(await result).toEqual(
+				timesOut
+					? {
+							error: expect.objectContaining({ code: 'network' }),
+							doNotRegenerate: true,
+						}
+					: { bytes: Buffer.from('fixture') },
+			)
+			expect(
+				database
+					.prepare('SELECT actual_images FROM spend_reservation ORDER BY id')
+					.all(),
+			).toEqual([{ actual_images: 1 }, { actual_images: timesOut ? null : 1 }])
+		} finally {
+			release.resolve()
+			deadline.mockRestore()
+			vi.useRealTimers()
+		}
+	},
+)
+
 test('exhausted image and token caps block image edits, generation, and visual review', async () => {
 	vi.stubEnv('NL_REPLAY', '')
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '0')

@@ -92,7 +92,25 @@ export function imageRenderer(
 	generationReplay = options.replay,
 ) {
 	const provider = imageProvider(config.baseUrl, config.model)
-	const replay = checkedReplay(createReplayFetch(generationReplay))
+	const timeout = 90_000
+	const upstream = generationReplay?.fetch ?? globalThis.fetch
+	const replay = checkedReplay(
+		createReplayFetch({
+			...generationReplay,
+			fetch: inheritSpendGuard(upstream, (input, init) => {
+				if (!metered) return upstream(input, init)
+				const request = new Request(input, init)
+				return upstream(
+					new Request(request, {
+						signal: AbortSignal.any([
+							request.signal,
+							AbortSignal.timeout(timeout),
+						]),
+					}),
+				)
+			}),
+		}),
+	)
 	const metered = isSpendGuardedFetch(replay.fetch)
 	const download = createReplayFetch({
 		...generationReplay,
@@ -103,7 +121,8 @@ export function imageRenderer(
 		baseURL: config.baseUrl,
 		apiKey: config.apiKey,
 		fetch: Object.assign(replay.fetch, { Response }),
-		timeout: 90_000,
+		// The SDK starts its timer before admission; metered requests time out at dispatch.
+		timeout: metered ? 2 ** 31 - 1 : timeout,
 		maxRetries: 0,
 	})
 	return async (
