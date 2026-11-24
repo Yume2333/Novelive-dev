@@ -1,7 +1,6 @@
 {
-	"导入的作品": "Imported works",
-	"v{{version}} · 已发布 {{published}} / {{chapters}} 章": "v{{version}} · {{published}} / {{chapters}} chapters published",
 	"v{{installed}} → v{{version}} · 可更新": "v{{installed}} → v{{version}} · Update available",
+	"v{{version}} · 已发布 {{published}} / {{chapters}} 章": "v{{version}} · {{published}} / {{chapters}} chapters published",
 	"v{{version}} · 已安装较新的 v{{installed}}，不会替换": "v{{version}} · A newer v{{installed}} is installed and won't be replaced",
 	"v{{version}} · 已导入": "v{{version}} · Imported",
 	"v{{version}} · 新作品": "v{{version}} · New title",
@@ -9,14 +8,17 @@
 	"书库": "Library",
 	"书库还是空的": "Your library is empty",
 	"导入": "Import",
+	"导入一部小说原文，Novelive 会把它做成可以游玩的视觉小说。": "Import a novel manuscript and Novelive will turn it into a playable visual novel.",
 	"导入为工程": "Import as project",
 	"导入为工程会创建可编辑的副本，再次导出时将使用新的作品 ID。": "Importing as a project creates an editable copy that will use a new work ID when exported again.",
 	"导入作品包": "Import work package",
-	"导入原文": "Import source text",
+	"导入的作品": "Imported works",
 	"已发布 {{published}} / {{chapters}} 章": "Published {{published}} / {{chapters}} chapters",
 	"已导入为新工程，可以在书库中编辑。": "Imported as a new project. You can edit it in the library.",
 	"已导入或更新 {{count}} 部作品。": "{{count}} work(s) imported or updated.",
+	"开始引导": "Start setup",
 	"我的工程": "My projects",
+	"新建工程": "New project",
 	"无法导入为工程，请重试。": "Couldn't import as a project. Please try again.",
 	"无法导入作品包，请重试。": "Couldn't import the work package. Please try again.",
 	"无法检查作品包，请重新选择。": "Couldn't verify the work package. Please select it again.",
@@ -27,5 +29,7 @@
 	"正在读取书库": "Loading library",
 	"确认后将替换上述旧版本。存档和已读记录会迁移；无法迁移的存档会保留在「旧版本存档」中。": "Confirming will replace the old version above. Saves and read history will be migrated; saves that can't be migrated will be kept under \"Old version saves\".",
 	"确认导入与更新": "Confirm import and update",
-	"还没有作品": "No works yet"
+	"第 {{index}} 卷 · {{title}}": "Vol. {{index}} · {{title}}",
+	"还没有作品": "No works yet",
+	"还没有导入的作品": "No imported works yet"
 }

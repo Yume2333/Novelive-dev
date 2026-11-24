@@ -1,0 +1,66 @@
+.button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	padding: var(--space-px-10) var(--space-px-20);
+	border-radius: var(--radius-md);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	white-space: nowrap;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.sm {
+	gap: var(--space-px-5);
+	padding: var(--space-px-5) var(--space-px-10);
+	font-size: 11px;
+}
+
+.primary {
+	border: 1px solid var(--color-primary-container);
+	background: var(--color-primary);
+	box-shadow: var(--shadow-raised);
+	color: var(--color-on-primary);
+}
+
+.secondary {
+	color: var(--color-primary);
+}
+
+.ghost {
+	border: 1px solid transparent;
+	color: var(--color-on-surface-variant);
+}
+
+.danger {
+	border: 1px solid
+		color-mix(in srgb, var(--color-on-error-container) 20%, transparent);
+	background: var(--color-error-container);
+	color: var(--color-on-error-container);
+}
+
+.icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-full);
+	color: var(--color-on-surface-variant);
+}
+
+.icon:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.spin {
+	animation: spin var(--dur-spin) linear infinite;
+}

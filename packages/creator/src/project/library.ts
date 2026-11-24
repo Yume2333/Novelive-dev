@@ -39,6 +39,14 @@ export async function listLibrary(dataDir: string) {
 						title: work.title,
 						published,
 						chapters: work.chapterIds.length,
+						project: {
+							directory: project.root,
+							seriesId: series.seriesId,
+							seriesTitle: series.title,
+							volumeId,
+							volumeTitle: volume.title,
+							volumeIndex: series.volumeIds.indexOf(volumeId) + 1,
+						},
 					}
 				}
 			}),

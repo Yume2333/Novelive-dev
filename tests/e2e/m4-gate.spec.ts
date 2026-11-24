@@ -101,7 +101,7 @@ async function importBook(
 		if (references.length)
 			await page.getByRole('button', { name: '添加图片' }).click()
 	}
-	await page.getByRole('button', { name: '导入', exact: true }).click()
+	await page.getByRole('button', { name: '下一步', exact: true }).click()
 }
 async function launch(
 	root: string,
@@ -127,7 +127,9 @@ async function launch(
 		},
 	})
 	const page = await app.firstWindow()
-	await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+	await expect(
+		page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+	).toHaveText('创作端已就绪')
 	return { app, page }
 }
 
@@ -146,6 +148,7 @@ test.describe('M4 longform and queue', () => {
 				await call(page, 'config.update', configuration)
 				await importBook(app, page, source, folder)
 				await page.getByRole('button', { name: '跳过核对' }).click()
+				await page.getByRole('button', { name: '开始制作' }).click()
 				await page
 					.getByRole('link', { name: '选择主视觉' })
 					.click({ timeout: 30_000 })
@@ -277,10 +280,14 @@ test.describe('M4 longform and queue', () => {
 							.generation,
 				)
 				.toBeGreaterThan(before.generation)
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await call(page, 'config.update', configuration)
 			await importBook(app, page, join(root, '纸船.txt'), projects)
 			await page.getByRole('button', { name: '跳过核对' }).click()
+			await page.getByRole('button', { name: '开始制作' }).click()
+			await expect(page).toHaveURL(/#\/work\//)
 			const project = join(projects, '纸船')
 			const {
 				workIds: [workId],
@@ -384,7 +391,7 @@ test.describe('M4 longform and queue', () => {
 						: []
 				await importBook(app, page, book.path, projects, false, external)
 				await expect(
-					page.getByRole('heading', { name: '核对导入' }),
+					page.locator('[aria-current="step"]', { hasText: '核对信息' }),
 				).toBeVisible()
 				const projectDir = join(projects, book.name)
 				if (book.name.startsWith('epub')) {
@@ -398,6 +405,7 @@ test.describe('M4 longform and queue', () => {
 				expect(
 					report.structure.volumes[0].chapters[0].paragraphs.length,
 				).toBeGreaterThan(0)
+				await page.getByRole('button', { name: '下一步', exact: true }).click()
 				const images = page
 					.getByRole('group', { name: '插图参考（最多 3 张）' })
 					.getByRole('checkbox')
@@ -415,7 +423,7 @@ test.describe('M4 longform and queue', () => {
 					}
 				}
 				await capture(page, `w1-${book.name}`)
-				await page.getByRole('button', { name: '确认', exact: true }).click()
+				await page.getByRole('button', { name: '开始制作' }).click()
 				await expect(page).toHaveURL(/#\/work\//)
 				using project = await Project.open(projectDir)
 				const series = await project.read(projectFiles.series)
@@ -540,6 +548,8 @@ test.describe('M4 longform and queue', () => {
 			const projectA = join(projects, '纸船')
 			await importBook(app, page, join(root, '纸船.txt'), projects)
 			await page.getByRole('button', { name: '跳过核对' }).click()
+			await page.getByRole('button', { name: '开始制作' }).click()
+			await expect(page).toHaveURL(/#\/work\//)
 			const a = (await json(join(projectA, 'volumes/v0001/volume.json')))
 				.workIds[0] as string
 			const snapshot = (workId: string) =>
@@ -613,6 +623,8 @@ test.describe('M4 longform and queue', () => {
 			await page.getByRole('link', { name: '书库', exact: true }).click()
 			await importBook(app, page, join(root, '山路.txt'), projects)
 			await page.getByRole('button', { name: '跳过核对' }).click()
+			await page.getByRole('button', { name: '开始制作' }).click()
+			await expect(page).toHaveURL(/#\/work\//)
 			const projectB = join(projects, '山路')
 			const b = (await json(join(projectB, 'volumes/v0001/volume.json')))
 				.workIds[0] as string
@@ -751,7 +763,7 @@ test.describe('M4 longform and queue', () => {
 				location.hash = '/usage'
 			})
 			await expect(
-				page.getByRole('heading', { name: '用量', exact: true }),
+				page.getByRole('heading', { name: '用量统计', exact: true }),
 			).toBeVisible()
 			await app.evaluate(({ app }) =>
 				(
@@ -835,6 +847,11 @@ test.describe('M4 longform and queue', () => {
 			await page.evaluate((id) => {
 				location.hash = `/work/${id}/bible?volume=v0001`
 			}, a)
+			{
+				const chip = page.getByRole('button', { name: /^候选与冲突/ })
+				if ((await chip.getAttribute('aria-expanded')) !== 'true')
+					await chip.click()
+			}
 			await page
 				.getByRole('article', { name: '河岸过期提醒', exact: true })
 				.getByRole('button', { name: '接受候选' })
@@ -905,7 +922,9 @@ test.describe('M4 longform and queue', () => {
 		})
 		try {
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			const before = await page.evaluate(() => window.novelive.host.appState())
 			await app.evaluate(({ app, BrowserWindow, Tray }) => {
 				const state = app as typeof app & {

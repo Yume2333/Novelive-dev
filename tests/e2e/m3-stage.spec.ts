@@ -115,7 +115,9 @@ test('M3 save stage renders WebP thumbnails and restores state, replay actions a
 			BrowserWindow.getAllWindows()[0].setContentSize(960, 540),
 		)
 		const page = await app.firstWindow()
-		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 		await page.evaluate(
 			(Array.isArray(bundle) ? bundle[0] : bundle).output[0].code,
 		)
@@ -923,7 +925,9 @@ test('M3 stage directions render the direction set and four landscape fill crops
 			page.on('console', (message) => {
 				if (message.type() === 'error') console.error(message.text())
 			})
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await app.evaluate(({ dialog }, path) => {
 				dialog.showOpenDialog = async () => ({
 					canceled: false,
@@ -951,7 +955,8 @@ test('M3 stage directions render the direction set and four landscape fill crops
 						left: Math.floor(width / 2),
 						top: 8,
 						width: Math.floor(width / 2) - 8,
-						height: height - 16,
+						// Sample the upper half so the quick menu strip stays out of it.
+						height: Math.floor(height / 2),
 					})
 					.removeAlpha()
 					.raw()

@@ -1,0 +1,256 @@
+.scroll {
+	height: 100%;
+}
+
+.modelForm {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-5);
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.modelGrid,
+.imageModels {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-3);
+}
+
+.imageModels {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	border-top: 1px solid var(--divider);
+	padding-top: var(--space-4);
+}
+
+.modelField {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-px-6);
+	min-width: 0;
+}
+
+.modelField > span {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--color-on-surface-variant);
+	line-height: 1.2;
+	letter-spacing: 0.12em;
+}
+
+.modelField input,
+.modelField select {
+	width: 100%;
+	min-width: 0;
+	padding: var(--space-px-10) var(--space-px-14);
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-md);
+	background: var(--white-60);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-surface);
+	font-size: 14px;
+}
+
+.modelField select {
+	appearance: none;
+}
+
+.modelTest,
+.modelTest > span {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.modelTest > span {
+	color: var(--color-success);
+}
+
+.page {
+	display: flex;
+	min-height: 100vh;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-4);
+	padding: var(--space-7);
+}
+
+.brand {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	margin-bottom: var(--space-1);
+	font: 700 18px var(--font-display);
+	letter-spacing: 0.14em;
+}
+
+.card {
+	width: 100%;
+	max-width: 640px;
+	padding: var(--space-7) var(--space-7) var(--space-6);
+	border-radius: var(--radius-2xl);
+	animation: fade-up var(--dur-slow) var(--ease-out);
+}
+
+.card h1 {
+	margin: 0 0 var(--space-5);
+	font-size: 24px;
+}
+
+.dots {
+	display: flex;
+	justify-content: center;
+	gap: var(--space-px-6);
+	margin-bottom: var(--space-5);
+}
+
+.dots span {
+	display: inline-block;
+	width: 7px;
+	height: 7px;
+	border-radius: var(--radius-full);
+	background: var(--color-outline-variant);
+	transition: all var(--dur-base) var(--ease-in-out);
+}
+
+.dots span[data-active="true"] {
+	width: 18px;
+	background: var(--color-primary);
+}
+
+.languages {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-px-6);
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.languages legend {
+	margin-bottom: var(--space-px-6);
+	padding: 0;
+	color: var(--color-on-surface-variant);
+}
+
+.languages > div {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-px-14);
+}
+
+.radio {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-7);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.radio input {
+	box-sizing: border-box;
+	width: 17px;
+	height: 17px;
+	margin: 0;
+	border: 1px solid var(--color-outline-variant);
+	border-radius: 50%;
+	background: var(--white-60);
+	transition: all var(--dur-fast) var(--ease-out);
+	appearance: none;
+}
+
+.radio input:checked {
+	border: 5px solid var(--color-primary);
+}
+
+.paths {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-4);
+}
+
+.path {
+	display: flex;
+	flex: 1 1 200px;
+	flex-direction: column;
+	gap: var(--space-3);
+	padding: var(--space-5);
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-xl);
+	background: var(--white-40);
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition: all var(--dur-base) var(--ease-in-out);
+}
+
+.path[aria-pressed="true"] {
+	border-color: var(--color-primary);
+	background: var(--accent-wash);
+}
+
+.path strong {
+	font-size: 14px;
+}
+
+.path > span:last-child {
+	color: var(--color-on-surface-variant);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.pathIcon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 38px;
+	height: 38px;
+	border-radius: var(--radius-lg);
+	color: var(--color-primary);
+}
+
+.modelTitle {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	margin-bottom: var(--space-4);
+	color: var(--color-outline);
+}
+
+.modelTitle h1 {
+	margin: 0;
+	color: var(--color-on-surface);
+}
+
+.banner {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-2);
+	margin: 0 0 var(--space-4);
+	padding: var(--space-px-11) var(--space-4);
+	border-radius: var(--radius-lg);
+	background: var(--accent-wash);
+	color: var(--color-on-surface-variant);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.muted {
+	color: var(--color-outline);
+	font-size: 13px;
+}
+
+.footer {
+	display: flex;
+	justify-content: space-between;
+	margin-top: var(--space-6);
+}
+
+.footerActions {
+	display: flex;
+	gap: var(--space-3);
+}

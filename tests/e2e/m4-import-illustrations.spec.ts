@@ -46,14 +46,22 @@ for (const format of ['epub', 'docx'] as const) {
 				[source, projects],
 			)
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
-			await page.getByRole('link', { name: '导入原文' }).click()
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
+			await page.getByRole('link', { name: '新建工程' }).click()
 			await page.getByRole('button', { name: '选择原文', exact: true }).click()
 			await page.getByRole('button', { name: '选择文件夹' }).click()
-			await page.getByRole('button', { name: '导入', exact: true }).click()
+			await page.getByRole('button', { name: '下一步', exact: true }).click()
 			await expect(
-				page.getByRole('heading', { name: '核对导入' }),
+				page.locator('[aria-current="step"]', { hasText: '核对信息' }),
 			).toBeVisible()
+			await page
+				.getByRole('button', {
+					name: format === 'epub' ? '下一步' : '跳过核对',
+					exact: true,
+				})
+				.click()
 			const candidates = page.getByRole('group', {
 				name: '插图参考（最多 3 张）',
 			})
@@ -84,12 +92,7 @@ for (const format of ['epub', 'docx'] as const) {
 				path: `.workflow/evidence/m4-longform/a2-${format}-selection.png`,
 				animations: 'disabled',
 			})
-			await page
-				.getByRole('button', {
-					name: format === 'epub' ? '确认' : '跳过核对',
-					exact: true,
-				})
-				.click()
+			await page.getByRole('button', { name: '开始制作' }).click()
 			const projectDir = join(projects, '插图')
 			await expect
 				.poll(

@@ -1,0 +1,25 @@
+.tabs {
+	display: inline-flex;
+	gap: var(--space-1);
+	padding: var(--space-1);
+	border: 1px solid var(--white-60);
+	border-radius: var(--radius-lg);
+	background: var(--white-40);
+	box-shadow: var(--shadow-glass);
+}
+
+.tab {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-6);
+	padding: var(--space-2) var(--space-px-14);
+	border-radius: var(--radius-md);
+	color: var(--color-on-surface-variant);
+	transition: all var(--dur-fast) var(--ease-out);
+}
+
+.tab[aria-selected="true"] {
+	background: var(--white-90);
+	box-shadow: var(--shadow-chip);
+	color: var(--color-primary);
+}

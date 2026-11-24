@@ -12,17 +12,23 @@ import { PlayerPage } from './pages/player/PlayerPage'
 import { ProductionPage } from './pages/production/ProductionPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
 import { UsagePage } from './pages/usage/UsagePage'
+import { WelcomePage } from './pages/welcome/WelcomePage'
 import { WorkPage } from './pages/work/WorkPage'
 import { WorkProduction } from './pages/work/WorkProduction'
 import { productionRoutes } from './routes/production'
 import { AppShell } from './shell/AppShell'
 import '@fontsource/hanken-grotesk/400.css'
+import '@fontsource/hanken-grotesk/500.css'
+import '@fontsource/hanken-grotesk/600.css'
+import '@fontsource/manrope/400.css'
+import '@fontsource/manrope/600.css'
 import '@fontsource/manrope/700.css'
 import '@fontsource/noto-sans-sc/chinese-simplified-400.css'
 import '@fontsource/noto-sans-tc/chinese-traditional-400.css'
 import '@fontsource/noto-sans-jp/japanese-400.css'
 import './styles/tokens.css'
 import './styles/shell.css'
+import './styles/base.css'
 
 declare global {
 	interface Window {
@@ -38,6 +44,7 @@ if (root)
 				<Routes>
 					<Route path={productionRoutes.play} element={<PlayerPage />} />
 					<Route path="/package/:id/:version" element={<PlayerPage />} />
+					<Route path="/welcome" element={<WelcomePage />} />
 					<Route element={<AppShell />}>
 						<Route index element={<LibraryPage />} />
 						<Route path="import" element={<ImportPage />} />

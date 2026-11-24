@@ -23,7 +23,9 @@ test('M4 same-profile second instance exits and focuses the hidden original; dis
 	let independent: Awaited<ReturnType<typeof electron.launch>> | undefined
 	try {
 		const page = await first.firstWindow()
-		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 		const before = await page.evaluate(() => window.novelive.host.appState())
 		await first.evaluate(({ BrowserWindow }) =>
 			BrowserWindow.getAllWindows()[0].hide(),
@@ -65,7 +67,9 @@ test('M4 same-profile second instance exits and focuses the hidden original; dis
 			env,
 		})
 		const otherPage = await independent.firstWindow()
-		await expect(otherPage.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			otherPage.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 		expect(
 			await independent.evaluate(({ app }) => app.getPath('userData')),
 		).not.toBe(profile)

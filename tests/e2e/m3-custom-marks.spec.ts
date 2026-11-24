@@ -122,7 +122,9 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 		})
 		try {
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await page.evaluate(({ workId, chapterId }) => {
 				window.location.hash = `/work/${workId}/edit?chapterId=${chapterId}`
 			}, playerRef)
@@ -148,7 +150,7 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			const save = page.getByRole('button', { name: '保存当前句' })
 			await expect(save).toBeEnabled()
 			await save.click()
-			await expect(save).toBeDisabled()
+			await expect(save).toHaveCount(0)
 			await page.getByRole('button', { name: '快捷位置', exact: true }).click()
 			await page.getByRole('menuitem', { name: /^7 ·/ }).click()
 			await script.press('End')
@@ -158,7 +160,7 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			)
 			await expect(save).toBeEnabled()
 			await save.click()
-			await expect(save).toBeDisabled()
+			await expect(save).toHaveCount(0)
 			await page.getByRole('button', { name: '快捷位置', exact: true }).click()
 			await line.click()
 			await page.getByRole('button', { name: '从当前句预览' }).click()

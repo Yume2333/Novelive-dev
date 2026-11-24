@@ -25,6 +25,9 @@ export const themes = [
 	['system', msg('跟随系统')],
 ] as const
 
+export const formatLabel = (format: string) =>
+	formats.find(([name]) => name === format)?.[1] ?? format
+
 const formats = [
 	[
 		'openai-completions',

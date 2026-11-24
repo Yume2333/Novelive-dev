@@ -1,0 +1,589 @@
+/* Shared global classes ported from prototype/src/styles/base.css. */
+::selection {
+	background: var(--color-surface-variant);
+	color: var(--color-on-surface);
+}
+
+/* ---- 全局自定义滚动条（全项目禁止系统默认滚轮控件） ---- */
+*::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+	background: transparent;
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+	background: transparent;
+}
+*::-webkit-scrollbar-button {
+	display: none;
+	width: 0;
+	height: 0;
+}
+*::-webkit-scrollbar-thumb {
+	background-color: var(--scrollbar-thumb);
+	border: 2px solid transparent;
+	background-clip: content-box;
+	border-radius: var(--radius-full);
+}
+*::-webkit-scrollbar-thumb:hover {
+	background-color: var(--scrollbar-thumb-hover);
+}
+*::-webkit-scrollbar-thumb:active {
+	background-color: var(--scrollbar-thumb-active);
+}
+@supports not selector(::-webkit-scrollbar) {
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--scrollbar-thumb) transparent;
+	}
+}
+
+.nl-scroll-hidden {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+.nl-scroll-hidden::-webkit-scrollbar {
+	display: none;
+	width: 0;
+	height: 0;
+}
+
+.nl-scrollbar-track {
+	position: absolute;
+	width: 8px;
+	z-index: 6;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity var(--dur-base) var(--ease-out);
+	user-select: none;
+}
+.nl-scroll-host:hover > .nl-scrollbar-track,
+.nl-scroll-host:focus-within > .nl-scrollbar-track[data-active="true"],
+.nl-scrollbar-track[data-active="true"],
+.nl-scrollbar-track:hover {
+	opacity: 1;
+	pointer-events: auto;
+}
+.nl-scrollbar-thumb {
+	position: absolute;
+	top: 0;
+	right: 1px;
+	width: 4px;
+	border-radius: var(--radius-full);
+	background: var(--scrollbar-thumb);
+	cursor: pointer;
+	transition:
+		width var(--dur-fast) var(--ease-out),
+		background var(--dur-fast) var(--ease-out);
+}
+.nl-scrollbar-track:hover .nl-scrollbar-thumb,
+.nl-scrollbar-track[data-dragging="true"] .nl-scrollbar-thumb {
+	width: 5px;
+	background: var(--scrollbar-thumb-hover);
+}
+.nl-scrollbar-track[data-dragging="true"] .nl-scrollbar-thumb {
+	background: var(--scrollbar-thumb-active);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+	font-family: var(--font-display);
+	margin: 0;
+}
+p {
+	margin: 0;
+}
+button {
+	font: inherit;
+	cursor: pointer;
+	border: none;
+	background: none;
+	color: inherit;
+}
+input,
+select,
+textarea {
+	font: inherit;
+}
+pre,
+code,
+kbd,
+samp {
+	font-family: var(--font-mono);
+}
+
+/* ---- 无障碍焦点环 ---- */
+button:focus-visible,
+a:focus-visible,
+input[type="range"]:focus-visible,
+[tabindex]:focus-visible,
+.focusable:focus-visible {
+	outline: 2px solid var(--accent-border-35);
+	outline-offset: 2px;
+}
+
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus,
+.nl-input:focus {
+	outline: none;
+	background: var(--white-90);
+	box-shadow: var(--shadow-focus);
+}
+
+.nl-check-input:focus-visible + .nl-check-box {
+	outline: 2px solid var(--accent-border-35);
+	outline-offset: 2px;
+}
+
+.nl-input {
+	transition:
+		border-color var(--dur-fast) var(--ease-out),
+		box-shadow var(--dur-fast) var(--ease-out),
+		background var(--dur-fast) var(--ease-out);
+}
+
+/* ---- 质感工具类（来自样稿） ---- */
+.glass-panel {
+	background: var(--panel-70);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	border: 1px solid var(--glass-border);
+	box-shadow: var(--shadow-glass);
+}
+button.glass-panel {
+	transition:
+		background var(--dur-fast) var(--ease-in-out),
+		box-shadow var(--dur-fast) var(--ease-in-out);
+}
+button.glass-panel:hover:not(:disabled) {
+	background: var(--white-90);
+}
+button.glass-panel:active:not(:disabled) {
+	box-shadow: var(--shadow-inset);
+}
+
+/* ---- 按钮、导航、卡片与行交互 ---- */
+.nl-btn {
+	transition:
+		background var(--dur-fast) var(--ease-out),
+		color var(--dur-fast) var(--ease-out),
+		border-color var(--dur-fast) var(--ease-out),
+		box-shadow var(--dur-fast) var(--ease-out),
+		transform var(--dur-fast) var(--ease-out),
+		opacity var(--dur-fast) var(--ease-out),
+		filter var(--dur-fast) var(--ease-out);
+}
+.nl-btn:active:not(:disabled) {
+	transform: scale(0.985);
+}
+
+.nl-btn-primary:hover:not(:disabled) {
+	background: var(--color-primary-container);
+}
+.nl-btn-ghost:hover:not(:disabled) {
+	background: var(--white-60);
+	color: var(--color-on-surface);
+}
+.nl-btn-danger:hover:not(:disabled) {
+	filter: brightness(0.96);
+}
+:root[data-theme="dark"] .nl-btn-danger:hover:not(:disabled) {
+	filter: brightness(1.08);
+}
+
+.nl-icon-btn {
+	transition:
+		background var(--dur-fast) var(--ease-out),
+		color var(--dur-fast) var(--ease-out),
+		transform var(--dur-fast) var(--ease-out);
+}
+.nl-icon-btn:hover:not(:disabled) {
+	background: var(--white-70);
+	color: var(--color-on-surface);
+}
+.nl-icon-btn:active:not(:disabled) {
+	transform: scale(0.95);
+}
+
+.nl-nav-item {
+	transition:
+		background var(--dur-fast) var(--ease-out),
+		color var(--dur-fast) var(--ease-out),
+		box-shadow var(--dur-fast) var(--ease-out);
+}
+.nl-nav-item[data-active="false"]:hover {
+	background: var(--white-55);
+	color: var(--color-on-surface);
+}
+
+.nl-card-interactive {
+	cursor: pointer;
+	transition:
+		border-color var(--dur-fast) var(--ease-out),
+		box-shadow var(--dur-fast) var(--ease-out),
+		transform var(--dur-fast) var(--ease-out),
+		background var(--dur-fast) var(--ease-out);
+}
+.nl-card-interactive:hover {
+	border-color: var(--white-90);
+	box-shadow: var(--shadow-pop);
+}
+.nl-card-interactive:active {
+	transform: scale(0.995);
+}
+
+.nl-dropdown-item {
+	transition: background var(--dur-fast) var(--ease-out);
+}
+.nl-dropdown-item:hover {
+	background: var(--white-70);
+}
+
+.nl-img-thumb {
+	position: relative;
+	display: inline-flex;
+	flex-shrink: 0;
+}
+.nl-img-thumb-btn {
+	position: relative;
+	display: block;
+	padding: 0;
+	border-radius: var(--radius-md);
+	overflow: hidden;
+	border: 1px solid var(--white-80);
+	box-shadow: var(--shadow-glass);
+	transition:
+		box-shadow var(--dur-fast) var(--ease-out),
+		transform var(--dur-fast) var(--ease-out);
+}
+.nl-img-thumb:hover .nl-img-thumb-btn {
+	box-shadow: var(--shadow-raised);
+}
+.nl-img-thumb-mask {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--scrim);
+	color: var(--stage-text);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity var(--dur-fast) var(--ease-out);
+}
+.nl-img-thumb:hover .nl-img-thumb-mask,
+.nl-img-thumb:focus-within .nl-img-thumb-mask {
+	opacity: 1;
+}
+.nl-img-thumb-close {
+	position: absolute;
+	top: -6px;
+	right: -6px;
+	width: 18px;
+	height: 18px;
+	border-radius: var(--radius-full);
+	background: var(--veil-95);
+	color: var(--color-on-surface-variant);
+	border: 1px solid var(--divider);
+	box-shadow: var(--shadow-chip);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	opacity: 0;
+	transform: scale(0.85);
+	pointer-events: none;
+	transition:
+		opacity var(--dur-fast) var(--ease-out),
+		transform var(--dur-fast) var(--ease-out),
+		background var(--dur-fast) var(--ease-out),
+		color var(--dur-fast) var(--ease-out);
+}
+.nl-img-thumb:hover .nl-img-thumb-close,
+.nl-img-thumb:focus-within .nl-img-thumb-close {
+	opacity: 1;
+	transform: scale(1);
+	pointer-events: auto;
+}
+.nl-img-thumb-close:hover {
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+	border-color: var(--color-primary);
+}
+
+.soft-glow {
+	animation: soft-pulse var(--dur-pulse) infinite alternate;
+}
+@keyframes soft-pulse {
+	0% {
+		opacity: 0.7;
+		box-shadow: 0 0 3px var(--glow);
+	}
+	100% {
+		opacity: 1;
+		box-shadow: 0 0 8px var(--glow);
+	}
+}
+
+/* 列表行：次要操作平时隐藏，悬停或键盘聚焦到这一行时出现 */
+.hover-row .row-actions {
+	opacity: 0;
+	transition: opacity var(--dur-fast) var(--ease-in-out);
+}
+.hover-row:hover .row-actions,
+.hover-row:focus-within .row-actions {
+	opacity: 1;
+}
+.hover-row {
+	transition: background var(--dur-fast) var(--ease-in-out);
+}
+.hover-row:hover {
+	background: var(--white-50);
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+@keyframes fade-up {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* ---- 通用排版类 ---- */
+.label-caps {
+	font-family: var(--font-body);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	line-height: 1.2;
+}
+.label-caps-zh {
+	letter-spacing: 0.12em;
+} /* 中文标签收敛用 */
+
+.headline {
+	font-family: var(--font-display);
+	font-size: 24px;
+	font-weight: 600;
+	line-height: 1.3;
+}
+.display {
+	font-family: var(--font-display);
+	font-size: 36px;
+	font-weight: 700;
+	line-height: 1.2;
+	letter-spacing: -0.01em;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+/* 品牌标：亮/暗主题切换（墨页在暗色下翻为纸白） */
+.brand-mark-dark {
+	display: none;
+}
+:root[data-theme="dark"] .brand-mark-light {
+	display: none;
+}
+:root[data-theme="dark"] .brand-mark-dark {
+	display: block;
+}
+
+/* 书封悬浮微倾（配合作品卡 hover） */
+.cover-tilt {
+	transition: transform var(--dur-cover) var(--ease-in-out);
+}
+.glass-panel:hover .cover-tilt {
+	transform: translateY(-2px);
+}
+
+@keyframes skeleton-wave {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+@keyframes drawer-in {
+	from {
+		transform: translateX(24px);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}
+@keyframes fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+@keyframes fade-out {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+@keyframes fade-down-out {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+}
+@keyframes drawer-out {
+	from {
+		transform: translateX(0);
+		opacity: 1;
+	}
+	to {
+		transform: translateX(24px);
+		opacity: 0;
+	}
+}
+@keyframes scrim-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+@keyframes scrim-out {
+	from {
+		opacity: 1;
+	}
+	to {
+		opacity: 0;
+	}
+}
+
+.nl-collapse {
+	display: grid;
+	grid-template-rows: 0fr;
+	opacity: 0;
+	transition:
+		grid-template-rows var(--dur-base) var(--ease-out),
+		opacity var(--dur-base) var(--ease-out);
+}
+.nl-collapse[data-open="true"] {
+	grid-template-rows: 1fr;
+	opacity: 1;
+}
+.nl-collapse > div {
+	overflow: hidden;
+	min-height: 0;
+}
+
+.nl-chevron {
+	transition: transform var(--dur-base) var(--ease-out);
+}
+.nl-chevron[data-open="true"] {
+	transform: rotate(180deg);
+}
+
+@keyframes ink-shimmer {
+	0% {
+		background-position: 100% 0;
+	}
+	100% {
+		background-position: -100% 0;
+	}
+}
+.ink-shimmer {
+	background: linear-gradient(
+		90deg,
+		var(--color-on-surface-variant) 0%,
+		var(--color-on-surface-variant) 35%,
+		var(--color-primary) 50%,
+		var(--color-on-surface-variant) 65%,
+		var(--color-on-surface-variant) 100%
+	);
+	background-size: 220% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	animation: ink-shimmer var(--dur-breath) var(--ease-in-out) infinite;
+}
+
+@keyframes progress-sheen {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(250%);
+	}
+}
+.progress-sheen {
+	position: relative;
+	overflow: hidden;
+}
+.progress-sheen::after {
+	content: "";
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 45%;
+	background: linear-gradient(90deg, transparent, var(--white-45), transparent);
+	animation: progress-sheen var(--dur-sheen) var(--ease-in-out) infinite;
+}
+
+@keyframes caret-blink {
+	0%,
+	45% {
+		opacity: 1;
+	}
+	55%,
+	100% {
+		opacity: 0.15;
+	}
+}
+.typing-caret {
+	display: inline-block;
+	width: 2px;
+	height: 1em;
+	vertical-align: -0.15em;
+	margin-left: var(--space-px-2);
+	border-radius: var(--radius-full);
+	background: var(--color-primary);
+	animation: caret-blink var(--dur-blink) var(--ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0s !important;
+		scroll-behavior: auto !important;
+	}
+	.ink-shimmer {
+		background: none;
+		color: var(--color-on-surface-variant);
+	}
+}

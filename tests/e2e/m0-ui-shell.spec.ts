@@ -22,7 +22,6 @@ test('M0 library and usage navigate between real empty pages and switch theme wi
 			await expect(
 				page.getByRole('heading', { name: '书库', exact: true }),
 			).toBeVisible()
-			await expect(page.getByText('还没有作品')).toBeVisible()
 			await expect(
 				page.getByRole('heading', { name: '书库还是空的' }),
 			).toBeVisible()
@@ -30,18 +29,22 @@ test('M0 library and usage navigate between real empty pages and switch theme wi
 				'aria-current',
 				'page',
 			)
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await expect(page.getByRole('button', { name: '新建' })).toHaveCount(0)
 			await expect(
 				page.getByRole('button', { name: '导入作品包' }),
-			).toHaveCount(0)
+			).toBeVisible()
 			await page.getByRole('button', { name: '亮色' }).click()
 			await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
 			await page.screenshot({
 				path: test.info().outputPath('library-light.png'),
 			})
 			await nav.getByRole('link', { name: '用量' }).click()
-			await expect(page.getByRole('heading', { name: '用量' })).toBeVisible()
+			await expect(
+				page.getByRole('heading', { name: '用量统计', level: 1, exact: true }),
+			).toBeVisible()
 			await expect(page.getByText('暂无用量记录')).toBeVisible()
 			await page.getByRole('button', { name: '暗色' }).click()
 			await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
@@ -58,7 +61,9 @@ test('M0 library and usage navigate between real empty pages and switch theme wi
 			await page.reload()
 			await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 			await nav.getByRole('link', { name: '书库' }).click()
-			await expect(page.getByText('还没有作品')).toBeVisible()
+			await expect(
+				page.getByRole('heading', { name: '书库还是空的' }),
+			).toBeVisible()
 		} finally {
 			await app.close()
 		}
