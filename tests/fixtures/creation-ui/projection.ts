@@ -177,6 +177,7 @@ export async function installProjection(app: ElectronApplication) {
 						respond({ events: fixture.records, gap: false, snapshot: null })
 						break
 					case 'config.get':
+					case 'production.playerChapter':
 						port1.postMessage({
 							...base,
 							type: 'error',

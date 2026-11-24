@@ -328,6 +328,7 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 			page.getByText('已导入为新工程，可以在书库中编辑。'),
 		).toBeVisible()
 		await page.keyboard.press('Escape')
+		await page.getByRole('tab', { name: '我的工程' }).click()
 		await page
 			.getByRole('region', { name: '我的工程' })
 			.getByRole('link', { name: '黄昏' })

@@ -67,7 +67,10 @@ function ChapterRow({
 				<ChapterState chapter={chapter} />
 				<span className={styles.rowActions} data-expanded={showRecords}>
 					{status === 'published' && (
-						<Link className={styles.ghost} to={workRoute('play', workId)}>
+						<Link
+							className={styles.ghost}
+							to={`${workRoute('play', workId)}?chapter=${encodeURIComponent(chapterId)}`}
+						>
 							<Play aria-hidden="true" size={14} />
 							{t('游玩')}
 						</Link>

@@ -3,7 +3,7 @@ import type { WorkSettings } from '@novelive/format/model'
 import { type CompiledScene, compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type {
 	SentenceRef,
 	StageSnapshot,
@@ -34,6 +34,8 @@ export function PlayerPage({
 	legacySaves?: LegacySaveActions
 }) {
 	const { id, version } = useParams()
+	const [searchParams] = useSearchParams()
+	const requestedChapter = searchParams.get('chapter') ?? undefined
 	const progressId =
 		id && version ? installedProgressKey(id, Number(version)) : id
 	const progressApi = window.novelive.host.progress
@@ -217,8 +219,8 @@ export function PlayerPage({
 		[id, compare, progressApi, progressId, version],
 	)
 	useEffect(() => {
-		void loadProject()
-	}, [loadProject])
+		void loadProject(undefined, requestedChapter)
+	}, [loadProject, requestedChapter])
 	async function openProject() {
 		const directory = await window.novelive.pickFolder()
 		if (directory) await loadProject(directory)

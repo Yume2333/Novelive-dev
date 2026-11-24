@@ -7,7 +7,7 @@ import { Select } from '../settings/ModelFields'
 import { readableError } from '../settings/SettingsPage'
 import styles from './WelcomePage.module.css'
 
-const t = scoped('settings')
+const t = scoped('welcome')
 const slots = [
 	['fast', msg('快速模型')],
 	['main', msg('主模型')],
@@ -50,10 +50,6 @@ export function WelcomeModels({
 	useEffect(() => () => operation.current?.abort(), [])
 
 	function patch(): ConfigUpdate {
-		const sharedChanged =
-			format !== models.fast.format ||
-			baseUrl.trim() !== models.fast.baseUrl ||
-			apiKey !== models.fast.apiKeyMasked
 		return {
 			models: {
 				fast: {
@@ -68,7 +64,6 @@ export function WelcomeModels({
 						slot,
 						{
 							model: names[slot].trim(),
-							...(sharedChanged ? { inheritFast: true } : {}),
 						},
 					]),
 				),

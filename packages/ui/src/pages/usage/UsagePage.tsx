@@ -196,18 +196,31 @@ export function UsagePage() {
 	const sum = totals(shown)
 	const shownSet = new Set(shown)
 	const byPeriod = new Map<string, UsageRecord[]>()
+	const byWork = new Map<
+		string,
+		{ records: UsageRecord[]; phases: Map<string, UsageRecord[]> }
+	>()
 	for (const record of shown) {
 		const period = periodOf(record.at)
 		const rows = byPeriod.get(period)
 		if (rows) rows.push(record)
 		else byPeriod.set(period, [record])
+		let work = byWork.get(record.link.workId)
+		if (!work) {
+			work = { records: [], phases: new Map() }
+			byWork.set(record.link.workId, work)
+		}
+		work.records.push(record)
+		const phaseRows = work.phases.get(record.phase)
+		if (phaseRows) phaseRows.push(record)
+		else work.phases.set(record.phase, [record])
 	}
 	const perDay = [...byPeriod]
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([day, rows]) => ({ day, ...totals(rows) }))
 	const labelEvery = Math.ceil(perDay.length / 16)
 	const maxDay = Math.max(1, ...perDay.map(({ calls }) => calls))
-	const works = [...new Set(shown.map((r) => r.link.workId))].sort()
+	const works = [...byWork].sort(([a], [b]) => a.localeCompare(b))
 	const phaseOrder = Object.keys(phaseName)
 	const phases = [...new Set(shown.map((r) => r.phase))].sort(
 		(a, b) => phaseOrder.indexOf(a) - phaseOrder.indexOf(b),
@@ -403,22 +416,15 @@ export function UsagePage() {
 											</tr>
 										</thead>
 										<tbody>
-											{works.map((work) => {
-												const row = totals(
-													shown.filter((r) => r.link.workId === work),
-												)
+											{works.map(([work, bucket]) => {
+												const row = totals(bucket.records)
 												return (
 													<tr key={work} className="hover-row">
 														<td>{titleOf(work)}</td>
 														{phases.map((p) => {
-															const cell = totals(
-																shown.filter(
-																	(r) =>
-																		r.link.workId === work && r.phase === p,
-																),
-															)
+															const cell = totals(bucket.phases.get(p) ?? [])
 															return (
-																<td key={p}>
+																<td key={p} data-label={phaseLabel(p)}>
 																	{cell.calls ? (
 																		t('{{calls}} 次', { calls: cell.calls }) +
 																		(cell.images
@@ -432,7 +438,7 @@ export function UsagePage() {
 																</td>
 															)
 														})}
-														<td>
+														<td data-label={t('参考金额')}>
 															{row.cost === null ? (
 																<span className={styles.none}>
 																	{t('没有单价')}

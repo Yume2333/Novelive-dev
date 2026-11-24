@@ -11,3 +11,5 @@ Prototype `prototype/src` (port 5181) against production `pnpm dev` (port 5173) 
 | Welcome | `/welcome` outside the shell: language, create/play, real model cards; saved theme and language apply on direct launch | — |
 
 These captures predate the integration-branch fix that makes `.page .title` 32px as in the prototype (here it renders 36px), and the Settings section-gap and Welcome input fixes made there.
+
+Integration also reflows work × phase values into labeled per-work rows below 1200px so a full eight-phase record remains readable rather than wrapping table headings and currency into vertical characters. The desktop table stays unchanged. The existing creator recorders do not persist provider prices, so current real calls normally return `costUsd: null`; synthetic priced fixtures verify the optional read contract only, and production truthfully shows 没有单价 rather than estimating or inventing a price.

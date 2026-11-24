@@ -323,6 +323,7 @@ test('M5 share surfaces review export, approve updates and import as a project i
 			})
 			await preview.getByRole('button', { name: '关闭' }).click()
 
+			await page.getByRole('tab', { name: '我的工程' }).click()
 			await page.getByRole('link', { name: title }).click()
 			await page.getByRole('button', { name: '更多', exact: true }).click()
 			await page.getByRole('menuitem', { name: '导出作品包' }).click()

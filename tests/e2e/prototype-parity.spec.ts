@@ -21,12 +21,26 @@ test('prototype welcome saves the shared model form with reachable completion', 
 				BrowserWindow.getAllWindows()[0]?.setContentSize(1000, 700)
 			})
 			const page = await app.firstWindow()
-			await page.evaluate(() => {
+			await page.evaluate(async () => {
+				await window.novelive.call('config.update', {
+					models: {
+						main: {
+							inheritFast: false,
+							format: 'anthropic-messages',
+							baseUrl: 'https://independent.invalid',
+							model: 'independent-main',
+							apiKey: 'offline-fixture-key',
+						},
+					},
+				}).promise
 				location.hash = '/welcome'
 			})
 			await page.getByRole('button', { name: '继续', exact: true }).click()
 			await page.getByRole('button', { name: '继续', exact: true }).click()
 			await page.getByLabel('快速模型', { exact: true }).fill('offline-model')
+			await page
+				.getByLabel('接口地址', { exact: true })
+				.fill('https://shared.invalid')
 			const finish = page.getByRole('button', { name: '完成，进入书库' })
 			await finish.scrollIntoViewIfNeeded()
 			await expect(finish).toBeInViewport()
@@ -40,6 +54,18 @@ test('prototype welcome saves the shared model form with reachable completion', 
 					return 'models' in config ? config.models.fast.model : undefined
 				}),
 			).toBe('offline-model')
+			expect(
+				await page.evaluate(async () => {
+					const config = await window.novelive.call('config.get', {}).promise
+					return 'models' in config ? config.models.main : undefined
+				}),
+			).toMatchObject({
+				inheritFast: false,
+				format: 'anthropic-messages',
+				baseUrl: 'https://independent.invalid',
+				model: 'independent-main',
+				apiKeyMasked: '••••',
+			})
 		} finally {
 			await app.close()
 		}

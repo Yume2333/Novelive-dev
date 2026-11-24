@@ -186,6 +186,17 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			await expect(
 				page.getByRole('region', { name: '制作状态' }),
 			).toContainText('已发布 2 / 2 章')
+			await failed.hover()
+			await failed.getByRole('link', { name: '游玩', exact: true }).click()
+			await expect(page).toHaveURL(
+				new RegExp(`/work/${workId}/play\\?chapter=two$`),
+			)
+			await expect
+				.poll(() => fixture.calls('production.playerChapter'))
+				.toContainEqual({
+					workId,
+					chapterId: 'two',
+				})
 		} finally {
 			await app.close()
 		}
