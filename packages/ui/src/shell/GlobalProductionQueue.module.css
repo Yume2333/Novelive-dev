@@ -1,9 +1,9 @@
 .status {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: var(--space-px-10);
 	width: 100%;
-	padding: 10px var(--space-3);
+	padding: var(--space-px-10) var(--space-3);
 	border-radius: var(--radius-lg);
 	color: var(--color-on-surface);
 	text-align: left;
@@ -48,7 +48,7 @@
 	justify-content: center;
 	min-width: 18px;
 	height: 18px;
-	padding: 0 5px;
+	padding: 0 var(--space-px-5);
 	border-radius: var(--radius-sm);
 	background: var(--color-error-container);
 	color: var(--color-on-error-container);

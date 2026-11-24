@@ -19,7 +19,7 @@
 }
 
 .eyebrow {
-	margin-bottom: 10px;
+	margin-bottom: var(--space-px-10);
 	color: var(--color-outline);
 }
 
@@ -96,7 +96,7 @@
 .emptyActions {
 	display: flex;
 	gap: var(--space-3);
-	margin-top: 20px;
+	margin-top: var(--space-px-20);
 }
 
 .icon {

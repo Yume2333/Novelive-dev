@@ -58,9 +58,9 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 12px;
-	margin: 12% 14% 12% calc(14% + 8px);
-	padding: 12px;
+	gap: var(--space-3);
+	margin: 12% 14% 12% calc(14% + var(--space-2));
+	padding: var(--space-3);
 	border: 1px solid var(--cover-frame);
 	border-radius: 3px;
 }
@@ -89,6 +89,6 @@
 
 .compact .frame {
 	gap: 0;
-	margin: 10% 10% 10% calc(10% + 5px);
-	padding: 6px;
+	margin: 10% 10% 10% calc(10% + var(--space-px-5));
+	padding: var(--space-px-6);
 }

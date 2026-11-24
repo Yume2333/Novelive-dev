@@ -1,8 +1,10 @@
 {
 	"Agent（Ctrl/⌘+J）": "エージェント（Ctrl/⌘+J）",
+	"v{{version}} · 已发布 {{published}} / {{chapters}} 章": "v{{version}} · 公開済み {{published}} / {{chapters}} 章",
 	"{{count}} 部作品在排队": "{{count}} 作品がキュー待ち",
 	"{{count}} 部作品等你确认": "{{count}} 作品が確認待ち",
 	"{{series}} · 第 {{index}} 卷": "{{series}} · 第 {{index}} 巻",
+	"{{title}} · v{{version}}": "{{title}} · v{{version}}",
 	"主题": "テーマ",
 	"书库": "ライブラリ",
 	"亮色": "ライト",

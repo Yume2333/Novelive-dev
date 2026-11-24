@@ -316,6 +316,31 @@ function ImageCard({
 	)
 }
 
+/** Model cards shared by settings and the welcome flow. */
+export function ModelCards({
+	models,
+	update,
+}: {
+	models: MaskedConfig['models']
+	update: SettingsHost['updateConfig']
+}) {
+	return (
+		<div className={`${styles.page} ${styles.cards}`}>
+			{textSlots.map(([slot, title, icon]) => (
+				<TextCard
+					key={slot}
+					slot={slot}
+					title={t(title)}
+					icon={icon}
+					models={models}
+					update={update}
+				/>
+			))}
+			<ImageCard model={models.image} update={update} />
+		</div>
+	)
+}
+
 function SettingRow({
 	title,
 	icon,
@@ -387,19 +412,7 @@ export function SettingsPage() {
 							<h2 id="model-settings" className="label-caps label-caps-zh">
 								{t('模型')}
 							</h2>
-							<div className={styles.cards}>
-								{textSlots.map(([slot, title, icon]) => (
-									<TextCard
-										key={slot}
-										slot={slot}
-										title={t(title)}
-										icon={icon}
-										models={config.models}
-										update={updateConfig}
-									/>
-								))}
-								<ImageCard model={config.models.image} update={updateConfig} />
-							</div>
+							<ModelCards models={config.models} update={updateConfig} />
 							<ProductionSettings
 								config={config.production}
 								update={updateConfig}
