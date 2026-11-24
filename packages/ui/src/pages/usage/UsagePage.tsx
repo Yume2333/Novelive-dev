@@ -97,7 +97,8 @@ export function UsagePage() {
 				({ works }) => {
 					if (!active) return
 					const count = new Map<string, number>()
-					for (const w of works) count.set(w.title, (count.get(w.title) ?? 0) + 1)
+					for (const w of works)
+						count.set(w.title, (count.get(w.title) ?? 0) + 1)
 					setTitles(
 						new Map(
 							works.map((w) => {

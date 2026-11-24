@@ -267,7 +267,13 @@ export function LibraryPage() {
 									})}
 								</p>
 							)}
-							{library.works.length === 0 ? (
+							{!loaded ? (
+								error ? (
+									<p role="alert">{t('无法读取书库')}</p>
+								) : (
+									<p role="status">{t('正在读取书库')}</p>
+								)
+							) : library.works.length === 0 ? (
 								<EmptyState icon={NotebookPen} text={t('还没有作品')} card />
 							) : (
 								groupWorks(library.works as LibraryWork[]).map((group) => (
