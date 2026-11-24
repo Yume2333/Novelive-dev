@@ -42,7 +42,7 @@ export async function artJson<T>(
 	connection: TextConnection,
 	prompt: string,
 	schema: Schema<T>,
-	options: ModelOptions,
+	options: ModelOptions & { maxTokens?: number },
 	images: readonly Buffer[] = [],
 	formatRepair: 'once' | 'caller' = 'once',
 ): Promise<T> {
@@ -221,7 +221,7 @@ async function requestArtJson<T>(
 	connection: TextConnection,
 	prompt: string,
 	schema: Schema<T>,
-	options: ModelOptions,
+	options: ModelOptions & { maxTokens?: number },
 	images: readonly Buffer[],
 ): Promise<T> {
 	const model = buildTextModel(connection, images.length > 0)
@@ -246,6 +246,9 @@ async function requestArtJson<T>(
 			apiKey: connection.apiKey,
 			signal: options.signal,
 			cacheRetention: 'none',
+			...(options.maxTokens === undefined
+				? {}
+				: { maxTokens: options.maxTokens, outputLimit: options.maxTokens }),
 		},
 	).result()
 	options.signal?.throwIfAborted()

@@ -258,6 +258,49 @@ test('soft cutoff stops new requests at settled plus unresolved usage across gua
 	expect(send).toHaveBeenCalledTimes(4)
 })
 
+test('concurrent dispatch stops before the next reservation would cross the soft cutoff', async () => {
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	vi.stubEnv('NL_RUN_TOKEN_SOFT_FRACTION', '0.8')
+	vi.stubEnv('NL_RUN_OUTPUT_OVERSHOOT_FACTORS', '{}')
+	const request = () =>
+		new Request('https://example.invalid/v1/chat/completions', {
+			method: 'POST',
+			body: JSON.stringify({
+				model: 'devin-swe-2',
+				max_tokens: 48000,
+				messages: [{ role: 'user', content: 'Rewrite a short image brief.' }],
+			}),
+		})
+	using database = new DatabaseSync(':memory:')
+	await projectSpend(database)(request(), async () =>
+		Response.json({ usage: { total_tokens: 1083614 } }),
+	)
+	const send = vi.fn(async () => new Response(null, { status: 500 }))
+	const outcomes = await Promise.allSettled(
+		Array.from({ length: 3 }, () => projectSpend(database)(request(), send)),
+	)
+	expect(send).toHaveBeenCalledTimes(2)
+	expect(outcomes.filter(({ status }) => status === 'rejected')).toEqual([
+		{
+			status: 'rejected',
+			reason: expect.objectContaining({
+				message: expect.stringContaining('软停止线 1600000 tokens'),
+			}),
+		},
+	])
+	expect(
+		database
+			.prepare(
+				'SELECT COUNT(*) AS rows, SUM(COALESCE(actual_tokens, tokens)) AS exposure FROM spend_reservation',
+			)
+			.get(),
+	).toEqual({
+		rows: 3,
+		exposure: 1083614 + 2 * (await quoteSpend(request())).tokens,
+	})
+})
+
 test('Responses recording logs the full SQLite reservation before dispatch', async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'novelive-spend-'))
 	try {
@@ -528,7 +571,7 @@ test.each(['response.completed', 'response.incomplete'])(
 	'quotes Responses requests and settles from terminal %s usage without a DONE marker',
 	async (type) => {
 		vi.stubEnv('NL_REPLAY', '')
-		vi.stubEnv('NL_RUN_TOKEN_CAP', '2000')
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '2500')
 		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
 		using database = new DatabaseSync(':memory:')
 		const send = vi
