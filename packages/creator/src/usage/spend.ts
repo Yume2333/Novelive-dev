@@ -320,19 +320,31 @@ function includeLegacyReservations(
 			.get()
 	)
 		return false
+	database.exec(
+		'CREATE TABLE IF NOT EXISTS spend_window (run_id TEXT PRIMARY KEY, include_legacy INTEGER NOT NULL) STRICT',
+	)
+	const selection = database.prepare(
+		'SELECT include_legacy FROM spend_window WHERE run_id = ?',
+	)
+	const previous = selection.get(runId)
+	if (previous) return previous.include_legacy === 1
 	let usage: string
 	try {
 		usage = readFileSync(csv, 'utf8').trim()
 	} catch (error) {
-		if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
-			return false
-		throw error
+		if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
+			throw error
+		usage = ''
 	}
 	// Legacy CSV quotes have no reservation ID; don't assign ownership by matching amounts.
-	return usage.split(/\r?\n/).some((line) => {
+	const includeLegacy = usage.split(/\r?\n/).some((line) => {
 		const [tokens, images] = line.split(',').slice(3, 5)
 		return Number(tokens) > 0 || Number(images) > 0
 	})
+	database
+		.prepare('INSERT INTO spend_window VALUES (?, ?) ON CONFLICT DO NOTHING')
+		.run(runId, Number(includeLegacy))
+	return selection.get(runId)?.include_legacy === 1
 }
 
 function spendRunId() {
