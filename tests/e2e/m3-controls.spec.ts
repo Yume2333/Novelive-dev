@@ -291,9 +291,40 @@ test.describe('M3 player controls', () => {
 				page.getByLabel('自动播放', { exact: true }),
 			).not.toBeChecked()
 			await expect(page.getByLabel('跳过已读')).not.toBeChecked()
+			const savePages = page.getByRole('navigation', { name: '存档分页' })
+			await page.getByRole('button', { name: '存档', exact: true }).click()
+			await savePages.getByRole('button', { name: '2', exact: true }).click()
+			await page
+				.getByRole('button', { name: '存档槽位 7', exact: true })
+				.click()
+			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await menu()
 			await page.getByRole('button', { name: '读档', exact: true }).click()
 			await expect(
 				page.getByRole('button', { name: '返回菜单', exact: true }),
+			).toBeFocused()
+			const secondPage = savePages.getByRole('button', {
+				name: '2',
+				exact: true,
+			})
+			for (let step = 0; step < 6; step++) {
+				if (
+					await secondPage.evaluate((node) => node === document.activeElement)
+				)
+					break
+				await page.keyboard.press('Tab')
+			}
+			await expect(secondPage).toBeFocused()
+			await page.keyboard.press('Enter')
+			await expect(secondPage).toHaveAttribute('aria-current', 'page')
+			await expect(
+				page.getByRole('button', { name: '读档槽位 7', exact: true }),
+			).toBeEnabled()
+			await page.keyboard.press('Shift+Tab')
+			await page.keyboard.press('Shift+Tab')
+			await page.keyboard.press('Shift+Tab')
+			await expect(
+				page.getByRole('button', { name: '读档槽位 7', exact: true }),
 			).toBeFocused()
 			await menu()
 			await menu()
@@ -316,7 +347,7 @@ test.describe('M3 player controls', () => {
 				'naturalHeight',
 				270,
 			)
-			await expect(page.locator('time')).toBeVisible()
+			await expect(page.locator('time').first()).toBeVisible()
 			await mkdir('.workflow/evidence/m3-playback', { recursive: true })
 			await page.screenshot({
 				path: '.workflow/evidence/m3-playback/05-controls-saves.png',
