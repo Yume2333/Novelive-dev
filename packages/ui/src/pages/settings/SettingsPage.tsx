@@ -53,7 +53,7 @@ const capabilities = [
 type ImageTests = CommandOutput<'model.testImage'>
 type TestResult = ImageTests | CommandOutput<'model.testText'>
 
-function readableError(error: unknown): CommandError {
+export function readableError(error: unknown): CommandError {
 	const failure =
 		error && typeof error === 'object' && 'code' in error
 			? (error as CommandError)

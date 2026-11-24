@@ -8,7 +8,7 @@ const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
 )
 
-test('prototype welcome keeps expanded model forms and completion reachable', async () => {
+test('prototype welcome saves the shared model form with reachable completion', async () => {
 	const profile = await mkdtemp(join(tmpdir(), 'novelive-welcome-scroll-'))
 	try {
 		const app = await electron.launch({
@@ -26,14 +26,7 @@ test('prototype welcome keeps expanded model forms and completion reachable', as
 			})
 			await page.getByRole('button', { name: '继续', exact: true }).click()
 			await page.getByRole('button', { name: '继续', exact: true }).click()
-			const fast = page.getByRole('region', { name: '快速模型', exact: true })
-			await fast.getByRole('button', { name: '快速模型', exact: true }).click()
-			await fast.getByLabel('模型名', { exact: true }).fill('offline-model')
-			const save = fast.getByRole('button', { name: '保存', exact: true })
-			await save.scrollIntoViewIfNeeded()
-			await expect(save).toBeInViewport()
-			await save.click()
-			await expect(fast.getByRole('status')).toHaveText('已保存')
+			await page.getByLabel('快速模型', { exact: true }).fill('offline-model')
 			const finish = page.getByRole('button', { name: '完成，进入书库' })
 			await finish.scrollIntoViewIfNeeded()
 			await expect(finish).toBeInViewport()
@@ -41,6 +34,12 @@ test('prototype welcome keeps expanded model forms and completion reachable', as
 			await expect(
 				page.getByRole('heading', { name: '书库', exact: true }),
 			).toBeVisible()
+			expect(
+				await page.evaluate(async () => {
+					const config = await window.novelive.call('config.get', {}).promise
+					return 'models' in config ? config.models.fast.model : undefined
+				}),
+			).toBe('offline-model')
 		} finally {
 			await app.close()
 		}

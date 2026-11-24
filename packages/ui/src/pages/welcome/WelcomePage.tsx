@@ -9,7 +9,7 @@ import { localeNames, locales, scoped, setLocale } from '../../i18n'
 import { useAppearance } from '../../shell/appearance'
 import markLight from '../../shell/brand/novelive-mark.svg'
 import markDark from '../../shell/brand/novelive-mark-dark.svg'
-import { ModelCards } from '../settings/SettingsPage'
+import { WelcomeModels } from './WelcomeModels'
 import styles from './WelcomePage.module.css'
 
 const t = scoped('welcome')
@@ -182,7 +182,11 @@ export function WelcomePage() {
 							</p>
 						)}
 						{config && 'models' in config ? (
-							<ModelCards models={config.models} update={update} />
+							<WelcomeModels
+								models={config.models}
+								update={update}
+								onDone={finish}
+							/>
 						) : (
 							<p role="status" className={styles.muted}>
 								{t('正在读取设置…')}
@@ -196,7 +200,12 @@ export function WelcomePage() {
 								<Button variant="ghost" onClick={() => navigate('/')}>
 									{t('跳过')}
 								</Button>
-								<Button variant="primary" onClick={finish}>
+								<Button
+									variant="primary"
+									type="submit"
+									form="welcome-model-config"
+									disabled={!config || !('models' in config)}
+								>
 									{t('完成，进入书库')}
 								</Button>
 							</div>

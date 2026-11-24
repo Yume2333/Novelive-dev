@@ -2,6 +2,59 @@
 	height: 100%;
 }
 
+.modelForm {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-5);
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.modelGrid,
+.imageModels {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-3);
+}
+
+.imageModels {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	border-top: 1px solid var(--divider);
+	padding-top: var(--space-4);
+}
+
+.modelField {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.modelField > span {
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--color-on-surface-variant);
+}
+
+.modelField input,
+.modelField select {
+	width: 100%;
+	min-width: 0;
+}
+
+.modelTest,
+.modelTest > span {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.modelTest > span {
+	color: var(--color-success);
+}
+
 .page {
 	display: flex;
 	min-height: 100vh;
