@@ -8,7 +8,8 @@ export async function retryOwnerBookUnavailable(
 	model: string,
 	signal: AbortSignal,
 	send: (canRetry: boolean) => Promise<Response>,
-	pause = (ms: number) => setTimeout(ms, undefined, { signal }),
+	pause: (ms: number) => Promise<void> = (ms) =>
+		setTimeout(ms, undefined, { signal }),
 ) {
 	for (const ms of model === 'devin-swe-2' ? [5_000, 15_000] : []) {
 		const response = await send(true)
