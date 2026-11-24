@@ -11,7 +11,7 @@
 
 **付费调用：** 仅由协调者明确指定的 W4 会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，每次按共享 CSV 格式追加 `M1a W4` 用量行，与并行的 M1b 分开记录。其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向指定的 W4 会话请求录制。凭据、共享账本路径和私有录制不提交。
 **Base commit:** ea99733e566c72be5873d6507a07de37ef7b40ba
-**Status:** paused
+**Status:** blocked
 
 - [ ] W4 待[所有者决定](../../owner-review.md)：《野叟曝言》首卷最佳 **0.89461**，未达 **0.90**。暂停 W4 付费运行，等待所有者从评审列出的方案中选择；决定前不更改参照、评分器或门槛。严格门槛测试保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。[M1b/11](../m1b-production/11-m1b-owner-book.md) 独立验收和记账，不以本项为前置，也不能替代本项验收。
 
@@ -33,6 +33,10 @@
 - Check after: `6f47b58` 上运行 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → `Tests  1 failed (1)`，两次都停在第二包。分块比较、已确认设定保全与完成后重启零调用未验证；未生成严格回放 fixture。
 - 从维基文库 EPUB 重建同一目录版本的公版《野叟曝言》TXT。首卷 7 回正文逐段与网页一致，但新 TXT 的 SHA-256 不等同于旧收据。实际导入 20 卷／154 回；用量与断点见下文。
 - 最佳运行得分 **0.89461**（25 匹配、24 多报），新进程重开结果一致，已确认条目保留，模型请求 0 次。未过 **0.90**，未发布 `evidence/m1a/owner/chunked-run.json`。试验结果及下一步选项见[所有者评审](../../owner-review.md)；决定前不再发起付费运行。
+
+## Blocked
+
+原计划在固定整卷共识上调优分块结果并通过 **0.90**；已测试的方案最高为 **0.89461**。固定参照没有时间线共识，最佳结果的 7 条时间线都计为多报。等待所有者从[评审选项](../../owner-review.md)中作出决定；决定前不恢复付费，参照、评分器和门槛不变。
 
 ## 历史试跑
 
