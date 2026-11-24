@@ -5,13 +5,13 @@ import {
 	FileText,
 	Image,
 	type LucideIcon,
-	MessageSquareText,
+	Wallet,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Card, SectionLabel } from '../../components/Card'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { EmptyState, Page } from '../../components/Page'
-import { scoped } from '../../i18n'
+import { msg, scoped } from '../../i18n'
 import { Select } from '../settings/ModelFields'
 import styles from './UsagePage.module.css'
 
@@ -25,27 +25,63 @@ const dayOf = (at: number) => new Date(at).toLocaleDateString('sv')
 
 type Granularity = 'day' | 'month'
 
+const phaseName: Record<string, string> = {
+	import: msg('导入'),
+	preview: msg('预览'),
+	synthesize: msg('综合'),
+	chat: msg('对话'),
+	write: msg('写剧本'),
+	review: msg('审稿'),
+	stage: msg('演出'),
+	draw: msg('出图'),
+}
+const phaseLabel = (phase: string) =>
+	phaseName[phase] ? t(phaseName[phase]) : phase
+
+const money = (usd: number) =>
+	usd.toLocaleString(undefined, {
+		style: 'currency',
+		currency: 'USD',
+		maximumFractionDigits: usd > 0 && usd < 1 ? 4 : 2,
+	})
+
 function totals(records: UsageRecord[]) {
 	let input = 0
 	let output = 0
 	let images = 0
-	for (const record of records)
+	let cost = 0
+	let priced = 0
+	for (const record of records) {
 		if (record.kind === 'image') images += record.imageCount
 		else {
 			input += record.inputTokens
 			output += record.outputTokens
 		}
-	return { calls: records.length, input, output, images }
+		if (record.costUsd !== null) {
+			cost += record.costUsd
+			priced++
+		}
+	}
+	return {
+		calls: records.length,
+		input,
+		output,
+		images,
+		cost: priced ? cost : null,
+		unpriced: records.length - priced,
+	}
 }
 
 function Stat({
 	icon: Icon,
 	label,
 	value,
+	hint,
 }: {
 	icon: LucideIcon
 	label: string
-	value: number
+	value: string
+	hint?: string
 }) {
 	return (
 		<Card className={styles.stat}>
@@ -53,7 +89,8 @@ function Stat({
 				<Icon size={15} aria-hidden="true" />
 				<span className="label-caps label-caps-zh">{label}</span>
 			</span>
-			<strong className={styles.statValue}>{value.toLocaleString()}</strong>
+			<div className={styles.statValue}>{value}</div>
+			{hint && <div className={styles.statHint}>{hint}</div>}
 		</Card>
 	)
 }
@@ -223,7 +260,7 @@ export function UsagePage() {
 							/>
 							<Select<string>
 								label={t('阶段')}
-								options={options((r) => r.phase, t('全部阶段'))}
+								options={options((r) => r.phase, t('全部阶段'), phaseLabel)}
 								value={phase}
 								onChange={setPhase}
 							/>
@@ -253,7 +290,7 @@ export function UsagePage() {
 							<InfoTooltip
 								label={t('用量说明')}
 								text={t(
-									'仅供参考，统计已发生的调用；不估算费用，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
+									'文本按 tokens，图片按张数；参考金额只计入有单价的调用，仅供参考，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
 								)}
 							/>
 						</div>
@@ -270,19 +307,34 @@ export function UsagePage() {
 									<Stat
 										icon={ArrowUpRight}
 										label={t('调用次数')}
-										value={sum.calls}
-									/>
-									<Stat
-										icon={MessageSquareText}
-										label={t('文本输入 tokens')}
-										value={sum.input}
+										value={sum.calls.toLocaleString()}
 									/>
 									<Stat
 										icon={FileText}
-										label={t('文本输出 tokens')}
-										value={sum.output}
+										label={t('文本 tokens')}
+										value={(sum.input + sum.output).toLocaleString()}
+										hint={t('输入 {{input}} / 输出 {{output}}', {
+											input: sum.input.toLocaleString(),
+											output: sum.output.toLocaleString(),
+										})}
 									/>
-									<Stat icon={Image} label={t('图片数量')} value={sum.images} />
+									<Stat
+										icon={Image}
+										label={t('图片')}
+										value={t('{{images}} 张', {
+											images: sum.images.toLocaleString(),
+										})}
+									/>
+									<Stat
+										icon={Wallet}
+										label={t('参考金额')}
+										value={sum.cost === null ? t('没有单价') : money(sum.cost)}
+										hint={
+											sum.cost !== null && sum.unpriced
+												? t('部分调用拿不到单价，未计入')
+												: undefined
+										}
+									/>
 								</div>
 								<Card className={styles.panel}>
 									<SectionLabel>
@@ -298,11 +350,11 @@ export function UsagePage() {
 										}
 									>
 										{perDay.map(
-											({ day, calls, input, output, images }, index) => (
+											({ day, calls, input, output, images, cost }, index) => (
 												<div
 													key={day}
 													className={styles.bar}
-													title={t(
+													title={`${t(
 														'{{day}}：{{calls}} 次 · 输入 {{input}} / 输出 {{output}} · {{images}} 张图片',
 														{
 															day,
@@ -311,7 +363,7 @@ export function UsagePage() {
 															output,
 															images,
 														},
-													)}
+													)} · ${cost === null ? t('暂无单价') : t('参考 {{cost}}', { cost: money(cost) })}`}
 												>
 													<span>{labelEvery > 1 ? '' : calls}</span>
 													<span className={styles.barTrack}>
@@ -342,37 +394,53 @@ export function UsagePage() {
 											<tr>
 												<th>{t('作品')}</th>
 												{phases.map((p) => (
-													<th key={p}>{p}</th>
+													<th key={p}>{phaseLabel(p)}</th>
 												))}
+												<th>{t('参考金额')}</th>
 											</tr>
 										</thead>
 										<tbody>
-											{works.map((work) => (
-												<tr key={work} className="hover-row">
-													<td>{titleOf(work)}</td>
-													{phases.map((p) => {
-														const cell = totals(
-															shown.filter(
-																(r) => r.link.workId === work && r.phase === p,
-															),
-														)
-														return (
-															<td key={p}>
-																{cell.calls ? (
-																	t('{{calls}} 次', { calls: cell.calls }) +
-																	(cell.images
-																		? t(' · {{images}} 张', {
-																				images: cell.images,
-																			})
-																		: '')
-																) : (
-																	<span className={styles.none}>—</span>
-																)}
-															</td>
-														)
-													})}
-												</tr>
-											))}
+											{works.map((work) => {
+												const row = totals(
+													shown.filter((r) => r.link.workId === work),
+												)
+												return (
+													<tr key={work} className="hover-row">
+														<td>{titleOf(work)}</td>
+														{phases.map((p) => {
+															const cell = totals(
+																shown.filter(
+																	(r) =>
+																		r.link.workId === work && r.phase === p,
+																),
+															)
+															return (
+																<td key={p}>
+																	{cell.calls ? (
+																		t('{{calls}} 次', { calls: cell.calls }) +
+																		(cell.images
+																			? t(' · {{images}} 张', {
+																					images: cell.images,
+																				})
+																			: '')
+																	) : (
+																		<span className={styles.none}>—</span>
+																	)}
+																</td>
+															)
+														})}
+														<td>
+															{row.cost === null ? (
+																<span className={styles.none}>
+																	{t('没有单价')}
+																</span>
+															) : (
+																money(row.cost)
+															)}
+														</td>
+													</tr>
+												)
+											})}
 										</tbody>
 									</table>
 								</Card>
@@ -390,7 +458,7 @@ export function UsagePage() {
 													<strong>{record.model}</strong>
 													<span>
 														{titleOf(record.link.workId)} ·{' '}
-														{record.link.volumeId} · {record.phase}
+														{record.link.volumeId} · {phaseLabel(record.phase)}
 													</span>
 													<span>
 														{record.kind === 'image'

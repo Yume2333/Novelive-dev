@@ -136,7 +136,7 @@ test('M4 usage and stale assets', async () => {
 				page
 					.getByRole('tooltip')
 					.getByText(
-						'仅供参考，统计已发生的调用；不估算费用，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
+						'文本按 tokens，图片按张数；参考金额只计入有单价的调用，仅供参考，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
 					),
 			).toBeVisible()
 			await page.keyboard.press('Escape')
