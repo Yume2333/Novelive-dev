@@ -1881,6 +1881,22 @@ test('staging patches cannot replace writer dialogue', () => {
 	)
 })
 
+test.each([
+	['PUT 4.=3:\n@bg room/day', 'end line must be at or after the start line'],
+	['CUT 999', 'Use original line numbers'],
+	['PUT <4:\n@caption label', 'Insert only stage directions'],
+	[
+		'PUT <4:\n@bg room/day\nPUT <4:\n@cg cg-window',
+		'Overlapping staging patch operations: PUT <4:',
+	],
+	['PUT <4:\n@bg', 'E_'],
+])(
+	'validates staging patch %s before accepting the result',
+	(patch, reason) => {
+		expect(() => applyStagingPatch(script, patch)).toThrow(reason)
+	},
+)
+
 test.each([2, 1])(
 	'trims least-used CGs first, then variants and expressions, without dropping bases at budget %i',
 	(limit) => {
