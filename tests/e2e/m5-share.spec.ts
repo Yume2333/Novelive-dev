@@ -169,7 +169,8 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 			includeSource = false,
 		) {
 			await saveTo(app, path)
-			await page.getByRole('button', { name: '导出作品包' }).click()
+			await page.getByRole('button', { name: '更多', exact: true }).click()
+			await page.getByRole('menuitem', { name: '导出作品包' }).click()
 			if (scope) await page.getByRole('radio', { name: scope }).check()
 			if (includeSource)
 				await page.getByRole('checkbox', { name: '包含原文' }).check()
@@ -333,7 +334,8 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 			.click()
 		const fork = join(directory, 'fork.novelive')
 		await saveTo(app, fork)
-		await page.getByRole('button', { name: '导出作品包' }).click()
+		await page.getByRole('button', { name: '更多', exact: true }).click()
+		await page.getByRole('menuitem', { name: '导出作品包' }).click()
 		await page.getByRole('button', { name: '检查导出内容' }).click()
 		await expect(
 			page.getByText('检查完成，没有使用占位图的章节。'),

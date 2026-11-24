@@ -50,16 +50,19 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 		await page.getByRole('link', { name: '导入原文' }).click()
 		await page.getByRole('button', { name: '选择原文', exact: true }).click()
 		await page.getByRole('button', { name: '选择文件夹' }).click()
-		await page.getByRole('button', { name: '导入', exact: true }).click()
-		await expect(page.getByRole('heading', { name: '核对导入' })).toBeVisible()
-		await page.getByRole('button', { name: '确认', exact: true }).click()
+		await page.getByRole('button', { name: '下一步', exact: true }).click()
+		await expect(
+			page.locator('[aria-current="step"]', { hasText: '核对信息' }),
+		).toBeVisible()
+		await page.getByRole('button', { name: '下一步', exact: true }).click()
+		await page.getByRole('button', { name: '开始制作', exact: true }).click()
 		await expect(page).toHaveURL(/#\/work\/[0-9a-f-]+$/)
 		await page.getByRole('link', { name: '书库', exact: true }).click()
 		await page.getByRole('link', { name: '导入原文' }).click()
 		await page.getByRole('button', { name: '选择原文', exact: true }).click()
 		await page.getByRole('textbox', { name: '作品名' }).fill('')
 		await expect(
-			page.getByRole('button', { name: '导入', exact: true }),
+			page.getByRole('button', { name: '下一步', exact: true }),
 		).toBeDisabled()
 		await page.getByRole('radio', { name: '加入已有系列' }).check()
 		await expect(page.getByRole('textbox', { name: '作品名' })).toHaveCount(0)
@@ -68,20 +71,20 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 			'请选择有效的 Novelive 工程文件夹',
 		)
 		await expect(
-			page.getByRole('button', { name: '导入', exact: true }),
+			page.getByRole('button', { name: '下一步', exact: true }),
 		).toBeDisabled()
 		await page.getByRole('button', { name: '选择已有工程' }).click()
 		await expect(
 			page.getByRole('combobox', { name: '系列', exact: true }),
 		).toHaveValue('series')
 		await expect(
-			page.getByRole('button', { name: '导入', exact: true }),
+			page.getByRole('button', { name: '下一步', exact: true }),
 		).toBeEnabled()
 		const before = JSON.parse(
 			await readFile(join(projectDir, 'series.json'), 'utf8'),
 		)
 		const original = await readFile(join(projectDir, 'source/original.md'))
-		await page.getByRole('button', { name: '导入', exact: true }).click()
+		await page.getByRole('button', { name: '下一步', exact: true }).click()
 		await expect(
 			page.getByRole('heading', { name: '已加入系列' }),
 		).toBeVisible()

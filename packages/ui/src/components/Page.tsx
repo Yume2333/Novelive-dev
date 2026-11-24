@@ -35,7 +35,7 @@ export function Page({
 						</div>
 					)}
 					<h1 className={`display ${styles.title}`}>{title}</h1>
-					{subtitle && <p className={styles.subtitle}>{subtitle}</p>}
+					{subtitle && <div className={styles.subtitle}>{subtitle}</div>}
 				</div>
 				{slot && <div className={styles.actions}>{slot}</div>}
 			</header>
