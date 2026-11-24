@@ -358,7 +358,23 @@ function spendRunId() {
 	)
 }
 
-const replayImageAdmissions = new WeakMap<DatabaseSync, Map<string, number>>()
+const replayImageAdmissions = new Map<string, Map<string, number>>()
+const inMemoryReplayAdmissions = new WeakMap<
+	DatabaseSync,
+	Map<string, number>
+>()
+
+function replayAdmissions(database: DatabaseSync, create = false) {
+	const location = database.location()
+	const existing = location
+		? replayImageAdmissions.get(location)
+		: inMemoryReplayAdmissions.get(database)
+	if (existing || !create) return existing
+	const windows = new Map<string, number>()
+	if (location) replayImageAdmissions.set(location, windows)
+	else inMemoryReplayAdmissions.set(database, windows)
+	return windows
+}
 
 export async function noteReplayedImage(
 	database: DatabaseSync,
@@ -372,10 +388,8 @@ export async function noteReplayedImage(
 	)
 		return
 	const { images } = await quoteSpend(request)
-	const windows =
-		replayImageAdmissions.get(database) ?? new Map<string, number>()
-	windows.set(runId, (windows.get(runId) ?? 0) + images)
-	replayImageAdmissions.set(database, windows)
+	const windows = replayAdmissions(database, true)
+	windows?.set(runId, (windows.get(runId) ?? 0) + images)
 }
 
 export function chapterImageBudget(database: DatabaseSync, workId: string) {
@@ -400,7 +414,7 @@ export function chapterImageBudget(database: DatabaseSync, workId: string) {
 			Math.floor(
 				(imageCap -
 					images -
-					(replayImageAdmissions.get(database)?.get(runId) ?? 0) -
+					(replayAdmissions(database)?.get(runId) ?? 0) -
 					5) /
 					chapters,
 			),

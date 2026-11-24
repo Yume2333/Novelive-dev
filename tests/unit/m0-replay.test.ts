@@ -53,10 +53,12 @@ test('strict replay reproduces image admissions and selects the budget-specific 
 	vi.stubEnv('NL_RUN_IMAGE_CAP', '16')
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '100000')
 	using live = new DatabaseSync(':memory:')
-	using offline = new DatabaseSync(':memory:')
+	const replayDb = join(directory, 'project.db')
+	using offline = new DatabaseSync(replayDb)
+	using laterWork = new DatabaseSync(replayDb)
 	for (const database of [live, offline])
 		database.exec(
-			"CREATE TABLE chapter (work_id TEXT, user_state TEXT); INSERT INTO chapter VALUES ('w', 'producing')",
+			"CREATE TABLE chapter (work_id TEXT, user_state TEXT); INSERT INTO chapter VALUES ('w', 'producing'), ('later', 'producing')",
 		)
 	const upstream = vi.fn<typeof globalThis.fetch>(async (input, init) => {
 		const request = new Request(input, init)
@@ -97,14 +99,14 @@ test('strict replay reproduces image admissions and selects the budget-specific 
 		directory,
 		fetch: upstream,
 	})
-	const staging = (database: DatabaseSync) => {
-		const limit = chapterImageBudget(database, 'w')
+	const staging = (database: DatabaseSync, workId = 'w') => {
+		const limit = chapterImageBudget(database, workId)
 		if (limit === undefined) throw new Error('Missing staging budget')
 		return request(limit)
 	}
 	await (await recordStage(staging(live))).text()
 	await (await record(image())).text()
-	await (await recordStage(staging(live))).text()
+	await (await recordStage(staging(live, 'later'))).text()
 	const replay = createReplayFetch({
 		mode: 'strict',
 		directory,
@@ -112,7 +114,7 @@ test('strict replay reproduces image admissions and selects the budget-specific 
 		onReplay: (request) => noteReplayedImage(offline, request),
 	})
 	await (await replay(image())).text()
-	expect(await (await replay(staging(offline))).json()).toEqual({
+	expect(await (await replay(staging(laterWork, 'later'))).json()).toEqual({
 		patch: 'nine',
 	})
 	expect(await (await replay(request(11))).json()).toEqual({ patch: 'eleven' })
