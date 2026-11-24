@@ -356,6 +356,26 @@ function spendRunId() {
 	)
 }
 
+const replayImageAdmissions = new WeakMap<DatabaseSync, Map<string, number>>()
+
+export async function noteReplayedImage(
+	database: DatabaseSync,
+	request: Request,
+) {
+	const runId = spendRunId()
+	if (
+		!runId ||
+		request.method !== 'POST' ||
+		!/\/images\/(generations|edits)\/?$/.test(new URL(request.url).pathname)
+	)
+		return
+	const { images } = await quoteSpend(request)
+	const windows =
+		replayImageAdmissions.get(database) ?? new Map<string, number>()
+	windows.set(runId, (windows.get(runId) ?? 0) + images)
+	replayImageAdmissions.set(database, windows)
+}
+
 export function chapterImageBudget(database: DatabaseSync, workId: string) {
 	const runId = spendRunId()
 	if (!runId) return
@@ -373,7 +393,16 @@ export function chapterImageBudget(database: DatabaseSync, workId: string) {
 		)
 		.get(workId) as { chapters: number }
 	if (chapters)
-		return Math.max(0, Math.floor((imageCap - images - 5) / chapters))
+		return Math.max(
+			0,
+			Math.floor(
+				(imageCap -
+					images -
+					(replayImageAdmissions.get(database)?.get(runId) ?? 0) -
+					5) /
+					chapters,
+			),
+		)
 }
 
 export function projectSpend(database: DatabaseSync) {

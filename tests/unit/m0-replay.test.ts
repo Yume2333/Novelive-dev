@@ -1,8 +1,14 @@
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createReplayFetch } from '../../packages/creator/src/replay'
+import {
+	chapterImageBudget,
+	noteReplayedImage,
+	projectSpend,
+} from '../../packages/creator/src/usage/spend'
 
 const origin = 'https://relay.example.test'
 const path = '/v1/chat/completions'
@@ -42,8 +48,25 @@ test('normalized replay rebinds UUID-bearing chapter IDs in authored responses',
 	expect(upstream).toHaveBeenCalledTimes(1)
 })
 
-test('strict replay keeps staging identity stable across live image allowances', async () => {
-	const upstream = vi.fn(async () => Response.json({ patch: '' }))
+test('strict replay reproduces image admissions and selects the budget-specific staging response', async () => {
+	vi.stubEnv('NL_RUN_ID', 'staging')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '16')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '100000')
+	using live = new DatabaseSync(':memory:')
+	using offline = new DatabaseSync(':memory:')
+	for (const database of [live, offline])
+		database.exec(
+			"CREATE TABLE chapter (work_id TEXT, user_state TEXT); INSERT INTO chapter VALUES ('w', 'producing')",
+		)
+	const upstream = vi.fn(async (request: Request) =>
+		request.url.endsWith('/generations')
+			? Response.json({ data: [{ b64_json: 'aQ==' }, { b64_json: 'aQ==' }] })
+			: Response.json({
+					patch: (await request.text()).includes('chapter: 9 ')
+						? 'nine'
+						: 'eleven',
+				}),
+	)
 	const request = (limit: number, script = 'scene first') =>
 		new Request(origin + path, {
 			method: 'POST',
@@ -57,22 +80,45 @@ test('strict replay keeps staging identity stable across live image allowances',
 				],
 			}),
 		})
+	const image = () =>
+		new Request(`${origin}/v1/images/generations`, {
+			method: 'POST',
+			body: JSON.stringify({ n: 2 }),
+		})
 	const record = createReplayFetch({
 		mode: 'record',
 		directory,
 		fetch: upstream,
+		spend: projectSpend(live),
 	})
-	await (await record(request(9))).text()
+	const recordStage = createReplayFetch({
+		mode: 'record',
+		directory,
+		fetch: upstream,
+	})
+	const staging = (database: DatabaseSync) => {
+		const limit = chapterImageBudget(database, 'w')
+		if (limit === undefined) throw new Error('Missing staging budget')
+		return request(limit)
+	}
+	await (await recordStage(staging(live))).text()
+	await (await record(image())).text()
+	await (await recordStage(staging(live))).text()
 	const replay = createReplayFetch({
 		mode: 'strict',
 		directory,
 		fetch: upstream,
+		onReplay: (request) => noteReplayedImage(offline, request),
 	})
-	expect(await (await replay(request(11))).json()).toEqual({ patch: '' })
+	await (await replay(image())).text()
+	expect(await (await replay(staging(offline))).json()).toEqual({
+		patch: 'nine',
+	})
+	expect(await (await replay(request(11))).json()).toEqual({ patch: 'eleven' })
 	await expect(replay(request(11, 'scene second'))).rejects.toThrow(
 		'Missing strict replay cassette:',
 	)
-	expect(upstream).toHaveBeenCalledTimes(1)
+	expect(upstream).toHaveBeenCalledTimes(3)
 })
 
 test('response rebinding preserves empty responses and strict misses never call upstream', async () => {

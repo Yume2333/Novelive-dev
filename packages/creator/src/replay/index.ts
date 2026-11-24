@@ -32,6 +32,7 @@ export interface ReplayOptions {
 	reportMissing?: boolean
 	ignoreRecordedFailures?: boolean
 	spend?: ReturnType<typeof projectSpend>
+	onReplay?: (request: Request) => Promise<void>
 }
 
 const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
@@ -174,11 +175,6 @@ async function requestIdentity(
 			// Non-text request bodies are hashed as bytes.
 		}
 	}
-	if (typeof canonical === 'string')
-		canonical = canonical.replace(
-			/(Hard limit for this whole chapter: )\d+( new provider images,)/g,
-			'$1[chapter-image-budget]$2',
-		)
 	if (normalizeIds && typeof canonical === 'string') {
 		if (rebindIds)
 			ids.push(
@@ -572,6 +568,7 @@ export function createReplayFetch(
 			request.method === 'HEAD' || [204, 205, 304].includes(row.status)
 				? null
 				: replayBody(bytes, request.signal, options.fault, options.delayMs)
+		await options.onReplay?.(request)
 		return new Response(stream, { status: row.status, headers: row.headers })
 	}
 	if (spend && mode !== 'strict') spendGuardedFetches.add(dispatch)
