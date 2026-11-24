@@ -35,6 +35,7 @@ export interface ReplayOptions {
 	spend?: ReturnType<typeof projectSpend>
 	onReplay?: (request: Request) => Promise<void>
 	checkpointDirectory?: string
+	onCheckpointReply?: (save: () => Promise<void>) => void
 }
 
 const spendGuardedFetches = new WeakSet<typeof globalThis.fetch>()
@@ -310,6 +311,7 @@ export function createReplayFetch(
 					directory: checkpointDirectory,
 					reuseRecorded: true,
 					fetch: replayFetch(upstream),
+					onCheckpointReply: options.onCheckpointReply,
 				},
 				true,
 			)
@@ -497,10 +499,11 @@ function replayFetch(
 			let cancelled = false
 			let writing: Promise<void> | undefined
 			const persist = (bytes: Buffer) =>
-				(writing ??=
-					checkpoint && (!settled?.() || (isSse && !terminalSse(bytes)))
-						? Promise.resolve()
-						: store(identity, response, bytes))
+				(writing ??= (async () => {
+					if (!checkpoint) return store(identity, response, bytes)
+					if (settled?.() && (!isSse || terminalSse(bytes)))
+						options.onCheckpointReply?.(() => store(identity, response, bytes))
+				})())
 			const stream = new ReadableStream<Uint8Array>(
 				{
 					async pull(controller) {

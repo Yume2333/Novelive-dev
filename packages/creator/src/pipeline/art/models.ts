@@ -225,7 +225,15 @@ async function requestArtJson<T>(
 	images: readonly Buffer[],
 ): Promise<T> {
 	const model = buildTextModel(connection, images.length > 0)
-	const replay = checkedReplay(createReplayFetch(options.replay))
+	let saveReply: (() => Promise<void>) | undefined
+	const replay = checkedReplay(
+		createReplayFetch({
+			...options.replay,
+			onCheckpointReply: (save) => {
+				saveReply = save
+			},
+		}),
+	)
 	const content = [
 		{ type: 'text' as const, text: prompt },
 		...images.map((png) => ({
@@ -258,6 +266,7 @@ async function requestArtJson<T>(
 	const text = response.content
 		.flatMap((part) => (part.type === 'text' ? [part.text] : []))
 		.join('')
+	if (text.trim()) await saveReply?.()
 	let value: unknown
 	try {
 		value = parseModelJson(text)
