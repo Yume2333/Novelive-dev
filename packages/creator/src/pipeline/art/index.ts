@@ -13,7 +13,7 @@ import {
 } from '@novelive/format/model'
 import sharp from 'sharp'
 import { type ImageConfig, imageProvider, imageSize } from '../../models/image'
-import { type TextConnection, TextModelError } from '../../models/text'
+import type { TextConnection } from '../../models/text'
 import type { Project } from '../../project'
 import { entryOwner, persistOwnedEntries } from '../../project/series/ownership'
 import { resolveRegistry, scopeLevels } from '../../project/series/resolve'
@@ -846,25 +846,19 @@ export class ArtProduction {
 				]
 					.filter(Boolean)
 					.join('\n')
-				const request = (maxTokens: number) =>
-					artJson<{ content: string; expressionCue?: string }>(
-						painter,
-						prompt,
-						adaptExpression ? expressionContentSchema : contentSchema,
-						{
-							...this.options,
-							maxTokens,
-							checkpointReasoningLimit: maxTokens === 1024,
-						},
-					)
-				const rewrite = await request(1024).catch((error: unknown) => {
-					if (
-						error instanceof TextModelError &&
-						error.code === 'reasoning_limit'
-					)
-						return request(2048)
-					throw error
-				})
+				const rewrite = await artJson<{
+					content: string
+					expressionCue?: string
+				}>(
+					painter,
+					prompt,
+					adaptExpression ? expressionContentSchema : contentSchema,
+					{
+						...this.options,
+						maxTokens: 1024,
+						reasoningRetry: true,
+					},
+				)
 				content = rewrite.content
 				expressionCue = rewrite.expressionCue
 				await savePaint({

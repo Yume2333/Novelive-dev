@@ -132,6 +132,59 @@ async function projectTest(run: (project: Project) => Promise<void>) {
 	}
 }
 
+test('does not dispatch a painter retry when the effective cap cannot increase', async () => {
+	await projectTest(async (project) => {
+		const fetch = vi.fn<typeof globalThis.fetch>(async () => {
+			const chunk = {
+				choices: [
+					{
+						index: 0,
+						delta: { reasoning_content: 'Thinking about the brief' },
+						finish_reason: 'length',
+					},
+				],
+				usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+			}
+			return new Response(
+				`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
+				{
+					headers: { 'content-type': 'text/event-stream' },
+				},
+			)
+		})
+		vi.stubEnv('NL_RUN_TOKEN_CAP', '1000000')
+		vi.stubEnv('NL_RUN_IMAGE_CAP', '0')
+		try {
+			const request = () =>
+				artModels.artJson(
+					{ ...main, maxOutputTokens: 1024 },
+					'Rewrite the image brief.',
+					obj({ pass: bool() }),
+					{
+						maxTokens: 1024,
+						reasoningRetry: true,
+						replay: {
+							mode: 'record',
+							checkpointDirectory: join(project.root, 'rewrite'),
+							fetch,
+							spend: projectSpend(project.database),
+						},
+					},
+				)
+			await expect(request()).rejects.toMatchObject({ code: 'reasoning_limit' })
+			await expect(request()).rejects.toMatchObject({ code: 'reasoning_limit' })
+			expect(fetch).toHaveBeenCalledTimes(1)
+			expect(
+				project.database
+					.prepare('SELECT actual_tokens FROM spend_reservation')
+					.all(),
+			).toEqual([{ actual_tokens: 15 }])
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+})
+
 test('stops without a staging repair when the malformed reply did not settle', async () => {
 	const directory = await mkdtemp(join(tmpdir(), 'novelive-staging-usage-'))
 	using db = new DatabaseSync(':memory:')

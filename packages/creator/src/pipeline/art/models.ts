@@ -33,7 +33,7 @@ import type { Dimensions } from './check'
 export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
 type JsonOptions = ModelOptions & {
 	maxTokens?: number
-	checkpointReasoningLimit?: boolean
+	reasoningRetry?: boolean
 	onUsableReply?: (save: () => Promise<void>) => void
 }
 
@@ -394,14 +394,24 @@ async function requestArtJson<T>(
 ): Promise<T> {
 	const model = buildTextModel(connection, images.length > 0)
 	let saveReply: (() => Promise<void>) | undefined
-	const replay = checkedReplay(
-		createReplayFetch({
-			...options.replay,
-			onCheckpointReply: (save) => {
-				saveReply = save
-			},
-		}),
-	)
+	const request = (attempt: number) =>
+		checkedReplay(
+			createReplayFetch({
+				...options.replay,
+				...(attempt > 0 &&
+					options.replay?.checkpointDirectory && {
+						checkpointDirectory: join(
+							options.replay.checkpointDirectory,
+							`reasoning-retry-${attempt}`,
+						),
+					}),
+				onCheckpointReply: (save) => {
+					saveReply = save
+				},
+			}),
+		)
+	const initialReplay = request(0)
+	let replay = initialReplay
 	const content = [
 		{ type: 'text' as const, text: prompt },
 		...images.map((png) => ({
@@ -411,8 +421,17 @@ async function requestArtJson<T>(
 		})),
 	]
 	const response = await createTextStream({
-		fetch: replay.fetch,
+		fetch: inheritSpendGuard(replay.fetch, (input, init) =>
+			replay.fetch(input, init),
+		),
 		stopOnUnknownOutcome: true,
+		...(options.reasoningRetry && {
+			async onReasoningRetry() {
+				await saveReply?.()
+				saveReply = undefined
+				replay = request(1)
+			},
+		}),
 	})(
 		model,
 		normalizeContext({
@@ -424,7 +443,10 @@ async function requestArtJson<T>(
 			cacheRetention: 'none',
 			...(options.maxTokens === undefined
 				? {}
-				: { maxTokens: options.maxTokens, outputLimit: options.maxTokens }),
+				: {
+						maxTokens: options.maxTokens,
+						outputLimit: options.maxTokens * (options.reasoningRetry ? 2 : 1),
+					}),
 		},
 	).result()
 	options.signal?.throwIfAborted()
@@ -434,7 +456,12 @@ async function requestArtJson<T>(
 			response,
 			`Art model stopped: ${response.stopReason}`,
 		)
-		if (options.checkpointReasoningLimit && error.code === 'reasoning_limit')
+		if (
+			options.reasoningRetry &&
+			error.code === 'reasoning_limit' &&
+			options.maxTokens !== undefined &&
+			replay === initialReplay
+		)
 			await saveReply?.()
 		throw error
 	}
