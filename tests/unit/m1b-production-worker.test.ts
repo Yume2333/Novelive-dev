@@ -22,6 +22,7 @@ import {
 	productionBible,
 	productionModels,
 } from '../../packages/creator/src/project/production-worker'
+import { createReplayFetch } from '../../packages/creator/src/replay'
 import { ChapterScheduler } from '../../packages/creator/src/scheduler/chapter'
 import {
 	chapterImageBudget,
@@ -1215,6 +1216,87 @@ async function verifyFreshCandidates(returnUrl: boolean) {
 	expect(third.equals(fourth)).toBe(false)
 	expect(textModels.slice(4)).toEqual([configuration.models.visual.model])
 }
+
+test('drawing tasks consume successive legacy replies for the same fingerprint across assets', async () => {
+	const { projectDir, workId } = await fixture()
+	using project = await Project.open(projectDir)
+	const work = await project.read(projectFiles.work('v0001', workId))
+	const config = createConfigStore(directory)
+	await config.update(configuration)
+	const drawingBible = (await productionBible(project, 'v0001', workId)).art
+	const colored = async (background: string) =>
+		sharp({ create: { width: 64, height: 36, channels: 3, background } })
+			.png()
+			.toBuffer()
+	const red = await colored('red')
+	const blue = await colored('blue')
+	const generationRequests: Request[] = []
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const request = new Request(input, init)
+		if (request.url.endsWith('/images/generations')) {
+			generationRequests.push(request)
+			return Response.json({ data: [{ b64_json: red.toString('base64') }] })
+		}
+		const { model } = await request.json()
+		return model === configuration.models.visual.model
+			? completion({ pass: true, failedChecks: [], feedback: '' })
+			: completion({ content: 'A sunny room.' })
+	}
+	const { art, worker } = chapterWorker(
+		project,
+		'v0001',
+		work,
+		await productionModels(config),
+		{ fetch },
+	)
+	const service = art()
+	const [seed, ...jobs] = await service.register(
+		['seed/day', 'room-one/day', 'room-two/day'].map((id) => ({
+			id,
+			kind: 'location' as const,
+			description: 'Room in sunlight',
+		})),
+		drawingBible,
+	)
+	expect(await service.draw(seed, drawingBible)).toEqual({ status: 'drawn' })
+	expect(generationRequests).toHaveLength(1)
+	const legacyDirectory = join(projectDir, '.novelive', 'draw', workId)
+	for (const png of [red, blue]) {
+		const record = createReplayFetch({
+			mode: 'record',
+			directory: legacyDirectory,
+			fetch: async () =>
+				Response.json({ data: [{ b64_json: png.toString('base64') }] }),
+		})
+		await (await record(generationRequests[0].clone())).arrayBuffer()
+	}
+	for (const job of jobs) {
+		await project.writeFile(
+			`source/production/art/${job.assetId}.json`,
+			JSON.stringify({ job }),
+		)
+		expect(
+			await worker.draw(
+				{ assetId: job.assetId, kind: 'base' },
+				{
+					workId,
+					desensitized: false,
+					signal: new AbortController().signal,
+				},
+			),
+		).toEqual({ status: 'drawn' })
+	}
+	expect(generationRequests).toHaveLength(1)
+	const entries = (await service.registry()).entries
+	for (const [i, job] of jobs.entries()) {
+		const entry = entries.find(({ id }) => id === job.assetId)
+		if (!entry) throw new Error('Missing drawn asset')
+		const { channels } = await sharp(await project.readFile(entry.path)).stats()
+		expect(channels.slice(0, 3).map(({ mean }) => mean > 240)).toEqual(
+			i === 0 ? [true, false, false] : [false, false, true],
+		)
+	}
+})
 
 test('recording dispatches identical image requests for distinct editor candidates', async () => {
 	await verifyFreshCandidates(false)

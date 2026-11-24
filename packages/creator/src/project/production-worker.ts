@@ -146,11 +146,13 @@ export function chapterWorker(
 	replay?: ReplayOptions,
 ) {
 	const fetch = createReplayFetch(replay)
+	const imageReplayPositions = new Map<string, number>()
 	const art = (
 		signal?: AbortSignal,
 		imageGenerationReplay?: ReplayOptions,
 		drawingReplay = replay,
 		desensitized = false,
+		drawingPositions?: Map<string, number>,
 	) =>
 		usageMethods(
 			new ArtProduction(project, {
@@ -161,6 +163,7 @@ export function chapterWorker(
 				image: models.image,
 				replay: drawingReplay,
 				imageGenerationReplay,
+				imageReplayPositions: drawingPositions,
 				desensitized,
 				signal,
 				resolution: work.settings.outputResolution,
@@ -568,6 +571,7 @@ export function chapterWorker(
 						normalizeCheckpointIds: true,
 					},
 					ctx.desensitized,
+					imageReplayPositions,
 				).draw(
 					metadata.job,
 					(await productionBible(project, volumeId, work.workId)).art,

@@ -30,7 +30,11 @@ import { recordImageUsage } from '../../usage'
 import { hasSettledImage, SpendBudgetError } from '../../usage/spend'
 import type { Dimensions } from './check'
 
-export type ModelOptions = { signal?: AbortSignal; replay?: ReplayOptions }
+export type ModelOptions = {
+	signal?: AbortSignal
+	replay?: ReplayOptions
+	imageReplayPositions?: Map<string, number>
+}
 type JsonOptions = ModelOptions & {
 	maxTokens?: number
 	onUsableReply?: (save: () => Promise<void>) => void
@@ -95,7 +99,8 @@ export function imageRenderer(
 	options: ModelOptions,
 	generationReplay = options.replay,
 ) {
-	const generationPositions = new Map<string, number>()
+	const generationPositions =
+		options.imageReplayPositions ?? new Map<string, number>()
 	const downloadPositions = new Map<string, number>()
 	return (
 		prompt: string,
