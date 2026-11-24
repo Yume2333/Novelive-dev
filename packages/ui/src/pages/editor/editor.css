@@ -7,7 +7,6 @@
 
 .editor-actions,
 .editor-panel-head,
-.editor-panel-foot,
 .editor-dialog-head,
 .editor-dialog-foot,
 .editor-toolbar {
@@ -17,7 +16,7 @@
 	gap: var(--space-2);
 }
 
-:where(.editor-workbench, .editor-actions, .editor-scene-select, .editor-dialog)
+:where(.editor-workbench, .editor-actions, .editor-subtitle, .editor-dialog)
 	:is(button, select, input, textarea) {
 	font: inherit;
 	color: inherit;
@@ -91,13 +90,14 @@
 	margin-inline-start: auto;
 }
 
-:is(.editor-workbench, .editor-actions, .editor-scene-select, .editor-dialog)
+:is(.editor-workbench, .editor-actions, .editor-subtitle, .editor-dialog)
 	:is(button, select, input, textarea):focus-visible {
 	outline: none;
 	box-shadow: var(--shadow-focus);
 }
 
-:is(.editor-workbench, .editor-actions, .editor-dialog) button:disabled {
+:is(.editor-workbench, .editor-actions, .editor-subtitle, .editor-dialog)
+	button:disabled {
 	opacity: 0.45;
 	cursor: default;
 }
@@ -233,10 +233,6 @@
 
 .editor-panel-head {
 	gap: var(--space-3);
-}
-
-.editor-panel-foot {
-	justify-content: flex-end;
 }
 
 .editor-marks {
@@ -563,4 +559,11 @@
 
 .editor-script-panel .editor-code {
 	min-height: 420px;
+}
+
+.editor-subtitle {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--space-2);
 }

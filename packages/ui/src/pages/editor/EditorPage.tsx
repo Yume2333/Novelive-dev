@@ -308,21 +308,41 @@ export function EditorPage() {
 			subtitle={
 				scene &&
 				chapter && (
-					<label className="editor-scene-select">
-						<span>{t('场景')}</span>
-						<select
-							aria-label={t('场景')}
-							value={sceneIndex}
-							disabled={busy}
-							onChange={(event) => chooseScene(Number(event.target.value))}
+					<div className="editor-subtitle">
+						<label className="editor-scene-select">
+							<span>{t('场景')}</span>
+							<select
+								aria-label={t('场景')}
+								value={sceneIndex}
+								disabled={busy}
+								onChange={(event) => chooseScene(Number(event.target.value))}
+							>
+								{chapter.scenes.map((item, index) => (
+									<option key={item.sceneId} value={index}>
+										{item.nvs.match(/^scene (.+)/m)?.[1] ?? item.sceneId}
+									</option>
+								))}
+							</select>
+						</label>
+						{dirty && <span className="editor-chip">{t('未保存')}</span>}
+						<button
+							type="button"
+							className="editor-button editor-button-ghost"
+							disabled={(!dirty && !pendingRefresh) || busy}
+							onClick={discard}
 						>
-							{chapter.scenes.map((item, index) => (
-								<option key={item.sceneId} value={index}>
-									{item.nvs.match(/^scene (.+)/m)?.[1] ?? item.sceneId}
-								</option>
-							))}
-						</select>
-					</label>
+							<RotateCcw aria-hidden="true" size={15} strokeWidth={1.8} />
+							{t('放弃修改')}
+						</button>
+						<button
+							type="button"
+							className="editor-button editor-button-primary"
+							disabled={!dirty || busy}
+							onClick={() => void run(save)}
+						>
+							{t('保存当前句')}
+						</button>
+					</div>
 				)
 			}
 			actions={
@@ -504,9 +524,6 @@ export function EditorPage() {
 										<span className="editor-muted">
 											{t('当前行 {{line}}', { line })}
 										</span>
-										{dirty && (
-											<span className="editor-chip">{t('未保存')}</span>
-										)}
 									</header>
 									<div
 										className="editor-marks"
@@ -585,29 +602,6 @@ export function EditorPage() {
 										insert={insert}
 										onUndo={undo}
 									/>
-									<footer className="editor-panel-foot">
-										<button
-											type="button"
-											className="editor-button editor-button-ghost"
-											disabled={(!dirty && !pendingRefresh) || busy}
-											onClick={discard}
-										>
-											<RotateCcw
-												aria-hidden="true"
-												size={15}
-												strokeWidth={1.8}
-											/>
-											{t('放弃修改')}
-										</button>
-										<button
-											type="button"
-											className="editor-button editor-button-primary"
-											disabled={!dirty || busy}
-											onClick={() => void run(save)}
-										>
-											{t('保存当前句')}
-										</button>
-									</footer>
 								</section>
 								{source && (
 									<section className="editor-panel editor-source-panel">
