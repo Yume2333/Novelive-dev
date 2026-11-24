@@ -5,7 +5,15 @@ import type {
 } from '@novelive/creator/contract'
 import { compileScript } from '@novelive/format/script'
 import { effectiveMarkCss, mountMinimalPlayer } from '@novelive/player'
-import { BookOpen, Play, RotateCcw, Undo2, WandSparkles, X } from 'lucide-react'
+import {
+	BookOpen,
+	ChevronRight,
+	Play,
+	RotateCcw,
+	Undo2,
+	WandSparkles,
+	X,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Page } from '../../components/Page'
@@ -28,8 +36,34 @@ export function EditorPage() {
 	const setAgentPosition = useOutletContext<{
 		setAgentPosition(position: CommandInput<'chat.send'>['position']): void
 	}>()?.setAgentPosition
-	const [params] = useSearchParams()
+	const [params, setParams] = useSearchParams()
 	const chapterId = params.get('chapterId') ?? 'ch0001'
+	const [work, setWork] = useState<{
+		title?: string
+		chapters: { chapterId: string; index: number; title?: string }[]
+	}>()
+	useEffect(() => {
+		const pending = window.novelive.call('production.get', { workId: id })
+		pending.promise.then(
+			(snapshot) =>
+				setWork({
+					title: snapshot.title,
+					chapters: snapshot.chapters.flatMap((item, index) =>
+						item.status === 'published'
+							? [
+									{
+										chapterId: item.chapterId,
+										index: index + 1,
+										title: snapshot.chapterTitles?.[item.chapterId],
+									},
+								]
+							: [],
+					),
+				}),
+			() => setWork(undefined),
+		)
+		return () => pending.cancel()
+	}, [id])
 	const [opening, setOpening] = useState<Opening>()
 	const [sceneIndex, setSceneIndex] = useState(0)
 	const [draft, setDraft] = useState('')
@@ -74,6 +108,8 @@ export function EditorPage() {
 		return () => window.removeEventListener('novelive:chapter-changed', changed)
 	}, [id, chapterId, dirty])
 	const stage = useRef<HTMLDivElement>(null)
+	const stageBox = useRef<HTMLElement>(null)
+	const [stageScale, setStageScale] = useState(1)
 	const sourceViewport = useRef<HTMLDivElement>(null)
 	useEffect(() => {
 		if (scene)
@@ -225,6 +261,16 @@ export function EditorPage() {
 			setUndoCount((count) => count - 1)
 		})
 	}
+	const hasScene = !!scene
+	useEffect(() => {
+		const box = stageBox.current
+		if (!box || !hasScene) return
+		const observer = new ResizeObserver(() =>
+			setStageScale(box.clientWidth / 960),
+		)
+		observer.observe(box)
+		return () => observer.disconnect()
+	}, [hasScene])
 	useEffect(() => {
 		if (!preview || !opening || !stage.current || !scene) return
 		const abort = new AbortController()
@@ -290,7 +336,6 @@ export function EditorPage() {
 		return () => abort.abort()
 	}, [preview, opening, scene, sceneIndex, draft, line])
 	const rewriting = rewriteOpen || !!proposal
-	const hasScene = !!scene
 	useEffect(() => {
 		const dialog = rewriteDialog.current
 		if (!dialog || !hasScene) return
@@ -302,6 +347,18 @@ export function EditorPage() {
 			{error}
 		</div>
 	)
+	const chapters = work?.chapters.some((item) => item.chapterId === chapterId)
+		? work.chapters
+		: [
+				...(work?.chapters ?? []),
+				{ chapterId, index: 0, title: chapter?.title },
+			]
+	const chooseChapter = (value: string) =>
+		setParams((current) => {
+			const next = new URLSearchParams(current)
+			next.set('chapterId', value)
+			return next
+		})
 	const closeRewrite = () => {
 		rewriteRequest.current += 1
 		setRewriteOpen(false)
@@ -312,26 +369,49 @@ export function EditorPage() {
 		<Page
 			title={t('编辑器')}
 			width="full"
-			eyebrow={chapter?.title}
+			eyebrow={work?.title}
 			subtitle={
 				scene &&
 				chapter && (
 					<div className="editor-subtitle">
-						<label className="editor-scene-select">
-							<span>{t('场景')}</span>
-							<select
-								aria-label={t('场景')}
-								value={sceneIndex}
-								disabled={busy}
-								onChange={(event) => chooseScene(Number(event.target.value))}
-							>
-								{chapter.scenes.map((item, index) => (
-									<option key={item.sceneId} value={index}>
-										{item.nvs.match(/^scene (.+)/m)?.[1] ?? item.sceneId}
-									</option>
-								))}
-							</select>
-						</label>
+						<select
+							className="editor-compact-select"
+							aria-label={t('章节')}
+							value={chapterId}
+							disabled={busy || dirty}
+							title={dirty ? t('先保存或放弃当前修改') : undefined}
+							onChange={(event) => chooseChapter(event.target.value)}
+						>
+							{chapters.map((item) => (
+								<option key={item.chapterId} value={item.chapterId}>
+									{item.index
+										? t('第 {{index}} 章 {{title}}', {
+												index: item.index,
+												title: item.title ?? item.chapterId,
+											})
+										: (item.title ?? item.chapterId)}
+								</option>
+							))}
+						</select>
+						<ChevronRight
+							aria-hidden="true"
+							className="editor-subtitle-separator"
+							size={14}
+							strokeWidth={1.8}
+						/>
+						<select
+							className="editor-compact-select"
+							aria-label={t('场景')}
+							value={sceneIndex}
+							disabled={busy}
+							onChange={(event) => chooseScene(Number(event.target.value))}
+						>
+							{chapter.scenes.map((item, index) => (
+								<option key={item.sceneId} value={index}>
+									{item.nvs.match(/^scene (.+)/m)?.[1] ?? item.sceneId}
+								</option>
+							))}
+						</select>
 						{dirty && <span className="editor-chip">{t('未保存')}</span>}
 						<button
 							type="button"
@@ -370,21 +450,22 @@ export function EditorPage() {
 					<button
 						type="button"
 						className="editor-icon-button"
+						aria-label={t('从当前句预览')}
+						title={t('从当前句预览')}
+						disabled={!scene || busy}
+						onClick={() => setPreview((value) => value + 1)}
+					>
+						<Play aria-hidden="true" size={18} strokeWidth={1.8} />
+					</button>
+					<button
+						type="button"
+						className="editor-icon-button"
 						aria-label={t('撤销')}
 						title={t('撤销')}
 						disabled={(!undoCount && !dirty) || busy}
 						onClick={undo}
 					>
 						<Undo2 aria-hidden="true" size={18} strokeWidth={1.8} />
-					</button>
-					<button
-						type="button"
-						className="editor-button"
-						disabled={!scene || busy}
-						onClick={() => setPreview((value) => value + 1)}
-					>
-						<Play aria-hidden="true" size={16} strokeWidth={1.8} />
-						{t('从当前句预览')}
 					</button>
 					<button
 						type="button"
@@ -476,9 +557,15 @@ export function EditorPage() {
 									<div className="editor-stage-frame">
 										<section
 											className="editor-stage"
-											ref={stage}
+											ref={stageBox}
 											aria-label={t('舞台预览')}
-										/>
+										>
+											<div
+												className="editor-stage-surface"
+												ref={stage}
+												style={{ transform: `scale(${stageScale})` }}
+											/>
+										</section>
 										<SceneImages
 											key={scene.sceneId}
 											workId={id}

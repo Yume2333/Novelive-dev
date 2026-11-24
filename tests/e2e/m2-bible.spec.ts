@@ -3,7 +3,12 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { _electron as electron, expect, test } from '@playwright/test'
+import {
+	_electron as electron,
+	expect,
+	type Page,
+	test,
+} from '@playwright/test'
 import {
 	bibleRevision,
 	getBible,
@@ -33,6 +38,11 @@ const require = createRequire(
 const workId = 'f947f6e9-b854-4b16-b322-6aad47eb5df8'
 const volumeId = 'v0001'
 const scope = { level: 'series' } as const
+
+async function openCandidates(page: Page) {
+	const chip = page.getByRole('button', { name: /^候选与冲突/ })
+	if ((await chip.getAttribute('aria-expanded')) !== 'true') await chip.click()
+}
 
 test('M2 bible and glossary views, accepts, rejects and preserves confirmed content against stale proposals', async () => {
 	const root = await mkdtemp(join(tmpdir(), 'novelive-m2-bible-'))
@@ -287,6 +297,7 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 			await expect(
 				page.getByRole('heading', { name: '设定集', exact: true }),
 			).toBeVisible()
+			await openCandidates(page)
 			const volumeInput = page.getByRole('textbox', { name: '卷 ID' })
 			await volumeInput.focus()
 			await volumeInput.press('End')
@@ -356,6 +367,7 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 			).toBeVisible()
 			await confirmed.getByText('跨章节定位（2）').first().click()
 			await expect(confirmed.getByText('ch02 · p0002').first()).toBeVisible()
+			await openCandidates(page)
 			const accept = page.getByRole('article', {
 				name: '更新角色与地点',
 				exact: true,
@@ -443,13 +455,14 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 			).toHaveText('已接受候选。')
 			await page.getByRole('button', { name: /^术语/ }).click()
 			await expect(
-				confirmed.getByRole('heading', { name: '灯船', exact: true }),
+				confirmed.getByRole('rowheader', { name: '灯船', exact: true }),
 			).toBeVisible()
 			await page.screenshot({
 				path: '.workflow/evidence/m2-editor/04-bible-after.png',
 				fullPage: true,
 			})
 			await page.reload()
+			await openCandidates(page)
 			await expect(
 				page.getByRole('heading', { name: '小夏', exact: true }),
 			).toBeVisible()
@@ -575,6 +588,7 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 			await page.evaluate((id) => {
 				window.location.hash = `/work/${id}/bible?volume=v1`
 			}, workId)
+			await openCandidates(page)
 			const character = page
 				.getByRole('article', {
 					name: /^综合候选：character\/ada\//,
@@ -587,6 +601,7 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 				overview: 'Replacement synthesis, unchanged Bible',
 			})
 			await page.reload()
+			await openCandidates(page)
 			const superseded = page
 				.getByRole('article', { name: /^综合候选：character\/ada\// })
 				.filter({ hasText: 'Ada → Ava' })
@@ -644,6 +659,7 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 			await glossary.getByRole('button', { name: '拒绝候选' }).click()
 			await expect(glossary).toHaveCount(0)
 			await page.reload()
+			await openCandidates(page)
 			await expect(
 				page
 					.getByRole('region', { name: '已登记内容' })

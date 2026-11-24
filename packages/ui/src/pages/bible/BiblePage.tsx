@@ -410,7 +410,7 @@ function BibleProjection({
 	const [notice, setNotice] = useState('')
 	const [busy, setBusy] = useState(false)
 	const [volumeDraft, setVolumeDraft] = useState(volumeId)
-	const [candidatesOpen, setCandidatesOpen] = useState(true)
+	const [candidatesOpen, setCandidatesOpen] = useState(false)
 	const [focused, setFocused] = useState('')
 	useEffect(() => {
 		if (!workId) return
@@ -663,6 +663,58 @@ function BibleProjection({
 													))}
 												</div>
 												<div className={styles.cards}>{entries.map(card)}</div>
+											</div>
+										) : category === 'glossary' && entries.length > 0 ? (
+											<div className={styles.glossary}>
+												<table>
+													<thead>
+														<tr>
+															{(
+																[
+																	'original',
+																	'written',
+																	'pronunciation',
+																	'category',
+																	'note',
+																] as const
+															).map((key) => (
+																<th key={key} scope="col">
+																	{t(labels[key])}
+																</th>
+															))}
+															<th scope="col">{t('定位')}</th>
+														</tr>
+													</thead>
+													<tbody>
+														{(entries as Bible['glossary']).map((entry) => (
+															<tr
+																key={entry.id}
+																id={`bible-entry-${entry.id}`}
+																data-focused={focused === entry.id || undefined}
+															>
+																<td>{entry.original}</td>
+																<th scope="row">
+																	{entry.written}
+																	{entry.status !== 'confirmed' && (
+																		<span className={styles.chip}>
+																			{t('候选')}
+																		</span>
+																	)}
+																</th>
+																<td>{entry.pronunciation || '—'}</td>
+																<td>
+																	<span className={styles.chip}>
+																		{entry.category}
+																	</span>
+																</td>
+																<td>{entry.note || '—'}</td>
+																<td>
+																	<Occurrences entry={entry} />
+																</td>
+															</tr>
+														))}
+													</tbody>
+												</table>
 											</div>
 										) : (
 											<div className={styles.cards}>{entries.map(card)}</div>
