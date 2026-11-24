@@ -123,7 +123,7 @@ test('M1b make and play publishes through both confirmation points in real Elect
 				.getByRole('link', { name: '选择主视觉' })
 				.click({ timeout: 25_000 })
 			await expect(
-				page.getByRole('heading', { name: '确认角色与主视觉' }),
+				page.getByRole('heading', { name: /角色设定 \/ 主视觉/ }),
 			).toBeVisible()
 			const visuals = page.getByRole('group', { name: '主视觉', exact: true })
 			const costume = page.getByRole('group', { name: /Ada/ })

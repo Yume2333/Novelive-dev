@@ -21,14 +21,12 @@ export function ConfirmFirstPage() {
 	return (
 		<Page
 			width={760}
-			eyebrow={
-				snapshot.title
-					? `${snapshot.title} · ${t('确认点 2 / 2')}`
-					: t('确认点 2 / 2')
-			}
+			eyebrow={t('确认点 2 / 2')}
 			title={
 				<span className={local.title}>
-					{t('第一章成品')}
+					{snapshot.title
+						? `${snapshot.title} · ${t('第一章成品')}`
+						: t('第一章成品')}
 					<InfoTooltip
 						label={t('确认点说明')}
 						text={t('确认后其余章节在后台按卷连续做，做完一章即可游玩。')}

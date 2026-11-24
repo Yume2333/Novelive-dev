@@ -58,7 +58,7 @@ export function ConfirmVisualPage() {
 	const visual = snapshot.phase === 'confirm-visual' ? snapshot.visual : null
 	if (visual) return <VisualChoices visual={visual} />
 	return (
-		<Page title={t('确认角色与主视觉')}>
+		<Page title={t('角色设定 / 主视觉')}>
 			<div className={styles.flow}>
 				<section className={`${styles.panel} ${styles.panelBody}`}>
 					<p className={styles.muted}>{t('目前没有待确认的主视觉。')}</p>
@@ -140,14 +140,12 @@ function VisualChoices({ visual }: { visual: Visual }) {
 
 	return (
 		<Page
-			eyebrow={
-				snapshot.title
-					? `${snapshot.title} · ${t('确认点 1 / 2')}`
-					: t('确认点 1 / 2')
-			}
+			eyebrow={t('确认点 1 / 2')}
 			title={
 				<span className={local.title}>
-					{t('确认角色与主视觉')}
+					{snapshot.title
+						? `${snapshot.title} · ${t('角色设定 / 主视觉')}`
+						: t('角色设定 / 主视觉')}
 					<InfoTooltip
 						label={t('确认点说明')}
 						text={t('确认后开始制作第一章；第一章做完会再停一次。')}
@@ -193,9 +191,6 @@ function VisualChoices({ visual }: { visual: Visual }) {
 						navigate(workRoute('production', workId))
 				}}
 			>
-				<p className={styles.muted}>
-					{t('确认点 1 / 2 · 选择首卷主要角色的设定和全作统一的主视觉。')}
-				</p>
 				{visual.mattingUnavailable && (
 					<ProductionNotice kind="warning">
 						<span role="status">
