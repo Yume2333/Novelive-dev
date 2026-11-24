@@ -5,6 +5,7 @@ import { projectFiles } from '@novelive/format/model'
 import { compileScript } from '@novelive/format/script'
 import { expect, test, vi } from 'vitest'
 import { createConfigStore } from '../../packages/creator/src/config'
+import { productionSnapshotEvent } from '../../packages/creator/src/contract/production'
 import { importTxtProject } from '../../packages/creator/src/import/wizard'
 import { playbackAssetIds } from '../../packages/creator/src/pipeline/art/plan'
 import { Project } from '../../packages/creator/src/project'
@@ -77,7 +78,17 @@ test.each(scenarios)(
 	'offline four-chapter production: $name',
 	async ({ name, faults }) => {
 		const root = await mkdtemp(join(tmpdir(), 'novelive-m1b-offline-'))
-		const relay = fakeRelay(faults)
+		const overdelivery = faults.includes('image-overdelivery')
+		const published = new Map(
+			chapterIds.map((id) => [id, Promise.withResolvers<void>()]),
+		)
+		const relay = fakeRelay(
+			faults,
+			false,
+			overdelivery
+				? (chapter) => published.get(chapterIds[chapter - 2])?.promise
+				: undefined,
+		)
 		const profile = join(root, 'profile')
 		const config = createConfigStore(profile)
 		const createHost = () =>
@@ -85,7 +96,12 @@ test.each(scenarios)(
 				profile,
 				config,
 				{ fetch: relay.fetch },
-				() => {},
+				({ event }) => {
+					if (!overdelivery || !productionSnapshotEvent.check(event)) return
+					for (const chapter of event.payload.chapters)
+						if (chapter.status === 'published')
+							published.get(chapter.chapterId)?.resolve()
+				},
 				() => {},
 			)
 		let host = createHost()
@@ -121,7 +137,7 @@ test.each(scenarios)(
 					image: {
 						...configuration.models.image,
 						retries: 3,
-						...(faults.includes('image-overdelivery') && {
+						...(overdelivery && {
 							model: 'gpt-image-2.6-sunburst',
 						}),
 					},
@@ -467,10 +483,25 @@ test.each(scenarios)(
 			}
 			const ledger = reservations()
 			expect(ledger).toHaveLength(relay.admissions.length)
-			if (faults.includes('image-overdelivery')) {
+			if (overdelivery) {
 				expect(
 					ledger.filter(({ actual_images }) => actual_images === 3),
 				).toMatchObject([{ tokens: 31_000, images: 3, actual_tokens: 30_509 }])
+				expect(
+					relay.admissions.find(({ fault }) => fault === 'image-overdelivery')
+						?.chapter,
+				).toBe(1)
+				for (const chapter of [2, 3, 4]) {
+					const stages = stageKeys.filter((row) => row.chapter === chapter)
+					const images = relay.admissions
+						.filter((row) => row.operation === 'image' && row.chapter < chapter)
+						.reduce((total, row) => total + (row.images ?? 0), 0)
+					expect(stages.length).toBeGreaterThan(0)
+					for (const stage of stages)
+						expect(stage.imageAllowance, `chapter ${chapter} allowance`).toBe(
+							Math.floor((50 - 5 - images) / (5 - chapter)),
+						)
+				}
 			}
 			const pair = (tokens: number | null, images: number | null) =>
 				JSON.stringify([tokens, images])

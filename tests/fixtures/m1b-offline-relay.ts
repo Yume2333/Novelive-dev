@@ -39,6 +39,7 @@ export type Admission = {
 	fault?: Fault
 	requestKey: string
 	outputCap?: number
+	imageAllowance?: number
 }
 
 export type Fault =
@@ -120,7 +121,11 @@ function completion(
 	)
 }
 
-export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
+export function fakeRelay(
+	faults: readonly Fault[],
+	privateStaging = false,
+	beforeWriting?: (chapter: number) => Promise<void> | undefined,
+) {
 	const pending = new Set(faults)
 	const admissions: Admission[] = []
 	const imageBytes = new Map<string, Buffer>()
@@ -217,11 +222,18 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 					lines.some((line) => paragraphs.some(([, , text]) => line === text)),
 				) + 1
 			assert.ok(chapter, 'Writing prompt did not cite a fixture chapter')
+			if (beforeWriting) await beforeWriting(chapter)
 			currentChapter = chapter
 		}
 		const scenes = [...prompt.matchAll(/^(\d+): scene 河灯-(\d+)-(\d+)$/gm)]
 		const repair = prompt.includes('\nRepair the ')
 		const outputCap = body.max_completion_tokens ?? body.max_tokens
+		const imageAllowance =
+			operation === 'stage'
+				? /Hard limit for this whole chapter: (\d+) new provider images/.exec(
+						prompt,
+					)?.[1]
+				: undefined
 		const previous = admissions.at(-1)
 		const fault = faults.find(
 			(candidate) =>
@@ -302,6 +314,8 @@ export function fakeRelay(faults: readonly Fault[], privateStaging = false) {
 			run,
 			fault,
 			outputCap,
+			imageAllowance:
+				imageAllowance === undefined ? undefined : Number(imageAllowance),
 			requestKey: createHash('sha256')
 				.update(
 					JSON.stringify(

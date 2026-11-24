@@ -65,7 +65,8 @@ export function createProduction(
 			spend: projectSpend(project.database),
 			onReplay:
 				mode === 'strict'
-					? (request) => noteReplayedImage(project.database, request)
+					? (request, response) =>
+							noteReplayedImage(project.database, request, response)
 					: undefined,
 		}
 	}

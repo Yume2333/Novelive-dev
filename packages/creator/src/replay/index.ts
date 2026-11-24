@@ -34,7 +34,7 @@ export interface ReplayOptions {
 	reportMissing?: boolean
 	ignoreRecordedFailures?: boolean
 	spend?: ReturnType<typeof projectSpend>
-	onReplay?: (request: Request) => Promise<void>
+	onReplay?: (request: Request, response: Response) => Promise<void>
 	checkpointDirectory?: string
 	onCheckpointReply?: (save: () => Promise<void>) => void
 	checkpointAllowance?: { images?: number }
@@ -631,8 +631,12 @@ function replayFetch(
 			request.method === 'HEAD' || [204, 205, 304].includes(row.status)
 				? null
 				: replayBody(bytes, request.signal, options.fault, options.delayMs)
-		await options.onReplay?.(request)
-		return new Response(stream, { status: row.status, headers: row.headers })
+		const response = new Response(stream, {
+			status: row.status,
+			headers: row.headers,
+		})
+		await options.onReplay?.(request, response)
+		return response
 	}
 	if (spend && mode !== 'strict') spendGuardedFetches.add(dispatch)
 	return checkpoint ? inheritSpendGuard(send, dispatch) : dispatch

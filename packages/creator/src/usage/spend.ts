@@ -389,6 +389,7 @@ function replayAdmissions(database: DatabaseSync, create = false) {
 export async function noteReplayedImage(
 	database: DatabaseSync,
 	request: Request,
+	response: Response,
 ) {
 	const runId = spendRunId()
 	if (
@@ -397,7 +398,15 @@ export async function noteReplayedImage(
 		!/\/images\/(generations|edits)\/?$/.test(new URL(request.url).pathname)
 	)
 		return
-	const { images } = await quoteSpend(request)
+	const actual = response.ok
+		? returnedImageCount(
+				await response
+					.clone()
+					.json()
+					.catch(() => undefined),
+			)
+		: undefined
+	const images = actual ?? (await quoteSpend(request)).images
 	const windows = replayAdmissions(database, true)
 	windows?.set(runId, (windows.get(runId) ?? 0) + images)
 }
@@ -410,7 +419,7 @@ export function chapterImageBudget(database: DatabaseSync, workId: string) {
 	const includeLegacy = includeLegacyReservations(database, runId)
 	const { images } = database
 		.prepare(
-			'SELECT COALESCE(SUM(images), 0) AS images FROM spend_reservation WHERE run_id = ? OR (? AND run_id IS NULL)',
+			'SELECT COALESCE(SUM(COALESCE(actual_images, images)), 0) AS images FROM spend_reservation WHERE run_id = ? OR (? AND run_id IS NULL)',
 		)
 		.get(runId, Number(includeLegacy)) as { images: number }
 	const { chapters } = database
@@ -429,6 +438,19 @@ export function chapterImageBudget(database: DatabaseSync, workId: string) {
 					chapters,
 			),
 		)
+}
+
+function returnedImageCount(value: unknown) {
+	const { data } = object(value)
+	return Array.isArray(data)
+		? data.filter((entry) => {
+				const { b64_json, url } = object(entry)
+				return (
+					(typeof b64_json === 'string' && b64_json.length) ||
+					(typeof url === 'string' && url.length)
+				)
+			}).length || undefined
+		: undefined
 }
 
 export function projectSpend(database: DatabaseSync) {
@@ -510,14 +532,10 @@ export function projectSpend(database: DatabaseSync) {
 			)
 			if (images) {
 				if (Array.isArray(body.data)) {
-					const count = body.data.filter((entry) => {
-						const { b64_json, url } = object(entry)
-						return (
-							(typeof b64_json === 'string' && b64_json.length) ||
-							(typeof url === 'string' && url.length)
-						)
-					}).length
-					settle(totalUsage(body.usage) ?? null, count || null)
+					settle(
+						totalUsage(body.usage) ?? null,
+						returnedImageCount(body) ?? null,
+					)
 				}
 			} else {
 				const actual = totalUsage(body.usage)

@@ -387,6 +387,35 @@ test('continuing an existing CSV conservatively counts legacy reservations witho
 	}
 })
 
+test('a settled one-image Sunburst response frees two slots but unresolved calls keep all three', async () => {
+	vi.stubEnv('NL_RUN_ID', 'staging')
+	vi.stubEnv('NL_RUN_TOKEN_CAP', '200000')
+	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
+	vi.stubEnv('NL_RUN_IMAGE_TOKEN_RESERVE', '7000')
+	using database = new DatabaseSync(':memory:')
+	database.exec(
+		"CREATE TABLE chapter (work_id TEXT, user_state TEXT); INSERT INTO chapter VALUES ('w', 'producing')",
+	)
+	const request = () =>
+		new Request('https://example.invalid/v1/images/generations', {
+			method: 'POST',
+			body: JSON.stringify({ model: 'gpt-image-2.6-sunburst', n: 1 }),
+		})
+	const budget = () => chapterImageBudget(database, 'w')
+	const spend = projectSpend(database)
+	expect(budget()).toBe(45)
+	await spend(request(), async () => {
+		expect(budget()).toBe(42)
+		return Response.json({
+			data: [{ b64_json: 'fixture' }],
+			usage: { total_tokens: 7000 },
+		})
+	})
+	expect(budget()).toBe(44)
+	await spend(request(), async () => new Response(null, { status: 503 }))
+	expect(budget()).toBe(41)
+})
+
 test('concurrent dispatch stops before the next reservation would cross the soft cutoff', async () => {
 	vi.stubEnv('NL_RUN_TOKEN_CAP', '2000000')
 	vi.stubEnv('NL_RUN_IMAGE_CAP', '50')
