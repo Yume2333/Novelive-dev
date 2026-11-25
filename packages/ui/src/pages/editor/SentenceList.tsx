@@ -524,7 +524,21 @@ export function SentenceList({
 
 	useEffect(() => {
 		void activeLine
-		activeRef.current?.scrollIntoView({ block: 'nearest' })
+		const card = activeRef.current
+		// 只在自己的滚动视口内对齐：scrollIntoView 会连带滚动所有祖先
+		// （包括外壳主滚动区），把页首的标记提议横幅顶出屏幕。
+		const viewport = card?.closest('[data-scroll-viewport]')
+		if (!card || !(viewport instanceof HTMLElement)) return
+		const cardRect = card.getBoundingClientRect()
+		const viewportRect = viewport.getBoundingClientRect()
+		// 与 scrollIntoView({ block: 'nearest' }) 一致的最近边对齐：
+		// 完全可见或完全盖住视口都不滚动；只滚动这一个视口，不向祖先传播。
+		const above = viewportRect.top - cardRect.top
+		const below = cardRect.bottom - viewportRect.bottom
+		if (above <= 0 && below <= 0) return
+		if (above > 0 && below > 0) return
+		viewport.scrollTop +=
+			above > 0 ? -Math.min(above, -below) : Math.min(below, -above)
 	}, [activeLine])
 
 	if (!sentences.length) {

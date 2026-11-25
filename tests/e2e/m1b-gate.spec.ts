@@ -174,17 +174,32 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			await expect(dusk.getByText('逐字')).toBeVisible()
 			await expect(dusk.getByText('color: #aabbff;')).toBeVisible()
 			await expect(boat.getByText('整段')).toBeVisible()
-			const marks = page.getByRole('combobox', { name: '文本标记' })
-			await expect(marks.locator('option[value="dusk-glow"]')).toHaveCount(0)
+			// 先断言横幅在视口内：之后的点击（高级模式、菜单）会触发滚动，
+			// 把横幅顶出视口属于正常的跟随交互，不应影响此断言。
 			await expect(dusk).toBeInViewport()
 			await expect(boat).toBeInViewport()
+			// 文本标记现在是高级模式 NVS 工具栏上的 Dropdown（不再是 <select>）：
+			// 菜单项只在展开菜单时渲染，断言前先切到高级模式、展开菜单再读 menuitem。
+			const marks = page.getByRole('button', { name: '文本标记' })
+			const marksMenu = page.getByRole('menu', { name: '文本标记' })
+			const markItem = (name: string) =>
+				marksMenu.getByRole('menuitem', { name, exact: true })
+			await page.getByRole('button', { name: '高级模式' }).click()
+			await expect(marks).toBeVisible()
+			await marks.click()
+			await expect(markItem('dusk-glow')).toHaveCount(0)
+			await page.keyboard.press('Escape')
 			await capture(page, '06-editor-pending-marks')
 			await dusk.getByRole('button', { name: '接受标记' }).click()
 			await expect(dusk).toHaveCount(0)
-			await expect(marks.locator('option[value="dusk-glow"]')).toHaveCount(1)
+			await marks.click()
+			await expect(markItem('dusk-glow')).toHaveCount(1)
+			await page.keyboard.press('Escape')
 			await boat.getByRole('button', { name: '拒绝标记' }).click()
 			await expect(banners).toHaveCount(0)
-			await expect(marks.locator('option[value="boat-trail"]')).toHaveCount(0)
+			await marks.click()
+			await expect(markItem('boat-trail')).toHaveCount(0)
+			await page.keyboard.press('Escape')
 			const reopened = await page.evaluate(
 				(target) => window.novelive.call('editor.open', target).promise,
 				firstChapter,
@@ -224,8 +239,9 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			).toBeVisible()
 			await expect(page.getByText(/制作已暂停/)).toHaveCount(0)
 			await second.getByRole('button', { name: '运行记录' }).click()
+			// 运行记录现在在抽屉（Drawer）里渲染，不再内嵌于列表项
 			await expect(
-				second
+				page
 					.getByRole('region', { name: '章节运行记录' })
 					.getByText('运行失败'),
 			).toBeVisible()
