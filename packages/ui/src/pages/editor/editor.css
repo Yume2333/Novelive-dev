@@ -211,8 +211,10 @@
 
 /* ---- 新标记提议横幅（页内自绘，非 Banner 组件） ---- */
 
-.editor-banner-wrap {
-	margin-bottom: var(--space-6);
+.editor-banners {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
 }
 
 .editor-banner {

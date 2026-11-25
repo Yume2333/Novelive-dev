@@ -1061,87 +1061,91 @@ export function EditorPage() {
 				)}
 				{opening && (
 					<>
-						{chapter?.markSuggestions.map((mark) => (
-							<section
-								className="editor-banner-wrap"
-								key={mark.id}
-								aria-label={t('新标记提议')}
-							>
-								<Banner
-									kind="warning"
-									icon={Sparkles}
-									action={
-										<span className="editor-banner-actions">
-											<Button
-												size="sm"
-												variant="ghost"
-												disabled={busy || dirty}
-												onClick={() =>
-													void run(async () => {
-														if (!target) return
-														const resolved = await window.novelive.call(
-															'editor.resolveMark',
-															{
-																...target,
-																suggestionId: mark.id,
-																decision: 'reject',
-															},
-														).promise
-														accept(resolved)
-													})
-												}
-											>
-												{t('拒绝标记')}
-											</Button>
-											<Button
-												size="sm"
-												variant="primary"
-												disabled={busy || dirty}
-												onClick={() =>
-													void run(async () => {
-														if (!target) return
-														const resolved = await window.novelive.call(
-															'editor.resolveMark',
-															{
-																...target,
-																suggestionId: mark.id,
-																decision: 'accept',
-															},
-														).promise
-														const fresh = await window.novelive.call(
-															'editor.snapshot',
-															{
-																workId: id,
-																chapterId,
-																editorId: opening?.editorId,
-															},
-														).promise
-														setOpening((value) =>
-															value
-																? {
-																		...value,
-																		settings: fresh.settings,
-																		settingsRevision: fresh.settingsRevision,
-																	}
-																: value,
-														)
-														accept(resolved)
-													})
-												}
-											>
-												{t('接受标记')}
-											</Button>
-										</span>
-									}
-								>
-									<strong>{t('新标记：{{name}}', { name: mark.name })}</strong>{' '}
-									<code>
-										{effectiveMarkCss(mark.name, mark.css) || t('无可渲染样式')}
-									</code>{' '}
-									{mark.perChar ? t('逐字') : t('整段')}
-								</Banner>
-							</section>
-						))}
+						{chapter && chapter.markSuggestions.length > 0 && (
+							<div className="editor-banners">
+								{chapter.markSuggestions.map((mark) => (
+									<section key={mark.id} aria-label={t('新标记提议')}>
+										<Banner
+											kind="warning"
+											icon={Sparkles}
+											action={
+												<span className="editor-banner-actions">
+													<Button
+														size="sm"
+														variant="ghost"
+														disabled={busy || dirty}
+														onClick={() =>
+															void run(async () => {
+																if (!target) return
+																const resolved = await window.novelive.call(
+																	'editor.resolveMark',
+																	{
+																		...target,
+																		suggestionId: mark.id,
+																		decision: 'reject',
+																	},
+																).promise
+																accept(resolved)
+															})
+														}
+													>
+														{t('拒绝标记')}
+													</Button>
+													<Button
+														size="sm"
+														variant="primary"
+														disabled={busy || dirty}
+														onClick={() =>
+															void run(async () => {
+																if (!target) return
+																const resolved = await window.novelive.call(
+																	'editor.resolveMark',
+																	{
+																		...target,
+																		suggestionId: mark.id,
+																		decision: 'accept',
+																	},
+																).promise
+																const fresh = await window.novelive.call(
+																	'editor.snapshot',
+																	{
+																		workId: id,
+																		chapterId,
+																		editorId: opening?.editorId,
+																	},
+																).promise
+																setOpening((value) =>
+																	value
+																		? {
+																				...value,
+																				settings: fresh.settings,
+																				settingsRevision:
+																					fresh.settingsRevision,
+																			}
+																		: value,
+																)
+																accept(resolved)
+															})
+														}
+													>
+														{t('接受标记')}
+													</Button>
+												</span>
+											}
+										>
+											<strong>
+												{t('新标记：{{name}}', { name: mark.name })}
+											</strong>{' '}
+											<code>
+												{effectiveMarkCss(mark.name, mark.css) ||
+													t('无可渲染样式')}
+											</code>{' '}
+											{mark.perChar ? t('逐字') : t('整段')}
+										</Banner>
+									</section>
+								))}
+							</div>
+						)}
 						{!scene ? (
 							<p className="editor-empty">{t('本章还没有剧本')}</p>
 						) : (
