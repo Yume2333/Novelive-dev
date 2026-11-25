@@ -172,7 +172,9 @@ test.describe('M3 player controls', () => {
 			})
 			await page.keyboard.press('Escape')
 			await page.getByRole('button', { name: '快速存档', exact: true }).click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(page.locator('.nl-player').getByRole('status')).toHaveText(
+				'存档成功',
+			)
 			await page.keyboard.press('Escape')
 			await page.getByRole('button', { name: '快速读档', exact: true }).click()
 			await expect(display).toHaveText(read)
@@ -278,7 +280,9 @@ test.describe('M3 player controls', () => {
 				page.getByRole('button', { name: '快速读档', exact: true }),
 			).toBeDisabled()
 			await page.getByRole('button', { name: '快速存档', exact: true }).click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(page.locator('.nl-player').getByRole('status')).toHaveText(
+				'存档成功',
+			)
 			await advance()
 			await expect(text()).toHaveText('我在想什么？')
 			await menu()
@@ -297,7 +301,9 @@ test.describe('M3 player controls', () => {
 			await page
 				.getByRole('button', { name: '存档槽位 7', exact: true })
 				.click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(page.locator('.nl-player').getByRole('status')).toHaveText(
+				'存档成功',
+			)
 			await menu()
 			await page.getByRole('button', { name: '读档', exact: true }).click()
 			await expect(
@@ -333,7 +339,9 @@ test.describe('M3 player controls', () => {
 			await page
 				.getByRole('button', { name: '存档槽位 1', exact: true })
 				.click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(page.locator('.nl-player').getByRole('status')).toHaveText(
+				'存档成功',
+			)
 			await menu()
 			await page.getByRole('button', { name: '读档', exact: true }).click()
 			await expect(
@@ -538,7 +546,9 @@ test.describe('M3 player controls', () => {
 			await expect(text()).toHaveText('你好，世界。')
 			await menu()
 			await page.getByRole('button', { name: '快速存档', exact: true }).click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(page.locator('.nl-player').getByRole('status')).toHaveText(
+				'存档成功',
+			)
 			const savedText = await page.evaluate(
 				async (id) =>
 					(await window.novelive.host.progress?.load(id))?.saves.find(
@@ -940,8 +950,12 @@ test.describe('M3 player controls', () => {
 					)
 				} else {
 					for (let index = 0; index < 6; index++) await advance()
-					await expect(page.getByRole('status')).toContainText('下一章 · 晨光')
-					await expect(page.getByRole('status')).toContainText('制作中')
+					await expect(
+						page.locator('.nl-player').getByRole('status'),
+					).toContainText('下一章 · 晨光')
+					await expect(
+						page.locator('.nl-player').getByRole('status'),
+					).toContainText('制作中')
 					{
 						using project = await Project.open(root)
 						project.database

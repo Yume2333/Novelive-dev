@@ -679,7 +679,7 @@ test('agent drawer captures matched-viewport parity evidence', async () => {
 				.getByRole('navigation', { name: '分支' })
 				.getByRole('button', { name: '上一个分支' })
 				.click()
-			await panel.getByRole('button', { name: /read_bible/ }).click()
+			await panel.getByRole('button', { name: /读取设定集/ }).click()
 			await expect(panel.getByText('"field": "年龄"')).toBeVisible()
 			for (const theme of ['light', 'dark'] as const) {
 				await page.evaluate((value) => {

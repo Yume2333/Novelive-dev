@@ -1,11 +1,4 @@
-import {
-	ArrowUp,
-	ImagePlus,
-	Maximize2,
-	Minimize2,
-	Square,
-	X,
-} from 'lucide-react'
+import { ImagePlus, Maximize2, Minimize2, Send, Square, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Chip } from '../../components/Card'
 import { Tooltip } from '../../components/Extended'
@@ -161,7 +154,7 @@ export function Composer({
 				disabled={disabled || busy || (!text.trim() && pending.length === 0)}
 				onClick={() => void send()}
 			>
-				<ArrowUp aria-hidden="true" size={17} strokeWidth={1.8} />
+				<Send aria-hidden="true" size={17} strokeWidth={1.8} />
 			</button>
 		</Tooltip>
 	)

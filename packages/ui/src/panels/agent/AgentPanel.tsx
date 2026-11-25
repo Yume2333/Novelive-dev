@@ -11,6 +11,7 @@ import {
 	X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { IconButton } from '../../components/Button'
 import { Collapse } from '../../components/Collapse'
 import { ConfirmDialog, Tooltip } from '../../components/Extended'
 import { Modal } from '../../components/Modal'
@@ -40,6 +41,45 @@ const t = scoped('agent')
 
 type Chat = ReturnType<typeof useAgentChat>
 
+function RenameInput({
+	initial,
+	onCancel,
+	onSend,
+}: {
+	initial: string
+	onCancel(): void
+	onSend(title: string): void
+}) {
+	const [title, setTitle] = useState(initial)
+	return (
+		<form
+			className={styles.renameForm}
+			onSubmit={(event) => {
+				event.preventDefault()
+				if (title.trim()) onSend(title.trim())
+				else onCancel()
+			}}
+		>
+			<input
+				// biome-ignore lint/a11y/noAutofocus: 点了重命名就该能直接打字
+				autoFocus
+				className={`nl-input ${styles.field}`}
+				aria-label={t('会话名称')}
+				value={title}
+				onChange={(event) => setTitle(event.target.value)}
+				onKeyDown={(event) => {
+					if (event.key === 'Escape') {
+						event.stopPropagation()
+						onCancel()
+					}
+				}}
+				onBlur={onCancel}
+				onClick={(event) => event.stopPropagation()}
+			/>
+		</form>
+	)
+}
+
 function SessionMenu({
 	chat,
 	onDelete,
@@ -50,7 +90,6 @@ function SessionMenu({
 	onClose(): void
 }) {
 	const [renaming, setRenaming] = useState<string>()
-	const [title, setTitle] = useState('')
 	const current = chat.snapshot?.session.sessionId
 	const guard = (action: Promise<unknown>, message: string) =>
 		void action.catch(() => chat.setError(message))
@@ -71,35 +110,14 @@ function SessionMenu({
 					{chat.sessions.map((session) => (
 						<li key={session.sessionId} className="hover-row">
 							{renaming === session.sessionId ? (
-								<form
-									className={styles.renameForm}
-									onSubmit={(event) => {
-										event.preventDefault()
-										if (title.trim())
-											guard(
-												chat.rename(session.sessionId, title.trim()),
-												t('没能重命名'),
-											)
+								<RenameInput
+									initial={session.title}
+									onCancel={() => setRenaming(undefined)}
+									onSend={(next) => {
 										setRenaming(undefined)
+										guard(chat.rename(session.sessionId, next), t('没能重命名'))
 									}}
-								>
-									<input
-										// biome-ignore lint/a11y/noAutofocus: 点了重命名就该能直接打字
-										autoFocus
-										className={`nl-input ${styles.field}`}
-										aria-label={t('会话名称')}
-										value={title}
-										onChange={(event) => setTitle(event.target.value)}
-										onKeyDown={(event) => {
-											if (event.key === 'Escape') {
-												event.stopPropagation()
-												setRenaming(undefined)
-											}
-										}}
-										onBlur={() => setRenaming(undefined)}
-										onClick={(event) => event.stopPropagation()}
-									/>
-								</form>
+								/>
 							) : (
 								<>
 									<button
@@ -121,10 +139,7 @@ function SessionMenu({
 												title: session.title,
 											})}
 											title={t('重命名 {{title}}', { title: session.title })}
-											onClick={() => {
-												setTitle(session.title)
-												setRenaming(session.sessionId)
-											}}
+											onClick={() => setRenaming(session.sessionId)}
 										>
 											<Pencil aria-hidden="true" size={13} strokeWidth={1.8} />
 										</button>
@@ -227,6 +242,7 @@ export function AgentPanel({
 	const chat = useAgentChat(workId)
 	const { snapshot } = chat
 	const [menu, setMenu] = useState(false)
+	const [renamingCurrent, setRenamingCurrent] = useState(false)
 	const [editing, setEditing] = useState<string>()
 	const [preview, setPreview] = useState<{ src: string; name: string }>()
 	const [deleting, setDeleting] = useState<ChatSession>()
@@ -292,20 +308,43 @@ export function AgentPanel({
 				<span className={styles.badge} aria-hidden="true">
 					<Sparkles size={17} strokeWidth={1.8} />
 				</span>
-				<button
-					type="button"
-					className={styles.sessionButton}
-					aria-expanded={menu}
-					aria-label={t('切换会话')}
-					onClick={() => setMenu(!menu)}
-				>
-					<span className={styles.sessionTitle}>
-						{snapshot?.session.title ?? t('新会话')}
-					</span>
-					<span className="nl-chevron" data-open={menu}>
-						<ChevronDown aria-hidden="true" size={15} strokeWidth={1.8} />
-					</span>
-				</button>
+				{renamingCurrent && snapshot ? (
+					<RenameInput
+						initial={snapshot.session.title}
+						onCancel={() => setRenamingCurrent(false)}
+						onSend={(next) => {
+							setRenamingCurrent(false)
+							void chat
+								.rename(snapshot.session.sessionId, next)
+								.catch(() => chat.setError(t('没能重命名')))
+						}}
+					/>
+				) : (
+					<button
+						type="button"
+						className={styles.sessionButton}
+						aria-expanded={menu}
+						aria-label={t('切换会话')}
+						onClick={() => setMenu(!menu)}
+					>
+						<span className={styles.sessionTitle}>
+							{snapshot?.session.title ?? t('新会话')}
+						</span>
+						<span className="nl-chevron" data-open={menu}>
+							<ChevronDown aria-hidden="true" size={15} strokeWidth={1.8} />
+						</span>
+					</button>
+				)}
+				<Tooltip text={t('重命名会话')}>
+					<IconButton
+						icon={Pencil}
+						label={t('重命名会话')}
+						size={28}
+						iconSize={15}
+						disabled={!snapshot || renamingCurrent}
+						onClick={() => setRenamingCurrent(true)}
+					/>
+				</Tooltip>
 				<Tooltip text={full ? t('退出全屏') : t('全屏')}>
 					<button
 						type="button"

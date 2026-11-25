@@ -64,6 +64,26 @@ const proposalIcons = {
 	resynthesizeVolume: RefreshCw,
 } as const
 
+/* 工具 id → 人话标题；未登记的工具按原始 id 显示，展开详情里仍能见到原始 id */
+const toolNames: Record<string, string> = {
+	read_chapter_preview: msg('查看章节预览'),
+	read_bible: msg('读取设定集'),
+	read_glossary: msg('读取术语表'),
+	read_scene: msg('查看场景'),
+	read_source_range: msg('查看原文'),
+	list_assets: msg('列出素材'),
+	read_chapter_manifest: msg('查看章节清单'),
+	read_task_result: msg('查看任务结果'),
+	propose_bible_change: msg('提议修改设定集'),
+	propose_glossary_change: msg('提议修改术语表'),
+	propose_adaptation_notes: msg('提议修改改编要求'),
+	propose_rewrite_scene: msg('提议重写场景'),
+	propose_redraw_image: msg('提议重画图片'),
+	propose_redo_chapter: msg('提议重做章节'),
+	propose_resynthesize_volume: msg('提议重新综合'),
+	spawn_agent: msg('派出子任务'),
+}
+
 function pretty(value: string) {
 	try {
 		return JSON.stringify(JSON.parse(value), null, 2)
@@ -233,6 +253,8 @@ function ToolCard({
 		: []
 	const scalarResult =
 		done && resultObject === undefined && !errorText ? (part.result ?? '') : ''
+	const displayName =
+		part.name in toolNames ? t(toolNames[part.name]) : part.name
 	const hasDetail = Boolean(part.input || part.result)
 
 	return (
@@ -262,7 +284,7 @@ function ToolCard({
 						<CircleAlert aria-hidden="true" size={15} strokeWidth={1.8} />
 					)}
 				</span>
-				<span className={styles.cardTitle}>{part.name}</span>
+				<span className={styles.cardTitle}>{displayName}</span>
 				<span
 					className={`label-caps label-caps-zh ${styles.statusLabel}${running ? ' ink-shimmer' : ''}`}
 					data-tone={failed ? 'error' : undefined}
@@ -273,6 +295,9 @@ function ToolCard({
 			</button>
 			<Collapse open={open && hasDetail}>
 				<div className={styles.toolBody}>
+					{displayName !== part.name && (
+						<span className={styles.toolId}>{part.name}</span>
+					)}
 					{inputEntries.length > 0 && (
 						<div>
 							{inputEntries.map(([key, value]) => (

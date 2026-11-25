@@ -252,12 +252,18 @@
 	flex-direction: column;
 	justify-content: flex-start;
 	width: 100%;
-	min-height: 22%;
-	padding: 3.5vh 8% var(--space-6);
-	background: color-mix(
-		in srgb,
-		black calc(min(var(--player-dialogue-opacity, 0.9) + 0.12, 1) * 100%),
-		transparent
+	min-height: 34%;
+	padding: 8.5vh 8% var(--space-6);
+	background: linear-gradient(
+		180deg,
+		transparent 0%,
+		color-mix(in srgb, var(--stage-scrim) 82%, var(--color-primary)) 68%,
+		color-mix(
+				in srgb,
+				var(--stage-frame) calc(var(--player-dialogue-opacity, 0.9) * 100%),
+				transparent
+			)
+			100%
 	);
 	box-shadow: none;
 	color: color-mix(in srgb, white 90%, transparent);
@@ -268,29 +274,10 @@
 	animation: nl-box-in 0.32s var(--ease-out) both;
 }
 
-.nl-player .nl-player-textbox::before {
-	content: "";
-	position: absolute;
-	right: 0;
-	bottom: 100%;
-	left: 0;
-	height: 6vh;
-	background: linear-gradient(
-		180deg,
-		transparent,
-		color-mix(
-			in srgb,
-			black calc(min(var(--player-dialogue-opacity, 0.9) + 0.12, 1) * 100%),
-			transparent
-		)
-	);
-	pointer-events: none;
-}
-
 .nl-player .nl-player-textbox::after {
 	content: "";
 	position: absolute;
-	top: 0;
+	top: 15%;
 	left: 9%;
 	right: 9%;
 	height: 1px;

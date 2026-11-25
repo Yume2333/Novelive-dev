@@ -3,7 +3,15 @@ import type { WorkSettings } from '@novelive/format/model'
 import { type CompiledScene, compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
 import { ChevronDown } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+	type RefObject,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type {
 	SentenceRef,
@@ -28,6 +36,52 @@ import './player.css'
 import { scoped } from '../../i18n'
 
 const t = scoped('player')
+
+function NextGlyph({ host }: { host: RefObject<HTMLDivElement | null> }) {
+	const glyph = useRef<HTMLSpanElement>(null)
+	useLayoutEffect(() => {
+		const span = glyph.current
+		const main = span?.closest('.nl-player')
+		const surface = host.current
+		if (!span || !main || !surface) return
+		const place = () => {
+			const viewport = surface.querySelector<HTMLElement>('.nl-player-text')
+			if (!viewport) return
+			const display = viewport.querySelector<HTMLElement>('.nl-text-display')
+			const revealed = Number(viewport.dataset.revealed ?? 0)
+			const last = display?.querySelector<HTMLElement>(
+				`[data-glyph="${revealed - 1}"]`,
+			)
+			if (!last) return
+			const bounds = main.getBoundingClientRect()
+			const rect = last.getBoundingClientRect()
+			const size = span.offsetHeight || 13
+			span.style.left = `${rect.right - bounds.left + 10}px`
+			span.style.top = `${rect.top - bounds.top + (rect.height - size) / 2}px`
+			span.style.visibility = 'visible'
+		}
+		span.style.visibility = 'hidden'
+		place()
+		const frame = requestAnimationFrame(place)
+		const observer = new MutationObserver(place)
+		observer.observe(surface, {
+			subtree: true,
+			childList: true,
+			attributes: true,
+		})
+		window.addEventListener('resize', place)
+		return () => {
+			cancelAnimationFrame(frame)
+			observer.disconnect()
+			window.removeEventListener('resize', place)
+		}
+	}, [host])
+	return (
+		<span ref={glyph} className="nl-next-glyph" aria-hidden="true">
+			<ChevronDown size={13} strokeWidth={1.8} />
+		</span>
+	)
+}
 
 export function PlayerPage({
 	legacySaves,
@@ -518,9 +572,7 @@ export function PlayerPage({
 				</div>
 			)}
 			{loaded && !ended && !awaitingClick && !overlayActive && textFinished && (
-				<span className="nl-next-glyph" aria-hidden="true">
-					<ChevronDown size={13} strokeWidth={1.8} />
-				</span>
+				<NextGlyph host={host} />
 			)}
 			{loaded && (
 				<PlayerControls

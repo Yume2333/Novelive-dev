@@ -105,19 +105,21 @@
 /* ---------- 下一句提示 ---------- */
 .nl-next-glyph {
 	position: absolute;
-	right: 9%;
-	bottom: calc(var(--space-3) + 38px);
+	left: 0;
+	top: 0;
 	z-index: 4;
 	display: inline-flex;
-	color: var(--stage-text);
+	color: var(--stage-accent);
 	pointer-events: none;
 	animation: nl-next-bob 1.5s ease-in-out infinite;
 }
 
 .nl-player-surface[data-dialogue-style="paper"] ~ .nl-next-glyph {
-	right: calc((100% - min(88%, 1060px)) / 2 + 40px);
-	bottom: calc(24px + 46px);
-	color: var(--color-on-surface-variant);
+	color: var(--color-primary);
+}
+
+.nl-player-surface[data-ui-hidden="true"] ~ .nl-next-glyph {
+	display: none;
 }
 
 @keyframes nl-next-bob {
