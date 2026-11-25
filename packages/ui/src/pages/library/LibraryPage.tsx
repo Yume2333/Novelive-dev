@@ -565,7 +565,7 @@ export function LibraryPage() {
 													strokeWidth={1.8}
 												/>
 												{group.title}
-												<span className={styles.groupPath}>{group.key}</span>
+												<span className={styles.groupPath}>· {group.key}</span>
 											</h2>
 										)}
 										{group.volumes.map((volume) => (

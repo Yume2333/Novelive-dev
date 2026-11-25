@@ -55,7 +55,7 @@
 	padding: var(--space-px-20) var(--space-5) var(--space-3);
 }
 
-.title {
+.header .title {
 	margin: 0;
 	font-size: 18px;
 }
