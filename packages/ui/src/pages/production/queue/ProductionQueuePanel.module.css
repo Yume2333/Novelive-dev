@@ -44,7 +44,6 @@ a.row {
 	border-radius: var(--radius-sm);
 }
 
-.rowLink,
 .rowText {
 	display: flex;
 	min-width: 0;
@@ -52,6 +51,10 @@ a.row {
 	flex-direction: column;
 	align-items: flex-start;
 	gap: 2px;
+}
+
+.rowLink {
+	max-width: 100%;
 }
 
 a.rowLink {
@@ -89,4 +92,8 @@ a.rowLink {
 .empty {
 	margin: 0;
 	color: var(--color-on-surface-variant);
+}
+
+.topAction {
+	width: 100%;
 }

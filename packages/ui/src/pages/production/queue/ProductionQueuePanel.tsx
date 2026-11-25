@@ -87,7 +87,7 @@ export function ProductionQueuePanel({
 					icon={Square}
 					disabled={busy}
 					onClick={() => queue.active && onStop(queue.active.link.workId)}
-					style={{ width: '100%' }}
+					className={styles.topAction}
 				>
 					{t('立即停止')}
 				</Button>
@@ -97,7 +97,7 @@ export function ProductionQueuePanel({
 					icon={Play}
 					disabled={busy}
 					onClick={() => onContinue(promoted.link.workId)}
-					style={{ width: '100%' }}
+					className={styles.topAction}
 				>
 					{t('继续制作')}
 				</Button>
@@ -109,13 +109,15 @@ export function ProductionQueuePanel({
 						{queue.active && (
 							<div className={`glass-panel ${styles.row}`}>
 								<Cover workId={queue.active.link.workId} />
-								<Link
-									className={styles.rowLink}
-									to={workRoute('production', queue.active.link.workId)}
-								>
-									<span className={styles.title}>{queue.active.title}</span>
+								<span className={styles.rowText}>
+									<Link
+										className={styles.rowLink}
+										to={workRoute('production', queue.active.link.workId)}
+									>
+										<span className={styles.title}>{queue.active.title}</span>
+									</Link>
 									<span className={styles.status}>{t('正在制作')}</span>
-								</Link>
+								</span>
 							</div>
 						)}
 						{queue.queued.length > 0 && (
@@ -126,15 +128,17 @@ export function ProductionQueuePanel({
 										key={work.link.workId}
 									>
 										<Cover workId={work.link.workId} />
-										<Link
-											className={styles.rowLink}
-											to={workRoute('production', work.link.workId)}
-										>
-											<span className={styles.title}>{work.title}</span>
+										<span className={styles.rowText}>
+											<Link
+												className={styles.rowLink}
+												to={workRoute('production', work.link.workId)}
+											>
+												<span className={styles.title}>{work.title}</span>
+											</Link>
 											<span className={styles.status}>
 												{t('排队中 · {{value}}', { value: index + 1 })}
 											</span>
-										</Link>
+										</span>
 										<IconButton
 											icon={ArrowUp}
 											label={t('提前：{{title}}', { title: work.title })}
@@ -198,13 +202,15 @@ export function ProductionQueuePanel({
 									key={work.link.workId}
 								>
 									<Cover workId={work.link.workId} />
-									<Link
-										className={styles.rowLink}
-										to={workRoute('production', work.link.workId)}
-									>
-										<span className={styles.title}>{work.title}</span>
+									<span className={styles.rowText}>
+										<Link
+											className={styles.rowLink}
+											to={workRoute('production', work.link.workId)}
+										>
+											<span className={styles.title}>{work.title}</span>
+										</Link>
 										<span className={styles.status}>{pausedLabel(work)}</span>
-									</Link>
+									</span>
 									{resumableRow && (
 										<Button
 											variant="secondary"
