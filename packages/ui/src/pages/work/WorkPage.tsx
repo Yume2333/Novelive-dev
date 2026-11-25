@@ -16,7 +16,7 @@ import {
 	Settings2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import {
 	Card,
@@ -398,7 +398,6 @@ export function WorkPage() {
 	)
 	const title = snapshot.title ?? t('作品概览')
 	const visible = chapters.slice((current - 1) * pageSize, current * pageSize)
-	const navigate = useNavigate()
 	const [exporting, setExporting] = useState(false)
 	const [settingsOpen, setSettingsOpen] = useState(false)
 	const canExport = Boolean(share && pickDestination && exportTarget)
@@ -417,16 +416,6 @@ export function WorkPage() {
 							</>
 						}
 						items={[
-							{
-								label: t('查看制作'),
-								icon: Clapperboard,
-								onSelect: () => navigate(workRoute('production', workId)),
-							},
-							{
-								label: t('作品设置'),
-								icon: Settings2,
-								onSelect: () => setSettingsOpen(true),
-							},
 							...(canExport
 								? [
 										{
@@ -436,6 +425,11 @@ export function WorkPage() {
 										},
 									]
 								: []),
+							{
+								label: t('作品设置'),
+								icon: Settings2,
+								onSelect: () => setSettingsOpen(true),
+							},
 						]}
 					/>
 					{exporting && share && pickDestination && exportTarget && (
