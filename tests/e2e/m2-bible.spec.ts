@@ -42,6 +42,15 @@ const scope = { level: 'series' } as const
 async function openCandidates(page: Page) {
 	const chip = page.getByRole('button', { name: /^候选与冲突/ })
 	if ((await chip.getAttribute('aria-expanded')) !== 'true') await chip.click()
+	await expect(page.getByRole('dialog', { name: '候选与冲突' })).toBeVisible()
+}
+
+async function closeCandidates(page: Page) {
+	const dialog = page.getByRole('dialog', { name: '候选与冲突' })
+	if (await dialog.isVisible()) {
+		await dialog.getByRole('button', { name: '关闭' }).click()
+		await expect(dialog).toBeHidden()
+	}
 }
 
 test('M2 bible and glossary views, accepts, rejects and preserves confirmed content against stale proposals', async () => {
@@ -297,22 +306,21 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 			await expect(
 				page.getByRole('heading', { name: '设定集', exact: true }),
 			).toBeVisible()
-			await openCandidates(page)
-			const volumeInput = page.getByRole('textbox', { name: '卷 ID' })
-			await volumeInput.focus()
-			await volumeInput.press('End')
-			await volumeInput.press('Backspace')
-			await volumeInput.press('2')
-			await expect(volumeInput).toBeFocused()
-			await expect(volumeInput).toHaveValue('v0002')
-			expect(page.url()).not.toContain('volume=v0002')
-			await volumeInput.press('Enter')
-			await expect(page.getByRole('alert')).toHaveText(
+			const volumeSelect = page.getByRole('combobox', { name: '切换卷' })
+			await expect(volumeSelect).toBeVisible()
+			await expect(volumeSelect).toHaveValue(volumeId)
+			await expect(page.getByRole('slider', { name: '截至章节' })).toBeVisible()
+			await page.evaluate((id) => {
+				window.location.hash = `/work/${id}/bible?volume=v0002`
+			}, workId)
+			await expect(page.getByRole('alert')).toContainText(
 				'工程中找不到这部作品或卷',
 			)
-			await expect(volumeInput).toHaveValue('v0002')
-			await volumeInput.fill(volumeId)
-			await page.getByRole('button', { name: '切换卷' }).click()
+			await expect(volumeSelect).toHaveValue('v0002')
+			await volumeSelect.selectOption(volumeId)
+			await expect(
+				page.getByText('小夏', { exact: true }).first(),
+			).toBeVisible()
 			const missing = await page.evaluate(async (workId) => {
 				try {
 					await window.novelive.call('proposal.get', {
@@ -384,6 +392,7 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 			await expect(
 				page.getByText('已接受候选；', { exact: false }),
 			).toBeVisible()
+			await closeCandidates(page)
 			await confirmed.getByRole('button', { name: '小夏', exact: true }).click()
 			await expect(confirmed.getByText('银发', { exact: false })).toBeVisible()
 			using db = new DatabaseSync(join(directory, 'project.db'))
@@ -403,6 +412,7 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 				'xia/uniform/base',
 				'xia/uniform/happy',
 			])
+			await openCandidates(page)
 			const rejected = page.getByRole('article', {
 				name: '不采用的术语',
 				exact: true,
@@ -452,8 +462,11 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 				.getByRole('button', { name: '接受候选' })
 				.click()
 			await expect(
-				page.getByRole('status').filter({ hasText: '已接受候选' }),
-			).toHaveText('已接受候选。')
+				page
+					.getByRole('status')
+					.getByRole('button', { name: '已接受候选。', exact: true }),
+			).toBeVisible()
+			await closeCandidates(page)
 			await page.getByRole('button', { name: /^术语/ }).click()
 			await expect(
 				confirmed.getByRole('rowheader', { name: '灯船', exact: true }),
@@ -636,6 +649,7 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 				character.getByRole('button', { name: '拒绝候选' }),
 			).toBeEnabled()
 			await expect(character).toContainText('Ada → Ava')
+			await closeCandidates(page)
 			await page.getByRole('button', { name: /^术语/ }).click()
 			const glossary = page
 				.getByRole('article', {
@@ -643,14 +657,17 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 				})
 				.filter({ hasText: '待确认' })
 			await page.getByRole('button', { name: /^角色/ }).click()
+			await openCandidates(page)
 			await character.getByRole('button', { name: '接受候选' }).click()
 			await expect(character).toHaveCount(0)
+			await closeCandidates(page)
 			await expect(
 				page
 					.getByRole('region', { name: '已登记内容' })
 					.getByRole('heading', { name: 'Ava', exact: true }),
 			).toBeVisible()
 			await page.getByRole('button', { name: /^术语/ }).click()
+			await openCandidates(page)
 			await expect(
 				glossary.getByRole('button', { name: '接受候选' }),
 			).toBeEnabled()
@@ -661,13 +678,17 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 			await expect(glossary).toHaveCount(0)
 			await page.reload()
 			await openCandidates(page)
+			await closeCandidates(page)
 			await expect(
 				page
 					.getByRole('region', { name: '已登记内容' })
 					.getByRole('heading', { name: 'Ava', exact: true }),
 			).toBeVisible()
+			await openCandidates(page)
 			await expect(character).toHaveCount(0)
+			await closeCandidates(page)
 			await page.getByRole('button', { name: /^术语/ }).click()
+			await openCandidates(page)
 			await expect(glossary).toHaveCount(0)
 			expect(
 				(await project.read(projectFiles.character(scope, 'ada'))).entries[0],

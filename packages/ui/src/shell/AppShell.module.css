@@ -16,6 +16,7 @@
 	background: var(--panel-70);
 	box-shadow: var(--shadow-glass);
 	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
 }
 
 .sideScroll,
@@ -67,11 +68,6 @@
 		background var(--dur-fast) var(--ease-out),
 		color var(--dur-fast) var(--ease-out),
 		box-shadow var(--dur-fast) var(--ease-out);
-}
-
-.navLink:hover .navBody[data-active="false"] {
-	background: var(--white-55);
-	color: var(--color-on-surface);
 }
 
 .navBody[data-active="true"] {
@@ -193,10 +189,6 @@
 	color: var(--color-primary);
 }
 
-.themes button:disabled {
-	cursor: not-allowed;
-}
-
 .main {
 	position: relative;
 	display: flex;
@@ -236,4 +228,33 @@
 	height: 1px;
 	overflow: hidden;
 	clip-path: inset(50%);
+}
+
+.agentOverlay {
+	position: absolute;
+	inset: 0;
+	z-index: 50;
+	pointer-events: none;
+}
+
+.agentOverlay > * {
+	pointer-events: auto;
+}
+
+.agentOverlay[data-state="exit"] > * {
+	pointer-events: none;
+}
+
+.agentOverlay[data-state="enter"] {
+	animation: drawer-in var(--dur-base) var(--ease-out) forwards;
+}
+
+.agentOverlay[data-state="exit"] {
+	animation: drawer-out var(--dur-base) var(--ease-out) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.agentOverlay {
+		animation: none;
+	}
 }

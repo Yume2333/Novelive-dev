@@ -7,17 +7,28 @@ import {
 	type LucideIcon,
 	Wallet,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import {
+	type ReactNode,
+	useEffect,
+	useId,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { Card, SectionLabel } from '../../components/Card'
+import { CompactSelect } from '../../components/Form'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { EmptyState, Page } from '../../components/Page'
 import { msg, scoped } from '../../i18n'
-import { Select } from '../settings/ModelFields'
 import styles from './UsagePage.module.css'
 
 const t = scoped('usage')
 
 type UsageRecord = CommandOutput<'usage.list'>['records'][number]['usage']
+
+type LibraryWork = CommandOutput<'library.list'>['works'][number]
 
 const all = ''
 
@@ -45,7 +56,16 @@ const money = (usd: number) =>
 		maximumFractionDigits: usd > 0 && usd < 1 ? 4 : 2,
 	})
 
-function totals(records: UsageRecord[]) {
+interface UsageTotals {
+	calls: number
+	input: number
+	output: number
+	images: number
+	cost: number | null
+	unpriced: number
+}
+
+function totals(records: UsageRecord[]): UsageTotals {
 	let input = 0
 	let output = 0
 	let images = 0
@@ -72,6 +92,14 @@ function totals(records: UsageRecord[]) {
 	}
 }
 
+function volumeTitleOf(work: LibraryWork): string | undefined {
+	if ('project' in work && work.project && typeof work.project === 'object') {
+		const volume = (work.project as Record<string, unknown>).volumeTitle
+		if (typeof volume === 'string') return volume
+	}
+	return undefined
+}
+
 function Stat({
 	icon: Icon,
 	label,
@@ -86,12 +114,61 @@ function Stat({
 	return (
 		<Card className={styles.stat}>
 			<span className={styles.statLabel}>
-				<Icon size={15} aria-hidden="true" />
+				<Icon size={15} strokeWidth={1.8} aria-hidden="true" />
 				<span className="label-caps label-caps-zh">{label}</span>
 			</span>
 			<div className={styles.statValue}>{value}</div>
 			{hint && <div className={styles.statHint}>{hint}</div>}
 		</Card>
+	)
+}
+
+interface BarTip {
+	/** 悬停/聚焦柱条的 key，用于 aria-describedby 与激活高亮 */
+	day: string
+	/** 锚点柱条元素：定位随滚动/缩放重算 */
+	anchor: HTMLElement
+	content: ReactNode
+}
+
+/** 图表玻璃提示卡：createPortal 挂到 body。
+    外层定位壳只做 fixed 定位与水平 clamp（translate(-50%, -100%) 向上抬起），
+    内层气泡负责 fade-up 入场动画 —— 二者严格分离（DESIGN.md）。 */
+function BarTooltip({ tip, id }: { tip: BarTip; id: string }) {
+	const shellRef = useRef<HTMLSpanElement>(null)
+
+	useLayoutEffect(() => {
+		const shell = shellRef.current
+		if (!shell) return
+		const place = () => {
+			const rect = tip.anchor.getBoundingClientRect()
+			const half = shell.offsetWidth / 2
+			const center = rect.left + rect.width / 2
+			const minX = 12 + half
+			const maxX = window.innerWidth - 12 - half
+			shell.style.left = `${
+				minX > maxX
+					? window.innerWidth / 2
+					: Math.max(minX, Math.min(maxX, center))
+			}px`
+			shell.style.top = `${rect.top - 8}px`
+		}
+		place()
+		window.addEventListener('resize', place)
+		window.addEventListener('scroll', place, true)
+		return () => {
+			window.removeEventListener('resize', place)
+			window.removeEventListener('scroll', place, true)
+		}
+	}, [tip])
+
+	return createPortal(
+		<span ref={shellRef} className={styles.tipShell}>
+			<span className={styles.tipCard} role="tooltip" id={id}>
+				{tip.content}
+			</span>
+		</span>,
+		document.body,
 	)
 }
 
@@ -105,6 +182,8 @@ export function UsagePage() {
 	const [phase, setPhase] = useState(all)
 	const [model, setModel] = useState(all)
 	const [titles, setTitles] = useState(new Map<string, string>())
+	const [tip, setTip] = useState<BarTip | null>(null)
+	const tooltipId = useId()
 	useEffect(() => {
 		let active = true
 		let request:
@@ -139,8 +218,7 @@ export function UsagePage() {
 					setTitles(
 						new Map(
 							works.map((w) => {
-								const volume = (w as { project?: { volumeTitle?: string } })
-									.project?.volumeTitle
+								const volume = volumeTitleOf(w)
 								return [
 									w.workId,
 									(count.get(w.title) ?? 0) > 1 && volume
@@ -167,17 +245,16 @@ export function UsagePage() {
 		[data],
 	)
 	const titleOf = (workId: string) => titles.get(workId) ?? workId
-	const options = (
+	const selectOptions = (
 		pick: (record: UsageRecord) => string,
 		label: string,
 		name: (value: string) => string = (value) => value,
-	) =>
-		[
-			[all, label] as const,
-			...[...new Set(records.map(pick))]
-				.sort()
-				.map((v) => [v, name(v)] as const),
-		] as const
+	) => [
+		{ value: all, label },
+		...[...new Set(records.map(pick))]
+			.sort()
+			.map((value) => ({ value, label: name(value) })),
+	]
 	const periodOf = (at: number) =>
 		granularity === 'month' ? dayOf(at).slice(0, 7) : dayOf(at)
 	const periods = records.map((r) => periodOf(r.at)).sort()
@@ -225,25 +302,78 @@ export function UsagePage() {
 	const phases = [...new Set(shown.map((r) => r.phase))].sort(
 		(a, b) => phaseOrder.indexOf(a) - phaseOrder.indexOf(b),
 	)
+
+	const showTip = (
+		day: string,
+		dayTotals: UsageTotals,
+		target: HTMLElement,
+	) => {
+		setTip({
+			day,
+			anchor: target,
+			content: (
+				<>
+					<span className={styles.tipTitle}>{day}</span>
+					<span className={styles.tipLine}>
+						{t('{{calls}} 次', {
+							calls: dayTotals.calls.toLocaleString(),
+						})}
+						{' · '}
+						{t('输入 {{input}} / 输出 {{output}}', {
+							input: dayTotals.input.toLocaleString(),
+							output: dayTotals.output.toLocaleString(),
+						})}
+						{dayTotals.images
+							? t(' · {{images}} 张', {
+									images: dayTotals.images.toLocaleString(),
+								})
+							: ''}
+					</span>
+					<span className={styles.tipCost}>
+						{dayTotals.cost === null
+							? t('暂无单价')
+							: t('参考 {{cost}}', { cost: money(dayTotals.cost) })}
+					</span>
+				</>
+			),
+		})
+	}
+	const hideTip = (day: string) =>
+		setTip((current) => (current?.day === day ? null : current))
+
+	// 提示卡打开期间按 Escape 关闭（与控件库 Tooltip 一致）；
+	// 数据刷新后锚点柱条已不在当前过滤结果中时一并收起
+	const tipGone = tip !== null && !perDay.some((row) => row.day === tip.day)
+	useEffect(() => {
+		if (!tip) return
+		if (tipGone) {
+			setTip(null)
+			return
+		}
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') setTip(null)
+		}
+		window.addEventListener('keydown', onKey)
+		return () => window.removeEventListener('keydown', onKey)
+	}, [tip, tipGone])
+
 	return (
 		<Page
 			title={t('用量统计')}
 			actions={
-				<span className={styles.granularity}>
-					<Select<Granularity>
-						label={t('统计粒度')}
-						options={[
-							['day', t('按天')],
-							['month', t('按月')],
-						]}
-						value={granularity}
-						onChange={(value) => {
-							setGranularity(value)
-							setFrom('')
-							setTo('')
-						}}
-					/>
-				</span>
+				<CompactSelect<Granularity>
+					aria-label={t('统计粒度')}
+					options={[
+						{ value: 'day', label: t('按天') },
+						{ value: 'month', label: t('按月') },
+					]}
+					value={granularity}
+					onChange={(value) => {
+						setGranularity(value)
+						setFrom('')
+						setTo('')
+					}}
+				/>
 			}
 		>
 			<div className={styles.content}>
@@ -268,27 +398,36 @@ export function UsagePage() {
 							</section>
 						)}
 						<div className={styles.filters}>
-							<Select<string>
-								label={t('作品')}
-								options={options((r) => r.link.workId, t('全部作品'), titleOf)}
+							<CompactSelect
+								aria-label={t('作品')}
+								options={selectOptions(
+									(r) => r.link.workId,
+									t('全部作品'),
+									titleOf,
+								)}
 								value={workId}
 								onChange={setWorkId}
 							/>
-							<Select<string>
-								label={t('阶段')}
-								options={options((r) => r.phase, t('全部阶段'), phaseLabel)}
+							<CompactSelect
+								aria-label={t('阶段')}
+								options={selectOptions(
+									(r) => r.phase,
+									t('全部阶段'),
+									phaseLabel,
+								)}
 								value={phase}
 								onChange={setPhase}
 							/>
-							<Select<string>
-								label={t('模型')}
-								options={options((r) => r.model, t('全部模型'))}
+							<CompactSelect
+								aria-label={t('模型')}
+								options={selectOptions((r) => r.model, t('全部模型'))}
 								value={model}
 								onChange={setModel}
 							/>
 							<span className={styles.range}>
 								<input
 									type={granularity === 'month' ? 'month' : 'date'}
+									className={`nl-input ${styles.rangeInput}`}
 									aria-label={t('开始日期')}
 									value={from || first}
 									max={to || last || undefined}
@@ -297,6 +436,7 @@ export function UsagePage() {
 								<span>{t('到')}</span>
 								<input
 									type={granularity === 'month' ? 'month' : 'date'}
+									className={`nl-input ${styles.rangeInput}`}
 									aria-label={t('结束日期')}
 									value={to || last}
 									min={from || first || undefined}
@@ -365,43 +505,68 @@ export function UsagePage() {
 												: styles.chart
 										}
 									>
-										{perDay.map(
-											({ day, calls, input, output, images, cost }, index) => (
-												<div
-													key={day}
-													className={styles.bar}
-													title={`${t(
+										{perDay.map((dayRow, index) => {
+											const active = tip?.day === dayRow.day
+											return (
+												<button
+													key={dayRow.day}
+													type="button"
+													className={
+														active
+															? `${styles.bar} ${styles.barActive}`
+															: styles.bar
+													}
+													aria-label={t(
 														'{{day}}：{{calls}} 次 · 输入 {{input}} / 输出 {{output}} · {{images}} 张图片',
 														{
-															day,
-															calls,
-															input,
-															output,
-															images,
+															day: dayRow.day,
+															calls: dayRow.calls,
+															input: dayRow.input,
+															output: dayRow.output,
+															images: dayRow.images,
 														},
-													)} · ${cost === null ? t('暂无单价') : t('参考 {{cost}}', { cost: money(cost) })}`}
+													)}
+													aria-describedby={active ? tooltipId : undefined}
+													onMouseEnter={(event) =>
+														showTip(dayRow.day, dayRow, event.currentTarget)
+													}
+													onMouseLeave={() => hideTip(dayRow.day)}
+													onFocus={(event) =>
+														showTip(dayRow.day, dayRow, event.currentTarget)
+													}
+													onBlur={() => hideTip(dayRow.day)}
+													onClick={(event) =>
+														showTip(dayRow.day, dayRow, event.currentTarget)
+													}
 												>
-													<span>{labelEvery > 1 ? '' : calls}</span>
+													<span className={styles.barCalls}>
+														{labelEvery > 1 ? '' : dayRow.calls}
+													</span>
 													<span className={styles.barTrack}>
 														<span
-															className={styles.barFill}
+															className={
+																active
+																	? `${styles.barFill} ${styles.barFillActive}`
+																	: styles.barFill
+															}
 															style={{
-																height: `${Math.max(4, (calls / maxDay) * 100)}%`,
+																height: `${Math.max(4, (dayRow.calls / maxDay) * 100)}%`,
 															}}
 														/>
 													</span>
 													<time
-														dateTime={day}
+														dateTime={dayRow.day}
 														hidden={index % labelEvery !== 0}
 													>
 														{granularity === 'month'
-															? day
-															: day.slice(5).replace('-', '/')}
+															? dayRow.day
+															: dayRow.day.slice(5).replace('-', '/')}
 													</time>
-												</div>
-											),
-										)}
+												</button>
+											)
+										})}
 									</div>
+									{tip ? <BarTooltip tip={tip} id={tooltipId} /> : null}
 								</Card>
 								<Card className={styles.panel}>
 									<SectionLabel>{t('按作品 × 阶段')}</SectionLabel>

@@ -563,12 +563,12 @@ test.describe('contract-render', () => {
 				await page
 					.getByRole('button', { name: '重写场景', exact: true })
 					.click()
-				await page.getByRole('checkbox', { name: /h2/ }).uncheck()
-				await page.getByRole('checkbox', { name: /h1/ }).uncheck()
+				await page.locator('label').filter({ hasText: 'h2' }).click()
+				await page.locator('label').filter({ hasText: 'h1' }).click()
 				await expect(
 					page.getByRole('button', { name: '应用勾选差异' }),
 				).toBeDisabled()
-				await page.getByRole('checkbox', { name: /h1/ }).check()
+				await page.locator('label').filter({ hasText: 'h1' }).click()
 				await page.getByRole('button', { name: '应用勾选差异' }).click()
 				await expect(
 					page.getByRole('textbox', { name: 'NVS 剧本' }),

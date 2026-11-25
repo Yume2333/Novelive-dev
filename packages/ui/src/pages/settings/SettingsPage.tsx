@@ -11,25 +11,32 @@ import {
 	Cable,
 	Check,
 	ChevronDown,
+	CircleCheck,
 	Contrast,
+	ExternalLink,
 	Eye,
 	FilePenLine,
 	FolderOpen,
 	Globe,
 	Image,
 	type LucideIcon,
+	RotateCcw,
+	X,
 	Zap,
 } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { Button, Spinner } from '../../components/Button'
 import { Collapse } from '../../components/Collapse'
+import { CompactSelect } from '../../components/Form'
+import { Modal } from '../../components/Modal'
 import { Page } from '../../components/Page'
+import { useToast } from '../../components/Toast'
 import { localeNames, locales, msg, scoped } from '../../i18n'
 import type { SettingsHost } from '../../shell/AppShell'
 import {
 	formatLabel,
 	type ModelDraft,
-	Select,
 	themes,
 	useImageFields,
 	useTextFields,
@@ -50,6 +57,22 @@ const capabilities = [
 	['transparent', msg('透明底')],
 	['edit', msg('图片编辑')],
 ] as const
+
+/**
+ * 主要第三方组件许可一览；完整许可文本随应用分发
+ * （打包版见 licenses/THIRD_PARTY_NOTICES.txt，可用右侧按钮打开原文）。
+ */
+const thirdPartyLicenses: ReadonlyArray<readonly [string, string]> = [
+	['React & React DOM', 'MIT License'],
+	['React Router', 'MIT License'],
+	['lucide-react', 'ISC License'],
+	['CodeMirror 6', 'MIT License'],
+	['Electron', 'MIT License'],
+	['sharp / libvips', 'LGPL-3.0-or-later'],
+	['Real-ESRGAN', 'BSD-3-Clause License'],
+	['upscayl-ncnn', 'AGPL-3.0 License'],
+	['Noto Sans SC / Noto Serif SC', 'SIL Open Font License 1.1'],
+]
 
 type ImageTests = CommandOutput<'model.testImage'>
 type TestResult = ImageTests | CommandOutput<'model.testText'>
@@ -101,17 +124,26 @@ function ImageResults({ results }: { results: ImageTests }) {
 				const error = result.ok ? undefined : readableError(result.error)
 				return (
 					<div key={capability} className={styles.result}>
-						<strong>{t(title)}</strong>
+						<span
+							className={`${styles.resultHead} ${result.ok ? styles.success : styles.error}`}
+						>
+							{result.ok ? (
+								<CircleCheck size={14} strokeWidth={1.8} aria-hidden="true" />
+							) : (
+								<AlertTriangle size={14} strokeWidth={1.8} aria-hidden="true" />
+							)}
+							{t(title)} · {result.ok ? t('测试成功') : t('未通过')}
+						</span>
 						{result.ok ? (
-							<>
-								<img
-									src={window.novelive.resourceUrl(result.thumbnail)}
-									alt={t('{{title}}测试缩略图', { title: t(title) })}
-								/>
-								<span className={styles.success}>{t('测试成功')}</span>
-							</>
+							<img
+								src={window.novelive.resourceUrl(result.thumbnail)}
+								alt={t('{{title}}测试缩略图', { title: t(title) })}
+							/>
 						) : (
-							<small className={styles.error} data-error-code={error?.code}>
+							<small
+								className={styles.errorBadge}
+								data-error-code={error?.code}
+							>
 								{error?.message}
 							</small>
 						)}
@@ -137,6 +169,7 @@ function ModelCard({
 	draft: ModelDraft
 	testModel(): { promise: Promise<TestResult>; cancel(): void }
 }) {
+	const toast = useToast()
 	const [open, setOpen] = useState(false)
 	const [phase, setPhase] = useState<'idle' | 'saving' | 'testing'>('idle')
 	const [result, setResult] = useState<TestResult>()
@@ -166,7 +199,10 @@ function ModelCard({
 				const response = await call.promise
 				if ('generate' in response) setOpen(true)
 				setResult(response)
-			} else setSaved(true)
+			} else {
+				setSaved(true)
+				toast(t('已保存'), Check)
+			}
 		} catch (failure) {
 			setError(
 				readableError(
@@ -178,6 +214,12 @@ function ModelCard({
 			setPhase('idle')
 		}
 	}
+
+	const feedbackIcon = error ? (
+		<AlertTriangle size={14} strokeWidth={1.8} aria-hidden="true" />
+	) : complete ? (
+		<CircleCheck size={14} strokeWidth={1.8} aria-hidden="true" />
+	) : null
 
 	return (
 		<section aria-label={title} className={styles.card}>
@@ -198,29 +240,44 @@ function ModelCard({
 						className={styles.chevron}
 						aria-hidden="true"
 						size={18}
+						strokeWidth={1.8}
 					/>
 				</button>
-				<small className={configured ? styles.success : styles.muted}>
+				<small className={configured ? styles.configured : styles.muted}>
 					{configured ? t('已配置') : t('未配置')}
 				</small>
 				{phase === 'testing' ? (
-					<button
+					<Button
+						size="sm"
 						className={styles.testButton}
-						type="button"
 						onClick={() => work.current?.abort()}
 					>
 						{t('取消')}
-					</button>
+					</Button>
 				) : (
-					<button
+					<Button
+						size="sm"
+						icon={Cable}
 						className={styles.testButton}
-						type="button"
 						disabled={busy}
 						onClick={() => void run(true)}
 					>
-						<Cable size={14} aria-hidden="true" /> {t('测试')}
-					</button>
+						{t('测试')}
+					</Button>
 				)}
+				{phase === 'testing' ? (
+					<span className={`${styles.statusNote} ${styles.muted}`}>
+						<Spinner size={13} />
+					</span>
+				) : error ? (
+					<span className={`${styles.statusNote} ${styles.error}`}>
+						<X size={14} strokeWidth={1.8} aria-hidden="true" />
+					</span>
+				) : complete ? (
+					<span className={`${styles.statusNote} ${styles.success}`}>
+						<CircleCheck size={14} strokeWidth={1.8} aria-hidden="true" />
+					</span>
+				) : null}
 			</div>
 			{(busy || result || error || (saved && !draft.dirty)) && (
 				<p
@@ -229,19 +286,26 @@ function ModelCard({
 					data-error-code={error?.code}
 				>
 					{phase === 'testing' ? (
-						t('正在测试…')
+						<>
+							<Spinner size={13} /> {t('正在测试…')}
+						</>
 					) : phase === 'saving' ? (
 						t('正在保存…')
 					) : error ? (
-						error.message
+						<>
+							{feedbackIcon} {error.message}
+						</>
 					) : complete ? (
 						<>
-							<Check size={14} aria-hidden="true" /> {t('连接成功')}
+							{feedbackIcon} {t('连接成功')}
 						</>
 					) : images ? (
 						t('测试完成，请查看各项结果。')
 					) : (
-						t('已保存')
+						<>
+							<Check size={14} strokeWidth={1.8} aria-hidden="true" />{' '}
+							{t('已保存')}
+						</>
 					)}
 				</p>
 			)}
@@ -252,13 +316,13 @@ function ModelCard({
 						{draft.fields}
 					</fieldset>
 					<div className={styles.actions}>
-						<button
-							type="button"
+						<Button
+							size="sm"
 							disabled={busy || !draft.dirty}
 							onClick={() => void run(false)}
 						>
 							{t('保存')}
-						</button>
+						</Button>
 					</div>
 				</div>
 			</Collapse>
@@ -334,7 +398,7 @@ export function ModelCards({
 	update: SettingsHost['updateConfig']
 }) {
 	return (
-		<div className={`${styles.page} ${styles.cards}`}>
+		<div className={styles.cards}>
 			{textSlots.map(([slot, title, icon]) => (
 				<TextCard
 					key={slot}
@@ -370,10 +434,12 @@ function SettingRow({
 
 export function SettingsPage() {
 	const { config, updateConfig, resetConfig } = useOutletContext<SettingsHost>()
+	const toast = useToast()
 	const [error, setError] = useState('')
 	const [resetting, setResetting] = useState(false)
 	const [about, setAbout] = useState<{ version: string; packaged: boolean }>()
 	const [checkingUpdates, setCheckingUpdates] = useState(false)
+	const [licensesOpen, setLicensesOpen] = useState(false)
 	const aboutHost = window.novelive.host.about
 	useEffect(() => {
 		void aboutHost?.info().then(setAbout, () => setAbout(undefined))
@@ -398,22 +464,26 @@ export function SettingsPage() {
 					<p className={styles.muted}>{t('正在读取设置…')}</p>
 				) : 'configError' in config ? (
 					<div className={styles.warning} role="alert">
-						<AlertTriangle size={19} aria-hidden="true" />
+						<AlertTriangle size={19} strokeWidth={1.8} aria-hidden="true" />
 						<div>
 							<strong>{t('配置文件无法读取')}</strong>
 							<p>{config.configError.reason}</p>
 							<p className={styles.path}>{config.configError.path}</p>
 						</div>
-						<button
-							type="button"
+						<Button
+							size="sm"
+							icon={RotateCcw}
 							disabled={resetting}
 							onClick={() => {
 								setResetting(true)
-								void apply(resetConfig).finally(() => setResetting(false))
+								void apply(async () => {
+									await resetConfig()
+									toast(t('配置已重置'), RotateCcw)
+								}).finally(() => setResetting(false))
 							}}
 						>
 							{t('重置配置')}
-						</button>
+						</Button>
 					</div>
 				) : (
 					<>
@@ -433,11 +503,13 @@ export function SettingsPage() {
 							</h2>
 							<div className={`${styles.card} ${styles.appearance}`}>
 								<SettingRow title={t('界面语言')} icon={Globe}>
-									<Select
-										label={t('界面语言')}
-										options={locales.map(
-											(locale) => [locale, localeNames[locale]] as const,
-										)}
+									<CompactSelect
+										aria-label={t('界面语言')}
+										className={styles.rowSelect}
+										options={locales.map((locale) => ({
+											value: locale,
+											label: localeNames[locale],
+										}))}
 										value={config.language}
 										onChange={(language) =>
 											void apply(() => updateConfig({ language }))
@@ -445,11 +517,13 @@ export function SettingsPage() {
 									/>
 								</SettingRow>
 								<SettingRow title={t('主题')} icon={Contrast}>
-									<Select
-										label={t('主题')}
-										options={themes.map(
-											([value, name]) => [value, t(name)] as const,
-										)}
+									<CompactSelect
+										aria-label={t('主题')}
+										className={styles.rowSelect}
+										options={themes.map(([value, name]) => ({
+											value,
+											label: t(name),
+										}))}
 										value={config.theme}
 										onChange={(theme) =>
 											void apply(() => updateConfig({ theme }))
@@ -467,8 +541,9 @@ export function SettingsPage() {
 									<small className={styles.path}>
 										{config.projectDir || t('未设置')}
 									</small>
-									<button
-										type="button"
+									<Button
+										size="sm"
+										icon={FolderOpen}
 										onClick={() =>
 											void apply(async () => {
 												const projectDir = await window.novelive.pickFolder()
@@ -478,7 +553,7 @@ export function SettingsPage() {
 										}
 									>
 										{t('更改')}
-									</button>
+									</Button>
 								</SettingRow>
 							</div>
 						</section>
@@ -504,20 +579,30 @@ export function SettingsPage() {
 									onClick={() => void apply(() => aboutHost.open('license'))}
 								>
 									{t('开源许可')}
+									<ExternalLink
+										size={12}
+										strokeWidth={1.8}
+										aria-hidden="true"
+									/>
 								</button>
-								{about?.packaged && (
-									<button
-										type="button"
-										onClick={() => void apply(() => aboutHost.open('notices'))}
-									>
-										{t('第三方许可')}
-									</button>
-								)}
+								<button type="button" onClick={() => setLicensesOpen(true)}>
+									{t('第三方许可')}
+									<ExternalLink
+										size={12}
+										strokeWidth={1.8}
+										aria-hidden="true"
+									/>
+								</button>
 								<button
 									type="button"
 									onClick={() => void apply(() => aboutHost.open('source'))}
 								>
 									{t('源代码')}
+									<ExternalLink
+										size={12}
+										strokeWidth={1.8}
+										aria-hidden="true"
+									/>
 								</button>
 								<button
 									type="button"
@@ -536,6 +621,46 @@ export function SettingsPage() {
 					</div>
 				</section>
 			</div>
+			<Modal
+				open={licensesOpen}
+				title={t('第三方许可')}
+				onClose={() => setLicensesOpen(false)}
+				width={520}
+				footer={
+					<>
+						{about?.packaged && aboutHost ? (
+							<Button
+								variant="ghost"
+								icon={ExternalLink}
+								onClick={() =>
+									void apply(async () => {
+										await aboutHost.open('notices')
+										setLicensesOpen(false)
+									})
+								}
+							>
+								{t('打开完整文本')}
+							</Button>
+						) : null}
+						<Button variant="primary" onClick={() => setLicensesOpen(false)}>
+							{t('关闭')}
+						</Button>
+					</>
+				}
+			>
+				<div className={styles.licenses}>
+					{thirdPartyLicenses.map(([name, license], index) => (
+						<div
+							key={name}
+							className={styles.licenseRow}
+							data-first={index === 0 || undefined}
+						>
+							<strong>{name}</strong>
+							<span>{license}</span>
+						</div>
+					))}
+				</div>
+			</Modal>
 		</Page>
 	)
 }
