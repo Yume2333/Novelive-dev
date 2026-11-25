@@ -76,8 +76,11 @@ export function GlobalProductionQueue() {
 			setQueue(undefined)
 			setError(t('创作端已断开，等待重新连接。'))
 		})
+		// An explicit reload (drawer open, 重新读取, creator.ready) must always
+		// fetch when the creator is ready: events emitted before an external
+		// change can otherwise suppress the fetch with a stale payload.
 		void window.novelive.host.appState().then((state) => {
-			if (active && revision === 0 && state.creator === 'ready') load()
+			if (active && state.creator === 'ready') load()
 		})
 		return () => {
 			active = false

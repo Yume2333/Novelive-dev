@@ -201,6 +201,13 @@ test('prototype sidebar switches from a project to an installed work', async () 
 			await expect(sidebar.getByText('工程作品', { exact: true })).toBeVisible()
 			await sidebar.getByRole('button', { name: '换一部作品' }).click()
 			await page.getByRole('menuitem', { name: '导入的作品包 · v3' }).click()
+			await expect(page).toHaveURL(new RegExp(`#/package/${packageWorkId}/3$`))
+			// Package selection in the switcher now navigates straight into the
+			// player (task 02); returning to the library must surface the package
+			// as the sidebar's recent work.
+			await page.evaluate(() => {
+				location.hash = '/'
+			})
 			await expect(page).toHaveURL(/#\/$/)
 			const play = page
 				.getByRole('navigation', { name: '作品导航' })
