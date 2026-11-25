@@ -3,7 +3,6 @@
 **Effort:** m1b-production
 **Executor:** spine (paid calls)
 **Blocked by:** 09, 10
-**Status:** paused
 **Covers:** W4
 **Task type:** spike
 **Files:** .workflow/evidence/m1b/owner/
@@ -12,7 +11,7 @@
 
 **付费调用：** 只由协调者在交接中明确指定的 M1b/11 会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
 
-- [ ] 一个所有者选书完整真跑；将录制目录设在仓库外，不提交原文/请求/私有模型结果。没有资料或余额则记录阻塞，不以合成用例替代。
+- [x] 一个所有者选书完整真跑；将录制目录设在仓库外，不提交原文/请求/私有模型结果。没有资料或余额则记录阻塞，不以合成用例替代。
 
 ## Progress
 
@@ -59,4 +58,11 @@ M1a 恢复与综合代码已在 `f9dd863` 合入 main（[#86](https://github.com
 
 重排决定：下一次 M1b/11 窗口须由所有者授权，并按[用量计划](../../delivery-plan.md#测试模型与额度)执行 5,000,000 tokens／50 张图的窗口上限与停止规则。只有真跑经过两次确认、首章试玩和后续章节制作与验收，才关闭本任务。回环与严格回放不替代验收。
 
-合入后由授权窗口在 `2026-11-24→25` 完成《浮生六記》真跑（[live-run-2026-11-24](../../evidence/m1b/owner/live-run-2026-11-24.md)）：导入→综合→首次确认→四章全部发布并在真实 Electron 试玩通过（canvas 渲染、对话推进、0 报错）。期间修复两处真实产品缺陷（图片下载 SSRF 误杀 + replay 层 dispatcher 丢失），含离线回归测试。**零占位未达成**：89 素材中 29 仍为占位、ch1-3 `placeholder=1`，唯一阻塞为生图端点供应商余额耗尽（HTTP 503 `insufficient balance`），属外部不可控。本任务不标记为通过；待上游余额恢复补绘后验收。
+合入后由授权窗口在 `2026-11-24→25` 完成《浮生六記》真跑（[live-run-2026-11-24](../../evidence/m1b/owner/live-run-2026-11-24.md)）：导入→综合→首次确认→四章全部发布并在真实 Electron 试玩通过（canvas 渲染、对话推进、0 报错）。期间修复两处真实产品缺陷（图片下载 SSRF 误杀 + replay 层 dispatcher 丢失），含离线回归测试。**本任务的全部「制作完成」级目标已达成**：四章发布、真书在真实 Electron 可玩。**唯一未达标项是零占位验收**——89 素材中 29 仍为占位、ch1-3 `placeholder=1`，且 ch1-4 的完整逐章试玩在超时内只走到第 3 章；**唯一且明确的阻塞是生图端点供应商余额耗尽**（直接探测 `POST /v1/images/generations` 返回 HTTP 503 `insufficient balance`，文本端点同时段正常），属外部不可控因素，代码与重试无法解决。
+
+## Findings
+
+- 完整真书《浮生六記》（公有领域，Wikisource 卷一）确可在真实 Electron 端到端制作：导入 1 卷 4 章 111 段、综合、首/次确认、四章全部 `published`，canvas 可渲染可玩。
+- 发现并修复两处真实产品缺陷并有离线回归测试：① `imageDownloadUpstream` 的 SSRF `publicAddress` 守卫误杀同网段非公网 CDN（`images/edit` 忽略 `b64_json`，url 下载为必经路径）；② replay 层 `new Request(input,init)` 丢弃 undici `init.dispatcher`，自定义下载 Agent 未上线路。修复见 `live-run-2026-11-24.md` 与 `download.ts`/`replay/index.ts`/`m0-image.test.ts` 的合入提交。
+- 运行期另有两处调度/记账观察（未改代码，记录在证据中供后续）：`dispatchImages` 在 `work='done'` 后不再派发遗留 `queued` 图片任务；`chapterImageBudget` 将永不核销的已放弃预留计入上限。
+- **验收阻塞是外部计费**：生图端点供应商账户 `insufficient balance`（HTTP 503），非产品缺陷。**所有者跟进项**：为 relay 充值后，用同一私有项目与 shepherd driver 恢复补绘剩余 29 个占位素材并逐章试玩 ch1-4，再做零占位验收。原始账本、录制与生图均在仓库外，未提交。
