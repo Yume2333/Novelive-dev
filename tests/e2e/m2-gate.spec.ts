@@ -318,16 +318,16 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await page.getByRole('button', { name: 'Novelive Agent' }).click()
 		await page.getByRole('button', { name: 'Novelive Agent' }).click()
 		await expect(chatDiff).toBeVisible()
-		for (const box of await chatDiff.getByRole('checkbox').all())
-			await box.uncheck()
+		for (const label of await chatDiff.locator('label').all())
+			await label.click()
 		await expect(
 			chatDiff.getByRole('button', { name: '应用勾选差异' }),
 		).toBeDisabled()
 		await chatDiff
+			.locator('ins', { hasText: '笛声' })
+			.locator('..')
 			.locator('label')
-			.filter({ hasText: '笛声' })
-			.getByRole('checkbox')
-			.check()
+			.click()
 		await capture(page, '05-agent-rewrite-selected')
 		const beforeAgent = (
 			await script.locator('.cm-line').allTextContents()
@@ -373,7 +373,9 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		)
 		expect(reopened).toEqual(history)
 		await page.getByRole('button', { name: 'Novelive Agent' }).click()
-		await expect(page.getByText('已确认', { exact: true })).toBeVisible()
+		await expect(
+			page.getByRole('status').filter({ hasText: '已确认' }).first(),
+		).toBeVisible()
 		await expect(page.getByRole('region', { name: '重写差异' })).toHaveCount(0)
 		await capture(page, '06-reopened-persisted')
 		await page.getByRole('button', { name: 'Novelive Agent' }).click()
