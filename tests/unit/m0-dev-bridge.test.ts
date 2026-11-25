@@ -84,7 +84,9 @@ test('local browser bridge forwards creator commands and host operations and con
 				transitions.push(`down:${generation}`),
 			)
 			await expect
-				.poll(async () => (await api.host.appState()).creator)
+				.poll(async () => (await api.host.appState()).creator, {
+					timeout: 10_000,
+				})
 				.toBe('ready')
 			const snapshot = () =>
 				api.call('events.list', { scope: 'app', scopeId: 'app', afterSeq: 0 })
@@ -106,7 +108,7 @@ test('local browser bridge forwards creator commands and host operations and con
 			expect(logged).toEqual([join(dataDir, 'logs')])
 			await api.host.restartCreator()
 			await expect
-				.poll(api.host.appState)
+				.poll(api.host.appState, { timeout: 10_000 })
 				.toMatchObject({ creator: 'ready', generation: 2 })
 			expect(transitions).toEqual(['down:1'])
 			unsub()

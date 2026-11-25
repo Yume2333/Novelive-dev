@@ -667,7 +667,23 @@ export async function applyPatches(
 			}
 			const op = originalIds.has(id) ? 'update' : 'add'
 			const source = merged.find((item) => item.op === op) ?? merged[0]
-			consolidated.set(group[0], { ...source, op, entry } as Patch)
+			const consolidatedEntry =
+				(kind === 'location' || kind === 'relation') &&
+				!('description' in entry && entry.description)
+					? {
+							...entry,
+							description:
+								('description' in source.entry && source.entry.description) ||
+								changesOf(entry).find(({ field }) => field === 'description')
+									?.value ||
+								'',
+						}
+					: entry
+			consolidated.set(group[0], {
+				...source,
+				op,
+				entry: consolidatedEntry,
+			} as Patch)
 		}
 		const survivors = [...entries.values()]
 		Object.assign(published, { [kind]: survivors })

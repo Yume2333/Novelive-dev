@@ -1,0 +1,41 @@
+{
+	"status": "passed",
+	"sha256": "b8142265e2506899a6683be88fcd8d018a8050f7c42437160e34c7636475b2ad",
+	"chapters": 154,
+	"volumes": 20,
+	"comparedChapters": 7,
+	"previewBytes": 19122,
+	"packets": 5,
+	"events": 11,
+	"synthesisModel": "devin-swe-2",
+	"selectionModel": "devin-swe-2",
+	"whole": 44,
+	"chunked": 52,
+	"shared": 29,
+	"wholeOnly": 15,
+	"chunkedOnly": 23,
+	"f1": 0.6041666666666666,
+	"reference": 44,
+	"leaveOneOut": [
+		0.6923076923076923,
+		0.6067415730337079,
+		0.6506024096385542
+	],
+	"baseline": 0.6498838916599848,
+	"normalized": 0.929653241786708,
+	"confirmedIntact": true,
+	"restartRequests": 0,
+	"restartIntact": true,
+	"stats": {
+		"calls": 20,
+		"tokens": 200949,
+		"images": 0,
+		"reserved": 0,
+		"previewCalls": 8,
+		"synthesisCalls": 12,
+		"packetCount": 5,
+		"resumedPacket": 0,
+		"resumedEvents": 0,
+		"selectionPrompts": []
+	}
+}

@@ -29,7 +29,23 @@ const aliasesOf = (entry: object) =>
 				(label): label is string => typeof label === 'string',
 			)
 		: []
-
+const shortLocationVariantLabels = (entry: object) =>
+	'variants' in entry && Array.isArray(entry.variants)
+		? entry.variants.flatMap((variant) => {
+				const description =
+					variant &&
+					typeof variant === 'object' &&
+					'description' in variant &&
+					typeof variant.description === 'string'
+						? variant.description.trim()
+						: ''
+				return description &&
+					description.length <= 12 &&
+					!/[，。；：！？,.!?;:\s]/u.test(description)
+					? [description]
+					: []
+			})
+		: []
 function names(entries: readonly Named[]) {
 	const byLabel = new Map<string, string | null>()
 	const spellings = new Set<string>()
@@ -200,7 +216,11 @@ function normalizeNames(patch: BiblePatch, bible: Bible): BiblePatch {
 	const existingLocations = names(
 		bible.location.map((entry) => ({
 			...entry,
-			aliases: [...aliasesOf(entry), locationName(entry.name)],
+			aliases: [
+				...aliasesOf(entry),
+				...shortLocationVariantLabels(entry),
+				locationName(entry.name),
+			],
 		})),
 	)
 	const pendingLocations = new Map<string, Named>()
@@ -226,11 +246,22 @@ function normalizeNames(patch: BiblePatch, bible: Bible): BiblePatch {
 			continue
 		const { entry } = item
 		const name = locationName(entry.name)
-		const existing =
-			existingLocations.id(entry.name) ?? existingLocations.id(name)
+		const aliasCandidates = [
+			entry.name,
+			name,
+			...aliasesOf(entry),
+			...shortLocationVariantLabels(entry),
+		]
+		const existing = aliasCandidates
+			.map((label) => existingLocations.id(label))
+			.find((id): id is string => Boolean(id))
 		const known = (existing && bibleLocations.get(existing)) || undefined
 		const label = key(name)
-		const prior = locationsByName.get(label)
+		const prior = aliasCandidates
+			.map((candidate) => locationsByName.get(key(locationName(candidate))))
+			.find((found): found is { entry: Named; normalizedOwner: boolean } =>
+				Boolean(found),
+			)
 		const normalizedOwner = name !== entry.name
 		const originalKey = (value: string) => key(locationName(value))
 		const canonical =
@@ -238,11 +269,19 @@ function normalizeNames(patch: BiblePatch, bible: Bible): BiblePatch {
 				? known
 				: prior &&
 						compatibleOriginals(entry, prior.entry, originalKey) &&
-						(normalizedOwner || prior.normalizedOwner)
+						(normalizedOwner ||
+							prior.normalizedOwner ||
+							key(prior.entry.name) !== label)
 					? prior.entry
 					: { ...entry, name }
-		if (label && !prior)
-			locationsByName.set(label, { entry: canonical, normalizedOwner })
+		for (const candidate of aliasCandidates) {
+			const candidateKey = key(locationName(candidate))
+			if (candidateKey && !locationsByName.has(candidateKey))
+				locationsByName.set(candidateKey, {
+					entry: canonical,
+					normalizedOwner,
+				})
+		}
 		pendingLocations.set(entry.id, canonical)
 	}
 	const characterLabels = new Map<string, Named>()
@@ -259,7 +298,11 @@ function normalizeNames(patch: BiblePatch, bible: Bible): BiblePatch {
 		const canonical = pendingLocations.get(item.entry.id)
 		if (!canonical || bibleLocations.has(canonical.id)) continue
 		const aliases = locationAliases.get(canonical.id) ?? new Set<string>()
-		for (const label of [item.entry.name, ...aliasesOf(item.entry)])
+		for (const label of [
+			item.entry.name,
+			...aliasesOf(item.entry),
+			...shortLocationVariantLabels(item.entry),
+		])
 			if (key(label) && key(label) !== key(canonical.name)) aliases.add(label)
 		locationAliases.set(canonical.id, aliases)
 	}

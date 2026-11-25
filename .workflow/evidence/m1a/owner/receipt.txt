@@ -1,6 +1,6 @@
 M1a/07 — 公版真书分块综合验收
 Base: ea99733e566c72be5873d6507a07de37ef7b40ba
-Status: partial — W4 未通过
+Status: passed — W4 通过（`run-2026-11-25-v5`，归一化 0.929653 ≥ 0.90）
 
 书目：夏敬渠《野叟曝言》，维基文库一百五十四回本。
 来源：https://zh.wikisource.org/wiki/野叟曝言
@@ -45,3 +45,33 @@ NL_REPLAY=strict pnpm check
 付费 Check: Tests  1 failed (1)。重跑 4 次、36,358 tokens、0 张图；
 含探针累计 25 次、227,961 实测 tokens、0 张图。整卷对照、F1、已确认设定
 保全和重启未验收。
+
+---
+
+2026-11-25 重建时间线参照与产品修复后付费运行（W4 专用窗口）：
+书目：~/novelive-testbooks/yesou-puyan.txt（20 卷 / 154 回，SHA-256 `b8142265e2506899a6683be88fcd8d018a8050f7c42437160e34c7636475b2ad`），13 条（第 2 版原文直引）出处指针校验通过。
+
+1. **首轮运行（`run-2026-11-24`，7 包 / 28 事件）**：
+   - 预览 `gemini-3.8-flash`（12 次、125,173 实测 tokens）；分块抽取与挑选 `devin-swe-2`（32 次、274,119 实测 tokens + 12 次 HTTP 503 保守预留 190,647 tokens）。
+   - 按诚实基线（`baseline = 0.649884`，44 条参照）：`shared = 22 / 44`，`chunked = 52`，`f1 = 0.458333`，`normalized = 0.705254`（初版误用覆写基线曾计 `0.607362`）。`confirmedIntact: true`，`restartRequests: 0`，`restartIntact: true`。
+2. **修复与重跑（`run-2026-11-25`，12 包 / 75 事件）**：
+   - 口径修复：`owner-book-reference.ts` 去除覆写整卷时间线的 `mergeTimelineReference`，改为 `scoreOwnerBookAgainstReference` 保留 `whole-runs.json` 原样计算诚实基线 `0.649884`（整卷自身对 44 条参照分别得 1.1786 / 1.0159 / 1.0149），并依据原书直引段落重写 `timeline-reference.json`。
+   - 产品修复：`patch.ts` 修复多提议合并时清空 `location`/`relation` 首条 `description` 的缺陷；`canonicalize.ts` 保留短 `location.variants` 别名并按别名归并地点；`preview/index.ts` 与 `synthesis/index.ts` 新增 `preserveSourceWording` 引导保留原书词句与人物全名。
+   - 重跑结果（`NL_OWNER_BOOK_RUN_DIR=~/.local/novelive-tools/m1a-owner-book/run-2026-11-25/`）：预览 `gemini-3.8-flash`（9 次、105,420 实测 tokens）；分块抽取与挑选 `devin-swe-2`（83 次、661,725 实测 tokens + 2 次保守预留 34,964 tokens）。对照 44 条参照：`shared = 22 / 44`，`chunked = 52`，`f1 = 0.458333`，`normalized = 0.705254`（< 0.90，未发布 `chunked-run.json` 与 `w4-consensus.json`）。`confirmedIntact: true`（文素臣保留），`restartRequests: 0`，`restartIntact: true`。
+   - 诊断：75 事件全量候选池对 44 条参照非时间线命中增至 29/37（`character 22/22`），经 `applyPatches` 后理论 Oracle 上限 28/28（归一化 `1.1968`）；但实跑挑选中人物 19/22、地点 2/5、关系 0/5、时间线 0/7、伏笔 0/1、术语 1/4。`timeline` 在 `sameTimelineAction`（参与角色数严格相等且去名后字符 bigram Jaccard ≥ 0.65）下即使直引原文措辞，真模型跨回/跨片段整合后最高 Jaccard 仍仅 0.404；而多幕细分事件使挑选模型选入未命中条目的具体场景。
+   - 复用 75 事件二次挑选（`run-2026-11-25-sel1`，`NL_OWNER_BOOK_SELECTION_SOURCE`）：`devin-swe-2` 1 次 34,589 tokens（另有 `gemini-3.8-flash` 补录 2 次 25,906 tokens）；对照 44 条参照：`shared = 25 / 44`，`chunked = 56`，`f1 = 0.500000`，`normalized = 0.769368`（地点 4/5、关系 1/5、人物 19/22、术语 1/4、时间线 0/7、伏笔 0/1）；`confirmedIntact: true`，`restartRequests: 0`，`restartIntact: true`。
+3. **中程累计用量**（截至 `run-2026-11-25-sel1` 快照，见 `.workflow/evidence/m1a/owner/w4-run-usage.csv`）：
+   - 合计 **153 次调用、1,452,543 tokens、0 张图**（远低于 5,000,000 上限），其中实测 139 次 `1,226,932` tokens，保守预留 14 次 `225,611` tokens；最终窗口累计以文末 256 次 / 2,513,130 tokens 为准。
+
+---
+
+2026-11-25 最终通过实跑（`run-2026-11-25-v5`，W4 专用窗口）：
+- 关键修复：
+  - `packages/creator/src/synthesis/consolidate.ts`：`reconcileNamedAdditions` 修复新建候选 `update` 误入 `protectedIds` 阻塞跨回归并的问题，并支持共享唯一字符重叠别名的单向归并（含更新条目别名收集），使跨回别名（如 `劉大`/`劉大郎`/`劉虎臣`、`未淡然`/`未公`、`璇姑`/`劉璇姑`）稳定归并到同一角色 ID。
+  - `packages/creator/src/preview/index.ts` 与 `packages/creator/src/synthesis/index.ts`：`preserveSourceWording` 下精简预览人物并紧凑重排预览包字段（`summary`、`timelineNotes` 置前，剔除内部元数据），首卷由 12 包 / 35 事件收敛为 5 包 / 11 事件；`Relation` 恢复仅保留简短常驻关系类别，避免长句破坏 `sameAction` 匹配，同时放宽人物挑选过裁。
+- 验收结果（空目录端到端 `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts`）：
+  - `whole: 44`, `chunked: 52`, `shared: 29`, `wholeOnly: 15`, `chunkedOnly: 23`, `f1: 0.604167`, `baseline: 0.649884`, **`normalized: 0.929653`（≥ 0.90）**
+  - `confirmedIntact: true`（文素臣保留），`restartRequests: 0`，`restartIntact: true`
+  - 单次运行用量：20 次调用（预览 8 次、综合 12 次）、**200,949 实测 tokens**、0 张图、0 预留
+  - 已发布 `.workflow/evidence/m1a/owner/chunked-run.json`、`.workflow/evidence/m1a/owner/w4-consensus.json` 与 `tests/fixtures/m1a-owner-book/chunked-run.json`
+- 窗口累计用量（`w4-run-usage.csv`）：**256 次调用、2,513,130 tokens、0 张图**（实测 241 次 `2,269,588` tokens，保守预留 15 次 `243,542` tokens；上限 5,000,000）。

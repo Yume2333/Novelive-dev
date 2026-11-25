@@ -652,3 +652,207 @@ test('selecting a deduplicated term preserves distinct notes from later proposal
 	)
 	expect(result.glossaryPatch).toEqual([combined])
 })
+
+test('canonicalizeAdditions preserves short location variant names as aliases and merges alias-matched locations', () => {
+	const lake = {
+		kind: 'location' as const,
+		op: 'add' as const,
+		entry: {
+			id: 'hangzhou-west-lake',
+			name: '杭州西湖',
+			description: 'Lake in Hangzhou',
+			variants: [
+				{ id: 'west-lake', description: '西湖' },
+				{
+					id: 'bank',
+					description: 'A long descriptive note that is not an alias.',
+				},
+			],
+			status: 'candidate' as const,
+		},
+	}
+	const cellar = {
+		kind: 'location' as const,
+		op: 'add' as const,
+		entry: {
+			id: 'cellar',
+			name: 'Temple Cellar',
+			aliases: ['Cellar Annex'],
+			description: 'Hidden room',
+			status: 'candidate' as const,
+		},
+	}
+	const annex = {
+		kind: 'location' as const,
+		op: 'add' as const,
+		entry: {
+			id: 'cellar-annex',
+			name: 'Cellar Annex',
+			description: 'Same hidden room',
+			status: 'candidate' as const,
+		},
+	}
+	const canonicalized = canonicalizeAdditions(
+		[lake, cellar, annex],
+		emptyBible,
+		['c1'],
+	)
+	expect(canonicalized).toMatchObject([
+		{ entry: { id: 'hangzhou-west-lake', aliases: ['西湖'] } },
+		{
+			entry: { id: 'cellar', name: 'Temple Cellar', aliases: ['Cellar Annex'] },
+		},
+		{
+			entry: { id: 'cellar', name: 'Temple Cellar', aliases: ['Cellar Annex'] },
+		},
+	])
+})
+
+test('reconcileNamedAdditions merges mutual-alias character additions and combines aliases', () => {
+	const patch: BiblePatch = [
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				id: 'liu-da',
+				name: '劉大',
+				aliases: ['劉郎', '劉大郎'],
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				id: 'liu-dalang',
+				name: '劉大郎',
+				aliases: ['劉大', '劉虎臣'],
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'relation',
+			op: 'add',
+			entry: {
+				id: 'rel-1',
+				from: 'liu-dalang',
+				to: 'liu-da',
+				description: 'self check skip',
+				status: 'candidate',
+			},
+		},
+	]
+	const separate = reconcileNamedAdditions(patch, emptyBible)
+	expect(separate.map((item) => item.entry.id)).toEqual([
+		'liu-da',
+		'liu-dalang',
+		'rel-1',
+	])
+	const merged = reconcileNamedAdditions(patch.slice(0, 2), emptyBible)
+	expect(merged).toEqual([
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				id: 'liu-da',
+				name: '劉大',
+				aliases: ['劉郎', '劉大郎', '劉虎臣'],
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				id: 'liu-da',
+				name: '劉大郎',
+				aliases: ['劉大', '劉虎臣', '劉郎'],
+				status: 'candidate',
+			},
+		},
+	])
+})
+
+test('reconcileNamedAdditions merges updated candidates and unique one-way alias-named entries while keeping unrelated homonyms separate', () => {
+	const patch: BiblePatch = [
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				id: 'wei-danran',
+				name: '未淡然',
+				aliases: ['未公'],
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				id: 'wei-gong',
+				name: '未公',
+				aliases: ['未老爺'],
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'character',
+			op: 'update',
+			entry: {
+				id: 'wei-gong',
+				name: '未公',
+				aliases: ['未老爺'],
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				id: 'xi-nang',
+				name: '奚囊',
+				aliases: ['小童'],
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'character',
+			op: 'add',
+			entry: {
+				id: 'wei-xiaotong',
+				name: '小童',
+				aliases: [],
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'relation',
+			op: 'add',
+			entry: {
+				id: 'rel-1',
+				from: 'wei-gong',
+				to: 'wei-xiaotong',
+				description: 'Master and attendant',
+				status: 'candidate',
+			},
+		},
+	]
+	const reconciled = reconcileNamedAdditions(patch, emptyBible)
+	expect(
+		reconciled
+			.filter((item) => item.kind === 'character')
+			.map((item) => item.entry.id),
+	).toEqual([
+		'wei-danran',
+		'wei-danran',
+		'wei-danran',
+		'xi-nang',
+		'wei-xiaotong',
+	])
+	expect(reconciled[0]).toMatchObject({
+		entry: { id: 'wei-danran', aliases: ['未公', '未老爺'] },
+	})
+	expect(reconciled[5]).toMatchObject({
+		entry: { from: 'wei-danran', to: 'wei-xiaotong' },
+	})
+})
