@@ -130,8 +130,8 @@ select:focus,
 textarea:focus,
 .nl-input:focus {
 	outline: none;
-	background: var(--white-90);
-	box-shadow: var(--shadow-focus);
+	background: var(--white-90) !important;
+	box-shadow: var(--shadow-focus) !important;
 }
 
 .nl-check-input:focus-visible + .nl-check-box {
@@ -182,11 +182,11 @@ button.glass-panel:active:not(:disabled) {
 }
 
 .nl-btn-primary:hover:not(:disabled) {
-	background: var(--color-primary-container);
+	background: var(--color-primary-container) !important;
 }
 .nl-btn-ghost:hover:not(:disabled) {
-	background: var(--white-60);
-	color: var(--color-on-surface);
+	background: var(--white-60) !important;
+	color: var(--color-on-surface) !important;
 }
 .nl-btn-danger:hover:not(:disabled) {
 	filter: brightness(0.96);
@@ -216,8 +216,8 @@ button.glass-panel:active:not(:disabled) {
 		box-shadow var(--dur-fast) var(--ease-out);
 }
 .nl-nav-item[data-active="false"]:hover {
-	background: var(--white-55);
-	color: var(--color-on-surface);
+	background: var(--white-55) !important;
+	color: var(--color-on-surface) !important;
 }
 
 .nl-card-interactive {
@@ -229,8 +229,8 @@ button.glass-panel:active:not(:disabled) {
 		background var(--dur-fast) var(--ease-out);
 }
 .nl-card-interactive:hover {
-	border-color: var(--white-90);
-	box-shadow: var(--shadow-pop);
+	border-color: var(--white-90) !important;
+	box-shadow: var(--shadow-pop) !important;
 }
 .nl-card-interactive:active {
 	transform: scale(0.995);

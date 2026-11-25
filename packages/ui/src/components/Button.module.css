@@ -62,5 +62,7 @@
 }
 
 .spin {
+	display: inline-flex;
+	flex-shrink: 0;
 	animation: spin var(--dur-spin) linear infinite;
 }

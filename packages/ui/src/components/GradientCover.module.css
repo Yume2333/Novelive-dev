@@ -78,6 +78,12 @@
 	text-shadow: var(--cover-title-shadow);
 }
 
+.author {
+	color: var(--cover-author);
+	font-size: 10px;
+	letter-spacing: 0.25em;
+}
+
 .compact .spine {
 	width: 8px;
 }

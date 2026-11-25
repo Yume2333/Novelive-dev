@@ -1,3 +1,13 @@
 {
-	"关闭": "Close"
+	"上一页": "Previous page",
+	"下一页": "Next page",
+	"关闭": "Close",
+	"制作中": "Producing",
+	"取消": "Cancel",
+	"已发布": "Published",
+	"清除": "Clear",
+	"点击关闭": "Click to dismiss",
+	"确认": "Confirm",
+	"等待": "Waiting",
+	"需要处理": "Needs attention"
 }

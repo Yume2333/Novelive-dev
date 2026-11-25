@@ -2,6 +2,7 @@ import type { Novelive } from '@novelive/creator/contract'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { ToastProvider } from './components/Toast'
 import { BiblePage } from './pages/bible/BiblePage'
 import { ConfirmFirstPage } from './pages/confirm/ConfirmFirstPage'
 import { ConfirmVisualPage } from './pages/confirm/ConfirmVisualPage'
@@ -40,36 +41,38 @@ const root = document.getElementById('root')
 if (root)
 	createRoot(root).render(
 		<StrictMode>
-			<HashRouter>
-				<Routes>
-					<Route path={productionRoutes.play} element={<PlayerPage />} />
-					<Route path="/package/:id/:version" element={<PlayerPage />} />
-					<Route path="/welcome" element={<WelcomePage />} />
-					<Route element={<AppShell />}>
-						<Route index element={<LibraryPage />} />
-						<Route path="import" element={<ImportPage />} />
-						<Route path="usage" element={<UsagePage />} />
-						<Route path="settings" element={<SettingsPage />} />
-						<Route path={productionRoutes.editor} element={<EditorPage />} />
-						<Route path={productionRoutes.bible} element={<BiblePage />} />
-						<Route element={<WorkProduction />}>
-							<Route path={productionRoutes.work} element={<WorkPage />} />
-							<Route
-								path={productionRoutes.production}
-								element={<ProductionPage />}
-							/>
-							<Route
-								path={productionRoutes.confirmVisual}
-								element={<ConfirmVisualPage />}
-							/>
-							<Route
-								path={productionRoutes.confirmFirst}
-								element={<ConfirmFirstPage />}
-							/>
+			<ToastProvider>
+				<HashRouter>
+					<Routes>
+						<Route path={productionRoutes.play} element={<PlayerPage />} />
+						<Route path="/package/:id/:version" element={<PlayerPage />} />
+						<Route path="/welcome" element={<WelcomePage />} />
+						<Route element={<AppShell />}>
+							<Route index element={<LibraryPage />} />
+							<Route path="import" element={<ImportPage />} />
+							<Route path="usage" element={<UsagePage />} />
+							<Route path="settings" element={<SettingsPage />} />
+							<Route path={productionRoutes.editor} element={<EditorPage />} />
+							<Route path={productionRoutes.bible} element={<BiblePage />} />
+							<Route element={<WorkProduction />}>
+								<Route path={productionRoutes.work} element={<WorkPage />} />
+								<Route
+									path={productionRoutes.production}
+									element={<ProductionPage />}
+								/>
+								<Route
+									path={productionRoutes.confirmVisual}
+									element={<ConfirmVisualPage />}
+								/>
+								<Route
+									path={productionRoutes.confirmFirst}
+									element={<ConfirmFirstPage />}
+								/>
+							</Route>
+							<Route path="*" element={<Navigate to="/" replace />} />
 						</Route>
-						<Route path="*" element={<Navigate to="/" replace />} />
-					</Route>
-				</Routes>
-			</HashRouter>
+					</Routes>
+				</HashRouter>
+			</ToastProvider>
 		</StrictMode>,
 	)

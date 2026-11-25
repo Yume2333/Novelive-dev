@@ -20,6 +20,7 @@
 .track {
 	position: absolute;
 	width: var(--space-2);
+	z-index: 6;
 	opacity: 0;
 	pointer-events: none;
 	transition: opacity var(--dur-base) var(--ease-out);
@@ -27,6 +28,7 @@
 }
 
 .host:hover > .track,
+.host:focus-within > .track[data-active="true"],
 .track[data-active="true"],
 .track:hover {
 	opacity: 1;
@@ -42,9 +44,14 @@
 	background: var(--scrollbar-thumb);
 	cursor: pointer;
 	touch-action: none;
+	transition:
+		width var(--dur-fast) var(--ease-out),
+		background var(--dur-fast) var(--ease-out);
 }
 
-.track:hover .thumb {
+.track:hover .thumb,
+.track[data-dragging="true"] .thumb {
+	width: var(--space-px-5);
 	background: var(--scrollbar-thumb-hover);
 }
 
@@ -53,7 +60,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.track {
+	.track,
+	.thumb {
 		transition: none;
 	}
 }
