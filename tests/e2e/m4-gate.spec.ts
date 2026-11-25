@@ -653,7 +653,6 @@ test.describe('M4 longform and queue', () => {
 			await expect(queuedRows).toHaveText(
 				titles.map((title) => new RegExp(title)),
 			)
-			await queuedRows.last().hover()
 			await queuedRows.last().getByRole('button', { name: /提前/ }).click()
 			await expect(queuedRows).toHaveText(
 				[...titles].reverse().map((title) => new RegExp(title)),
@@ -662,7 +661,6 @@ test.describe('M4 longform and queue', () => {
 				a2,
 				a,
 			])
-			await queuedRows.first().hover()
 			await queuedRows.first().getByRole('button', { name: /延后/ }).click()
 			await expect(queuedRows).toHaveText(
 				titles.map((title) => new RegExp(title)),
@@ -671,7 +669,6 @@ test.describe('M4 longform and queue', () => {
 				a,
 				a2,
 			])
-			await queuedRows.last().hover()
 			await queuedRows.last().getByRole('button', { name: /提前/ }).click()
 			await expect(queuedRows).toHaveText(
 				[...titles].reverse().map((title) => new RegExp(title)),
@@ -709,7 +706,10 @@ test.describe('M4 longform and queue', () => {
 			expect(await queue()).toEqual(frozen)
 			expect(await Promise.all([a, a2, b].map(snapshot))).toEqual(paused)
 			await capture(page, 'w2-crashed-paused')
-			await page.getByRole('button', { name: '关闭制作队列' }).click()
+			await page
+				.getByRole('dialog', { name: '制作队列' })
+				.getByRole('button', { name: '关闭', exact: true })
+				.click()
 			for (const id of [b, a2]) {
 				await call(page, 'production.continue', { workId: id })
 				await expect
