@@ -4,10 +4,6 @@
 	font-family: var(--font-body);
 }
 
-.content > .filters {
-	margin-bottom: calc(var(--space-6) - var(--space-7));
-}
-
 .filters {
 	display: flex;
 	flex-wrap: wrap;
@@ -15,18 +11,9 @@
 	gap: var(--space-3);
 }
 
-.filters select,
-.granularity select {
-	min-height: 34px;
-	padding: var(--space-px-7) var(--space-px-10);
-	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-md);
-	background: var(--panel-70);
-	color: var(--color-on-surface);
-	font: inherit;
-	font-size: 13px;
+.content > .filters {
+	margin-bottom: calc(var(--space-6) - var(--space-7));
 }
-
 .totals {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -78,8 +65,11 @@
 	gap: var(--space-px-6);
 	min-width: 0;
 	height: 100%;
+	padding: 0;
+	border-radius: var(--radius-sm);
 	color: var(--color-outline);
 	font-size: 11px;
+	text-align: center;
 }
 
 .dense {
@@ -91,8 +81,12 @@
 	visibility: hidden;
 }
 
-.bar:hover {
+.barActive {
 	color: var(--color-on-surface);
+}
+
+.barCalls {
+	transition: color var(--dur-fast) var(--ease-out);
 }
 
 .barTrack {
@@ -109,16 +103,64 @@
 	width: 100%;
 	border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 	background: color-mix(in srgb, var(--color-primary) 78%, transparent);
-	transition: height var(--dur-slow) var(--ease-out);
+	transition:
+		height var(--dur-slow) var(--ease-out),
+		background var(--dur-fast) var(--ease-out);
 }
 
-.bar:hover .barFill {
+.barFillActive {
 	background: var(--color-primary);
 }
 
 .bar time {
 	font-size: 10px;
 	white-space: nowrap;
+	transition: color var(--dur-fast) var(--ease-out);
+}
+
+/* ---- 图表玻璃提示卡：外层定位壳只做 fixed 定位与 clamp，内层气泡负责入场动画 ---- */
+.tipShell {
+	position: fixed;
+	z-index: 200;
+	transform: translate(-50%, -100%);
+	pointer-events: none;
+}
+
+.tipCard {
+	display: flex;
+	flex-direction: column;
+	padding: var(--space-2) var(--space-3);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-md);
+	background: var(--veil-95);
+	backdrop-filter: blur(14px);
+	-webkit-backdrop-filter: blur(14px);
+	box-shadow: var(--shadow-pop);
+	color: var(--color-on-surface);
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: nowrap;
+	animation: fade-up var(--dur-fast) var(--ease-out);
+}
+
+.tipTitle {
+	margin-bottom: var(--space-px-2);
+	font-weight: 700;
+}
+
+.tipLine {
+	color: var(--color-on-surface-variant);
+}
+
+.tipCost {
+	color: var(--color-outline);
+	font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tipCard {
+		animation: none;
+	}
 }
 
 .table {
@@ -193,14 +235,16 @@
 	font-size: 12px;
 }
 
-.range input {
+/* 日期/月范围输入：玻璃拟态（--shadow-glass + --white-60/--white-80），
+   聚焦态由全局 .nl-input:focus 提供柔和聚焦阴影 */
+.rangeInput {
 	width: 136px;
 	padding: var(--space-px-7) var(--space-px-10);
-	border: 1px solid var(--glass-border);
+	border: 1px solid var(--white-80);
 	border-radius: var(--radius-md);
-	background: var(--panel-70);
+	background: var(--white-60);
+	box-shadow: var(--shadow-glass);
 	color: var(--color-on-surface);
-	font: inherit;
 	font-size: 13px;
 }
 

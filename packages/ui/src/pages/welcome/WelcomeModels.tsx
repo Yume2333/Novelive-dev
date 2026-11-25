@@ -1,9 +1,9 @@
 import type { ConfigUpdate, MaskedConfig } from '@novelive/creator/contract'
-import { Cable, Check } from 'lucide-react'
+import { Cable, Check, CircleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/Button'
+import { Field, Select, TextInput } from '../../components/Form'
 import { msg, scoped } from '../../i18n'
-import { Select } from '../settings/ModelFields'
 import { readableError } from '../settings/SettingsPage'
 import styles from './WelcomePage.module.css'
 
@@ -103,34 +103,6 @@ export function WelcomeModels({
 		}
 	}
 
-	function field(
-		label: string,
-		value: string,
-		change: (value: string) => void,
-		secret = false,
-		placeholder?: string,
-	) {
-		return (
-			<label className={styles.modelField}>
-				<span>{label}</span>
-				<input
-					className="nl-input"
-					type={secret ? 'password' : 'text'}
-					placeholder={placeholder}
-					value={value}
-					autoComplete={secret ? 'new-password' : 'off'}
-					onFocus={(event) => {
-						if (secret && value === '••••') event.currentTarget.select()
-					}}
-					onChange={(event) => {
-						change(event.target.value)
-						setTested(false)
-					}}
-				/>
-			</label>
-		)
-	}
-
 	return (
 		<form
 			id="welcome-model-config"
@@ -141,73 +113,117 @@ export function WelcomeModels({
 		>
 			<fieldset className={styles.modelForm} disabled={busy}>
 				<div className={styles.modelGrid}>
-					<div className={styles.modelField}>
-						<span>{t('接口格式')}</span>
+					<Field label={t('接口格式')}>
 						<Select
-							label={t('接口格式')}
+							aria-label={t('接口格式')}
 							value={format}
-							options={formats}
+							options={formats.map(([value, label]) => ({ value, label }))}
 							onChange={(value) => {
 								setFormat(value)
 								setTested(false)
 							}}
 						/>
-					</div>
-					{field(t('接口地址'), baseUrl, setBaseUrl, false, 'https://…')}
+					</Field>
+					<Field label={t('接口地址')}>
+						<TextInput
+							value={baseUrl}
+							placeholder="https://…"
+							autoComplete="off"
+							onChange={(value) => {
+								setBaseUrl(value)
+								setTested(false)
+							}}
+						/>
+					</Field>
 				</div>
-				{field('API KEY', apiKey, setApiKey, true, 'sk-…')}
+				<Field label="API Key">
+					<TextInput
+						type="password"
+						value={apiKey}
+						placeholder="sk-…"
+						autoComplete="new-password"
+						onFocus={(event) => {
+							if (apiKey === '••••') event.currentTarget.select()
+						}}
+						onChange={(value) => {
+							setApiKey(value)
+							setTested(false)
+						}}
+					/>
+				</Field>
 				<div className={styles.modelTest}>
-					<Button size="sm" onClick={() => void save(true)} loading={busy}>
-						<Cable size={14} aria-hidden="true" />
+					<Button
+						size="sm"
+						icon={Cable}
+						loading={busy}
+						onClick={() => void save(true)}
+					>
 						{t('测试连接')}
 					</Button>
 					{tested && (
-						<span role="status">
-							<Check size={14} aria-hidden="true" />
+						<span role="status" className={styles.testOk}>
+							<Check size={14} strokeWidth={1.8} aria-hidden="true" />
 							{t('连接成功')}
+						</span>
+					)}
+					{error && (
+						<span role="alert" className={styles.testFail}>
+							<CircleAlert size={14} strokeWidth={1.8} aria-hidden="true" />
+							{error}
 						</span>
 					)}
 				</div>
 				<div className={styles.modelGrid}>
 					{slots.map(([slot, title]) => (
-						<div key={slot}>
-							{field(
-								t(title),
-								names[slot],
-								(value) =>
-									setNames((previous) => ({ ...previous, [slot]: value })),
-								false,
-								t('模型名'),
-							)}
-						</div>
+						<Field key={slot} label={t(title)}>
+							<TextInput
+								value={names[slot]}
+								placeholder={t('模型名')}
+								autoComplete="off"
+								onChange={(value) =>
+									setNames((previous) => ({ ...previous, [slot]: value }))
+								}
+							/>
+						</Field>
 					))}
 				</div>
 				<div className={styles.imageModels}>
-					{field(
-						`${t('图片模型')} · ${t('接口地址')}`,
-						image.baseUrl,
-						(value) =>
-							setImage((previous) => ({ ...previous, baseUrl: value })),
-						false,
-						'https://…/v1',
-					)}
-					{field(
-						t('模型名'),
-						image.model,
-						(value) => setImage((previous) => ({ ...previous, model: value })),
-						false,
-						t('模型名'),
-					)}
-					{field(
-						'API KEY',
-						image.apiKey,
-						(value) => setImage((previous) => ({ ...previous, apiKey: value })),
-						true,
-						'sk-…',
-					)}
+					<Field label={`${t('图片模型')} · ${t('接口地址')}`}>
+						<TextInput
+							value={image.baseUrl}
+							placeholder="https://…/v1"
+							autoComplete="off"
+							onChange={(value) =>
+								setImage((previous) => ({ ...previous, baseUrl: value }))
+							}
+						/>
+					</Field>
+					<Field label={t('模型名')}>
+						<TextInput
+							value={image.model}
+							placeholder={t('模型名')}
+							autoComplete="off"
+							onChange={(value) =>
+								setImage((previous) => ({ ...previous, model: value }))
+							}
+						/>
+					</Field>
+					<Field label="API Key">
+						<TextInput
+							type="password"
+							value={image.apiKey}
+							placeholder="sk-…"
+							autoComplete="new-password"
+							onFocus={(event) => {
+								if (image.apiKey === '••••') event.currentTarget.select()
+							}}
+							onChange={(value) =>
+								setImage((previous) => ({ ...previous, apiKey: value }))
+							}
+						/>
+					</Field>
 				</div>
 			</fieldset>
-			{error && <p role="alert">{error}</p>}
 		</form>
 	)
 }

@@ -4,6 +4,8 @@ import type {
 	TextSlot,
 } from '@novelive/creator/contract'
 import { useRef, useState } from 'react'
+import { Checkbox } from '../../components/Extended'
+import { CompactSelect, Field, TextInput } from '../../components/Form'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { msg, scoped } from '../../i18n'
 import styles from './SettingsPage.module.css'
@@ -51,52 +53,6 @@ const compatibility = [
 	['anthropic-compat', msg('兼容 Anthropic'), 'https://api.anthropic.com'],
 ] as const
 
-export function Select<T extends string | number>({
-	label,
-	options,
-	value,
-	onChange,
-	disabled,
-}: {
-	label: string
-	options: ReadonlyArray<readonly [T, string, ...string[]]>
-	value: T
-	onChange(value: T): void
-	disabled?: boolean
-}) {
-	return (
-		<select
-			aria-label={label}
-			value={value}
-			disabled={disabled}
-			onChange={(event) => {
-				const option = options.find(
-					([key]) => String(key) === event.target.value,
-				)
-				if (option) onChange(option[0])
-			}}
-		>
-			{options.map(([key, name]) => (
-				<option key={key} value={key}>
-					{name}
-				</option>
-			))}
-		</select>
-	)
-}
-
-function Input({
-	label,
-	...props
-}: React.ComponentProps<'input'> & { label: string }) {
-	return (
-		<label className={styles.field}>
-			<span>{label}</span>
-			<input {...props} />
-		</label>
-	)
-}
-
 function ApiKeyInput({
 	value,
 	disabled,
@@ -108,17 +64,18 @@ function ApiKeyInput({
 }) {
 	const [focused, setFocused] = useState(false)
 	return (
-		<Input
-			label="API Key"
-			type="password"
-			autoComplete="new-password"
-			value={focused && value === '••••' ? '' : value}
-			disabled={disabled}
-			placeholder="sk-…"
-			onFocus={() => setFocused(true)}
-			onBlur={() => setFocused(false)}
-			onChange={(event) => onChange(event.target.value)}
-		/>
+		<Field label="API Key">
+			<TextInput
+				type="password"
+				autoComplete="new-password"
+				value={focused && value === '••••' ? '' : value}
+				disabled={disabled}
+				placeholder="sk-…"
+				onFocus={() => setFocused(true)}
+				onBlur={() => setFocused(false)}
+				onChange={onChange}
+			/>
+		</Field>
 	)
 }
 
@@ -197,13 +154,13 @@ export function useTextFields(
 		},
 		fields: (
 			<>
-				<div className={styles.field}>
-					<span>{t('兼容哪家')}</span>
-					<Select
-						label={t('兼容哪家')}
-						options={compatibility.map(
-							([value, name, url]) => [value, t(name), url] as const,
-						)}
+				<Field label={t('兼容哪家')}>
+					<CompactSelect
+						aria-label={t('兼容哪家')}
+						options={compatibility.map(([value, name]) => ({
+							value,
+							label: t(name),
+						}))}
 						value={connection.compat}
 						disabled={inherited}
 						onChange={(compat) => {
@@ -214,12 +171,11 @@ export function useTextFields(
 							suggest({ ...draft, compat, baseUrl })
 						}}
 					/>
-				</div>
-				<div className={styles.field}>
-					<span>{t('接口格式')}</span>
-					<Select
-						label={t('接口格式')}
-						options={formats}
+				</Field>
+				<Field label={t('接口格式')}>
+					<CompactSelect
+						aria-label={t('接口格式')}
+						options={formats.map(([value, name]) => ({ value, label: name }))}
 						value={connection.format}
 						disabled={inherited}
 						onChange={(format) => {
@@ -229,14 +185,12 @@ export function useTextFields(
 							suggest({ ...draft, format, baseUrl })
 						}}
 					/>
-				</div>
+				</Field>
 				{slot !== 'fast' && (
-					<label className={styles.inherit}>
-						<input
-							type="checkbox"
+					<div className={styles.inherit}>
+						<Checkbox
 							checked={Boolean(inherited)}
-							onChange={(event) => {
-								const inheritFast = event.target.checked
+							onChange={(inheritFast) => {
 								const nextConnection = inheritFast ? fast : draft
 								change({ inheritFast })
 								if (
@@ -245,45 +199,47 @@ export function useTextFields(
 								)
 									suggest({ ...draft, inheritFast }, inheritFast)
 							}}
-						/>{' '}
-						{t('同快速模型')}
-					</label>
+							label={t('同快速模型')}
+						/>
+					</div>
 				)}
-				<Input
-					label={t('接口地址')}
-					value={connection.baseUrl}
-					placeholder="https://…"
-					disabled={inherited}
-					onChange={(event) => change({ baseUrl: event.target.value })}
-				/>
-				<Input
-					label={t('模型名')}
-					value={draft.model}
-					placeholder={t('模型名')}
-					onChange={(event) =>
-						change({ model: event.target.value, context: '', output: '' })
-					}
-					onBlur={() => {
-						if (lastModel.current !== draft.model) {
-							lastModel.current = draft.model
-							suggest(draft)
-						}
-					}}
-				/>
-				<Input
-					label={t('上下文长度')}
-					value={draft.context}
-					inputMode="numeric"
-					placeholder={t('模型上下文窗口 tokens（至少 4096）')}
-					onChange={(event) => change({ context: event.target.value })}
-				/>
-				<Input
-					label={t('最大输出量')}
-					value={draft.output}
-					inputMode="numeric"
-					placeholder={t('留空则按模型自动设置')}
-					onChange={(event) => change({ output: event.target.value })}
-				/>
+				<Field label={t('接口地址')}>
+					<TextInput
+						value={connection.baseUrl}
+						placeholder="https://…"
+						disabled={inherited}
+						onChange={(baseUrl) => change({ baseUrl })}
+					/>
+				</Field>
+				<Field label={t('模型名')}>
+					<TextInput
+						value={draft.model}
+						placeholder={t('模型名')}
+						onChange={(model) => change({ model, context: '', output: '' })}
+						onBlur={() => {
+							if (lastModel.current !== draft.model) {
+								lastModel.current = draft.model
+								suggest(draft)
+							}
+						}}
+					/>
+				</Field>
+				<Field label={t('上下文长度')}>
+					<TextInput
+						value={draft.context}
+						inputMode="numeric"
+						placeholder={t('模型上下文窗口 tokens（至少 4096）')}
+						onChange={(context) => change({ context })}
+					/>
+				</Field>
+				<Field label={t('最大输出量')}>
+					<TextInput
+						value={draft.output}
+						inputMode="numeric"
+						placeholder={t('留空则按模型自动设置')}
+						onChange={(output) => change({ output })}
+					/>
+				</Field>
 				<ApiKeyInput
 					value={inherited ? fast.apiKeyMasked : draft.apiKey}
 					disabled={inherited}
@@ -329,86 +285,99 @@ export function useImageFields(
 		},
 		fields: (
 			<>
-				<Input
-					label={t('接口地址')}
-					value={draft.baseUrl}
-					placeholder="https://…"
-					onChange={(event) => change({ baseUrl: event.target.value })}
-				/>
-				<Input
-					label={t('模型名')}
-					value={draft.model}
-					placeholder={t('模型名')}
-					onChange={(event) => change({ model: event.target.value })}
-				/>
+				<Field label={t('接口地址')}>
+					<TextInput
+						value={draft.baseUrl}
+						placeholder="https://…"
+						onChange={(baseUrl) => change({ baseUrl })}
+					/>
+				</Field>
+				<Field label={t('模型名')}>
+					<TextInput
+						value={draft.model}
+						placeholder={t('模型名')}
+						onChange={(model) => change({ model })}
+					/>
+				</Field>
 				<div className={styles.fullField}>
 					<ApiKeyInput
 						value={draft.apiKey}
 						onChange={(apiKey) => change({ apiKey })}
 					/>
 				</div>
-				<div className={styles.field}>
-					<span>{t('生图质量')}</span>
-					<Select
-						label={t('生图质量')}
+				<Field label={t('生图质量')}>
+					<CompactSelect
+						aria-label={t('生图质量')}
 						value={draft.quality}
 						options={[
-							['high', t('高')],
-							['medium', t('中')],
-							['low', t('低')],
+							{ value: 'high', label: t('高') },
+							{ value: 'medium', label: t('中') },
+							{ value: 'low', label: t('低') },
 						]}
 						onChange={(quality) => change({ quality })}
 					/>
-				</div>
-				<div className={styles.field}>
-					<span className={styles.fieldLabel}>
+				</Field>
+				<div className={styles.tooltipField}>
+					<span
+						className={`label-caps label-caps-zh ${styles.tooltipFieldLabel}`}
+					>
 						{t('原生长边上限')}
 						<InfoTooltip
 							label={t('原生长边上限说明')}
 							text={t('超出部分由本地放大')}
 						/>
 					</span>
-					<Select
-						label={t('原生长边上限')}
-						value={draft.nativeMaxEdge}
+					<CompactSelect
+						aria-label={t('原生长边上限')}
+						value={String(draft.nativeMaxEdge)}
 						options={[
-							[1536, t('1536 · Codex 渠道')],
-							[2048, '2048'],
-							[2560, t('2560 · OpenAI 官方 API')],
-							[2816, '2816 · Seedream 5.x'],
-							[3840, t('3840 · 4K（OpenAI 实验 / Seedream 4.5）')],
+							{ value: '1536', label: t('1536 · Codex 渠道') },
+							{ value: '2048', label: '2048' },
+							{ value: '2560', label: t('2560 · OpenAI 官方 API') },
+							{ value: '2816', label: '2816 · Seedream 5.x' },
+							{
+								value: '3840',
+								label: t('3840 · 4K（OpenAI 实验 / Seedream 4.5）'),
+							},
 						]}
-						onChange={(nativeMaxEdge) => change({ nativeMaxEdge })}
+						onChange={(value) =>
+							change({
+								nativeMaxEdge: Number(value) as typeof draft.nativeMaxEdge,
+							})
+						}
 					/>
 				</div>
-				<Input
-					label={t('同时出图数')}
-					inputMode="numeric"
-					value={draft.concurrency}
-					onChange={(event) => change({ concurrency: event.target.value })}
-				/>
-				<Input
-					label={t('生图失败重试次数')}
-					inputMode="numeric"
-					value={draft.retries}
-					onChange={(event) => change({ retries: event.target.value })}
-				/>
+				<Field label={t('同时出图数')}>
+					<TextInput
+						inputMode="numeric"
+						value={draft.concurrency}
+						onChange={(concurrency) => change({ concurrency })}
+					/>
+				</Field>
+				<Field label={t('生图失败重试次数')}>
+					<TextInput
+						inputMode="numeric"
+						value={draft.retries}
+						onChange={(retries) => change({ retries })}
+					/>
+				</Field>
 				<div className={styles.postProcess}>
-					<div className={styles.field}>
-						<span>{t('后处理')}</span>
-						<Select
-							label={t('后处理')}
+					<Field label={t('后处理')}>
+						<CompactSelect
+							aria-label={t('后处理')}
 							value={draft.postProcess}
 							options={[
-								['off', t('关')],
-								['single', t('放大降噪（默认）')],
-								['double', t('双重放大降噪')],
+								{ value: 'off', label: t('关') },
+								{ value: 'single', label: t('放大降噪（默认）') },
+								{ value: 'double', label: t('双重放大降噪') },
 							]}
 							onChange={(postProcess) => change({ postProcess })}
 						/>
-					</div>
-					<div className={styles.field}>
-						<span className={styles.fieldLabel}>
+					</Field>
+					<div className={styles.tooltipField}>
+						<span
+							className={`label-caps label-caps-zh ${styles.tooltipFieldLabel}`}
+						>
 							{t('放大档位')}
 							{draft.upscaleTier !== 'anime' && (
 								<InfoTooltip
@@ -421,14 +390,14 @@ export function useImageFields(
 								/>
 							)}
 						</span>
-						<Select
-							label={t('放大档位')}
+						<CompactSelect
+							aria-label={t('放大档位')}
 							value={draft.upscaleTier}
 							disabled={draft.postProcess === 'off'}
 							options={[
-								['anime', t('动漫（默认）')],
-								['fast', t('快速')],
-								['detail', t('保留细节')],
+								{ value: 'anime', label: t('动漫（默认）') },
+								{ value: 'fast', label: t('快速') },
+								{ value: 'detail', label: t('保留细节') },
 							]}
 							onChange={(upscaleTier) => change({ upscaleTier })}
 						/>

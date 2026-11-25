@@ -1,11 +1,19 @@
 import type { CommandOutput, ConfigUpdate } from '@novelive/creator/contract'
-import { BookOpen, Info, PlayCircle } from 'lucide-react'
+import { BookOpen, Info, LibraryBig, PlayCircle } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/Button'
+import { Banner, RadioGroup, Tooltip } from '../../components/Extended'
 import { ScrollArea } from '../../components/ScrollArea'
-import { localeNames, locales, scoped, setLocale } from '../../i18n'
+import { useToast } from '../../components/Toast'
+import {
+	type Locale,
+	localeNames,
+	locales,
+	scoped,
+	setLocale,
+} from '../../i18n'
 import { useAppearance } from '../../shell/appearance'
 import markLight from '../../shell/brand/novelive-mark.svg'
 import markDark from '../../shell/brand/novelive-mark-dark.svg'
@@ -29,6 +37,7 @@ function Dots({ current }: { current: number }) {
 export function WelcomePage() {
 	useTranslation('welcome')
 	const navigate = useNavigate()
+	const toast = useToast()
 	const [step, setStep] = useState(0)
 	const [path, setPath] = useState<'create' | 'play'>('create')
 	const [config, setConfig] = useState<CommandOutput<'config.get'>>()
@@ -61,6 +70,10 @@ export function WelcomePage() {
 		return saved
 	}, [])
 	const finish = () => navigate(path === 'create' ? '/' : '/?tab=imported')
+	const enterLibrary = () => {
+		toast(t('已进入书库'), LibraryBig)
+		finish()
+	}
 
 	return (
 		<ScrollArea className={styles.scroll}>
@@ -90,25 +103,19 @@ export function WelcomePage() {
 							<legend className="label-caps label-caps-zh">
 								{t('界面语言')}
 							</legend>
-							<div>
-								{locales.map((locale) => (
-									<label key={locale} className={styles.radio}>
-										<input
-											type="radio"
-											name="language"
-											checked={
-												(language ?? document.documentElement.lang) === locale
-											}
-											onChange={() => {
-												setLocale(locale)
-												if (config && 'language' in config)
-													void update({ language: locale }).catch(() => {})
-											}}
-										/>
-										{localeNames[locale]}
-									</label>
-								))}
-							</div>
+							<RadioGroup
+								name="language"
+								value={(language ?? document.documentElement.lang) as Locale}
+								options={locales.map((locale) => ({
+									value: locale,
+									label: localeNames[locale],
+								}))}
+								onChange={(locale) => {
+									setLocale(locale)
+									if (config && 'language' in config)
+										void update({ language: locale }).catch(() => {})
+								}}
+							/>
 						</fieldset>
 						<div className={styles.footer}>
 							<span />
@@ -147,7 +154,7 @@ export function WelcomePage() {
 									onClick={() => setPath(key)}
 								>
 									<span className={`glass-panel ${styles.pathIcon}`}>
-										<Icon size={19} aria-hidden="true" />
+										<Icon size={19} strokeWidth={1.8} aria-hidden="true" />
 									</span>
 									<strong>{title}</strong>
 									<span>{desc}</span>
@@ -169,23 +176,24 @@ export function WelcomePage() {
 						<Dots current={2} />
 						<div className={styles.modelTitle}>
 							<h1 className="headline">{t('模型配置')}</h1>
-							<span title={t('Key 只保存在本机配置文件中')}>
-								<Info size={15} aria-label={t('Key 只保存在本机配置文件中')} />
-							</span>
+							<Tooltip text={t('Key 只保存在本机配置文件中')}>
+								<Info size={15} strokeWidth={1.8} aria-hidden="true" />
+							</Tooltip>
 						</div>
 						{path === 'play' && (
-							<p className={styles.banner}>
-								<PlayCircle size={16} aria-hidden="true" />
-								{t(
-									'已选「游玩」路线：模型配置为可选项，可直接跳过前往书库导入 .novelive 作品包。',
-								)}
-							</p>
+							<div className={styles.playerNotice}>
+								<Banner kind="info" icon={PlayCircle}>
+									{t(
+										'已选「游玩」路线：模型配置为可选项，可直接跳过前往书库导入 .novelive 作品包。',
+									)}
+								</Banner>
+							</div>
 						)}
 						{config && 'models' in config ? (
 							<WelcomeModels
 								models={config.models}
 								update={update}
-								onDone={finish}
+								onDone={enterLibrary}
 							/>
 						) : (
 							<p role="status" className={styles.muted}>

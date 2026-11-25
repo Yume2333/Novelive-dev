@@ -25,47 +25,32 @@
 	padding-top: var(--space-4);
 }
 
-.modelField {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-px-6);
-	min-width: 0;
-}
-
-.modelField > span {
-	font-size: 12px;
-	font-weight: 600;
-	color: var(--color-on-surface-variant);
-	line-height: 1.2;
-	letter-spacing: 0.12em;
-}
-
-.modelField input,
-.modelField select {
-	width: 100%;
-	min-width: 0;
-	padding: var(--space-px-10) var(--space-px-14);
-	border: 1px solid var(--white-80);
-	border-radius: var(--radius-md);
-	background: var(--white-60);
-	box-shadow: var(--shadow-glass);
-	color: var(--color-on-surface);
-	font-size: 14px;
-}
-
-.modelField select {
-	appearance: none;
-}
-
-.modelTest,
-.modelTest > span {
+.modelTest {
 	display: flex;
 	align-items: center;
 	gap: var(--space-3);
 }
 
-.modelTest > span {
+.testOk,
+.testFail {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-5);
+	padding: var(--space-px-3) var(--space-2);
+	border-radius: var(--radius-sm);
+	font-size: 12px;
+	font-weight: 600;
+	animation: fade-in var(--dur-fast) var(--ease-out);
+}
+
+.testOk {
+	background: var(--color-success-container);
 	color: var(--color-success);
+}
+
+.testFail {
+	background: var(--color-error-container);
+	color: var(--color-on-error-container);
 }
 
 .page {
@@ -136,36 +121,6 @@
 	color: var(--color-on-surface-variant);
 }
 
-.languages > div {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--space-px-14);
-}
-
-.radio {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-px-7);
-	font-size: 13px;
-	cursor: pointer;
-}
-
-.radio input {
-	box-sizing: border-box;
-	width: 17px;
-	height: 17px;
-	margin: 0;
-	border: 1px solid var(--color-outline-variant);
-	border-radius: 50%;
-	background: var(--white-60);
-	transition: all var(--dur-fast) var(--ease-out);
-	appearance: none;
-}
-
-.radio input:checked {
-	border: 5px solid var(--color-primary);
-}
-
 .paths {
 	display: flex;
 	flex-wrap: wrap;
@@ -226,17 +181,8 @@
 	color: var(--color-on-surface);
 }
 
-.banner {
-	display: flex;
-	align-items: flex-start;
-	gap: var(--space-2);
-	margin: 0 0 var(--space-4);
-	padding: var(--space-px-11) var(--space-4);
-	border-radius: var(--radius-lg);
-	background: var(--accent-wash);
-	color: var(--color-on-surface-variant);
-	font-size: 13px;
-	line-height: 1.6;
+.playerNotice {
+	margin-bottom: var(--space-4);
 }
 
 .muted {

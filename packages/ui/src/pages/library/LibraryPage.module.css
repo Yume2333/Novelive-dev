@@ -30,7 +30,18 @@
 }
 
 .groupTitle {
-	color: var(--color-on-surface-variant);
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	color: var(--color-primary);
+}
+
+.groupPath {
+	color: var(--color-outline);
+	font-size: 11px;
+	font-weight: 400;
+	letter-spacing: 0;
+	text-transform: none;
 }
 
 .volume {
@@ -40,7 +51,7 @@
 }
 
 .volumeTitle {
-	color: var(--color-outline);
+	color: var(--color-on-surface-variant);
 	font: 600 13px var(--font-body);
 }
 
@@ -53,32 +64,9 @@
 	list-style: none;
 }
 
-.packageAction {
-	border: 1px solid var(--glass-border);
-	background: var(--panel-70);
-	box-shadow: var(--shadow-glass);
-	color: var(--color-on-surface);
-}
-
-.packageAction {
-	min-height: 36px;
-	padding: var(--space-1) var(--space-3);
-	border-radius: var(--radius-md);
-	cursor: pointer;
-}
-
-.packageAction:hover:not(:disabled) {
-	background: var(--white-90);
-}
-
-.packageAction:disabled {
-	opacity: 0.5;
-	cursor: default;
-}
-
 .card {
 	display: flex;
-	align-items: center;
+	align-items: stretch;
 	gap: var(--space-4);
 	height: 100%;
 	padding: var(--space-3);
@@ -92,6 +80,7 @@
 	flex-shrink: 0;
 	aspect-ratio: 3 / 4;
 	overflow: hidden;
+	border: 1px solid var(--white-40);
 	border-radius: var(--radius-md);
 	box-shadow: var(--shadow-glass);
 }
@@ -100,38 +89,172 @@
 	display: flex;
 	flex: 1;
 	flex-direction: column;
+	min-width: 0;
+	padding: var(--space-px-2) var(--space-1) var(--space-px-2) 0;
+}
+
+.cardHead {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
 	gap: var(--space-2);
+}
+
+.cardTitles {
 	min-width: 0;
 }
 
 .cardBody .title {
 	overflow: hidden;
+	margin-bottom: var(--space-px-2);
 	font-size: 16px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
+.cardBadge {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--space-1);
+}
+
+.cardFoot {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	margin-top: auto;
+	padding-top: var(--space-3);
+}
+
 .status {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--space-px-5);
+	gap: var(--space-px-6);
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.statusQuiet {
+	color: var(--color-on-surface-variant);
+}
+
+.statusAttention {
+	color: var(--color-on-error-container);
+}
+
+.statusDone {
+	color: var(--color-success);
+}
+
+.readingCaption {
+	display: flex;
+	justify-content: space-between;
+	color: var(--color-outline);
+	font-size: 11px;
+}
+
+.readingPercent {
+	color: var(--color-primary);
+	font-weight: 500;
+}
+
+.emptyGuide {
+	padding-bottom: var(--space-6);
+	text-align: center;
+}
+
+.emptyGuide button {
+	color: var(--color-outline);
+	font-size: 11px;
+	cursor: pointer;
+	transition: color var(--dur-fast) var(--ease-out);
+}
+
+.emptyGuide button:hover {
+	color: var(--color-on-surface-variant);
+}
+
+/* ---- 导入作品包弹窗 ---- */
+
+.packageHead {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.packageIcon {
+	display: flex;
+	width: 44px;
+	height: 44px;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-lg);
+	color: var(--color-primary);
+}
+
+.packageName {
+	overflow: hidden;
+	font-weight: 700;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.packageMeta {
 	color: var(--color-on-surface-variant);
 	font-size: 12px;
 }
 
-.progressRow {
+.packageWorks {
 	display: flex;
-	align-items: center;
+	flex-direction: column;
 	gap: var(--space-2);
-	color: var(--color-outline);
-	font-size: 11px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
 }
 
-.groupPath {
-	margin-left: var(--space-2);
-	color: var(--color-outline);
-	font-size: 11px;
-	font-weight: 400;
-	letter-spacing: 0;
-	text-transform: none;
+.packageWork {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+	padding: var(--space-2) var(--space-3);
+	border-radius: var(--radius-md);
+	background: var(--white-50);
+}
+
+.packageWorkTitle {
+	overflow: hidden;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.packageWorkVersion {
+	flex-shrink: 0;
+	color: var(--color-on-surface-variant);
+	font-size: 12px;
+}
+
+.packageWorkVersion[data-relation="update"] {
+	color: var(--color-on-error-container);
+}
+
+.packageNote {
+	margin: 0;
+	color: var(--color-on-surface-variant);
+	font-size: 13px;
+	line-height: 1.7;
+}
+
+.packageContent {
+	display: grid;
+	gap: var(--space-3);
+	padding: var(--space-1);
+}
+
+.packageContent :is(p, ul) {
+	margin: 0;
 }
