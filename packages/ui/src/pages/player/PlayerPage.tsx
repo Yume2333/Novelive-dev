@@ -95,8 +95,29 @@ export function PlayerPage({
 	// biome-ignore lint/correctness/useExhaustiveDependencies: 进入播放器（progressId 变化）时重新播放进场黑幕
 	useEffect(() => {
 		setVeiled(true)
+		// 黑幕只覆盖装载与舞台亮相过程：首个文本内容一旦出现就立刻撤下，
+		// 之后的任何舞台截图都不会再叠到半透明黑幕。1250ms 兜底对应无文本章节。
 		const timer = window.setTimeout(() => setVeiled(false), 1250)
-		return () => window.clearTimeout(timer)
+		const surface = host.current
+		if (!surface) return () => window.clearTimeout(timer)
+		const unveil = () => {
+			if (
+				surface.querySelector(
+					'.nl-player-text .nl-text-display, .nl-player-caption .nl-text-display',
+				)
+			) {
+				setVeiled(false)
+				observer.disconnect()
+				window.clearTimeout(timer)
+			}
+		}
+		const observer = new MutationObserver(unveil)
+		observer.observe(surface, { childList: true, subtree: true })
+		unveil()
+		return () => {
+			observer.disconnect()
+			window.clearTimeout(timer)
+		}
 	}, [progressId])
 	useEffect(() => {
 		let active = true
