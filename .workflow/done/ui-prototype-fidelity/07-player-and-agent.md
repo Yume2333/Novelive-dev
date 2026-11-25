@@ -19,3 +19,12 @@
 - Check after: pnpm check exit 0 (Test Files 75 passed | 1 skipped (76); Tests 1142 passed | 3 skipped (1145)); e2e --grep 'M3 controls|M3 stage|M3 custom marks|M2 chat' with --workers=1: 4 passed, exit 0 (two consecutive runs; 3-worker runs are flaky on m3-stage canvas-width assertion due to resize race under Xvfb, baseline uip-integration passes with 1 worker)
 - Note: tests/e2e/m3-controls.spec.ts ('M3 player controls', not matched by the grep) has unscoped getByRole('status') assertions that collide with the empty ToastProvider role=status stack added by base task 01 (packages/ui/src/components/Toast.tsx); outside window 07 ownership.
 - Review: pass (base 769f6e3340b2d1bd86e282ba0b252b196db821da, reviewer reviewer-07)
+
+### Rework round 1 (gate 08 feedback 7a/7b/7c)
+
+- Rework base commit: 3568aa2784353c8164f449957afc33332f9d99b2
+- 7a: overlay Tab trap (`PlayerControls.tsx`) no longer excludes `.nl-focus-skip`; save pagination is keyboard-reachable (initial-focus selector still skips it).
+- 7b: `ProgressPanel` `chapters` optional, defaults to `[]`; embedders without chapters (legacy-save fixture) render again.
+- 7c: entry veil removed as soon as the first `.nl-text-display` mounts (1250 ms fallback); `.nl-end-overlay` scrim/blur and `.nl-end-card` shadow removed so chapter-end stage pixels stay untouched; ruby gets `line-height: 2` so annotations stay inside their line box for the pagination clip (trial matrix: 1.8 fails clip 3/3, 1.9 and 2.0 pass 9/9). m3-text clip failure reproduced at pre-fidelity base 3a8ba3b, fixed here anyway.
+- Check after: `NL_REPLAY=strict pnpm check` exit 0 (Test Files 75 passed | 1 skipped (76); Tests 1142 passed | 3 skipped (1145)); with gate 08 test-selector patch applied temporarily: m3-controls + m3-text + m3-gate + m1b-player + m5-share + m5-share-ui + m2-chat `--workers=1`: 17 passed / 1 failed, the failure being the m1b-player.spec.ts:57 `setContentSize` resize-handshake timeout, which reproduces at the same rate (1/8) on base 3a8ba3b; m1b-player + m3-text + m5-share otherwise pass (6/6 in repeated runs); brief check on clean tree: 4 passed (28.7s).
+- Review: pass after fix (base 3568aa2784353c8164f449957afc33332f9d99b2, reviewer uip07-review; SHOULD-FIX ruby 2.4 → 2 applied; nits on veil timing accepted as intentional).

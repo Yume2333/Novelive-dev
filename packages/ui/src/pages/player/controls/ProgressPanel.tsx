@@ -39,14 +39,14 @@ export function ProgressPanel({
 	workId,
 	progress,
 	history,
-	chapters,
+	chapters = [],
 	legacySaves,
 	onSlot,
 	onHistory,
 	onHistoryStep,
 }: ProgressControlsProps & {
 	view: 'save' | 'load' | 'history'
-	chapters: readonly HistoryChapter[]
+	chapters?: readonly HistoryChapter[]
 	onSlot(slot: SaveSlot): void
 }) {
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({})

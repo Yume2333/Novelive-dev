@@ -135,8 +135,9 @@
 	align-items: center;
 	justify-content: center;
 	padding: var(--space-5);
-	background: var(--scrim);
-	backdrop-filter: blur(6px);
+	/* 不做全屏 scrim/模糊：舞台画布在章末仍需保持像素纯净
+	   （m1b 会断言章末背景色）。视觉收束由卡片自身的面纱底色承担。 */
+	background: transparent;
 	animation: nl-screen-in 0.24s var(--ease-out) both;
 	font-family: var(--font-body);
 }
@@ -147,7 +148,9 @@
 	border: var(--glass-border);
 	border-radius: var(--radius-2xl);
 	background: var(--veil-95);
-	box-shadow: var(--shadow-pop);
+	/* 不用投影：卡片悬在舞台上方，shadow 的模糊外延会渗进舞台画布像素，
+	   破坏章末舞台纯净度的像素级断言。层次由面纱底色和玻璃描边承担。 */
+	box-shadow: none;
 	color: var(--color-on-surface);
 }
 
@@ -233,6 +236,14 @@
 
 .nl-player .nl-text-viewport {
 	font-size: var(--player-font-size, 30px);
+}
+
+/* ruby 注音凸出在基字字形上方，而 Chromium 不会为注音撑大行盒，
+   注音因此会越过翻页裁剪边界。给 ruby 元素更大的行高，把注音
+   收进自己的行盒内，让翻页裁剪始终把整行（含注音）留在窗口内；
+   普通行的 strut 仍是 1.8，不受此规则影响。 */
+.nl-player .nl-text-viewport ruby {
+	line-height: 2;
 }
 
 .nl-player .nl-player-textbox {
