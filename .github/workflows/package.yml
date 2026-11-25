@@ -8,6 +8,8 @@ permissions:
 
 jobs:
   package:
+    env:
+      NL_REPLAY: strict
     name: Package ${{ matrix.platform }}
     strategy:
       fail-fast: false
@@ -40,6 +42,28 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @novelive/desktop run package:${{ matrix.platform }}
+      - name: Verify packaged artifacts
+        run: node tools/package/verify-artifacts.mjs ${{ matrix.platform }}
+      - name: Print artifact SHA256 sums
+        shell: bash
+        run: cat apps/desktop/dist/*/artifacts/SHA256SUMS
+      - name: Verify Windows NSIS package
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./scripts/ci/verify-windows-package.ps1
+      - name: Verify macOS DMG and ZIP package
+        if: matrix.platform == 'macos'
+        run: bash scripts/ci/verify-macos-package.sh
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.platform != 'linux'
+        with:
+          name: verification-${{ matrix.platform }}-${{ runner.arch }}
+          path: |
+            ${{ runner.temp }}/*-package-verification.json
+            ${{ runner.temp }}/**/packaged-report.json
+            ${{ runner.temp }}/nl-mac-verify.*/**/steps.jsonl
+          if-no-files-found: warn
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: novelive-${{ matrix.platform }}-${{ runner.arch }}
