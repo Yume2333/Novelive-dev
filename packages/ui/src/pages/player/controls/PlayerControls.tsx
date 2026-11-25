@@ -27,7 +27,7 @@ import type {
 import type { SaveSlot } from '../../../../../player/src/contract/progress'
 import { Button } from '../../../components/Button'
 import { Chip, ProgressBar } from '../../../components/Card'
-import { ConfirmDialog, Slider } from '../../../components/Extended'
+import { ConfirmDialog, Slider, Tooltip } from '../../../components/Extended'
 import { Toggle } from '../../../components/Form'
 import { ScrollArea } from '../../../components/ScrollArea'
 import {
@@ -364,6 +364,19 @@ export function PlayerControls({
 		: onLibrary
 			? { label: t('返回书库'), action: onLibrary }
 			: null
+	const editorButton = (
+		<button
+			type="button"
+			disabled={!editorLinked || !controller?.frame().position}
+			onClick={() => {
+				const position = controller?.frame().position
+				if (position) onEditor(position)
+			}}
+		>
+			{icon(PencilLine, 17)}
+			{t('在编辑器中打开这里')}
+		</button>
+	)
 	return (
 		<>
 			{notice && !screen && (
@@ -590,20 +603,13 @@ export function PlayerControls({
 										{icon(Settings2, 17)}
 										{t('设置')}
 									</button>
-									<button
-										type="button"
-										disabled={!editorLinked || !controller?.frame().position}
-										title={
-											editorLinked ? undefined : t('请先将本地工程关联到作品')
-										}
-										onClick={() => {
-											const position = controller?.frame().position
-											if (position) onEditor(position)
-										}}
-									>
-										{icon(PencilLine, 17)}
-										{t('在编辑器中打开这里')}
-									</button>
+									{editorLinked ? (
+										editorButton
+									) : (
+										<Tooltip text={t('请先将本地工程关联到作品')}>
+											{editorButton}
+										</Tooltip>
+									)}
 									{onWorkPage && (
 										<button type="button" onClick={() => setConfirmExit(true)}>
 											{icon(LogOut, 17)}
