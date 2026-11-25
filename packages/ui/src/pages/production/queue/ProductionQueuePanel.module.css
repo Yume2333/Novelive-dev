@@ -1,26 +1,92 @@
-.panel h2 {
-	margin-block: 0 var(--space-3);
-	font: 700 18px var(--font-display);
+.panel {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-5);
 }
 
-.row a {
-	color: var(--color-primary);
+.panel section > :first-child {
+	margin-bottom: 10px;
+	color: var(--color-outline);
+}
+
+.rows {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rows > li {
+	min-width: 0;
+	list-style: none;
+}
+
+.row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	padding: 10px var(--space-3);
+	border-radius: var(--radius-lg);
+}
+
+a.row {
+	color: var(--color-on-surface);
 	text-decoration: none;
 }
 
-.row a:hover {
+.cover {
+	width: 28px;
+	height: 38px;
+	overflow: hidden;
+	flex-shrink: 0;
+	border-radius: var(--radius-sm);
+}
+
+.rowLink,
+.rowText {
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+}
+
+a.rowLink {
+	color: var(--color-on-surface);
+	text-decoration: none;
+}
+
+.title {
+	overflow: hidden;
+	max-width: 100%;
+	font-size: 14px;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rowLink:hover .title {
 	text-decoration: underline;
 }
 
-@media (hover: hover) {
-	.actions {
-		opacity: 0;
-		pointer-events: none;
-	}
+.status {
+	color: var(--color-outline);
+	font-size: 12px;
+}
 
-	.row:hover > .actions,
-	.row:focus-within > .actions {
-		opacity: 1;
-		pointer-events: auto;
-	}
+.confirm {
+	color: var(--color-on-error-container);
+}
+
+.chevron {
+	flex-shrink: 0;
+	color: var(--color-outline);
+}
+
+.empty {
+	margin: 0;
+	color: var(--color-on-surface-variant);
 }

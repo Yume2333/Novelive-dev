@@ -637,10 +637,6 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 			await expect(page.getByText(/软停止线 80000 tokens/)).toBeVisible()
 			const queue = await openQueue(page)
 			await expect(queue.getByText('已暂停：模型预算不足')).toBeVisible()
-			await queue
-				.getByRole('listitem')
-				.filter({ hasText: '已暂停：模型预算不足' })
-				.hover()
 			expect(calls).toHaveLength(malformedAttempts + 1)
 			expect(calls[malformedAttempts]).toEqual(calls[0])
 			expect(unexpected).toEqual([])
@@ -668,10 +664,6 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 			)
 			const queue = await openQueue(page)
 			await expect(queue.getByText('已暂停：模型预算不足')).toBeVisible()
-			await queue
-				.getByRole('listitem')
-				.filter({ hasText: '已暂停：模型预算不足' })
-				.hover()
 			await queue.getByRole('button', { name: '继续制作' }).click()
 			await expect
 				.poll(() =>
