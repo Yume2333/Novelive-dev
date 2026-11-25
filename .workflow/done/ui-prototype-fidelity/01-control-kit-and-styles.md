@@ -19,3 +19,10 @@
 - Base commit: 3a8ba3bbb97d4c78d2f7ea6ad9b1f27218378176
 - Check after: `NL_REPLAY=strict pnpm check && pnpm build` passed (exit 0) — `tsc --noEmit` 0 errors, `biome check` + `stylelint` 0 errors, `vitest run` 75 passed | 1 skipped (1142 passed | 3 skipped, including 32 control-kit tests and 6 locale parity tests), `electron-vite build` succeeded (main/preload/renderer).
 - Review: pass (base 3a8ba3bbb97d4c78d2f7ea6ad9b1f27218378176, reviewer reviewer-01)
+
+### Rework round 2
+
+- Rework base commit: 14fbf824e95c624b0398a7b067cc9e4dbe8784d0
+- Fix: removed Drawer scrim `backdrop-filter: blur(4px)` and `-webkit-backdrop-filter: blur(4px)` from `.drawerScrim` in `packages/ui/src/components/Extended.module.css` per gate 08 feedback 1a; `background: var(--scrim)` and `.drawerScrimEnter/.drawerScrimExit` presence animations kept; Modal blur untouched. No unit test under tests/unit asserts drawer scrim blur.
+- Check after: `NL_REPLAY=strict pnpm check` exit 0 — `Test Files 75 passed | 1 skipped (76)`, `Tests 1142 passed | 3 skipped (1145)` (first run hit pre-existing flake in `tests/integration/m1b-offline-dry-run.test.ts > concurrent-sunburst`; same spec passed 31/31 on clean baseline rerun and full check passed on rerun with the fix). `pnpm build` exit 0 (`electron-vite build` main/preload/renderer, `✓ built in 4.59s`).
+- Playwright: `xvfb-run -a env NL_REPLAY=strict … npx playwright test tests/e2e/m4-production-queue.spec.ts tests/e2e/m0-ui-shell.spec.ts --workers=1` → `1 failed (m4-production-queue, test timeout 30000ms exceeded), 2 passed (m0-ui-shell, 43.0s)`. m4 failure is pre-existing and unrelated: isolated rerun failed identically, and the same spec fails identically on clean baseline without this change (both in uip-01 and in the uip-integration worktree at 14fbf82).
