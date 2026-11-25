@@ -888,9 +888,18 @@ test.describe('M3 player controls', () => {
 					await expect(
 						page.getByRole('button', { name: '返回游戏' }),
 					).toBeFocused()
-					await expect(
-						page.getByRole('button', { name: '在编辑器中打开这里' }),
-					).toHaveAttribute('title', '请先将本地工程关联到作品')
+					const editorOpen = page.getByRole('button', {
+						name: '在编辑器中打开这里',
+					})
+					await expect(editorOpen).not.toHaveAttribute('title', /.+/)
+					const linkHint = page
+						.getByRole('tooltip')
+						.filter({ hasText: '请先将本地工程关联到作品' })
+					await expect(linkHint).toHaveCount(0)
+					await editorOpen.hover()
+					await expect(linkHint).toBeVisible()
+					await page.mouse.move(0, 0)
+					await expect(linkHint).toHaveCount(0)
 					await mkdir(join(directory, 'profile', 'projects'), {
 						recursive: true,
 					})
