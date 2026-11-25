@@ -249,23 +249,17 @@ test.describe('M5 packaged application smoke verification', () => {
 			)
 			expect(about).toEqual({ version: expectedVersion, packaged: true })
 
-			const packagedLicenses = await desktopApp.evaluate(async () => {
-				// Playwright serializes this callback into the Electron main context,
-				// where outer module imports are out of scope.
-				const fs = await import('node:fs/promises')
-				const path = await import('node:path')
-				const out: Record<string, number> = {}
-				for (const name of ['LICENSE.txt', 'THIRD_PARTY_NOTICES.txt']) {
-					const info = await fs.stat(
-						path.join(process.resourcesPath, 'licenses', name),
-					)
-					if (!info.isFile() || info.size === 0) {
-						throw new Error(`Missing or empty packaged license: ${name}`)
-					}
-					out[name] = info.size
+			const resourcesPath = await desktopApp.evaluate(
+				() => process.resourcesPath,
+			)
+			const packagedLicenses: Record<string, number> = {}
+			for (const name of ['LICENSE.txt', 'THIRD_PARTY_NOTICES.txt']) {
+				const info = await stat(join(resourcesPath, 'licenses', name))
+				if (!info.isFile() || info.size === 0) {
+					throw new Error(`Missing or empty packaged license: ${name}`)
 				}
-				return out
-			})
+				packagedLicenses[name] = info.size
+			}
 			expect(packagedLicenses['LICENSE.txt']).toBeGreaterThan(0)
 			expect(packagedLicenses['THIRD_PARTY_NOTICES.txt']).toBeGreaterThan(0)
 
