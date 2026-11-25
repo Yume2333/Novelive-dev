@@ -45,7 +45,6 @@ function CandidateCard({
 	checked,
 	onChange,
 	onPreview,
-	origin,
 	source,
 	multiple = false,
 	disabled,
@@ -57,7 +56,6 @@ function CandidateCard({
 	checked: boolean
 	onChange(): void
 	onPreview(): void
-	origin: string
 	source: string
 	multiple?: boolean
 	disabled?: boolean
@@ -65,7 +63,7 @@ function CandidateCard({
 	const caption = label ?? t('方案 {{value}}', { value: index + 1 })
 	return (
 		<div className={local.thumb} data-selected={checked}>
-			{/* label 包住 input 与说明文字，点击文字或图片都切换候选；zoom、版本签与选中角标浮在图片上 */}
+			{/* label 包住 input 与说明文字，点击文字或图片都切换候选；zoom 与选中角标浮在图片上 */}
 			<label className={local.thumbLabel}>
 				<input
 					type={multiple ? 'checkbox' : 'radio'}
@@ -75,9 +73,6 @@ function CandidateCard({
 					onChange={onChange}
 				/>
 				<img src={window.novelive.resourceUrl(candidate.cachePath)} alt="" />
-				<span className={local.origin} aria-hidden="true">
-					{origin}
-				</span>
 				<span className={local.caption}>
 					{caption}
 					{checked && <Check size={16} aria-hidden="true" />}
@@ -218,7 +213,6 @@ function VisualChoices({ visual }: { visual: Visual }) {
 		isImported(id) ? t('EPUB 插图') : t('生成候选')
 	const modalSourceOf = (id: string) =>
 		isImported(id) ? t('来源：EPUB 插图') : t('来源：生成候选')
-	const originOf = (id: string) => (isImported(id) ? t('EPUB') : t('第 1 版'))
 
 	const pickMain = (id: string) => {
 		setMainId(id)
@@ -401,7 +395,6 @@ function VisualChoices({ visual }: { visual: Visual }) {
 								checked={candidate.id === mainId}
 								onChange={() => pickMain(candidate.id)}
 								onPreview={() => openMainPreview(candidate, index)}
-								origin={originOf(candidate.id)}
 								source={sourceOf(candidate.id)}
 							/>
 						))}
@@ -494,7 +487,6 @@ function VisualChoices({ visual }: { visual: Visual }) {
 														onPreview={() =>
 															openCharacterPreview(entry, candidate, index)
 														}
-														origin={originOf(candidate.id)}
 														source={sourceOf(candidate.id)}
 													/>
 												))}
@@ -535,7 +527,6 @@ function VisualChoices({ visual }: { visual: Visual }) {
 										onPreview={() =>
 											openSupplementalPreview(candidate, index, checked, locked)
 										}
-										origin={originOf(candidate.id)}
 										source={sourceOf(candidate.id)}
 									/>
 								)

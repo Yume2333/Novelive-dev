@@ -1,7 +1,6 @@
 {
 	" · {{count}} 个场景": " · {{count}} scenes",
 	"CG": "CG",
-	"EPUB": "EPUB",
 	"EPUB 参考方案": "EPUB reference plan",
 	"EPUB 插图": "EPUB illustration",
 	"EPUB 插图 {{value}}": "EPUB illustration {{value}}",
@@ -38,7 +37,6 @@
 	"确认点 2 / 2": "Checkpoint 2 / 2",
 	"确认点说明": "About this checkpoint",
 	"立绘": "Standee",
-	"第 1 版": "Version 1",
 	"第 1 章 · {{value}}": "Chapter 1 · {{value}}",
 	"第一卷主要角色": "Volume 1 main characters",
 	"第一章已确认，其余章节进入后台按卷制作": "Chapter 1 confirmed; remaining chapters continue in the background",

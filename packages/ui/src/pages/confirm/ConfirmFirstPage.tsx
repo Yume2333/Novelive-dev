@@ -1,6 +1,6 @@
 import type { AssetRegistry } from '@novelive/format/model'
 import { parseScript, type Scene } from '@novelive/format/script'
-import { Check, Ellipsis, Image, NotebookPen, Play } from 'lucide-react'
+import { Check, Ellipsis, Image, NotebookPen, PlayCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../components/Button'
@@ -170,7 +170,7 @@ export function ConfirmFirstPage() {
 				ready && (
 					<div className={local.actions}>
 						<Link className={local.linkButton} to={workRoute('play', workId)}>
-							<Play aria-hidden="true" size={16} />
+							<PlayCircle aria-hidden="true" size={16} strokeWidth={1.8} />
 							{t('试玩第一章')}
 						</Link>
 						<Dropdown

@@ -257,25 +257,6 @@
 	color: var(--color-on-primary);
 }
 
-/* 候选图左下角版本 / 来源小签（紧凑圆角矩形，不用胶囊）；
-   与图片同占 label 网格第一行，对齐图片左下角，不依赖固定高度。 */
-.origin {
-	z-index: 2;
-	grid-row: 1;
-	align-self: end;
-	justify-self: start;
-	margin: 0 0 var(--space-2) var(--space-2);
-	padding: 3px var(--space-2);
-	border: 1px solid var(--divider);
-	border-radius: var(--radius-sm);
-	background: var(--veil-90);
-	color: var(--color-on-surface-variant);
-	font-size: 10px;
-	font-weight: 600;
-	letter-spacing: 0.02em;
-	pointer-events: none;
-}
-
 /* 说明文字下方安静的来源行 */
 .source {
 	display: block;
