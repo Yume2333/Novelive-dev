@@ -141,7 +141,7 @@
 	accent-color: var(--color-primary);
 }
 
-.sliderReadout {
+.slider .sliderReadout {
 	min-width: 52px;
 	color: var(--color-primary);
 	text-align: right;
@@ -299,7 +299,7 @@
 	padding: var(--space-px-18) var(--space-px-20) var(--space-px-10);
 }
 
-.drawerTitle {
+.drawerHeader .drawerTitle {
 	font-size: 17px;
 }
 

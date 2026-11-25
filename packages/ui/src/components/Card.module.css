@@ -18,7 +18,7 @@
 	white-space: nowrap;
 }
 
-.publishedQuiet {
+.statusMark .publishedQuiet {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-px-5);
