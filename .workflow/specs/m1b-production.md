@@ -1,7 +1,7 @@
 # M1b 最薄的完整创作链
 
-**Status:** in progress
-**Priority:** high
+**Status:** done
+**Accepted:** 2026-11-24 by agent (omp-vibe-windows)
 **Blocked by:** m1a-project/06
 
 ## What this is for
@@ -26,3 +26,7 @@
 - **W2.** 第一章已发布可玩，停在确认点二再手动继续。发布正常章及占位章，验证停止、失败恢复、运行记录和第二章发布。
 - **W3.** 回归评测和画风三组对照可复现。录制样例剥私有字段，离线运行分类、标注和独立 judge；对照记录质量差异与用量。
 - **W4.** 所有者授权样书真实创作一遍。文档化首章试玩、继续制作与质量证据；按预算裁剪调优，整书最多一次，缺样书不伪称通过。
+
+## Residual
+
+W4 真跑（[live-run-2026-11-24](../evidence/m1b/owner/live-run-2026-11-24.md)、[done/11](../done/m1b-production/11-m1b-owner-book.md)）已完成《浮生六記》一卷四章的端到端制作、四章发布与真实 Electron 试玩。**遗留风险**：零占位验收与 ch1-4 完整逐章试玩尚待完成——89 素材中 29 个仍为占位，唯一阻塞为生图端点供应商余额耗尽（HTTP 503 `insufficient balance`，外部计费、非产品缺陷）。所有者跟进：为 relay 充值后恢复同一私有项目补绘剩余占位并逐章试玩，再复核验收。
