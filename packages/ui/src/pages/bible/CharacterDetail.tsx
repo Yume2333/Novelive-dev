@@ -1,14 +1,27 @@
-import type { CommandOutput } from '@novelive/creator/contract'
-import { ArrowRight, ChevronDown } from 'lucide-react'
-import { type ReactNode, useState } from 'react'
-import { Collapse } from '../../components/Collapse'
+import {
+	ArrowRight,
+	Lock,
+	PenLine,
+	RefreshCw,
+	Sparkles,
+	User,
+	UserX,
+} from 'lucide-react'
+import type { KeyboardEvent, ReactNode } from 'react'
+import { Button, Chip, SectionLabel, Spinner, Tooltip } from '../../components'
 import { scoped } from '../../i18n'
-import { Fields, labelFor } from './BibleFields'
+import { ChangeList, Fields, LayerChip } from './BibleFields'
 import styles from './BiblePage.module.css'
+import {
+	assetResourceUrl,
+	type BibleCharacter,
+	coverGradientVar,
+	isWithinChapter,
+	type PreviewTarget,
+	type ResolvedAssetMap,
+} from './bibleHelpers'
 
 const t = scoped('bible')
-
-type BibleCharacter = CommandOutput<'bible.get'>['characters'][number]
 
 const handledCharacterKeys = [
 	'id',
@@ -34,21 +47,287 @@ const handledCharacterKeys = [
 	'revealedChapter',
 ] as const
 
+/** 渐变圆形角色徽标；一次性角色用 UserX 标记 */
+export function CharacterAvatar({
+	character,
+	size = 44,
+}: {
+	character: Pick<BibleCharacter, 'id' | 'name' | 'reuse'>
+	size?: number
+}) {
+	const Icon = character.reuse === 'one-off' ? UserX : User
+	return (
+		<span
+			className={styles.avatarBadge}
+			style={{
+				width: size,
+				height: size,
+				background: coverGradientVar(character.id),
+			}}
+		>
+			<Icon
+				size={Math.round(size * 0.52)}
+				strokeWidth={1.8}
+				aria-hidden="true"
+			/>
+		</span>
+	)
+}
+
+type AssetProps = {
+	resolvedAssets?: ResolvedAssetMap
+	assetVersions?: Readonly<Record<string, number>>
+	regenKeys?: Readonly<Record<string, boolean>>
+	onPreview?: (target: PreviewTarget) => void
+	onRegen?: (assetId: string, label: string) => void
+}
+
+function ExpressionCard({
+	character,
+	costumeId,
+	costumeDescription,
+	expr,
+	singleBase,
+	resolvedAssets,
+	assetVersions,
+	regenKeys,
+	onPreview,
+	onRegen,
+}: {
+	character: BibleCharacter
+	costumeId: string
+	costumeDescription: string
+	expr: { id: string; description: string }
+	singleBase?: boolean
+} & AssetProps) {
+	const assetId = `${character.id}/${costumeId}/${expr.id}`
+	const cachePath = resolvedAssets?.[assetId] ?? undefined
+	const imgUrl = assetResourceUrl(cachePath, assetVersions?.[assetId])
+	const drawn = Boolean(imgUrl)
+	const isRegen = Boolean(regenKeys?.[assetId])
+	const openPreview = () => {
+		onPreview?.({
+			kind: 'expression',
+			charId: character.id,
+			costumeId,
+			exprId: expr.id,
+			assetId,
+			title: `${character.name} · ${costumeId} · ${expr.id}`,
+			subtitle: costumeDescription,
+			description: expr.description,
+		})
+	}
+	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+		if (
+			event.target === event.currentTarget &&
+			(event.key === 'Enter' || event.key === ' ')
+		) {
+			event.preventDefault()
+			openPreview()
+		}
+	}
+	return (
+		<Tooltip
+			text={
+				drawn
+					? t('{{costume}} · {{expr}}（点击预览）', {
+							costume: costumeId,
+							expr: expr.id,
+						})
+					: t('{{expr}} · 还没画（点击查看详情）', { expr: expr.id })
+			}
+		>
+			{/* biome-ignore lint/a11y/useSemanticElements: 复合媒体块内含重绘子按钮与生成遮罩，不能用原生 button 嵌套 */}
+			<div
+				role="button"
+				tabIndex={0}
+				onClick={openPreview}
+				onKeyDown={onKeyDown}
+				className={`${styles.mediaCard} ${styles.exprCard} ${
+					drawn ? styles.exprCardDrawn : styles.exprCardEmpty
+				}`}
+			>
+				<div className={styles.exprCardInner}>
+					{drawn && imgUrl ? (
+						<>
+							<img className={styles.exprImg} src={imgUrl} alt={expr.id} />
+							<span className={styles.exprLabel}>{expr.id}</span>
+						</>
+					) : (
+						<>
+							<PenLine aria-hidden="true" size={18} strokeWidth={1.8} />
+							{!singleBase && (
+								<span className={styles.exprLabel}>{expr.id}</span>
+							)}
+							<span className={styles.exprLabel}>{t('还没画')}</span>
+						</>
+					)}
+				</div>
+				{isRegen ? (
+					<div className={styles.shimmerOverlay}>
+						<div className={styles.shimmerContent}>
+							<Spinner size={14} />
+							<span className={`ink-shimmer ${styles.shimmerText}`}>
+								{t('正在生成…')}
+							</span>
+						</div>
+					</div>
+				) : (
+					drawn &&
+					onRegen && (
+						<button
+							type="button"
+							className={`${styles.mediaActions} ${styles.exprRegenBtn}`}
+							aria-label={t('重新生成')}
+							onClick={(event) => {
+								event.stopPropagation()
+								onRegen(assetId, `${character.name} · ${expr.id}`)
+							}}
+						>
+							<RefreshCw size={11} strokeWidth={1.8} aria-hidden="true" />
+						</button>
+					)
+				)}
+			</div>
+		</Tooltip>
+	)
+}
+
+/** 造型 + 表情网格；按章节筛选拆分可见与未来造型 */
+function OutfitExpressions({
+	character,
+	chapterCutoff,
+	chapterOrder,
+	resolvedAssets,
+	assetVersions,
+	regenKeys,
+	onPreview,
+	onRegen,
+}: {
+	character: BibleCharacter
+	chapterCutoff?: number
+	chapterOrder?: ReadonlyMap<string, number>
+} & AssetProps) {
+	const costumes = character.costumes ?? []
+	const visibleCostumes = costumes.filter((costume) =>
+		isWithinChapter(costume.fromChapter, chapterCutoff, chapterOrder),
+	)
+	const futureCostumes = costumes.filter(
+		(costume) =>
+			!isWithinChapter(costume.fromChapter, chapterCutoff, chapterOrder),
+	)
+	const expressions = character.expressions ?? []
+	const assetProps: AssetProps = {
+		resolvedAssets,
+		assetVersions,
+		regenKeys,
+		onPreview,
+		onRegen,
+	}
+
+	if (costumes.length === 0) {
+		if (expressions.length === 0) return null
+		return (
+			<section className={styles.detailSection}>
+				<SectionLabel>{t('表情')}</SectionLabel>
+				<div className={styles.exprRow}>
+					{expressions.map((expr) => (
+						<ExpressionCard
+							key={expr.id}
+							character={character}
+							costumeId="base"
+							costumeDescription={expr.description}
+							expr={expr}
+							{...assetProps}
+						/>
+					))}
+				</div>
+			</section>
+		)
+	}
+
+	return (
+		<section className={styles.detailSection}>
+			<SectionLabel>{t('造型与表情')}</SectionLabel>
+			<div className={styles.outfitList}>
+				{visibleCostumes.map((costume) => {
+					const syntheticBase = expressions.length === 0
+					const exprList = syntheticBase
+						? [{ id: 'base', description: costume.description }]
+						: expressions
+					return (
+						<div key={costume.id} className={styles.outfitBlock}>
+							<div className={styles.outfitHead}>
+								<span className={styles.outfitName}>{costume.id}</span>
+								{costume.fromChapter && (
+									<Chip>
+										{t('起始章')} {costume.fromChapter}
+									</Chip>
+								)}
+							</div>
+							<p className={styles.outfitDesc}>{costume.description}</p>
+							<div className={styles.exprRow}>
+								{exprList.map((expr) => (
+									<ExpressionCard
+										key={expr.id}
+										character={character}
+										costumeId={costume.id}
+										costumeDescription={costume.description}
+										expr={expr}
+										singleBase={syntheticBase}
+										{...assetProps}
+									/>
+								))}
+							</div>
+						</div>
+					)
+				})}
+				{futureCostumes.map((costume) => (
+					<div key={costume.id} className={styles.futureOutfit}>
+						<Lock aria-hidden="true" size={13} strokeWidth={1.8} />
+						<span>
+							{t('{{chapter}} 起有新造型「{{name}}」（当前筛选不展示）', {
+								chapter: costume.fromChapter ?? '',
+								name: costume.id,
+							})}
+						</span>
+					</div>
+				))}
+			</div>
+		</section>
+	)
+}
+
 export function CharacterDetail({
 	character,
 	characters,
 	focused,
 	occurrences,
+	chapterCutoff,
+	chapterOrder,
+	resolvedAssets,
+	assetVersions,
+	regenKeys,
+	onPreview,
+	onRegen,
+	onAskAgent,
 }: {
 	character: BibleCharacter
 	characters: readonly BibleCharacter[]
 	focused?: boolean
 	occurrences?: ReactNode
+	chapterCutoff?: number
+	chapterOrder?: ReadonlyMap<string, number>
+	resolvedAssets?: ResolvedAssetMap
+	assetVersions?: Readonly<Record<string, number>>
+	regenKeys?: Readonly<Record<string, boolean>>
+	onPreview?: (target: PreviewTarget) => void
+	onRegen?: (assetId: string, label: string) => void
+	onAskAgent?: (entryId: string, label: string) => void
 }) {
-	const [changesOpen, setChangesOpen] = useState(false)
-	const changes = character.changes ?? []
-	const headChanges = changes.slice(0, 2)
-	const tailChanges = changes.slice(2)
+	const beforeFirst =
+		Boolean(character.firstSeenChapter) &&
+		!isWithinChapter(character.firstSeenChapter, chapterCutoff, chapterOrder)
 
 	const profileRows: { key: string; label: string; content: ReactNode }[] = []
 	if (character.originalName)
@@ -64,8 +343,8 @@ export function CharacterDetail({
 			content: (
 				<ul className={styles.chipList}>
 					{character.aliases.map((alias) => (
-						<li key={alias} className={styles.chip}>
-							{alias}
+						<li key={alias}>
+							<Chip>{alias}</Chip>
 						</li>
 					))}
 				</ul>
@@ -90,57 +369,66 @@ export function CharacterDetail({
 			content: character.speech,
 		})
 
+	const knows = (character.knows ?? []).filter((item) =>
+		isWithinChapter(item.chapterId, chapterCutoff, chapterOrder),
+	)
+	const hasGallery =
+		(character.costumes?.length ?? 0) > 0 ||
+		(character.expressions?.length ?? 0) > 0
+
 	return (
 		<article
-			className={styles.card}
+			className={`${styles.card} ${beforeFirst ? styles.charDimmed : ''}`}
 			id={`bible-entry-${character.id}`}
 			data-focused={focused || undefined}
 		>
 			<header className={styles.charHead}>
-				<span className={styles.avatarLg} aria-hidden="true">
-					{character.name.slice(0, 1)}
-				</span>
+				<CharacterAvatar character={character} size={52} />
 				<div className={styles.charHeadBody}>
 					<div className={styles.charTitleRow}>
-						<h3>{character.name}</h3>
-						<span
-							className={styles.chip}
-							data-tone={
-								character.status === 'confirmed' ? 'confirmed' : 'candidate'
-							}
-						>
+						<h3 className="headline">{character.name}</h3>
+						<Chip active={character.status === 'confirmed'}>
 							{character.status === 'confirmed' ? t('已确认') : t('候选')}
-						</span>
-						{character.major && (
-							<span className={styles.chip}>{t('主要角色')}</span>
-						)}
+						</Chip>
+						<LayerChip entry={character} />
+						{character.major && <Chip>{t('主要角色')}</Chip>}
 						{character.reuse && (
-							<span className={styles.chip}>
+							<Chip>
 								{character.reuse === 'reusable' ? t('可复用') : t('一次性')}
-							</span>
+							</Chip>
 						)}
 					</div>
 					{(character.firstSeenChapter || character.revealedChapter) && (
-						<dl className={styles.inlineMeta}>
+						<div className={styles.charMeta}>
 							{character.firstSeenChapter && (
-								<div>
-									<dt>{t('首次出场')}</dt>
-									<dd>{character.firstSeenChapter}</dd>
-								</div>
+								<span>
+									{t('首次出场')} {character.firstSeenChapter}
+								</span>
 							)}
 							{character.revealedChapter && (
-								<div>
-									<dt>{t('揭示章节')}</dt>
-									<dd>{character.revealedChapter}</dd>
-								</div>
+								<span>
+									{t('揭示章节')} {character.revealedChapter}
+								</span>
 							)}
-						</dl>
+							{beforeFirst && <span>{t('当前章节前尚未出场')}</span>}
+						</div>
 					)}
 				</div>
+				{onAskAgent && (
+					<Button
+						size="sm"
+						variant="ghost"
+						icon={Sparkles}
+						className={styles.askBtn}
+						onClick={() => onAskAgent(character.id, character.name)}
+					>
+						{t('问 Agent 修改')}
+					</Button>
+				)}
 			</header>
 
 			{character.conflict && (
-				<p className={styles.conflict}>{character.conflict}</p>
+				<p className={styles.conflictBox}>{character.conflict}</p>
 			)}
 
 			{profileRows.length > 0 && (
@@ -156,7 +444,7 @@ export function CharacterDetail({
 
 			{character.appearance && (
 				<section className={styles.detailSection}>
-					<h4 className={styles.sectionHeading}>{t('外貌')}</h4>
+					<SectionLabel>{t('外貌')}</SectionLabel>
 					<p className={styles.detailText}>
 						{character.appearance.description}
 					</p>
@@ -166,8 +454,8 @@ export function CharacterDetail({
 								<span className={styles.subLabel}>{t('锚点特征')}</span>
 								<ul className={styles.chipList}>
 									{character.appearance.anchorFeatures.map((feature) => (
-										<li key={feature} className={styles.chip}>
-											{feature}
+										<li key={feature}>
+											<Chip>{feature}</Chip>
 										</li>
 									))}
 								</ul>
@@ -197,7 +485,7 @@ export function CharacterDetail({
 
 			{character.addresses && character.addresses.length > 0 && (
 				<section className={styles.detailSection}>
-					<h4 className={styles.sectionHeading}>{t('称呼')}</h4>
+					<SectionLabel>{t('称呼')}</SectionLabel>
 					<ul className={styles.objectList}>
 						{(() => {
 							const seen = new Map<string, number>()
@@ -225,54 +513,32 @@ export function CharacterDetail({
 				</section>
 			)}
 
-			{character.costumes && character.costumes.length > 0 && (
-				<section className={styles.detailSection}>
-					<h4 className={styles.sectionHeading}>{t('造型')}</h4>
-					<div className={styles.subGrid}>
-						{character.costumes.map((costume) => (
-							<div key={costume.id} className={styles.subCard}>
-								<div className={styles.subCardHead}>
-									<strong>{costume.id}</strong>
-									{costume.fromChapter && (
-										<span className={styles.chip}>
-											{t('起始章')} {costume.fromChapter}
-										</span>
-									)}
-								</div>
-								<p className={styles.detailText}>{costume.description}</p>
-							</div>
-						))}
-					</div>
-				</section>
+			{hasGallery && (
+				<OutfitExpressions
+					character={character}
+					chapterCutoff={chapterCutoff}
+					chapterOrder={chapterOrder}
+					resolvedAssets={resolvedAssets}
+					assetVersions={assetVersions}
+					regenKeys={regenKeys}
+					onPreview={onPreview}
+					onRegen={onRegen}
+				/>
 			)}
 
-			{character.expressions && character.expressions.length > 0 && (
+			{knows.length > 0 && (
 				<section className={styles.detailSection}>
-					<h4 className={styles.sectionHeading}>{t('表情')}</h4>
-					<div className={styles.exprGrid}>
-						{character.expressions.map((expr) => (
-							<div key={expr.id} className={styles.subCard}>
-								<strong>{expr.id}</strong>
-								<p className={styles.detailText}>{expr.description}</p>
-							</div>
-						))}
-					</div>
-				</section>
-			)}
-
-			{character.knows && character.knows.length > 0 && (
-				<section className={styles.detailSection}>
-					<h4 className={styles.sectionHeading}>{t('已知事实')}</h4>
+					<SectionLabel>{t('已知事实')}</SectionLabel>
 					<ul className={styles.objectList}>
 						{(() => {
 							const seen = new Map<string, number>()
-							return character.knows.map((item) => {
+							return knows.map((item) => {
 								const base = `${item.chapterId}-${item.fact}`
 								const count = (seen.get(base) ?? 0) + 1
 								seen.set(base, count)
 								return (
 									<li key={`${base}-${count}`} className={styles.changeRow}>
-										<span className={styles.chip}>{item.chapterId}</span>
+										<Chip>{item.chapterId}</Chip>
 										<span>{item.fact}</span>
 									</li>
 								)
@@ -284,7 +550,7 @@ export function CharacterDetail({
 
 			{character.references && character.references.length > 0 && (
 				<section className={styles.detailSection}>
-					<h4 className={styles.sectionHeading}>{t('参考图')}</h4>
+					<SectionLabel>{t('参考图')}</SectionLabel>
 					<ul className={styles.objectList}>
 						{(() => {
 							const seen = new Map<string, number>()
@@ -304,75 +570,14 @@ export function CharacterDetail({
 				</section>
 			)}
 
-			{changes.length > 0 && (
+			{(character.changes?.length ?? 0) > 0 && (
 				<section className={styles.detailSection}>
-					<h4 className={styles.sectionHeading}>{t('剧情变化')}</h4>
-					<ul className={styles.objectList}>
-						{(() => {
-							const seen = new Map<string, number>()
-							return headChanges.map((change) => {
-								const base = `${change.chapterId}-${change.field}-${change.value}`
-								const count = (seen.get(base) ?? 0) + 1
-								seen.set(base, count)
-								return (
-									<li key={`${base}-${count}`} className={styles.changeRow}>
-										<span className={styles.chip}>{change.chapterId}</span>
-										<span className={styles.changeField}>
-											{labelFor(change.field)}
-										</span>
-										<strong>{change.value}</strong>
-									</li>
-								)
-							})
-						})()}
-					</ul>
-					{tailChanges.length > 0 && (
-						<>
-							<Collapse open={changesOpen}>
-								<ul className={styles.objectList}>
-									{(() => {
-										const seen = new Map<string, number>()
-										return tailChanges.map((change) => {
-											const base = `${change.chapterId}-${change.field}-${change.value}`
-											const count = (seen.get(base) ?? 0) + 1
-											seen.set(base, count)
-											return (
-												<li
-													key={`${base}-${count}`}
-													className={styles.changeRow}
-												>
-													<span className={styles.chip}>
-														{change.chapterId}
-													</span>
-													<span className={styles.changeField}>
-														{labelFor(change.field)}
-													</span>
-													<strong>{change.value}</strong>
-												</li>
-											)
-										})
-									})()}
-								</ul>
-							</Collapse>
-							<button
-								type="button"
-								className={styles.collapseToggle}
-								aria-expanded={changesOpen}
-								onClick={() => setChangesOpen((open) => !open)}
-							>
-								<ChevronDown
-									aria-hidden="true"
-									size={14}
-									strokeWidth={1.8}
-									className="nl-chevron"
-									data-open={changesOpen ? 'true' : 'false'}
-								/>
-								{changesOpen
-									? t('收起')
-									: t('还有 {{count}} 条变化', { count: tailChanges.length })}
-							</button>
-						</>
-					)}
+					<SectionLabel>{t('剧情变化')}</SectionLabel>
+					<ChangeList
+						changes={character.changes}
+						chapterCutoff={chapterCutoff}
+						chapterOrder={chapterOrder}
+					/>
 				</section>
 			)}
 

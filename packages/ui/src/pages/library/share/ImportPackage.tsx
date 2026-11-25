@@ -1,9 +1,18 @@
 import type { DesktopShareApi, ShareResponse } from '@novelive/creator/contract'
+import {
+	CircleCheck,
+	NotebookPen,
+	Package,
+	TriangleAlert,
+	Upload,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { ShareDialog } from '../../../components/ShareDialog'
-import styles from '../../../components/ShareDialog.module.css'
+import { Button } from '../../../components/Button'
+import { Banner } from '../../../components/Extended'
+import { Modal } from '../../../components/Modal'
+import { useToast } from '../../../components/Toast'
 import { scoped } from '../../../i18n'
-import libraryStyles from '../LibraryPage.module.css'
+import styles from '../LibraryPage.module.css'
 
 const t = scoped('library')
 
@@ -13,17 +22,43 @@ type InspectedWork = Extract<
 	{ operation: 'inspectImport' }
 >['works'][number]
 
+function describeVersion(entry: InspectedWork) {
+	switch (entry.relation) {
+		case 'new':
+			return t('v{{version}} · 新作品', { version: entry.work.version })
+		case 'update':
+			return t('v{{installed}} → v{{version}} · 可更新', {
+				installed: entry.installedVersion,
+				version: entry.work.version,
+			})
+		case 'current':
+			return t('v{{version}} · 已导入', { version: entry.work.version })
+		case 'older':
+			return t('v{{version}} · 已安装较新的 v{{installed}}，不会替换', {
+				version: entry.work.version,
+				installed: entry.installedVersion,
+			})
+	}
+}
+
 export function ImportPackage({
 	api,
 	pickPackage,
 	pickProjectFolder,
 	onImported,
+	inspectRef,
+	hideTrigger,
 }: {
 	api: DesktopShareApi
 	pickPackage(): Promise<string | undefined>
 	pickProjectFolder(): Promise<string | null>
 	onImported(): void
+	/** 父级（空书库的次级按钮）经此 ref 共用这个导入流程。 */
+	inspectRef?: { current: (() => void) | null }
+	/** 空书库时由空状态里的按钮触发，这里只留弹窗宿主。 */
+	hideTrigger?: boolean
 }) {
+	const toast = useToast()
 	const [open, setOpen] = useState(false)
 	const [review, setReview] = useState<{
 		packagePath: string
@@ -83,6 +118,15 @@ export function ImportPackage({
 			setBusy(false)
 		}
 	}).current
+	const inspectLatest = useRef(inspect)
+	inspectLatest.current = inspect
+	useEffect(() => {
+		if (!inspectRef) return
+		inspectRef.current = () => void inspectLatest.current()
+		return () => {
+			inspectRef.current = null
+		}
+	}, [inspectRef])
 	useEffect(() => {
 		const installed = window.novelive?.host.installed
 		if (!installed || open || busy) return
@@ -120,6 +164,7 @@ export function ImportPackage({
 					return
 				}
 				setProjectImported(true)
+				toast(t('工程副本已创建'), NotebookPen)
 			} else {
 				const response = await api.call({
 					operation: 'import',
@@ -131,6 +176,7 @@ export function ImportPackage({
 					return
 				}
 				setImported(response.result.works.length)
+				toast(t('作品包导入完成'), CircleCheck)
 			}
 			onImported()
 		} catch {
@@ -144,47 +190,47 @@ export function ImportPackage({
 		}
 	}
 
+	const fileName = review?.packagePath.split(/[\\/]/).pop()
 	return (
 		<>
-			<button
-				type="button"
-				className={libraryStyles.packageAction}
-				disabled={busy}
-				onClick={() => void inspect()}
-			>
-				{t('导入作品包')}
-			</button>
-			{open && (
-				<ShareDialog
-					title={t('导入作品包')}
-					busy={busy}
-					onClose={() => setOpen(false)}
-					actions={
-						review &&
-						!projectImported &&
-						(imported === undefined && canImport ? (
-							<button
-								type="button"
-								className={styles.primary}
+			{hideTrigger ? null : (
+				<Button icon={Upload} disabled={busy} onClick={() => void inspect()}>
+					{t('导入作品包')}
+				</Button>
+			)}
+			<Modal
+				open={open}
+				title={t('导入作品包')}
+				width={560}
+				closeDisabled={busy}
+				onClose={() => {
+					if (!busy) setOpen(false)
+				}}
+				footer={
+					review &&
+					!projectImported &&
+					(imported === undefined && canImport ? (
+						<Button
+							variant="primary"
+							disabled={busy}
+							onClick={() => void importPackage(false)}
+						>
+							{updates.length ? t('确认导入与更新') : t('导入')}
+						</Button>
+					) : (
+						canImportAsProject && (
+							<Button
+								variant="primary"
 								disabled={busy}
-								onClick={() => void importPackage(false)}
+								onClick={() => void importPackage(true)}
 							>
-								{updates.length ? t('确认导入与更新') : t('导入')}
-							</button>
-						) : (
-							canImportAsProject && (
-								<button
-									type="button"
-									className={styles.primary}
-									disabled={busy}
-									onClick={() => void importPackage(true)}
-								>
-									{t('导入为工程')}
-								</button>
-							)
-						))
-					}
-				>
+								{t('导入为工程')}
+							</Button>
+						)
+					))
+				}
+			>
+				<div className={styles.packageContent}>
 					{busy ? (
 						<p role="status">
 							{review ? t('正在导入…') : t('正在检查作品包…')}
@@ -198,55 +244,57 @@ export function ImportPackage({
 					) : (
 						review && (
 							<>
-								<ul>
+								<div className={styles.packageHead}>
+									<span className={`glass-panel ${styles.packageIcon}`}>
+										<Package size={21} strokeWidth={1.8} aria-hidden="true" />
+									</span>
+									<div>
+										<div className={styles.packageName}>{fileName}</div>
+										<div className={styles.packageMeta}>
+											{t('{{count}} 部作品', { count: works.length })}
+										</div>
+									</div>
+								</div>
+								{updates.length > 0 ? (
+									<>
+										<Banner kind="warning" icon={TriangleAlert}>
+											{t('书库里已有同作品旧版本，导入后会被新版本替换。')}
+										</Banner>
+										<p className={styles.packageNote}>
+											{t(
+												'存档和已读记录会按作品内 ID 自动迁移；对不上的旧存档会保留，在存档界面单独成组。',
+											)}
+										</p>
+									</>
+								) : canImport ? (
+									<Banner>{t('检查完成：是新作品，可以直接导入。')}</Banner>
+								) : null}
+								<ul className={styles.packageWorks}>
 									{works.map((entry) => (
-										<li key={entry.work.workId}>
-											<strong>
+										<li key={entry.work.workId} className={styles.packageWork}>
+											<strong className={styles.packageWorkTitle}>
 												{t('《{{title}}》', { title: entry.title })}
-											</strong>{' '}
-											{describeVersion(entry)}
+											</strong>
+											<span
+												className={styles.packageWorkVersion}
+												data-relation={entry.relation}
+											>
+												{describeVersion(entry)}
+											</span>
 										</li>
 									))}
 								</ul>
-								{updates.length > 0 && (
-									<div className={styles.notice}>
-										<p>
-											{t(
-												'确认后将替换上述旧版本。存档和已读记录会迁移；无法迁移的存档会保留在「旧版本存档」中。',
-											)}
-										</p>
-									</div>
-								)}
 							</>
 						)
 					)}
 					{review && canImportAsProject && !projectImported && (
-						<p>
+						<p className={styles.packageNote}>
 							{t('导入为工程会创建可编辑的副本，再次导出时将使用新的作品 ID。')}
 						</p>
 					)}
 					{error && <p role="alert">{error}</p>}
-				</ShareDialog>
-			)}
+				</div>
+			</Modal>
 		</>
 	)
-}
-
-function describeVersion(entry: InspectedWork) {
-	switch (entry.relation) {
-		case 'new':
-			return t('v{{version}} · 新作品', { version: entry.work.version })
-		case 'update':
-			return t('v{{installed}} → v{{version}} · 可更新', {
-				installed: entry.installedVersion,
-				version: entry.work.version,
-			})
-		case 'current':
-			return t('v{{version}} · 已导入', { version: entry.work.version })
-		case 'older':
-			return t('v{{version}} · 已安装较新的 v{{installed}}，不会替换', {
-				version: entry.work.version,
-				installed: entry.installedVersion,
-			})
-	}
 }

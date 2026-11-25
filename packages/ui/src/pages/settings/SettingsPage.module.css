@@ -34,69 +34,7 @@
 .cardHeader {
 	position: relative;
 	padding: var(--space-4) var(--space-5);
-	padding-inline-end: calc(var(--space-5) + var(--space-4) + var(--space-3));
-}
-
-.page button:not(.expand),
-.page input:not([type="checkbox"]),
-.page textarea,
-.page select {
-	box-sizing: border-box;
-	padding: var(--space-2) var(--space-3);
-	border: 1px solid var(--accent-border-20);
-	border-radius: var(--radius-md);
-	background: var(--white-55);
-	color: var(--color-on-surface);
-	font: inherit;
-}
-
-.page button {
-	cursor: pointer;
-}
-
-.page button:not(.expand) {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-1);
-	white-space: nowrap;
-	font-size: 13px;
-}
-
-.page button.testButton:not(.expand) {
-	gap: var(--space-1);
-	padding: var(--space-1) var(--space-2);
-	border-color: var(--glass-border);
-	background: var(--panel-70);
-	box-shadow: var(--shadow-glass);
-	color: var(--color-primary);
-	font-size: 11px;
-	font-weight: 600;
-	letter-spacing: 0.08em;
-}
-
-.page button:disabled,
-.page select:disabled,
-.page input:disabled {
-	opacity: 0.6;
-	cursor: default;
-}
-
-.page button:focus-visible,
-.page select:focus-visible,
-.page textarea:focus-visible,
-.page input:focus-visible {
-	outline: none;
-	box-shadow: var(--shadow-focus);
-}
-
-.page button:not(:disabled):hover,
-.page select:not(:disabled):hover {
-	background: var(--accent-wash);
-}
-
-.page .expand:not(:disabled):hover {
-	background: transparent;
+	padding-inline-end: calc(var(--space-5) + var(--space-4));
 }
 
 .expand {
@@ -106,10 +44,8 @@
 	gap: var(--space-3);
 	min-width: 0;
 	padding: 0;
-	border: 0;
-	background: transparent;
+	border-radius: var(--radius-md);
 	color: inherit;
-	font: inherit;
 	text-align: start;
 }
 
@@ -117,6 +53,7 @@
 	position: absolute;
 	inset-inline-end: var(--space-5);
 	color: var(--color-outline);
+	transition: transform var(--dur-fast) var(--ease-out);
 }
 
 .expand[aria-expanded="true"] > .chevron {
@@ -128,6 +65,10 @@
 	min-width: 0;
 }
 
+.summary strong {
+	font-size: 13.5px;
+}
+
 .summary small,
 .about small {
 	display: block;
@@ -136,8 +77,10 @@
 
 .summary small {
 	overflow: hidden;
+	margin-top: var(--space-px-2);
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	font-size: 12px;
 }
 
 .icon {
@@ -152,29 +95,49 @@
 	box-shadow: var(--shadow-glass);
 }
 
-.editor,
-.feedback {
+.appearance .icon {
+	color: var(--color-on-surface-variant);
+}
+
+.statusNote {
+	display: inline-flex;
+	align-items: center;
+	white-space: nowrap;
+}
+
+.testButton {
+	flex-shrink: 0;
+}
+
+.editor {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
 	margin: 0 var(--space-5);
-	padding-bottom: var(--space-4);
+	padding-bottom: var(--space-5);
 }
 
 .feedback {
 	display: flex;
 	align-items: center;
-	gap: var(--space-1);
+	gap: var(--space-px-6);
+	margin: 0 var(--space-5);
+	padding-bottom: var(--space-4);
 	font-size: 13px;
 }
 
-.fields,
-.postProcess,
-.results {
+.fields {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: var(--space-3);
+	gap: var(--space-4);
 	min-width: 0;
 	margin: 0;
 	padding: 0;
 	border: 0;
+}
+
+.fields:disabled {
+	opacity: 0.75;
 }
 
 .fullField,
@@ -187,105 +150,72 @@
 }
 
 .postProcess {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	align-items: start;
 	gap: var(--space-4);
 	border-top: 1px solid var(--divider);
 	padding-top: var(--space-4);
 }
 
-.field {
-	display: grid;
-	gap: var(--space-1);
-	min-width: 0;
+.tooltipField {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-px-6);
 	font-size: 13px;
 }
 
-.fullField .field {
-	gap: var(--space-2);
-}
-
-.fullField .field > span {
-	color: var(--color-on-surface-variant);
-	font-family: var(--font-body);
-	font-size: 12px;
-	font-weight: 600;
-	line-height: 1.2;
-	letter-spacing: 0.12em;
-	text-transform: uppercase;
-}
-
-.fieldLabel {
-	display: flex;
+.tooltipFieldLabel {
+	display: inline-flex;
 	align-items: center;
 	gap: var(--space-1);
-}
-
-.field input,
-.field select,
-.field textarea {
-	width: 100%;
-	min-width: 0;
-}
-
-.presetEditor {
-	display: grid;
-	gap: var(--space-3);
-	padding: var(--space-4);
-	border-top: 1px solid var(--divider);
-}
-
-.textArea {
-	position: relative;
-	display: grid;
-}
-
-.textArea textarea {
-	resize: none;
-	scrollbar-width: none;
-}
-
-.replacement {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
-	gap: var(--space-2);
-	margin-bottom: var(--space-2);
-}
-
-.inherit,
-.actions {
-	display: flex;
-	align-items: center;
-	gap: var(--space-2);
+	color: var(--color-on-surface-variant);
 }
 
 .inherit {
-	align-self: end;
-	min-height: calc(var(--space-6) + var(--space-1));
+	display: flex;
+	align-items: flex-end;
+	min-height: 44px;
+	padding-bottom: var(--space-px-3);
+	font-size: 13px;
 }
 
-.inherit input {
-	accent-color: var(--color-primary);
-}
-
-.actions {
-	justify-content: flex-end;
-	margin-top: var(--space-3);
+/*
+ * 共享 Checkbox 的输入框默认 pointer-events: none（视觉完全交给自定义框）。
+ * 这里恢复直接命中，让键盘焦点与端到端测试都能落在真实 input 上；
+ * 输入框本身依旧 1px 透明，视觉不变。
+ */
+.inherit :global(.nl-check-input) {
+	pointer-events: auto;
 }
 
 .results {
+	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
-	margin-bottom: var(--space-3);
+	gap: var(--space-3);
+	margin: 0;
+	padding: 0;
+	border: 0;
 }
 
 .result {
-	display: grid;
+	display: flex;
+	flex-direction: column;
 	align-content: start;
 	gap: var(--space-2);
 	min-width: 0;
-	padding: var(--space-2);
-	border: 1px solid var(--divider);
+	padding: var(--space-3);
+	border: 1px solid var(--white-60);
 	border-radius: var(--radius-md);
-	background: var(--white-45);
+	background: var(--white-40);
+}
+
+.resultHead {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-6);
+	font-size: 12px;
+	font-weight: 600;
 }
 
 .result img {
@@ -296,59 +226,90 @@
 	object-fit: contain;
 }
 
+.errorBadge {
+	display: block;
+	padding: var(--space-2) var(--space-3);
+	border-radius: var(--radius-md);
+	background: var(--color-error-container);
+	color: var(--color-on-error-container);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
 .row + .row {
-	border-top: 1px solid var(--divider);
-}
-
-.appearance {
-	padding-block: calc(var(--space-1) / 2);
-}
-
-.appearance .row {
-	gap: var(--space-3);
-	padding: var(--space-4);
-}
-
-.appearance .row + .row {
 	position: relative;
 	border-top-color: transparent;
 }
 
-.appearance .row + .row::before {
+.row + .row::before {
 	position: absolute;
-	inset: -1px var(--space-4) auto;
+	inset: -1px var(--space-px-18) auto;
 	height: 1px;
 	background: var(--divider);
 	content: "";
 }
 
-.appearance .row .icon {
-	color: var(--color-on-surface-variant);
-}
-
-.appearance .row select {
-	padding: var(--space-2);
-	border-color: var(--white-80);
-	background: var(--white-60);
-	font-size: 13px;
-}
-
 .row strong,
 .about .row span:nth-child(2) {
 	flex: 1;
+	min-width: 0;
 }
 
-.appearance .row strong {
+.row strong {
 	font-size: 13.5px;
 	font-weight: 600;
 }
 
+.rowIcon {
+	display: grid;
+	flex: 0 0 36px;
+	place-items: center;
+	height: 36px;
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-md);
+	background: var(--white-45);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-surface-variant);
+}
+
+span.rowSelect {
+	width: auto;
+	min-width: 150px;
+}
+
+.appearance {
+	padding-block: var(--space-px-2);
+}
+
+.appearance .row {
+	gap: var(--space-3);
+	padding: var(--space-4) var(--space-px-18);
+}
+
 .aboutLinks {
 	display: flex;
-	gap: var(--space-3);
-	padding: 0 var(--space-4) var(--space-3);
-	color: var(--color-on-surface-variant);
+	gap: var(--space-4);
+	padding: 0 var(--space-px-18) var(--space-3);
 	font-size: 12px;
+}
+
+.aboutLinks button {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-1);
+	padding: 0;
+	color: var(--color-primary);
+	font-size: 12px;
+}
+
+.aboutLinks button:disabled {
+	color: var(--color-on-surface-variant);
+	cursor: default;
 }
 
 .muted,
@@ -361,6 +322,7 @@
 	overflow-wrap: anywhere;
 }
 
+.configured,
 .success {
 	color: var(--color-success);
 }
@@ -384,12 +346,177 @@
 	margin: var(--space-1) 0 0;
 }
 
-@media (width < 740px) {
-	.fields,
-	.postProcess {
-		grid-template-columns: minmax(0, 1fr);
-	}
+/* ---- 写手预设 ---- */
+
+.presets {
+	padding: var(--space-4) var(--space-5);
 }
+
+.presetsHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: var(--space-3);
+}
+
+.presetsHead strong {
+	font-size: 13.5px;
+	font-weight: 700;
+}
+
+.presetList {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.presetRow {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	min-height: 44px;
+	padding: 0 var(--space-2);
+	border-radius: var(--radius-md);
+}
+
+.presetRow :global(.row-actions) {
+	display: flex;
+	gap: var(--space-1);
+	margin-inline-start: auto;
+}
+
+.presetName {
+	min-width: 0;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.presetDefault {
+	margin-inline-start: var(--space-2);
+	color: var(--color-outline);
+	font-size: 11px;
+	font-weight: 400;
+}
+
+/* ---- 写手预设编辑弹窗 ---- */
+
+.presetForm {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.presetAreaLabel {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-px-6);
+	font-size: 13px;
+}
+
+.presetAreaLabel > span:first-child,
+.replacements > span:first-child {
+	color: var(--color-on-surface-variant);
+}
+
+.presetArea {
+	position: relative;
+	display: grid;
+}
+
+.presetArea textarea {
+	width: 100%;
+	min-height: 72px;
+	padding: var(--space-px-10);
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-md);
+	background: var(--white-60);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-surface);
+	font-size: 13px;
+	line-height: 1.6;
+	resize: none;
+}
+
+.sampling {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-3);
+}
+
+.replacements {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	font-size: 13px;
+}
+
+.replacementRow {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.replacementArrow {
+	flex-shrink: 0;
+	color: var(--color-outline);
+}
+
+.addReplacement {
+	align-self: flex-start;
+}
+
+/*
+ * 预设编辑器页脚：吸底在弹窗滚动区下缘，视觉等同 Modal 自带 footer，
+ * 同时留在 <form> 内部保证表单控件与按钮的 DOM 从属关系。
+ */
+.presetFooter {
+	position: sticky;
+	bottom: calc(-1 * var(--space-px-20));
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: var(--space-3);
+	margin: var(--space-2) calc(-1 * var(--space-5)) calc(-1 * var(--space-px-20));
+	padding: var(--space-px-14) var(--space-5);
+	border-top: 1px solid var(--white-60);
+	background: var(--veil-95);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+}
+
+/* ---- 第三方许可 ---- */
+
+.licenses {
+	display: flex;
+	flex-direction: column;
+}
+
+.licenseRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+	padding: var(--space-2) 0;
+	border-top: 1px solid var(--divider);
+	font-size: 13px;
+}
+
+.licenseRow[data-first] {
+	border-top: none;
+}
+
+.licenseRow strong {
+	font-weight: 600;
+}
+
+.licenseRow span {
+	color: var(--color-outline);
+	font-size: 12px;
+	text-align: end;
+}
+
+/* ---- 高级区 ---- */
 
 .page h2.advanced {
 	margin: 0 0 var(--space-2);
@@ -402,4 +529,19 @@
 	align-items: center;
 	gap: var(--space-px-6);
 	color: var(--color-on-surface-variant);
+}
+
+@media (width < 740px) {
+	.fields,
+	.postProcess {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.results {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.sampling {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }

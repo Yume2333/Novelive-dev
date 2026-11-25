@@ -10,6 +10,7 @@
 	"导入 .novelive 作品包直接玩": "Import a .novelive package and play it",
 	"导入原文，改编成视觉小说": "Import a manuscript and adapt it into a visual novel",
 	"已选「游玩」路线：模型配置为可选项，可直接跳过前往书库导入 .novelive 作品包。": "You chose Play: model setup is optional. Skip ahead to the library to import a .novelive package.",
+	"已进入书库": "Entered the library",
 	"快速模型": "Fast model",
 	"接口地址": "API endpoint",
 	"接口格式": "API format",
