@@ -3,6 +3,7 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 import { arr, compile, int, obj, opt, str } from '@earendil-works/pi-schema'
+import type { Dispatcher } from 'undici'
 import {
 	inheritSettlement,
 	isResponsesTerminal,
@@ -439,15 +440,34 @@ function replayFetch(
 	const mode = options.mode ?? modeFromEnvironment()
 	const send = options.fetch ?? globalThis.fetch
 	const spend = options.spend
-	const sendAdmitted = (input: RequestInfo | URL, admitted: Request) => {
+	// new Request(input, init) in dispatch() drops non-standard init fields like
+	// undici's `dispatcher`; forward it explicitly so a custom download Agent
+	// (e.g. imageDownloadUpstream's same-network agent) still applies.
+	type WithDispatcher = RequestInit & { dispatcher?: Dispatcher }
+	const sendWithDispatcher = (request: Request, init?: WithDispatcher) =>
+		send(
+			request,
+			(init?.dispatcher ? { ...init, dispatcher: init.dispatcher } : init) as
+				| RequestInit
+				| undefined,
+		)
+	const sendAdmitted = (
+		input: RequestInfo | URL,
+		admitted: Request,
+		init?: WithDispatcher,
+	) => {
 		admitted.signal.throwIfAborted()
 		if (input instanceof Request) dispatchedRequests.add(input)
-		return send(admitted)
+		return sendWithDispatcher(admitted, init)
 	}
-	const sendLive = (request: Request, original: RequestInfo | URL) =>
+	const sendLive = (
+		request: Request,
+		original: RequestInfo | URL,
+		init?: WithDispatcher,
+	) =>
 		spend
-			? spend(request, (admitted) => sendAdmitted(original, admitted))
-			: send(request)
+			? spend(request, (admitted) => sendAdmitted(original, admitted, init))
+			: sendWithDispatcher(request, init)
 	if (!mode) {
 		if (!spend) return send
 		const upstream: typeof fetch = (input, init) =>
@@ -655,10 +675,15 @@ function replayFetch(
 						`${new Date().toISOString().slice(0, 10)},${String(body.model ?? 'image').replaceAll(',', '')},1,${reservation?.tokens ?? requestedOutputTokens(admitted, body) ?? 0},${reservation?.images ?? 0},cassette recording (${reservation ? 'reserved tokens and images' : 'reserved output tokens'})\n`,
 					)
 				}
-				return spend ? sendAdmitted(input, admitted) : send(admitted)
+				return spend
+					? sendAdmitted(input, admitted, init)
+					: sendWithDispatcher(admitted, init)
 			}
 			const response = await (checkpoint
-				? send(input, init)
+				? sendWithDispatcher(
+						input instanceof Request ? input : new Request(input, init),
+						init,
+					)
 				: spend
 					? spend(request, recordSend)
 					: recordSend(request))
@@ -737,7 +762,7 @@ function replayFetch(
 					await appendFile(process.env.NL_REPLAY_MISSING_LOG, `${message}\n`)
 				throw new Error(message)
 			}
-			return sendLive(request, input)
+			return sendLive(request, input, init)
 		}
 		return reply(
 			rows[Math.min(nextPosition(directory), rows.length - 1)],

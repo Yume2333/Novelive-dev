@@ -50,6 +50,80 @@ it('refuses image hostnames whose DNS answers are private', async () => {
 	})
 })
 
+it('permits image downloads from the configured private origin’s own network', async () => {
+	// Regression: a relay on a non-public address serves images from a CDN on the
+	// same non-public /16 — the guard must not brick those downloads.
+	const png = await sharp({
+		create: { width: 1, height: 1, channels: 3, background: 'blue' },
+	})
+		.png()
+		.toBuffer()
+	const server = createServer((_request, response) => {
+		response.writeHead(200, { 'content-type': 'image/png' }).end(png)
+	})
+	server.listen(0, '127.0.0.1')
+	try {
+		await once(server, 'listening')
+		const address = server.address()
+		if (!address || typeof address === 'string')
+			throw new Error('Expected TCP address')
+		// A *different* loopback port counts as an external same-network CDN host.
+		const cdn = `http://127.0.0.1:${address.port}`
+		const bytes = await imageDownloadUpstream('http://127.0.0.1:1/v1')(
+			`${cdn}/image.png`,
+		)
+		expect(bytes.ok).toBe(true)
+		expect(Buffer.from(await bytes.arrayBuffer())).toEqual(png)
+	} finally {
+		await new Promise<void>((resolve, reject) =>
+			server.close((error) => (error ? reject(error) : resolve())),
+		)
+	}
+})
+
+it('still refuses image downloads from a foreign private network', async () => {
+	// 10.x.x.x shares no /16 with a 127.x.x.x base — must stay blocked offline.
+	await expect(
+		imageDownloadUpstream('http://127.0.0.1:1/v1')('http://10.9.9.9/image.png'),
+	).rejects.toThrow('requires a public address')
+})
+
+it('still refuses link-local and metadata ranges even on a same-network base', async () => {
+	// A non-public base must never pull cloud-metadata / link-local ranges into
+	// the same-network allowance — these stay blocked unconditionally.
+	for (const host of [
+		'http://169.254.169.254/latest/meta-data/image.png',
+		'http://[fe80::1]/image.png',
+		'http://[fd00:ec2::254]/image.png',
+	])
+		await expect(
+			imageDownloadUpstream('http://169.254.10.10/v1')(host),
+		).rejects.toThrow('requires a public address')
+})
+
+it('forwards a custom download dispatcher through the record-mode replay path', async () => {
+	// new Request(input, init) inside replayFetch drops init.dispatcher; the
+	// record path must forward it so the same-network Agent reaches the wire.
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-image-'))
+	dirs.push(directory)
+	const dispatcher = { marker: 'same-network-agent' }
+	let seen: unknown
+	const upstream: typeof fetch = async (_input, init) => {
+		seen = (init as { dispatcher?: unknown } | undefined)?.dispatcher
+		return new Response('ok')
+	}
+	const record = createReplayFetch({
+		directory,
+		mode: 'record',
+		fetch: upstream,
+	})
+	const request = new Request('https://relay.invalid/image.png')
+	// fetch has no typed dispatcher field; pass it the same way the download
+	// upstream does (undici extension on RequestInit).
+	await record(request, { dispatcher } as RequestInit)
+	expect(seen).toBe(dispatcher)
+})
+
 it('forwards cancellation from the replay layer’s Request to image downloads', async () => {
 	const caller = new AbortController()
 	const request = new Request('https://relay.invalid/image.png', {

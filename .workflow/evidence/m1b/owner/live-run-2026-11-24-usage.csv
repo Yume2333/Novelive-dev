@@ -1,0 +1,5 @@
+run_id,settled_tokens,settled_images,unsettled_tokens,unsettled_images,note
+m1b-2026-11-24-w1,1004360,24,3637145,6,synthesis+confirm1+ch1 window
+m1b-2026-11-24-w2,1388355,30,3431892,18,ch2-4 production window (hit 50-image soft cap)
+m1b-2026-11-24-w3,4152364,212,1922000,186,shepherd redraw/recovery window (raised caps)
+TOTAL,6545079,266,8991037,210,
