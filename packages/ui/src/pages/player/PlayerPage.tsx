@@ -2,6 +2,7 @@ import { installedProgressKey } from '@novelive/creator/contract'
 import type { WorkSettings } from '@novelive/format/model'
 import { type CompiledScene, compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
+import { ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type {
@@ -73,6 +74,11 @@ export function PlayerPage({
 		speakerNames: Record<string, string>
 		customMarks: WorkSettings['customMarks']
 	}>()
+	const [workTitle, setWorkTitle] = useState<string>()
+	const [overlayActive, setOverlayActive] = useState(false)
+	const [veiled, setVeiled] = useState(true)
+	const [textFinished, setTextFinished] = useState(false)
+	const wheelAt = useRef(0)
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
 	useEffect(() => {
@@ -86,6 +92,39 @@ export function PlayerPage({
 		sentenceOrder.current.clear()
 		setLoaded(undefined)
 	}, [progressId, compare])
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 进入播放器（progressId 变化）时重新播放进场黑幕
+	useEffect(() => {
+		setVeiled(true)
+		const timer = window.setTimeout(() => setVeiled(false), 1250)
+		return () => window.clearTimeout(timer)
+	}, [progressId])
+	useEffect(() => {
+		let active = true
+		setWorkTitle(undefined)
+		if (version && window.novelive.host.installed)
+			window.novelive.host.installed.list().then(
+				(works) => {
+					if (!active) return
+					setWorkTitle(
+						works.find(
+							(item) => item.workId === id && item.version === Number(version),
+						)?.title,
+					)
+				},
+				() => {},
+			)
+		else if (id)
+			void window.novelive.call('library.list', {}).promise.then(
+				(result) => {
+					if (!active) return
+					setWorkTitle(result.works.find((item) => item.workId === id)?.title)
+				},
+				() => {},
+			)
+		return () => {
+			active = false
+		}
+	}, [id, version])
 	const loadProject = useCallback(
 		async (
 			directory?: string,
@@ -94,6 +133,7 @@ export function PlayerPage({
 			waitForClick = false,
 			restore?: StageSnapshot,
 			onValidated?: () => PlaybackMode,
+			fromStart = false,
 		) => {
 			if (!id || !progressId) return
 			setError('')
@@ -104,7 +144,8 @@ export function PlayerPage({
 					if (saved) progress.current = new PlaybackProgress(compare, saved)
 				})()
 				await progressReady.current
-				const resume = !chapterId ? progress.current.data.mainline : null
+				const resume =
+					!chapterId && !fromStart ? progress.current.data.mainline : null
 				const {
 					linked,
 					script,
@@ -255,9 +296,16 @@ export function PlayerPage({
 			progress.current,
 			controller.signal,
 		)
+		setTextFinished(false)
 		setControl(controls)
 		const unsubscribe = controls.subscribe(() => {
-			setEnded(controls.frame().ended)
+			const frame = controls.frame()
+			setEnded(frame.ended)
+			setTextFinished(
+				!frame.ended &&
+					host.current?.querySelector<HTMLElement>('.nl-player-text')?.dataset
+						.textFinished === 'true',
+			)
 		})
 		const fail = () => setError(t('无法加载舞台素材'))
 		let restoring = !!loaded.restore
@@ -369,6 +417,42 @@ export function PlayerPage({
 		onError: setError,
 		offline: Boolean(version),
 	})
+	const replayChapter = useCallback(() => {
+		if (!loaded) return
+		setEnded(false)
+		void loadProject(
+			undefined,
+			loaded.chapterId,
+			loaded.mode,
+			false,
+			undefined,
+			undefined,
+			true,
+		)
+	}, [loaded, loadProject])
+	// biome-ignore lint/correctness/useExhaustiveDependencies: restoreHistory 只读取 ref 中的进度数据，无需随渲染重建监听
+	useEffect(() => {
+		const key = (event: KeyboardEvent) => {
+			if (event.key !== 'PageUp' && event.key !== 'PageDown') return
+			if (!loaded || overlayActive || awaitingClick || ended) return
+			const target = event.target
+			if (
+				target instanceof HTMLElement &&
+				(target.tagName === 'INPUT' ||
+					target.tagName === 'TEXTAREA' ||
+					target.tagName === 'SELECT' ||
+					target.isContentEditable)
+			)
+				return
+			event.preventDefault()
+			if (event.key === 'PageUp') {
+				const cursor = progress.current.history.cursor ?? 0
+				if (cursor > 0) restoreHistory(cursor - 1)
+			} else control?.advance(false)
+		}
+		window.addEventListener('keydown', key)
+		return () => window.removeEventListener('keydown', key)
+	}, [loaded, overlayActive, awaitingClick, ended, control])
 	const listLegacy = progressApi?.listLegacy
 	const deleteLegacy = progressApi?.deleteLegacy
 	const packageLegacySaves = useMemo(
@@ -384,6 +468,16 @@ export function PlayerPage({
 			aria-label={t('播放器')}
 			data-mode={loaded?.mode}
 			data-mainline={JSON.stringify(progress.current.data.mainline)}
+			onWheel={(event) => {
+				if (!loaded || overlayActive || awaitingClick || ended) return
+				const now = Date.now()
+				if (now - wheelAt.current < 140) return
+				wheelAt.current = now
+				if (event.deltaY < 0) {
+					const cursor = progress.current.history.cursor ?? 0
+					if (cursor > 0) restoreHistory(cursor - 1)
+				} else if (event.deltaY > 0) control?.advance(false)
+			}}
 		>
 			<div
 				className="nl-player-surface"
@@ -396,6 +490,17 @@ export function PlayerPage({
 					}
 				}}
 			/>
+			{veiled && <div className="nl-enter-veil" aria-hidden="true" />}
+			{loaded?.mode === 'reread' && !overlayActive && (
+				<div className="nl-reread-badge" aria-hidden="true">
+					{t('重看')}
+				</div>
+			)}
+			{loaded && !ended && !awaitingClick && !overlayActive && textFinished && (
+				<span className="nl-next-glyph" aria-hidden="true">
+					<ChevronDown size={13} strokeWidth={1.8} />
+				</span>
+			)}
 			{loaded && (
 				<PlayerControls
 					controller={control}
@@ -439,6 +544,15 @@ export function PlayerPage({
 					}
 					awaitingClick={awaitingClick}
 					onResume={() => setAwaitingClick(false)}
+					workTitle={workTitle}
+					onWorkPage={
+						!version && id ? () => navigate(`/work/${id}`) : undefined
+					}
+					ended={ended}
+					reread={loaded.mode === 'reread'}
+					nextChapter={nextChapter}
+					onReplayChapter={replayChapter}
+					onOverlayChange={setOverlayActive}
 				/>
 			)}
 			{!loaded && !version && (
