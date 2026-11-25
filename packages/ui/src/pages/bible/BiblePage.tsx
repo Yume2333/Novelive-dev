@@ -926,9 +926,7 @@ function BibleProjection({
 								aria-label={t('设定集 · {{label}}', { label })}
 							>
 								<div className={styles.contentHead}>
-									<button
-										type="button"
-										className={styles.candidateChip}
+									<Chip
 										aria-expanded={candidatesOpen}
 										onClick={() => setCandidatesOpen(!candidatesOpen)}
 									>
@@ -943,7 +941,7 @@ function BibleProjection({
 											strokeWidth={1.8}
 											className={styles.candidateChevron}
 										/>
-									</button>
+									</Chip>
 								</div>
 								<section
 									className={styles.entries}

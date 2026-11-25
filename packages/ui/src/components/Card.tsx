@@ -204,12 +204,14 @@ export function Chip({
 	onClick,
 	className,
 	style,
+	'aria-expanded': ariaExpanded,
 }: {
 	children: ReactNode
 	active?: boolean
 	onClick?: () => void
 	className?: string
 	style?: CSSProperties
+	'aria-expanded'?: boolean
 }) {
 	const classes = [
 		styles.chip,
@@ -221,7 +223,13 @@ export function Chip({
 		.join(' ')
 	if (onClick) {
 		return (
-			<button type="button" onClick={onClick} className={classes} style={style}>
+			<button
+				type="button"
+				onClick={onClick}
+				className={classes}
+				style={style}
+				aria-expanded={ariaExpanded}
+			>
 				{children}
 			</button>
 		)
