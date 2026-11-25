@@ -1,0 +1,15 @@
+# 06: Replicate Bible workbench with prototype gallery, slider, drawer, and responsive layout
+
+**Effort:** ui-prototype-fidelity
+**Blocked by:** 01
+**Covers:** W1, W2, W4
+**Files:** packages/ui/src/pages/bible/, packages/ui/src/locales/*/bible.json
+**Read first:** .workflow/specs/ui-prototype-fidelity.md, .workflow/research/ui-prototype-fidelity-audit.md, DESIGN.md, prototype/src/pages/bible/BiblePage.tsx, prototype/src/pages/bible/bible.css
+**Check:** `NL_REPLAY=strict pnpm check && NL_REPLAY=strict pnpm test:e2e --grep 'M2 bible'` → check and Bible Electron E2E pass with prototype visual cards, chapter-cutoff slider, volume select, candidate drawer, and responsive container layout.
+
+- [ ] **Header controls & navigation (`BiblePage.tsx`, `BiblePage.module.css`)**: replace the raw text `<input>` for volume ID with a `CompactSelect` volume switcher populated from `library.list` volumes; add the header "截至第 N 章" `Slider` filtering chapter-stamped bible entries, outfits, timeline, and foreshadowing; restore prototype's responsive `@container` queries (`<=960px` icon-only category nav, `<=720px` stacked character master/detail) matching `prototype/src/pages/bible/bible.css`.
+- [ ] **Character avatars & outfit/expression visual gallery (`CharacterDetail.tsx`)**: replace plain letter circles with gradient `CharacterAvatar` badges; replace flat raw-ID `subCard` text dumps with prototype's `OutfitExpressions` gallery (per-outfit `SectionLabel` + chapter/change chips, 66x80 expression visual cards resolving real assets via `production.resolveAsset` + `novelive.resourceUrl`, dashed empty-state tiles for undrawn expressions, hover-revealed regenerate button wired to `editor.regenerateImage` when an asset exists, and click-to-open `Modal` lightbox).
+- [ ] **Structured category views (`BibleFields.tsx`, `BiblePage.tsx`)**: replace generic raw field dumps with prototype category layouts — Locations with 86px visual preview block + variant chips + lightbox `Modal`, Relations with `A ⇄ B` paired cards and change history, Timeline & Foreshadowing with icon-led status rows, Styles with labeled art/narration blocks + 3-column reference gallery cards + lightbox `Modal`, Glossary with polished table + occurrences column, and layer `Chip`s where scope metadata exists.
+- [ ] **Proposals & conflicts drawer (`BiblePage.tsx`)**: move inline pending proposals into a prototype 460px right-side `Drawer` (triggered from a header button with badge count) showing color-coded confirmed vs candidate diff blocks, `TextInput` reject reason, approve/reject `Button`s wired to `chat.*` proposal actions, and `useToast` feedback.
+- [ ] **Honest editability**: where `bible.get` is read-only without a direct mutation command, keep a clean "问 Agent 修改" quick entry that opens `AgentPanel` pre-bound to the selected Bible entry instead of fabricating fake local edits.
+- [ ] Sync all new i18n keys across `zh-CN`, `zh-TW`, `en`, `ja` `bible.json`.
