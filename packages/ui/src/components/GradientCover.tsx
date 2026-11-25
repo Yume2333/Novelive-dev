@@ -27,6 +27,16 @@ function hash(seed: string) {
 	return value
 }
 
+/** Palette index (0–5) derived from a stable seed; matches `data-palette`. */
+export function coverPalette(seed: string) {
+	return hash(seed) % 6
+}
+
+/** Gradient token for a seed — the same gradient GradientCover paints. */
+export function coverGradient(seed: string) {
+	return `var(--cover-${coverPalette(seed)})`
+}
+
 /** CSS-drawn book cover; palette and motif are derived from a stable seed. */
 export function GradientCover({
 	seed,
@@ -57,7 +67,7 @@ export function GradientCover({
 	return (
 		<div
 			className={className ? `${coverClass} ${className}` : coverClass}
-			data-palette={value % 6}
+			data-palette={coverPalette(seed)}
 			aria-hidden="true"
 			style={{ ...(gradient ? { background: gradient } : undefined), ...style }}
 		>

@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, ChevronRight, Play, Square } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
 	Button,
-	GradientCover,
+	coverGradient,
 	IconButton,
 	SectionLabel,
 } from '../../../components'
@@ -55,9 +55,11 @@ function confirmRoute(work: InactiveRow) {
 
 function Cover({ workId }: { workId: string }) {
 	return (
-		<div className={styles.cover}>
-			<GradientCover seed={workId} compact />
-		</div>
+		<div
+			className={styles.cover}
+			aria-hidden="true"
+			style={{ background: coverGradient(workId) }}
+		/>
 	)
 }
 

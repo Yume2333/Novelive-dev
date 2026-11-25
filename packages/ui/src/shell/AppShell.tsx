@@ -8,8 +8,10 @@ import {
 	AlertTriangle,
 	BarChart3,
 	BookOpen,
+	BookOpenText,
 	Check,
 	ChevronsUpDown,
+	Clapperboard,
 	Contrast,
 	LibraryBig,
 	type LucideIcon,
@@ -19,7 +21,6 @@ import {
 	Settings,
 	Sparkles,
 	Sun,
-	Workflow,
 } from 'lucide-react'
 import {
 	createContext,
@@ -66,9 +67,9 @@ const themes: { value: ThemeMode; icon: LucideIcon; name: string }[] = [
 const workNavigation = [
 	{ route: 'work', icon: BookOpen, name: msg('概览') },
 	{ route: 'play', icon: PlayCircle, name: msg('游玩') },
-	{ route: 'production', icon: Workflow, name: msg('制作') },
+	{ route: 'production', icon: Clapperboard, name: msg('制作') },
 	{ route: 'editor', icon: NotebookPen, name: msg('编辑') },
-	{ route: 'bible', icon: LibraryBig, name: msg('设定集') },
+	{ route: 'bible', icon: BookOpenText, name: msg('设定集') },
 ] as const
 
 const recentWorkKey = 'novelive.recentWork'
@@ -553,7 +554,6 @@ export function AppShell() {
 											type="button"
 											className={`glass-panel ${styles.agent}`}
 											aria-pressed={agentVisible}
-											title={t('Agent（Ctrl/⌘+J）')}
 											onClick={() => setAgentOpen((open) => !open)}
 										>
 											<Sparkles
