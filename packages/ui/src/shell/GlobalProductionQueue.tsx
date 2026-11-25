@@ -1,17 +1,33 @@
 import {
 	type CommandOutput,
 	commandError,
+	type ProductionSnapshot,
 	productionQueueEvent,
+	productionSnapshotEvent,
 } from '@novelive/creator/contract'
-import { Workflow, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import {
+	ArrowUpDown,
+	CircleStop,
+	Clapperboard,
+	ListChecks,
+	Moon,
+	Play,
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ScrollArea } from '../components/ScrollArea'
+import { Banner, Button, ConfirmDialog, Drawer, useToast } from '../components'
 import { scoped } from '../i18n'
 import { ProductionQueuePanel } from '../pages/production/queue/ProductionQueuePanel'
 import styles from './GlobalProductionQueue.module.css'
 
 const t = scoped('shell')
+
+const toneIcon = {
+	producing: Clapperboard,
+	confirm: ListChecks,
+	stopped: CircleStop,
+	idle: Moon,
+} as const
 
 export function GlobalProductionQueue() {
 	const [queue, setQueue] = useState<CommandOutput<'production.getQueue'>>()
@@ -19,11 +35,14 @@ export function GlobalProductionQueue() {
 	const [busy, setBusy] = useState(false)
 	const [open, setOpen] = useState(false)
 	const [reload, setReload] = useState(0)
-	const dialog = useRef<HTMLDialogElement>(null)
+	const [pendingStop, setPendingStop] = useState<string | null>(null)
+	const [activeSnapshot, setActiveSnapshot] = useState<ProductionSnapshot>()
+	const toast = useToast()
 	const { pathname } = useLocation()
 	useEffect(() => {
 		void pathname
-		dialog.current?.close()
+		setOpen(false)
+		setPendingStop(null)
 	}, [pathname])
 	useEffect(() => {
 		void reload
@@ -67,12 +86,64 @@ export function GlobalProductionQueue() {
 			offDown()
 		}
 	}, [reload])
-	async function run(action: () => Promise<unknown>) {
+	const activeWorkId = queue?.active?.link.workId
+	useEffect(() => {
+		if (!activeWorkId) {
+			setActiveSnapshot(undefined)
+			return
+		}
+		let active = true
+		let revision = 0
+		let pending:
+			| { promise: Promise<ProductionSnapshot>; cancel(): void }
+			| undefined
+		const load = () => {
+			const current = ++revision
+			pending?.cancel()
+			pending = window.novelive.call('production.get', { workId: activeWorkId })
+			void pending.promise.then(
+				(next) => {
+					if (active && current === revision) setActiveSnapshot(next)
+				},
+				() => {},
+			)
+		}
+		const offEvent = window.novelive.on('event', (event) => {
+			if (
+				event.scope !== 'work' ||
+				event.scopeId !== activeWorkId ||
+				!productionSnapshotEvent.check(event.event)
+			)
+				return
+			revision++
+			setActiveSnapshot(event.event.payload)
+		})
+		const offReady = window.novelive.on('creator.ready', load)
+		const offDown = window.novelive.on('creator.down', () => {
+			revision++
+			setActiveSnapshot(undefined)
+		})
+		load()
+		return () => {
+			active = false
+			pending?.cancel()
+			offEvent()
+			offReady()
+			offDown()
+		}
+	}, [activeWorkId])
+	async function run(
+		action: () => Promise<unknown>,
+		toastText?: string,
+		toastIcon?: typeof ArrowUpDown,
+	): Promise<boolean> {
 		setBusy(true)
 		setError('')
 		try {
 			await action()
 			setReload((value) => value + 1)
+			if (toastText) toast(toastText, toastIcon)
+			return true
 		} catch (failure) {
 			if (commandError.check(failure) && failure.code === 'invalid_config') {
 				setError(
@@ -85,6 +156,7 @@ export function GlobalProductionQueue() {
 			} else {
 				setError(t('队列操作失败，请重试'))
 			}
+			return false
 		} finally {
 			setBusy(false)
 		}
@@ -111,13 +183,37 @@ export function GlobalProductionQueue() {
 		stopped: t('已停止'),
 		idle: t('空闲'),
 	}[tone]
-	const detail = queue?.active
-		? queue.active.title
-		: tone === 'confirm'
-			? t('{{count}} 部作品等你确认', { count: waiting })
-			: queue?.queued.length
-				? t('{{count}} 部作品在排队', { count: queue.queued.length })
-				: t('没有排队的作品')
+	const StatusIcon = toneIcon[tone]
+	const detail = (() => {
+		if (queue?.active) {
+			if (
+				activeSnapshot &&
+				activeSnapshot.workId === queue.active.link.workId
+			) {
+				const producingIndex = activeSnapshot.chapters.findIndex(
+					(c) => c.status === 'producing',
+				)
+				if (producingIndex >= 0)
+					return t('{{title}} · 第 {{index}} 章', {
+						title: queue.active.title,
+						index: producingIndex + 1,
+					})
+				if (activeSnapshot.phase === 'preview')
+					return t('{{title}} · 全书预览', { title: queue.active.title })
+			}
+			return queue.active.title
+		}
+		if (tone === 'confirm')
+			return t('{{count}} 部作品等你确认', { count: waiting })
+		if (queue?.queued.length)
+			return t('{{count}} 部作品在排队', { count: queue.queued.length })
+		if (tone === 'stopped') {
+			const pausedCount =
+				queue?.inactive.filter((work) => work.status === 'paused').length ?? 0
+			return t('{{count}} 部作品已暂停', { count: pausedCount })
+		}
+		return t('没有排队的作品')
+	})()
 	return (
 		<>
 			<button
@@ -128,11 +224,10 @@ export function GlobalProductionQueue() {
 				aria-expanded={open}
 				onClick={() => {
 					setReload((value) => value + 1)
-					dialog.current?.showModal()
 					setOpen(true)
 				}}
 			>
-				<Workflow
+				<StatusIcon
 					aria-hidden="true"
 					size={18}
 					strokeWidth={1.8}
@@ -148,25 +243,37 @@ export function GlobalProductionQueue() {
 					</span>
 				)}
 			</button>
-			<dialog
-				ref={dialog}
-				className={styles.drawer}
-				aria-label={t('制作队列')}
-				onClose={() => setOpen(false)}
+			<Drawer
+				open={open}
+				title={t('制作队列')}
+				onClose={() => {
+					if (!pendingStop) setOpen(false)
+				}}
+				width={400}
 			>
-				<header className={styles.header}>
-					<button
-						type="button"
-						className={styles.close}
-						aria-label={t('关闭制作队列')}
-						onClick={() => dialog.current?.close()}
-					>
-						<X aria-hidden="true" size={18} strokeWidth={1.8} />
-					</button>
-				</header>
-				<ScrollArea className={styles.scroll}>
-					{error && <p role="alert">{error}</p>}
-					{!queue && !error && <p role="status">{t('正在读取制作队列')}</p>}
+				<div className={styles.drawerBody}>
+					{error && (
+						<Banner
+							kind="error"
+							action={
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={busy}
+									onClick={() => setReload((value) => value + 1)}
+								>
+									{t('重新读取')}
+								</Button>
+							}
+						>
+							<span role="alert">{error}</span>
+						</Banner>
+					)}
+					{!queue && !error && (
+						<p role="status" className={styles.loading}>
+							{t('正在读取制作队列')}
+						</p>
+					)}
 					{queue && (
 						<ProductionQueuePanel
 							queue={queue}
@@ -178,6 +285,8 @@ export function GlobalProductionQueue() {
 											workId,
 											direction,
 										}).promise,
+									t('已调整队列顺序'),
+									ArrowUpDown,
 								)
 							}
 							onContinue={(workId) =>
@@ -185,27 +294,33 @@ export function GlobalProductionQueue() {
 									() =>
 										window.novelive.call('production.continue', { workId })
 											.promise,
+									t('已继续制作'),
+									Play,
 								)
 							}
-							onStop={(workId) =>
-								void run(
-									() =>
-										window.novelive.call('production.stop', { workId }).promise,
-								)
-							}
+							onStop={(workId) => setPendingStop(workId)}
 						/>
 					)}
-					{error && (
-						<button
-							type="button"
-							disabled={busy}
-							onClick={() => setReload((value) => value + 1)}
-						>
-							{t('重新读取')}
-						</button>
-					)}
-				</ScrollArea>
-			</dialog>
+				</div>
+			</Drawer>
+			<ConfirmDialog
+				open={Boolean(pendingStop)}
+				title={t('停止制作')}
+				message={t('正在进行的请求会中断，下次继续时重做被中断的部分。')}
+				confirmLabel={t('立即停止')}
+				danger
+				busy={busy}
+				onCancel={() => setPendingStop(null)}
+				onConfirm={() => {
+					if (!pendingStop) return
+					const workId = pendingStop
+					void run(
+						() => window.novelive.call('production.stop', { workId }).promise,
+						t('已停止制作'),
+						CircleStop,
+					).then(() => setPendingStop(null))
+				}}
+			/>
 		</>
 	)
 }
