@@ -39,7 +39,6 @@ a.row {
 .cover {
 	width: 28px;
 	height: 38px;
-	overflow: hidden;
 	flex-shrink: 0;
 	border-radius: var(--radius-sm);
 }

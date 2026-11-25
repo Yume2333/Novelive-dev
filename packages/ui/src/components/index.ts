@@ -37,7 +37,12 @@ export {
 	Toggle,
 	textareaStyle,
 } from './Form'
-export { type CoverMotif, GradientCover } from './GradientCover'
+export {
+	type CoverMotif,
+	coverGradient,
+	coverPalette,
+	GradientCover,
+} from './GradientCover'
 export { InfoTooltip } from './InfoTooltip'
 export { Modal } from './Modal'
 export { usePresence } from './Motion'
