@@ -1,9 +1,6 @@
 import type { ProductionSnapshot } from '@novelive/creator/contract'
-import { CircleAlert, CircleCheck, Clapperboard } from 'lucide-react'
-import { msg, scoped } from '../../i18n'
-import styles from './Production.module.css'
-
-const t = scoped('production')
+import { ChapterStatusMark, Tooltip } from '../../components'
+import { msg } from '../../i18n'
 
 type Chapter = ProductionSnapshot['chapters'][number]
 export const stepName = {
@@ -20,28 +17,15 @@ export function stepProgress(chapter: Chapter) {
 	return (steps.indexOf(chapter.step) + 0.5) / steps.length
 }
 
+/** 章状态标记：复用控件库 ChapterStatusMark；「需要处理」原因放进 Tooltip，不占用行内空间 */
 export function ChapterState({ chapter }: { chapter: Chapter }) {
-	return (
-		<span className={styles.mark}>
-			{chapter.status === 'published' ? (
-				<>
-					<CircleCheck aria-hidden="true" size={13} />
-					<span>{t('已发布')}</span>
-				</>
-			) : (
-				<span className={styles.pill} data-status={chapter.status}>
-					{chapter.status === 'producing' && (
-						<Clapperboard aria-hidden="true" size={12} />
-					)}
-					{chapter.status === 'producing' ? t('制作中') : t('等待')}
+	if (chapter.issue)
+		return (
+			<Tooltip text={chapter.issue}>
+				<span style={{ display: 'inline-flex' }}>
+					<ChapterStatusMark status={chapter.status} attention />
 				</span>
-			)}
-			{chapter.issue && (
-				<span className={styles.attention} title={chapter.issue}>
-					<CircleAlert aria-hidden="true" size={13} />
-					{t('需要处理')}
-				</span>
-			)}
-		</span>
-	)
+			</Tooltip>
+		)
+	return <ChapterStatusMark status={chapter.status} />
 }

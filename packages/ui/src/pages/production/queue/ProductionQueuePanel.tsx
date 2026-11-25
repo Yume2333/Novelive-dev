@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
+import { Button, IconButton } from '../../../components'
 import { scoped } from '../../../i18n'
 import { workRoute } from '../../../routes/production'
 import styles from '../Production.module.css'
@@ -23,6 +24,10 @@ type Props = {
 
 function inactiveLabel(work: InactiveRow) {
 	if (work.status === 'done') return t('已完成')
+	if (work.status === 'awaiting_confirm')
+		return work.reason === 'confirm_visual'
+			? t('待确认主视觉')
+			: t('待确认第一章')
 	switch (work.reason) {
 		case 'confirm_visual':
 			return t('待确认主视觉')
@@ -61,14 +66,16 @@ export function ProductionQueuePanel({
 			{queue.active && (
 				<div className={`${styles.row} ${queueStyles.row}`}>
 					<WorkLink work={queue.active} label={t('制作中')} />
-					<button
-						className={`${styles.button} ${queueStyles.actions}`}
-						type="button"
-						disabled={busy}
-						onClick={() => queue.active && onStop(queue.active.link.workId)}
-					>
-						{t('立即停止')}
-					</button>
+					<span className={queueStyles.actions}>
+						<Button
+							variant="danger"
+							size="sm"
+							disabled={busy}
+							onClick={() => queue.active && onStop(queue.active.link.workId)}
+						>
+							{t('立即停止')}
+						</Button>
+					</span>
 				</div>
 			)}
 			{queue.queued.length > 0 && (
@@ -83,24 +90,18 @@ export function ProductionQueuePanel({
 								label={t('排队中 · {{value}}', { value: index + 1 })}
 							/>
 							<div className={`${styles.actions} ${queueStyles.actions}`}>
-								<button
-									className={styles.button}
-									type="button"
-									aria-label={t('提前：{{title}}', { title: work.title })}
+								<IconButton
+									icon={ArrowUp}
+									label={t('提前：{{title}}', { title: work.title })}
 									disabled={busy || index === 0}
 									onClick={() => onMove(work.link.workId, -1)}
-								>
-									<ArrowUp aria-hidden="true" size={16} />
-								</button>
-								<button
-									className={styles.button}
-									type="button"
-									aria-label={t('延后：{{title}}', { title: work.title })}
+								/>
+								<IconButton
+									icon={ArrowDown}
+									label={t('延后：{{title}}', { title: work.title })}
 									disabled={busy || index === queue.queued.length - 1}
 									onClick={() => onMove(work.link.workId, 1)}
-								>
-									<ArrowDown aria-hidden="true" size={16} />
-								</button>
+								/>
 							</div>
 						</li>
 					))}
@@ -125,14 +126,16 @@ export function ProductionQueuePanel({
 								}
 							/>
 							{work.status === 'paused' && work.reason !== 'chapter_failed' && (
-								<button
-									className={`${styles.button} ${queueStyles.actions}`}
-									type="button"
-									disabled={busy}
-									onClick={() => onContinue(work.link.workId)}
-								>
-									{t('继续制作')}
-								</button>
+								<span className={queueStyles.actions}>
+									<Button
+										variant="secondary"
+										size="sm"
+										disabled={busy}
+										onClick={() => onContinue(work.link.workId)}
+									>
+										{t('继续制作')}
+									</Button>
+								</span>
 							)}
 						</li>
 					))}

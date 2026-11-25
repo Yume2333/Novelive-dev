@@ -1,12 +1,23 @@
 import type { ProductionSnapshot } from '@novelive/creator/contract'
-import { Check, CircleCheck } from 'lucide-react'
+import {
+	ArrowLeft,
+	Check,
+	CircleCheck,
+	Ellipsis,
+	Expand,
+	Palette,
+} from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { Button, IconButton } from '../../components/Button'
+import { Card, SectionLabel } from '../../components/Card'
+import { Dropdown } from '../../components/Dropdown'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { Page } from '../../components/Page'
+import { Modal } from '../../components/Modal'
+import { EmptyState, Page } from '../../components/Page'
+import { useToast } from '../../components/Toast'
 import { scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
-import styles from '../production/Production.module.css'
 import { ProductionNotice } from '../production/ProductionNotice'
 import { useWorkProduction } from '../work/WorkProduction'
 import local from './Confirm.module.css'
@@ -15,6 +26,16 @@ const t = scoped('confirm')
 
 type Visual = NonNullable<ProductionSnapshot['visual']>
 type Candidate = Visual['mainVisuals'][number]
+type CharacterEntry = Visual['characters'][number]
+
+interface PreviewTarget {
+	candidate: Candidate
+	label: string
+	subtitle: string
+	source: string
+	selected: boolean
+	onPick(): void
+}
 
 function CandidateCard({
 	candidate,
@@ -23,6 +44,9 @@ function CandidateCard({
 	label,
 	checked,
 	onChange,
+	onPreview,
+	origin,
+	source,
 	multiple = false,
 	disabled,
 }: {
@@ -32,51 +56,104 @@ function CandidateCard({
 	label?: string
 	checked: boolean
 	onChange(): void
+	onPreview(): void
+	origin: string
+	source: string
 	multiple?: boolean
 	disabled?: boolean
 }) {
+	const caption = label ?? t('方案 {{value}}', { value: index + 1 })
 	return (
-		<label className={local.thumb} data-selected={checked}>
-			<input
-				type={multiple ? 'checkbox' : 'radio'}
-				name={name}
-				checked={checked}
+		<div className={local.thumb} data-selected={checked}>
+			{/* label 包住 input 与说明文字，点击文字或图片都切换候选；zoom、版本签与选中角标浮在图片上 */}
+			<label className={local.thumbLabel}>
+				<input
+					type={multiple ? 'checkbox' : 'radio'}
+					name={name}
+					checked={checked}
+					disabled={disabled}
+					onChange={onChange}
+				/>
+				<img src={window.novelive.resourceUrl(candidate.cachePath)} alt="" />
+				<span className={local.origin} aria-hidden="true">
+					{origin}
+				</span>
+				<span className={local.caption}>
+					{caption}
+					{checked && <Check size={16} aria-hidden="true" />}
+				</span>
+				<span className={local.source} aria-hidden="true">
+					{source}
+				</span>
+			</label>
+			<IconButton
+				icon={Expand}
+				label={t('放大预览 {{label}}', { label: caption })}
+				size={26}
+				iconSize={13}
+				className={local.zoom}
 				disabled={disabled}
-				onChange={onChange}
+				onClick={onPreview}
 			/>
-			<img src={window.novelive.resourceUrl(candidate.cachePath)} alt="" />
-			<span>
-				{label ?? t('方案 {{value}}', { value: index + 1 })}
-				{checked && <Check size={16} aria-hidden="true" />}
-			</span>
-		</label>
+			{checked && (
+				<span className={local.badge} aria-hidden="true">
+					<Check size={13} strokeWidth={1.8} />
+				</span>
+			)}
+		</div>
 	)
 }
 
 export function ConfirmVisualPage() {
 	const { snapshot } = useWorkProduction()
+	const navigate = useNavigate()
 	const visual = snapshot.phase === 'confirm-visual' ? snapshot.visual : null
 	if (visual) return <VisualChoices visual={visual} />
 	return (
 		<Page title={t('角色设定 / 主视觉')}>
-			<div className={styles.flow}>
-				<section className={`${styles.panel} ${styles.panelBody}`}>
-					<p className={styles.muted}>{t('目前没有待确认的主视觉。')}</p>
-					<Link
-						className={styles.ghost}
-						to={workRoute('work', snapshot.workId)}
+			<EmptyState
+				icon={Palette}
+				text={t('目前没有待确认的主视觉。')}
+				actions={
+					<Button
+						variant="primary"
+						onClick={() => navigate(workRoute('work', snapshot.workId))}
 					>
 						{t('返回概览')}
-					</Link>
-				</section>
-			</div>
+					</Button>
+				}
+			/>
 		</Page>
 	)
 }
 
+/** 同一角色的多套造型在左侧只占一行；右边每张造型卡单独一个 fieldset */
+function groupByCharacter(entries: CharacterEntry[]) {
+	const order: string[] = []
+	const map = new Map<string, CharacterEntry[]>()
+	for (const entry of entries) {
+		const group = map.get(entry.characterId)
+		if (group) group.push(entry)
+		else {
+			map.set(entry.characterId, [entry])
+			order.push(entry.characterId)
+		}
+	}
+	return order.map((characterId) => map.get(characterId) ?? [])
+}
+
+const keyOf = ({
+	characterId,
+	costumeId,
+}: {
+	characterId: string
+	costumeId: string
+}) => `${characterId}/${costumeId}`
+
 function VisualChoices({ visual }: { visual: Visual }) {
 	const { snapshot, run, busy, project } = useWorkProduction()
 	const navigate = useNavigate()
+	const toast = useToast()
 	const imported = visual.importedIllustrations
 	const recommended = imported?.recommended ?? []
 	const importedCandidates = imported?.candidates ?? []
@@ -85,7 +162,8 @@ function VisualChoices({ visual }: { visual: Visual }) {
 	const [characterIds, setCharacterIds] = useState<Record<string, string>>({})
 	const [supplemental, setSupplemental] = useState(() => defaults.slice(1, 3))
 	const [showAll, setShowAll] = useState(false)
-	const [selectedKey, setSelectedKey] = useState('')
+	const [selectedCharacter, setSelectedCharacter] = useState('')
+	const [preview, setPreview] = useState<PreviewTarget | null>(null)
 	const visibleImported = importedCandidates.filter(
 		({ id }) =>
 			showAll ||
@@ -123,20 +201,84 @@ function VisualChoices({ visual }: { visual: Visual }) {
 		},
 	)
 	const workId = snapshot.workId
-	const keyOf = ({
-		characterId,
-		costumeId,
-	}: {
-		characterId: string
-		costumeId: string
-	}) => `${characterId}/${costumeId}`
-	const active =
-		visual.characters.find((character) => keyOf(character) === selectedKey) ??
-		visual.characters[0]
-	const activeKey = active ? keyOf(active) : ''
+	const groups = groupByCharacter(visual.characters)
+	const activeGroup =
+		groups.find((group) => group[0]?.characterId === selectedCharacter) ??
+		groups[0]
+	const activeCharacterId = activeGroup?.[0]?.characterId ?? ''
 
 	const missing = (main ? 0 : 1) + visual.characters.length - characters.length
 	const ready = !busy && missing === 0
+
+	// 来源只写真实渠道：EPUB 导入的插图来自作品包，其余由制作流水线生成。
+	const isImported = (id: string) =>
+		importedCandidates.some((candidate) => candidate.id === id) ||
+		id === 'costume-epub'
+	const sourceOf = (id: string) =>
+		isImported(id) ? t('EPUB 插图') : t('生成候选')
+	const modalSourceOf = (id: string) =>
+		isImported(id) ? t('来源：EPUB 插图') : t('来源：生成候选')
+	const originOf = (id: string) => (isImported(id) ? t('EPUB') : t('第 1 版'))
+
+	const pickMain = (id: string) => {
+		setMainId(id)
+		setSupplemental((ids) => ids.filter((item) => item !== id))
+	}
+
+	const openMainPreview = (candidate: Candidate, index: number) =>
+		setPreview({
+			candidate,
+			label: label(candidate.id) ?? t('方案 {{value}}', { value: index + 1 }),
+			subtitle: t('主视觉'),
+			source: modalSourceOf(candidate.id),
+			selected: candidate.id === mainId,
+			onPick: () => pickMain(candidate.id),
+		})
+
+	const openCharacterPreview = (
+		entry: CharacterEntry,
+		candidate: Candidate,
+		index: number,
+	) => {
+		const key = keyOf(entry)
+		setPreview({
+			candidate,
+			label:
+				candidate.id === 'costume-epub'
+					? t('EPUB 参考方案')
+					: t('方案 {{value}}', { value: index + 1 }),
+			subtitle: t('{{character}} · {{costume}}', {
+				character: entry.characterName ?? entry.characterId,
+				costume: entry.costumeName ?? entry.costumeId,
+			}),
+			source: modalSourceOf(candidate.id),
+			selected: characterIds[key] === candidate.id,
+			onPick: () =>
+				setCharacterIds((choices) => ({ ...choices, [key]: candidate.id })),
+		})
+	}
+
+	const openSupplementalPreview = (
+		candidate: Candidate,
+		index: number,
+		checked: boolean,
+		locked: boolean,
+	) =>
+		setPreview({
+			candidate,
+			label: label(candidate.id) ?? t('方案 {{value}}', { value: index + 1 }),
+			subtitle: t('补充画风参考（最多两张）'),
+			source: modalSourceOf(candidate.id),
+			selected: checked,
+			onPick: () => {
+				if (!checked && locked) return
+				setSupplemental(
+					checked
+						? supplementalIds.filter((id) => id !== candidate.id)
+						: [...supplementalIds, candidate.id],
+				)
+			},
+		})
 
 	return (
 		<Page
@@ -160,30 +302,44 @@ function VisualChoices({ visual }: { visual: Visual }) {
 				</span>
 			}
 			actions={
-				<div className={styles.actions}>
+				<div className={local.actions}>
 					{missing > 0 && (
 						<span className={local.missing}>
 							{t('还差 {{value}} 项未选定', { value: missing })}
 						</span>
 					)}
-					<Link className={styles.ghost} to={workRoute('work', workId)}>
-						{t('返回概览')}
-					</Link>
-					<button
-						className={styles.primary}
+					<Dropdown
+						label={t('更多')}
+						className={local.moreTrigger}
+						trigger={
+							<>
+								<Ellipsis aria-hidden="true" size={16} />
+								{t('更多')}
+							</>
+						}
+						items={[
+							{
+								label: t('先不确认，回作品页'),
+								icon: ArrowLeft,
+								onSelect: () => navigate(workRoute('work', workId)),
+							},
+						]}
+					/>
+					<Button
+						variant="primary"
+						icon={Check}
 						disabled={!ready}
-						form="visual-choices"
 						type="submit"
+						form="visual-choices"
 					>
-						<Check aria-hidden="true" size={16} />
 						{t('确认并制作第一章')}
-					</button>
+					</Button>
 				</div>
 			}
 		>
 			<form
 				id="visual-choices"
-				className={styles.flow}
+				className={local.flow}
 				onSubmit={async (event) => {
 					event.preventDefault()
 					if (!main || characters.length !== visual.characters.length) return
@@ -194,8 +350,10 @@ function VisualChoices({ visual }: { visual: Visual }) {
 							characters,
 							supplementalIds,
 						})
-					)
+					) {
+						toast(t('角色设定和主视觉已确认，开始制作第一章'), Check)
 						navigate(workRoute('production', workId))
+					}
 				}}
 			>
 				{visual.mattingUnavailable && (
@@ -220,7 +378,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 							!recommended.includes(id) && !imported?.selected.includes(id),
 					) && (
 						<button
-							className={styles.ghost}
+							className={local.toggleAll}
 							type="button"
 							aria-pressed={showAll}
 							onClick={() => setShowAll(!showAll)}
@@ -230,9 +388,9 @@ function VisualChoices({ visual }: { visual: Visual }) {
 					)}
 				<fieldset className={local.section} disabled={busy}>
 					<legend>
-						<span className={styles.sectionLabel}>{t('主视觉')}</span>
+						<SectionLabel>{t('主视觉')}</SectionLabel>
 					</legend>
-					<div className={`${styles.panel} ${styles.panelBody} ${local.grid}`}>
+					<Card className={`${local.cardBody} ${local.grid}`}>
 						{mainVisuals.map((candidate, index) => (
 							<CandidateCard
 								key={candidate.id}
@@ -241,103 +399,122 @@ function VisualChoices({ visual }: { visual: Visual }) {
 								name="main-visual"
 								label={label(candidate.id)}
 								checked={candidate.id === mainId}
-								onChange={() => {
-									setMainId(candidate.id)
-									setSupplemental((ids) =>
-										ids.filter((id) => id !== candidate.id),
-									)
-								}}
+								onChange={() => pickMain(candidate.id)}
+								onPreview={() => openMainPreview(candidate, index)}
+								origin={originOf(candidate.id)}
+								source={sourceOf(candidate.id)}
 							/>
 						))}
-					</div>
+					</Card>
 				</fieldset>
-				{active && (
+				{activeGroup && (
 					<section
 						aria-labelledby="major-characters"
 						className={local.characters}
 					>
-						<h2 id="major-characters" className={styles.sectionLabel}>
-							{t('第一卷主要角色')}
+						<h2 id="major-characters">
+							<SectionLabel>{t('第一卷主要角色')}</SectionLabel>
 						</h2>
 						<div className={local.characterLayout}>
 							<div className={local.characterList}>
-								{visual.characters.map(
-									({ characterId, costumeId, characterName, costumeName }) => {
-										const key = `${characterId}/${costumeId}`
-										const done = characters.some(
+								{groups.map((group) => {
+									const first = group[0]
+									const characterId = first.characterId
+									const doneCount = group.filter((entry) =>
+										characters.some(
 											(choice) =>
-												`${choice.characterId}/${choice.costumeId}` === key,
-										)
-										return (
-											<button
-												key={key}
-												type="button"
-												className={local.characterTab}
-												aria-pressed={key === activeKey}
-												onClick={() => setSelectedKey(key)}
-											>
-												<span>
-													<strong>{characterName ?? characterId}</strong>
-													<small>
-														{costumeName ?? costumeId} ·{' '}
-														{done ? t('已选定') : t('未选定')}
-													</small>
-												</span>
-												{done && <CircleCheck aria-hidden="true" size={16} />}
-											</button>
-										)
-									},
-								)}
+												choice.characterId === entry.characterId &&
+												choice.costumeId === entry.costumeId,
+										),
+									).length
+									const allDone = doneCount === group.length
+									const summary =
+										group.length === 1
+											? `${first.costumeName ?? first.costumeId} · ${
+													doneCount === 1 ? t('已选定') : t('未选定')
+												}`
+											: t('已选 {{done}} / {{total}} 套造型', {
+													done: doneCount,
+													total: group.length,
+												})
+									return (
+										<button
+											key={characterId}
+											type="button"
+											className={local.characterTab}
+											aria-pressed={characterId === activeCharacterId}
+											onClick={() => setSelectedCharacter(characterId)}
+										>
+											<span>
+												<strong>{first.characterName ?? characterId}</strong>
+												<small>{summary}</small>
+											</span>
+											{allDone && <CircleCheck aria-hidden="true" size={16} />}
+										</button>
+									)
+								})}
 							</div>
-							<fieldset
-								key={activeKey}
-								className={`${styles.panel} ${styles.panelBody} ${local.section} ${local.portraits}`}
-								disabled={busy}
-							>
-								<legend className={local.character}>
-									<h3>
-										{active.characterName ?? active.characterId} ·{' '}
-										{active.costumeName ?? active.costumeId}
-									</h3>
-								</legend>
-								<div className={local.grid}>
-									{active.candidates.map((candidate, index) => (
-										<CandidateCard
-											key={candidate.id}
-											candidate={candidate}
-											index={index}
-											name={activeKey}
-											label={
-												candidate.id === 'costume-epub'
-													? t('EPUB 参考方案')
-													: undefined
-											}
-											checked={characterIds[activeKey] === candidate.id}
-											onChange={() =>
-												setCharacterIds((choices) => ({
-													...choices,
-													[activeKey]: candidate.id,
-												}))
-											}
-										/>
-									))}
-								</div>
-							</fieldset>
+							<div className={local.characterDetail}>
+								{activeGroup.map((entry) => {
+									const key = keyOf(entry)
+									const groupName = `${entry.characterName ?? entry.characterId} · ${entry.costumeName ?? entry.costumeId}`
+									return (
+										<fieldset
+											key={key}
+											className={`${local.outfit} ${local.portraits}`}
+											aria-label={groupName}
+											disabled={busy}
+										>
+											<legend className={local.outfitHeader}>
+												<SectionLabel>
+													{t('造型 · {{value}}', {
+														value: entry.costumeName ?? entry.costumeId,
+													})}
+												</SectionLabel>
+											</legend>
+											<Card className={`${local.cardBody} ${local.grid}`}>
+												{entry.candidates.map((candidate, index) => (
+													<CandidateCard
+														key={candidate.id}
+														candidate={candidate}
+														index={index}
+														name={key}
+														label={
+															candidate.id === 'costume-epub'
+																? t('EPUB 参考方案')
+																: undefined
+														}
+														checked={characterIds[key] === candidate.id}
+														onChange={() =>
+															setCharacterIds((choices) => ({
+																...choices,
+																[key]: candidate.id,
+															}))
+														}
+														onPreview={() =>
+															openCharacterPreview(entry, candidate, index)
+														}
+														origin={originOf(candidate.id)}
+														source={sourceOf(candidate.id)}
+													/>
+												))}
+											</Card>
+										</fieldset>
+									)
+								})}
+							</div>
 						</div>
 					</section>
 				)}
 				{supplementalVisuals.length > 0 && (
 					<fieldset className={local.section} disabled={busy}>
 						<legend>
-							<span className={styles.sectionLabel}>
-								{t('补充画风参考（最多两张）')}
-							</span>
+							<SectionLabel>{t('补充画风参考（最多两张）')}</SectionLabel>
 						</legend>
-						<div
-							className={`${styles.panel} ${styles.panelBody} ${local.grid}`}
-						>
+						<Card className={`${local.cardBody} ${local.grid}`}>
 							{supplementalVisuals.map((candidate, index) => {
 								const checked = supplementalIds.includes(candidate.id)
+								const locked = !checked && supplementalIds.length >= 2
 								return (
 									<CandidateCard
 										key={candidate.id}
@@ -347,7 +524,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 										label={label(candidate.id)}
 										multiple
 										checked={checked}
-										disabled={!checked && supplementalIds.length >= 2}
+										disabled={locked}
 										onChange={() =>
 											setSupplemental(
 												checked
@@ -355,13 +532,63 @@ function VisualChoices({ visual }: { visual: Visual }) {
 													: [...supplementalIds, candidate.id],
 											)
 										}
+										onPreview={() =>
+											openSupplementalPreview(candidate, index, checked, locked)
+										}
+										origin={originOf(candidate.id)}
+										source={sourceOf(candidate.id)}
 									/>
 								)
 							})}
-						</div>
+						</Card>
 					</fieldset>
 				)}
 			</form>
+			<Modal
+				open={preview !== null}
+				title={preview?.label ?? ''}
+				onClose={() => setPreview(null)}
+				width={640}
+				footer={
+					preview ? (
+						<>
+							<Button variant="ghost" onClick={() => setPreview(null)}>
+								{t('关闭')}
+							</Button>
+							<Button
+								variant="primary"
+								icon={Check}
+								disabled={preview.selected}
+								onClick={() => {
+									preview.onPick()
+									setPreview(null)
+								}}
+							>
+								{preview.selected ? t('当前已选用') : t('选用这一版')}
+							</Button>
+						</>
+					) : null
+				}
+			>
+				{preview ? (
+					<div className={local.flow}>
+						<div className={local.preview}>
+							<img
+								src={window.novelive.resourceUrl(preview.candidate.cachePath)}
+								alt={preview.label}
+							/>
+						</div>
+						<div className={local.previewMeta}>
+							<span
+								className={`label-caps label-caps-zh ${local.previewSubtitle}`}
+							>
+								{preview.subtitle}
+							</span>
+							<span className={local.previewSource}>{preview.source}</span>
+						</div>
+					</div>
+				) : null}
+			</Modal>
 		</Page>
 	)
 }

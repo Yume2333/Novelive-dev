@@ -3,12 +3,14 @@ import { parseScript, type Scene } from '@novelive/format/script'
 import { Check, Ellipsis, Image, NotebookPen, Play } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Button } from '../../components/Button'
+import { Card, SectionLabel } from '../../components/Card'
 import { Dropdown } from '../../components/Dropdown'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { Page } from '../../components/Page'
+import { useToast } from '../../components/Toast'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
-import styles from '../production/Production.module.css'
 import { chapterTitle, useWorkProduction } from '../work/WorkProduction'
 import local from './Confirm.module.css'
 
@@ -75,8 +77,14 @@ function sceneCard(
 	}
 }
 
+type FirstChapter = {
+	scenes: SceneCard[]
+	sourceLanguage?: string
+	workLanguage?: string
+}
+
 function useFirstChapterScenes(workId: string, chapterId?: string) {
-	const [scenes, setScenes] = useState<SceneCard[]>()
+	const [result, setResult] = useState<FirstChapter>()
 	useEffect(() => {
 		if (!chapterId) return
 		const request = window.novelive.call('production.playerChapter', {
@@ -84,34 +92,58 @@ function useFirstChapterScenes(workId: string, chapterId?: string) {
 			chapterId,
 		})
 		request.promise.then(
-			({ script, registry, customMarks }) => {
+			({ script, registry, customMarks, chapter }) => {
 				const parsed = parseScript(script, {
 					customMarks: Object.keys(customMarks),
 				})
 				const entries = new Map(
 					registry.entries.map((entry) => [entry.id, entry]),
 				)
-				setScenes(
-					parsed.scenes.map((scene, index) => sceneCard(scene, index, entries)),
-				)
+				// 章节文档是开放模型；译本工程可能附带 sourceLanguage / workLanguage，
+				// 后端没给时不显示语言对照。
+				const extra = chapter as typeof chapter & {
+					sourceLanguage?: unknown
+					workLanguage?: unknown
+				}
+				setResult({
+					scenes: parsed.scenes.map((scene, index) =>
+						sceneCard(scene, index, entries),
+					),
+					sourceLanguage:
+						typeof extra.sourceLanguage === 'string'
+							? extra.sourceLanguage
+							: undefined,
+					workLanguage:
+						typeof extra.workLanguage === 'string'
+							? extra.workLanguage
+							: undefined,
+				})
 			},
-			() => setScenes([]),
+			() => setResult({ scenes: [] }),
 		)
 		return () => request.cancel()
 	}, [workId, chapterId])
-	return scenes
+	return result
 }
 
 export function ConfirmFirstPage() {
 	const { snapshot, run, busy, project } = useWorkProduction()
 	const navigate = useNavigate()
+	const toast = useToast()
 	const { workId, phase, blockedChapterId } = snapshot
 	const first = snapshot.chapters[0]
 	const ready = phase === 'confirm-first' && first?.status === 'published'
-	const scenes = useFirstChapterScenes(
+	const firstChapter = useFirstChapterScenes(
 		workId,
 		ready ? first.chapterId : undefined,
 	)
+	const scenes = firstChapter?.scenes
+	const languagePair =
+		firstChapter?.sourceLanguage &&
+		firstChapter?.workLanguage &&
+		firstChapter.sourceLanguage !== firstChapter.workLanguage
+			? `${firstChapter.sourceLanguage} → ${firstChapter.workLanguage}`
+			: null
 
 	return (
 		<Page
@@ -136,14 +168,14 @@ export function ConfirmFirstPage() {
 			}
 			actions={
 				ready && (
-					<div className={styles.actions}>
-						<Link className={styles.button} to={workRoute('play', workId)}>
+					<div className={local.actions}>
+						<Link className={local.linkButton} to={workRoute('play', workId)}>
 							<Play aria-hidden="true" size={16} />
 							{t('试玩第一章')}
 						</Link>
 						<Dropdown
 							label={t('更多')}
-							className={styles.ghost}
+							className={local.moreTrigger}
 							trigger={
 								<>
 									<Ellipsis aria-hidden="true" size={16} />
@@ -161,26 +193,27 @@ export function ConfirmFirstPage() {
 								},
 							]}
 						/>
-						<button
-							className={styles.primary}
-							type="button"
+						<Button
+							variant="primary"
+							icon={Check}
 							disabled={busy || Boolean(blockedChapterId)}
 							onClick={async () => {
-								if (await run('production.continue', { workId }))
+								if (await run('production.continue', { workId })) {
+									toast(t('第一章已确认，其余章节进入后台按卷制作'), Check)
 									navigate(workRoute('production', workId))
+								}
 							}}
 						>
-							<Check aria-hidden="true" size={16} />
 							{t('继续制作')}
-						</button>
+						</Button>
 					</div>
 				)
 			}
 		>
-			<div className={styles.flow}>
+			<div className={local.flow}>
 				{ready ? (
 					<>
-						<p className={styles.sectionLabel}>
+						<SectionLabel>
 							{t('第 1 章 · {{value}}', {
 								value: chapterTitle(snapshot, first.chapterId),
 							})}
@@ -188,21 +221,23 @@ export function ConfirmFirstPage() {
 								? t(' · {{count}} 个场景', { count: scenes.length })
 								: ''}
 							<span className={local.aside}>
+								{languagePair ? `${languagePair} · ` : ''}
 								{t('已发布，可以试玩，准备好后再手动继续制作。')}
 							</span>
-						</p>
+						</SectionLabel>
 						<div className={local.scenes}>
 							{(scenes ?? []).map((scene, index) => (
-								<section
-									className={`${styles.panel} ${local.chapter}`}
+								<Card
+									className={local.chapter}
 									key={scene.key}
+									role="region"
 									aria-label={scene.title}
 								>
 									<span className={local.art} aria-hidden="true">
 										{scene.art && <img src={scene.art} alt="" />}
 										<span>{t('场景 {{value}}', { value: index + 1 })}</span>
 									</span>
-									<div className={styles.panelBody}>
+									<div className={local.cardBody}>
 										<h2 className={local.cardTitle}>{scene.title}</h2>
 										{scene.desc && (
 											<p className={local.sceneDesc}>{scene.desc}</p>
@@ -214,17 +249,20 @@ export function ConfirmFirstPage() {
 											</p>
 										)}
 									</div>
-								</section>
+								</Card>
 							))}
 						</div>
 					</>
 				) : (
-					<section className={`${styles.panel} ${styles.panelBody}`}>
-						<p className={styles.muted}>{t('目前没有待确认的第一章。')}</p>
-						<Link className={styles.ghost} to={workRoute('production', workId)}>
+					<Card className={local.cardBody}>
+						<p>{t('目前没有待确认的第一章。')}</p>
+						<Link
+							className={local.linkButton}
+							to={workRoute('production', workId)}
+						>
 							{t('查看制作')}
 						</Link>
-					</section>
+					</Card>
 				)}
 			</div>
 		</Page>

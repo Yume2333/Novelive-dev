@@ -4,12 +4,18 @@ import type {
 	CommandOutput,
 } from '@novelive/creator/contract'
 import {
+	ArrowDown,
 	ArrowLeft,
 	ArrowRight,
-	Check,
+	ArrowUp,
+	BookOpen,
+	FileImage,
 	FileText,
+	FileType2,
 	FolderOpen,
+	Image,
 	ImagePlus,
+	type LucideIcon,
 	Merge,
 	Scissors,
 	SplitSquareVertical,
@@ -17,8 +23,19 @@ import {
 	WandSparkles,
 	X,
 } from 'lucide-react'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import { Button, IconButton } from '../../components/Button'
+import { Card, SectionLabel } from '../../components/Card'
+import {
+	Banner,
+	Checkbox,
+	RadioGroup,
+	Stepper,
+	Tooltip,
+} from '../../components/Extended'
+import { Field, Select, TextInput, Toggle } from '../../components/Form'
+import { InfoTooltip } from '../../components/InfoTooltip'
 import { Page } from '../../components/Page'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
@@ -30,6 +47,7 @@ import {
 	isVolumeStart,
 	mergeChapter,
 	mergeVolume,
+	nudgeVolume,
 	renameChapter,
 	renameVolume,
 	splitChapter,
@@ -61,72 +79,128 @@ const encodingNames: Record<Encoding, string> = {
 
 const steps = [msg('选择文件'), msg('核对信息'), msg('改编设置')]
 
-function Stepper({ current }: { current: number }) {
+/** 向导步骤指示：共享 Stepper 负责视觉，这里补上 aria-current 步骤语义。 */
+function WizardStepper({ current }: { current: number }) {
+	const host = useRef<HTMLDivElement>(null)
+	useLayoutEffect(() => {
+		const root = host.current?.firstElementChild
+		if (!root) return
+		for (const [index, item] of [...root.children].entries()) {
+			if (index === current) item.setAttribute('aria-current', 'step')
+			else item.removeAttribute('aria-current')
+		}
+	}, [current])
 	return (
-		<ol className={styles.stepper} aria-label={t('导入步骤')}>
-			{steps.map((step, index) => (
-				<li
-					key={step}
-					data-state={
-						index === current ? 'current' : index < current ? 'done' : 'todo'
-					}
-					aria-current={index === current ? 'step' : undefined}
-				>
-					<span className={styles.step}>
-						{index < current ? (
-							<Check aria-hidden="true" size={14} />
-						) : (
-							<b>{index + 1}</b>
-						)}
-						{t(step)}
-					</span>
-				</li>
-			))}
-		</ol>
-	)
-}
-
-function PickerField({
-	label,
-	children,
-}: {
-	label: string
-	children: ReactNode
-}) {
-	return (
-		<div className={styles.field}>
-			<span className={styles.label}>{label}</span>
-			<span className={styles.picker}>{children}</span>
-		</div>
-	)
-}
-
-function Field({
-	label,
-	hint,
-	children,
-}: {
-	label: string
-	hint?: string
-	children: ReactNode
-}) {
-	return (
-		<div className={styles.field}>
-			{/* biome-ignore lint/a11y/noLabelWithoutControl: every Field wraps its own control */}
-			<label className={styles.field}>
-				<span className={styles.label}>{label}</span>
-				{children}
-			</label>
-			{hint && <span className={styles.hint}>{hint}</span>}
+		<div ref={host} className={styles.stepperHost}>
+			<Stepper steps={steps.map((step) => t(step))} current={current} />
 		</div>
 	)
 }
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path
+const extIcon: Record<string, LucideIcon> = {
+	epub: BookOpen,
+	docx: FileType2,
+	pdf: FileImage,
+}
+
 const message = (error: unknown) =>
 	error && typeof error === 'object' && 'message' in error
 		? String((error as CommandError).message)
 		: t('导入失败，请重试。')
+
+/** 文件行：图标 + 文件名 + 类型标签，悬停/聚焦浮出移除按钮 */
+function FileRow({
+	path,
+	icon: Icon,
+	tag,
+	onRemove,
+}: {
+	path: string
+	icon: LucideIcon
+	tag: string
+	onRemove?: () => void
+}) {
+	return (
+		<div className={`hover-row ${styles.fileRow}`}>
+			<Icon
+				aria-hidden="true"
+				size={18}
+				strokeWidth={1.8}
+				className={styles.fileIcon}
+			/>
+			<span className={styles.fileName}>{fileName(path)}</span>
+			<span className={`label-caps label-caps-zh ${styles.fileTag}`}>
+				{tag}
+			</span>
+			{onRemove ? (
+				<span className="row-actions">
+					<IconButton
+						icon={X}
+						label={t('移除 {{value}}', { value: fileName(path) })}
+						size={26}
+						iconSize={13}
+						onClick={onRemove}
+					/>
+				</span>
+			) : null}
+		</div>
+	)
+}
+
+/** 虚线拖选区：图标 + 主标题 + 一行辅助说明 */
+function DropZone({
+	icon: Icon,
+	title,
+	caption,
+	disabled,
+	'aria-label': ariaLabel,
+	onPick,
+}: {
+	icon: LucideIcon
+	title: string
+	caption: string
+	disabled?: boolean
+	'aria-label': string
+	onPick: () => void
+}) {
+	return (
+		<button
+			type="button"
+			className={styles.drop}
+			aria-label={ariaLabel}
+			disabled={disabled}
+			onClick={onPick}
+		>
+			<Icon aria-hidden="true" size={24} strokeWidth={1.6} />
+			<strong>{title}</strong>
+			<span>{caption}</span>
+		</button>
+	)
+}
+
+/** 只读路径选取行：玻璃输入壳 + 行尾操作按钮 */
+function PickerField({
+	label,
+	value,
+	action,
+}: {
+	label: string
+	value: string
+	action: ReactNode
+}) {
+	return (
+		<div className={styles.field}>
+			<span className={`label-caps label-caps-zh ${styles.fieldLabel}`}>
+				{label}
+			</span>
+			<span className={styles.picker}>
+				<span className={styles.pickerValue}>{value}</span>
+				{action}
+			</span>
+		</div>
+	)
+}
 
 export function ImportPage() {
 	const { config } = useOutletContext<SettingsHost>()
@@ -173,6 +247,11 @@ export function ImportPage() {
 			setCandidates(undefined)
 			setEncoding(undefined)
 		})
+	const removeSource = () => {
+		setSource('')
+		setCandidates(undefined)
+		setEncoding(undefined)
+	}
 	const pickReferences = () =>
 		run(async () => {
 			const paths = await window.novelive.pickFiles('image')
@@ -184,6 +263,15 @@ export function ImportPage() {
 		run(async () => {
 			const path = await window.novelive.pickFolder()
 			if (path) setFolder(path)
+		})
+	const pickJoinTarget = () =>
+		run(async () => {
+			const projectDir = await window.novelive.pickFolder()
+			if (!projectDir) return
+			setJoinTarget(undefined)
+			setJoinTarget(
+				await window.novelive.call('import.target', { projectDir }).promise,
+			)
 		})
 	const start = () =>
 		run(async () => {
@@ -244,27 +332,35 @@ export function ImportPage() {
 				title={t('已加入系列')}
 				width={760}
 				actions={
-					<button
-						type="button"
-						className={styles.primary}
+					<Button
+						variant="primary"
 						onClick={() => navigate(workRoute('work', joined.workId))}
 					>
 						{t('进入作品')}
-					</button>
+					</Button>
 				}
 			>
 				<div className={styles.flow}>
-					<section className={styles.card} aria-label={t('新增卷')}>
+					<Card
+						className={styles.cardBody}
+						aria-label={t('新增卷')}
+						role="region"
+					>
 						{joined.volumes.map((volume) => (
 							<div className={styles.fileRow} key={volume.volumeId}>
-								<FileText aria-hidden="true" size={18} />
-								<span className={styles.value}>{volume.title}</span>
+								<FileText
+									aria-hidden="true"
+									size={18}
+									strokeWidth={1.8}
+									className={styles.fileIcon}
+								/>
+								<span className={styles.fileName}>{volume.title}</span>
 								<span className={styles.meta}>
 									{t('{{chapters}} 章', { chapters: volume.chapters })}
 								</span>
 							</div>
 						))}
-					</section>
+					</Card>
 				</div>
 			</Page>
 		)
@@ -289,197 +385,192 @@ export function ImportPage() {
 		(joining ? joinTarget : location) &&
 		(!candidates || encoding) &&
 		!busy
+	const next = (
+		<Button
+			variant="primary"
+			icon={ArrowRight}
+			disabled={!ready}
+			loading={busy}
+			onClick={() => void start()}
+		>
+			{t('下一步')}
+		</Button>
+	)
 	return (
 		<Page eyebrow={t('从原文开始')} title={t('新建工程')} width={760}>
 			<div className={styles.flow}>
-				<Stepper current={0} />
+				<WizardStepper current={0} />
 				{error && (
-					<p className={styles.error} role="alert">
-						{error}
-					</p>
+					<div role="alert">
+						<Banner kind="error">{error}</Banner>
+					</div>
 				)}
-				<div className={styles.card}>
+				<Card className={styles.cardBody}>
 					<div className={styles.drops}>
-						<button
-							type="button"
-							className={styles.drop}
+						<DropZone
+							icon={Upload}
+							title={t('选择原文文件')}
+							caption={t('支持 TXT、EPUB、Markdown、DOCX、PDF')}
 							aria-label={t('选择原文')}
 							disabled={busy}
-							onClick={() => void pickSource()}
-						>
-							<Upload aria-hidden="true" size={22} strokeWidth={1.6} />
-							<strong>{t('选择原文文件')}</strong>
-							<span>{t('支持 TXT、EPUB、Markdown、DOCX、PDF')}</span>
-						</button>
-						<button
-							type="button"
-							className={styles.drop}
-							aria-label={t('添加图片')}
-							disabled={busy || joining || references.length >= 3}
-							onClick={() => void pickReferences()}
-						>
-							<ImagePlus aria-hidden="true" size={22} strokeWidth={1.6} />
-							<strong>{t('参考图（可选）')}</strong>
-							<span>
-								{joining
+							onPick={() => void pickSource()}
+						/>
+						<DropZone
+							icon={ImagePlus}
+							title={t('参考图（可选）')}
+							caption={
+								joining
 									? t('参考图沿用已有工程')
 									: t('最多 3 张，已选 {{length}} 张', {
 											length: references.length,
-										})}
-							</span>
-						</button>
+										})
+							}
+							aria-label={t('添加图片')}
+							disabled={busy || joining || references.length >= 3}
+							onPick={() => void pickReferences()}
+						/>
 					</div>
 					{(source || (!joining && references.length > 0)) && (
 						<div className={styles.files}>
 							{source && (
-								<div className={styles.fileRow}>
-									<FileText aria-hidden="true" size={18} />
-									<span className={styles.value}>{fileName(source)}</span>
-									<span className={styles.tag}>{t('原文')}</span>
-								</div>
+								<FileRow
+									path={source}
+									icon={
+										extIcon[
+											fileName(source).split('.').pop()?.toLowerCase() ?? ''
+										] ?? FileText
+									}
+									tag={t('原文')}
+									onRemove={removeSource}
+								/>
 							)}
 							{!joining &&
 								references.map((path) => (
-									<div key={path} className={styles.fileRow}>
-										<ImagePlus aria-hidden="true" size={18} />
-										<span className={styles.value}>{fileName(path)}</span>
-										<span className={styles.tag}>{t('参考图')}</span>
-										<button
-											type="button"
-											className={styles.icon}
-											aria-label={t('移除 {{value}}', {
-												value: fileName(path),
-											})}
-											onClick={() =>
-												setReferences((current) =>
-													current.filter((item) => item !== path),
-												)
-											}
-										>
-											<X aria-hidden="true" size={14} />
-										</button>
-									</div>
+									<FileRow
+										key={path}
+										path={path}
+										icon={Image}
+										tag={t('参考图')}
+										onRemove={() =>
+											setReferences((current) =>
+												current.filter((item) => item !== path),
+											)
+										}
+									/>
 								))}
 						</div>
 					)}
 					<div className={styles.grid}>
 						{joining ? (
-							<PickerField label={t('已有工程')}>
-								<span className={styles.value}>
-									{joinTarget?.projectDir ?? t('未选择')}
-								</span>
-								<button
-									type="button"
-									className={styles.button}
-									disabled={busy}
-									onClick={() =>
-										void run(async () => {
-											const projectDir = await window.novelive.pickFolder()
-											if (!projectDir) return
-											setJoinTarget(undefined)
-											setJoinTarget(
-												await window.novelive.call('import.target', {
-													projectDir,
-												}).promise,
-											)
-										})
-									}
-								>
-									<FolderOpen aria-hidden="true" size={15} />
-									{t('选择已有工程')}
-								</button>
-							</PickerField>
+							<PickerField
+								label={t('已有工程')}
+								value={joinTarget?.projectDir ?? t('未选择')}
+								action={
+									<Button
+										size="sm"
+										icon={FolderOpen}
+										disabled={busy}
+										onClick={() => void pickJoinTarget()}
+									>
+										{t('选择已有工程')}
+									</Button>
+								}
+							/>
 						) : (
-							<PickerField label={t('工程文件夹')}>
-								<span className={styles.value}>{location || t('未设置')}</span>
-								<button
-									type="button"
-									className={styles.button}
-									disabled={busy}
-									onClick={() => void pickLocation()}
-								>
-									<FolderOpen aria-hidden="true" size={15} />
-									{t('选择文件夹')}
-								</button>
-							</PickerField>
+							<PickerField
+								label={t('工程文件夹')}
+								value={location || t('未设置')}
+								action={
+									<Button
+										size="sm"
+										icon={FolderOpen}
+										disabled={busy}
+										onClick={() => void pickLocation()}
+									>
+										{t('选择文件夹')}
+									</Button>
+								}
+							/>
 						)}
-						<fieldset className={styles.radios}>
-							<legend className={styles.label}>{t('放进哪里')}</legend>
-							<label>
-								<input
-									type="radio"
-									name="import-mode"
-									checked={!joining}
-									disabled={busy}
-									onChange={() => setJoining(false)}
+						<div className={styles.field}>
+							<span className={styles.placementLabel}>
+								<span
+									className={`label-caps label-caps-zh ${styles.fieldLabel}`}
+								>
+									{t('放进哪里')}
+								</span>
+								<InfoTooltip
+									label={t('放进哪里')}
+									text={t(
+										'加入已有系列时，新原文会成为下一卷并沿用原有角色、设定与素材。',
+									)}
 								/>
-								{t('新建系列')}
-							</label>
-							<label>
-								<input
-									type="radio"
-									name="import-mode"
-									checked={joining}
-									disabled={busy}
-									onChange={() => setJoining(true)}
-								/>
-								{t('加入已有系列')}
-							</label>
-						</fieldset>
+							</span>
+							<RadioGroup
+								value={joining ? 'existing' : 'new'}
+								disabled={busy}
+								onChange={(mode) => setJoining(mode === 'existing')}
+								options={[
+									{ value: 'new', label: t('新建系列') },
+									{ value: 'existing', label: t('加入已有系列') },
+								]}
+							/>
+						</div>
 						{joining ? (
 							joinTarget && (
 								<Field label={t('系列')}>
-									<select
-										className={styles.input}
+									<Select
 										value={joinTarget.seriesId}
 										disabled={busy}
-									>
-										<option value={joinTarget.seriesId}>
-											{joinTarget.title || joinTarget.seriesId}
-										</option>
-									</select>
+										onChange={() => {}}
+										options={[
+											{
+												value: joinTarget.seriesId,
+												label: joinTarget.title || joinTarget.seriesId,
+											},
+										]}
+									/>
 								</Field>
 							)
 						) : (
 							<Field label={t('作品名')}>
-								<input
-									className={styles.input}
-									value={title}
-									onChange={(event) => setTitle(event.target.value)}
-								/>
+								<TextInput value={title} onChange={setTitle} />
 							</Field>
 						)}
 					</div>
 					{candidates && (
 						<fieldset className={styles.encodings} aria-label={t('原文编码')}>
-							<legend className={styles.label}>{t('原文编码')}</legend>
-							{candidates.map((candidate) => (
-								<label key={candidate.encoding} className={styles.option}>
-									<input
-										type="radio"
-										name="encoding"
-										checked={encoding === candidate.encoding}
-										onChange={() => setEncoding(candidate.encoding)}
-									/>
-									<strong>{t(encodingNames[candidate.encoding])}</strong>
-									<span className={styles.value}>{candidate.preview}</span>
-								</label>
-							))}
+							<legend
+								className={`label-caps label-caps-zh ${styles.fieldLabel}`}
+							>
+								{t('原文编码')}
+							</legend>
+							<RadioGroup
+								className={styles.encodingOptions}
+								value={encoding ?? ''}
+								onChange={(value) => setEncoding(value as Encoding)}
+								options={candidates.map((candidate) => ({
+									value: candidate.encoding,
+									label: (
+										<span className={styles.encodingOption}>
+											<strong>{t(encodingNames[candidate.encoding])}</strong>
+											<span className={styles.encodingPreview}>
+												{candidate.preview}
+											</span>
+										</span>
+									),
+								}))}
+							/>
 						</fieldset>
 					)}
-				</div>
+				</Card>
 				<footer className={styles.footer}>
 					<span />
-					<button
-						type="button"
-						className={styles.primary}
-						disabled={!ready}
-						title={source ? undefined : t('先选至少一份原文文件')}
-						onClick={() => void start()}
-					>
-						{t('下一步')}
-						<ArrowRight aria-hidden="true" size={16} />
-					</button>
+					{!source && !ready ? (
+						<Tooltip text={t('先选至少一份原文文件')}>{next}</Tooltip>
+					) : (
+						next
+					)}
 				</footer>
 			</div>
 		</Page>
@@ -519,25 +610,28 @@ function Review({
 		setReviewed(review)
 		setStep(2)
 	}
+	const languageOptions = [
+		...languages.map(([value, name]) => ({ value, label: t(name) })),
+		...(!languages.some(([value]) => value === layout.language)
+			? [{ value: layout.language, label: layout.language }]
+			: []),
+	]
 	return (
 		<Page eyebrow={t('从原文开始')} title={t('新建工程')} width={760}>
 			<div className={styles.flow}>
-				<Stepper current={step} />
+				<WizardStepper current={step} />
 				{error && (
-					<p className={styles.error} role="alert">
-						{error}
-					</p>
+					<div role="alert">
+						<Banner kind="error">{error}</Banner>
+					</div>
 				)}
 				{step === 1 && (
-					<div className={styles.card}>
+					<Card className={styles.cardBody}>
 						<div className={styles.grid}>
 							<Field label={t('作品名')}>
-								<input
-									className={styles.input}
+								<TextInput
 									value={layout.title}
-									onChange={(event) =>
-										onChange({ ...layout, title: event.target.value })
-									}
+									onChange={(title) => onChange({ ...layout, title })}
 								/>
 							</Field>
 							<Field
@@ -552,31 +646,20 @@ function Review({
 										: ''
 								}`}
 							>
-								<select
-									className={styles.input}
+								<Select
 									value={layout.language}
-									onChange={(event) =>
-										onChange({ ...layout, language: event.target.value })
-									}
-								>
-									{languages.map(([value, name]) => (
-										<option key={value} value={value}>
-											{t(name)}
-										</option>
-									))}
-									{!languages.some(([value]) => value === layout.language) && (
-										<option value={layout.language}>{layout.language}</option>
-									)}
-								</select>
+									onChange={(language) => onChange({ ...layout, language })}
+									options={languageOptions}
+								/>
 							</Field>
 						</div>
 						{wizard.findings.length > 0 && (
 							<section className={styles.findings} aria-label={t('整理建议')}>
 								<div className={styles.sectionHead}>
-									<h2 className={styles.label}>{t('整理建议')}</h2>
-									<button
-										type="button"
-										className={styles.ghost}
+									<SectionLabel>{t('整理建议')}</SectionLabel>
+									<Button
+										variant="ghost"
+										size="sm"
 										onClick={() =>
 											onChange({
 												...wizard.suggested,
@@ -587,7 +670,7 @@ function Review({
 										}
 									>
 										{t('恢复建议划分')}
-									</button>
+									</Button>
 								</div>
 								{wizard.findings.map((finding, i) => (
 									// biome-ignore lint/suspicious/noArrayIndexKey: findings are a fixed list from the import report
@@ -600,27 +683,41 @@ function Review({
 								))}
 							</section>
 						)}
-						<h2 className={styles.label}>
+						<SectionLabel>
 							{t('分卷 · {{volumes}} 卷 {{chapters}} 章', {
 								volumes: layout.volumes.length,
 								chapters: layout.chapters.length,
 							})}
-						</h2>
+						</SectionLabel>
 						{layout.volumes.map((volume, v) => {
 							const end = layout.volumes[v + 1]?.start ?? layout.chapters.length
+							const nextEnd =
+								layout.volumes[v + 2]?.start ?? layout.chapters.length
+							const canNudgeDown =
+								v < layout.volumes.length - 1 &&
+								layout.volumes[v + 1].start + 1 < nextEnd
+							const canNudgeUp =
+								v < layout.volumes.length - 1 &&
+								layout.volumes[v + 1].start - 1 > volume.start
 							return (
 								<section
 									key={volume.start}
 									className={styles.volume}
 									aria-label={t('第 {{value}} 卷', { value: v + 1 })}
 								>
-									<div className={styles.volumeHead}>
-										<input
+									<div className={`hover-row ${styles.volumeHead}`}>
+										<TextInput
 											className={styles.volumeTitle}
+											style={{
+												width: 150,
+												padding: 'var(--space-px-5) var(--space-px-10)',
+												fontSize: 13,
+												fontWeight: 600,
+											}}
 											aria-label={t('第 {{value}} 卷标题', { value: v + 1 })}
 											value={volume.title}
-											onChange={(event) =>
-												onChange(renameVolume(layout, v, event.target.value))
+											onChange={(title) =>
+												onChange(renameVolume(layout, v, title))
 											}
 										/>
 										<span className={styles.meta}>
@@ -629,80 +726,123 @@ function Review({
 												end,
 											})}
 										</span>
-										<span className={styles.spacer} />
-										{v > 0 && (
-											<button
-												type="button"
-												className={`${styles.ghost} ${styles.reveal}`}
-												onClick={() => onChange(mergeVolume(layout, v))}
-											>
-												<Merge aria-hidden="true" size={14} />
-												{t('并入上一卷')}
-											</button>
-										)}
+										<span className={`row-actions ${styles.volumeActions}`}>
+											<Tooltip text={t('往下挪一章')}>
+												<IconButton
+													icon={ArrowDown}
+													label={t('往下挪一章')}
+													size={26}
+													iconSize={14}
+													disabled={!canNudgeDown || busy}
+													onClick={() =>
+														onChange(
+															nudgeVolume(layout, v, 1, layout.chapters.length),
+														)
+													}
+												/>
+											</Tooltip>
+											<Tooltip text={t('往上收一章')}>
+												<IconButton
+													icon={ArrowUp}
+													label={t('往上收一章')}
+													size={26}
+													iconSize={14}
+													disabled={!canNudgeUp || busy}
+													onClick={() =>
+														onChange(
+															nudgeVolume(
+																layout,
+																v,
+																-1,
+																layout.chapters.length,
+															),
+														)
+													}
+												/>
+											</Tooltip>
+											{v > 0 && (
+												<Tooltip text={t('并入上一卷')}>
+													<IconButton
+														icon={Merge}
+														label={t('并入上一卷')}
+														size={26}
+														iconSize={14}
+														disabled={busy}
+														onClick={() => onChange(mergeVolume(layout, v))}
+													/>
+												</Tooltip>
+											)}
+										</span>
 									</div>
 									{layout.chapters
 										.slice(volume.start, end)
 										.map((chapter, offset) => {
 											const i = volume.start + offset
 											const length = chapterLength(layout, i, total)
+											const locked = i === 0 || isVolumeStart(layout, i)
 											return (
 												<fieldset
 													key={`${i}-${chapter.start}`}
-													className={styles.chapter}
+													className={`hover-row ${styles.chapter}`}
 													aria-label={t('第 {{value}} 章', { value: i + 1 })}
 												>
 													<span className={styles.index}>
 														{String(i + 1).padStart(2, '0')}
 													</span>
-													<input
+													<TextInput
 														className={styles.chapterTitle}
+														style={{
+															padding: 'var(--space-px-7) var(--space-px-10)',
+															fontSize: 13,
+														}}
 														aria-label={t('第 {{value}} 章标题', {
 															value: i + 1,
 														})}
 														value={chapter.title}
-														onChange={(event) =>
-															onChange(
-																renameChapter(layout, i, event.target.value),
-															)
+														onChange={(title) =>
+															onChange(renameChapter(layout, i, title))
 														}
 													/>
 													<span className={styles.meta}>
 														{t('{{length}} 段', { length })}
 													</span>
-													<span className={styles.reveal}>
-														<button
-															type="button"
-															className={styles.ghost}
-															disabled={length < 2}
-															onClick={() =>
-																onChange(splitChapter(layout, i, total))
-															}
-														>
-															<Scissors aria-hidden="true" size={14} />
-															{t('拆分')}
-														</button>
-														<button
-															type="button"
-															className={styles.ghost}
-															disabled={i === 0 || isVolumeStart(layout, i)}
-															onClick={() => onChange(mergeChapter(layout, i))}
-														>
-															<Merge aria-hidden="true" size={14} />
-															{t('并入上一章')}
-														</button>
-														<button
-															type="button"
-															className={styles.ghost}
-															disabled={i === 0 || isVolumeStart(layout, i)}
-															onClick={() => onChange(startVolume(layout, i))}
-														>
-															<SplitSquareVertical
-																aria-hidden="true"
-																size={14}
+													<span
+														className={`row-actions ${styles.chapterActions}`}
+													>
+														<Tooltip text={t('拆分')}>
+															<IconButton
+																icon={Scissors}
+																label={t('拆分')}
+																size={26}
+																iconSize={14}
+																disabled={length < 2 || busy}
+																onClick={() =>
+																	onChange(splitChapter(layout, i, total))
+																}
 															/>
-															{t('从此分卷')}
-														</button>
+														</Tooltip>
+														<Tooltip text={t('并入上一章')}>
+															<IconButton
+																icon={Merge}
+																label={t('并入上一章')}
+																size={26}
+																iconSize={14}
+																disabled={locked || busy}
+																onClick={() =>
+																	onChange(mergeChapter(layout, i))
+																}
+															/>
+														</Tooltip>
+														<Tooltip text={t('从此分卷')}>
+															<IconButton
+																icon={SplitSquareVertical}
+																label={t('从此分卷')}
+																size={26}
+																iconSize={14}
+																disabled={locked || busy}
+																onClick={() => onChange(startVolume(layout, i))}
+															/>
+														</Tooltip>
 													</span>
 												</fieldset>
 											)
@@ -710,69 +850,72 @@ function Review({
 								</section>
 							)
 						})}
-					</div>
+					</Card>
 				)}
 				{step === 2 && (
-					<div className={styles.card}>
+					<Card className={styles.cardBody}>
 						{wizard.illustrations.length === 0 && references === 0 && (
-							<p className={styles.hint}>
+							<Banner kind="info">
 								{t('这份原文没有需要额外设置的项目，可以直接开始制作。')}
-							</p>
+							</Banner>
 						)}
 						{wizard.illustrations.length > 0 && (
 							<fieldset className={styles.illustrations}>
-								<legend className={styles.label}>
+								<legend
+									className={`label-caps label-caps-zh ${styles.fieldLabel}`}
+								>
 									{t('插图参考（最多 3 张）')}
 								</legend>
 								{wizard.illustrations.map((candidate, index) => {
 									const checked = selectedIllustrations.includes(candidate.id)
 									return (
-										<label
+										<Checkbox
 											key={candidate.id}
-											className={styles.illustration}
-											data-selected={checked}
-										>
-											<input
-												type="checkbox"
-												checked={checked}
-												disabled={busy || (!checked && references >= 3)}
-												onChange={(event) =>
-													onSelectIllustrations(
-														event.target.checked
-															? [...selectedIllustrations, candidate.id]
-															: selectedIllustrations.filter(
-																	(id) => id !== candidate.id,
-																),
-													)
-												}
-											/>
-											<img
-												src={candidate.preview}
-												alt={t('插图 {{value}}', { value: index + 1 })}
-											/>
-											<span>
-												{t(
-													'使用插图 {{value}} · 第 {{value2}} 卷 · 第 {{value3}} 章',
-													{
-														value: index + 1,
-														value2: candidate.volume + 1,
-														value3: candidate.chapter + 1,
-													},
-												)}
-												{candidate.paragraph === undefined
-													? ''
-													: t(' · 第 {{value}} 段', {
-															value: candidate.paragraph + 1,
-														})}
-											</span>
-										</label>
+											className={`${styles.illustration} ${
+												checked ? styles.illustrationSelected : ''
+											}`}
+											checked={checked}
+											disabled={busy || (!checked && references >= 3)}
+											onChange={(next) =>
+												onSelectIllustrations(
+													next
+														? [...selectedIllustrations, candidate.id]
+														: selectedIllustrations.filter(
+																(id) => id !== candidate.id,
+															),
+												)
+											}
+											label={
+												<span className={styles.illustrationBody}>
+													<img
+														src={candidate.preview}
+														alt={t('插图 {{value}}', { value: index + 1 })}
+													/>
+													<span>
+														{t(
+															'使用插图 {{value}} · 第 {{value2}} 卷 · 第 {{value3}} 章',
+															{
+																value: index + 1,
+																value2: candidate.volume + 1,
+																value3: candidate.chapter + 1,
+															},
+														)}
+														{candidate.paragraph === undefined
+															? ''
+															: t(' · 第 {{value}} 段', {
+																	value: candidate.paragraph + 1,
+																})}
+													</span>
+												</span>
+											}
+										/>
 									)
 								})}
 							</fieldset>
 						)}
 						{references > 0 && (
-							<label className={styles.toggleRow}>
-								<span>
+							<div className={styles.toggleRow}>
+								<span className={styles.toggleCopy}>
 									<strong>
 										{t('已有 {{value}} 张参考图时也停在角色设定', {
 											value: references,
@@ -782,66 +925,62 @@ function Review({
 										{t('关闭后直接用参考图开始制作第一章。')}
 									</span>
 								</span>
-								<input
-									type="checkbox"
-									className={styles.switch}
-									checked={layout.confirmWithReferences}
-									onChange={(event) =>
-										onChange({
-											...layout,
-											confirmWithReferences: event.target.checked,
-										})
+								<Toggle
+									on={layout.confirmWithReferences}
+									disabled={busy}
+									aria-label={t('已有 {{value}} 张参考图时也停在角色设定', {
+										value: references,
+									})}
+									onChange={(confirmWithReferences) =>
+										onChange({ ...layout, confirmWithReferences })
 									}
 								/>
-							</label>
+							</div>
 						)}
-					</div>
+					</Card>
 				)}
 				<footer className={styles.footer}>
 					{step === 2 ? (
-						<button
-							type="button"
-							className={styles.ghost}
+						<Button
+							variant="ghost"
+							icon={ArrowLeft}
 							disabled={busy}
 							onClick={() => setStep(1)}
 						>
-							<ArrowLeft aria-hidden="true" size={16} />
 							{t('上一步')}
-						</button>
+						</Button>
 					) : (
 						<span />
 					)}
 					<span className={styles.footerActions}>
 						{step === 1 ? (
 							<>
-								<button
-									type="button"
-									className={styles.ghost}
+								<Button
+									variant="ghost"
 									disabled={busy}
 									onClick={() => advance(false)}
 								>
 									{t('跳过核对')}
-								</button>
-								<button
-									type="button"
-									className={styles.primary}
+								</Button>
+								<Button
+									variant="primary"
+									icon={ArrowRight}
 									disabled={busy || !valid}
 									onClick={() => advance(true)}
 								>
 									{t('下一步')}
-									<ArrowRight aria-hidden="true" size={16} />
-								</button>
+								</Button>
 							</>
 						) : (
-							<button
-								type="button"
-								className={styles.primary}
+							<Button
+								variant="primary"
+								icon={WandSparkles}
+								loading={busy}
 								disabled={busy}
 								onClick={() => onFinish(reviewed)}
 							>
-								<WandSparkles aria-hidden="true" size={16} />
 								{t('开始制作')}
-							</button>
+							</Button>
 						)}
 					</span>
 				</footer>

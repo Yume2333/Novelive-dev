@@ -160,9 +160,12 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 		await page.getByLabel('第 2 卷标题').fill('风起')
 		await expect(page.getByLabel('第 3 卷标题')).toHaveValue('第二卷 风止')
 		await page.getByRole('button', { name: '下一步', exact: true }).click()
-		await page
-			.getByRole('checkbox', { name: /参考图时也停在角色设定/ })
-			.uncheck()
+		const confirmWithReferences = page.getByRole('switch', {
+			name: /参考图时也停在角色设定/,
+		})
+		await expect(confirmWithReferences).toHaveAttribute('aria-checked', 'true')
+		await confirmWithReferences.click()
+		await expect(confirmWithReferences).toHaveAttribute('aria-checked', 'false')
 		await page.getByRole('button', { name: '开始制作' }).click()
 		await expect(page).toHaveURL(/#\/work\//)
 
