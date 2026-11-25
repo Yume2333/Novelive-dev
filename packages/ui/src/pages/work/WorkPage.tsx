@@ -4,6 +4,7 @@ import {
 } from '@novelive/creator/contract'
 import {
 	BookOpen,
+	ChevronDown,
 	ChevronsUp,
 	CircleAlert,
 	CircleCheck,
@@ -175,6 +176,7 @@ function PhaseCard({ position }: { position?: number }) {
 				</div>
 				<QueueChip position={position} running={running} />
 				<Link className={local.buttonLink} to={workRoute('production', workId)}>
+					<Clapperboard aria-hidden="true" size={16} strokeWidth={1.8} />
 					{t('打开制作面板')}
 				</Link>
 			</Card>
@@ -226,6 +228,7 @@ function PhaseCard({ position }: { position?: number }) {
 					)}
 				</div>
 				<Link className={local.buttonLink} to={workRoute('production', workId)}>
+					<Clapperboard aria-hidden="true" size={16} strokeWidth={1.8} />
 					{t('打开制作面板')}
 				</Link>
 			</Card>
@@ -303,6 +306,9 @@ function HeroCard() {
 						onClick={() => setExpanded(!expanded)}
 					>
 						{expanded ? t('收起') : t('展开简介')}
+						<span className="nl-chevron" data-open={expanded}>
+							<ChevronDown size={15} strokeWidth={1.8} aria-hidden="true" />
+						</span>
 					</Button>
 				)}
 				{reading && (
