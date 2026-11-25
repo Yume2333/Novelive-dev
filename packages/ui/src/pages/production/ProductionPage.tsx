@@ -134,7 +134,7 @@ function ChapterRow({
 }
 
 export function ProductionPage() {
-	const { snapshot, run, busy } = useWorkProduction()
+	const { snapshot, run, busy, project } = useWorkProduction()
 	const { workId, phase, status, blockedChapterId, chapters } = snapshot
 	const published = chapters.filter(
 		(chapter) => chapter.status === 'published',
@@ -154,6 +154,13 @@ export function ProductionPage() {
 
 	return (
 		<Page
+			eyebrow={
+				project &&
+				t('{{series}} · 第 {{index}} 卷', {
+					series: project.seriesTitle,
+					index: project.volumeIndex,
+				})
+			}
 			title={snapshot.title ? `${snapshot.title} · ${t('制作')}` : t('制作')}
 			actions={
 				<div className={styles.actions}>
@@ -235,7 +242,13 @@ export function ProductionPage() {
 					</div>
 				</section>
 				<h2 className={styles.sectionLabel} id="production-chapters">
-					{t('章节')}
+					{project
+						? t('第 {{index}} 卷 · {{volume}} · 共 {{length}} 章', {
+								index: project.volumeIndex,
+								volume: project.volumeTitle,
+								length: chapters.length,
+							})
+						: t('章节')}
 				</h2>
 				<section className={styles.panel} aria-labelledby="production-chapters">
 					{chapters.length ? (

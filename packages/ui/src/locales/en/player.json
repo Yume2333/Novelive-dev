@@ -67,6 +67,7 @@
 	"确认删除": "Confirm deletion",
 	"空存档位": "Empty slot",
 	"章节": "Chapters",
+	"第 {{index}} 章 · {{title}}": "Chapter {{index}} · {{title}}",
 	"等待": "Waiting",
 	"系统菜单": "System menu",
 	"自动": "Auto",
@@ -87,6 +88,5 @@
 	"返回菜单": "Back to menu",
 	"这些存档无法在当前版本读取，可以保留或删除。": "These saves can't be read in the current version. You can keep or delete them.",
 	"隐藏": "Hide",
-	"隐藏界面": "Hide UI",
-	"第 {{index}} 章 · {{title}}": "Chapter {{index}} · {{title}}"
+	"隐藏界面": "Hide UI"
 }

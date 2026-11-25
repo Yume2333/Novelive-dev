@@ -27,23 +27,41 @@ const firstScene =
 	'scene 空屋\nsource p0001\n: 第一句。 #0001\n: 第二句。 #0002\n'
 const secondScene = 'scene 门外\nsource p0002\n: 门外的风。 #0003\n'
 
+async function enterAdvancedMode(page: Page) {
+	const toggle = page.getByRole('button', { name: '高级模式', exact: true })
+	if ((await toggle.getAttribute('aria-pressed')) !== 'true')
+		await toggle.click()
+}
+
 async function jumpTo(page: Page, line: number | string) {
 	await page.getByRole('button', { name: '快捷位置', exact: true }).click()
 	await page.getByRole('menuitem', { name: new RegExp(`^${line} ·`) }).click()
 }
 
-async function editAndPreview(page: Page, secondLine = 4) {
+async function editAndPreview(page: Page, _secondLine = 4) {
 	await expect(
 		page.getByRole('heading', { name: '编辑器', exact: true }),
 	).toBeVisible()
-	await expect(page.getByRole('textbox', { name: 'NVS 剧本' })).toContainText(
-		'第一句。',
-	)
-	const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
-	await jumpTo(page, secondLine)
-	await editor.press('End')
-	await page.keyboard.insertText(' ')
-	await page.getByRole('button', { name: '保存当前句' }).click()
+	await expect(page.getByText('这一场的句子', { exact: true })).toBeVisible()
+	await expect(page.getByRole('textbox', { name: 'NVS 剧本' })).toHaveCount(0)
+	const firstCard = page
+		.locator('.editor-sentence-trigger')
+		.filter({ hasText: '第一句。' })
+	const secondCard = page
+		.locator('.editor-sentence-trigger')
+		.filter({ hasText: '第二句。' })
+	await expect(firstCard).toHaveAttribute('aria-expanded', 'true')
+	await secondCard.click()
+	await expect(secondCard).toHaveAttribute('aria-expanded', 'true')
+	await expect(
+		page.getByRole('button', { name: '撤销', exact: true }),
+	).toBeDisabled()
+	const lineInput = page.getByRole('textbox', { name: '文本', exact: true })
+	await lineInput.fill('第二句。 ')
+	await expect(
+		page.getByRole('button', { name: '保存当前句' }).first(),
+	).toBeEnabled()
+	await page.getByRole('button', { name: '放弃修改' }).first().click()
 	await expect(page.getByRole('button', { name: '保存当前句' })).toHaveCount(0)
 	await expect(
 		page.getByRole('button', { name: '撤销', exact: true }),
@@ -51,23 +69,18 @@ async function editAndPreview(page: Page, secondLine = 4) {
 	await page.getByRole('button', { name: '原文对照' }).click()
 	const source = page.getByRole('button', { name: 'p0002 · 门外原文。' })
 	await source.click()
-	await expect(page.getByRole('textbox', { name: 'NVS 剧本' })).toContainText(
-		'门外的风。',
-	)
+	await expect(
+		page.locator('.editor-sentence-trigger').filter({ hasText: '门外的风。' }),
+	).toBeVisible()
 	await expect(source).toHaveAttribute('aria-pressed', 'true')
 	await page.getByLabel('场景', { exact: true }).selectOption('0')
 	await expect(
 		page.getByRole('button', { name: 'p0001 · 空屋原文。' }),
 	).toHaveAttribute('aria-pressed', 'true')
-	await jumpTo(page, secondLine)
-	await expect(
-		page.getByText(`当前行 ${secondLine}`, { exact: true }),
-	).toBeVisible()
-	await editor.press('Home')
-	await editor.press('ArrowRight')
-	await editor.press('ArrowRight')
-	await page.keyboard.insertText('改过的')
-	await page.getByRole('button', { name: '保存当前句' }).click()
+	await secondCard.click()
+	await expect(secondCard).toHaveAttribute('aria-expanded', 'true')
+	await lineInput.fill('改过的第二句。')
+	await page.getByRole('button', { name: '保存当前句' }).first().click()
 	await expect(page.getByRole('button', { name: '保存当前句' })).toHaveCount(0)
 	await expect(
 		page.getByRole('button', { name: '撤销', exact: true }),
@@ -75,8 +88,10 @@ async function editAndPreview(page: Page, secondLine = 4) {
 	await page.getByRole('button', { name: '从当前句预览' }).click()
 	await expect(page.locator('.nl-text-display')).toHaveText('改过的第二句。')
 	await page.getByRole('button', { name: '撤销', exact: true }).click()
-	await expect(editor).not.toContainText('改过的')
-	await jumpTo(page, secondLine)
+	await expect(
+		page.locator('.editor-sentence-trigger').filter({ hasText: '改过的' }),
+	).toHaveCount(0)
+	await secondCard.click()
 	await page.getByRole('button', { name: '从当前句预览' }).click()
 	await expect(page.locator('.nl-text-display')).toHaveText('第二句。')
 	await mkdir(evidence, { recursive: true })
@@ -216,8 +231,10 @@ test('M2 editor preview locates source and current line, edits, undoes and previ
 				window.location.hash = `/work/${workId}/edit?chapterId=${chapterId}`
 			}, playerRef)
 			await expect(
-				page.getByRole('textbox', { name: 'NVS 剧本' }),
-			).toContainText('第二句。')
+				page
+					.locator('.editor-sentence-trigger')
+					.filter({ hasText: '第二句。' }),
+			).toBeVisible()
 			await expect(
 				page.getByRole('button', { name: '撤销', exact: true }),
 			).toBeDisabled()
@@ -391,6 +408,7 @@ test.describe('contract-render', () => {
 					return
 				}
 				if (mode === 'long') {
+					await enterAdvancedMode(page)
 					const trigger = page.getByRole('button', {
 						name: '快捷位置',
 						exact: true,
@@ -436,6 +454,7 @@ test.describe('contract-render', () => {
 					return
 				}
 				if (mode === 'effects') {
+					await enterAdvancedMode(page)
 					const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
 					await expect(editor).toContainText('标题')
 					for (const [line, next] of [
@@ -476,6 +495,7 @@ test.describe('contract-render', () => {
 					return
 				}
 				if (mode === 'leading') {
+					await enterAdvancedMode(page)
 					await expect(
 						page.getByRole('textbox', { name: 'NVS 剧本' }),
 					).toContainText('第一句。')
@@ -496,8 +516,10 @@ test.describe('contract-render', () => {
 				}
 				if (mode === 'crlf') {
 					await expect(
-						page.getByRole('textbox', { name: 'NVS 剧本' }),
-					).toContainText('第一句。')
+						page
+							.locator('.editor-sentence-trigger')
+							.filter({ hasText: '第一句。' }),
+					).toBeVisible()
 					await expect(
 						page.getByRole('button', { name: '保存当前句' }),
 					).toHaveCount(0)
@@ -505,6 +527,7 @@ test.describe('contract-render', () => {
 					return
 				}
 				if (mode === 'stale') {
+					await enterAdvancedMode(page)
 					const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
 					await expect(editor).toContainText('第一句。')
 					await jumpTo(page, 3)
@@ -528,6 +551,7 @@ test.describe('contract-render', () => {
 				await expect(
 					page.getByRole('region', { name: '新标记提议' }),
 				).toHaveCount(0)
+				await enterAdvancedMode(page)
 				await jumpTo(page, 3)
 				await page.getByRole('button', { name: '强调', exact: true }).click()
 				await expect(

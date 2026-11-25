@@ -1,5 +1,6 @@
 # Prototype parity
-**Status:** in progress
+**Status:** done
+**Accepted:** 2026-11-24 by agent (omp-vibe-windows)
 **Priority:** high
 **Integration branch:** devin/1795518395-prototype-parity-integration
 

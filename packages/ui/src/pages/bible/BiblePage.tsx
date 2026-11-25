@@ -17,7 +17,14 @@ import { Collapse } from '../../components/Collapse'
 import { Page } from '../../components/Page'
 import { ScrollArea } from '../../components/ScrollArea'
 import { msg, scoped } from '../../i18n'
+import {
+	Fields,
+	fieldLabels,
+	formatConflictValue,
+	labelFor,
+} from './BibleFields'
 import styles from './BiblePage.module.css'
+import { CharacterDetail } from './CharacterDetail'
 
 const t = scoped('bible')
 
@@ -56,67 +63,6 @@ const message = (error: unknown) =>
 	error && typeof error === 'object' && 'message' in error
 		? String(error.message)
 		: t('读取失败，请重试。')
-const labels: Record<string, string> = {
-	name: msg('名字'),
-	originalName: msg('原文名字'),
-	aliases: msg('别名'),
-	major: msg('主要角色'),
-	addresses: msg('称呼'),
-	speakerId: msg('说话人'),
-	identity: msg('身份'),
-	personality: msg('性格'),
-	speech: msg('说话方式'),
-	appearance: msg('外貌'),
-	description: msg('描述'),
-	anchorFeatures: msg('锚点特征'),
-	keyColors: msg('关键颜色'),
-	hair: msg('发色'),
-	eyes: msg('瞳色'),
-	clothing: msg('服装'),
-	costumes: msg('造型'),
-	fromChapter: msg('起始章'),
-	expressions: msg('表情'),
-	references: msg('参考图'),
-	reuse: msg('复用方式'),
-	knows: msg('已知事实'),
-	fact: msg('事实'),
-	changes: msg('剧情变化'),
-	chapterId: msg('章节'),
-	field: msg('字段'),
-	value: msg('内容'),
-	firstSeenChapter: msg('首次出场'),
-	revealedChapter: msg('揭示章节'),
-	from: msg('角色'),
-	to: msg('关联角色'),
-	variants: msg('变体'),
-	event: msg('事件'),
-	storyTime: msg('故事时间'),
-	plantedChapter: msg('埋设章节'),
-	resolvedChapter: msg('回收章节'),
-	narration: msg('旁白语气'),
-	original: msg('原文写法'),
-	written: msg('作品写法'),
-	pronunciation: msg('注音'),
-	category: msg('类别'),
-	note: msg('备注'),
-	path: msg('路径'),
-	id: 'ID',
-}
-function print(value: unknown): string {
-	if (Array.isArray(value))
-		return value.length ? value.map(print).join(t('；')) : t('无')
-	if (value && typeof value === 'object')
-		return Object.entries(value)
-			.map(([key, item]) =>
-				t('{{value}}：{{value2}}', {
-					value: labels[key] ? t(labels[key]) : key,
-					value2: print(item),
-				}),
-			)
-			.join(t('，'))
-	if (typeof value === 'boolean') return value ? t('是') : t('否')
-	return value === undefined || value === null ? t('未设置') : String(value)
-}
 const title = (entry: Entry | ProposalEntry) =>
 	'name' in entry
 		? String(entry.name)
@@ -179,23 +125,6 @@ export function approvalNotice(proposal: Proposal, bible: Bible) {
 		t('已接受候选') +
 		(images ? t('；受影响的已有图片已标记过期。') : t('。')) +
 		(style ? t('风格变更仅提示，不自动过期。') : '')
-	)
-}
-
-function Fields({ entry }: { entry: Entry | ProposalEntry }) {
-	return (
-		<dl className={styles.fields}>
-			{Object.entries(entry)
-				.filter(
-					([key]) => !['id', 'status', 'occurrences', 'conflict'].includes(key),
-				)
-				.map(([key, value]) => (
-					<div key={key}>
-						<dt>{labels[key] ? t(labels[key]) : key}</dt>
-						<dd>{print(value)}</dd>
-					</div>
-				))}
-		</dl>
 	)
 }
 
@@ -328,19 +257,21 @@ function Candidate({
 								{conflicts.map(([key, value]) => (
 									<p key={key}>
 										{t('{{label}}：{{before}} → {{after}}', {
-											label: labels[key] ? t(labels[key]) : key,
-											before: print(
+											label: labelFor(key),
+											before: formatConflictValue(
 												(confirmed as unknown as Record<string, unknown>)[key],
 											),
-											after: value === undefined ? t('移除') : print(value),
+											after:
+												value === undefined
+													? t('移除')
+													: formatConflictValue(value),
 										})}
 									</p>
 								))}
 							</div>
 						)}
 						{entry.conflict && <p>{entry.conflict}</p>}
-						<Fields entry={entry} />
-						{confirmed && <Occurrences entry={confirmed} />}
+						<Fields entry={entry as unknown as Record<string, unknown>} />
 						{kind === 'style' && (
 							<p>{t('风格变更不会自动标记图片过期，请自行检查已有图片。')}</p>
 						)}
@@ -498,11 +429,6 @@ function BibleProjection({
 			data-focused={focused === entry.id || undefined}
 		>
 			<header className={styles.cardHead}>
-				{category === 'characters' && (
-					<span className={styles.avatar} aria-hidden="true">
-						{title(entry).slice(0, 1)}
-					</span>
-				)}
 				<h3>{title(entry)}</h3>
 				<span
 					className={styles.chip}
@@ -511,7 +437,7 @@ function BibleProjection({
 					{entry.status === 'confirmed' ? t('已确认') : t('候选')}
 				</span>
 			</header>
-			<Fields entry={entry} />
+			<Fields entry={entry as unknown as Record<string, unknown>} />
 			<Occurrences entry={entry} />
 		</article>
 	)
@@ -658,7 +584,14 @@ function BibleProjection({
 														</button>
 													))}
 												</div>
-												<div className={styles.cards}>{card(selected)}</div>
+												<div className={styles.cards}>
+													<CharacterDetail
+														character={selected as Bible['characters'][number]}
+														characters={bible.characters}
+														focused={focused === selected.id}
+														occurrences={<Occurrences entry={selected} />}
+													/>
+												</div>
 											</div>
 										) : category === 'glossary' && entries.length > 0 ? (
 											<div className={styles.glossary}>
@@ -675,7 +608,7 @@ function BibleProjection({
 																] as const
 															).map((key) => (
 																<th key={key} scope="col">
-																	{t(labels[key])}
+																	{t(fieldLabels[key])}
 																</th>
 															))}
 															<th scope="col">{t('定位')}</th>

@@ -151,6 +151,13 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 				window.location.hash = `/work/${id}/edit`
 			}, workId)
 			await expect(
+				page.getByText('这一场的句子', { exact: true }),
+			).toBeVisible()
+			await expect(
+				page.locator('.editor-sentence-trigger').filter({ hasText: '纸船' }),
+			).toBeVisible()
+			await page.getByRole('button', { name: '高级模式', exact: true }).click()
+			await expect(
 				page.getByRole('textbox', { name: 'NVS 剧本' }),
 			).toContainText('纸船')
 		}
@@ -201,7 +208,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(script).not.toContainText('笛声')
 		await page.getByRole('button', { name: '修改历史', exact: true }).click()
 		await expect(page.getByRole('region', { name: '修改历史' })).toContainText(
-			'rewrite',
+			'重写',
 		)
 		await page.getByRole('button', { name: '修改历史', exact: true }).click()
 		await page.evaluate(
@@ -335,7 +342,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			page.getByText('章节已更新，当前修改已保留；放弃修改后加载新版本'),
 		).toBeVisible()
 		await expect(script).toContainText('未保存的桥下修改')
-		await page.getByRole('button', { name: 'Agent', exact: true }).click()
+		await page.getByRole('button', { name: 'Novelive Agent' }).click()
 		await script.fill(beforeAgent)
 		await expect(
 			page.getByRole('button', { name: '放弃修改', exact: true }),
@@ -344,7 +351,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(script).toContainText('笛声')
 		await expect(script).toContainText('慢慢')
 		await expect(script).not.toContainText('缓缓')
-		await page.getByRole('button', { name: 'Agent', exact: true }).click()
+		await page.getByRole('button', { name: 'Novelive Agent' }).click()
 		await capture(page, '05-agent-rewrite-applied')
 		const history = await page.evaluate(
 			(target) => window.novelive.call('editor.history', target).promise,
@@ -649,7 +656,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		})
 		await page.getByRole('button', { name: '修改历史', exact: true }).click()
 		await expect(page.getByRole('region', { name: '修改历史' })).toContainText(
-			'expression',
+			'表情',
 		)
 		await page.getByRole('button', { name: '修改历史', exact: true }).click()
 		await page.getByRole('button', { name: '撤销', exact: true }).click()

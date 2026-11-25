@@ -141,11 +141,10 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			await fixture.publish('first')
 			await page.getByRole('link', { name: '确认第一章' }).click()
 			await expect(
-				page.getByRole('region', { name: '第一章成品' }),
-			).toContainText('已发布')
-			await expect(
-				page.getByRole('region', { name: '第一章成品' }),
-			).toContainText('需要处理')
+				page.getByText('第 1 章 · 灯塔 · 2 个场景', { exact: false }),
+			).toBeVisible()
+			const scene = page.getByRole('region', { name: '灯塔', exact: true })
+			await expect(scene).toContainText('灯塔的第一句。')
 			await expect(
 				page.getByRole('link', { name: '试玩第一章' }),
 			).toHaveAttribute('href', `#/work/${workId}/play`)

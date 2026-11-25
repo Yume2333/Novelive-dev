@@ -40,5 +40,6 @@
 	"第一卷角色和主视觉已就绪，等待确认。": "The characters and key visual for volume 1 are ready. Awaiting confirmation.",
 	"第一章已发布，可以先试玩，再继续制作。": "Chapter 1 is published. Try it now, then continue production.",
 	"选择主视觉": "Select key visual",
-	"重新读取": "Reload"
+	"重新读取": "Reload",
+	"{{series}} · 第 {{index}} 卷 · {{volume}}": "{{series}} · Vol. {{index}} · {{volume}}"
 }

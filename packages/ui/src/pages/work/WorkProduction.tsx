@@ -1,5 +1,6 @@
 import {
 	type CommandInput,
+	type CommandOutput,
 	type ProductionSnapshot,
 	productionSnapshotEvent,
 } from '@novelive/creator/contract'
@@ -20,6 +21,8 @@ type Action =
 type WorkProductionContext = {
 	snapshot: ProductionSnapshot
 	busy: boolean
+	/** `library.list` 中这部作品的系列／卷；已安装作品包没有。 */
+	project?: CommandOutput<'library.list'>['works'][number]['project']
 	run<K extends Action>(command: K, input: CommandInput<K>): Promise<boolean>
 }
 
@@ -60,6 +63,7 @@ export function WorkProduction() {
 
 function Projection({ workId, retry }: { workId: string; retry(): void }) {
 	const [snapshot, setSnapshot] = useState<ProductionSnapshot>()
+	const [project, setProject] = useState<WorkProductionContext['project']>()
 	const [error, setError] = useState('')
 	const [busy, setBusy] = useState(false)
 	const eventVersion = useRef(0)
@@ -138,6 +142,18 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 		}
 	}, [workId])
 
+	useEffect(() => {
+		const request = window.novelive.call('library.list', {})
+		request.promise.then(
+			(library) =>
+				setProject(
+					library.works.find((work) => work.workId === workId)?.project,
+				),
+			() => setProject(undefined),
+		)
+		return () => request.cancel()
+	}, [workId])
+
 	async function run<K extends Action>(command: K, input: CommandInput<K>) {
 		if (action.current) return false
 		action.current = true
@@ -177,7 +193,9 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 			)}
 			{snapshot ? (
 				<Outlet
-					context={{ snapshot, busy, run } satisfies WorkProductionContext}
+					context={
+						{ snapshot, busy, run, project } satisfies WorkProductionContext
+					}
 				/>
 			) : (
 				!error && (

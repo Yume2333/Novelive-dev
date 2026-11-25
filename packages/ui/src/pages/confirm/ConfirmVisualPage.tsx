@@ -75,7 +75,7 @@ export function ConfirmVisualPage() {
 }
 
 function VisualChoices({ visual }: { visual: Visual }) {
-	const { snapshot, run, busy } = useWorkProduction()
+	const { snapshot, run, busy, project } = useWorkProduction()
 	const navigate = useNavigate()
 	const imported = visual.importedIllustrations
 	const recommended = imported?.recommended ?? []
@@ -140,7 +140,14 @@ function VisualChoices({ visual }: { visual: Visual }) {
 
 	return (
 		<Page
-			eyebrow={t('确认点 1 / 2')}
+			eyebrow={
+				project
+					? `${t('{{series}} · 第 {{index}} 卷', {
+							series: project.seriesTitle,
+							index: project.volumeIndex,
+						})} · ${t('确认点 1 / 2')}`
+					: t('确认点 1 / 2')
+			}
 			title={
 				<span className={local.title}>
 					{snapshot.title

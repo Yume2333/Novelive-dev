@@ -148,7 +148,6 @@
 	visibility: hidden;
 	opacity: 0;
 }
-
 .nl-player .nl-player-stage > div:first-child {
 	clip-path: none !important;
 }
@@ -163,23 +162,12 @@
 	flex-direction: column;
 	justify-content: flex-start;
 	width: 100%;
-	min-height: 34%;
-	padding: 8.5vh 8% var(--space-6);
-	background: linear-gradient(
-		180deg,
-		transparent 0%,
-		color-mix(
-				in srgb,
-				black calc(var(--player-dialogue-opacity, 0.9) * 82%),
-				transparent
-			)
-			68%,
-		color-mix(
-				in srgb,
-				black calc(var(--player-dialogue-opacity, 0.9) * 94%),
-				transparent
-			)
-			100%
+	min-height: 22%;
+	padding: 3.5vh 8% var(--space-6);
+	background: color-mix(
+		in srgb,
+		black calc(min(var(--player-dialogue-opacity, 0.9) + 0.12, 1) * 100%),
+		transparent
 	);
 	box-shadow: none;
 	color: color-mix(in srgb, white 90%, transparent);
@@ -190,10 +178,29 @@
 	animation: nl-box-in 0.32s var(--ease-out) both;
 }
 
+.nl-player .nl-player-textbox::before {
+	content: "";
+	position: absolute;
+	right: 0;
+	bottom: 100%;
+	left: 0;
+	height: 6vh;
+	background: linear-gradient(
+		180deg,
+		transparent,
+		color-mix(
+			in srgb,
+			black calc(min(var(--player-dialogue-opacity, 0.9) + 0.12, 1) * 100%),
+			transparent
+		)
+	);
+	pointer-events: none;
+}
+
 .nl-player .nl-player-textbox::after {
 	content: "";
 	position: absolute;
-	top: 15%;
+	top: 0;
 	left: 9%;
 	right: 9%;
 	height: 1px;
@@ -268,6 +275,7 @@
 	position: relative;
 }
 
+.nl-player-surface[data-dialogue-style="paper"] .nl-player-textbox::before,
 .nl-player-surface[data-dialogue-style="paper"] .nl-player-textbox::after {
 	display: none;
 }
@@ -414,14 +422,12 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-	padding: var(--space-1) var(--space-3);
-	border-radius: var(--radius-full, 999px);
-	background: color-mix(in srgb, black 60%, transparent);
-	color: color-mix(in srgb, white 92%, transparent);
+	color: var(--color-primary);
 	font-family: var(--font-body);
-	font-size: 13px;
-	letter-spacing: 0.08em;
+	font-size: 11px;
+	letter-spacing: 0.2em;
 	pointer-events: none;
+	transition: opacity var(--dur-base) var(--ease-out);
 }
 
 .nl-controls-backdrop {
@@ -578,17 +584,22 @@
 }
 
 .nl-chapter-chip {
-	padding: 2px var(--space-2);
-	border-radius: var(--radius-full);
-	background: var(--color-surface-container);
-	font-size: 0.75rem;
+	padding: var(--space-px-3) var(--space-2);
+	border-radius: var(--radius-sm);
+	background: var(--color-tertiary-fixed);
+	color: var(--color-on-secondary-container);
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	line-height: 1.35;
+	white-space: nowrap;
 }
 
 .nl-history-navigation button {
 	width: auto !important;
 	min-height: 36px !important;
 	border: var(--glass-border) !important;
-	border-radius: var(--radius-full) !important;
+	border-radius: var(--radius-lg) !important;
 }
 
 @keyframes nl-screen-in {
@@ -824,7 +835,7 @@
 .nl-controls-screen .nl-settings-card .nl-control-row select {
 	padding: 6px var(--space-4);
 	border: var(--glass-border);
-	border-radius: var(--radius-full);
+	border-radius: var(--radius-lg);
 	background: var(--color-surface-container-lowest);
 	font-size: 13px;
 	font-weight: 500;

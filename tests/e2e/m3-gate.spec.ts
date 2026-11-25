@@ -87,7 +87,7 @@ listener (inner): 演出已经清除。 #0002
 		)
 		project.database
 			.prepare(
-				'INSERT INTO work (work_id, title, queue_pos, created_at) VALUES (?, ?, 0, 0)',
+				"INSERT INTO work (work_id, title, status, queue_pos, created_at) VALUES (?, ?, 'done', 0, 0)",
 			)
 			.run(playerWorkId, '黄昏')
 		project.database

@@ -82,7 +82,7 @@ function PhaseCard() {
 }
 
 export function WorkPage() {
-	const { snapshot } = useWorkProduction()
+	const { snapshot, project } = useWorkProduction()
 	const { workId, summary, chapters, exportTarget } = snapshot
 	const share = window.novelive.host.share
 	const pickDestination = window.novelive.pickPackageDestination
@@ -155,6 +155,15 @@ export function WorkPage() {
 						<BookOpen size={28} strokeWidth={1.6} />
 					</span>
 					<div className={local.heroText}>
+						{project && (
+							<p className={`label-caps label-caps-zh ${local.heroEyebrow}`}>
+								{t('{{series}} · 第 {{index}} 卷 · {{volume}}', {
+									series: project.seriesTitle,
+									index: project.volumeIndex,
+									volume: project.volumeTitle,
+								})}
+							</p>
+						)}
 						<p className={local.heroTitle}>{title}</p>
 						<span className={styles.muted}>
 							<CircleCheck aria-hidden="true" size={13} />{' '}

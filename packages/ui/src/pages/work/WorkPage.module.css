@@ -29,6 +29,11 @@
 	min-width: 0;
 }
 
+.heroEyebrow {
+	margin: 0;
+	color: var(--color-outline);
+}
+
 .heroText > span {
 	display: inline-flex;
 	align-items: center;

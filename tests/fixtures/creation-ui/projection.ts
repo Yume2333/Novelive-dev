@@ -100,9 +100,10 @@ const record = (
 	},
 })
 
+type Stage = 'beforeVisual' | 'first' | 'finished'
 type ProjectionDriver = {
 	calls: Extract<ClientFrame, { type: 'call' }>[]
-	publish(stage: 'first' | 'finished'): void
+	publish(stage: Stage): void
 }
 type TestGlobal = typeof globalThis & { creationProjection: ProjectionDriver }
 
@@ -117,7 +118,7 @@ export async function installProjection(app: ElectronApplication) {
 			const calls: ProjectionDriver['calls'] = []
 			const sendEvent = (envelope: EventEnvelope) =>
 				port1.postMessage({ type: 'event', generation, envelope })
-			const publish = (stage: 'first' | 'finished') => {
+			const publish = (stage: Stage) => {
 				snapshot = fixture[stage]
 				sendEvent({
 					seq: ++seq,
@@ -137,7 +138,25 @@ export async function installProjection(app: ElectronApplication) {
 				}
 				switch (data.command) {
 					case 'library.list':
-						respond({ works: [], unreadableCount: 0 })
+						respond({
+							works: [
+								{
+									workId: snapshot.workId,
+									title: snapshot.title ?? '白塔来信',
+									published: 0,
+									chapters: snapshot.chapters.length,
+									project: {
+										directory: '/projects/fog-sea',
+										seriesId: 'ser-1',
+										seriesTitle: '雾海纪行',
+										volumeId: 'v1',
+										volumeTitle: '灯塔卷',
+										volumeIndex: 1,
+									},
+								},
+							],
+							unreadableCount: 0,
+						})
 						break
 					case 'production.getQueue':
 						respond({ active: null, queued: [], inactive: [] })
@@ -190,16 +209,41 @@ export async function installProjection(app: ElectronApplication) {
 								published: chapter.status === 'published',
 								progress: chapter.status,
 							})),
-							script: `scene ${title}\nsource p0001\n: ${title}的第一句。 #0001\n: ${title}的下一句。 #0002\n`,
+							script: `scene ${title}\nsource p0001\n@bg room/night\n: ${title}的第一句。 #0001\n: ${title}的下一句。 #0002\n\nscene ${title} · 夜谈\nsource p0002\n@bg room/day\n@show keeper/coat/neutral center\n: 灯塔下的潮声。 #0003\n`,
 							chapter: {
 								formatVersion: 1,
 								chapterId,
 								title,
-								paragraphIds: ['p0001'],
-								sceneIds: ['aaaabbbb'],
+								paragraphIds: ['p0001', 'p0002'],
+								sceneIds: ['aaaabbbb', 'ccccdddd'],
 								cg: [],
 							},
-							registry: { formatVersion: 1, entries: [] },
+							registry: {
+								formatVersion: 1,
+								entries: [
+									{
+										id: 'room/night',
+										type: 'location',
+										path: 'creation-ui/visual-1.png',
+										status: 'drawn',
+										aliases: [],
+									},
+									{
+										id: 'room/day',
+										type: 'location',
+										path: 'creation-ui/visual-2.png',
+										status: 'drawn',
+										aliases: [],
+									},
+									{
+										id: 'keeper/coat/neutral',
+										type: 'character',
+										path: 'creation-ui/portrait-1.png',
+										status: 'drawn',
+										aliases: [],
+									},
+								],
+							},
 							speakers: [],
 							speakerNames: {},
 							customMarks: {},
@@ -247,7 +291,7 @@ export async function installProjection(app: ElectronApplication) {
 		},
 	)
 	return {
-		publish: (stage: 'first' | 'finished') =>
+		publish: (stage: Stage) =>
 			app.evaluate(
 				(_electron, value) =>
 					(globalThis as TestGlobal).creationProjection.publish(value),

@@ -22,7 +22,9 @@ import { EditorPanels } from './EditorPanels'
 import { JumpPoints } from './JumpPoints'
 import { SceneImages } from './SceneImages'
 import { ScriptEditor } from './ScriptEditor'
+import { SentenceList } from './SentenceList'
 import { lineExpression, sceneAssets } from './scene-assets'
+import { parseSentenceLines, updateSentenceLine } from './sentence-lines'
 import '../player/player.css'
 import './editor.css'
 import { scoped } from '../../i18n'
@@ -89,7 +91,7 @@ export function EditorPage() {
 	const rewriteInput = useRef<HTMLTextAreaElement>(null)
 	const [error, setError] = useState('')
 	const [busy, setBusy] = useState(false)
-	const [undoCount, setUndoCount] = useState(0)
+	const [undoLines, setUndoLines] = useState<string[]>([])
 	const [instruction, setInstruction] = useState('')
 	const [proposal, setProposal] = useState<RewriteProposal>()
 	const [selected, setSelected] = useState<string[]>([])
@@ -101,14 +103,16 @@ export function EditorPage() {
 	const [preview, setPreview] = useState(0)
 	const [refresh, setRefresh] = useState(0)
 	const [pendingRefresh, setPendingRefresh] = useState(false)
+	const [advancedMode, setAdvancedMode] = useState(false)
 	const chapter = opening?.chapter
 	const scene = chapter?.scenes[sceneIndex]
 	const dirty =
 		!!scene &&
 		draft.replace(/\r\n?/g, '\n') !== scene.nvs.replace(/\r\n?/g, '\n')
+	const sentences = useMemo(() => parseSentenceLines(draft), [draft])
 	const expression = useMemo(
 		() =>
-			opening && chapter && scene && !dirty
+			opening && chapter && scene
 				? lineExpression(chapter.scenes, sceneIndex, line, {
 						paragraphIds: chapter.paragraphs.map((p) => p.id),
 						assets: opening.registry.entries,
@@ -116,7 +120,7 @@ export function EditorPage() {
 						customMarks: Object.keys(opening.settings.customMarks),
 					})
 				: undefined,
-		[opening, chapter, scene, dirty, sceneIndex, line],
+		[opening, chapter, scene, sceneIndex, line],
 	)
 	useEffect(() => {
 		const changed = (event: Event) => {
@@ -126,15 +130,69 @@ export function EditorPage() {
 				if (dirty) {
 					setPendingRefresh(true)
 					setError(t('章节已更新，当前修改已保留；放弃修改后加载新版本'))
-				} else setRefresh((value) => value + 1)
+				} else
+					void window.novelive
+						.call('editor.snapshot', {
+							workId: id,
+							chapterId,
+							editorId: opening?.editorId,
+						})
+						.promise.then((fresh) => {
+							setOpening((value) =>
+								value
+									? {
+											...value,
+											chapter: fresh.chapter,
+											settings: fresh.settings,
+											settingsRevision: fresh.settingsRevision,
+										}
+									: value,
+							)
+							setDraft(fresh.chapter.scenes[sceneIndex]?.nvs ?? '')
+							setUndoLines(fresh.undoLines)
+							setProposal(undefined)
+						})
+						.catch(() => setRefresh((value) => value + 1))
 			}
 		}
+		const assetChanged = (event: Event) => {
+			const { workId, assetId } = (event as CustomEvent).detail as {
+				workId: string
+				assetId: string
+			}
+			if (workId !== id) return
+			void window.novelive
+				.call('production.resolveAsset', { workId: id, assetId })
+				.promise.then((asset) => {
+					if (!asset) return
+					setOpening((value) =>
+						value
+							? {
+									...value,
+									registry: {
+										...value.registry,
+										entries: value.registry.entries.map((entry) =>
+											entry.id === assetId
+												? { ...entry, path: asset.cachePath }
+												: entry,
+										),
+									},
+								}
+							: value,
+					)
+					setPreview((value) => (value ? value + 1 : value))
+				})
+				.catch(() => {})
+		}
 		window.addEventListener('novelive:chapter-changed', changed)
-		return () => window.removeEventListener('novelive:chapter-changed', changed)
-	}, [id, chapterId, dirty])
+		window.addEventListener('novelive:asset-changed', assetChanged)
+		return () => {
+			window.removeEventListener('novelive:chapter-changed', changed)
+			window.removeEventListener('novelive:asset-changed', assetChanged)
+		}
+	}, [id, chapterId, dirty, opening, sceneIndex])
 	const stage = useRef<HTMLDivElement>(null)
 	const stageBox = useRef<HTMLElement>(null)
-	const [stageScale, setStageScale] = useState(1)
 	const sourceViewport = useRef<HTMLDivElement>(null)
 	useEffect(() => {
 		if (scene)
@@ -158,7 +216,7 @@ export function EditorPage() {
 		let opened: Opening | undefined
 		setOpening(undefined)
 		setError('')
-		setUndoCount(0)
+		setUndoLines([])
 		setSceneIndex(0)
 		setProposal(undefined)
 		const close = (value: Opening) =>
@@ -178,7 +236,14 @@ export function EditorPage() {
 					return
 				}
 				setOpening(value)
-				setDraft(value.chapter.scenes[0]?.nvs ?? '')
+				const initialNvs = value.chapter.scenes[0]?.nvs ?? ''
+				setDraft(initialNvs)
+				const firstLine =
+					(initialNvs
+						.split(/\r\n?|\n/)
+						.findIndex((row) => / #[0-9a-f]{4}\s*$/.test(row)) ?? -1) + 1
+				setLine(firstLine || 1)
+				setPosition((prev) => ({ line: firstLine || 1, key: prev.key + 1 }))
 			})
 			.catch((cause) => {
 				if (!disposed) setError(cause.message ?? t('无法打开编辑器'))
@@ -267,7 +332,7 @@ export function EditorPage() {
 		}).promise
 		accept(saved)
 		if (saved.revision !== target.expectedRevision)
-			setUndoCount((count) => count + 1)
+			setUndoLines((lines) => [...lines, `${scene.sceneId}:${lineId}`])
 	}
 	function discard() {
 		if (pendingRefresh) {
@@ -280,22 +345,12 @@ export function EditorPage() {
 			discard()
 			return
 		}
-		if (!target || !undoCount) return
+		if (!target || !undoLines.length) return
 		void run(async () => {
 			accept(await window.novelive.call('editor.undo', target).promise)
-			setUndoCount((count) => count - 1)
+			setUndoLines((lines) => lines.slice(0, -1))
 		})
 	}
-	const hasScene = !!scene
-	useEffect(() => {
-		const box = stageBox.current
-		if (!box || !hasScene) return
-		const observer = new ResizeObserver(() =>
-			setStageScale(box.clientWidth / 960),
-		)
-		observer.observe(box)
-		return () => observer.disconnect()
-	}, [hasScene])
 	useEffect(() => {
 		if (!preview || !opening || !stage.current || !scene) return
 		const abort = new AbortController()
@@ -360,6 +415,20 @@ export function EditorPage() {
 		).catch(fail)
 		return () => abort.abort()
 	}, [preview, opening, scene, sceneIndex, draft, line])
+	const hasScene = !!scene
+	useEffect(() => {
+		const box = stageBox.current
+		if (!box || !hasScene) return
+		const syncScale = () =>
+			box.style.setProperty(
+				'--editor-stage-scale',
+				String(box.clientWidth / 960),
+			)
+		syncScale()
+		const observer = new ResizeObserver(syncScale)
+		observer.observe(box)
+		return () => observer.disconnect()
+	}, [hasScene])
 	const rewriting = rewriteOpen || !!proposal
 	useEffect(() => {
 		const dialog = rewriteDialog.current
@@ -393,123 +462,159 @@ export function EditorPage() {
 		setRewriteOpen(false)
 		setProposal(undefined)
 	}
-
+	function changeExpression(next: string) {
+		if (!target || !scene || !expression || next === expression.current) return
+		void run(async () => {
+			const saved = await window.novelive.call('editor.editLine', {
+				...target,
+				sceneId: scene.sceneId,
+				edit: {
+					kind: 'expression',
+					lineId: expression.lineId,
+					previous: expression.current,
+					next,
+				},
+			}).promise
+			accept(saved)
+			if (saved.revision !== target.expectedRevision)
+				setUndoLines((lines) => [
+					...lines,
+					`${scene.sceneId}:${expression.lineId}`,
+				])
+		})
+	}
+	function selectSentenceLine(nextLine: number) {
+		if (dirty && nextLine !== line) {
+			setError(t('请先保存或放弃当前修改'))
+			return
+		}
+		setError('')
+		setLine(nextLine)
+		setPosition((value) => ({ line: nextLine, key: value.key + 1 }))
+	}
+	function updateSentence(
+		lineNumber: number,
+		patch: { text?: string; displayAs?: string },
+	) {
+		setDraft((current) => updateSentenceLine(current, lineNumber, patch))
+	}
 	return (
 		<Page
 			title={t('编辑器')}
 			width="full"
 			eyebrow={workTitle}
 			subtitle={
-				<>
-					{scene && chapter && (
-						<div className="editor-subtitle">
-							<select
-								className="editor-compact-select"
-								aria-label={t('章节')}
-								value={chapterId}
-								disabled={busy || dirty}
-								title={dirty ? t('先保存或放弃当前修改') : undefined}
-								onChange={(event) => chooseChapter(event.target.value)}
-							>
-								{chapters.map((item) => (
-									<option key={item.chapterId} value={item.chapterId}>
-										{item.index
-											? t('第 {{index}} 章 {{title}}', {
-													index: item.index,
-													title: item.title ?? item.chapterId,
-												})
-											: (item.title ?? item.chapterId)}
-									</option>
-								))}
-							</select>
-							<ChevronRight
-								aria-hidden="true"
-								className="editor-subtitle-separator"
-								size={14}
-								strokeWidth={1.8}
-							/>
-							<select
-								className="editor-compact-select"
-								aria-label={t('场景')}
-								value={sceneIndex}
+				scene &&
+				chapter && (
+					<div className="editor-subtitle">
+						<select
+							className="editor-compact-select"
+							aria-label={t('章节')}
+							value={chapterId}
+							disabled={busy || dirty}
+							title={dirty ? t('先保存或放弃当前修改') : undefined}
+							onChange={(event) => chooseChapter(event.target.value)}
+						>
+							{chapters.map((item) => (
+								<option key={item.chapterId} value={item.chapterId}>
+									{item.index
+										? t('第 {{index}} 章 {{title}}', {
+												index: item.index,
+												title: item.title ?? item.chapterId,
+											})
+										: (item.title ?? item.chapterId)}
+								</option>
+							))}
+						</select>
+						<ChevronRight
+							aria-hidden="true"
+							className="editor-subtitle-separator"
+							size={14}
+							strokeWidth={1.8}
+						/>
+						<select
+							className="editor-compact-select"
+							aria-label={t('场景')}
+							value={sceneIndex}
+							disabled={busy}
+							onChange={(event) => chooseScene(Number(event.target.value))}
+						>
+							{chapter.scenes.map((item, index) => (
+								<option key={item.sceneId} value={index}>
+									{item.nvs.match(/^scene (.+)/m)?.[1] ?? item.sceneId}
+								</option>
+							))}
+						</select>
+					</div>
+				)
+			}
+			actions={
+				<div className="editor-actions">
+					<button
+						type="button"
+						className="editor-icon-button"
+						aria-label={t('原文对照')}
+						title={t('原文对照')}
+						aria-expanded={source}
+						data-active={source || undefined}
+						disabled={!scene}
+						onClick={() => setSource((value) => !value)}
+					>
+						<BookOpen aria-hidden="true" size={18} strokeWidth={1.8} />
+					</button>
+					<button
+						type="button"
+						className="editor-icon-button"
+						aria-label={t('从当前句预览')}
+						title={t('从当前句预览')}
+						disabled={!scene || busy}
+						onClick={() => setPreview((value) => value + 1)}
+					>
+						<Play aria-hidden="true" size={18} strokeWidth={1.8} />
+					</button>
+					<button
+						type="button"
+						className="editor-icon-button"
+						aria-label={t('撤销')}
+						title={t('撤销')}
+						disabled={(!undoLines.length && !dirty) || busy}
+						onClick={undo}
+					>
+						<Undo2 aria-hidden="true" size={18} strokeWidth={1.8} />
+					</button>
+					<button
+						type="button"
+						className="editor-button editor-button-primary"
+						disabled={!scene || busy || dirty}
+						title={dirty ? t('先保存或放弃当前修改') : undefined}
+						onClick={() => setRewriteOpen(true)}
+					>
+						<WandSparkles aria-hidden="true" size={16} strokeWidth={1.8} />
+						{t('让 Agent 重写本场景')}
+					</button>
+					{(dirty || pendingRefresh) && (
+						<div className="editor-draft-actions">
+							{dirty && <span className="editor-chip">{t('未保存')}</span>}
+							<button
+								type="button"
+								className="editor-button editor-button-ghost"
 								disabled={busy}
-								onChange={(event) => chooseScene(Number(event.target.value))}
+								onClick={discard}
 							>
-								{chapter.scenes.map((item, index) => (
-									<option key={item.sceneId} value={index}>
-										{item.nvs.match(/^scene (.+)/m)?.[1] ?? item.sceneId}
-									</option>
-								))}
-							</select>
+								<RotateCcw aria-hidden="true" size={15} strokeWidth={1.8} />
+								{t('放弃修改')}
+							</button>
+							<button
+								type="button"
+								className="editor-button"
+								disabled={!dirty || busy}
+								onClick={() => void run(save)}
+							>
+								{t('保存当前句')}
+							</button>
 						</div>
 					)}
-					<div className="editor-actions editor-header-toolbar">
-						<button
-							type="button"
-							className="editor-icon-button"
-							aria-label={t('原文对照')}
-							title={t('原文对照')}
-							aria-expanded={source}
-							data-active={source || undefined}
-							disabled={!scene}
-							onClick={() => setSource((value) => !value)}
-						>
-							<BookOpen aria-hidden="true" size={18} strokeWidth={1.8} />
-						</button>
-						<button
-							type="button"
-							className="editor-icon-button"
-							aria-label={t('从当前句预览')}
-							title={t('从当前句预览')}
-							disabled={!scene || busy}
-							onClick={() => setPreview((value) => value + 1)}
-						>
-							<Play aria-hidden="true" size={18} strokeWidth={1.8} />
-						</button>
-						<button
-							type="button"
-							className="editor-icon-button"
-							aria-label={t('撤销')}
-							title={t('撤销')}
-							disabled={(!undoCount && !dirty) || busy}
-							onClick={undo}
-						>
-							<Undo2 aria-hidden="true" size={18} strokeWidth={1.8} />
-						</button>
-						<button
-							type="button"
-							className="editor-button editor-button-primary"
-							disabled={!scene || busy || dirty}
-							title={dirty ? t('先保存或放弃当前修改') : undefined}
-							onClick={() => setRewriteOpen(true)}
-						>
-							<WandSparkles aria-hidden="true" size={16} strokeWidth={1.8} />
-							{t('让 Agent 重写本场景')}
-						</button>
-						{(dirty || pendingRefresh) && (
-							<div className="editor-draft-actions">
-								{dirty && <span className="editor-chip">{t('未保存')}</span>}
-								<button
-									type="button"
-									className="editor-button editor-button-ghost"
-									disabled={busy}
-									onClick={discard}
-								>
-									<RotateCcw aria-hidden="true" size={15} strokeWidth={1.8} />
-									{t('放弃修改')}
-								</button>
-								<button
-									type="button"
-									className="editor-button"
-									disabled={!dirty || busy}
-									onClick={() => void run(save)}
-								>
-									{t('保存当前句')}
-								</button>
-							</div>
-						)}
-					</div>
-				</>
+				</div>
 			}
 		>
 			<div className="editor-workbench" aria-busy={busy}>
@@ -546,33 +651,35 @@ export function EditorPage() {
 										key={decision}
 										onClick={() =>
 											void run(async () => {
-												if (target) {
-													accept(
-														await window.novelive.call('editor.resolveMark', {
-															...target,
-															suggestionId: mark.id,
-															decision,
-														}).promise,
+												if (!target) return
+												const resolved = await window.novelive.call(
+													'editor.resolveMark',
+													{
+														...target,
+														suggestionId: mark.id,
+														decision,
+													},
+												).promise
+												if (decision === 'accept') {
+													const fresh = await window.novelive.call(
+														'editor.snapshot',
+														{
+															workId: id,
+															chapterId,
+															editorId: opening?.editorId,
+														},
+													).promise
+													setOpening((value) =>
+														value
+															? {
+																	...value,
+																	settings: fresh.settings,
+																	settingsRevision: fresh.settingsRevision,
+																}
+															: value,
 													)
-													if (decision === 'accept')
-														setOpening((value) =>
-															value
-																? {
-																		...value,
-																		settings: {
-																			...value.settings,
-																			customMarks: {
-																				...value.settings.customMarks,
-																				[mark.name]: {
-																					css: mark.css,
-																					perChar: mark.perChar,
-																				},
-																			},
-																		},
-																	}
-																: value,
-														)
 												}
+												accept(resolved)
 											})
 										}
 									>
@@ -592,11 +699,7 @@ export function EditorPage() {
 											ref={stageBox}
 											aria-label={t('舞台预览')}
 										>
-											<div
-												className="editor-stage-surface"
-												ref={stage}
-												style={{ transform: `scale(${stageScale})` }}
-											/>
+											<div className="editor-stage-surface" ref={stage} />
 										</section>
 										<SceneImages
 											key={scene.sceneId}
@@ -644,125 +747,143 @@ export function EditorPage() {
 								</div>
 								<section className="editor-panel editor-script-panel">
 									<header className="editor-panel-head">
-										<span className="editor-label">{t('剧本')}</span>
-										<span className="editor-muted">
-											{t('当前行 {{line}}', { line })}
+										<span className="editor-label">
+											{advancedMode ? t('NVS 剧本') : t('这一场的句子')}
 										</span>
-									</header>
-									<div
-										className="editor-marks"
-										role="toolbar"
-										aria-label={t('文本效果')}
-									>
-										{[
-											[t('强调'), '{em}', '{/em}'],
-											[t('加粗'), '{b}', '{/b}'],
-											[t('注音'), t('{ruby よみ}'), '{/ruby}'],
-											[t('停顿'), '{wait 0.5}', ''],
-											[t('变速'), '{speed 0.5}', '{/speed}'],
-										].map(([label, before, after]) => (
-											<button
-												type="button"
-												className="editor-chip-button"
-												key={label}
-												disabled={busy}
-												onClick={() =>
-													setInsert({
-														before: before as string,
-														after: after as string,
-														key: Date.now(),
-													})
-												}
-											>
-												{label}
-											</button>
-										))}
-										<select
-											className="editor-mark-select"
-											aria-label={t('文本标记')}
-											value=""
+										<span className="editor-muted">
+											{advancedMode
+												? t('当前行 {{line}}', { line })
+												: t('共 {{count}} 句', { count: sentences.length })}
+										</span>
+										<button
+											type="button"
+											className="editor-chip-button editor-mode-toggle"
+											aria-pressed={advancedMode}
 											disabled={busy}
-											onChange={(event) => {
-												const name = event.target.value
-												if (name)
-													setInsert({
-														before: `{${name}}`,
-														after: `{/${name}}`,
-														key: Date.now(),
-													})
-											}}
+											onClick={() => setAdvancedMode((value) => !value)}
 										>
-											<option value="">{t('更多标记')}</option>
-											{[
-												'em',
-												'b',
-												'dim',
-												'whisper',
-												'shout',
-												'glitch',
-												'hl',
-												...Object.keys(opening.settings.customMarks),
-											].map((name) => (
-												<option key={name} value={name}>
-													{name}
-												</option>
-											))}
-										</select>
-										{expression && (
-											<select
-												className="editor-mark-select"
-												aria-label={t('表情')}
-												value={expression.current}
-												disabled={busy || dirty}
-												onChange={(event) => {
-													const next = event.target.value
-													if (!target || !scene || next === expression.current)
-														return
-													void run(async () => {
-														const saved = await window.novelive.call(
-															'editor.editLine',
-															{
-																...target,
-																sceneId: scene.sceneId,
-																edit: {
-																	kind: 'expression',
-																	lineId: expression.lineId,
-																	previous: expression.current,
-																	next,
-																},
-															},
-														).promise
-														accept(saved)
-														if (saved.revision !== target.expectedRevision)
-															setUndoCount((count) => count + 1)
-													})
-												}}
+											{t('高级模式')}
+										</button>
+									</header>
+									{advancedMode ? (
+										<>
+											<div
+												className="editor-marks"
+												role="toolbar"
+												aria-label={t('文本效果')}
 											>
-												{expression.choices.map((id) => (
-													<option key={id} value={id}>
-														{id}
-													</option>
+												{[
+													[t('强调'), '{em}', '{/em}'],
+													[t('加粗'), '{b}', '{/b}'],
+													[t('注音'), t('{ruby よみ}'), '{/ruby}'],
+													[t('停顿'), '{wait 0.5}', ''],
+													[t('变速'), '{speed 0.5}', '{/speed}'],
+												].map(([label, before, after]) => (
+													<button
+														type="button"
+														className="editor-chip-button"
+														key={label}
+														disabled={busy}
+														onClick={() =>
+															setInsert({
+																before: before as string,
+																after: after as string,
+																key: Date.now(),
+															})
+														}
+													>
+														{label}
+													</button>
 												))}
-											</select>
-										)}
-										<JumpPoints
-											script={draft}
-											disabled={busy}
-											onJump={(line) =>
-												setPosition((value) => ({ line, key: value.key + 1 }))
-											}
+												<select
+													className="editor-mark-select"
+													aria-label={t('文本标记')}
+													value=""
+													disabled={busy}
+													onChange={(event) => {
+														const name = event.target.value
+														if (name)
+															setInsert({
+																before: `{${name}}`,
+																after: `{/${name}}`,
+																key: Date.now(),
+															})
+													}}
+												>
+													<option value="">{t('更多标记')}</option>
+													{[
+														'em',
+														'b',
+														'dim',
+														'whisper',
+														'shout',
+														'glitch',
+														'hl',
+														...Object.keys(opening.settings.customMarks),
+													].map((name) => (
+														<option key={name} value={name}>
+															{name}
+														</option>
+													))}
+												</select>
+												{expression && (
+													<select
+														className="editor-mark-select"
+														aria-label={t('表情')}
+														value={expression.current}
+														disabled={busy || dirty}
+														onChange={(event) =>
+															changeExpression(event.target.value)
+														}
+													>
+														{expression.choices.map((id) => (
+															<option key={id} value={id}>
+																{id}
+															</option>
+														))}
+													</select>
+												)}
+												<JumpPoints
+													script={draft}
+													disabled={busy}
+													onJump={(line) =>
+														setPosition((value) => ({
+															line,
+															key: value.key + 1,
+														}))
+													}
+												/>
+											</div>
+											<ScriptEditor
+												readOnly={busy}
+												autoFocus={!chapter?.markSuggestions.length}
+												value={draft}
+												onChange={setDraft}
+												onLine={setLine}
+												position={position}
+												insert={insert}
+												onUndo={undo}
+											/>
+										</>
+									) : (
+										<SentenceList
+											sentences={sentences}
+											savedNvs={scene.nvs}
+											activeLine={line}
+											dirty={dirty}
+											pendingRefresh={pendingRefresh}
+											busy={busy}
+											speakerNames={opening.speakerNames}
+											customMarks={opening.settings.customMarks}
+											expression={expression}
+											onSelectLine={selectSentenceLine}
+											onUpdateLine={updateSentence}
+											onChangeExpression={changeExpression}
+											onSave={() => void run(save)}
+											onDiscard={discard}
+											onUndo={undo}
 										/>
-									</div>
-									<ScriptEditor
-										readOnly={busy}
-										autoFocus={!chapter?.markSuggestions.length}
-										value={draft}
-										onChange={setDraft}
-										onLine={setLine}
-										position={position}
-										insert={insert}
-										onUndo={undo}
-									/>
+									)}
 								</section>
 								{source && (
 									<section className="editor-panel editor-source-panel">
@@ -805,6 +926,10 @@ export function EditorPage() {
 										</ScrollArea>
 									</section>
 								)}
+							</div>
+						)}
+						{scene && (
+							<div className="editor-auxiliary">
 								<EditorPanels
 									workId={id}
 									chapterId={chapterId}
@@ -836,152 +961,159 @@ export function EditorPage() {
 										)
 									}
 								/>
-								<dialog
-									ref={rewriteDialog}
-									className="editor-dialog"
-									aria-label={t('让 Agent 重写本场景')}
-									onClose={closeRewrite}
-								>
-									<ScrollArea
-										className="editor-dialog-scroll"
-										viewportStyle={{
-											maxHeight: 'calc(100vh - var(--space-7) * 2 - 2px)',
-										}}
-									>
-										<div className="editor-dialog-body">
-											<header className="editor-dialog-head">
-												<h2>{t('让 Agent 重写本场景')}</h2>
-												<button
-													type="button"
-													className="editor-icon-button editor-icon-button-small"
-													aria-label={t('关闭')}
-													title={t('关闭')}
-													onClick={closeRewrite}
-												>
-													<X aria-hidden="true" size={16} strokeWidth={1.8} />
-												</button>
-											</header>
-											<form
-												className="editor-rewrite-form"
-												onSubmit={(event) => {
-													event.preventDefault()
-													void run(async () => {
-														if (!target) return
-														const request = ++rewriteRequest.current
-														const value = await window.novelive.call(
-															'editor.rewriteScene',
-															{
-																workId: id,
-																chapterId,
-																sceneId: scene.sceneId,
-																expectedRevision: target.expectedRevision,
-																instruction,
-																sourceIds: scene.sourceIds,
-															},
-														).promise
-														if (request !== rewriteRequest.current) return
-														setProposal(value)
-														setSelected(value.hunks.map((hunk) => hunk.id))
-													})
-												}}
-											>
-												{error && rewriting && alert}
-												<div className="editor-rewrite-input">
-													<textarea
-														ref={rewriteInput}
-														className="nl-scroll-hidden"
-														aria-label={t('重写要求')}
-														value={instruction}
-														rows={3}
-														onChange={(event) =>
-															setInstruction(event.target.value)
-														}
-														placeholder={t('例如：节奏更快，保留所有演出指令')}
-													/>
-													<OverlayScrollbar targetRef={rewriteInput} />
-												</div>
-												<button
-													type="submit"
-													className="editor-button editor-button-primary"
-													disabled={!instruction.trim() || dirty || busy}
-												>
-													<WandSparkles
-														aria-hidden="true"
-														size={16}
-														strokeWidth={1.8}
-													/>
-													{t('重写场景')}
-												</button>
-											</form>
-											{proposal && (
-												<section
-													className="editor-diffs"
-													aria-label={t('重写差异')}
-												>
-													<h3 className="editor-label">{t('差异列表')}</h3>
-													<ScrollArea className="editor-diff">
-														{proposal.hunks.map((hunk) => (
-															<label className="editor-hunk" key={hunk.id}>
-																<input
-																	type="checkbox"
-																	checked={selected.includes(hunk.id)}
-																	onChange={(event) =>
-																		setSelected((value) =>
-																			event.target.checked
-																				? [...value, hunk.id]
-																				: value.filter((id) => id !== hunk.id),
-																		)
-																	}
-																/>
-																<span className="editor-hunk-id">
-																	{hunk.id}
-																</span>
-																<del>{hunk.before.join('\n')}</del>
-																<ins>{hunk.after.join('\n')}</ins>
-															</label>
-														))}
-													</ScrollArea>
-													<footer className="editor-dialog-foot">
-														<button
-															type="button"
-															className="editor-button editor-button-ghost"
-															onClick={closeRewrite}
-														>
-															{t('取消重写')}
-														</button>
-														<button
-															type="button"
-															className="editor-button editor-button-primary"
-															disabled={!selected.length || dirty || busy}
-															onClick={() =>
-																void run(async () => {
-																	accept(
-																		await window.novelive.call(
-																			'editor.applyRewrite',
-																			{
-																				workId: id,
-																				chapterId,
-																				sceneId: proposal.sceneId,
-																				expectedRevision:
-																					proposal.expectedRevision,
-																				proposalId: proposal.proposalId,
-																				hunkIds: selected,
-																			},
-																		).promise,
-																	)
-																	setRewriteOpen(false)
-																})
-															}
-														>
-															{t('应用勾选差异')}
-														</button>
-													</footer>
-												</section>
-											)}
-										</div>
-									</ScrollArea>
-								</dialog>
 							</div>
+						)}
+						{scene && (
+							<dialog
+								ref={rewriteDialog}
+								className="editor-dialog"
+								aria-label={t('让 Agent 重写本场景')}
+								onClose={closeRewrite}
+							>
+								<ScrollArea
+									className="editor-dialog-scroll"
+									viewportStyle={{
+										maxHeight: 'calc(100vh - var(--space-7) * 2 - 2px)',
+									}}
+								>
+									<div className="editor-dialog-body">
+										<header className="editor-dialog-head">
+											<h2>{t('让 Agent 重写本场景')}</h2>
+											<button
+												type="button"
+												className="editor-icon-button editor-icon-button-small"
+												aria-label={t('关闭')}
+												title={t('关闭')}
+												onClick={closeRewrite}
+											>
+												<X aria-hidden="true" size={16} strokeWidth={1.8} />
+											</button>
+										</header>
+										<form
+											className="editor-rewrite-form"
+											onSubmit={(event) => {
+												event.preventDefault()
+												void run(async () => {
+													if (!target) return
+													const request = ++rewriteRequest.current
+													const value = await window.novelive.call(
+														'editor.rewriteScene',
+														{
+															workId: id,
+															chapterId,
+															sceneId: scene.sceneId,
+															expectedRevision: target.expectedRevision,
+															instruction,
+															sourceIds: scene.sourceIds,
+														},
+													).promise
+													if (request !== rewriteRequest.current) return
+													setProposal(value)
+													setSelected(value.hunks.map((hunk) => hunk.id))
+												})
+											}}
+										>
+											{error && rewriting && alert}
+											<div className="editor-rewrite-input">
+												<textarea
+													ref={rewriteInput}
+													className="nl-scroll-hidden"
+													aria-label={t('重写要求')}
+													value={instruction}
+													rows={3}
+													onChange={(event) =>
+														setInstruction(event.target.value)
+													}
+													placeholder={t('例如：节奏更快，保留所有演出指令')}
+												/>
+												<OverlayScrollbar targetRef={rewriteInput} />
+											</div>
+											<button
+												type="submit"
+												className="editor-button editor-button-primary"
+												disabled={!instruction.trim() || dirty || busy}
+											>
+												<WandSparkles
+													aria-hidden="true"
+													size={16}
+													strokeWidth={1.8}
+												/>
+												{t('重写场景')}
+											</button>
+										</form>
+										{proposal && (
+											<section
+												className="editor-diffs"
+												aria-label={t('重写差异')}
+											>
+												<h3 className="editor-label">{t('差异列表')}</h3>
+												<ScrollArea className="editor-diff">
+													{proposal.hunks.map((hunk) => (
+														<label className="editor-hunk" key={hunk.id}>
+															<input
+																type="checkbox"
+																checked={selected.includes(hunk.id)}
+																onChange={(event) =>
+																	setSelected((value) =>
+																		event.target.checked
+																			? [...value, hunk.id]
+																			: value.filter((id) => id !== hunk.id),
+																	)
+																}
+															/>
+															<span className="editor-hunk-id">{hunk.id}</span>
+															<del>{hunk.before.join('\n')}</del>
+															<ins>{hunk.after.join('\n')}</ins>
+														</label>
+													))}
+												</ScrollArea>
+												<footer className="editor-dialog-foot">
+													<button
+														type="button"
+														className="editor-button editor-button-ghost"
+														onClick={closeRewrite}
+													>
+														{t('取消重写')}
+													</button>
+													<button
+														type="button"
+														className="editor-button editor-button-primary"
+														disabled={!selected.length || dirty || busy}
+														onClick={() =>
+															void run(async () => {
+																const applied = await window.novelive.call(
+																	'editor.applyRewrite',
+																	{
+																		workId: id,
+																		chapterId,
+																		sceneId: proposal.sceneId,
+																		expectedRevision: proposal.expectedRevision,
+																		proposalId: proposal.proposalId,
+																		hunkIds: selected,
+																	},
+																).promise
+																const fresh = await window.novelive.call(
+																	'editor.snapshot',
+																	{
+																		workId: id,
+																		chapterId,
+																		editorId: opening?.editorId,
+																	},
+																).promise
+																setUndoLines(fresh.undoLines)
+																accept(applied)
+																setRewriteOpen(false)
+															})
+														}
+													>
+														{t('应用勾选差异')}
+													</button>
+												</footer>
+											</section>
+										)}
+									</div>
+								</ScrollArea>
+							</dialog>
 						)}
 					</>
 				)}

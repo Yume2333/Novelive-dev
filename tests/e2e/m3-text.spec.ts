@@ -266,7 +266,9 @@ test('M3 text typography: page clip boundary keeps every rendered line whole, in
 		})
 		try {
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await app.evaluate(({ dialog }, path) => {
 				dialog.showOpenDialog = async () => ({
 					canceled: false,

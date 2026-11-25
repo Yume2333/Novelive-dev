@@ -56,5 +56,7 @@
 	"选择主视觉": "Choose main visual",
 	"部分较早的运行记录已不可用。": "Some earlier run log entries are no longer available.",
 	"重试": "Retry",
-	"需要处理": "Needs processing"
+	"需要处理": "Needs processing",
+	"{{series}} · 第 {{index}} 卷": "{{series}} · Vol. {{index}}",
+	"第 {{index}} 卷 · {{volume}} · 共 {{length}} 章": "Vol. {{index}} · {{volume}} · {{length}} chapters"
 }
