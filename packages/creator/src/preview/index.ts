@@ -124,6 +124,7 @@ export async function previewBook(
 	options: {
 		connection: TextConnection
 		language: string
+		preserveSourceWording?: boolean
 		signal?: AbortSignal
 		fetch?: typeof globalThis.fetch
 	},
@@ -165,7 +166,9 @@ export async function previewBook(
 				if (attempt === 1) throw error
 				messages.push({
 					role: 'user',
-					content: `Repair JSON: ${String(error).slice(0, 64)}`,
+					content: options.preserveSourceWording
+						? `Repair JSON (keep exact keys summary, characters, locations, timelineNotes as string[], foreshadowingHints as string[]): ${String(error).slice(0, 240)}`
+						: `Repair JSON: ${String(error).slice(0, 64)}`,
 					timestamp: 0,
 				})
 			}
@@ -183,6 +186,9 @@ export async function previewBook(
 			const inputFingerprint = fingerprint({
 				paragraphs: chapter.paragraphs,
 				language: options.language,
+				...(options.preserveSourceWording
+					? { preserveSourceWording: true }
+					: {}),
 			})
 			let preview = await existing(() => project.read(file))
 			if (
@@ -195,7 +201,7 @@ export async function previewBook(
 				for (const segment of splitChapter(chapter.paragraphs, budget)) {
 					parts.push(
 						(await request(
-							`Preview fiction in ${options.language}. Return JSON with summary, characters and locations (arrays of {name, description}), timelineNotes and foreshadowingHints (string arrays). Report only visible unexplained hooks, not narrator predictions.\nPrevious ending: ${previous}\nText:\n${segment}`,
+							`Preview fiction in ${options.language}. Return JSON with summary, characters and locations (arrays of {name, description}), timelineNotes and foreshadowingHints (string arrays). Report only visible unexplained hooks, not narrator predictions.${options.preserveSourceWording ? ' Keep characters concise: list active on-stage characters, immediate family/spouses, and named recurring allies/antagonists/officials with short role descriptions and any alternate/short names or titles used in the text; omit one-line background guests and non-acting historical mentions. List named settlements, landmarks, and primary venues in locations with exact names and alternate/short forms. For timelineNotes, emit 1-2 plain-text string items (main plot climax first, preferring decisive plot action over dialogue/monologue), each quoting contiguous turning-point sentence(s) verbatim from the text without ellipsis splicing and with only its direct actors (substituting canonical full names for pronouns or bare titles, keeping the immediate trigger clause and omitting bystander clauses or commentary). In foreshadowingHints, emit plain-text string items quoting the exact unresolved clue phrase verbatim and retaining distinctive specialized, architectural, occult/medical, or technical terms.' : ''}\nPrevious ending: ${previous}\nText:\n${segment}`,
 							false,
 						)) as Details,
 					)

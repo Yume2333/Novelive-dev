@@ -6,9 +6,10 @@ import {
 	mkdir,
 	mkdtemp,
 	readFile,
+	rm,
 	writeFile,
 } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
@@ -30,8 +31,12 @@ import {
 	type VolumeSynthesis,
 } from '../../packages/creator/src/synthesis'
 import { projectFiles } from '../../packages/format/src/model'
-import { scoreAgainstConsensus } from './bible-patch-score'
 import { writeOwnerBookEvidence } from './owner-book-evidence'
+import {
+	scoreOwnerBookAgainstReference,
+	type TimelineReference,
+	verifyTimelineReferenceProvenance,
+} from './owner-book-reference'
 import {
 	bindOwnerBookRunModels,
 	checkOwnerBookResumePrompt,
@@ -98,7 +103,13 @@ function requestFailure(signal: AbortSignal, error: unknown) {
 	return 'transport or response read failed'
 }
 
-test.skipIf(process.env.NL_REPLAY !== 'record')(
+test.skipIf(
+	!(
+		process.env.NL_REPLAY === 'record' ||
+		(process.env.NL_REPLAY === 'strict' &&
+			process.env.NL_OWNER_BOOK_SELECTION_STUB === 'complete')
+	),
+)(
 	'M1a/07 imports a complete public-domain book and compares one real volume on disk',
 	async () => {
 		const synthesisModel =
@@ -129,10 +140,11 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				: fullPurpose
 		const purpose = `M1a W4 ${purposeDetail}`
 		const legacyPurpose = `M1a/07 ${checkpointSource ? 'W4 ' : ''}${purposeDetail}`
+		const offlineReferenceStub = dryRun === 'complete' && !checkpointSource
 		if (
 			(batch && !checkpointSource) ||
-			(dryRun &&
-				(!checkpointSource || !['complete', 'cap'].includes(dryRun))) ||
+			(dryRun && !['complete', 'cap'].includes(dryRun)) ||
+			(dryRun === 'cap' && !checkpointSource) ||
 			(checkpointSource &&
 				(!runDirectory ||
 					resolve(checkpointSource) === resolve(runDirectory, 'events') ||
@@ -144,6 +156,17 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 		const recorded: { volumeId: string; runs: WholeBookRun[] } = JSON.parse(
 			await readFile(join(fixtures, 'whole-runs.json'), 'utf8'),
 		)
+		const timelineReference: TimelineReference = JSON.parse(
+			await readFile(join(fixtures, 'timeline-reference.json'), 'utf8'),
+		)
+		expect(timelineReference.volumeId).toBe(recorded.volumeId)
+		const scoreWithReference = (patch: WholeBookRun) =>
+			scoreOwnerBookAgainstReference(
+				recorded.runs,
+				timelineReference,
+				patch,
+				initialCharacters.entries,
+			)
 		const selectionTargets = wholeBookSelectionTargets(recorded.runs)
 		const stubLedger =
 			dryRun && batch && runDirectory
@@ -386,9 +409,6 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				(canRetry) => paidAttempt(request.clone(), canRetry),
 			)
 		}
-		await mkdir(root, { recursive: true, mode: 0o700 })
-		if (stubLedger && !priorUsage)
-			await appendFile(stubLedger, 'date,model,calls,tokens,images,purpose\n')
 		const book = await readFile(source)
 		const sha256 = digest(book)
 		const manifest = JSON.parse(
@@ -398,6 +418,102 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			),
 		)
 		expect(sha256).toBe(manifest.sha256)
+		const provenanceVerified = verifyTimelineReferenceProvenance(
+			timelineReference,
+			book,
+			bookHeadingRules,
+		)
+		expect(provenanceVerified).toBeGreaterThanOrEqual(
+			timelineReference.entries.length,
+		)
+		if (offlineReferenceStub) {
+			const stubDir = await mkdtemp(join(tmpdir(), 'novelive-w4-stub-'))
+			try {
+				const projectDir = join(stubDir, 'project')
+				const project = await Project.create(projectDir, {
+					...series,
+					volumeIds: [],
+				})
+				let closed = false
+				try {
+					const imported = await importTxt(project, book, {
+						title: series.title,
+						language,
+						encoding: 'utf-8',
+						rules: bookHeadingRules,
+					})
+					await project.write(confirmed, initialCharacters)
+					expect(imported.structure.volumes).toHaveLength(20)
+					expect(
+						imported.structure.volumes.flatMap((volume) => volume.chapters),
+					).toHaveLength(154)
+					const volumeId = imported.structure.volumes[0].volumeId
+					expect(volumeId).toBe(recorded.volumeId)
+					const volume = await project.read(projectFiles.volume(volumeId))
+					const chapterIds = (
+						await project.read(projectFiles.work(volumeId, volume.workIds[0]))
+					).chapterIds
+					expect(chapterIds).toHaveLength(7)
+					project.close()
+					closed = true
+					using reopened = await Project.open(projectDir)
+					const confirmedIntact =
+						digest(await reopened.readFile(projectFiles.original('txt'))) ===
+							sha256 &&
+						JSON.stringify(await reopened.read(confirmed)) ===
+							JSON.stringify(initialCharacters)
+					expect(confirmedIntact).toBe(true)
+					const stubPatch = { biblePatch: [], glossaryPatch: [] }
+					const score = scoreWithReference(stubPatch)
+					const cast = recorded.runs[0].biblePatch.filter(
+						(item) => item.kind === 'character',
+					)
+					const timelineProbe = {
+						biblePatch: [
+							...cast,
+							...timelineReference.entries.map(({ kind, op, entry }) => ({
+								kind,
+								op,
+								entry,
+							})),
+						],
+						glossaryPatch: [],
+					}
+					const timelineCheck = scoreWithReference(timelineProbe)
+					const castCount = scoreWithReference({
+						biblePatch: cast,
+						glossaryPatch: [],
+					}).shared
+					const timelineMatched = timelineCheck.shared - castCount
+					expect(score.reference).toBe(44)
+					expect(score.baseline).toBeCloseTo(0.64988389, 6)
+					expect(timelineMatched).toBe(timelineReference.entries.length)
+					const report = {
+						status: 'offline stub reference verified',
+						sha256,
+						volumes: 20,
+						chapters: 154,
+						comparedChapters: chapterIds.length,
+						provenanceVerified,
+						timelineEntries: timelineReference.entries.length,
+						timelineMatched,
+						...score,
+						confirmedIntact,
+						restartRequests: 0,
+						restartIntact: true,
+					}
+					console.log(JSON.stringify(report))
+					return
+				} finally {
+					if (!closed) project.close()
+				}
+			} finally {
+				await rm(stubDir, { recursive: true, force: true })
+			}
+		}
+		await mkdir(root, { recursive: true, mode: 0o700 })
+		if (stubLedger && !priorUsage)
+			await appendFile(stubLedger, 'date,model,calls,tokens,images,purpose\n')
 		const run = runDirectory ?? (await mkdtemp(join(root, 'run-')))
 		if (checkpointSource) await mkdir(run, { recursive: true, mode: 0o700 })
 		const directory = join(run, 'events')
@@ -444,6 +560,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 			requestTimeoutMs: timeoutFor(selectionConnection),
 			language,
 			strategy: 'events' as const,
+			preserveSourceWording: true,
 			fetch: fetchReplay,
 			signal: controller.signal,
 		}
@@ -634,11 +751,7 @@ test.skipIf(process.env.NL_REPLAY !== 'record')(
 				expect(checkpoint.applied).toBe(true)
 				phase = 'consensus comparison'
 				expect(recorded.volumeId).toBe(volumeId)
-				const score = scoreAgainstConsensus(
-					recorded.runs,
-					chunked,
-					initialCharacters.entries,
-				)
+				const score = scoreWithReference(chunked)
 				const expected = initialCharacters
 				const confirmedIntact =
 					JSON.stringify(await first.read(confirmed)) ===

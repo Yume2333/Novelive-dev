@@ -23,17 +23,25 @@ export function reconcileNamedAdditions(
 	for (const kind of ['character', 'location'] as const) {
 		const protectedIds = new Set(bible[kind].map(({ id }) => id))
 		for (const item of patch)
-			if (item.kind === kind && item.op !== 'add')
+			if (item.kind === kind && (item.op === 'delete' || item.op === 'none'))
 				protectedIds.add(item.entry.id)
 		const idsByName = new Map<string, Set<string>>()
 		const namesById = new Map<string, Set<string>>()
 		const explicitNames = new Map<string, Set<string>>()
 		const signals = new Map<string, Set<string>>()
+		const labelsById = new Map<string, Set<string>>()
+		const rawLabelsById = new Map<string, string[]>()
+		const firstEntryById = new Map<
+			string,
+			{ name: string; originalName?: string }
+		>()
 		for (const item of patch) {
 			if (item.kind !== kind || item.op !== 'add') continue
 			const { id, name, originalName } = item.entry
 			const key = nameKey(name)
 			if (!key) continue
+			if (!firstEntryById.has(id))
+				firstEntryById.set(id, { name, originalName })
 			const ids = idsByName.get(key) ?? new Set<string>()
 			ids.add(id)
 			idsByName.set(key, ids)
@@ -45,14 +53,31 @@ export function reconcileNamedAdditions(
 				originals.add(nameKey(originalName))
 				explicitNames.set(key, originals)
 			}
+			const allLabels = labelsById.get(id) ?? new Set<string>()
+			allLabels.add(key)
+			const rawLabels = rawLabelsById.get(id) ?? []
+			rawLabels.push(name)
+			if (originalName && nameKey(originalName)) {
+				allLabels.add(nameKey(originalName))
+				rawLabels.push(originalName)
+			}
 			const evidence = signals.get(id) ?? new Set<string>()
-			for (const alias of [
-				originalName,
-				...(item.kind === 'character' ? item.entry.aliases : []),
-			]) {
+			const aliases =
+				'aliases' in item.entry && Array.isArray(item.entry.aliases)
+					? item.entry.aliases.filter(
+							(alias): alias is string => typeof alias === 'string',
+						)
+					: []
+			for (const alias of [originalName, ...aliases]) {
 				const label = alias && nameKey(alias)
+				if (label) {
+					allLabels.add(label)
+					if (alias) rawLabels.push(alias)
+				}
 				if (label && label !== key) evidence.add(`alias:${label}`)
 			}
+			labelsById.set(id, allLabels)
+			rawLabelsById.set(id, rawLabels)
 			const description =
 				item.kind === 'location'
 					? item.entry.description
@@ -80,18 +105,108 @@ export function reconcileNamedAdditions(
 					))
 			)
 				continue
-			for (const alias of ids.slice(1)) remap[kind].set(alias, ids[0])
+			for (const alias of ids.slice(1)) {
+				remap[kind].set(alias, ids[0])
+				const targetLabels = labelsById.get(ids[0])
+				for (const label of labelsById.get(alias) ?? [])
+					targetLabels?.add(label)
+				rawLabelsById.get(ids[0])?.push(...(rawLabelsById.get(alias) ?? []))
+			}
+		}
+		const labelOwners = new Map<string, Set<string>>()
+		for (const [id, labels] of labelsById) {
+			if (remap[kind].has(id)) continue
+			for (const label of labels) {
+				const owners = labelOwners.get(label) ?? new Set<string>()
+				owners.add(id)
+				labelOwners.set(label, owners)
+			}
+		}
+		const sharesChar = (a: string, b: string) =>
+			[...a].some((char) => b.includes(char))
+		const orderedIds = [...firstEntryById.keys()]
+		for (let i = 0; i < orderedIds.length; i++) {
+			const id = orderedIds[i]
+			if (
+				remap[kind].has(id) ||
+				protectedIds.has(id) ||
+				namesById.get(id)?.size !== 1
+			)
+				continue
+			const base = firstEntryById.get(id)
+			const baseLabels = labelsById.get(id)
+			if (!base || !baseLabels) continue
+			const baseKey = nameKey(base.name)
+			for (let j = i + 1; j < orderedIds.length; j++) {
+				const otherId = orderedIds[j]
+				if (
+					remap[kind].has(otherId) ||
+					protectedIds.has(otherId) ||
+					namesById.get(otherId)?.size !== 1
+				)
+					continue
+				const other = firstEntryById.get(otherId)
+				const otherLabels = labelsById.get(otherId)
+				if (!other || !otherLabels) continue
+				const otherKey = nameKey(other.name)
+				if (otherKey === baseKey) continue
+				const mutual = baseLabels.has(otherKey) && otherLabels.has(baseKey)
+				const uniqueOneWay =
+					sharesChar(baseKey, otherKey) &&
+					((baseLabels.has(otherKey) &&
+						labelOwners.get(otherKey)?.size === 2) ||
+						(otherLabels.has(baseKey) && labelOwners.get(baseKey)?.size === 2))
+				if (!mutual && !uniqueOneWay) continue
+				if (
+					base.originalName &&
+					other.originalName &&
+					nameKey(base.originalName) !== nameKey(other.originalName)
+				)
+					continue
+				if (
+					kind === 'character' &&
+					relations.some(
+						({ from, to }) =>
+							(from === id && to === otherId) ||
+							(from === otherId && to === id),
+					)
+				)
+					continue
+				remap[kind].set(otherId, id)
+				for (const label of otherLabels) baseLabels.add(label)
+				rawLabelsById.get(id)?.push(...(rawLabelsById.get(otherId) ?? []))
+			}
 		}
 	}
 	if (!remap.character.size && !remap.location.size) return patch
 	const character = (id: string) => remap.character.get(id) ?? id
+	const mergedAliases = new Map<string, string[]>()
+	for (const [aliasId, targetId] of remap.character) {
+		const extra = mergedAliases.get(targetId) ?? []
+		for (const item of patch) {
+			if (
+				item.kind !== 'character' ||
+				(item.op !== 'add' && item.op !== 'update')
+			)
+				continue
+			if (item.entry.id === aliasId || item.entry.id === targetId) {
+				extra.push(
+					item.entry.name,
+					...(item.entry.originalName ? [item.entry.originalName] : []),
+					...(item.entry.aliases ?? []),
+				)
+			}
+		}
+		mergedAliases.set(targetId, extra)
+	}
 	return patch.map((item) => {
 		const { entry } = item
 		switch (item.kind) {
 			case 'character': {
+				const targetId = character(entry.id)
 				const remapped = {
 					...item.entry,
-					id: character(entry.id),
+					id: targetId,
 					...(item.entry.addresses && {
 						addresses: item.entry.addresses.map((address) => ({
 							...address,
@@ -99,9 +214,15 @@ export function reconcileNamedAdditions(
 						})),
 					}),
 				}
-				return item.op === 'add'
-					? { ...item, entry: { ...remapped, aliases: item.entry.aliases } }
-					: { ...item, entry: remapped }
+				if (item.op !== 'add') return { ...item, entry: remapped }
+				const extra = mergedAliases.get(targetId)
+				const aliases = extra
+					? [...new Set([...item.entry.aliases, ...extra])].filter(
+							(label) =>
+								nameKey(label) && nameKey(label) !== nameKey(item.entry.name),
+						)
+					: item.entry.aliases
+				return { ...item, entry: { ...remapped, aliases } }
 			}
 			case 'location':
 				return {

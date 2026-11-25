@@ -1,0 +1,196 @@
+{
+	"formatVersion": 1,
+	"volumeId": "v0001",
+	"volumeTitle": "第一卷 奮字卷之一",
+	"source": {
+		"title": "野叟曝言",
+		"indexOldid": 2523154,
+		"sourceUrl": "https://zh.wikisource.org/wiki/野叟曝言",
+		"bookSha256": "b8142265e2506899a6683be88fcd8d018a8050f7c42437160e34c7636475b2ad",
+		"chapters": 7
+	},
+	"entries": [
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0001",
+				"status": "candidate",
+				"chapterId": "ch0001",
+				"storyTime": "成化三年三月初二日",
+				"event": "文素臣擇於成化三年三月初二日起身，帶著小童奚囊，別了親友，竟望江西而來"
+			},
+			"provenance": [
+				{
+					"chapterIndex": 1,
+					"chapterId": "ch0001",
+					"paragraphIndex": 36,
+					"paragraphId": "p0037",
+					"paragraphOffset": 0,
+					"charOffset": 7204,
+					"charLength": 113,
+					"byteOffset": 21452,
+					"byteLength": 339,
+					"sha256": "f11f32e37b0c548cc7055a417fe6bb06d0c42690d140408498827fab16d2254f",
+					"anchor": "素臣擇於成化…望江西而來。"
+				}
+			]
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0002",
+				"status": "candidate",
+				"chapterId": "ch0002",
+				"storyTime": "抵杭次日入暮",
+				"event": "湖中水勢掀播，直欲接天，滿船啼哭，未淡然不知所為，文素臣急走出艙，跳上船頭，隨波逐流而去"
+			},
+			"provenance": [
+				{
+					"chapterIndex": 2,
+					"chapterId": "ch0002",
+					"paragraphIndex": 17,
+					"paragraphId": "p0018",
+					"paragraphOffset": 76,
+					"charOffset": 16805,
+					"charLength": 150,
+					"byteOffset": 50123,
+					"byteLength": 450,
+					"sha256": "d5b2ee5e8d487c04732b04a8b1d84af38227c9cb6e02c089455785a7c75e4cd9",
+					"anchor": "那湖中水勢掀…波逐流而去。"
+				}
+			]
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0003",
+				"status": "candidate",
+				"chapterId": "ch0003",
+				"storyTime": "當日入暮",
+				"event": "文素臣急拗柳枝射去直貫左目，復把柳條望右目戳去力拔出眼珠，又順勢一拗，尾上節骨居然脫筍"
+			},
+			"provenance": [
+				{
+					"chapterIndex": 3,
+					"chapterId": "ch0003",
+					"paragraphIndex": 3,
+					"paragraphId": "p0004",
+					"paragraphOffset": 866,
+					"charOffset": 20522,
+					"charLength": 258,
+					"byteOffset": 61218,
+					"byteLength": 774,
+					"sha256": "9a1709e7de65f893bc9992362fde79bd9cc0366d655459c624855d4b871c96a8",
+					"anchor": "急拗柳枝，如…，居然脫筍。"
+				}
+			]
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0004",
+				"status": "candidate",
+				"chapterId": "ch0004",
+				"storyTime": "夜間",
+				"event": "文素臣與未鸞吹在神前拜將下去，訂了兄妹之交"
+			},
+			"provenance": [
+				{
+					"chapterIndex": 4,
+					"chapterId": "ch0004",
+					"paragraphIndex": 4,
+					"paragraphId": "p0005",
+					"paragraphOffset": 86,
+					"charOffset": 29459,
+					"charLength": 21,
+					"byteOffset": 87939,
+					"byteLength": 63,
+					"sha256": "bbffa030e031620cfa43aca7f318abb80fa76948ec269b46b840469b2ec96e19",
+					"anchor": "兩人起身，便…了兄妹之交。"
+				}
+			]
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0005",
+				"status": "candidate",
+				"chapterId": "ch0005",
+				"storyTime": "半夜",
+				"event": "行曇口裡念咒拿符把蠟臺拖了下來，火燒袈裟落在松庵帳頂上，松庵亂嚷亂跌、行曇皮膚焦黑"
+			},
+			"provenance": [
+				{
+					"chapterIndex": 5,
+					"chapterId": "ch0005",
+					"paragraphIndex": 2,
+					"paragraphId": "p0003",
+					"paragraphOffset": 380,
+					"charOffset": 37294,
+					"charLength": 136,
+					"byteOffset": 111356,
+					"byteLength": 408,
+					"sha256": "6f8385418331640b9838143e7da77f9b0639322df0812cb4a8024faab442b46e",
+					"anchor": "那行曇口裡念…是皮膚焦黑。"
+				}
+			]
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0006",
+				"status": "candidate",
+				"chapterId": "ch0006",
+				"storyTime": "當夜",
+				"event": "劉大郎與石氏勸酒致文素臣酣然沉醉，石氏忙把璇姑推入房中，將門反扣而去"
+			},
+			"provenance": [
+				{
+					"chapterIndex": 6,
+					"chapterId": "ch0006",
+					"paragraphIndex": 14,
+					"paragraphId": "p0015",
+					"paragraphOffset": 411,
+					"charOffset": 52454,
+					"charLength": 527,
+					"byteOffset": 156672,
+					"byteLength": 1581,
+					"sha256": "05129b68d34196c4cc7dc6b0961d7abb5c626d9e1e873168774bfc4ac817a18d",
+					"anchor": "大郎這酒味雖…門反扣而去。"
+				}
+			]
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0007",
+				"status": "candidate",
+				"chapterId": "ch0007",
+				"storyTime": "第二天夜間",
+				"event": "文素臣一手把璇姑身子撫摸，忽覺那手如有所驚一般收縮不迭，把手抱住璇姑纖腰，將一腿屈入璇姑胯裡，交股而睡，絕不動彈了"
+			},
+			"provenance": [
+				{
+					"chapterIndex": 7,
+					"chapterId": "ch0007",
+					"paragraphIndex": 9,
+					"paragraphId": "p0010",
+					"paragraphOffset": 90,
+					"charOffset": 59983,
+					"charLength": 75,
+					"byteOffset": 179173,
+					"byteLength": 225,
+					"sha256": "043d5fb3852493be2a0244a1022a4961145e2e385e87d1356f963e82d4195fc5",
+					"anchor": "一手把璇姑身…絕不動彈了。"
+				}
+			]
+		}
+	]
+}

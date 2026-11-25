@@ -85,6 +85,13 @@ const selection = synthesisOutput(
 )
 const inclusionCriteria =
 	'Inclusion: keep plot-relevant supporting characters and recurring or consequential terms and locations. Omit incidental mentions.'
+const sourceWordingGuidance = `Source wording fidelity:
+- Character: keep named on-stage cast, immediate family/spouses, and named recurring allies/antagonists/officials; omit unnamed roles, non-human creatures, and one-line background guests who do not act. Include every short name, courtesy name, and title used in the previews in aliases so cross-chapter references resolve to one entry.
+- Timeline: emit strictly one primary turning-point timeline entry per chapter (never emit two timeline entries for the same chapterId, and do not overwrite a chapter climax with a minor scene), choosing the decisive plot action (not mere dialogue) from timelineNotes and copying its sentence(s) verbatim (substituting canonical full names only for pronouns or bare titles, without paraphrasing or adding commentary).
+- Foreshadowing: keep concise (1 short sentence) retaining the exact source clue phrase and why it remains unresolved.
+- Location: keep primary named settlements, landmarks, and scene venues with exact place names and all alternate/short names in aliases.
+- Relation: keep enduring family, marital, sworn, and master-servant relationships; write description strictly as the concise standing relationship kind (e.g. 母子關係, 夫妻關係, 兄妹關係, 義兄妹關係, 主僕關係, 師徒關係) with NO colon, explanation, or scene details, and set firstSeenChapter to when that tie first appears.
+- Glossary: extract distinctive specialized, ritual, architectural, technical, or cultural compound terms verbatim (preferring full named terms over shortened roots).`
 const checkpointSchema = obj({
 	...version,
 	fingerprint: str(),
@@ -143,6 +150,7 @@ export interface SynthesisOptions {
 	language: string
 	requirements?: string
 	strategy?: 'auto' | 'whole' | 'events'
+	preserveSourceWording?: boolean
 	maxEvents?: number
 	incremental?: boolean
 	scope?: ProjectScope
@@ -152,7 +160,6 @@ export interface SynthesisOptions {
 	signal?: AbortSignal
 	fetch?: typeof globalThis.fetch
 }
-
 const minimumEventLimit = 128
 const packetFormat = 7
 const selectionVersion = 12
@@ -508,6 +515,7 @@ export async function synthesizeVolume(
 		requirements: options.requirements,
 		strategy: mode,
 		incremental,
+		...(options.preserveSourceWording ? { preserveSourceWording: true } : {}),
 		...(options.scope ? { scope: options.scope } : {}),
 		...(options.previousDigests
 			? { previousDigests: options.previousDigests }
@@ -557,7 +565,17 @@ export async function synthesizeVolume(
 		4096,
 		Math.floor(model.contextWindow / 4),
 	)
-	const packetText = previews.map((preview) => JSON.stringify(preview))
+	const packetText = previews.map((preview) =>
+		options.preserveSourceWording
+			? JSON.stringify({
+					summary: preview.summary,
+					timelineNotes: preview.timelineNotes,
+					foreshadowingHints: preview.foreshadowingHints,
+					characters: preview.characters,
+					locations: preview.locations,
+				})
+			: JSON.stringify(preview),
+	)
 	const prefix = `Synthesize the ordered chapter previews in ${options.language}. Adaptation requirements: ${options.requirements ?? ''}.`
 	const instructions = `${prefix}
 Return JSON. Use stable IDs, real chapter IDs, and character IDs for relations. Mark main characters major and new entries candidate. Preserve confirmed facts; ${incremental ? 'never delete.' : 'delete only this volume’s mistaken candidates.'}
@@ -850,8 +868,13 @@ ${packets[packet]}`
 			extractionPrompt = prompt(extract, entries, history)
 			focusedPrompt = prompt(focus, entries, history)
 		}
+		const withGuidance = (text: string) => {
+			if (!options.preserveSourceWording) return text
+			const guided = `${eventPrompt}\n${sourceWordingGuidance}${text.slice(eventPrompt.length)}`
+			return bytes(guided) + bytes(repairPrefix) < budget ? guided : text
+		}
 		const event = await request(
-			extractionPrompt,
+			withGuidance(extractionPrompt),
 			nextEvent,
 			async (value: Event) => {
 				value.biblePatch = await validateStylePatch(project, value.biblePatch)
@@ -863,7 +886,7 @@ ${packets[packet]}`
 				if (value.is_last && packet === packets.length - 1)
 					combine(volumeId, chapterIds, [...state.events, value])
 			},
-			focusedPrompt,
+			withGuidance(focusedPrompt),
 		)
 		state.events.push(event)
 		if (event.is_last) state.packet++
@@ -999,7 +1022,7 @@ ${packets[packet]}`
 			return `${instructions}
 ${selection.instructions}
 Select from these canonical candidates across the whole volume. Compare evidence from early and late chapters. Observations are evidence about the same entry, not separate choices. Keep nothing if no candidate qualifies. Return keep as the numbers of the kept candidates.
-${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. Judge inclusion before counting. Cover distinct plot threads across the volume, not each stage of the same incident. ${guidance} Do not stop at the target if a distinct candidate still meets the inclusion criteria. You may exceed a kind's target only with a justification. In justifications, give each over-target kind and what distinct facts the extra entries preserve.\n` : ''}Respond with only the JSON object, with no commentary before or after it.
+${targets.length ? `Soft size targets for kept candidates (not quotas): ${targets.join(', ')}. Judge inclusion before counting. Cover distinct plot threads across the volume, not each stage of the same incident. ${guidance} Do not stop at the target if a distinct candidate still meets the inclusion criteria. You may exceed a kind's target only with a justification. In justifications, give each over-target kind and what distinct facts the extra entries preserve.\n` : ''}${options.preserveSourceWording ? "Strict volume-level pruning: aim close to each kind's soft target without over-pruning active cast or adding peripheral mentions. For character: keep active on-stage cast, immediate family/spouses, and named recurring or consequential allies/antagonists/officials/retainers; omit deceased backstory ancestors, unnamed roles, non-human creatures, one-line cameos, and peripheral banquet guests who do not act. For location: keep named origin/home settlements, primary landmarks, and major scene venues, omitting interior sub-rooms and passing geographical mentions. For relation: keep one core enduring family, marital, sworn, or master-servant tie per character pair (preferring the defining enduring tie over an earlier transient encounter), omitting one-scene disputes or minor background links. For timeline: keep strictly one primary turning-point entry per chapter (the chapter's decisive plot climax). For foreshadowing: keep only major unresolved plot mysteries with explicit clues. For glossary: keep only distinctive specialized, occult/medical, architectural, ritual, or technical compound terms central to plot events, preferring full compound terms over shortened roots and omitting generic ranks, offices, and broad category nouns.\n" : ''}Respond with only the JSON object, with no commentary before or after it.
 Chapter progress:
 ${progress}
 Candidates:
@@ -1042,8 +1065,13 @@ ${scopes.flatMap(({ lines }) => lines).join('\n')}`
 		)
 		const targeted = numbered.some(({ target }) => target !== undefined)
 		const plan = hash(
-			targeted || selector.id !== model.id
-				? [targeted ? targetedSelectionVersion : 0, selector.id, ranges]
+			targeted || selector.id !== model.id || options.preserveSourceWording
+				? [
+						targeted ? targetedSelectionVersion : 0,
+						selector.id,
+						ranges,
+						...(options.preserveSourceWording ? ['preserveSourceWording'] : []),
+					]
 				: ranges,
 		)
 		const previousSameModelPlan =

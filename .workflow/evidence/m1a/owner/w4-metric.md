@@ -38,3 +38,44 @@
 两次没进参照的独立整卷归一后都超过 1.0，所以这个口径能让一次正常的整卷结果通过；修复前的分块结果仍然不通过。
 
 重跑耗费（私有账本 `usage.csv`）：`gemini-3.8-flash` 5 次，79,068 tokens，0 张图；其中 1 次 12,286 tokens 的运行复用了旧检查点，没产生条目，不计入比较。
+
+## 固定整卷时间线零共识根因（2026-11-25 核查）
+
+`whole-runs.json` 中三次整卷输出各自包含 7 条时间线（`ch0001`–`ch0007`），但在现行评分器 `tests/acceptance/bible-patch-score.ts`（不改动逻辑）下 `consensus` 产生 **0 条**时间线共识，原因有二：
+
+1. **参与角色集与数量要求严格一致**：`sameEntry` 对 `timeline` 要求 `a.participants.length > 0`、与 `b.participants.length` 相等且一一重叠；`mentioned()` 仅识别 `event` 文本中出现的角色名/别名子串（长度 > 1）。例如 `ch0001` 第 1 次写「水夫人」（3 人）而第 2、3 次写「母親／受母命」（2 人）；`ch0002` 第 2 次提「和光」（3 人）而第 1、3 次未提（2 人）；`ch0003` 第 2 次未提「老陶」（2 人）而第 1、3 次提及（3 人）；`ch0005` 三次提及角色组合分别为 `{文素臣, 行曇, 松庵, 劉大}`（4）、`{文素臣, 未淡然, 劉大}`（3）、`{文素臣, 行曇, 未淡然, 松庵}`（4）。
+2. **去角色名后的动作双字组 Jaccard 门槛极高（≥ 0.65）**：`timelineAction` 先从规范化 `event` 中剥离已识别角色名，再用 `sameTimelineAction` 要求字符双字组（bigram）Jaccard 相似度 `shared / (left.size + right.size - shared) >= 0.65`。三次整卷各自以一句自由改写概括全回情节，实测 `ch0001`–`ch0007` 全部 21 对两两比较的 Jaccard 仅为 **0.0000–0.2222**（最高为 `ch0006` 第 1、2 次的 `8/36 = 0.2222`），远低于 `0.65`。
+
+结果：三次整卷的时间线在共识中全部落空（参照仅 37 条非时间线条目），而每次整卷自身的 7 条时间线仍计入 `leaveOneOut` 分母（`50 / 59 / 50`），却无法计入分子或其余两次共识，使原留一基线被压低至 `0.64988`：
+
+- 折 0（Run 0 vs Consensus(1,2)）：`2 * 27 / (50 + 28) = 54 / 78 = 0.692308`
+- 折 1（Run 1 vs Consensus(0,2)）：`2 * 27 / (59 + 30) = 54 / 89 = 0.606742`
+- 折 2（Run 2 vs Consensus(0,1)）：`2 * 27 / (50 + 33) = 54 / 83 = 0.650602`
+- 平均基线：`(0.692308 + 0.606742 + 0.650602) / 3 = 0.649884`
+
+## 重建时间线参照与诚实留一基线（2026-11-25）
+
+按所有者批准方案（不改 `tests/acceptance/bible-patch-score.ts` 评分逻辑，不降 `0.90` 归一化门槛），从公版《野叟曝言》（维基文库 `oldid=2523154`，首卷「奮字卷之一」第 1–7 回）原书段落重建 7 条贴近原文措辞的时间线参照，存为 [`tests/fixtures/m1a-owner-book/timeline-reference.json`](../../../../tests/fixtures/m1a-owner-book/timeline-reference.json)。仓库仅保存脱敏出处指针（`chapterIndex`、`chapterId`、`paragraphIndex`、`paragraphId`、`paragraphOffset`、`charOffset`、`charLength`、`byteOffset`、`byteLength`、`sha256` 及极短锚点 `anchor`），不入库原书整段正文；本地持有私有文本时由 `verifyTimelineReferenceProvenance` 逐条校验 SHA-256 与偏移。
+
+初版实现 `mergeTimelineReference` 曾将三次整卷运行的 `timeline` 覆写为参照条目（使其在留一折中免费获得 7/7 时间线匹配并将基线抬高至 `0.754630`）。现改为诚实口径 `scoreOwnerBookAgainstReference`（`tests/acceptance/owner-book-reference.ts`）：
+
+- `whole-runs.json` 三次整卷保留各自真实输出的全部条目；其留一基线维持真实的 `0.649884`（折 0 `0.692308`、折 1 `0.606742`、折 2 `0.650602`）。
+- 评估参照 `buildOwnerBookReference` 为 `extractConsensusReference` 提取的 37 条非时间线多数共识加上 `timeline-reference.json` 的 7 条原书核验时间线，共 **44 条**。
+- `whole-runs.json` 三次整卷不经覆写直接对照该 44 条参照：Run 0 得 **36/44**（原始 F1 `0.765957`，归一 `1.1786`）、Run 1 得 **34/44**（原始 F1 `0.660194`，归一 `1.0159`）、Run 2 得 **31/44**（原始 F1 `0.659574`，归一 `1.0149`），三次真实整卷输出均过 `≥ 0.90`。
+- 归一化 `≥ 0.90` 门槛对应的原始 F1 下限：`0.90 × 0.649884 ≈ 0.584896`。
+
+## 2026-11-25 实跑结果与最终通过（`run-2026-11-25-v5`）
+
+在未改动 `tests/acceptance/bible-patch-score.ts` 与 `0.90` 归一化门槛、且全部通过 `confirmedIntact: true`、`restartRequests: 0`、`restartIntact: true` 核验下，各轮付费实跑与最终通过结果如下：
+
+| 运行 | 条目数 | 匹配 | 漏报 | 多报 | 原始 F1 | 归一（诚实基线 0.64988） | 说明 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 首次实跑（`run-2026-11-24`，7 包 / 28 事件） | 52 | 22 | 22 | 30 | 0.458333 | **0.705254** | 未通过；含旧版自由改写时间线与多章关系清空描述 |
+| `run-2026-11-25`（12 包 / 75 事件） | 52 | 22 | 22 | 30 | 0.458333 | **0.705254** | 未通过；75 事件全量池理论上限 28/28，但挑选过度纳入次要人物与场景 |
+| `run-2026-11-25-sel1`（复用 75 事件） | 56 | 25 | 19 | 31 | 0.500000 | **0.769368** | 未通过；地点升至 `4/5`、关系 `1/5`，时间线 `0/7` |
+| `run-2026-11-25-v3`（`preserveSourceWording`） | 78 | 29 | 15 | 49 | 0.475410 | **0.731530** | 未通过；`v3-sel1` 升至 `0.769368`（24/52），跨包别名合并受 `protectedIds` 阻塞 |
+| `run-2026-11-25-v4`（6 包 / 16 事件） | 46 | 25 | 19 | 21 | 0.555556 | **0.854854** | 未通过；修复 `consolidate.ts` 别名归并与分包，时间线升至 `2/8`、地点 `4/5`、术语 `3/4`，但关系附加长句且人物过裁（16/23） |
+| **最终通过（`run-2026-11-25-v5`，5 包 / 11 事件）** | **52** | **29** | **15** | **23** | **0.604167** | **0.929653** | **通过（≥ 0.90）**；关系回归简短常驻类别（4/7）、地点 **5/5**、人物 **18/23**、术语 **2/4**；已发布 `chunked-run.json` 与 `w4-consensus.json` |
+
+- **通过运行明细（`run-2026-11-25-v5`）**：全卷空目录端到端运行（`NL_REPLAY=record`），`previewCalls: 8`、`synthesisCalls: 12`、总计 **20 次调用 / 200,949 实测 tokens / 0 张图 / 0 预留**；`confirmedIntact: true`、`restartRequests: 0`、`restartIntact: true`。严格离线门禁 `tests/unit/m1a-w4-gate.test.ts` 4/4 全通过（0 跳过）。
+- **窗口累计用量**（`~/novelive-private/usage-w4.csv` 与 `.workflow/evidence/m1a/owner/w4-run-usage.csv`）：累计 **256 次调用、2,513,130 tokens、0 张图**（实测 241 次 `2,269,588` tokens；15 次保守预留 `243,542` tokens），远低于 `5,000,000` 上限。
