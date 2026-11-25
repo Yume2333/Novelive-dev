@@ -1,17 +1,110 @@
 import type { CommandOutput } from '@novelive/creator/contract'
-import { BarChart3, ChevronDown } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Collapse } from '../../components/Collapse'
+import {
+	ArrowUpRight,
+	BarChart3,
+	FileText,
+	Image,
+	type LucideIcon,
+	Wallet,
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Card, SectionLabel } from '../../components/Card'
+import { InfoTooltip } from '../../components/InfoTooltip'
 import { EmptyState, Page } from '../../components/Page'
-import { scoped } from '../../i18n'
+import { msg, scoped } from '../../i18n'
+import { Select } from '../settings/ModelFields'
 import styles from './UsagePage.module.css'
 
 const t = scoped('usage')
 
+type UsageRecord = CommandOutput<'usage.list'>['records'][number]['usage']
+
+const all = ''
+
+const dayOf = (at: number) => new Date(at).toLocaleDateString('sv')
+
+type Granularity = 'day' | 'month'
+
+const phaseName: Record<string, string> = {
+	import: msg('导入'),
+	preview: msg('全书预览'),
+	synthesize: msg('综合'),
+	chat: msg('对话'),
+	write: msg('写'),
+	review: msg('审稿'),
+	stage: msg('演出'),
+	draw: msg('出图'),
+}
+const phaseLabel = (phase: string) =>
+	phaseName[phase] ? t(phaseName[phase]) : phase
+
+const money = (usd: number) =>
+	usd.toLocaleString(undefined, {
+		style: 'currency',
+		currency: 'USD',
+		maximumFractionDigits: usd > 0 && usd < 1 ? 4 : 2,
+	})
+
+function totals(records: UsageRecord[]) {
+	let input = 0
+	let output = 0
+	let images = 0
+	let cost = 0
+	let priced = 0
+	for (const record of records) {
+		if (record.kind === 'image') images += record.imageCount
+		else {
+			input += record.inputTokens
+			output += record.outputTokens
+		}
+		if (record.costUsd !== null) {
+			cost += record.costUsd
+			priced++
+		}
+	}
+	return {
+		calls: records.length,
+		input,
+		output,
+		images,
+		cost: priced ? cost : null,
+		unpriced: records.length - priced,
+	}
+}
+
+function Stat({
+	icon: Icon,
+	label,
+	value,
+	hint,
+}: {
+	icon: LucideIcon
+	label: string
+	value: string
+	hint?: string
+}) {
+	return (
+		<Card className={styles.stat}>
+			<span className={styles.statLabel}>
+				<Icon size={15} aria-hidden="true" />
+				<span className="label-caps label-caps-zh">{label}</span>
+			</span>
+			<div className={styles.statValue}>{value}</div>
+			{hint && <div className={styles.statHint}>{hint}</div>}
+		</Card>
+	)
+}
+
 export function UsagePage() {
-	const [showExplanation, setShowExplanation] = useState(false)
+	const [granularity, setGranularity] = useState<Granularity>('day')
+	const [from, setFrom] = useState('')
+	const [to, setTo] = useState('')
 	const [data, setData] = useState<CommandOutput<'usage.list'>>()
 	const [error, setError] = useState('')
+	const [workId, setWorkId] = useState(all)
+	const [phase, setPhase] = useState(all)
+	const [model, setModel] = useState(all)
+	const [titles, setTitles] = useState(new Map<string, string>())
 	useEffect(() => {
 		let active = true
 		let request:
@@ -32,41 +125,128 @@ export function UsagePage() {
 				},
 			)
 		}
-		const off = window.novelive.on('creator.ready', load)
+		const off = window.novelive.on('creator.ready', () => {
+			load()
+			loadTitles()
+		})
+		function loadTitles() {
+			window.novelive.call('library.list', {}).promise.then(
+				({ works }) => {
+					if (!active) return
+					const count = new Map<string, number>()
+					for (const w of works)
+						count.set(w.title, (count.get(w.title) ?? 0) + 1)
+					setTitles(
+						new Map(
+							works.map((w) => {
+								const volume = (w as { project?: { volumeTitle?: string } })
+									.project?.volumeTitle
+								return [
+									w.workId,
+									(count.get(w.title) ?? 0) > 1 && volume
+										? `${w.title} · ${volume}`
+										: w.title,
+								]
+							}),
+						),
+					)
+				},
+				() => {},
+			)
+		}
 		load()
+		loadTitles()
 		return () => {
 			active = false
 			off()
 			request?.cancel()
 		}
 	}, [])
-	const text =
-		data?.records
-			.map(({ usage }) => usage)
-			.filter((record) => record.kind === 'text') ?? []
-	const images =
-		data?.records
-			.map(({ usage }) => usage)
-			.filter((record) => record.kind === 'image') ?? []
+	const records = useMemo(
+		() => data?.records.map(({ usage }) => usage) ?? [],
+		[data],
+	)
+	const titleOf = (workId: string) => titles.get(workId) ?? workId
+	const options = (
+		pick: (record: UsageRecord) => string,
+		label: string,
+		name: (value: string) => string = (value) => value,
+	) =>
+		[
+			[all, label] as const,
+			...[...new Set(records.map(pick))]
+				.sort()
+				.map((v) => [v, name(v)] as const),
+		] as const
+	const periodOf = (at: number) =>
+		granularity === 'month' ? dayOf(at).slice(0, 7) : dayOf(at)
+	const periods = records.map((r) => periodOf(r.at)).sort()
+	const first = periods[0] ?? ''
+	const last = periods.at(-1) ?? ''
+	const shown = records.filter((record) => {
+		const period = periodOf(record.at)
+		return (
+			(!workId || record.link.workId === workId) &&
+			(!phase || record.phase === phase) &&
+			(!model || record.model === model) &&
+			(!from || period >= from) &&
+			(!to || period <= to)
+		)
+	})
+	const sum = totals(shown)
+	const shownSet = new Set(shown)
+	const byPeriod = new Map<string, UsageRecord[]>()
+	const byWork = new Map<
+		string,
+		{ records: UsageRecord[]; phases: Map<string, UsageRecord[]> }
+	>()
+	for (const record of shown) {
+		const period = periodOf(record.at)
+		const rows = byPeriod.get(period)
+		if (rows) rows.push(record)
+		else byPeriod.set(period, [record])
+		let work = byWork.get(record.link.workId)
+		if (!work) {
+			work = { records: [], phases: new Map() }
+			byWork.set(record.link.workId, work)
+		}
+		work.records.push(record)
+		const phaseRows = work.phases.get(record.phase)
+		if (phaseRows) phaseRows.push(record)
+		else work.phases.set(record.phase, [record])
+	}
+	const perDay = [...byPeriod]
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([day, rows]) => ({ day, ...totals(rows) }))
+	const labelEvery = Math.ceil(perDay.length / 16)
+	const maxDay = Math.max(1, ...perDay.map(({ calls }) => calls))
+	const works = [...byWork].sort(([a], [b]) => a.localeCompare(b))
+	const phaseOrder = Object.keys(phaseName)
+	const phases = [...new Set(shown.map((r) => r.phase))].sort(
+		(a, b) => phaseOrder.indexOf(a) - phaseOrder.indexOf(b),
+	)
 	return (
-		<Page title={t('用量')}>
+		<Page
+			title={t('用量统计')}
+			actions={
+				<span className={styles.granularity}>
+					<Select<Granularity>
+						label={t('统计粒度')}
+						options={[
+							['day', t('按天')],
+							['month', t('按月')],
+						]}
+						value={granularity}
+						onChange={(value) => {
+							setGranularity(value)
+							setFrom('')
+							setTo('')
+						}}
+					/>
+				</span>
+			}
+		>
 			<div className={styles.content}>
-				<div>
-					<button
-						type="button"
-						className={styles.disclosure}
-						aria-expanded={showExplanation}
-						onClick={() => setShowExplanation((open) => !open)}
-					>
-						<ChevronDown size={16} aria-hidden="true" />
-						{t('用量说明')}
-					</button>
-					<Collapse open={showExplanation}>
-						{t(
-							'仅供参考，统计已发生的调用；不估算费用，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
-						)}
-					</Collapse>
-				</div>
 				{error && <p role="alert">{error}</p>}
 				{!data && !error && <p role="status">{t('正在读取用量')}</p>}
 				{data && (
@@ -87,65 +267,236 @@ export function UsagePage() {
 								</ul>
 							</section>
 						)}
-						<dl className={styles.totals}>
-							<div>
-								<dt>{t('文本输入 tokens')}</dt>
-								<dd>
-									{text
-										.reduce((n, row) => n + row.inputTokens, 0)
-										.toLocaleString()}
-								</dd>
-							</div>
-							<div>
-								<dt>{t('文本输出 tokens')}</dt>
-								<dd>
-									{text
-										.reduce((n, row) => n + row.outputTokens, 0)
-										.toLocaleString()}
-								</dd>
-							</div>
-							<div>
-								<dt>{t('图片数量')}</dt>
-								<dd>
-									{images
-										.reduce((n, row) => n + row.imageCount, 0)
-										.toLocaleString()}
-								</dd>
-							</div>
-						</dl>
-						{!data.records.length ? (
-							<EmptyState icon={BarChart3} text={t('暂无用量记录')} />
+						<div className={styles.filters}>
+							<Select<string>
+								label={t('作品')}
+								options={options((r) => r.link.workId, t('全部作品'), titleOf)}
+								value={workId}
+								onChange={setWorkId}
+							/>
+							<Select<string>
+								label={t('阶段')}
+								options={options((r) => r.phase, t('全部阶段'), phaseLabel)}
+								value={phase}
+								onChange={setPhase}
+							/>
+							<Select<string>
+								label={t('模型')}
+								options={options((r) => r.model, t('全部模型'))}
+								value={model}
+								onChange={setModel}
+							/>
+							<span className={styles.range}>
+								<input
+									type={granularity === 'month' ? 'month' : 'date'}
+									aria-label={t('开始日期')}
+									value={from || first}
+									max={to || last || undefined}
+									onChange={(event) => setFrom(event.target.value)}
+								/>
+								<span>{t('到')}</span>
+								<input
+									type={granularity === 'month' ? 'month' : 'date'}
+									aria-label={t('结束日期')}
+									value={to || last}
+									min={from || first || undefined}
+									onChange={(event) => setTo(event.target.value)}
+								/>
+							</span>
+							<InfoTooltip
+								label={t('用量说明')}
+								text={t(
+									'文本按 tokens，图片按张数；参考金额只计入有单价的调用，仅供参考，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
+								)}
+							/>
+						</div>
+						{!shown.length ? (
+							<EmptyState
+								icon={BarChart3}
+								title={t('暂无用量记录')}
+								text={t('换个过滤条件试试。')}
+								card
+							/>
 						) : (
-							<section aria-label={t('已发生用量')} className={styles.list}>
-								{data.records.map(({ id, usage: record }) => (
-									<article className={styles.row} key={id}>
-										<strong>{record.model}</strong>
-										<span>{record.link.workId}</span>
-										<span>
-											{record.link.volumeId} · {record.phase}
-										</span>
-										<time>{new Date(record.at).toLocaleString()}</time>
-										<span>
-											{record.kind === 'image'
-												? t('{{imageCount}} 张图片', {
-														imageCount: record.imageCount,
-													})
-												: t(
-														'输入 {{inputTokens}} / 输出 {{outputTokens}} · 缓存读取 {{cacheReadTokens}} / 写入 {{cacheWriteTokens}}',
+							<>
+								<div className={styles.totals}>
+									<Stat
+										icon={ArrowUpRight}
+										label={t('调用次数')}
+										value={sum.calls.toLocaleString()}
+									/>
+									<Stat
+										icon={FileText}
+										label={t('文本 tokens')}
+										value={(sum.input + sum.output).toLocaleString()}
+										hint={t('输入 {{input}} / 输出 {{output}}', {
+											input: sum.input.toLocaleString(),
+											output: sum.output.toLocaleString(),
+										})}
+									/>
+									<Stat
+										icon={Image}
+										label={t('图片')}
+										value={t('{{images}} 张', {
+											images: sum.images.toLocaleString(),
+										})}
+									/>
+									<Stat
+										icon={Wallet}
+										label={t('参考金额')}
+										value={sum.cost === null ? t('没有单价') : money(sum.cost)}
+										hint={
+											sum.cost !== null && sum.unpriced
+												? t('部分调用拿不到单价，未计入')
+												: undefined
+										}
+									/>
+								</div>
+								<Card className={styles.panel}>
+									<SectionLabel>
+										{granularity === 'month'
+											? t('各月调用量')
+											: t('各天调用量')}
+									</SectionLabel>
+									<div
+										className={
+											labelEvery > 1
+												? `${styles.chart} ${styles.dense}`
+												: styles.chart
+										}
+									>
+										{perDay.map(
+											({ day, calls, input, output, images, cost }, index) => (
+												<div
+													key={day}
+													className={styles.bar}
+													title={`${t(
+														'{{day}}：{{calls}} 次 · 输入 {{input}} / 输出 {{output}} · {{images}} 张图片',
 														{
-															inputTokens: record.inputTokens,
-															outputTokens: record.outputTokens,
-															cacheReadTokens: record.cacheReadTokens,
-															cacheWriteTokens: record.cacheWriteTokens,
+															day,
+															calls,
+															input,
+															output,
+															images,
 														},
-													)}
-										</span>
-									</article>
-								))}
-							</section>
+													)} · ${cost === null ? t('暂无单价') : t('参考 {{cost}}', { cost: money(cost) })}`}
+												>
+													<span>{labelEvery > 1 ? '' : calls}</span>
+													<span className={styles.barTrack}>
+														<span
+															className={styles.barFill}
+															style={{
+																height: `${Math.max(4, (calls / maxDay) * 100)}%`,
+															}}
+														/>
+													</span>
+													<time
+														dateTime={day}
+														hidden={index % labelEvery !== 0}
+													>
+														{granularity === 'month'
+															? day
+															: day.slice(5).replace('-', '/')}
+													</time>
+												</div>
+											),
+										)}
+									</div>
+								</Card>
+								<Card className={styles.panel}>
+									<SectionLabel>{t('按作品 × 阶段')}</SectionLabel>
+									<table className={styles.table}>
+										<thead>
+											<tr>
+												<th>{t('作品')}</th>
+												{phases.map((p) => (
+													<th key={p}>{phaseLabel(p)}</th>
+												))}
+												<th>{t('参考金额')}</th>
+											</tr>
+										</thead>
+										<tbody>
+											{works.map(([work, bucket]) => {
+												const row = totals(bucket.records)
+												return (
+													<tr key={work} className="hover-row">
+														<td>{titleOf(work)}</td>
+														{phases.map((p) => {
+															const cell = totals(bucket.phases.get(p) ?? [])
+															return (
+																<td key={p} data-label={phaseLabel(p)}>
+																	{cell.calls ? (
+																		t('{{calls}} 次', { calls: cell.calls }) +
+																		(cell.images
+																			? t(' · {{images}} 张', {
+																					images: cell.images,
+																				})
+																			: '')
+																	) : (
+																		<span className={styles.none}>—</span>
+																	)}
+																</td>
+															)
+														})}
+														<td data-label={t('参考金额')}>
+															{row.cost === null ? (
+																<span className={styles.none}>
+																	{t('没有单价')}
+																</span>
+															) : (
+																money(row.cost)
+															)}
+														</td>
+													</tr>
+												)
+											})}
+										</tbody>
+									</table>
+								</Card>
+								<Card
+									className={styles.panel}
+									role="region"
+									aria-label={t('已发生用量')}
+								>
+									<SectionLabel>{t('已发生用量')}</SectionLabel>
+									<ul className={styles.list}>
+										{data.records
+											.filter(({ usage }) => shownSet.has(usage))
+											.map(({ id, usage: record }) => (
+												<li className={styles.row} key={id}>
+													<strong>{record.model}</strong>
+													<span>
+														{titleOf(record.link.workId)} ·{' '}
+														{record.link.volumeId} · {phaseLabel(record.phase)}
+													</span>
+													<span>
+														{record.kind === 'image'
+															? t('{{imageCount}} 张图片', {
+																	imageCount: record.imageCount,
+																})
+															: t(
+																	'输入 {{inputTokens}} / 输出 {{outputTokens}} · 缓存读取 {{cacheReadTokens}} / 写入 {{cacheWriteTokens}}',
+																	{
+																		inputTokens: record.inputTokens,
+																		outputTokens: record.outputTokens,
+																		cacheReadTokens: record.cacheReadTokens,
+																		cacheWriteTokens: record.cacheWriteTokens,
+																	},
+																)}
+													</span>
+													<time>{new Date(record.at).toLocaleString()}</time>
+												</li>
+											))}
+									</ul>
+								</Card>
+							</>
 						)}
-						<section aria-label={t('过期素材')}>
-							<h2>{t('过期素材')}</h2>
+						<Card
+							className={styles.panel}
+							role="region"
+							aria-label={t('过期素材')}
+						>
+							<SectionLabel>{t('过期素材')}</SectionLabel>
 							{!data.staleAssets.length ? (
 								<p>{t('暂无过期素材')}</p>
 							) : (
@@ -161,7 +512,7 @@ export function UsagePage() {
 									))}
 								</ul>
 							)}
-						</section>
+						</Card>
 					</>
 				)}
 			</div>

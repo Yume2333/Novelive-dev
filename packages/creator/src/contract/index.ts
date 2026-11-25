@@ -8,6 +8,7 @@ import {
 	nullable,
 	obj,
 	oneOf,
+	opt,
 	type Static,
 	str,
 	union,
@@ -88,7 +89,22 @@ export const commands = {
 		input: empty,
 		output: obj({
 			works: arr(
-				obj({ workId: str(), title: str(), published: int(), chapters: int() }),
+				obj({
+					workId: str(),
+					title: str(),
+					published: int(),
+					chapters: int(),
+					project: opt(
+						obj({
+							directory: str(),
+							seriesId: str(),
+							seriesTitle: str(),
+							volumeId: str(),
+							volumeTitle: str(),
+							volumeIndex: int({ minimum: 1 }),
+						}),
+					),
+				}),
 			),
 			unreadableCount: int(),
 		}),

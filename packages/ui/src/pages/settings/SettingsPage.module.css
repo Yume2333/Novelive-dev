@@ -1,24 +1,17 @@
 .page {
-	box-sizing: content-box;
-	max-width: 760px;
-	margin: 0 auto;
-	padding: var(--space-7) var(--space-5) var(--space-8);
-}
-
-.page h1 {
-	margin: 0 0 var(--space-7);
-	font: 700 32px var(--font-display);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-7);
 }
 
 .page h2 {
-	margin: var(--space-5) var(--space-1) var(--space-2);
+	margin: 0 0 var(--space-3);
 	color: var(--color-on-surface-variant);
-	font-size: 13px;
 }
 
 .cards {
 	display: grid;
-	gap: var(--space-2);
+	gap: var(--space-3);
 }
 
 .card {
@@ -34,8 +27,8 @@
 .warning {
 	display: flex;
 	align-items: center;
-	gap: var(--space-3);
-	padding: var(--space-3) var(--space-4);
+	gap: var(--space-px-14);
+	padding: var(--space-px-14) var(--space-px-18);
 }
 
 .cardHeader {
@@ -396,4 +389,17 @@
 	.postProcess {
 		grid-template-columns: minmax(0, 1fr);
 	}
+}
+
+.page h2.advanced {
+	margin: 0 0 var(--space-2);
+	font-size: inherit;
+}
+
+.advanced .expand {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-6);
+	color: var(--color-on-surface-variant);
 }

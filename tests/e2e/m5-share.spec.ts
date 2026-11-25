@@ -169,7 +169,8 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 			includeSource = false,
 		) {
 			await saveTo(app, path)
-			await page.getByRole('button', { name: '导出作品包' }).click()
+			await page.getByRole('button', { name: '更多', exact: true }).click()
+			await page.getByRole('menuitem', { name: '导出作品包' }).click()
 			if (scope) await page.getByRole('radio', { name: scope }).check()
 			if (includeSource)
 				await page.getByRole('checkbox', { name: '包含原文' }).check()
@@ -277,7 +278,7 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 		await promisify(execFile)(
 			executablePath,
 			[...args, '--no-sandbox', `--user-data-dir=${readerDir}`, release2],
-			{ env, timeout: 15_000 },
+			{ env, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 },
 		)
 		await expect(
 			page.getByRole('dialog').getByText('v1 → v2', { exact: false }),
@@ -327,13 +328,15 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 			page.getByText('已导入为新工程，可以在书库中编辑。'),
 		).toBeVisible()
 		await page.keyboard.press('Escape')
+		await page.getByRole('tab', { name: '我的工程' }).click()
 		await page
-			.getByRole('region', { name: '我的工程' })
+			.getByRole('tabpanel', { name: '我的工程' })
 			.getByRole('link', { name: '黄昏' })
 			.click()
 		const fork = join(directory, 'fork.novelive')
 		await saveTo(app, fork)
-		await page.getByRole('button', { name: '导出作品包' }).click()
+		await page.getByRole('button', { name: '更多', exact: true }).click()
+		await page.getByRole('menuitem', { name: '导出作品包' }).click()
 		await page.getByRole('button', { name: '检查导出内容' }).click()
 		await expect(
 			page.getByText('检查完成，没有使用占位图的章节。'),

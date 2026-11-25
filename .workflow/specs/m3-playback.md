@@ -1,6 +1,7 @@
 # M3 完整播放器与本地放大
 
-**Status:** in progress
+**Status:** done
+**Accepted:** 2026-11-24 by agent (omp-vibe-windows)
 **Priority:** high
 **Blocked by:** m2-editor/08
 

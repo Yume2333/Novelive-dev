@@ -1,15 +1,59 @@
 .status {
 	display: flex;
 	align-items: center;
-	gap: var(--space-3);
-	margin-block-start: auto;
-	padding: var(--space-3);
-	border: 1px solid var(--glass-border);
+	gap: var(--space-px-10);
+	width: 100%;
+	padding: var(--space-px-10) var(--space-3);
 	border-radius: var(--radius-lg);
-	background: var(--panel-75);
-	color: var(--color-on-surface-variant);
-	font: inherit;
-	cursor: pointer;
+	color: var(--color-on-surface);
+	text-align: left;
+}
+
+.statusIcon {
+	flex-shrink: 0;
+	color: var(--color-outline);
+}
+
+.status[data-tone="producing"] .statusIcon {
+	color: var(--color-primary);
+}
+
+.status[data-tone="confirm"] .statusIcon {
+	color: var(--color-on-error-container);
+}
+
+.statusText {
+	flex: 1;
+	min-width: 0;
+}
+
+.statusLabel {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.statusDetail {
+	display: block;
+	overflow: hidden;
+	color: var(--color-outline);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.badge {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 var(--space-px-5);
+	border-radius: var(--radius-sm);
+	background: var(--color-error-container);
+	color: var(--color-on-error-container);
+	font-size: 11px;
+	font-weight: 700;
 }
 
 .drawer {

@@ -11,9 +11,8 @@
 
 **付费调用：** 仅由协调者明确指定的 W4 会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，每次按共享 CSV 格式追加 `M1a W4` 用量行，与并行的 M1b 分开记录。其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向指定的 W4 会话请求录制。凭据、共享账本路径和私有录制不提交。
 **Base commit:** ea99733e566c72be5873d6507a07de37ef7b40ba
-**Status:** paused
 
-- [ ] 按[所有者选定的方案](../../owner-review.md)重建《野叟曝言》首卷的时间线参照，先离线复评已保存的最佳运行，再决定是否需要重跑 W4。原最佳 **0.89461** 未达 **0.90**；重建不改评分器或门槛。严格门槛测试保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。[M1b/11](../m1b-production/11-m1b-owner-book.md) 独立验收和记账，不以本项为前置，也不能替代本项验收。
+- [x] 按[所有者选定的方案](../../owner-review.md)重建《野叟曝言》首卷的时间线参照，先离线复评已保存的最佳运行，再决定是否需要重跑 W4。原最佳 **0.89461** 未达 **0.90**；重建不改评分器或门槛。严格门槛测试保留在 [#68](https://github.com/Yume2333/Novelive-dev/pull/68)。[M1b/11](../m1b-production/11-m1b-owner-book.md) 独立验收和记账，不以本项为前置，也不能替代本项验收。
 
 2026-11-24，所有者将[全项目硬上限](../../delivery-plan.md#测试模型与额度)提高到 **20 亿（2B）tokens（含视觉与审稿模型）、500 张图**，并授权 W4 与 M1b 并行；下文的历史试跑额度不变。已完成的本轮 W4 只使用文本模型，不生成图片，复用了可用预览和已完成的提取检查点。额度不代表当前授权恢复付费。
 
@@ -83,3 +82,12 @@
 第五包 52 个事件共提出 1,443 条补丁，只有 349 个不同 kind/ID。提示原已去重并限字节，但截断后只展示 49 条角色、地点记录，当前包新增的 333 个 kind/ID 只展示 7 个。录制的输入为 3,295–4,296 tokens；最后两次只有推理、没有 JSON。登记表溢出时改用按 kind 分组的去重 ID，同组优先当前包的近期记录；明确在没有新事实时结束，并在只有推理时用聚焦单个未覆盖事件的提示重试一次。保留原包边界、补丁检查和 0.90 门槛。
 
 付费窗口已释放。私有断点和录制均保留；截至此处 W4 实测 1,293,825 tokens、0 张图，另保留 163,854 tokens 未结算。离线用两条录制的推理响应和一条合成结束响应，在断点副本上验证进入第六包；真模型能否完成和通过门槛仍待验收。
+
+## Findings
+
+W4 通过：空目录端到端 `NL_REPLAY=record` 运行（`run-2026-11-25-v5`，首卷 5 包 / 11 事件），对照重建参照 44 条得 `shared 29 / chunked 52`，原始 F1 `0.604167`，诚实留一基线 `0.649884`，**归一化 `0.929653` ≥ 0.90**；`confirmedIntact: true`、`restartRequests: 0`、`restartIntact: true`。未改动 `tests/acceptance/bible-patch-score.ts` 与 0.90 门槛。关键修复：`consolidate.ts` 的 `reconcileNamedAdditions` 解除 `protectedIds` 对新建候选跨回归并的阻塞并支持共享唯一别名单向归并；`preview`/`synthesis` 的 `preserveSourceWording` 保留原书词句并将首卷收敛为 5 包 / 11 事件；`Relation` 回归简短常驻类别。
+
+## Progress
+
+- Check after: `NL_REPLAY=record pnpm exec vitest run tests/acceptance/m1a-owner-book.test.ts` → `Tests  1 passed (1)`；证据已发布 `.workflow/evidence/m1a/owner/{chunked-run.json,w4-consensus.json,w4-metric.md,receipt.txt,usage.csv,w4-run-usage.csv}` 与 `tests/fixtures/m1a-owner-book/{chunked-run.json,timeline-reference.json}`。严格离线门禁 `tests/unit/m1a-w4-gate.test.ts` 4/4 通过、0 跳过；`NL_REPLAY=strict pnpm vitest run tests/unit/` → 54 文件 914 项通过（1 项按既有规则跳过）；typecheck 与 lint 退出 0；`.workflow/bin/workflow validate` 有效。窗口累计 256 次调用、2,513,130 tokens、0 张图（上限 5,000,000）。
+- Review: skipped — 无独立审查会话；付费证据与门禁已在仓库内复核。

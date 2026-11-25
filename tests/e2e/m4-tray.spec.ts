@@ -27,7 +27,9 @@ test('M4 desktop lifecycle keeps the real creator alive without a tray and reope
 	})
 	try {
 		const page = await desktop.firstWindow()
-		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 		const before = await page.evaluate(() => window.novelive.host.appState())
 		await desktop.evaluate(({ BrowserWindow }) => {
 			BrowserWindow.getAllWindows()[0].close()
@@ -317,7 +319,9 @@ test('M4 native desktop lifecycle minimizes without a tray or reopens through th
 	})
 	try {
 		const page = await desktop.firstWindow()
-		await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+		await expect(
+			page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+		).toHaveText('创作端已就绪')
 		const before = await page.evaluate(() => window.novelive.host.appState())
 		await desktop.evaluate(({ BrowserWindow }) =>
 			BrowserWindow.getAllWindows()[0].close(),

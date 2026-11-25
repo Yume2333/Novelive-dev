@@ -1,0 +1,858 @@
+{
+	"formatVersion": 1,
+	"volumeId": "v0001",
+	"model": "devin-swe-2",
+	"biblePatch": [
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "shui-furen",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "水夫人",
+				"aliases": ["文母"],
+				"identity": "文素臣與文真之母，寡居持家的儒婦。",
+				"personality": "經學精湛，嚴厲督導二子成才，支持文素臣遠遊。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "wen-zhen",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "文真",
+				"aliases": ["古心", "文古心", "長兄"],
+				"identity": "文素臣長兄，字古心。",
+				"personality": "拘迂重孝，志在考取科名，以顯親、奉母、課子為念。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "tian-shi",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "田氏",
+				"aliases": ["文田氏", "內黃田氏"],
+				"identity": "文素臣之妻，內黃田翰林之女。",
+				"personality": "知書達禮，受囑小心侍奉孀姑。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "ruan-shi",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "阮氏",
+				"aliases": ["嫂阮氏", "文阮氏"],
+				"identity": "文真之妻，田氏之嫂。",
+				"personality": "賢淑盡婦道，侍奉水夫人。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "jing-rijing",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "景日京",
+				"aliases": ["日京"],
+				"identity": "景敬亭之弟，文素臣莫逆之交。",
+				"personality": "性情粗豪莽直，志在立功絕域與行俠仗義；揭發行曇冤案後去向不明。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "qu-boming",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "屈伯明",
+				"aliases": ["伯明", "屈秀才"],
+				"identity": "居於北關外的落魄秀才，以訓蒙為生。",
+				"personality": "其妻何氏遭行曇夜襲，案件又因柯渾枉法而蒙冤。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "he-shi",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "何氏",
+				"aliases": ["屈妻", "隨奶奶"],
+				"description": "暗中周旋照應被松庵強擄之婦女，火起時報信召集眾人。",
+				"changes": [
+					{
+						"chapterId": "ch0001",
+						"field": "identity",
+						"value": "屈伯明之妻，遭五台山僧行曇夜襲強姦未遂。"
+					},
+					{
+						"chapterId": "ch0005",
+						"field": "identity",
+						"value": "昭慶寺內婦人"
+					}
+				]
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "xing-tan",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "行曇",
+				"aliases": ["五台山和尚", "五台山惡僧", "妖僧", "惡僧", "兇僧"],
+				"identity": "五台山和尚，據稱精通祝由治病。",
+				"personality": "夜襲何氏強姦未遂，因知縣柯渾偏護而獲釋。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "ke-hun",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "柯渾",
+				"aliases": ["柯知縣", "知縣柯渾"],
+				"identity": "廣東籍知縣，負責審理行曇案。",
+				"personality": "審案時顛倒是非，重杖捉奸鄰保並縱釋兇僧。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "wen-xu",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "文虛",
+				"aliases": ["老家人", "老家人文虛"],
+				"identity": "文家老家人。",
+				"personality": "受文素臣囑咐，與妻子留守掌管家中瑣務。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "xi-nang",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "奚囊",
+				"aliases": ["小童奚囊", "行童", "小童"],
+				"personality": "隨文素臣遠遊江西。",
+				"major": false,
+				"appearance": {
+					"description": "眉目秀媚異常，宛然女子，卻又是貴相"
+				},
+				"changes": [
+					{
+						"chapterId": "ch0001",
+						"field": "identity",
+						"value": "文素臣隨身小童。"
+					}
+				]
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "an-ji",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "安吉",
+				"aliases": ["兵部尚書", "兵部尚書安吉", "主考"],
+				"identity": "兵部尚書，曾任蘇州府試主考。",
+				"personality": "因文素臣作詩譏刺《三教同原》而懷恨在心，記下其名籍。"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"kind": "relation",
+			"op": "add",
+			"entry": {
+				"id": "rel-shui-furen-wen-suchen",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"from": "shui-furen",
+				"to": "wen-suchen",
+				"description": "母子關係"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"kind": "relation",
+			"op": "add",
+			"entry": {
+				"id": "rel-tian-shi-wen-suchen",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"from": "tian-shi",
+				"to": "wen-suchen",
+				"description": "夫妻關係"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"kind": "relation",
+			"op": "add",
+			"entry": {
+				"id": "rel-xi-nang-wen-suchen",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"from": "xi-nang",
+				"to": "wen-suchen",
+				"description": "主僕關係"
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"kind": "location",
+			"op": "add",
+			"entry": {
+				"id": "loc-wujiang-county",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"name": "吳江縣",
+				"aliases": ["吳江", "吳江城"],
+				"description": "蘇州府屬縣，文家所在及餞別、辭家之地。",
+				"variants": [
+					{
+						"id": "wujiang",
+						"description": "吳江縣的簡稱。"
+					},
+					{
+						"id": "wujiang-city",
+						"description": "吳江城。"
+					}
+				]
+			},
+			"observedChapter": "ch0001"
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0001-departure-jiangxi",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"chapterId": "ch0001",
+				"event": "文素臣擇於成化三年三月初二日起身，諸言志者俱來送別，獨有景日京不知所往。文素臣拜別祖先，向水夫人房中叩別，聽了囑咐，別過兄嫂，囑妻田氏小心侍奉，吩咐老家人文虛夫婦，紫函、冰弦兩個丫鬟，在家照管，帶著小童奚囊，別了親友，竟望江西而來。",
+				"storyTime": "成化三年三月初二日"
+			}
+		},
+		{
+			"kind": "foreshadowing",
+			"op": "add",
+			"entry": {
+				"id": "fs-jing-rijing-whereabouts",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"description": "「獨有日京不知所往」：景日京在送別後的去向仍無交代。",
+				"plantedChapter": "ch0001"
+			}
+		},
+		{
+			"kind": "foreshadowing",
+			"op": "add",
+			"entry": {
+				"id": "fs-anji-name-registry",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"description": "「惟記其名籍，恨恨而已」：安吉對文素臣的記恨與名籍之患尚未爆發。",
+				"plantedChapter": "ch0001"
+			}
+		},
+		{
+			"kind": "style",
+			"op": "add",
+			"entry": {
+				"id": "style-farewell-ambitions-inset-injustice",
+				"status": "candidate",
+				"firstSeenChapter": "ch0001",
+				"description": "以餞別宴上眾人輪番言志建立群像，再由景日京之口插入行曇冤案，收束於文素臣辭家遠遊。",
+				"narration": "第三人稱全知敘事，兼具回敘與對話。"
+			}
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "song-an",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"name": "松庵",
+				"aliases": ["昭慶寺住持", "昭慶寺當家僧"],
+				"identity": "昭慶寺住持",
+				"personality": "淫邪暴虐，欲強逼未鸞吹",
+				"reuse": "one-off",
+				"major": false,
+				"changes": [
+					{
+						"chapterId": "ch0004",
+						"field": "identity",
+						"value": "昭慶寺當家僧"
+					}
+				]
+			}
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "wei-danran",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"name": "未淡然",
+				"aliases": [
+					"未翁",
+					"未公",
+					"未老爺",
+					"翀然",
+					"老爺",
+					"未老伯",
+					"未淡然"
+				],
+				"originalName": "翀然",
+				"identity": "江右豐城人，退休戶部員外，文素臣亡父的生前莫逆",
+				"reuse": "reusable",
+				"changes": [
+					{
+						"chapterId": "ch0003",
+						"field": "aliases",
+						"value": "增補「未公」「未老爺」稱謂；與忠僕水中獲昭慶寺香火救起，被差役迎送往撫署"
+					},
+					{
+						"chapterId": "ch0004",
+						"field": "identity",
+						"value": "未鸞吹之父，已被救入撫院"
+					},
+					{
+						"chapterId": "ch0005",
+						"field": "identity",
+						"value": "鸞吹之父"
+					}
+				],
+				"major": true,
+				"description": "感念文素臣而助解劉大之困，斥退訛詐汛差，允諾面會撫軍發告示禁約，臨行贈銀送被",
+				"personality": "知恩圖報、仗義相助"
+			}
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "wei-luanchui",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"name": "未鸞吹",
+				"aliases": ["鸞吹", "未公長女", "未公之女", "未鸞吹"],
+				"major": true,
+				"identity": "未淡然長女",
+				"personality": "感恩知恥而性情剛烈，危急時敢於反擊淫僧",
+				"reuse": "reusable",
+				"knows": [
+					{
+						"chapterId": "ch0004",
+						"fact": "從素娥處得知未公已被救入撫院"
+					}
+				],
+				"description": "認文素臣為義兄，行前將新鋪蓋與素臣原失耳挖相贈轉交，隨父登舟赴贛",
+				"changes": [
+					{
+						"chapterId": "ch0004",
+						"field": "identity",
+						"value": "未公之女，溺水獲救後與文素臣結為義兄妹"
+					},
+					{
+						"chapterId": "ch0005",
+						"field": "identity",
+						"value": "未公長女"
+					}
+				]
+			}
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "wei-jinyu",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"name": "未金羽",
+				"aliases": ["金羽", "未淡然幼女"],
+				"identity": "未淡然幼女，年約六七歲",
+				"reuse": "reusable"
+			}
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "su-e",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"name": "素娥",
+				"identity": "出身儒門的婢女，隨侍未鸞吹為閨伴",
+				"reuse": "reusable",
+				"aliases": ["未家婢女"],
+				"major": false,
+				"knows": [
+					{
+						"chapterId": "ch0004",
+						"fact": "告知未公已被救入撫院"
+					}
+				],
+				"description": "同隨鸞吹登舟返回江西",
+				"changes": [
+					{
+						"chapterId": "ch0004",
+						"field": "identity",
+						"value": "未家婢女，落水得救後被僧眾強留昭慶寺，與未鸞吹重逢"
+					},
+					{
+						"chapterId": "ch0005",
+						"field": "identity",
+						"value": "鸞吹之貼身丫鬟"
+					}
+				]
+			}
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "lao-tao",
+				"status": "candidate",
+				"firstSeenChapter": "ch0003",
+				"name": "老陶",
+				"identity": "自稱在靳府當差的惡漢",
+				"personality": "趁水災救起未鸞吹，欲強逼其為妾",
+				"reuse": "one-off",
+				"aliases": []
+			}
+		},
+		{
+			"kind": "relation",
+			"op": "add",
+			"entry": {
+				"id": "rel-wei-danran-wen-suchen",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"from": "wei-danran",
+				"to": "wen-suchen",
+				"description": "世交關係"
+			}
+		},
+		{
+			"kind": "location",
+			"op": "add",
+			"entry": {
+				"id": "loc-zhaoqing-si",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"name": "昭慶寺",
+				"description": "杭州寺院，住持為松庵；文素臣投宿於此，山門外涼亭後被狂風吹倒壓死數人。",
+				"variants": [
+					{
+						"id": "zhaoqing-temple",
+						"description": "昭慶寺"
+					}
+				],
+				"changes": [
+					{
+						"chapterId": "ch0004",
+						"field": "description",
+						"value": "杭州名剎，文素臣暫寓；僧眾姦惡，設有禪堂、窖房，松庵與何氏在此逼害女客"
+					}
+				]
+			}
+		},
+		{
+			"kind": "location",
+			"op": "add",
+			"entry": {
+				"id": "loc-xihu",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"name": "西湖",
+				"description": "杭州名勝，分為裡湖與外湖；文素臣遊湖時遭遇怪潮，之後又暴發蛟災致湖水暴漲、葑田淹沒。",
+				"variants": [
+					{
+						"id": "li-hu",
+						"description": "裡湖"
+					},
+					{
+						"id": "wai-hu",
+						"description": "外湖"
+					},
+					{
+						"id": "lihu",
+						"description": "裡湖"
+					},
+					{
+						"id": "waihu",
+						"description": "外湖"
+					}
+				],
+				"aliases": ["裡湖", "外湖"],
+				"changes": [
+					{
+						"chapterId": "ch0003",
+						"field": "variants",
+						"value": "增補裡湖、外湖之分；社廟位於外湖堤邊"
+					}
+				]
+			}
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0002-swept-into-lake",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"chapterId": "ch0002",
+				"event": "文素臣急走出艙，跳上船頭，卻不斷浪卷舟輕，宛在虛空拋擲，方欲站住腳跟，身子一歪，早已隨波逐流而去。"
+			}
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0003-dragon-repelled",
+				"status": "candidate",
+				"firstSeenChapter": "ch0003",
+				"chapterId": "ch0003",
+				"event": "文素臣運出渾身氣力，用放竹箭的法子連放柳枝折斷龍目，復拗斷其尾上節骨，天地一震後孽龍遁去"
+			}
+		},
+		{
+			"kind": "foreshadowing",
+			"op": "add",
+			"entry": {
+				"id": "fs-jin-jing-conspiracy",
+				"status": "candidate",
+				"firstSeenChapter": "ch0002",
+				"plantedChapter": "ch0002",
+				"description": "「宮中靳公公、德州景府，天下效其所為。而且羽翼四布，陰謀更不可測」顯示幕後權勢網絡尚未揭露。"
+			}
+		},
+		{
+			"kind": "character",
+			"op": "add",
+			"entry": {
+				"id": "he-shi-zhaoqing",
+				"status": "candidate",
+				"firstSeenChapter": "ch0004",
+				"name": "何氏",
+				"originalName": "昭慶寺何氏",
+				"aliases": ["何氏"],
+				"identity": "松庵親戚隨意之妻，為昭慶寺接待女客並牽線作惡",
+				"major": false
+			},
+			"observedChapter": "ch0004"
+		},
+		{
+			"kind": "relation",
+			"op": "add",
+			"entry": {
+				"id": "rel-wen-suchen-wei-luanchui",
+				"status": "candidate",
+				"firstSeenChapter": "ch0004",
+				"from": "wen-suchen",
+				"to": "wei-luanchui",
+				"description": "義兄妹關係"
+			},
+			"observedChapter": "ch0004"
+		},
+		{
+			"kind": "location",
+			"op": "add",
+			"entry": {
+				"id": "loc-xiling-gushe",
+				"status": "candidate",
+				"firstSeenChapter": "ch0004",
+				"name": "西泠古社",
+				"description": "西湖邊供奉宋敕水仙王的社廟，文素臣為未鸞吹療疾烘衣並與其結義之處",
+				"variants": [
+					{
+						"id": "xiling-she",
+						"description": "西泠古社的簡稱"
+					}
+				],
+				"aliases": ["西泠古社的簡稱"]
+			},
+			"observedChapter": "ch0004"
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0004-bronze-candlestick-hits-songan",
+				"status": "confirmed",
+				"firstSeenChapter": "ch0004",
+				"chapterId": "ch0004",
+				"event": "未鸞吹看供桌上一隻古銅蠟臺，高三尺許，順手一推，卻好隔著桌子，跌向外邊，正中松庵腦上，戳進了二三寸。",
+				"storyTime": "是夜"
+			}
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "shi-shi",
+				"status": "candidate",
+				"firstSeenChapter": "ch0005",
+				"name": "石氏",
+				"aliases": ["劉嫂子", "劉大嫂"],
+				"description": "受素臣全節救命之恩，居中勸導璇姑委身相報，張羅婚筵鋪陳",
+				"personality": "殷勤感恩",
+				"changes": [
+					{
+						"chapterId": "ch0005",
+						"field": "identity",
+						"value": "劉大之妻"
+					}
+				]
+			},
+			"observedChapter": "ch0005"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "xuan-gu",
+				"status": "candidate",
+				"firstSeenChapter": "ch0005",
+				"name": "璇姑",
+				"aliases": ["璇姑娘"],
+				"personality": "聰慧自重、面重情深",
+				"description": "經不住兄嫂跪求勉強應允委身素臣，後被收為妾，習得勾股割圓之法",
+				"major": true,
+				"changes": [
+					{
+						"chapterId": "ch0005",
+						"field": "identity",
+						"value": "劉大之妹"
+					}
+				]
+			},
+			"observedChapter": "ch0005"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "liu-da",
+				"status": "candidate",
+				"firstSeenChapter": "ch0005",
+				"name": "劉大",
+				"aliases": ["劉大郎", "劉郎", "大郎", "劉虎臣"],
+				"appearance": {
+					"description": "身材魁梧孔武有力"
+				},
+				"description": "竭力苦留文素臣，撮合妹璇姑委身相報",
+				"originalName": "劉虎臣",
+				"personality": "俠義感恩",
+				"changes": [
+					{
+						"chapterId": "ch0005",
+						"field": "identity",
+						"value": "昭慶寺鄰糕餅店主"
+					}
+				]
+			},
+			"observedChapter": "ch0005"
+		},
+		{
+			"op": "add",
+			"kind": "character",
+			"entry": {
+				"id": "wei-neng",
+				"status": "candidate",
+				"firstSeenChapter": "ch0005",
+				"name": "未能",
+				"description": "為主人往返送呈銀兩、鋪蓋及辭行",
+				"aliases": [],
+				"changes": [
+					{
+						"chapterId": "ch0005",
+						"field": "identity",
+						"value": "未公世僕"
+					}
+				]
+			},
+			"observedChapter": "ch0005"
+		},
+		{
+			"op": "add",
+			"kind": "relation",
+			"entry": {
+				"id": "rel-liu-da-shi-shi",
+				"status": "candidate",
+				"firstSeenChapter": "ch0005",
+				"from": "liu-da",
+				"to": "shi-shi",
+				"description": "夫妻關係",
+				"changes": [
+					{
+						"chapterId": "ch0005",
+						"field": "description",
+						"value": "夫妻關係"
+					}
+				]
+			},
+			"observedChapter": "ch0005"
+		},
+		{
+			"op": "add",
+			"kind": "location",
+			"entry": {
+				"id": "loc-liuda-bakery",
+				"status": "candidate",
+				"firstSeenChapter": "ch0005",
+				"name": "劉大糕餅店",
+				"description": "昭慶寺後鄰劉大之居所兼店鋪，前後共兩進，後牆緊依昭慶寺夾巷。",
+				"variants": [
+					{
+						"id": "liujia",
+						"description": "劉家"
+					}
+				],
+				"aliases": ["劉大郎糕餅店", "劉家"]
+			},
+			"observedChapter": "ch0005"
+		},
+		{
+			"op": "add",
+			"kind": "timeline",
+			"entry": {
+				"id": "tl-ch0005-rescue-women-wall",
+				"status": "candidate",
+				"firstSeenChapter": "ch0005",
+				"chapterId": "ch0005",
+				"event": "文素臣掄起火鉤，望牆上打去，不消幾下，已成大窟窿。眾婦女七撞八跌，都在磚石上爬將過去來，各出陷阱，共慶重生"
+			}
+		},
+		{
+			"op": "add",
+			"kind": "foreshadowing",
+			"entry": {
+				"id": "fs-liuda-chained-arrest",
+				"status": "candidate",
+				"firstSeenChapter": "ch0005",
+				"plantedChapter": "ch0005",
+				"description": "「三四個穿青衣的，把鐵鏈鎖著大郎，拉了要走」——劉大被公差鎖拿的罪名與後續下落未明。"
+			}
+		},
+		{
+			"kind": "relation",
+			"op": "add",
+			"entry": {
+				"id": "rel-wen-suchen-xuan-gu",
+				"status": "candidate",
+				"firstSeenChapter": "ch0007",
+				"from": "wen-suchen",
+				"to": "xuan-gu",
+				"description": "夫妾關係"
+			}
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0006-xuangu-pushed-into-room",
+				"status": "candidate",
+				"firstSeenChapter": "ch0006",
+				"chapterId": "ch0006",
+				"event": "石氏忙把璇姑推入房中，把門扣上。"
+			}
+		},
+		{
+			"kind": "timeline",
+			"op": "add",
+			"entry": {
+				"id": "tl-ch0007-accept-xuangu-concubine",
+				"status": "candidate",
+				"firstSeenChapter": "ch0007",
+				"chapterId": "ch0007",
+				"event": "「素臣聽到傷心之處，不覺淚涔涔下道：『你這裡牆卑室淺，這樣哭法，被人聽見，怎了？我如今情願收你為妾，你可住著啼哭。』」"
+			}
+		},
+		{
+			"kind": "foreshadowing",
+			"op": "add",
+			"entry": {
+				"id": "fs-suchen-recoil",
+				"status": "candidate",
+				"firstSeenChapter": "ch0007",
+				"plantedChapter": "ch0007",
+				"description": "「忽覺素臣那手如有所驚一般收縮不迭」「交股而睡，絕不動彈」，素臣臨事驚縮止動之因未解。"
+			}
+		}
+	],
+	"glossaryPatch": [
+		{
+			"id": "gloss-sanjiao-tongyuan",
+			"status": "candidate",
+			"firstSeenChapter": "ch0001",
+			"original": "三教同原",
+			"written": "《三教同原》",
+			"category": "思想著述",
+			"note": "以儒釋道同源為旨的著述或論題，遭文素臣作詩痛斥。"
+		},
+		{
+			"id": "jiaofang",
+			"status": "candidate",
+			"firstSeenChapter": "ch0004",
+			"original": "窖房",
+			"written": "窖房",
+			"category": "建築",
+			"note": "昭慶寺內關押或聚置女人的隱密處所。"
+		},
+		{
+			"id": "zhuyouke",
+			"status": "candidate",
+			"firstSeenChapter": "ch0005",
+			"original": "祝由科",
+			"written": "祝由科",
+			"category": "方技儀式",
+			"note": "行曇以祝由科醫治松庵，作法時引燃燭火致寺焚。"
+		},
+		{
+			"id": "gl-gougu-geyuan",
+			"status": "candidate",
+			"firstSeenChapter": "ch0007",
+			"original": "勾股割圓",
+			"written": "勾股割圓",
+			"category": "算學術語",
+			"note": "文素臣傳授璇姑的算學之法"
+		}
+	]
+}

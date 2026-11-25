@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type {
 	PlaybackHistory,
@@ -13,6 +14,8 @@ import {
 } from './legacy-saves/LegacySavePanel'
 
 const t = scoped('player')
+const slotsPerPage = 6
+const pageCount = Math.ceil(manualSaveSlots / slotsPerPage)
 
 export interface ProgressControlsProps {
 	workId: string
@@ -25,21 +28,29 @@ export interface ProgressControlsProps {
 	onHistoryStep(direction: 'back' | 'forward'): void
 }
 
+interface HistoryChapter {
+	chapterId: string
+	title: string
+}
+
 export function ProgressPanel({
 	view,
 	workId,
 	progress,
 	history,
+	chapters,
 	legacySaves,
 	onSlot,
 	onHistory,
 	onHistoryStep,
 }: ProgressControlsProps & {
 	view: 'save' | 'load' | 'history'
+	chapters: readonly HistoryChapter[]
 	onSlot(slot: SaveSlot): void
 }) {
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
 	const [failure, setFailure] = useState('')
+	const [page, setPage] = useState(0)
 	const occurrences = new Map<string, number>()
 	const historyEntries = history.entries.map((snapshot) => {
 		const position = JSON.stringify(snapshot.position)
@@ -47,6 +58,27 @@ export function ProgressPanel({
 		occurrences.set(position, occurrence)
 		return { snapshot, key: `${position}-${occurrence}` }
 	})
+	const historyGroups: {
+		chapterId: string
+		rows: ((typeof historyEntries)[number] & { index: number })[]
+	}[] = []
+	historyEntries.forEach((entry, index) => {
+		const chapterId = entry.snapshot.position.chapterId
+		const last = historyGroups.at(-1)
+		if (last?.chapterId === chapterId) last.rows.push({ ...entry, index })
+		else historyGroups.push({ chapterId, rows: [{ ...entry, index }] })
+	})
+	const chapterLabel = (chapterId: string) => {
+		const order = chapters.findIndex(
+			(chapter) => chapter.chapterId === chapterId,
+		)
+		return order === -1
+			? chapterId
+			: t('第 {{index}} 章 · {{title}}', {
+					index: order + 1,
+					title: chapters[order].title,
+				})
+	}
 	useEffect(() => {
 		if (view === 'history') return
 		let cancelled = false
@@ -95,19 +127,40 @@ export function ProgressPanel({
 					</button>
 				</div>
 				{history.entries.length ? (
-					historyEntries.map(({ snapshot, key }, index) => (
-						<button
-							type="button"
-							key={key}
-							aria-current={index === history.cursor ? 'step' : undefined}
-							onClick={() => onHistory(index)}
-						>
-							{index + 1}.{' '}
-							{snapshot.stage.text.content
-								.map((part) => (part.type === 'text' ? part.text : ''))
-								.join('')}
-						</button>
-					))
+					<div className="nl-history-groups">
+						{historyGroups.map(({ chapterId, rows }) => (
+							<section
+								key={rows[0].key}
+								className="nl-history-list"
+								aria-label={chapterLabel(chapterId)}
+							>
+								<h3 className="nl-history-chapter">
+									{chapterLabel(chapterId)}
+								</h3>
+								{rows.map(({ snapshot, key, index }) => (
+									<button
+										type="button"
+										key={key}
+										className="nl-history-row"
+										aria-current={index === history.cursor ? 'step' : undefined}
+										onClick={() => onHistory(index)}
+									>
+										{snapshot.stage.text.displayName && (
+											<span className="nl-history-speaker" aria-hidden="true">
+												{snapshot.stage.text.displayName}
+											</span>
+										)}
+										<span className="nl-history-text">
+											<span className="nl-history-index">{index + 1}.</span>{' '}
+											{snapshot.stage.text.content
+												.map((part) => (part.type === 'text' ? part.text : ''))
+												.join('')}
+										</span>
+									</button>
+								))}
+							</section>
+						))}
+					</div>
 				) : (
 					<p>{t('暂无历史记录')}</p>
 				)}
@@ -130,6 +183,7 @@ export function ProgressPanel({
 						<button
 							type="button"
 							key={name}
+							hidden={Math.floor(index / slotsPerPage) !== page}
 							aria-label={
 								view === 'save'
 									? t('存档槽位 {{index}}', { index: index + 1 })
@@ -146,18 +200,58 @@ export function ProgressPanel({
 									alt={t('槽位 {{value}} 缩略图', { value: index + 1 })}
 								/>
 							) : (
-								<span className="nl-save-empty">{t('空槽位')}</span>
+								<span className="nl-save-empty">
+									<Save size={22} strokeWidth={1.8} aria-hidden="true" />
+								</span>
 							)}
-							<span>{t('槽位 {{value}}', { value: index + 1 })}</span>
-							{entry && (
+							<span className="nl-save-title">
+								{entry
+									? t('槽位 {{value}}', { value: index + 1 })
+									: t('空存档位')}
+							</span>
+							{entry ? (
 								<time dateTime={entry.savedAt}>
 									{new Date(entry.savedAt).toLocaleString()}
 								</time>
+							) : (
+								<span className="nl-save-meta">—</span>
 							)}
 						</button>
 					)
 				})}
 			</div>
+			<nav className="nl-save-pages" aria-label={t('存档分页')}>
+				<button
+					type="button"
+					className="nl-save-page-step nl-focus-skip"
+					aria-label={t('上一页')}
+					disabled={page === 0}
+					onClick={() => setPage(page - 1)}
+				>
+					<ChevronLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+				</button>
+				{Array.from({ length: pageCount }, (_, value) => (
+					<button
+						type="button"
+						// biome-ignore lint/suspicious/noArrayIndexKey: pages are fixed positions
+						key={value}
+						className="nl-save-page nl-focus-skip"
+						aria-current={value === page ? 'page' : undefined}
+						onClick={() => setPage(value)}
+					>
+						{value + 1}
+					</button>
+				))}
+				<button
+					type="button"
+					className="nl-save-page-step nl-focus-skip"
+					aria-label={t('下一页')}
+					disabled={page === pageCount - 1}
+					onClick={() => setPage(page + 1)}
+				>
+					<ChevronRight size={16} strokeWidth={1.8} aria-hidden="true" />
+				</button>
+			</nav>
 		</>
 	)
 }

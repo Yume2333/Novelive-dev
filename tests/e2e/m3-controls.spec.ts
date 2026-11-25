@@ -46,7 +46,9 @@ test.describe('M3 player controls', () => {
 		})
 		try {
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await app.evaluate(({ dialog }, path) => {
 				dialog.showOpenDialog = async () => ({
 					canceled: false,
@@ -113,7 +115,9 @@ test.describe('M3 player controls', () => {
 		})
 		try {
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await app.evaluate(({ dialog }, path) => {
 				dialog.showOpenDialog = async () => ({
 					canceled: false,
@@ -247,7 +251,9 @@ test.describe('M3 player controls', () => {
 				env: { ...process.env, ELECTRON_RENDERER_URL: '', NL_REPLAY: 'strict' },
 			})
 			const page = await app.firstWindow()
-			await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+			await expect(
+				page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+			).toHaveText('创作端已就绪')
 			await page.evaluate((id) => {
 				window.location.hash = `/work/${id}/play`
 			}, playerWorkId)
@@ -285,9 +291,40 @@ test.describe('M3 player controls', () => {
 				page.getByLabel('自动播放', { exact: true }),
 			).not.toBeChecked()
 			await expect(page.getByLabel('跳过已读')).not.toBeChecked()
+			const savePages = page.getByRole('navigation', { name: '存档分页' })
+			await page.getByRole('button', { name: '存档', exact: true }).click()
+			await savePages.getByRole('button', { name: '2', exact: true }).click()
+			await page
+				.getByRole('button', { name: '存档槽位 7', exact: true })
+				.click()
+			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await menu()
 			await page.getByRole('button', { name: '读档', exact: true }).click()
 			await expect(
 				page.getByRole('button', { name: '返回菜单', exact: true }),
+			).toBeFocused()
+			const secondPage = savePages.getByRole('button', {
+				name: '2',
+				exact: true,
+			})
+			for (let step = 0; step < 6; step++) {
+				if (
+					await secondPage.evaluate((node) => node === document.activeElement)
+				)
+					break
+				await page.keyboard.press('Tab')
+			}
+			await expect(secondPage).toBeFocused()
+			await page.keyboard.press('Enter')
+			await expect(secondPage).toHaveAttribute('aria-current', 'page')
+			await expect(
+				page.getByRole('button', { name: '读档槽位 7', exact: true }),
+			).toBeEnabled()
+			await page.keyboard.press('Shift+Tab')
+			await page.keyboard.press('Shift+Tab')
+			await page.keyboard.press('Shift+Tab')
+			await expect(
+				page.getByRole('button', { name: '读档槽位 7', exact: true }),
 			).toBeFocused()
 			await menu()
 			await menu()
@@ -310,7 +347,7 @@ test.describe('M3 player controls', () => {
 				'naturalHeight',
 				270,
 			)
-			await expect(page.locator('time')).toBeVisible()
+			await expect(page.locator('time').first()).toBeVisible()
 			await mkdir('.workflow/evidence/m3-playback', { recursive: true })
 			await page.screenshot({
 				path: '.workflow/evidence/m3-playback/05-controls-saves.png',
@@ -324,6 +361,17 @@ test.describe('M3 player controls', () => {
 			await expect(text()).toHaveText('第二章开始。')
 			await menu()
 			await page.getByRole('button', { name: '历史记录', exact: true }).click()
+			await expect(page.locator('.nl-history-chapter')).toHaveCount(2)
+			await expect(
+				page
+					.getByRole('region', { name: /晨光/ })
+					.getByRole('button', { name: '3. 第二章开始。', exact: true }),
+			).toBeVisible()
+			await expect(
+				page
+					.getByRole('region', { name: /晨光/ })
+					.getByRole('button', { name: '1. 你好，世界。', exact: true }),
+			).toHaveCount(0)
 			await page
 				.getByRole('button', { name: '1. 你好，世界。', exact: true })
 				.click()
@@ -667,7 +715,9 @@ test.describe('M3 player controls', () => {
 			})
 			try {
 				const page = await app.firstWindow()
-				await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+				await expect(
+					page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+				).toHaveText('创作端已就绪')
 				await page.evaluate(() => {
 					document.body.dataset.playerWaitEntries = '0'
 					window.addEventListener('novelive:player-waiting', (event) => {
@@ -696,6 +746,11 @@ test.describe('M3 player controls', () => {
 					const viewport = page.locator('.nl-player-text')
 					if (await viewport.count())
 						await expect(viewport).toHaveAttribute('data-text-finished', 'true')
+					// A click during a stage transition completes it instead of advancing.
+					await expect(page.locator('.nl-player-stage')).toHaveAttribute(
+						'aria-busy',
+						'false',
+					)
 					await canvas.click({ position: { x: 20, y: 20 } })
 				}
 				async function range(label: string, value: number) {
@@ -727,7 +782,9 @@ test.describe('M3 player controls', () => {
 						.press('End')
 					await page.getByLabel('瞬间显示').check()
 					await range('自动播放倍率', 2)
-					await page.getByLabel('对话框样式').selectOption('paper')
+					await page
+						.getByRole('button', { name: '浅色纸笺', exact: true })
+						.click()
 					await expect(page.locator('.nl-player-textbox')).toHaveCSS(
 						'font-size',
 						'36px',
@@ -815,7 +872,7 @@ test.describe('M3 player controls', () => {
 					await page.getByRole('button', { name: '返回游戏' }).focus()
 					await page.keyboard.press('Shift+Tab')
 					await expect(
-						page.getByRole('button', { name: '设置', exact: true }),
+						page.getByRole('button', { name: '隐藏界面', exact: true }),
 					).toBeFocused()
 					await page.keyboard.press('Tab')
 					await expect(

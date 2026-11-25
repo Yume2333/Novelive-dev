@@ -72,6 +72,7 @@
 	"最大输出": "Max output",
 	"最大输出量": "Maximum output",
 	"未填写模型名": "Model name not provided",
+	"未填模型": "No model set",
 	"未设置": "Not set",
 	"未配置": "Not configured",
 	"查找": "Find",
@@ -125,6 +126,7 @@
 	"鉴权失败，请检查接口地址、API Key 和模型名。": "Authentication failed; check the API endpoint, API Key, and model name.",
 	"预设名称": "Preset name",
 	"高": "High",
+	"高级": "Advanced",
 	"高级设置": "Advanced settings",
 	"高级设置已保存": "Advanced settings saved",
 	"默认工程位置": "Default project location"

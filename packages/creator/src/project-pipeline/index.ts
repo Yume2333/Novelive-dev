@@ -74,6 +74,7 @@ export async function prepareVolume(
 	const preview = await previewBook(project, chapters, {
 		connection: previewConnection,
 		language: options.language,
+		preserveSourceWording: options.preserveSourceWording,
 		fetch: options.fetch,
 		signal: options.signal,
 	})

@@ -9,7 +9,13 @@ fileAssociations:
 files:
   - out/**
   - "!out/licenses/**"
-asar: false
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - "**/*.so*"
+  - "**/node_modules/sharp/**"
+  - "**/node_modules/@img/**"
+  - "**/node_modules/onnxruntime-node/**"
 npmRebuild: false
 publish:
   provider: generic

@@ -68,15 +68,17 @@ export function ProductionSettings({
 
 	return (
 		<section aria-labelledby="production-settings">
-			<h2 id="production-settings">
+			<h2 id="production-settings" className={styles.advanced}>
 				<button
 					className={styles.expand}
 					type="button"
+					aria-label={t('高级设置')}
 					aria-expanded={open}
 					aria-controls="production-settings-panel"
 					onClick={() => setOpen((value) => !value)}
 				>
-					{t('高级设置')} <ChevronDown size={16} aria-hidden="true" />
+					<span className="label-caps label-caps-zh">{t('高级')}</span>{' '}
+					<ChevronDown size={16} aria-hidden="true" />
 				</button>
 			</h2>
 			<Collapse open={open}>

@@ -23,9 +23,11 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Collapse } from '../../components/Collapse'
+import { Page } from '../../components/Page'
 import { localeNames, locales, msg, scoped } from '../../i18n'
 import type { SettingsHost } from '../../shell/AppShell'
 import {
+	formatLabel,
 	type ModelDraft,
 	Select,
 	themes,
@@ -52,7 +54,7 @@ const capabilities = [
 type ImageTests = CommandOutput<'model.testImage'>
 type TestResult = ImageTests | CommandOutput<'model.testText'>
 
-function readableError(error: unknown): CommandError {
+export function readableError(error: unknown): CommandError {
 	const failure =
 		error && typeof error === 'object' && 'code' in error
 			? (error as CommandError)
@@ -285,7 +287,15 @@ function TextCard({
 		<ModelCard
 			title={title}
 			icon={icon}
-			summary={[model.model, connection.baseUrl].filter(Boolean).join(' · ')}
+			summary={[
+				model.model || t('未填模型'),
+				formatLabel(connection.format),
+				slot !== 'fast' && 'inheritFast' in model && model.inheritFast
+					? t('同快速模型')
+					: '',
+			]
+				.filter(Boolean)
+				.join(' · ')}
 			configured={Boolean(
 				model.model && connection.baseUrl && connection.apiKeyMasked,
 			)}
@@ -307,11 +317,36 @@ function ImageCard({
 		<ModelCard
 			title={t('图片模型')}
 			icon={Image}
-			summary={[model.model, model.baseUrl].filter(Boolean).join(' · ')}
+			summary={model.model || t('未填模型')}
 			configured={Boolean(model.model && model.baseUrl && model.apiKeyMasked)}
 			draft={draft}
 			testModel={() => window.novelive.call('model.testImage', {})}
 		/>
+	)
+}
+
+/** Model cards shared by settings and the welcome flow. */
+export function ModelCards({
+	models,
+	update,
+}: {
+	models: MaskedConfig['models']
+	update: SettingsHost['updateConfig']
+}) {
+	return (
+		<div className={`${styles.page} ${styles.cards}`}>
+			{textSlots.map(([slot, title, icon]) => (
+				<TextCard
+					key={slot}
+					slot={slot}
+					title={t(title)}
+					icon={icon}
+					models={models}
+					update={update}
+				/>
+			))}
+			<ImageCard model={models.image} update={update} />
+		</div>
 	)
 }
 
@@ -352,158 +387,155 @@ export function SettingsPage() {
 		}
 	}
 	return (
-		<section className={styles.page}>
-			<h1>{t('设置')}</h1>
-			{error && (
-				<p role="alert" className={styles.warning}>
-					{error}
-				</p>
-			)}
-			{!config ? (
-				<p className={styles.muted}>{t('正在读取设置…')}</p>
-			) : 'configError' in config ? (
-				<div className={styles.warning} role="alert">
-					<AlertTriangle size={19} aria-hidden="true" />
-					<div>
-						<strong>{t('配置文件无法读取')}</strong>
-						<p>{config.configError.reason}</p>
-						<p className={styles.path}>{config.configError.path}</p>
-					</div>
-					<button
-						type="button"
-						disabled={resetting}
-						onClick={() => {
-							setResetting(true)
-							void apply(resetConfig).finally(() => setResetting(false))
-						}}
-					>
-						{t('重置配置')}
-					</button>
-				</div>
-			) : (
-				<>
-					<section aria-labelledby="model-settings">
-						<h2 id="model-settings">{t('模型')}</h2>
-						<div className={styles.cards}>
-							{textSlots.map(([slot, title, icon]) => (
-								<TextCard
-									key={slot}
-									slot={slot}
-									title={t(title)}
-									icon={icon}
-									models={config.models}
-									update={updateConfig}
-								/>
-							))}
-							<ImageCard model={config.models.image} update={updateConfig} />
+		<Page title={t('设置')} width={760}>
+			<div className={styles.page}>
+				{error && (
+					<p role="alert" className={styles.warning}>
+						{error}
+					</p>
+				)}
+				{!config ? (
+					<p className={styles.muted}>{t('正在读取设置…')}</p>
+				) : 'configError' in config ? (
+					<div className={styles.warning} role="alert">
+						<AlertTriangle size={19} aria-hidden="true" />
+						<div>
+							<strong>{t('配置文件无法读取')}</strong>
+							<p>{config.configError.reason}</p>
+							<p className={styles.path}>{config.configError.path}</p>
 						</div>
+						<button
+							type="button"
+							disabled={resetting}
+							onClick={() => {
+								setResetting(true)
+								void apply(resetConfig).finally(() => setResetting(false))
+							}}
+						>
+							{t('重置配置')}
+						</button>
+					</div>
+				) : (
+					<>
+						<section aria-labelledby="model-settings">
+							<h2 id="model-settings" className="label-caps label-caps-zh">
+								{t('模型')}
+							</h2>
+							<ModelCards models={config.models} update={updateConfig} />
+						</section>
 						<ProductionSettings
 							config={config.production}
 							update={updateConfig}
 						/>
-					</section>
-					<section aria-labelledby="appearance-settings">
-						<h2 id="appearance-settings">{t('界面')}</h2>
-						<div className={`${styles.card} ${styles.appearance}`}>
-							<SettingRow title={t('界面语言')} icon={Globe}>
-								<Select
-									label={t('界面语言')}
-									options={locales.map(
-										(locale) => [locale, localeNames[locale]] as const,
-									)}
-									value={config.language}
-									onChange={(language) =>
-										void apply(() => updateConfig({ language }))
-									}
-								/>
-							</SettingRow>
-							<SettingRow title={t('主题')} icon={Contrast}>
-								<Select
-									label={t('主题')}
-									options={themes.map(
-										([value, name]) => [value, t(name)] as const,
-									)}
-									value={config.theme}
-									onChange={(theme) =>
-										void apply(() => updateConfig({ theme }))
-									}
-								/>
-							</SettingRow>
+						<section aria-labelledby="appearance-settings">
+							<h2 id="appearance-settings" className="label-caps label-caps-zh">
+								{t('界面')}
+							</h2>
+							<div className={`${styles.card} ${styles.appearance}`}>
+								<SettingRow title={t('界面语言')} icon={Globe}>
+									<Select
+										label={t('界面语言')}
+										options={locales.map(
+											(locale) => [locale, localeNames[locale]] as const,
+										)}
+										value={config.language}
+										onChange={(language) =>
+											void apply(() => updateConfig({ language }))
+										}
+									/>
+								</SettingRow>
+								<SettingRow title={t('主题')} icon={Contrast}>
+									<Select
+										label={t('主题')}
+										options={themes.map(
+											([value, name]) => [value, t(name)] as const,
+										)}
+										value={config.theme}
+										onChange={(theme) =>
+											void apply(() => updateConfig({ theme }))
+										}
+									/>
+								</SettingRow>
+							</div>
+						</section>
+						<section aria-labelledby="project-settings">
+							<h2 id="project-settings" className="label-caps label-caps-zh">
+								{t('工程')}
+							</h2>
+							<div className={styles.card}>
+								<SettingRow title={t('默认工程位置')} icon={FolderOpen}>
+									<small className={styles.path}>
+										{config.projectDir || t('未设置')}
+									</small>
+									<button
+										type="button"
+										onClick={() =>
+											void apply(async () => {
+												const projectDir = await window.novelive.pickFolder()
+												if (projectDir !== null)
+													await updateConfig({ projectDir })
+											})
+										}
+									>
+										{t('更改')}
+									</button>
+								</SettingRow>
+							</div>
+						</section>
+					</>
+				)}
+				<section aria-labelledby="about-settings">
+					<h2 id="about-settings" className="label-caps label-caps-zh">
+						{t('关于')}
+					</h2>
+					<div className={`${styles.card} ${styles.about}`}>
+						<div className={styles.row}>
+							<IconTile icon={BookOpen} />
+							<span>
+								<strong>Novelive</strong>
+								<small>{t('把小说改编为视觉小说并直接游玩。')}</small>
+							</span>
+							<small>{about && `v${about.version} · `}AGPL-3.0</small>
 						</div>
-					</section>
-					<section aria-labelledby="project-settings">
-						<h2 id="project-settings">{t('工程')}</h2>
-						<div className={styles.card}>
-							<SettingRow title={t('默认工程位置')} icon={FolderOpen}>
-								<small className={styles.path}>
-									{config.projectDir || t('未设置')}
-								</small>
+						{aboutHost && (
+							<div className={styles.aboutLinks}>
 								<button
 									type="button"
-									onClick={() =>
-										void apply(async () => {
-											const projectDir = await window.novelive.pickFolder()
-											if (projectDir !== null)
-												await updateConfig({ projectDir })
-										})
-									}
+									onClick={() => void apply(() => aboutHost.open('license'))}
 								>
-									{t('更改')}
+									{t('开源许可')}
 								</button>
-							</SettingRow>
-						</div>
-					</section>
-				</>
-			)}
-			<section aria-labelledby="about-settings">
-				<h2 id="about-settings">{t('关于')}</h2>
-				<div className={`${styles.card} ${styles.about}`}>
-					<div className={styles.row}>
-						<IconTile icon={BookOpen} />
-						<span>
-							<strong>Novelive</strong>
-							<small>{t('把小说改编为视觉小说并直接游玩。')}</small>
-						</span>
-						<small>{about && `v${about.version} · `}AGPL-3.0</small>
+								{about?.packaged && (
+									<button
+										type="button"
+										onClick={() => void apply(() => aboutHost.open('notices'))}
+									>
+										{t('第三方许可')}
+									</button>
+								)}
+								<button
+									type="button"
+									onClick={() => void apply(() => aboutHost.open('source'))}
+								>
+									{t('源代码')}
+								</button>
+								<button
+									type="button"
+									disabled={checkingUpdates}
+									onClick={() => {
+										setCheckingUpdates(true)
+										void apply(() => aboutHost.checkUpdates()).finally(() =>
+											setCheckingUpdates(false),
+										)
+									}}
+								>
+									{checkingUpdates ? t('正在检查…') : t('检查更新')}
+								</button>
+							</div>
+						)}
 					</div>
-					{aboutHost && (
-						<div className={styles.aboutLinks}>
-							<button
-								type="button"
-								onClick={() => void apply(() => aboutHost.open('license'))}
-							>
-								{t('开源许可')}
-							</button>
-							{about?.packaged && (
-								<button
-									type="button"
-									onClick={() => void apply(() => aboutHost.open('notices'))}
-								>
-									{t('第三方许可')}
-								</button>
-							)}
-							<button
-								type="button"
-								onClick={() => void apply(() => aboutHost.open('source'))}
-							>
-								{t('源代码')}
-							</button>
-							<button
-								type="button"
-								disabled={checkingUpdates}
-								onClick={() => {
-									setCheckingUpdates(true)
-									void apply(() => aboutHost.checkUpdates()).finally(() =>
-										setCheckingUpdates(false),
-									)
-								}}
-							>
-								{checkingUpdates ? t('正在检查…') : t('检查更新')}
-							</button>
-						</div>
-					)}
-				</div>
-			</section>
-		</section>
+				</section>
+			</div>
+		</Page>
 	)
 }

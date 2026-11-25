@@ -1,6 +1,7 @@
 # M1a 工程与全书理解
 
-**Status:** in progress
+**Status:** done
+**Accepted:** 2026-11-24 by agent (omp-vibe-windows)
 **Priority:** high
 **Blocked by:** m0-skeleton/11
 

@@ -120,7 +120,7 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			).toBeDisabled()
 			await confirm.click()
 			await expect(
-				page.getByRole('heading', { name: '制作', exact: true }),
+				page.getByRole('heading', { name: '白塔来信 · 制作', exact: true }),
 			).toBeVisible()
 			await expect(page.getByText('写剧本', { exact: true })).toBeVisible()
 			expect(await fixture.calls('production.confirmVisual')).toEqual([
@@ -141,11 +141,10 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			await fixture.publish('first')
 			await page.getByRole('link', { name: '确认第一章' }).click()
 			await expect(
-				page.getByRole('region', { name: '第一章成品' }),
-			).toContainText('已发布')
-			await expect(
-				page.getByRole('region', { name: '第一章成品' }),
-			).toContainText('需要处理')
+				page.getByText('第 1 章 · 灯塔 · 2 个场景', { exact: false }),
+			).toBeVisible()
+			const scene = page.getByRole('region', { name: '灯塔', exact: true })
+			await expect(scene).toContainText('灯塔的第一句。')
 			await expect(
 				page.getByRole('link', { name: '试玩第一章' }),
 			).toHaveAttribute('href', `#/work/${workId}/play`)
@@ -186,6 +185,56 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			await expect(
 				page.getByRole('region', { name: '制作状态' }),
 			).toContainText('已发布 2 / 2 章')
+			await failed.hover()
+			await page.evaluate(async (id) => {
+				const position = {
+					chapterId: 'two',
+					sceneId: 'aaaabbbb',
+					sentenceId: '0001',
+				}
+				await window.novelive.host.progress?.save(id, {
+					mainline: position,
+					saves: [],
+					read: [position],
+				})
+			}, workId)
+			await failed.getByRole('link', { name: '游玩', exact: true }).click()
+			await expect(page).toHaveURL(
+				new RegExp(`/work/${workId}/play\\?chapter=two$`),
+			)
+			await expect
+				.poll(() => fixture.calls('production.playerChapter'))
+				.toContainEqual({
+					workId,
+					chapterId: 'two',
+				})
+			await expect(page.locator('.nl-text-display')).toHaveText(
+				'潮汐的第一句。',
+			)
+			await page.locator('.nl-player').click()
+			await page.locator('.nl-player').click()
+			await expect(page.locator('.nl-text-display')).toHaveText(
+				'潮汐的下一句。',
+			)
+			await expect
+				.poll(async () =>
+					page.evaluate(
+						async (id) => (await window.novelive.host.progress?.load(id))?.read,
+						workId,
+					),
+				)
+				.toContainEqual({
+					chapterId: 'two',
+					sceneId: 'aaaabbbb',
+					sentenceId: '0002',
+				})
+			expect(
+				await page.evaluate(
+					async (id) =>
+						(await window.novelive.host.progress?.load(id))?.mainline,
+					workId,
+				),
+			).toEqual({ chapterId: 'two', sceneId: 'aaaabbbb', sentenceId: '0001' })
 		} finally {
 			await app.close()
 		}

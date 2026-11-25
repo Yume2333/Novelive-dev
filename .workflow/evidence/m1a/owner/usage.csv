@@ -17,3 +17,9 @@ date,model,calls,tokens,images,purpose
 2026-11-23,devin-swe-2,1,68396,0,W4 global selection-only at 9b2e274 measured from relay response
 2026-11-23,devin-swe-2,1,80047,0,W4 aligned global selection-only at c8ae66d measured from relay response
 2026-11-23,devin-swe-2,1,67799,0,W4 global salience selection-only at 0990bec measured from relay response
+2026-11-25,gemini-3.8-flash,23,256499,0,W4 rebuilt-reference runs (run1+run2+sel1) preview usage measured from relay responses
+2026-11-25,devin-swe-2,116,970433,0,W4 rebuilt-reference runs (run1+run2+sel1) extraction and selection usage measured from relay responses
+2026-11-25,devin-swe-2,14,225611,0,W4 rebuilt-reference runs (run1+run2+sel1) conservative upper-bound reservations
+2026-11-25,gemini-3.8-flash,31,350383,0,W4 passing-window runs (v2+v3+v4+v5) preview usage measured from relay responses
+2026-11-25,devin-swe-2,71,692273,0,W4 passing-window runs (v2+v3+v4+v5) extraction and selection usage measured from relay responses
+2026-11-25,devin-swe-2,1,17931,0,W4 passing-window runs (v2+v3+v4+v5) conservative upper-bound reservation

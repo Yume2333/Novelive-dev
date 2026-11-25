@@ -3447,3 +3447,121 @@ test('changing a source preview during the run prevents publication', async () =
 		code: 'ENOENT',
 	})
 })
+
+test('consolidating multi-chapter relation observations preserves initial description in consolidated patch', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const guide = {
+		id: 'guide',
+		name: 'Lin',
+		aliases: [],
+		status: 'candidate' as const,
+	}
+	const patch: BiblePatch = [
+		{ kind: 'character', op: 'add', observedChapter: 'c1', entry: guide },
+		{
+			kind: 'relation',
+			op: 'add',
+			observedChapter: 'c1',
+			entry: {
+				id: 'ada-lin',
+				from: 'ada',
+				to: 'guide',
+				firstSeenChapter: 'c1',
+				description: 'Allies: Lin guides Ada through the fog.',
+				status: 'candidate',
+			},
+		},
+		{
+			kind: 'relation',
+			op: 'update',
+			observedChapter: 'c2',
+			entry: {
+				id: 'ada-lin',
+				from: 'ada',
+				to: 'guide',
+				description: 'Sworn companions after crossing the bridge.',
+				status: 'candidate',
+			},
+		},
+	]
+	const { consolidated } = await applyPatches(
+		project,
+		await readBible(project),
+		patch,
+		[],
+		new Set(chapters),
+	)
+	const merged = consolidated.get(patch[1])
+	expect(merged).toMatchObject({
+		kind: 'relation',
+		op: 'add',
+		entry: {
+			id: 'ada-lin',
+			description: 'Allies: Lin guides Ada through the fog.',
+			changes: [
+				{
+					chapterId: 'c1',
+					field: 'description',
+					value: 'Allies: Lin guides Ada through the fog.',
+				},
+				{
+					chapterId: 'c2',
+					field: 'description',
+					value: 'Sworn companions after crossing the bridge.',
+				},
+			],
+		},
+	})
+})
+
+test('preserveSourceWording adds extractive timeline and naming guidance to extraction and selection prompts', async () => {
+	await seed(root)
+	using project = await Project.open(root)
+	const prompts: string[] = []
+	const sse = (result: unknown) =>
+		new Response(
+			`data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', content: JSON.stringify(result) }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`,
+			{ headers: { 'content-type': 'text/event-stream' } },
+		)
+	const fetch: typeof globalThis.fetch = async (input, init) => {
+		const { messages } = await new Request(input, init).json()
+		const prompt = messages[0].content as string
+		prompts.push(prompt)
+		if (prompt.includes('Candidates:\n')) return sse({ keep: [1] })
+		return sse({
+			overview: 'Ada leaves harbor.',
+			chapters: chapters.map((chapterId) => ({
+				chapterId,
+				progress: 'Ada leaves harbor.',
+			})),
+			event: 'Ada leaves harbor.',
+			is_last: true,
+			biblePatch: [
+				{
+					kind: 'timeline',
+					op: 'add',
+					entry: {
+						id: 't1',
+						chapterId: 'c1',
+						event: 'Ada leaves harbor.',
+						status: 'candidate',
+					},
+				},
+			],
+			glossaryPatch: [],
+		})
+	}
+	await synthesizeVolume(project, 'v1', chapters, {
+		...options,
+		strategy: 'events',
+		preserveSourceWording: true,
+		fetch,
+	})
+	expect(prompts[0]).toContain('Source wording fidelity:')
+	expect(prompts[0]).toContain('"timelineNotes":')
+	expect(prompts[0]).not.toContain('"inputFingerprint":')
+	expect(prompts[1]).toContain(
+		'keep strictly one primary turning-point entry per chapter',
+	)
+})

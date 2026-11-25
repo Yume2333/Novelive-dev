@@ -13,4 +13,4 @@
 ## Progress
 
 - 严格回放通过。导出成功后由宿主更新工程版本；作品升级时，先停止并排空旧会话写入，再迁移。
-- 回放覆盖应用接收文件路径，未验证文件管理器双击。测试机未安装 AppImage 桌面集成，也未使用 Windows/macOS 原生机器。详见 [M5 Linux](../../evidence/m5/linux/README.md) 和 [M5 复核](../../evidence/m5/closeout/README.md)。
+- Linux 端已完成 AppImage 包装器完整回放（FUSE 与 `APPIMAGE_EXTRACT_AND_RUN=1`）及隔离 XDG 下的 `xdg-mime`/`xdg-open` 桌面文件关联验证（冷启动、删除原包离线播放、播放中第二实例升级、含空格/中文 `%U` `file://` URI 解码）；Windows/macOS 原生文件管理器双击待各自原生机验证。详见 [M5 Linux](../../evidence/m5/linux/README.md) 和 [M5 复核](../../evidence/m5/closeout/README.md)。

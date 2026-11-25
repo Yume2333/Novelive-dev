@@ -1,5 +1,17 @@
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { app } from 'electron'
+
+function parsePackageArg(arg: string, cwd: string) {
+	if (/^file:\/\//i.test(arg)) {
+		try {
+			return fileURLToPath(arg)
+		} catch {
+			return null
+		}
+	}
+	return resolve(cwd, arg)
+}
 
 export function collectPackageOpens(notify: () => void) {
 	const files: string[] = []
@@ -9,7 +21,11 @@ export function collectPackageOpens(notify: () => void) {
 		notify()
 	}
 	function collect(args: string[], cwd: string) {
-		for (const arg of args) if (!arg.startsWith('-')) enqueue(resolve(cwd, arg))
+		for (const arg of args) {
+			if (arg.startsWith('-')) continue
+			const path = parsePackageArg(arg, cwd)
+			if (path) enqueue(path)
+		}
 	}
 	app.on('open-file', (event, path) => {
 		event.preventDefault()

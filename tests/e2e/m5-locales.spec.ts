@@ -15,7 +15,11 @@ const require = createRequire(
 )
 const locales = ['zh-CN', 'zh-TW', 'en', 'ja'] as const
 type Locale = (typeof locales)[number]
-const text = (locale: Locale, ns: 'shell' | 'settings', key: string) =>
+const text = (
+	locale: Locale,
+	ns: 'shell' | 'settings' | 'usage',
+	key: string,
+) =>
 	JSON.parse(
 		readFileSync(`packages/ui/src/locales/${locale}/${ns}.json`, 'utf8'),
 	)[key] as string
@@ -67,7 +71,9 @@ test('M5 locales switch the interface through four languages and persist', async
 			for (const [key, name] of pages) {
 				const label = text(locale, 'shell', key)
 				await page.getByRole('link', { name: label, exact: true }).click()
-				await expect(page.getByRole('heading', { level: 1 })).toHaveText(label)
+				await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+					name === 'usage' ? text(locale, 'usage', '用量统计') : label,
+				)
 				expect(await overflowing(page), `${locale} ${name}`).toEqual([])
 				await page.screenshot({
 					path: `.workflow/evidence/m5/localization/${locale}-${name}.png`,

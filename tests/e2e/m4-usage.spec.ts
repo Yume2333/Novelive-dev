@@ -131,17 +131,16 @@ test('M4 usage and stale assets', async () => {
 			await expect(
 				page.getByRole('region', { name: '已发生用量' }),
 			).toContainText('fixture-art-image')
-			const disclosure = page.getByRole('button', { name: '用量说明' })
-			await expect(disclosure).toHaveAttribute('aria-expanded', 'false')
-			await disclosure.click()
-			await expect(disclosure).toHaveAttribute('aria-expanded', 'true')
+			await page.getByRole('button', { name: '用量说明' }).click()
 			await expect(
-				page.getByText(
-					'仅供参考，统计已发生的调用；不估算费用，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
-				),
+				page
+					.getByRole('tooltip')
+					.getByText(
+						'文本按 tokens，图片按张数；参考金额只计入有单价的调用，仅供参考，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
+					),
 			).toBeVisible()
-			await disclosure.click()
-			await expect(disclosure).toHaveAttribute('aria-expanded', 'false')
+			await page.keyboard.press('Escape')
+			await expect(page.getByRole('tooltip')).toHaveCount(0)
 			const scope = { level: 'series' } as const
 			const character = {
 				id: 'xia',
@@ -230,6 +229,11 @@ test('M4 usage and stale assets', async () => {
 					{ workId, volumeId },
 				)
 				await page.reload()
+				{
+					const chip = page.getByRole('button', { name: /^候选与冲突/ })
+					if ((await chip.getAttribute('aria-expanded')) !== 'true')
+						await chip.click()
+				}
 				await page
 					.getByRole('article', { name: id, exact: true })
 					.getByRole('button', { name: '接受候选' })

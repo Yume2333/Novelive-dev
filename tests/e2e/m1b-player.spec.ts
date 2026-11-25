@@ -58,7 +58,9 @@ for (const missingAsset of [false, true]) {
 					() => innerWidth === 960 && innerHeight === 540,
 				)
 				await expect(page).toHaveURL(/^file:.*\/out\/renderer\/index\.html$/)
-				await expect(page.getByRole('status')).toHaveText('创作端已就绪')
+				await expect(
+					page.getByRole('status').filter({ hasText: /^创作端已就绪$/ }),
+				).toHaveText('创作端已就绪')
 				await app.evaluate(({ dialog }, path) => {
 					dialog.showOpenDialog = async () => ({
 						canceled: false,
