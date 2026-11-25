@@ -4,7 +4,7 @@
 	gap: var(--space-5);
 }
 
-.panel section > :first-child {
+.sectionLabel {
 	margin-bottom: 10px;
 	color: var(--color-outline);
 }

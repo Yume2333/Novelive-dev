@@ -104,7 +104,9 @@ export function ProductionQueuePanel({
 			) : null}
 			{(queue.active || queue.queued.length > 0) && (
 				<section>
-					<SectionLabel>{t('排队中')}</SectionLabel>
+					<div className={styles.sectionLabel}>
+						<SectionLabel>{t('排队中')}</SectionLabel>
+					</div>
 					<div className={styles.rows}>
 						{queue.active && (
 							<div className={`glass-panel ${styles.row}`}>
@@ -160,7 +162,9 @@ export function ProductionQueuePanel({
 			)}
 			{awaitingConfirm.length > 0 && (
 				<section>
-					<SectionLabel>{t('等你确认')}</SectionLabel>
+					<div className={styles.sectionLabel}>
+						<SectionLabel>{t('等你确认')}</SectionLabel>
+					</div>
 					<ul className={styles.rows}>
 						{awaitingConfirm.map((work) => (
 							<li key={work.link.workId}>
@@ -189,13 +193,15 @@ export function ProductionQueuePanel({
 			)}
 			{inactive.length > 0 && (
 				<section>
-					<SectionLabel>{t('未在排队')}</SectionLabel>
+					<div className={styles.sectionLabel}>
+						<SectionLabel>{t('未在排队')}</SectionLabel>
+					</div>
 					<ul className={styles.rows}>
 						{inactive.map((work) => {
 							const resumableRow =
 								work.status === 'paused' &&
 								work.reason !== 'chapter_failed' &&
-								(queue.active !== null || resumable.length > 1)
+								work !== promoted
 							return (
 								<li
 									className={`glass-panel ${styles.row}`}
