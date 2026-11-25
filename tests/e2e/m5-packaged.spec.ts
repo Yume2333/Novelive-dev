@@ -189,11 +189,12 @@ test.describe('M5 packaged application smoke verification', () => {
 		const fixturePath = join(directory, 'fixture.novelive')
 
 		let servedMetadata = initialMetadata
-		const requests: { method: string; url: string }[] = []
+		const requests: { method: string; url: string; pathname: string }[] = []
 		const server = createServer((req, res) => {
 			const url = req.url ?? '/'
-			requests.push({ method: req.method ?? 'GET', url })
-			if (url === `/${metadataName}`) {
+			const pathname = new URL(url, 'http://127.0.0.1').pathname
+			requests.push({ method: req.method ?? 'GET', url, pathname })
+			if (pathname === `/${metadataName}`) {
 				res.writeHead(200, { 'content-type': 'text/yaml; charset=utf-8' })
 				res.end(servedMetadata)
 				return
@@ -273,7 +274,8 @@ test.describe('M5 packaged application smoke verification', () => {
 				.poll(
 					() =>
 						requests.some(
-							(req) => req.method === 'GET' && req.url === `/${metadataName}`,
+							(req) =>
+								req.method === 'GET' && req.pathname === `/${metadataName}`,
 						),
 					{ timeout: 15_000 },
 				)
@@ -343,14 +345,14 @@ test.describe('M5 packaged application smoke verification', () => {
 			await page.waitForTimeout(300)
 
 			const beforeSameVersion = requests.filter(
-				(req) => req.url === `/${metadataName}`,
+				(req) => req.pathname === `/${metadataName}`,
 			).length
 			await page.getByRole('button', { name: '检查更新' }).click()
 			await expect
 				.poll(
 					() =>
-						requests.filter((req) => req.url === `/${metadataName}`).length >
-						beforeSameVersion,
+						requests.filter((req) => req.pathname === `/${metadataName}`)
+							.length > beforeSameVersion,
 					{ timeout: 15_000 },
 				)
 				.toBe(true)
@@ -388,14 +390,14 @@ test.describe('M5 packaged application smoke verification', () => {
 				})
 
 				const beforeManual = requests.filter(
-					(req) => req.url === `/${metadataName}`,
+					(req) => req.pathname === `/${metadataName}`,
 				).length
 				await page.getByRole('button', { name: '检查更新' }).click()
 				await expect
 					.poll(
 						() =>
-							requests.filter((req) => req.url === `/${metadataName}`).length >
-							beforeManual,
+							requests.filter((req) => req.pathname === `/${metadataName}`)
+								.length > beforeManual,
 						{ timeout: 15_000 },
 					)
 					.toBe(true)
@@ -432,7 +434,7 @@ test.describe('M5 packaged application smoke verification', () => {
 
 			// Ensure no installer or zip download was attempted during update checks
 			const downloads = requests.filter((req) =>
-				/\.(dmg|zip|exe|appimage)$/i.test(req.url),
+				/\.(dmg|zip|exe|appimage)$/i.test(req.pathname),
 			)
 			expect(downloads).toEqual([])
 
@@ -449,7 +451,7 @@ test.describe('M5 packaged application smoke verification', () => {
 							packagedLicenses,
 							metadataEndpoint: `/${metadataName}`,
 							metadataRequests: requests.filter(
-								(req) => req.url === `/${metadataName}`,
+								(req) => req.pathname === `/${metadataName}`,
 							).length,
 							installerDownloadsAttempted: downloads.length,
 							offlinePlaybackPixel: [32, 48, 96],

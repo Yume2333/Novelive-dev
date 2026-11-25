@@ -139,7 +139,7 @@ ERROR_MESSAGE=""
 EXPECTED_VERSION="$(node -e "console.log(JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).version)" "$DESKTOP_PACKAGE_JSON")"
 APP_PATH="$TEMP_APPS/Novelive.app"
 APP_BINARY="$APP_PATH/Contents/MacOS/Novelive"
-SHARE_E2E_STATUS="skipped"
+SHARE_E2E_STATUS="not-run"
 PACKAGED_SPEC_STATUS="not-run"
 MANUAL_PROMPT_VERIFIED=0
 
@@ -274,7 +274,7 @@ if [[ -z "$ARTIFACTS_DIR" ]]; then
 		record_step 1 "artifacts-and-checksums" "failed" "$ERROR_MESSAGE"
 		exit 1
 	fi
-	ARTIFACTS_DIR="$(find "$DIST_DIR" -mindepth 2 -maxdepth 2 -type d -name artifacts -path "$DIST_DIR/darwin-*" -print0 2>/dev/null | xargs -0 ls -td 2>/dev/null | head -n 1 || true)"
+	ARTIFACTS_DIR="$(ls -td "$DIST_DIR"/darwin-*/artifacts 2>/dev/null | head -n 1 || true)"
 fi
 
 if [[ -z "$ARTIFACTS_DIR" || ! -d "$ARTIFACTS_DIR" ]]; then
@@ -528,9 +528,11 @@ const path = require("node:path");
 
 const [resourcesDir, outPath] = process.argv.slice(2);
 const checks = [
-	{ rel: "licenses/LICENSE.txt", pattern: /GNU AFFERO GENERAL PUBLIC LICENSE/i },
-	{ rel: "licenses/THIRD_PARTY_NOTICES.txt", pattern: /LICENSES\.chromium\.html|libvips|electron-updater/i },
-	{ rel: "app-update.yml", pattern: /provider:\s*generic/i },
+	{ rel: "licenses/LICENSE.txt", patterns: [/GNU AFFERO GENERAL PUBLIC LICENSE/i] },
+	{ rel: "licenses/THIRD_PARTY_NOTICES.txt", patterns: [/LICENSES\.chromium\.html/, /electron-updater@/] },
+	{ rel: "app-update.yml", patterns: [/provider:\s*generic/i] },
+	{ rel: "LICENSE.electron.txt", patterns: [/Electron/i] },
+	{ rel: "LICENSES.chromium.html", patterns: [/<html/i] },
 ];
 
 const found = [];
@@ -541,21 +543,15 @@ for (const check of checks) {
 		throw new Error(`Missing or empty app resource: ${full}`);
 	}
 	const text = fs.readFileSync(full, "utf8");
-	if (!check.pattern.test(text)) {
-		throw new Error(`Unexpected content in ${full}`);
+	for (const pattern of check.patterns) {
+		if (!pattern.test(text)) {
+			throw new Error(`Unexpected content in ${full} (expected ${pattern})`);
+		}
 	}
 	found.push({ path: check.rel, size: st.size });
 }
 
-// Verify Electron's own license files alongside the app bundle resources or frameworks
 const electronLicenses = [];
-for (const name of ["LICENSE.electron.txt", "LICENSES.chromium.html"]) {
-	const candidate = path.join(resourcesDir, name);
-	if (fs.existsSync(candidate)) {
-		electronLicenses.push({ path: name, size: fs.statSync(candidate).size });
-	}
-}
-
 fs.writeFileSync(outPath, JSON.stringify([...found, ...electronLicenses], null, 2));
 NODE
 then
@@ -615,6 +611,8 @@ if [[ "$SKIP_SHARE_E2E" != "1" ]]; then
 	fi
 	SHARE_E2E_STATUS="passed"
 	record_step 6 "share-e2e-replay" "passed" "Verified tests/e2e/m5-share.spec.ts against packaged binary"
+else
+	SHARE_E2E_STATUS="skipped"
 fi
 # ---------------------------------------------------------------------------
 # Step 7: Detach DMG explicitly (cleanup trap also guards this)

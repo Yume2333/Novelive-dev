@@ -274,7 +274,8 @@ function Get-RunningProcessInDir {
 
 $installedExe = $null
 $uninstallerExe = $null
-$recordedAssocRegistryPaths = @()
+$recordedProgIdKeys = @()
+$recordedOpenWithEntries = @()
 $recordedUninstallKeys = @()
 $savedEnv = @{}
 
@@ -444,7 +445,6 @@ try {
                 continue
             }
             $foundHives += $hive
-            $recordedAssocRegistryPaths += $extKey
 
             $progId = Get-RegistryDefaultValue -RegistryPath $extKey
             if ([string]::IsNullOrWhiteSpace($progId)) {
@@ -455,11 +455,23 @@ try {
                 throw "$extKey Content Type mismatch: expected 'application/vnd.novelive+zip', got '$contentType'"
             }
 
+            $openWithKey = "$extKey\OpenWithProgids"
+            if (Test-Path -LiteralPath $openWithKey) {
+                $owItem = Get-Item -LiteralPath $openWithKey
+                try {
+                    if ($owItem.GetValueNames() -contains $progId) {
+                        $recordedOpenWithEntries += [ordered]@{ Key = $openWithKey; ValueName = $progId }
+                    }
+                } finally {
+                    $owItem.Dispose()
+                }
+            }
+
             $progIdKey = "${hive}:\Software\Classes\$progId"
             if (-not (Test-Path -LiteralPath $progIdKey)) {
                 throw "ProgID registry key missing: $progIdKey"
             }
-            $recordedAssocRegistryPaths += $progIdKey
+            $recordedProgIdKeys += $progIdKey
 
             $cmdKey = "$progIdKey\shell\open\command"
             $openCmd = Get-RegistryDefaultValue -RegistryPath $cmdKey
@@ -647,10 +659,25 @@ try {
         while ([DateTime]::UtcNow -lt $deadline) {
             $dirExists = Test-Path -LiteralPath $InstallDir
             $anyRegLeft = $false
-            foreach ($regPath in $recordedAssocRegistryPaths) {
+            foreach ($regPath in $recordedProgIdKeys) {
                 if (Test-Path -LiteralPath $regPath) {
                     $anyRegLeft = $true
                     break
+                }
+            }
+            if (-not $anyRegLeft) {
+                foreach ($owEntry in $recordedOpenWithEntries) {
+                    if (Test-Path -LiteralPath $owEntry.Key) {
+                        $owItem = Get-Item -LiteralPath $owEntry.Key
+                        try {
+                            if ($owItem.GetValueNames() -contains $owEntry.ValueName) {
+                                $anyRegLeft = $true
+                                break
+                            }
+                        } finally {
+                            $owItem.Dispose()
+                        }
+                    }
                 }
             }
             if (-not $anyRegLeft) {
@@ -690,10 +717,9 @@ try {
             throw "Install directory still exists after silent uninstall: $InstallDir ($leftover)"
         }
         if (-not $regRemoved) {
-            $leftKeys = @($recordedAssocRegistryPaths | Where-Object { Test-Path -LiteralPath $_ })
-            throw "Registry keys still exist after silent uninstall: $($leftKeys -join ', ')"
+            $leftKeys = @($recordedProgIdKeys | Where-Object { Test-Path -LiteralPath $_ })
+            throw "Registry keys/values still exist after silent uninstall (ProgID keys: $($leftKeys -join ', '))"
         }
-
         Add-StepResult -Step 6 -Name $stepName -Status 'passed' -Detail "Cleanly uninstalled $InstallDir and removed NSIS registry keys"
     } catch {
         Add-StepResult -Step 6 -Name $stepName -Status 'failed' -Detail $_.Exception.Message
