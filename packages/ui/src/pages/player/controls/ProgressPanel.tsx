@@ -1,7 +1,8 @@
-import { ChevronLeft, ChevronRight, Save } from 'lucide-react'
+import { BookmarkPlus, ChevronLeft, ChevronRight, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type {
 	PlaybackHistory,
+	SaveEntry,
 	SaveSlot,
 	WorkProgress,
 } from '../../../../../player/src/contract'
@@ -85,7 +86,10 @@ export function ProgressPanel({
 		setFailure('')
 		void Promise.all(
 			progress.saves
-				.filter((entry) => entry.slot.kind === 'manual')
+				.filter(
+					(entry) =>
+						entry.slot.kind === 'quick' || entry.slot.kind === 'manual',
+				)
 				.map(async (entry) => {
 					const image = await window.novelive.host.progress?.thumbnail(
 						workId,
@@ -166,11 +170,71 @@ export function ProgressPanel({
 				)}
 			</>
 		)
+	const slotMeta = (entry: SaveEntry) => {
+		const order = chapters.findIndex(
+			(chapter) => chapter.chapterId === entry.snapshot.position.chapterId,
+		)
+		const chapter =
+			order === -1
+				? entry.snapshot.position.chapterId
+				: t('第 {{index}} 章 · {{title}}', {
+						index: order + 1,
+						title: chapters[order].title,
+					})
+		const line = entry.snapshot.stage.text.content
+			.map((part) => (part.type === 'text' ? part.text : ''))
+			.join('')
+		return line ? `${chapter} · ${line}` : chapter
+	}
+	const quickSlot: SaveSlot = { kind: 'quick' }
+	const quickEntry = progress.saves.find((entry) => entry.slot.kind === 'quick')
 	return (
 		<>
 			{failure && <p role="alert">{failure}</p>}
 			{legacySaves && (
 				<LegacySavePanel key={workId} workId={workId} actions={legacySaves} />
+			)}
+			{page === 0 && (
+				<div className="nl-quicksave-strip">
+					<button
+						type="button"
+						className="nl-focus-skip"
+						aria-label={view === 'save' ? t('快速存档') : t('快速读档')}
+						disabled={view === 'load' && !quickEntry}
+						onClick={() => onSlot(quickSlot)}
+					>
+						{thumbnails[slotKey(quickSlot)] ? (
+							<img
+								src={thumbnails[slotKey(quickSlot)]}
+								width={480}
+								height={270}
+								alt={t('快速存档缩略图')}
+							/>
+						) : (
+							<span className="nl-save-empty">
+								<BookmarkPlus size={22} strokeWidth={1.8} aria-hidden="true" />
+							</span>
+						)}
+						<span className="nl-quicksave-badge">
+							<BookmarkPlus size={12} strokeWidth={1.8} aria-hidden="true" />
+							{t('快速')}
+						</span>
+						<span className="nl-save-title">
+							{quickEntry
+								? slotMeta(quickEntry)
+								: view === 'save'
+									? t('快速存档')
+									: t('暂无快速存档')}
+						</span>
+						{quickEntry ? (
+							<time dateTime={quickEntry.savedAt}>
+								{new Date(quickEntry.savedAt).toLocaleString()}
+							</time>
+						) : (
+							<span className="nl-save-meta">—</span>
+						)}
+					</button>
+				</div>
 			)}
 			<div className="nl-save-grid">
 				{Array.from({ length: manualSaveSlots }, (_, index) => {
@@ -209,6 +273,9 @@ export function ProgressPanel({
 									? t('槽位 {{value}}', { value: index + 1 })
 									: t('空存档位')}
 							</span>
+							{entry && (
+								<span className="nl-save-excerpt">{slotMeta(entry)}</span>
+							)}
 							{entry ? (
 								<time dateTime={entry.savedAt}>
 									{new Date(entry.savedAt).toLocaleString()}
