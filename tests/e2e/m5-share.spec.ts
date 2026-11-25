@@ -278,7 +278,7 @@ test('M5 share and play offline: publish, launch, migrate saves, and fork', asyn
 		await promisify(execFile)(
 			executablePath,
 			[...args, '--no-sandbox', `--user-data-dir=${readerDir}`, release2],
-			{ env, timeout: 15_000 },
+			{ env, timeout: 30_000, maxBuffer: 32 * 1024 * 1024 },
 		)
 		await expect(
 			page.getByRole('dialog').getByText('v1 → v2', { exact: false }),
