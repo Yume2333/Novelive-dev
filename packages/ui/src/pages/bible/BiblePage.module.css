@@ -125,22 +125,15 @@
 
 .content {
 	display: grid;
-	gap: var(--space-5);
 	min-width: 0;
 }
 
 .contentHead {
-	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: var(--space-3);
+	margin-bottom: var(--space-5);
 }
 
-.contentHead h2 {
-	flex: 1;
-	margin: 0;
-	font-size: 17px;
-	font-weight: 700;
+.candidateChevron {
+	margin-left: var(--space-px-2);
 }
 
 .entries,

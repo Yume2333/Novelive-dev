@@ -921,11 +921,12 @@ function BibleProjection({
 									)
 								})}
 							</nav>
-							<div className={styles.content}>
+							<section
+								className={styles.content}
+								aria-label={t('设定集 · {{label}}', { label })}
+							>
 								<div className={styles.contentHead}>
-									<h2>{label}</h2>
-									<Button
-										size="sm"
+									<Chip
 										aria-expanded={candidatesOpen}
 										onClick={() => setCandidatesOpen(!candidatesOpen)}
 									>
@@ -938,8 +939,9 @@ function BibleProjection({
 											aria-hidden="true"
 											size={13}
 											strokeWidth={1.8}
+											className={styles.candidateChevron}
 										/>
-									</Button>
+									</Chip>
 								</div>
 								<section
 									className={styles.entries}
@@ -1075,7 +1077,7 @@ function BibleProjection({
 										/>
 									)}
 								</section>
-							</div>
+							</section>
 						</div>
 					</ScrollArea>
 				)}
