@@ -1,23 +1,31 @@
 import type { WorkSettings } from '@novelive/format/model'
 import {
 	AlignLeft,
+	Check,
 	ChevronDown,
 	Clock3,
 	Gauge,
+	Info,
+	Languages,
 	type LucideIcon,
 	MessageSquare,
+	MoreHorizontal,
 	Sparkles,
 	Subtitles,
 	Trash2,
 } from 'lucide-react'
-import { type CSSProperties, useEffect, useRef, useState } from 'react'
-import { Chip } from '../../components/Card'
+import { useEffect, useRef, useState } from 'react'
+import { Button, IconButton } from '../../components/Button'
+import { Chip, SectionLabel } from '../../components/Card'
 import { Collapse } from '../../components/Collapse'
+import { Dropdown } from '../../components/Dropdown'
+import { Tooltip } from '../../components/Extended'
+import { CompactSelect, Field, TextInput } from '../../components/Form'
 import { OverlayScrollbar, ScrollArea } from '../../components/ScrollArea'
 import { msg, scoped } from '../../i18n'
+import { RichText } from './RichText'
 import {
 	type MarkSpan,
-	parseRich,
 	removeMarkSpan,
 	rewriteMarkSpan,
 	type SentenceKind,
@@ -53,104 +61,6 @@ function markDisplayName(id: string): string {
 	return id
 }
 
-function segmentStyle(
-	mark: string,
-	customMarks: WorkSettings['customMarks'],
-): CSSProperties {
-	switch (mark) {
-		case 'em':
-			return { color: 'var(--color-primary)', fontWeight: 600 }
-		case 'b':
-			return { fontWeight: 800 }
-		case 'dim':
-			return { opacity: 0.55 }
-		case 'whisper':
-			return { opacity: 0.72, fontSize: '0.88em' }
-		case 'shout':
-			return { fontWeight: 800, fontSize: '1.15em', letterSpacing: '0.04em' }
-		case 'glitch':
-			return {
-				display: 'inline-block',
-				transform: 'skewX(-6deg)',
-				textShadow:
-					'1px 0 color-mix(in srgb, var(--color-error) 80%, transparent), -1px 0 color-mix(in srgb, var(--color-primary) 80%, transparent)',
-			}
-		case 'hl':
-			return {
-				background: 'var(--color-tertiary-fixed)',
-				padding: '0 var(--space-1)',
-				borderRadius: 'var(--radius-sm)',
-			}
-		default:
-			if (Object.hasOwn(customMarks, mark))
-				return {
-					background: 'var(--color-secondary-container)',
-					borderBottom: '1px dashed var(--color-primary)',
-					padding: '0 var(--space-1)',
-					borderRadius: 'var(--radius-sm)',
-				}
-			return {
-				textDecoration: 'underline dotted',
-				textUnderlineOffset: '3px',
-			}
-	}
-}
-
-function RichText({
-	src,
-	customMarks,
-}: {
-	src: string
-	customMarks: WorkSettings['customMarks']
-}) {
-	return (
-		<>
-			{parseRich(src).map((seg, index) => {
-				const key = `${seg.kind}-${index}`
-				if (seg.kind === 'text') return <span key={key}>{seg.text}</span>
-				if (seg.kind === 'mark')
-					return (
-						<span key={key} style={segmentStyle(seg.mark, customMarks)}>
-							{seg.text.includes('{') ? (
-								<RichText src={seg.text} customMarks={customMarks} />
-							) : (
-								seg.text
-							)}
-						</span>
-					)
-				if (seg.kind === 'ruby')
-					return (
-						<ruby className="editor-rich-ruby" key={key}>
-							{seg.text}
-							<rt>{seg.reading}</rt>
-						</ruby>
-					)
-				if (seg.kind === 'wait')
-					return (
-						<span
-							className="editor-rich-tag"
-							key={key}
-							title={t('停顿 {{seconds}} 秒', { seconds: seg.seconds })}
-						>
-							<Clock3 aria-hidden="true" size={12} strokeWidth={1.8} />
-							{seg.seconds}s
-						</span>
-					)
-				return (
-					<span
-						className="editor-rich-speed"
-						key={key}
-						title={t('变速 ×{{factor}}', { factor: seg.factor })}
-					>
-						<Gauge aria-hidden="true" size={12} strokeWidth={1.8} />
-						{seg.text}
-					</span>
-				)
-			})}
-		</>
-	)
-}
-
 function ActiveSentenceCard({
 	sentence,
 	speakerName,
@@ -158,6 +68,7 @@ function ActiveSentenceCard({
 	dirty,
 	pendingRefresh,
 	busy,
+	hasSource,
 	expression,
 	customMarks,
 	onUpdateLine,
@@ -172,6 +83,7 @@ function ActiveSentenceCard({
 	dirty: boolean
 	pendingRefresh: boolean
 	busy: boolean
+	hasSource: boolean
 	expression: { lineId: string; current: string; choices: string[] } | undefined
 	customMarks: WorkSettings['customMarks']
 	onUpdateLine: (
@@ -224,7 +136,7 @@ function ActiveSentenceCard({
 
 	function insertWait() {
 		if (busy || lockedByOtherDirty) return
-		const tag = '{wait 0.5}'
+		const tag = '{wait 0.4}'
 		const el = textRef.current
 		const at = el?.selectionEnd ?? sentence.text.length
 		const nextText = sentence.text.slice(0, at) + tag + sentence.text.slice(at)
@@ -259,6 +171,7 @@ function ActiveSentenceCard({
 				{sentence.speaker && (
 					<Chip>{sentence.displayAs || speakerName || sentence.speaker}</Chip>
 				)}
+				{hasSource && <Chip>{t('有原文对照')}</Chip>}
 				{!sentence.click && <Chip>{t('连播')}</Chip>}
 			</div>
 
@@ -268,49 +181,38 @@ function ActiveSentenceCard({
 					data-two-col={expression ? 'true' : undefined}
 				>
 					{expression && (
-						<label className="editor-field">
-							<span className="editor-label">{t('表情')}</span>
-							<select
-								className="editor-compact-select"
+						<Field label={t('表情')}>
+							<CompactSelect
 								aria-label={t('表情')}
 								value={expression.current}
 								disabled={busy || dirty}
-								title={dirty ? t('先保存或放弃当前修改') : undefined}
-								onChange={(event) => onChangeExpression(event.target.value)}
-							>
-								{expression.choices.map((id) => (
-									<option key={id} value={id}>
-										{id.split('/').pop() ?? id}
-									</option>
-								))}
-							</select>
-						</label>
+								onChange={onChangeExpression}
+								options={expression.choices.map((id) => ({
+									value: id,
+									label: id.split('/').pop() ?? id,
+								}))}
+							/>
+						</Field>
 					)}
-					<label className="editor-field">
-						<span className="editor-label">{t('显示名')}</span>
-						<input
-							type="text"
-							className="editor-input"
+					<Field label={t('显示名')}>
+						<TextInput
 							aria-label={t('显示名')}
 							value={sentence.displayAs ?? ''}
 							placeholder={speakerName ?? sentence.speaker}
 							disabled={busy || lockedByOtherDirty}
-							onChange={(event) =>
-								onUpdateLine(sentence.lineNumber, {
-									displayAs: event.target.value,
-								})
+							onChange={(value) =>
+								onUpdateLine(sentence.lineNumber, { displayAs: value })
 							}
 						/>
-					</label>
+					</Field>
 				</div>
 			)}
 
-			<label className="editor-field">
-				<span className="editor-label">{t('文本')}</span>
-				<div className="editor-textarea-wrap">
+			<Field label={t('文本')}>
+				<div className="editor-textarea-wrap nl-scroll-host">
 					<textarea
 						ref={textRef}
-						className="editor-textarea nl-scroll-hidden"
+						className="nl-input editor-textarea nl-scroll-hidden"
 						aria-label={t('文本')}
 						rows={3}
 						value={sentence.text}
@@ -337,75 +239,101 @@ function ActiveSentenceCard({
 					/>
 					<OverlayScrollbar targetRef={textRef} />
 				</div>
-			</label>
+			</Field>
 
 			<div className="editor-field">
-				<span className="editor-label">{t('加标记')}</span>
+				<span className="editor-marks-head">
+					<SectionLabel>{t('加标记')}</SectionLabel>
+					<Tooltip
+						text={t('先选中文字再点标记；也可以直接输入 {标记}…{/标记}')}
+					>
+						<Info
+							aria-hidden="true"
+							size={14}
+							strokeWidth={1.8}
+							className="editor-info-icon"
+						/>
+					</Tooltip>
+				</span>
 				<div className="editor-marks" role="toolbar" aria-label={t('文本效果')}>
 					{builtinMarks.map((mark) => (
-						<button
-							type="button"
-							key={mark.id}
-							className="editor-chip-button"
-							disabled={busy || lockedByOtherDirty}
-							onMouseDown={(event) => event.preventDefault()}
-							onClick={() => wrapOrInsert(`{${mark.id}}`, `{/${mark.id}}`)}
-						>
-							{t(mark.label)}
-						</button>
+						// biome-ignore lint/a11y/noStaticElementInteractions: mousedown 只是为了阻止文本域选区丢失，不承担交互
+						<span key={mark.id} onMouseDown={(event) => event.preventDefault()}>
+							<Chip
+								onClick={
+									busy || lockedByOtherDirty
+										? undefined
+										: () => wrapOrInsert(`{${mark.id}}`, `{/${mark.id}}`)
+								}
+							>
+								{t(mark.label)}
+							</Chip>
+						</span>
 					))}
 					{customNames.map((name) => (
-						<button
-							type="button"
-							key={name}
-							className="editor-chip-button"
-							disabled={busy || lockedByOtherDirty}
-							onMouseDown={(event) => event.preventDefault()}
-							onClick={() => wrapOrInsert(`{${name}}`, `{/${name}}`)}
-						>
-							{name}
-						</button>
+						// biome-ignore lint/a11y/noStaticElementInteractions: mousedown 只是为了阻止文本域选区丢失，不承担交互
+						<span key={name} onMouseDown={(event) => event.preventDefault()}>
+							<Chip
+								onClick={
+									busy || lockedByOtherDirty
+										? undefined
+										: () => wrapOrInsert(`{${name}}`, `{/${name}}`)
+								}
+							>
+								{name}
+							</Chip>
+						</span>
 					))}
-					<button
-						type="button"
-						className="editor-chip-button"
-						disabled={busy || lockedByOtherDirty}
-						onMouseDown={(event) => event.preventDefault()}
-						onClick={() => wrapOrInsert(t('{ruby よみ}'), '{/ruby}')}
-					>
-						{t('注音')}
-					</button>
-					<button
-						type="button"
-						className="editor-chip-button"
-						disabled={busy || lockedByOtherDirty}
-						onMouseDown={(event) => event.preventDefault()}
-						onClick={() => wrapOrInsert('{speed 0.5}', '{/speed}')}
-					>
-						{t('变速')}
-					</button>
-					<button
-						type="button"
-						className="editor-chip-button"
-						disabled={busy || lockedByOtherDirty}
-						onMouseDown={(event) => event.preventDefault()}
-						onClick={insertWait}
-					>
-						{t('停顿')}
-					</button>
+					{/* biome-ignore lint/a11y/noStaticElementInteractions: mousedown 只是为了阻止文本域选区丢失，不承担交互 */}
+					<span onMouseDown={(event) => event.preventDefault()}>
+						<Dropdown
+							label={t('更多标记')}
+							className="editor-more-marks-trigger nl-btn glass-panel"
+							trigger={
+								<span className="editor-more-marks-btn">
+									<MoreHorizontal
+										aria-hidden="true"
+										size={14}
+										strokeWidth={1.8}
+									/>
+									{t('更多标记')}
+								</span>
+							}
+							items={[
+								{
+									label: t('注音'),
+									icon: Languages,
+									disabled: busy || lockedByOtherDirty,
+									onSelect: () => wrapOrInsert(t('{ruby よみ}'), '{/ruby}'),
+								},
+								{
+									label: t('变速 ×0.6'),
+									icon: Gauge,
+									disabled: busy || lockedByOtherDirty,
+									onSelect: () => wrapOrInsert('{speed 0.6}', '{/speed}'),
+								},
+								{
+									label: t('停顿 0.4 秒'),
+									icon: Clock3,
+									disabled: busy || lockedByOtherDirty,
+									onSelect: insertWait,
+								},
+							]}
+						/>
+					</span>
 				</div>
 			</div>
 
 			{markSpans.length > 0 && (
 				<div className="editor-field">
-					<span className="editor-label">{t('这句里的标记')}</span>
+					<SectionLabel>{t('这句里的标记')}</SectionLabel>
 					<div className="editor-mark-spans">
 						{markSpans.map((span, index) => {
 							const open = activeMark === index
 							const summary =
 								span.mark === 'wait'
 									? t('停顿 {{seconds}} 秒', {
-											seconds: span.param ?? '0.5',
+											seconds: span.param ?? '0.4',
 										})
 									: span.mark === 'ruby'
 										? `${span.inner} · ${span.param ?? ''}`
@@ -447,85 +375,76 @@ function ActiveSentenceCard({
 											{isParametric ? (
 												<Chip>{markDisplayName(span.mark)}</Chip>
 											) : (
-												<select
-													className="editor-mark-select"
+												<CompactSelect
 													aria-label={t('选择标记')}
 													value={span.mark}
 													disabled={busy || lockedByOtherDirty}
-													onChange={(event) =>
-														applySpanEdit(index, span, event.target.value)
+													onChange={(nextMark) =>
+														applySpanEdit(index, span, nextMark)
 													}
-												>
-													{builtinMarks.map((item) => (
-														<option key={item.id} value={item.id}>
-															{t(item.label)}
-														</option>
-													))}
-													{customNames.map((name) => (
-														<option key={name} value={name}>
-															{name}
-														</option>
-													))}
-												</select>
+													options={[
+														...builtinMarks.map((item) => ({
+															value: item.id,
+															label: t(item.label),
+														})),
+														...customNames.map((name) => ({
+															value: name,
+															label: name,
+														})),
+													]}
+												/>
 											)}
 											{span.mark !== 'wait' && (
-												<input
-													type="text"
-													className="editor-input"
+												<TextInput
 													aria-label={t('标记文字')}
 													value={innerValue}
 													disabled={busy || lockedByOtherDirty}
-													onChange={(event) =>
+													onChange={(value) =>
 														setMarkEdits((current) => ({
 															...current,
-															[index]: event.target.value,
+															[index]: value,
 														}))
 													}
 												/>
 											)}
 											{isParametric && (
-												<input
-													type="text"
-													className="editor-input editor-mark-param"
+												<TextInput
 													aria-label={t('标记参数')}
+													className="editor-mark-param"
 													value={paramValue}
 													disabled={busy || lockedByOtherDirty}
-													onChange={(event) =>
+													onChange={(value) =>
 														setParamEdits((current) => ({
 															...current,
-															[index]: event.target.value,
+															[index]: value,
 														}))
 													}
 												/>
 											)}
-											<button
-												type="button"
-												className="editor-chip-button"
+											<Button
+												size="sm"
+												icon={Check}
 												disabled={busy || lockedByOtherDirty || !spanDirty}
 												onClick={() => applySpanEdit(index, span)}
 											>
 												{t('应用')}
-											</button>
-											<button
-												type="button"
-												className="editor-icon-button editor-icon-button-small"
-												aria-label={t('移除标记')}
-												title={t('移除标记')}
-												disabled={busy || lockedByOtherDirty}
-												onClick={() => {
-													onUpdateLine(sentence.lineNumber, {
-														text: removeMarkSpan(sentence.text, span),
-													})
-													clearMarkDrafts()
-													setActiveMark(null)
-												}}
-											>
-												<Trash2
-													aria-hidden="true"
-													size={14}
-													strokeWidth={1.8}
+											</Button>
+											<Tooltip text={t('移除标记')}>
+												<IconButton
+													icon={Trash2}
+													size={28}
+													iconSize={14}
+													label={t('移除标记')}
+													disabled={busy || lockedByOtherDirty}
+													onClick={() => {
+														onUpdateLine(sentence.lineNumber, {
+															text: removeMarkSpan(sentence.text, span),
+														})
+														clearMarkDrafts()
+														setActiveMark(null)
+													}}
 												/>
-											</button>
+											</Tooltip>
 										</div>
 									</Collapse>
 								</div>
@@ -537,24 +456,19 @@ function ActiveSentenceCard({
 
 			{(lineDirty || pendingRefresh) && (
 				<div className="editor-sentence-actions">
-					<button
-						type="button"
-						className="editor-button editor-button-ghost"
-						disabled={busy}
-						onClick={onDiscard}
-					>
+					<Button size="sm" variant="ghost" disabled={busy} onClick={onDiscard}>
 						{t('放弃修改')}
-					</button>
-					<button
-						type="button"
-						className="editor-button editor-button-primary"
+					</Button>
+					<Button
+						size="sm"
+						variant="primary"
 						disabled={
 							busy || !lineDirty || !sentence.text.trim() || !sentence.lineId
 						}
 						onClick={onSave}
 					>
 						{t('保存当前句')}
-					</button>
+					</Button>
 				</div>
 			)}
 		</div>
@@ -568,6 +482,9 @@ export function SentenceList({
 	dirty,
 	pendingRefresh,
 	busy,
+	playing = false,
+	hasSource = false,
+	editedLineIds,
 	speakerNames,
 	customMarks,
 	expression,
@@ -577,6 +494,7 @@ export function SentenceList({
 	onSave,
 	onDiscard,
 	onUndo,
+	onAskAgent,
 }: {
 	sentences: SentenceLine[]
 	savedNvs: string
@@ -584,6 +502,9 @@ export function SentenceList({
 	dirty: boolean
 	pendingRefresh: boolean
 	busy: boolean
+	playing?: boolean
+	hasSource?: boolean
+	editedLineIds?: ReadonlySet<string>
 	speakerNames: Record<string, string>
 	customMarks: WorkSettings['customMarks']
 	expression: { lineId: string; current: string; choices: string[] } | undefined
@@ -596,6 +517,7 @@ export function SentenceList({
 	onSave: () => void
 	onDiscard: () => void
 	onUndo: () => void
+	onAskAgent?: (sentence: SentenceLine) => void
 }) {
 	const savedLines = savedNvs.split(/\r\n?|\n/)
 	const activeRef = useRef<HTMLDivElement>(null)
@@ -621,6 +543,10 @@ export function SentenceList({
 					const speakerName = sentence.speaker
 						? (speakerNames[sentence.speaker] ?? sentence.speaker)
 						: undefined
+					const edited =
+						lineDirty ||
+						(sentence.lineId !== undefined &&
+							editedLineIds?.has(sentence.lineId) === true)
 
 					return (
 						<div
@@ -628,40 +554,65 @@ export function SentenceList({
 							ref={active ? activeRef : undefined}
 							className="editor-sentence-card hover-row"
 							data-active={active || undefined}
+							data-playing={playing && active ? 'true' : undefined}
 						>
-							<button
-								type="button"
-								className="editor-sentence-trigger"
-								aria-expanded={active}
-								onClick={() => onSelectLine(sentence.lineNumber)}
-							>
-								<span
-									className="editor-sentence-kind label-caps label-caps-zh"
-									data-active={active || undefined}
+							<div className="editor-sentence-row">
+								<button
+									type="button"
+									className="editor-sentence-trigger"
+									aria-expanded={active}
+									onClick={() => onSelectLine(sentence.lineNumber)}
 								>
-									<KindIcon aria-hidden="true" size={13} strokeWidth={1.8} />
-									{t(meta.label)}
-								</span>
-								<span className="editor-sentence-summary">
-									{sentence.speaker && (
-										<span className="editor-sentence-speaker">
-											{sentence.displayAs || speakerName}
-											{sentence.displayAs && sentence.displayAs !== speakerName
-												? t('（{{name}}）', { name: speakerName })
-												: ''}
-										</span>
-									)}
 									<span
-										className="editor-sentence-preview"
-										data-expanded={active || undefined}
+										className="editor-sentence-kind label-caps label-caps-zh"
+										data-active={active || undefined}
 									>
-										<RichText src={sentence.text} customMarks={customMarks} />
+										<KindIcon aria-hidden="true" size={13} strokeWidth={1.8} />
+										{t(meta.label)}
 									</span>
-								</span>
-								{lineDirty && (
-									<span className="editor-chip">{t('未保存')}</span>
+									<span className="editor-sentence-summary">
+										{sentence.speaker && (
+											<span className="editor-sentence-speaker">
+												{sentence.displayAs || speakerName}
+												{sentence.displayAs &&
+												sentence.displayAs !== speakerName
+													? t('（{{name}}）', { name: speakerName })
+													: ''}
+											</span>
+										)}
+										<span
+											className="editor-sentence-preview"
+											data-expanded={active || undefined}
+										>
+											<RichText
+												src={sentence.text}
+												base="list"
+												customMarks={customMarks}
+											/>
+										</span>
+									</span>
+									{edited && (
+										<Tooltip text={t('这句改过了')}>
+											<span className="editor-edited-dot" />
+										</Tooltip>
+									)}
+									{lineDirty && <Chip>{t('未保存')}</Chip>}
+								</button>
+								{onAskAgent && (
+									<span className="row-actions editor-sentence-row-actions">
+										<Tooltip text={t('问 Agent（带着这句的上下文）')}>
+											<IconButton
+												icon={Sparkles}
+												size={28}
+												iconSize={14}
+												label={t('问 Agent')}
+												disabled={busy}
+												onClick={() => onAskAgent(sentence)}
+											/>
+										</Tooltip>
+									</span>
 								)}
-							</button>
+							</div>
 							<Collapse open={active}>
 								{active && (
 									<ActiveSentenceCard
@@ -672,6 +623,7 @@ export function SentenceList({
 										dirty={dirty}
 										pendingRefresh={pendingRefresh}
 										busy={busy}
+										hasSource={hasSource}
 										expression={expression}
 										customMarks={customMarks}
 										onUpdateLine={onUpdateLine}

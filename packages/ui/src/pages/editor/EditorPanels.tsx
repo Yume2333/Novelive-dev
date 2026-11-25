@@ -1,6 +1,13 @@
 import type { CommandOutput } from '@novelive/creator/contract'
+import { BookmarkCheck, History, Trash2, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { ScrollArea } from '../../components/ScrollArea'
+import { Button, IconButton } from '../../components/Button'
+import { Chip, SectionLabel } from '../../components/Card'
+import { Banner, Drawer, RadioGroup } from '../../components/Extended'
+import { Field, Textarea } from '../../components/Form'
+import { Modal } from '../../components/Modal'
+import { EmptyState } from '../../components/Page'
+import { useToast } from '../../components/Toast'
 import { msg, scoped } from '../../i18n'
 
 const t = scoped('editor')
@@ -18,17 +25,18 @@ const kindLabel: Record<string, string> = {
 	'resolve-mark': msg('标记'),
 	rules: msg('规则'),
 	rewrite: msg('重写'),
+	image: msg('图片'),
 }
+
 // `previous`/`next` are JSON-encoded for rules and resolve-mark entries;
 // decode them into something readable instead of printing raw JSON.
 function readable(value: unknown): string {
 	if (Array.isArray(value)) return value.join(', ')
-	if (value && typeof value === 'object')
-		return (
-			(value as { name?: string }).name ??
-			(value as { css?: string }).css ??
-			JSON.stringify(value)
-		)
+	if (value && typeof value === 'object') {
+		if ('name' in value && typeof value.name === 'string') return value.name
+		if ('css' in value && typeof value.css === 'string') return value.css
+		return JSON.stringify(value)
+	}
 	return String(value)
 }
 function historyValue(entry: HistoryEntry, field: 'previous' | 'next') {
@@ -43,39 +51,67 @@ function historyValue(entry: HistoryEntry, field: 'previous' | 'next') {
 	}
 }
 
-export function EditorPanels({
-	workId,
-	chapterId,
-	rulesRevision,
-	workRules,
-	chapterRules,
-	disabled,
-	revision,
-	run,
-	onSavedRules,
-}: {
+function formatHistoryTime(at: string): string {
+	const date = new Date(at)
+	if (Number.isNaN(date.getTime())) return at
+	return date.toLocaleString(undefined, {
+		month: 'numeric',
+		day: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit',
+	})
+}
+
+export interface EditorPanelsProps {
 	workId: string
 	chapterId: string
+	chapterIndex: number
 	rulesRevision: string
 	workRules: readonly string[]
 	chapterRules: readonly string[]
 	disabled: boolean
 	revision: string
+	historyOpen: boolean
+	rulesOpen: boolean
+	canUndo?: boolean
+	onCloseHistory(): void
+	onCloseRules(): void
+	onUndo?(): void
 	run(action: () => Promise<void>): Promise<void>
 	onSavedRules(
 		scope: 'chapter' | 'work',
 		revision: string,
 		rules: string[],
 	): void
-}) {
-	const [showHistory, setShowHistory] = useState(false)
+}
+
+export function EditorPanels({
+	workId,
+	chapterId,
+	chapterIndex,
+	rulesRevision,
+	workRules,
+	chapterRules,
+	disabled,
+	revision,
+	historyOpen,
+	rulesOpen,
+	canUndo,
+	onCloseHistory,
+	onCloseRules,
+	onUndo,
+	run,
+	onSavedRules,
+}: EditorPanelsProps) {
+	const toast = useToast()
 	const [history, setHistory] = useState<HistoryEntry[]>([])
-	const [showRules, setShowRules] = useState(false)
 	const [scope, setScope] = useState<'chapter' | 'work'>('chapter')
 	const [ruleText, setRuleText] = useState('')
+
 	useEffect(() => {
-		if (!showHistory) return
+		if (!historyOpen) return
 		let active = true
+		setHistory([])
 		void revision
 		void window.novelive
 			.call('editor.history', { workId, chapterId })
@@ -86,138 +122,208 @@ export function EditorPanels({
 		return () => {
 			active = false
 		}
-	}, [showHistory, workId, chapterId, revision])
-	const currentRules = scope === 'chapter' ? chapterRules : workRules
-	const saveRuleList = (next: string[]) =>
+	}, [historyOpen, workId, chapterId, revision])
+
+	type RuleEntry = {
+		scope: 'chapter' | 'work'
+		index: number
+		text: string
+	}
+	const allRules: RuleEntry[] = [
+		...chapterRules.map(
+			(text, index): RuleEntry => ({ scope: 'chapter', index, text }),
+		),
+		...workRules.map(
+			(text, index): RuleEntry => ({ scope: 'work', index, text }),
+		),
+	]
+
+	const saveRules = (
+		ruleScope: 'chapter' | 'work',
+		previous: readonly string[],
+		next: string[],
+		successToast: () => void,
+	) =>
 		void run(async () => {
 			const saved = await window.novelive.call('editor.saveRules', {
 				workId,
 				expectedRevision: rulesRevision,
-				target: scope === 'chapter' ? { scope, chapterId } : { scope },
-				previous: [...currentRules],
+				target:
+					ruleScope === 'chapter'
+						? { scope: 'chapter' as const, chapterId }
+						: { scope: 'work' as const },
+				previous: [...previous],
 				next,
 			}).promise
-			onSavedRules(scope, saved.revision, saved.rules)
+			onSavedRules(ruleScope, saved.revision, saved.rules)
+			successToast()
 		})
+
+	const handleAddRule = () => {
+		const text = ruleText.trim()
+		if (!text) return
+		setRuleText('')
+		const currentRules = scope === 'chapter' ? chapterRules : workRules
+		const targetScope = scope
+		saveRules(targetScope, currentRules, [...currentRules, text], () =>
+			toast(
+				targetScope === 'chapter' ? t('已存为本章规则') : t('已存为本作品规则'),
+				BookmarkCheck,
+			),
+		)
+	}
+
+	const deleteRule = (ruleScope: 'chapter' | 'work', index: number) => {
+		const currentRules = ruleScope === 'chapter' ? chapterRules : workRules
+		saveRules(
+			ruleScope,
+			currentRules,
+			currentRules.filter((_, i) => i !== index),
+			() => toast(t('已删除规则'), Trash2),
+		)
+	}
+
 	return (
 		<>
-			<div className="editor-toolbar">
-				<button
-					type="button"
-					aria-expanded={showHistory}
-					disabled={disabled}
-					onClick={() => setShowHistory((value) => !value)}
-				>
-					{t('修改历史')}
-				</button>
-				<button
-					type="button"
-					aria-expanded={showRules}
-					disabled={disabled}
-					onClick={() => setShowRules((value) => !value)}
-				>
-					{t('规则')}
-				</button>
-			</div>
-			{showHistory && (
-				<section className="editor-drawer" aria-label={t('修改历史')}>
-					<h3>{t('修改历史')}</h3>
-					<ScrollArea className="editor-drawer-scroll">
-						{history.length ? (
-							<ul className="editor-list">
-								{history.map((entry) => (
-									<li key={entry.id}>
-										<strong>
-											{t(originLabel[entry.origin] ?? entry.origin)} ·{' '}
-											{t(kindLabel[entry.kind] ?? entry.kind)}
-										</strong>
-										<span>{entry.at}</span>
-										{historyValue(entry, 'previous') !== null && (
-											<del>{historyValue(entry, 'previous')}</del>
+			<Drawer
+				open={historyOpen}
+				title={t('修改历史')}
+				onClose={onCloseHistory}
+				width={380}
+			>
+				<section aria-label={t('修改历史')} className="editor-history-list">
+					{history.length ? (
+						history.map((entry, index) => {
+							const target = entry.assetId
+								? String(entry.assetId)
+								: entry.lineId
+									? `#${entry.lineId}`
+									: ''
+							return (
+								<div key={entry.id} className="glass-panel editor-history-card">
+									<div className="editor-history-desc">
+										{t(originLabel[entry.origin] ?? entry.origin)}
+										{' · '}
+										{t(kindLabel[entry.kind] ?? entry.kind)}
+									</div>
+									<div className="editor-history-meta">
+										{formatHistoryTime(entry.at)}
+										{target ? ` · ${target}` : ''}
+									</div>
+									{historyValue(entry, 'previous') !== null && (
+										<del className="editor-history-old">
+											{historyValue(entry, 'previous')}
+										</del>
+									)}
+									{historyValue(entry, 'next') !== null && (
+										<ins className="editor-history-new">
+											{historyValue(entry, 'next')}
+										</ins>
+									)}
+									{index === 0 &&
+										canUndo &&
+										onUndo &&
+										entry.origin === 'creator' &&
+										(entry.kind === 'text' || entry.kind === 'expression') && (
+											<Button
+												size="sm"
+												variant="ghost"
+												icon={Undo2}
+												disabled={disabled}
+												onClick={onUndo}
+											>
+												{t('撤销')}
+											</Button>
 										)}
-										{historyValue(entry, 'next') !== null && (
-											<ins>{historyValue(entry, 'next')}</ins>
-										)}
-									</li>
-								))}
-							</ul>
-						) : (
-							<p>{t('暂无修改历史')}</p>
-						)}
-					</ScrollArea>
+								</div>
+							)
+						})
+					) : (
+						<EmptyState
+							icon={History}
+							title={t('还没有修改')}
+							text={t('每步修改都可撤销。')}
+						/>
+					)}
 				</section>
-			)}
-			{showRules && (
-				<section className="editor-drawer" aria-label={t('规则')}>
-					<h3>{t('规则')}</h3>
-					<div className="editor-toolbar">
-						<label>
-							{t('作用范围')}
-							<select
-								aria-label={t('作用范围')}
-								value={scope}
-								disabled={disabled}
-								onChange={(event) =>
-									setScope(event.target.value as 'chapter' | 'work')
-								}
-							>
-								<option value="chapter">{t('本章规则')}</option>
-								<option value="work">{t('本作品规则')}</option>
-							</select>
-						</label>
-						<input
+			</Drawer>
+			<Modal
+				open={rulesOpen}
+				title={t('存为规则')}
+				onClose={onCloseRules}
+				width={520}
+				footer={
+					<>
+						<Button variant="ghost" onClick={onCloseRules}>
+							{t('取消')}
+						</Button>
+						<Button
+							variant="primary"
+							icon={BookmarkCheck}
+							disabled={!ruleText.trim() || disabled}
+							onClick={handleAddRule}
+						>
+							{t('保存规则')}
+						</Button>
+					</>
+				}
+			>
+				<div className="editor-rules-body">
+					<Field label={t('作用域')}>
+						<RadioGroup
+							value={scope}
+							onChange={(v) => setScope(v as 'chapter' | 'work')}
+							disabled={disabled}
+							options={[
+								{
+									value: 'chapter',
+									label: chapterIndex
+										? t('本章（第 {{index}} 章）', { index: chapterIndex })
+										: t('本章规则'),
+								},
+								{ value: 'work', label: t('本作品') },
+							]}
+						/>
+					</Field>
+					<Field label={t('规则内容')}>
+						<Textarea
 							aria-label={t('规则内容')}
+							rows={3}
 							value={ruleText}
 							disabled={disabled}
-							onChange={(event) => setRuleText(event.target.value)}
-							placeholder={t('规则内容')}
+							onChange={setRuleText}
+							placeholder={t('例：这一幕之后，凛不再主动提起灯塔')}
 						/>
-						<button
-							type="button"
-							disabled={!ruleText.trim() || disabled}
-							onClick={() => {
-								const text = ruleText.trim()
-								setRuleText('')
-								saveRuleList([...currentRules, text])
-							}}
-						>
-							{t('添加规则')}
-						</button>
-					</div>
-					<ScrollArea className="editor-drawer-scroll">
-						{currentRules.length ? (
-							<ul className="editor-list">
-								{(() => {
-									const seen = new Map<string, number>()
-									return currentRules.map((rule, index) => {
-										const count = (seen.get(rule) ?? 0) + 1
-										seen.set(rule, count)
-										return (
-											<li key={`${scope}-${rule}-${count}`}>
-												<span>{rule}</span>
-												<button
-													type="button"
-													disabled={disabled}
-													aria-label={t('删除规则 {{value}}', { value: rule })}
-													onClick={() =>
-														saveRuleList(
-															currentRules.filter((_, i) => i !== index),
-														)
-													}
-												>
-													{t('删除规则')}
-												</button>
-											</li>
-										)
-									})
-								})()}
-							</ul>
-						) : (
-							<p>{t('暂无规则')}</p>
-						)}
-					</ScrollArea>
-				</section>
-			)}
+					</Field>
+					<Banner kind="info">
+						{t('新规则只影响还没开始的任务；已经做完或在做的章节不受影响。')}
+					</Banner>
+					{allRules.length ? (
+						<>
+							<SectionLabel>{t('已存规则')}</SectionLabel>
+							{allRules.map((r) => (
+								<div
+									key={`${r.scope}-${r.index}`}
+									className="hover-row editor-rule-row"
+								>
+									<Chip>{r.scope === 'chapter' ? t('本章') : t('本作品')}</Chip>
+									<span className="editor-rule-text">{r.text}</span>
+									<div className="row-actions">
+										<IconButton
+											icon={Trash2}
+											size={28}
+											iconSize={14}
+											label={t('删除规则 {{value}}', { value: r.text })}
+											disabled={disabled}
+											onClick={() => deleteRule(r.scope, r.index)}
+										/>
+									</div>
+								</div>
+							))}
+						</>
+					) : null}
+				</div>
+			</Modal>
 		</>
 	)
 }

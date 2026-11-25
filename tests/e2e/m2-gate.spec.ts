@@ -192,25 +192,21 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await page.getByRole('button', { name: '重写场景', exact: true }).click()
 		const diffs = page.getByRole('region', { name: '重写差异' })
 		await expect(diffs.getByRole('checkbox')).not.toHaveCount(0)
-		for (const box of await diffs.getByRole('checkbox').all())
-			await box.uncheck()
+		for (const label of await diffs.locator('label').all()) await label.click()
 		await expect(
 			diffs.getByRole('button', { name: '应用勾选差异' }),
 		).toBeDisabled()
-		await diffs
-			.locator('label')
-			.filter({ hasText: '慢慢' })
-			.getByRole('checkbox')
-			.check()
+		await diffs.locator('label').filter({ hasText: '慢慢' }).click()
 		await capture(page, '02-editor-rewrite')
 		await diffs.getByRole('button', { name: '应用勾选差异' }).click()
 		await expect(script).toContainText('慢慢')
 		await expect(script).not.toContainText('笛声')
-		await page.getByRole('button', { name: '修改历史', exact: true }).click()
+		await page.getByRole('button', { name: '更多', exact: true }).click()
+		await page.getByRole('menuitem', { name: '修改历史' }).click()
 		await expect(page.getByRole('region', { name: '修改历史' })).toContainText(
 			'重写',
 		)
-		await page.getByRole('button', { name: '修改历史', exact: true }).click()
+		await page.getByRole('button', { name: '关闭', exact: true }).click()
 		await page.evaluate(
 			(connection) =>
 				window.novelive.call('config.update', {
@@ -411,7 +407,6 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 				}).promise,
 			workId,
 		)
-		await page.getByRole('textbox', { name: '重绘要求' }).fill('光线更柔和')
 		const beforeImage = (
 			await page
 				.getByRole('textbox', { name: 'NVS 剧本' })
@@ -437,9 +432,21 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			})
 			observer.observe(document.body, { childList: true, subtree: true })
 		})
+		await page.getByRole('button', { name: '重新生成立绘' }).click()
+		await page.getByRole('menuitem', { name: '带要求重绘…' }).click()
+		await page.getByRole('textbox', { name: '重绘要求' }).fill('光线更柔和')
 		await page
 			.getByRole('button', { name: '出一张，直接替换', exact: true })
 			.click()
+		await expect
+			.poll(
+				async () => {
+					const statuses = await page.getByRole('status').allTextContents()
+					return statuses.some((s) => s.includes('图片已替换'))
+				},
+				{ timeout: 30_000, intervals: [100, 200, 500] },
+			)
+			.toBe(true)
 		await expect
 			.poll(async () => {
 				const diagnostics = await readFile(missingLog, 'utf8').catch(() => '')
@@ -501,13 +508,9 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			page.getByRole('button', { name: '撤销', exact: true }),
 		).toBeEnabled()
 		await expect(page.locator('canvas')).toBeVisible()
-		const imageStatus = page.getByRole('status', { name: '图片已替换' })
-		await expect(imageStatus).toHaveText('图片已替换')
 		expect(
-			await imageStatus.evaluate(
-				(node) => !!node.closest('[aria-busy="true"]'),
-			),
-		).toBe(false)
+			await page.evaluate(() => !document.querySelector('[aria-busy="true"]')),
+		).toBe(true)
 		await expect(page.locator('body')).toHaveAttribute(
 			'data-image-loading-observed',
 			'true',
@@ -525,6 +528,8 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			{ useInnerText: true },
 		)
 		await capture(page, '07-image-redrawn')
+		await page.getByRole('button', { name: '重新生成立绘' }).click()
+		await page.getByRole('menuitem', { name: '带要求重绘…' }).click()
 		await page
 			.getByRole('combobox', { name: '图片', exact: true })
 			.selectOption('ada/uniform/neutral')
@@ -596,7 +601,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await page.getByRole('button', { name: '保存当前句', exact: true }).click()
 		await expect(
 			page.getByRole('button', { name: '保存当前句', exact: true }),
-		).toBeDisabled()
+		).toHaveCount(0)
 		await page.getByRole('button', { name: '从当前句预览' }).click()
 		const rubyReading = page.locator('.nl-text-display ruby rt').first()
 		await expect(rubyReading).toHaveText('はし')
@@ -604,22 +609,26 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await page.getByRole('button', { name: '撤销', exact: true }).click()
 		await expect(reopenedScript).not.toContainText('{ruby')
 		await page.getByLabel('场景', { exact: true }).selectOption('1')
+		await page.getByRole('button', { name: '重新生成立绘' }).click()
+		await page.getByRole('menuitem', { name: '带要求重绘…' }).click()
 		await expect(
 			page
 				.getByRole('combobox', { name: '图片', exact: true })
 				.locator('option'),
-		).toHaveText('ada/uniform/neutral')
+		).toHaveText('ada / uniform / neutral')
+		await page.keyboard.press('Escape')
 		await page.getByRole('button', { name: '快捷位置', exact: true }).click()
 		await page.getByRole('menuitem').filter({ hasText: '#0003' }).click()
 		await page.getByRole('button', { name: '从当前句预览' }).click()
 		await expect(page.locator('.nl-player-text')).toHaveText('夜风吹过岸边。', {
 			useInnerText: true,
 		})
-		await page.getByRole('button', { name: '规则', exact: true }).click()
+		await page.getByRole('button', { name: '更多', exact: true }).click()
+		await page.getByRole('menuitem', { name: '存为规则' }).click()
 		await page.getByRole('textbox', { name: '规则内容' }).fill('保持水彩质感')
-		await page.getByRole('button', { name: '添加规则', exact: true }).click()
+		await page.getByRole('button', { name: '保存规则', exact: true }).click()
 		await expect(page.getByText('保持水彩质感')).toBeVisible()
-		await page.getByRole('button', { name: '规则', exact: true }).click()
+		await page.keyboard.press('Escape')
 		{
 			using writable = await Project.open(projectDir)
 			const registryFile = projectFiles.assetRegistry({ level: 'series' })
@@ -654,12 +663,13 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(page.locator('.nl-player-text')).toHaveText('桥下很安静。', {
 			useInnerText: true,
 		})
-		await page.getByRole('button', { name: '修改历史', exact: true }).click()
+		await page.getByRole('button', { name: '更多', exact: true }).click()
+		await page.getByRole('menuitem', { name: '修改历史' }).click()
 		await expect(page.getByRole('region', { name: '修改历史' })).toContainText(
 			'表情',
 		)
-		await page.getByRole('button', { name: '修改历史', exact: true }).click()
-		await page.getByRole('button', { name: '撤销', exact: true }).click()
+		await page.getByRole('button', { name: '关闭', exact: true }).click()
+		await page.getByLabel('撤销', { exact: true }).click()
 		await expect(
 			page.getByRole('textbox', { name: 'NVS 剧本' }),
 		).not.toContainText('ada/uniform/smile')
