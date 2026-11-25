@@ -70,8 +70,14 @@ shared_evidence,m1b-924433e,deepseek-v4.1-flash,settled,15,,,,17612,0,0,0,m1b/ow
 shared_evidence,m1b-924433e,devin-swe-2,settled,42,,,,663094,0,0,0,m1b/owner/live-run-924433e-usage.csv:3,
 shared_evidence,m1b-924433e,gemini-3.8-flash,settled,18,,,,165056,0,0,0,m1b/owner/live-run-924433e-usage.csv:4,
 shared_evidence,m1b-924433e,gpt-image-2.6-sunburst,settled,23,,,,235412,28,0,0,m1b/owner/live-run-924433e-usage.csv:5,
-shared_unattributed,shared-settled-gap,unallocated,settled,,,,,140455,12,0,0,../owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported settled usage not linked to detailed rows
-shared_unattributed,shared-reserve-gap,unallocated,reservation_no_usage,,,,,0,0,195450,1,../owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported reserves not linked to detailed rows; outcome unknown
+shared_evidence,w4-owner-book-run,gemini-3.8-flash,settled,54,,,,606882,0,0,0,"m1a/owner/w4-run-usage.csv; m1a/owner/usage.csv:20,23",M1a/07 W4 owner-book window preview calls; per-call rows aggregated
+shared_evidence,w4-owner-book-run,devin-swe-2,settled,187,,,,1662706,0,0,0,"m1a/owner/w4-run-usage.csv; m1a/owner/usage.csv:21,24",M1a/07 W4 owner-book window extraction and selection calls; per-call rows aggregated
+shared_evidence,w4-owner-book-run,devin-swe-2,reservation_no_usage,15,,,,0,0,243542,0,"m1a/owner/w4-run-usage.csv; m1a/owner/usage.csv:22,25",Conservative upper-bound reservations retained; no provider usage
+shared_evidence,m1b-2026-11-24-w1,unallocated,settled,,,,,1004360,24,3637145,6,m1b/owner/live-run-2026-11-24-usage.csv:2; m1b/owner/live-run-2026-11-24.md:39-41,Synthesis+confirm1+ch1 window; per-model split not published; unsettled tokens and image slots are abandoned reservations
+shared_evidence,m1b-2026-11-24-w2,unallocated,settled,,,,,1388355,30,3431892,18,m1b/owner/live-run-2026-11-24-usage.csv:3; m1b/owner/live-run-2026-11-24.md:39-41,ch2-4 production window hit 50-image soft cap; per-model split not published; unsettled tokens and image slots are abandoned reservations
+shared_evidence,m1b-2026-11-24-w3,unallocated,settled,,,,,4152364,212,1922000,186,m1b/owner/live-run-2026-11-24-usage.csv:4; m1b/owner/live-run-2026-11-24.md:39-41,Shepherd redraw/recovery window under raised caps; per-model split not published; unsettled tokens and image slots are abandoned reservations
+shared_unattributed,shared-settled-gap,unallocated,settled,,,,,140455,12,0,0,7664e1a:.workflow/owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported settled usage not linked to detailed rows
+shared_unattributed,shared-reserve-gap,unallocated,reservation_no_usage,,,,,0,0,195450,1,7664e1a:.workflow/owner-review.md:12-14; m1b/owner/live-run-af551d2.md:24,Balance of reported reserves not linked to detailed rows; outcome unknown
 overlap_unknown,older-m1b-yesou,gemini-3.8-flash,settled,201,,,,1098996,0,0,0,a0fe816:m1b/owner/11-real-book-gate.md,Older real-book window; not linked to latest shared baseline
 overlap_unknown,older-m1b-yesou,gpt-image-2.6-sunburst,settled,22,,,,94708,22,0,0,a0fe816:m1b/owner/11-real-book-gate.md,Model-specific rows only; excludes mixed handoff row
 overlap_unknown,older-m1b-yesou,gpt-image-2.6-flare,settled,1,,,,7004,1,0,0,a0fe816:m1b/owner/11-real-book-gate.md,
