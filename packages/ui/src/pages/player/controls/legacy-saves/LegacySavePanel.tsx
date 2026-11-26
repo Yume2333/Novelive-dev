@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
 	LegacySaveGroup,
 	SaveEntry,
@@ -33,6 +34,21 @@ export function LegacySavePanel({
 	chapters?: readonly { chapterId: string; title: string }[]
 	actions: LegacySaveActions
 }) {
+	const { i18n } = useTranslation()
+	/** 存档时间跟随 UI 语言，精确到分（不显示秒），与运行记录格式一致 */
+	const saveTimeFormatter = useMemo(
+		() =>
+			new Intl.DateTimeFormat(i18n.language, {
+				dateStyle: 'medium',
+				timeStyle: 'short',
+			}),
+		[i18n.language],
+	)
+	const formatSaveTime = (savedAt: string): string => {
+		const date = new Date(savedAt)
+		if (Number.isNaN(date.getTime())) return ''
+		return saveTimeFormatter.format(date)
+	}
 	const [groups, setGroups] = useState<readonly LegacySaveGroup[]>([])
 	const [error, setError] = useState('')
 	const [target, setTarget] = useState<DeleteTarget | null>(null)
@@ -158,9 +174,7 @@ export function LegacySavePanel({
 										<span className={styles.rowTitle}>{name}</span>
 										<span className={styles.rowMeta}>{entryMeta(entry)}</span>
 									</span>
-									<time dateTime={savedAt}>
-										{new Date(savedAt).toLocaleString()}
-									</time>
+									<time dateTime={savedAt}>{formatSaveTime(savedAt)}</time>
 									<span className="row-actions">
 										<Button
 											size="sm"

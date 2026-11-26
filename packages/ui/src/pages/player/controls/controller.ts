@@ -3,7 +3,6 @@ import type {
 	SentenceRef,
 } from '../../../../../player/src/contract/playback'
 import type { PlaybackMode } from '../../../../../player/src/contract/progress'
-import { msg } from '../../../i18n'
 
 export const defaultPlayerSettings: PlayerSettings = {
 	textMillisecondsPerCharacter: 30,
@@ -20,12 +19,15 @@ export const defaultPlayerSettings: PlayerSettings = {
  * （`creator/src/project/player.ts`：写 → 审稿 → 演出 → 出图）一致，
  * 播放器等待卡据此渲染进度条，比例的语义是「阶段已过半」。
  * `等待` 与 `完成` 没有比例：等待卡对纯等待只显示文案。
+ * 键是后端制作进度文案里的 zh-CN 源串（亦为 i18n 键），逐字匹配。
+ * 此处刻意不用 `msg()` 标记：导入 `i18n` 会把 locales JSON 拖进模块图，
+ * 使直接引用本文件的 Playwright 规格在 Node 24 下加载失败。
  */
 export const chapterPhaseFractions: Readonly<Record<string, number>> = {
-	[msg('写作')]: 0.25,
-	[msg('审稿')]: 0.5,
-	[msg('演出')]: 0.72,
-	[msg('出图')]: 0.88,
+	写作: 0.25,
+	审稿: 0.5,
+	演出: 0.72,
+	出图: 0.88,
 }
 
 /** 在制作进度文案（`制作中 · 演出` 等拆开的片段）中取第一个已知阶段的比例。 */
