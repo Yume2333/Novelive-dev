@@ -265,7 +265,7 @@ export function ImportPackage({
 										</Banner>
 										<p className={styles.packageNote}>
 											{t(
-												'存档和已读记录会按作品内 ID 自动迁移；对不上的旧存档会保留，在存档界面单独成组。',
+												'存档和已读记录会自动迁移到新版本；对不上的旧存档会保留，在存档界面单独成组。',
 											)}
 										</p>
 									</>
@@ -292,7 +292,7 @@ export function ImportPackage({
 					)}
 					{review && canImportAsProject && !projectImported && (
 						<p className={styles.packageNote}>
-							{t('导入为工程会创建可编辑的副本，再次导出时将使用新的作品 ID。')}
+							{t('导入为工程会创建可编辑的副本，再次导出时会作为一部新作品。')}
 						</p>
 					)}
 					{error !== undefined && <ErrorNotice error={error} />}
