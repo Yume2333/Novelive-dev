@@ -13,3 +13,7 @@
 - [ ] Send surface tasks with real gaps back via rework instead of patching their folders here.
 - [ ] Rebuild the Linux AppImage, smoke-launch it in an isolated HOME under `xvfb-run`, and record path, size, and SHA-256 in `audit.md` (no binaries committed).
 - [ ] Mark the spec done, write `.workflow/done/ui-polish/closeout.md`, archive this task, and land onto `main`.
+
+## Progress
+- Round 1 (base 7f69386): rework sent to 02, 03, 04, 06, 07 (feedback archived at /home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/rework-feedback-round-1.md); all items verified fixed in round 2.
+- Round 2 (base b6c68ff = integration 459965e merged into ui-polish/08): `NL_REPLAY=strict pnpm check` exit 0 (`Test Files 77 passed | 1 skipped (78)`, `Tests 1212 passed | 3 skipped (1215)`) after biome-formatting six gate-owned specs; `pnpm build` exit 0; full offline e2e under nl-headless 78 passed / 6 failed / 3 skipped — prototype-parity confirm eyebrow copy fixed in the gate spec; m4-single-instance flake (passes in batch); m4-gate W3 minimize, m4-import-illustrations intermittent hang, m3-text ruby clip reproduce on pre-polish baseline 87d0a4c; m5-share trash is gvfs-environmental (passes with HOME on the real fs). Leak sweep: 0 FIX NEEDED. Screenshots: 8 reworked surfaces recaptured light + dark. AppImage packaged and smoke-launched (pre-rework revision). Review r2 (`evidence/task08/review-r2.md`) plus the editor eyebrow finding → rework sent to 01, 02, 03, 04, 06 (/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/rework-feedback.md).

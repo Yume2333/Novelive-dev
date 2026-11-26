@@ -157,9 +157,7 @@ test('M1b make and play publishes through both confirmation points in real Elect
 				.getByRole('link', { name: '确认第一章' })
 				.click({ timeout: 20_000 })
 			await expect(page.getByText(/确认点 2/)).toBeVisible()
-			await expect(
-				page.getByRole('link', { name: '试玩第一章' }),
-			).toBeVisible()
+			await expect(page.getByRole('link', { name: '试玩第一章' })).toBeVisible()
 			expect(published()).toEqual(['ch0001'])
 			await capture(page, '03-confirm-first')
 			const priorUrl = await page.evaluate(() => location.hash)
@@ -227,9 +225,7 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			await page.getByRole('button', { name: '继续制作' }).click()
 			const second = page.getByRole('listitem').filter({ hasText: '灯火' })
 			await expect(second.getByRole('button', { name: '重试' })).toBeVisible()
-			await expect(
-				second.getByText(/模型请求的配置无效/),
-			).toBeVisible()
+			await expect(second.getByText(/模型请求的配置无效/)).toBeVisible()
 			await setWritingModel(recoveredWriter)
 			await second.getByRole('button', { name: '重试' }).click()
 			await expect(second.getByText('已发布', { exact: true })).toBeVisible({
@@ -640,9 +636,7 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 			await expect(retry).toBeVisible()
 			expect(calls).toHaveLength(malformedAttempts)
 			await retry.click()
-			await expect(
-				page.getByText(/制作花费达到预算上限，已暂停/),
-			).toBeVisible()
+			await expect(page.getByText(/制作花费达到预算上限，已暂停/)).toBeVisible()
 			const queue = await openQueue(page)
 			await expect(queue.getByText('已暂停：模型预算不足')).toBeVisible()
 			expect(calls).toHaveLength(malformedAttempts + 1)

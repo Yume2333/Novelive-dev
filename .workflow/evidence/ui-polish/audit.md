@@ -4,7 +4,18 @@
 **Audited revision:** `ui-polish/integration` (tasks 01–07 merged)
 **Method:** real offline cassette pipeline (m1b-gate + m1b-art cassettes, `NL_REPLAY=strict`, isolated HOME, Electron under xvfb, 1280×800). Failure states exercised end-to-end: a failed chapter (`gate-writer-rejected` → humanized error), a stale asset (`room/day` marked stale in the project DB), two unreadable project bindings (`broken-alpha`/`broken-beta` pointing at missing directories), agent tool cards + a rewrite-proposal card (chat projection fixture). Every image was inspected visually; contrast numbers below are objective pixel measurements where cited.
 **Before images:** `.workflow/evidence/ui-prototype-fidelity/` — `screenshots/<surface>-<theme>-production.png` for all surfaces; `rework2/` supersedes for editor, player, shell-queue (later pre-polish state).
-**After images:** `after/<surface>-<light|dark>.png` (14 surfaces × 2 themes) plus supplementary evidence: `usage-scrolled-*` (aggregate tables), `settings-scrolled-*` (project-dir/about rows), `production-runrecord-*` (records drawer), `production-stale-*` (stale-asset drawer), `agent-proposal-*` (rewrite hunk card), `player-sysmenu/settings/saveload/history-*` (player overlays). All PNG ≤ 184KB.
+**After images:** `after/<surface>-<light|dark>.png` (14 surfaces × 2 themes) plus supplementary evidence: `usage-scrolled-*` (aggregate tables), `settings-scrolled-*` (project-dir/about rows), `production-runrecord-*` (records drawer), `production-stale-*` (stale-asset drawer), `agent-proposal-*` (rewrite hunk card), `player-sysmenu/settings/saveload/history-*` (player overlays). All PNG ≤ 190KB.
+
+---
+
+## Round 2 (2026-11-26, post-rework verification)
+
+**Audited revision:** `ui-polish/08` @ `b6c68ff` (integration + rework commits 3d5b401/7d39b21/8f36432/663918f/b18c69d/2a50d4f).
+**Method:** same cassette pipeline as round 1, plus: editor captured **without** `?chapterId=` to exercise the first-chapter fallback; the agent proposal card's approve action driven against a failing `proposal.resolve` (projection returns a raw English `ECONNREFUSED` error) to exercise the reworked `ErrorNotice`; settings captured after a renderer reload so the shell's cached config reflects the populated models (round-2 main run initially raced the shell's async bootstrap `config.get` and showed the unconfigured state — a capture artifact, not a regression; the reload capture verifies the same code path round 1 used).
+**Recaptured surfaces (light+dark, overwriting round-1 files):** shell, settings, confirm-visual, confirm-first, production (+runrecord/stale drawers), editor, player (+sysmenu/settings/saveload/history overlays), agent (+proposal) — 32 images, all PNG ≤ 190KB (same despeckle+palette quantization pipeline as round 1; round-2 palette sizes 123–137 colors match round-1's 70–129).
+**Round-2 verdicts:** recaptured surfaces pass except one **new FAILED item found during round-2 inspection: the editor eyebrow duplicates the work title (`纸船与灯火 · 纸船与灯火`)** — same duplicated-label class as the round-1 volume-title dedup, owner 04, see the editor section. Details otherwise in the per-surface rows below, marked **[r2]**. The two round-1 cosmetic nits are now fixed and verified in captures: the confirm-visual costume legend reads `造型 1` (no `造型 ·` duplication) and both confirm eyebrows read `纸船与灯火 · 第 1 卷 · 确认点 N / 2` (no `第 1 卷 · 第一卷`/`正文` duplication). Vision-model "dim text" concerns on dark overlays were pixel-measured and rejected again: player-history-dark round-2 measurements are pixel-identical to the audit-accepted round-1 image (secondary text 3.4:1, primary 10.6:1); agent-proposal-dark struck-through deletion text measures the same as round 1 (1.69:1 vs 1.71:1 — intentionally muted deletion styling, unchanged design).
+**New failure-state evidence in round 2:** the proposal card error state is now visible in `agent-proposal-light/dark` — a styled `ErrorNotice` reading `无法提交，请重试` (raw backend `ECONNREFUSED` suppressed).
+**Not recaptured (untouched by rework):** welcome, library, usage, import, work, bible — round-1 evidence stands for those.
 
 ---
 
@@ -16,12 +27,14 @@ Legend: **fixed** — verified in after-evidence or source; **residual** — acc
 
 | Finding | Status | Evidence / reason |
 |---|---|---|
-| L4 (high) sidebar work title falls back to raw UUID | fixed | `AppShell.tsx` uses `formatWorkTitle` humanized fallback; no UUID in any capture |
-| style2/F1 (high) duplicated `制作队列` heading in drawer | fixed | drawer shows single `制作队列` header + close button (shell-light/dark) |
-| F2 (high) queue rows lack cover thumbnails | fixed | rows show GradientCover thumbnail + title + status text (shell-light/dark) |
+| L4 (high) sidebar work title falls back to raw UUID | fixed | `AppShell.tsx` uses `formatWorkTitle` humanized fallback; no UUID in any capture. **[r2]** recaptured shell-light/dark: still no UUID anywhere |
+| style2/F1 (high) duplicated `制作队列` heading in drawer | fixed | drawer shows single `制作队列` header + close button (shell-light/dark). **[r2]** recaptured: heading still appears exactly once, `等你确认` subhead + queue row `纸船与灯火 / 确认角色设定和主视觉` clean |
+| F2 (high) queue rows lack cover thumbnails | fixed | rows show GradientCover thumbnail + title + status text (shell-light/dark). **[r2]** recaptured: unchanged |
 | S4/S5 (med) PageAction/Button duplication, `action` alias | fixed | `PageAction` now delegates to `ButtonLink variant="primary"`; alias removed (source) |
 | U9 (med) drawer rows link away and close silently | residual | documented in done-02 (d): nav feedback out of distilled scope; rows still navigate and close the drawer |
 | S9 (low) two UIs for theme setting | residual | accepted duplication per research note itself ("acceptable duplication") |
+| (r2 rework) shell `hostError` was bare `<p role="alert">` | fixed | `AppShell.tsx` now renders shared `ErrorNotice` (rework 3d5b401); error state not triggerable in the cassette harness (host actions don't fail offline) — verified in source, presentation is the shared component already evidenced on other surfaces |
+
 
 ### welcome — before: `../ui-prototype-fidelity/screenshots/welcome-light-production.png` / `-dark-` · after: [light](after/welcome-light.png) [dark](after/welcome-dark.png)
 
@@ -65,9 +78,11 @@ Legend: **fixed** — verified in after-evidence or source; **residual** — acc
 | L8 (med) config-error raw path | fixed | humanized + behind disclosure (done-02); error state not triggered in capture |
 | S7 (med) settings card re-implements glass | fixed | composes shared card treatments (done-02) |
 | S8 (med) 13.5px fractional font sizes | fixed | zero fractional font sizes remain in `packages/ui/src` (grep-verified: no `*.5px` anywhere) |
-| U5 (med) model card summary truncates | fixed | summary now shows only the model id (`fixture-art-fast` …), format moved into expanded editor; no ellipsis (settings-light/dark) |
+| U5 (med) model card summary truncates | fixed | summary now shows only the model id (`fixture-art-fast` …), format moved into expanded editor; no ellipsis. **[r2]** recaptured with populated config: all five cards show `fixture-art-fast`/`fixture-art-main`/`devin-swe-2`/`fixture-art-visual`/`fixture-art-image` + `已配置` badges, zero truncation (settings-light/dark) |
 | U8 (med) About row cramped, inconsistent icons | fixed | `Novelive v0.0.0 · AGPL-3.0` headline + tagline below; all four links carry icons (检查更新 has a refresh icon) (settings-scrolled-light/dark) |
-| L12 (low) format enum in card summary | fixed | no `OpenAI Chat Completions` in summary rows |
+| L12 (low) format enum in card summary | fixed | no `OpenAI Chat Completions` in summary rows. **[r2]** recaptured: no `openai-completions`/format strings in any summary row |
+| (r2 rework) settings `readableError` leaked raw English backend messages | fixed | rework (3d5b401 chain): only localized/CJK messages render as primary text; raw English detail moved behind collapsed `详细信息` disclosure, `unsupported` no longer passes through raw `failure.message`. Error state not triggerable in offline cassette harness (model tests don't run without network) — verified in source |
+
 
 ### import — before: `../ui-prototype-fidelity/screenshots/import-light-production.png` / `-dark-` · after: [light](after/import-light.png) [dark](after/import-dark.png)
 
@@ -99,8 +114,10 @@ Legend: **fixed** — verified in after-evidence or source; **residual** — acc
 
 | Finding | Status | Evidence / reason |
 |---|---|---|
-| leak7 (high) raw entity ids (`UNIFORM`) for unnamed costumes | fixed | character tab reads `Ada · 造型 1 · 未选定`; no uppercase raw ids anywhere (confirm-visual-light/dark). Nit: legend reads `造型 · 造型 1` — duplicated word when fallback ordinal is used (reads correctly as `造型 · 蓝色制服` when the backend supplies a name); cosmetic only, not a leak |
+| leak7 (high) raw entity ids (`UNIFORM`) for unnamed costumes | fixed | character tab reads `Ada · 造型 1 · 未选定`; no uppercase raw ids anywhere (confirm-visual-light/dark). **[r2]** the round-1 nit is now fixed and verified: legend reads `造型 1` — the `造型 ·` prefix duplication is gone (rework 7d39b21); eyebrow reads `纸船与灯火 · 第 1 卷 · 确认点 1 / 2` with no volume-title duplication (both themes) |
 | style6 (med) empty-state inconsistency | fixed | shared `EmptyState` with icon+text+action (source) |
+| (r2 rework) confirm-visual eyebrow duplicated volume label | fixed | eyebrow now uses `formatVolumeLabel({ index })` only — capture reads `纸船与灯火 · 第 1 卷 · 确认点 1 / 2`, no `第 1 卷 · 第一卷`/`正文` duplication (confirm-visual-light/dark) |
+
 
 ### confirm-first — before: `../ui-prototype-fidelity/screenshots/confirm-first-light-production.png` / `-dark-` · after: [light](after/confirm-first-light.png) [dark](after/confirm-first-dark.png)
 
@@ -108,31 +125,35 @@ Legend: **fixed** — verified in after-evidence or source; **residual** — acc
 |---|---|---|
 | leak11 (med) raw ISO language codes `ja → zh-CN` | fixed | `formatLanguage` shared helper; pair hidden when source==work language (zh-CN both, as in cassette); no raw codes visible |
 | ux9 (med) no loading/empty state for scenes | fixed | loading/empty states added (done-03) |
-| style10 (med) cramped title+aside | fixed | header reads `第 1 章 · 第一章 纸船 · 1 个场景` — trimmed to label+count (confirm-first-light) |
+| style10 (med) cramped title+aside | fixed | header reads `第 1 章 · 第一章 纸船 · 1 个场景` — trimmed to label+count (confirm-first-light). **[r2]** recaptured: same clean header; scene card `纸船` + `1 张背景 · 1 张立绘` |
+| (r2 rework) confirm-first eyebrow duplicated volume label | fixed | eyebrow reads `纸船与灯火 · 第 1 卷 · 确认点 2 / 2` — ordinal-only volume, no duplication (confirm-first-light/dark, rework 7d39b21) |
+
 
 ### production — before: `../ui-prototype-fidelity/screenshots/production-light-production.png` / `-dark-` · after: [light](after/production-light.png) [dark](after/production-dark.png) [runrecord-light](after/production-runrecord-light.png) [runrecord-dark](after/production-runrecord-dark.png) [stale-light](after/production-stale-light.png) [stale-dark](after/production-stale-dark.png)
 
 | Finding | Status | Evidence / reason |
 |---|---|---|
-| leak1 (high) raw provider error as chapter issue | fixed | ch2 row shows humanized `无法连接模型服务，请检查网络后重试。` (production-light/dark) |
-| leak2 (high) run-record detail raw enum (`budget_paused`) | fixed | record detail humanized via `errorKind` contract + localized mapping (done-01 contract change; runrecord drawer shows `写剧本 · 完成` compose format) |
+| leak1 (high) raw provider error as chapter issue | fixed | ch2 row shows humanized `无法连接模型服务，请检查网络后重试。` (production-light/dark). **[r2]** recaptured: same humanized error + top banner `1 章需要处理 / 制作已暂停，请在失败的章节中重试。`, zero bracketed codes |
+| leak2 (high) run-record detail raw enum (`budget_paused`) | fixed | record detail humanized via `errorKind` contract + localized mapping. **[r2]** recaptured runrecord drawer: `写剧本 · 完成` / `审稿 · 完成` / `演出 · 完成` compose format with localized timestamps `2026年11月26日 18:44`, zero enums (runrecord-light/dark) |
 | leak3 (high) backend hardcoded zh `message` | fixed | contract now sends structured `status`+`errorKind`; UI composes `{{step}} · {{status}}` — visible as `写剧本 · 完成` (runrecord-light/dark) |
-| leak6 (high) stale drawer raw assetKey title/toast | fixed | card title `Room · Day` — humanized-slug fallback per maintainer decision (cassette bible carries no description for `room/day`; descriptions resolve when present, cf. editor's `蓝色制服`). Toast likewise humanized (source) |
-| ux2 (high) stale drawer no keep action, no cascade info | residual+fixed | cascade info now present: `重画后第 1 章的 1 个场景会一起换新图` (stale-light/dark). **No 保留 button — documented backend-limited residual (done-03): no write path exists to clear a stale mark without redrawing** |
+| leak6 (high) stale drawer raw assetKey title/toast | fixed | card title `Room · Day` — humanized-slug fallback per maintainer decision. **[r2]** recaptured stale drawer: `过期图片` header, card `Room · Day` + `上游设定或参考图已更新` + `用于 1 个场景` + `重画` button, no raw assetKey (stale-light/dark) |
+| ux2 (high) stale drawer no keep action, no cascade info | residual+fixed | cascade info present: `重画后第 1 章的 1 个场景会一起换新图`. **[r2]** recaptured: cascade line confirmed in both themes (stale-light/dark). **No 保留 button — documented backend-limited residual (done-03): no write path exists to clear a stale mark without redrawing** |
 | ux1 (high) run-record drawer shadow of spec | residual | backend-limited (done-03): records exist only at step completion for write/review/stage; no live/draw records. Copy no longer over-promises. The streaming/tool-card parity with agent panel remains unimplemented — backend contract work |
 | ux3 (high) two stacked h2 headlines | fixed | painting chapter demoted to quiet secondary line `同时出图：第 N 章` (source; not simultaneously exercised in capture) |
 | style2 (high) queue heading duplication + missing thumbs | fixed | see shell/queue |
 | style3 (high) chapter numbering divergence | fixed | one `formatChapterLabel`/`formatChapterNumeral` family: rows `01`/`02` numerals + prose `第 N 章` (all captures consistent) |
 | style4 (med) fractional 13.5/12.5px fonts | fixed | zero fractional font sizes in `packages/ui/src` (grep-verified) |
 | ux7 (med) chip tone for queue position | fixed | `<Chip active>` only for active/producing; quiet chip for position (source) |
+| (r2 rework) production volume heading duplicated (`第 1 卷 · 第一卷`/`正文`) | fixed | `volumeLabelUnlessOrdinal` helper drops ordinal-duplicate titles; section heading reads `第 1 卷 · 共 2 章` in recaptured production-light/dark (rework 7d39b21). Stale row `1 张图过期` coexists with the failed chapter — the round-1 stale-assets freeze (fixture workId mismatch, reworked in 7d39b21/projection.ts) does not reproduce: page renders fully in both themes |
+
 
 ### editor — before: `../ui-prototype-fidelity/rework2/editor-light-production.png` / `../ui-prototype-fidelity/rework2/editor-dark-production.png` · after: [light](after/editor-light.png) [dark](after/editor-dark.png)
 
 | Finding | Status | Evidence / reason |
 |---|---|---|
-| L1 (high) stage footer raw asset ids `room · day` / `Ada/uniform/neutral` | fixed | footer reads `背景 · Room · Day` / `立绘 · Ada · 蓝色制服 · Neutral` — consistent `·` separators, costume resolved to Chinese description `蓝色制服`, remaining Latin fragments are the maintainer-sanctioned humanized-slug fallback for assets with no registered description (cassette registers descriptions only for `room/rain` and `ada/uniform/furious`, neither on stage in this scene) |
+| L1 (high) stage footer raw asset ids `room · day` / `Ada/uniform/neutral` | fixed | footer reads `背景 · Room · Day` / `立绘 · Ada · 蓝色制服 · Neutral`. **[r2]** recaptured: identical humanized footers in both themes, zero raw ids (editor-light/dark) |
 | L2 (high) expression picks raw ids | fixed | same resolution path as L1 (source: `formatAssetLabel` + bible descriptions threaded through) |
-| L3 (high) mark banner raw CSS | fixed | banner now: `新标记：dusk-glow` + live rendered sample (`示例文字` with styles applied) + `逐字/整段`; CSS moved behind collapsed `详细信息` (editor-light/dark). Nit: the mark slug `dusk-glow`/`boat-trail` remains as the banner title — it is the entity's user-facing handle (same name the toolbar menu uses after acceptance), borderline-accepted |
+| L3 (high) mark banner raw CSS | fixed | banner now: `新标记：dusk-glow` + live rendered sample (`示例文字` with styles applied) + `逐字/整段`; CSS moved behind collapsed `详细信息`. **[r2]** recaptured editor-dark: banners read `新标记: dusk-glow 示例文字 逐字` / `新标记: boat-trail 示例文字 整段` with live sample; no CSS visible as primary text. Nit carried from round 1: the mark slug remains the banner title — the entity's user-facing handle (same name the toolbar exposes after acceptance), borderline-accepted |
 | L6 (high) history meta raw line ids / NVS lines | fixed | NVS humanizer strips `#xxxx`/`cont` tails, renders via `parseSentenceLines`+`RichText` (done-04; drawer not captured in this set) |
 | L8 (high) source panel `p0001 ·` prefixes | fixed | paragraph ids dropped; ranges render `原文第 1–5 段` (source) |
 | L4/L5/L7/L9/L10 (med) hunk `h3` / NVS directives / `p0007` instruction / hex scene fallback / `ch0001` chapter fallback | fixed | ordinal fallbacks `第 N 处`/`第 N 场`/`第 N 章` throughout (done-04) |
@@ -141,6 +162,10 @@ Legend: **fixed** — verified in after-evidence or source; **residual** — acc
 | S1/S3 (med) bespoke empty states / third button style | fixed | canonical `EmptyState`/`Chip` (done-04) |
 | U7 (med) save errors mention invisible IDs | fixed | reworded without ids (done-04) |
 | U10 (med) rewrite hunks lack positional context | fixed | `第 N 处` ordinals (done-04) |
+| (r2 rework) editor hardcoded `ch0001` fallback when `chapterId` param absent | fixed | rework 663918f: falls back to the work's first chapter (`workChapters[0]`) instead of the literal `ch0001`. **[r2]** verified end-to-end: captured `/work/<id>/edit` **without** `?chapterId=` — editor resolves and renders `第 1 章 · 第一章 纸船` with full stage content (footer asset rows only render after the chapter session opens, proving the fallback completed), zero `ch0001` strings (editor-light/dark) |
+| (r2 NEW) editor eyebrow duplicates the work title (`纸船与灯火 · 纸船与灯火`) | FAILED — owner 04, rework round 2 | `EditorPage.tsx:111-116` composes `` `${item.project.seriesTitle} · ${item.title}` `` (series title · **work** title) consumed at line 999 `eyebrow={workTitle}`. In the data model both fields are always the same string: wizard `Project.create` sets `series.title` = the novel title (creator/import/wizard/index.ts:472-477) and `writeTxtLayout` writes `title: options.title` into every work file (creator/import/txt/index.ts:126) — so every real project renders `X · X`, not just the cassette. Observed: eyebrow reads `纸船与灯火 · 纸船与灯火` (editor-light/dark, both rounds). Expected: `seriesTitle · formatVolumeLabel({ index, … })` matching production (`ProductionPage.tsx:272-277` → `纸船与灯火 · 第 1 卷`), confirm×2, bible (`BiblePage.tsx:650-660`) — the editor already loads `project.volumeId`/`volumeIndex`/`volumeTitle` from the same `library.list` row. Same duplicated-label class as the round-1 volume-title dedup fixed in 03 |
+
+
 
 ### bible — before: `../ui-prototype-fidelity/screenshots/bible-light-production.png` / `-dark-` · after: [light](after/bible-light.png) [dark](after/bible-dark.png)
 
@@ -162,58 +187,85 @@ Legend: **fixed** — verified in after-evidence or source; **residual** — acc
 
 | Finding | Status | Evidence / reason |
 |---|---|---|
-| L15 (med-high) raw chapterId fallback in history/saves | fixed | `chapterLabelFor` falls back to `未知章节`; history groups render `第 1 章 · 第一章 纸船` (player-history-light/dark; redundancy is cassette data: chapter title literally starts with `第一章`) |
-| L17 (med) milliseconds in text-speed setting | fixed | unitless `慢`/`快` slider, no `ms` anywhere; `瞬间显示` toggle removed (player-settings-light/dark) |
+| L15 (med-high) raw chapterId fallback in history/saves | fixed | `chapterLabelFor` falls back to `未知章节`; history groups render `第 1 章 · 第一章 纸船`. **[r2]** recaptured player-history-light/dark: same clean group label, history line `1. 暮色中，一只纸船从桥下漂过。` (redundancy is cassette data: chapter title literally starts with `第一章`) |
+| L17 (med) milliseconds in text-speed setting | fixed | unitless `慢`/`快` slider, no `ms` anywhere; `瞬间显示` toggle removed. **[r2]** recaptured player-settings-light/dark: rows `自动播放倍率 1×` / `文字速度 慢—快` / `字号 30px` / `对话框不透明度 0.9` / `全屏` / `对话框样式`, no `ms`, no 瞬间显示 |
 | U10 (med) 瞬间显示 toggle fights slider | fixed | toggle gone (same evidence) |
 | L16 (low-med) legacy-save version/slot jargon | fixed | wording humanized; legacy panel only appears in load screen (source; no legacy saves in capture data) |
-| U7 (med) slot card title `槽位 N` | fixed | filled slots title = `第 N 章 · line excerpt`; `存档 N` demoted to secondary line; empty slots read `空存档位` (player-saveload-light/dark) |
+| U7 (med) slot card title `槽位 N` | fixed | filled slots title = `第 N 章 · line excerpt`; `存档 N` demoted to secondary line; empty slots read `空存档位`. **[r2]** recaptured player-saveload-light/dark: `快速存档` quick slot + empty slots `空存档位 / 存档 N`, pagination `1–10` (no filled slots in cassette data) |
 | U9 (low-med) legacy panel in save screen | fixed | rendered only when `view === 'load'` (source) |
 | S6 (med) bare unstyled `打开本地工程` button | fixed | shared `Button` (done-06) |
 | S7 (med) unstyled error `<p>`s | fixed | `ErrorNotice` throughout player surfaces (source) |
 | S8 (med) raw px literals in overlay css | fixed | token-audited (done-06) |
 | L18 (low-med) compiler jargon as player error | fixed | humanized container + details disclosure (done-06) |
 | U5 (med) dead 在编辑器中打开这里 menu item | fixed | hidden when not linkable (done-06) |
-| U14 (med) fullscreen error for transient failures | fixed | severity-appropriate presentation (done-06) |
+| U14 (med) fullscreen error for transient failures | fixed | severity-appropriate presentation. **[r2]** rework b18c69d verified in source: mid-play restore/slot failures now route through `transientFailure` + toast (`formatErrorText(humanizeError(...))`) with `report: 'none'` — the fullscreen layer is reserved for initial-load failures only; slot-action catch toasts the humanized error instead of raw `error.message` (PlayerControls.tsx). Not triggerable in the cassette harness (saves don't fail offline) — presentation components are the shared toast/ErrorNotice already evidenced |
+| (r2 rework) player font sizes bypassed the font-size setting / raw px in css | fixed | rework b18c69d: caption viewport now scales `calc(var(--player-font-size) * 1.2)` instead of hardcoded `1.5rem`; save indicator badge `0.5em` instead of raw `15px`; dead `.nl-player-textbox` block removed. **[r2]** recaptured player-light/dark + all four overlays in both themes: layout unchanged from the audit-accepted round-1 baseline (pixel-identical contrast measurements on player-history-dark: secondary 3.4:1, primary 10.6:1 — same as round 1), no regressions |
+
 
 ### agent — before: `../ui-prototype-fidelity/screenshots/agent-light-production.png` / `-dark-` · after: [light](after/agent-light.png) [dark](after/agent-dark.png) [proposal-light](after/agent-proposal-light.png) [proposal-dark](after/agent-proposal-dark.png)
 
 | Finding | Status | Evidence / reason |
 |---|---|---|
-| L1 (high) raw snake_case tool names as card titles | fixed | titles `读取设定集` / `查看第 2 章剧本` / `提议重写场景` (agent-light/dark) |
-| L2/L3 (high) raw JSON keys as row labels | fixed | curated Chinese rows e.g. `条目 守塔人`, `章节 第 2 章 · 灯火`, `要求 统一称呼` (agent-proposal-dark) |
+| L1 (high) raw snake_case tool names as card titles | fixed | titles `读取设定集` / `查看第 2 章剧本` / `提议重写场景`. **[r2]** recaptured agent-light/dark: same curated titles, no snake_case anywhere |
+| L2/L3 (high) raw JSON keys as row labels | fixed | curated Chinese rows e.g. `条目 守塔人`, `章节 第 2 章 · 灯火`, `要求 统一称呼`. **[r2]** recaptured: expanded `读取设定集` card shows `条目 守塔人` + collapsed `详细信息` only; no English JSON keys |
 | L4 (high) raw JSON dump default-expanded | fixed | collapsed `详细信息` disclosure (arrow closed in agent-dark); no `原始数据` label anywhere |
-| L5 (high) `Proposal <uuid> is awaiting…` English+UUID result | fixed | suppressed for propose tools — absent in both captures even though the fixture feeds it verbatim |
+| L5 (high) `Proposal <uuid> is awaiting…` English+UUID result | fixed | suppressed for propose tools — absent in both captures even though the fixture feeds it verbatim. **[r2]** recaptured: still absent |
 | L6 (high) spawn_agent double exposure | fixed | no spawn tool card; subtask card carries `核对第二章里守塔人的称呼是否与设定一致` + localized `审稿` role badge (agent-light) |
 | L7 (high) raw English role as subtask title | fixed | human task text as title + role as localized chip (same evidence) |
-| L8 (med) raw chapterId in impact line | fixed | `影响 第 2 章 · 灯火` (agent-proposal-light/dark) |
+| L8 (med) raw chapterId in impact line | fixed | `影响 第 2 章 · 灯火` (agent-proposal-light/dark). **[r2]** recaptured: same clean impact line |
 | L9 (med) raw asset path-id in redrawImage card | fixed | `formatAssetLabel` humanizer (source; redraw card not in fixture) |
-| L10 (med) hunk ids `h1`/`h2` as checkbox labels | fixed | `第 1 处改动` / `第 2 处改动` (agent-proposal-light/dark) |
+| L10 (med) hunk ids `h1`/`h2` as checkbox labels | fixed | `第 1 处改动` / `第 2 处改动`. **[r2]** recaptured agent-proposal-light/dark: same ordinal labels with checkboxes, body-font diffs, strikethrough deletions |
 | L11 (med) rewrite diff in mono font | fixed | diffs render in body font (same evidence) |
 | L12 (med) context chip leaks ids | fixed | entry names resolved via map; no raw fallback (done-07) |
 | S1/S2 (med) thinking copy / pulse animation | fixed | prototype copy + pulse removed (done-07) |
 | S4/S5 (med) send button shape / hand-rolled buttons | fixed | shared `Button`, circular send (done-07) |
 | U1 (high) wall of noise in expanded card | fixed | expanded card shows 1–3 curated rows + checks + collapsed disclosure only (agent-dark expanded `读取设定集` evidence) |
 | S13 (med) dead image placeholder icon | fixed | real image rendering via resourceUrl (done-07) |
+| (r2 rework) proposal + tool-card failures were bare `<p role="alert">` / hand-rolled error divs | fixed | rework 2a50d4f: shared `ErrorNotice` for both. **[r2]** verified end-to-end with new failure-state evidence: the projection's `proposal.resolve` fails with a raw English `ECONNREFUSED` error; clicking the card's `确认` renders a styled notice box reading `无法提交，请重试` — raw English never visible as primary text (agent-proposal-light/dark) |
+| (capture artifact) sidebar shows `已删除的作品` + generated cover in all agent captures | residual — capture data, not a lookup bug | the chat projection (both rounds) replaces the renderer's whole IPC backend and answers `library.list` with `works: []` (capture-main-r2.mjs:422-423); the sidebar work lookup then legitimately falls through to the maintainer-sanctioned `formatWorkTitle` fallback `已删除的作品` (AppShell.tsx:548, format/work.ts:35-39) — i.e. the captures incidentally *prove* the UUID-free fallback works. Real-backend surfaces (shell/library/work captures) show the correct title. Round-1 agent captures carry the identical artifact |
+
+
 
 ---
 
 ## Cross-cutting verification
 
-- **Fractional font sizes:** zero `*.5px` in `packages/ui/src` (grep-verified). One remaining raw `font-size: 15px` in `player/controls/controls.css:378` (player stage skin area).
+- **Fractional font sizes:** zero `*.5px` in `packages/ui/src` (grep-verified). **[r2]** the one remaining raw `font-size: 15px` in `player/controls/controls.css` (save-indicator badge) is now `0.5em` (rework b18c69d); caption text scales with the player font-size setting via `calc(var(--player-font-size) * 1.2)` instead of hardcoded `1.5rem`; the dead `.nl-player-textbox` rule was removed |
 - **Dark-theme contrast:** objective pixel measurements on `production-dark` error text — 9.7:1; muted table text in `usage-scrolled-dark` — 5.4:1; primary text 8.6–14.3:1. All pass WCAG AA. Vision-model "dim" reports were measured and rejected as false positives (quiet text is intentionally quieter by design).
 - **Native scrollbars:** covered by e2e assertions (`capture()` helper in m1b-gate and others assert zero native scrollbars).
 - **Locale spacing:** `第 N 章`/`第 N 卷` keys carry half-width spaces in all locale files (source-verified); vision OCR occasionally renders them tight but the DOM strings are correct.
 
 ## Findings needing rework
 
-None — no FAILED items. All high/medium findings are fixed or carry documented residuals accepted by the owning tasks:
+Round-2 rework targets (full detail: `/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/rework-feedback.md`):
 
-1. **residual — owner: gate/backend (out of 02–07 scope):** stale-asset drawer has no `保留` action; no backend write path exists to clear a stale mark without redrawing (done-03). Also: live/`出图` run records cannot exist — backend emits records only at write/review/stage completion.
-2. **residual — owner: pipeline effort (not UI):** bible key-color values render English model output (`black hair`) in a zh UI — prompting/backend matter per research note U2.
-3. **residual — owner 02 (accepted):** library/usage paths outside `$HOME` render absolute rather than collapsing; research suggested drop-or-tooltip as the cleaner end-state. Evidence artifact: captures necessarily use `/tmp` roots, so the absolute path is visible in library shots.
-4. **residual — owner 02 (accepted):** queue-drawer rows navigate away and close the drawer without feedback (done-02 d); welcome keeps its custom stepper dots.
-5. **cosmetic nits (no rework needed):** `造型 · 造型 1` duplicated word in confirm-visual legend when ordinal fallback is used; editor mark-proposal banner titles use the mark slug (`dusk-glow`) — the same user-facing handle the toolbar exposes after acceptance.
+1. **owner 01:** import.target failure squashed — `invalid_join_target` collapses to `internal`; model-flavoured generic copy; backend hardcoded zh reason strings in contract; dead `soft-pulse`/`--glow` styling; Windows home-collapse gap in `formatPath`; legacy subtask-role hydrate path.
+2. **owner 02:** bespoke interruption strip in the shell instead of shared presentation; 「日志」 failure copy; raw 「ID」 wording in import-package copy; vestigial `agentContextLabel` plumbing.
+3. **owner 03:** ja locale splits 空闲 rendering; join-series `Select` no-ops.
+4. **owner 04:** editor eyebrow duplicates the work title — `纸船与灯火 · 纸船与灯火` (`EditorPage.tsx:111-116`, see the editor-section FAILED row); must compose `seriesTitle · formatVolumeLabel(...)` like production/confirm/bible.
+5. **owner 06:** save timestamps follow the OS locale instead of the app locale.
+
+Accepted residuals (no rework needed):
+
+1. **custom-mark slug as banner title** — `packages/format` customMarks entries carry only `css`/`perChar`; the key is the creator-facing handle shown consistently in the editor toolbar and the proposal banner. Accepted as the entity's user-facing name.
+2. **bible glossary raw overflow-x** — pre-existing on main; the global `::-webkit-scrollbar` styling means no native bar renders. Accepted.
+3. **stale-asset drawer has no 保留 action** — no backend write path exists to clear a stale mark without redrawing (done-03). Owner: gate/backend, out of 02–07 scope.
+4. **run-record drawer has no live/`出图` records** — backend emits records only at write/review/stage completion (done-03). Owner: backend contract work.
+5. **English model output in bible color values** (`black hair` in a zh UI) — pipeline/prompting matter per research note U2, not UI-fixable.
+6. **m3-text ruby page-clip** — fails identically on the pre-polish baseline 87d0a4c; pre-existing, not a polish regression.
+7. **m4-import-illustrations intermittent teardown hang** — same rate on baseline; pre-existing flake.
+8. **m4-gate W3 minimize expectation** — Xvfb has no window manager; fails on baseline too. Harness limitation.
+9. **m5-share trash failure** — gvfs refuses trashing on internal mounts unless HOME is on a real filesystem; passes then. Environment artifact.
+10. **m4-single-instance focus flake under load** — intermittent under parallel test load; pre-existing.
+11. **library/usage paths outside `$HOME` render absolute** (owner 02, accepted) — captures necessarily use `/tmp` roots so the absolute path is visible in library shots; maintainer-sanctioned.
+12. **queue-drawer rows navigate away and close silently; welcome keeps custom stepper dots** (owner 02, accepted per done-02/research note).
+13. **agent-capture sidebar shows `已删除的作品`** — capture-data artifact of the chat projection's empty `library.list`; see the agent-section residual row.
 
 ## Linux AppImage
 
-pending
+**round 2, pre-rework revision `b6c68ff` + gate spec formatting; must be rebuilt on the final revision.**
+
+- **Build:** `NL_REPLAY=strict TMPDIR=/home/shizuku/t08-pkg pnpm --filter @novelive/desktop run package:linux` — exit 0 in 53.7s.
+- **Artifact:** `apps/desktop/dist/linux-x64-4TJyBT/artifacts/Novelive-0.0.0-linux-x86_64.AppImage` (git-ignored via `.gitignore:2:dist/`); size 525,779,827 bytes (501.42 MiB).
+- **SHA-256:** `8fdcfefc133269460f338642bfe281b64d81f73cb8ff000fa7931aa65af471b6` (matches the packager's SHA256SUMS).
+- **Smoke:** launched under nl-headless with `HOME=/tmp/uipo-win-08-appimage`, `APPIMAGE_EXTRACT_AND_RUN=1`, TMPDIR on disk (tmpfs cannot mmap the V8 snapshot) — process alive at 15s/20s, library empty state rendered, no creator startup errors. Screenshot: `/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/evidence/task08/r2-appimage-smoke.png`.

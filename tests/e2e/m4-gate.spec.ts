@@ -478,9 +478,7 @@ test.describe('M4 longform and queue', () => {
 				}
 			}
 			await importBook(app, page, join(root, 'scan.pdf'), projects)
-			await expect(
-				page.getByText(/扫描版 PDF 暂不支持识别文字/),
-			).toBeVisible()
+			await expect(page.getByText(/扫描版 PDF 暂不支持识别文字/)).toBeVisible()
 			await capture(page, 'w1-scanned-pdf')
 			const legacySource = join(root, 'legacy.md')
 			await writeFile(legacySource, first)

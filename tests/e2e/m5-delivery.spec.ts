@@ -186,9 +186,7 @@ test('M5 full delivery: creation, confirmations, edit, share, update, re-export 
 				.getByRole('link', { name: '确认第一章' })
 				.click({ timeout: 25_000 })
 			await expect(page.getByText(/确认点 2/)).toBeVisible()
-			await expect(
-				page.getByRole('link', { name: '试玩第一章' }),
-			).toBeVisible()
+			await expect(page.getByRole('link', { name: '试玩第一章' })).toBeVisible()
 			const hash = await page.evaluate(() => location.hash)
 			const matched = hash.match(/\/work\/([^/?]+)/)?.[1]
 			assert(matched, `Expected workId in route hash: ${hash}`)

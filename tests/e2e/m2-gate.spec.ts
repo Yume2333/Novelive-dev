@@ -163,17 +163,16 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		}
 		await openEditor()
 		await page.getByRole('button', { name: '原文对照' }).click()
-		await expect(
-			page.getByRole('button', { name: /^暮色中/ }),
-		).toBeVisible()
+		await expect(page.getByRole('button', { name: /^暮色中/ })).toBeVisible()
 		await page.getByLabel('场景', { exact: true }).selectOption('1')
 		await expect(
 			page.getByRole('button', { name: /^夜风吹过岸边/ }),
 		).toHaveAttribute('aria-pressed', 'true')
 		await page.getByRole('button', { name: /^暮色中/ }).click()
-		await expect(
-			page.getByRole('button', { name: /^暮色中/ }),
-		).toHaveAttribute('aria-pressed', 'true')
+		await expect(page.getByRole('button', { name: /^暮色中/ })).toHaveAttribute(
+			'aria-pressed',
+			'true',
+		)
 		await page.getByRole('button', { name: '快捷位置', exact: true }).click()
 		await page.getByRole('menuitem').filter({ hasText: '暮色中' }).click()
 		await page.getByRole('button', { name: '从当前句预览' }).click()
@@ -227,7 +226,9 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		)
 		await page.getByRole('button', { name: /^Novelive Agent Ctrl/ }).click()
 		const agent = page.getByRole('complementary', { name: 'Novelive Agent' })
-		const composer = agent.getByRole('textbox', { name: '给 Novelive Agent 发消息' })
+		const composer = agent.getByRole('textbox', {
+			name: '给 Novelive Agent 发消息',
+		})
 		await expect(agent.getByText('无法读取会话')).toHaveCount(0)
 		await expect(composer).toBeEnabled()
 		await capture(page, '03-agent-loaded')
