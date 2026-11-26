@@ -424,24 +424,35 @@ test('M5 share surfaces review export, approve updates and import as a project i
 			await page.addScriptTag({ content: fixture.code })
 			const legacy = page.getByRole('region', { name: '旧版本存档' })
 			await expect(legacy).toBeVisible()
-			const deleteSave = legacy.getByRole('button', { name: '删除 v1 槽位 1' })
+			const deleteSave = legacy.getByRole('button', {
+				name: '删除版本 1 的存档 1',
+			})
+			const deleteActions = legacy.locator('.row-actions', {
+				has: page.getByRole('button', { name: '删除版本 1 的存档 1' }),
+			})
 			await legacy.getByRole('heading', { name: '旧版本存档' }).hover()
-			await expect(deleteSave).toHaveCSS('opacity', '0')
+			await expect(deleteActions).toHaveCSS('opacity', '0')
 			await deleteSave.hover()
-			await expect(deleteSave).toHaveCSS('opacity', '1')
+			await expect(deleteActions).toHaveCSS('opacity', '1')
 			await legacy.getByRole('heading', { name: '旧版本存档' }).hover()
 			await deleteSave.focus()
-			await expect(deleteSave).toHaveCSS('opacity', '1')
+			await expect(deleteActions).toHaveCSS('opacity', '1')
 			await deleteSave.press('Enter')
-			await legacy.getByRole('button', { name: '取消' }).click()
+			const confirmOne = page.getByRole('dialog', { name: '删除这个存档？' })
+			await expect(confirmOne).toBeVisible()
+			await confirmOne.getByRole('button', { name: '取消' }).click()
 			await expect(
-				legacy.getByRole('region', { name: '版本 v1' }),
+				legacy.getByRole('region', { name: '旧版本的存档（版本 1）' }),
 			).toBeVisible()
-			await legacy.getByRole('button', { name: '删除 v1 槽位 1' }).click()
-			await legacy.getByRole('button', { name: '确认删除' }).click()
-			await expect(legacy.getByRole('region', { name: '版本 v1' })).toBeHidden()
+			await legacy.getByRole('button', { name: '删除版本 1 的存档 1' }).click()
+			await confirmOne
+				.getByRole('button', { name: '删除', exact: true })
+				.click()
 			await expect(
-				legacy.getByRole('region', { name: '版本 v2' }),
+				legacy.getByRole('region', { name: '旧版本的存档（版本 1）' }),
+			).toBeHidden()
+			await expect(
+				legacy.getByRole('region', { name: '旧版本的存档（版本 2）' }),
 			).toBeVisible()
 			await expect(page.locator('[data-removed]')).toHaveAttribute(
 				'data-removed',
@@ -451,8 +462,25 @@ test('M5 share surfaces review export, approve updates and import as a project i
 					slot: { kind: 'manual', slot: 1 },
 				}),
 			)
+			await legacy.getByRole('button', { name: '全部删除' }).click()
+			const confirmAll = page.getByRole('dialog', { name: '全部删除' })
+			await expect(confirmAll).toBeVisible()
+			await confirmAll
+				.getByRole('button', { name: '全部删除', exact: true })
+				.click()
 			await expect(
-				page.getByRole('button', { name: '读档槽位 1', exact: true }),
+				page.getByRole('region', { name: '旧版本存档' }),
+			).toHaveCount(0)
+			await expect(page.locator('[data-removed]')).toHaveAttribute(
+				'data-removed',
+				JSON.stringify({
+					workId: 'work',
+					version: 2,
+					slot: { kind: 'manual', slot: 1 },
+				}),
+			)
+			await expect(
+				page.getByRole('button', { name: '读取存档 1', exact: true }),
 			).toBeEnabled()
 		} finally {
 			await app.close()

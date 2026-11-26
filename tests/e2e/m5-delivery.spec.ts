@@ -466,7 +466,7 @@ test('M5 full delivery: creation, confirmations, edit, share, update, re-export 
 		})
 		await expect(legacyPanel).toBeVisible()
 		await expect(
-			legacyPanel.getByRole('region', { name: '版本 v1' }),
+			legacyPanel.getByRole('region', { name: '旧版本的存档（版本 1）' }),
 		).toBeVisible()
 		await reader.page.getByRole('button', { name: '返回菜单' }).click()
 		await reader.page.getByRole('button', { name: '返回书库' }).click()

@@ -57,12 +57,41 @@
 	font-size: 1.5rem;
 }
 
+.nl-player-open {
+	position: absolute;
+	inset: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
 .nl-player-error {
 	position: absolute;
-	inset: var(--space-6);
+	inset: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	padding: var(--space-6);
-	background: var(--color-error-container);
-	color: var(--color-on-error-container);
+	background: color-mix(in srgb, var(--color-background) 72%, transparent);
+}
+
+.nl-player-error-card {
+	width: min(480px, 100%);
+	max-height: 100%;
+	overflow: hidden auto;
+	display: flex;
+	flex-direction: column;
+	padding: var(--space-5);
+	border-radius: var(--radius-lg);
+	background: var(--veil-95);
+	box-shadow: var(--shadow-pop);
+}
+
+.nl-player-error-open {
+	align-self: center;
+	margin-top: var(--space-3);
 }
 
 /* ---------- 进场黑幕 ---------- */
@@ -87,8 +116,8 @@
 /* ---------- 重看角标 ---------- */
 .nl-reread-badge {
 	position: absolute;
-	top: 20px;
-	left: 24px;
+	top: var(--space-px-20);
+	left: var(--space-5);
 	z-index: 4;
 	padding: var(--space-1) var(--space-3);
 	border: 1px solid var(--stage-border);
@@ -97,7 +126,7 @@
 	backdrop-filter: blur(6px);
 	color: color-mix(in srgb, var(--stage-text) 72%, transparent);
 	font-family: var(--font-display);
-	font-size: 11px;
+	font-size: var(--text-11);
 	letter-spacing: 0.22em;
 	pointer-events: none;
 }

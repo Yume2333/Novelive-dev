@@ -11,7 +11,7 @@ import {
 	playerWorkId,
 	seedPlayerProject,
 } from '../fixtures/minimal-player'
-import { expectSwitch, setSwitch } from './support/toggle'
+import { setSwitch } from './support/toggle'
 
 const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
@@ -160,7 +160,8 @@ listener (inner): 演出已经清除。 #0002
 				await button(name).click()
 			}
 			const settings = () => menu('设置')
-			const instant = page.getByLabel('瞬间显示')
+			const speed = () =>
+				page.getByRole('slider', { name: '文字速度', exact: true })
 			const status = (message: string) =>
 				expect(player.getByRole('status')).toHaveText(message)
 			const snapshot = (kind: 'quick' | 'manual') =>
@@ -192,7 +193,7 @@ listener (inner): 演出已经清除。 #0002
 			await expect(viewport).toHaveAttribute('data-revealed', '1')
 			await idle()
 			await settings()
-			await setSwitch(instant, true)
+			await speed().press('End')
 			await page.keyboard.press('Escape')
 			await expect
 				.poll(async () => Number(await viewport.getAttribute('data-revealed')))
@@ -200,9 +201,9 @@ listener (inner): 演出已经清除。 #0002
 			await advance()
 			await expect(viewport).toHaveAttribute('data-page', '2')
 			await settings()
-			await setSwitch(instant, false)
+			await speed().press('Home')
 			await expect(viewport).toHaveAttribute('data-page', '1')
-			await setSwitch(instant, true)
+			await speed().press('End')
 			await page.keyboard.press('Escape')
 
 			for (const [ratio, width, height] of [
@@ -254,7 +255,7 @@ listener (inner): 演出已经清除。 #0002
 			})
 			await menu('存档')
 			await expect(page.locator('.nl-save-grid button')).toHaveCount(60)
-			await button('存档槽位 1').click()
+			await button('存入存档 1').click()
 			await status('存档成功')
 			expect(await snapshot('manual')).toEqual(saved)
 			const pages = Number(await viewport.getAttribute('data-pages'))
@@ -269,12 +270,12 @@ listener (inner): 演出已经清除。 #0002
 			await expect.poll(() => pixel(0.5, 0.01)).toEqual([0, 0, 0])
 			await expect.poll(() => pixel(0.8, 0.25)).toEqual(compositePixel)
 			await menu('读档')
-			const thumbnail = page.getByAltText('槽位 1 缩略图')
+			const thumbnail = page.getByAltText('存档 1 缩略图')
 			await expect(thumbnail).toHaveJSProperty('naturalWidth', 480)
 			await expect(thumbnail).toHaveJSProperty('naturalHeight', 270)
 			if (!packaged)
 				await page.screenshot({ path: join(evidence, 'gate-save-slots.png') })
-			await button('读档槽位 1').click()
+			await button('读取存档 1').click()
 			await status('读档完成')
 			await expect(viewport).toHaveAttribute('data-page', '1')
 			await page.keyboard.press('Escape')
@@ -327,7 +328,9 @@ listener (inner): 演出已经清除。 #0002
 			await restarted.page
 				.getByRole('button', { name: '设置', exact: true })
 				.click()
-			await expectSwitch(restarted.page.getByLabel('瞬间显示'), false)
+			await expect(
+				restarted.page.getByRole('slider', { name: '文字速度', exact: true }),
+			).not.toHaveJSProperty('value', '55')
 		} finally {
 			await restarted.app.close()
 		}
