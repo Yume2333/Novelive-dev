@@ -5,19 +5,12 @@ import {
 	type WriterPreset,
 	type WriterSettings,
 } from '@novelive/creator/contract'
-import {
-	Bot,
-	Check,
-	ChevronDown,
-	Copy,
-	PenLine,
-	Plus,
-	Trash2,
-} from 'lucide-react'
+import { Check, ChevronDown, Copy, PenLine, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '../../../components/Button'
 import { Collapse } from '../../../components/Collapse'
 import { ConfirmDialog } from '../../../components/Extended'
+import { ErrorNotice } from '../../../components/Feedback'
 import { CompactSelect } from '../../../components/Form'
 import { useToast } from '../../../components/Toast'
 import { msg, scoped } from '../../../i18n'
@@ -98,12 +91,12 @@ export function ProductionSettings({
 			</h2>
 			<Collapse open={open}>
 				<div className={styles.cards} id="production-settings-panel">
-					<section className={styles.card} aria-label={t('角色模型配置')}>
+					<section
+						className={`glass-panel ${styles.card}`}
+						aria-label={t('角色模型配置')}
+					>
 						{roles.map(([role, name]) => (
 							<div className={styles.row} key={role}>
-								<span className={styles.rowIcon}>
-									<Bot size={19} strokeWidth={1.8} aria-hidden="true" />
-								</span>
 								<strong>{t(name)}</strong>
 								<CompactSelect
 									aria-label={t('{{name}}模型', { name: t(name) })}
@@ -128,7 +121,7 @@ export function ProductionSettings({
 						))}
 					</section>
 					<section
-						className={`${styles.card} ${styles.presets}`}
+						className={`glass-panel ${styles.card} ${styles.presets}`}
 						aria-label={t('写手预设')}
 					>
 						<div className={styles.presetsHead}>
@@ -250,9 +243,7 @@ export function ProductionSettings({
 						</p>
 					)}
 					{notice === 'failed' && (
-						<p role="alert" className={styles.error}>
-							{t('无法保存高级设置，请检查输入后重试。')}
-						</p>
+						<ErrorNotice message={t('无法保存高级设置，请检查输入后重试。')} />
 					)}
 				</div>
 			</Collapse>

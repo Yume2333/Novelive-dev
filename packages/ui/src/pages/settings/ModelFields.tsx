@@ -27,9 +27,6 @@ export const themes = [
 	['system', msg('跟随系统')],
 ] as const
 
-export const formatLabel = (format: string) =>
-	formats.find(([name]) => name === format)?.[1] ?? format
-
 const formats = [
 	[
 		'openai-completions',
@@ -53,7 +50,24 @@ const compatibility = [
 	['anthropic-compat', msg('兼容 Anthropic'), 'https://api.anthropic.com'],
 ] as const
 
-function ApiKeyInput({
+export const formatLabel = (format: string) =>
+	formats.find(([name]) => name === format)?.[1] ?? t('未知格式')
+
+/** 接口格式下拉选项（welcome 与设置共用，不再各写一份） */
+export const formatOptions = formats.map(([value, name]) => ({
+	value,
+	label: name,
+}))
+
+/** 兼容厂商下拉选项（带各家的默认接口地址） */
+export const compatibilityOptions = compatibility
+
+/** 已保存 API Key 的遮罩占位符：输入框拿到焦点时清空，避免误保存遮罩本身。 */
+function unmaskApiKey(value: string, focused: boolean): string {
+	return focused && value === '••••' ? '' : value
+}
+
+export function ApiKeyInput({
 	value,
 	disabled,
 	onChange,
@@ -68,7 +82,7 @@ function ApiKeyInput({
 			<TextInput
 				type="password"
 				autoComplete="new-password"
-				value={focused && value === '••••' ? '' : value}
+				value={unmaskApiKey(value, focused)}
 				disabled={disabled}
 				placeholder="sk-…"
 				onFocus={() => setFocused(true)}
