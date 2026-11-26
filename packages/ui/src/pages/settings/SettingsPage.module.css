@@ -238,6 +238,13 @@
 	line-height: 1.5;
 }
 
+.errorDetail {
+	margin: var(--space-2) 0 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-size: var(--text-11);
+}
+
 .actions {
 	display: flex;
 	justify-content: flex-end;

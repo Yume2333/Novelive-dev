@@ -21,6 +21,14 @@ Check after: `NL_REPLAY=strict pnpm check` exit 0 — lint 33 warnings / 2 infos
 Review: pass (base 3765fcb805ec811299e48501d04e9ef354dc20ab, reviewer reviewer-02)
 The reviewer's findings (quietLead wiring, grouped unreadable banner, ApiKeyInput reuse, welcome negative margin, zh-TW 空閒) were fixed and re-checked.
 
+### Rework (gate 08)
+
+- `AppShell.tsx` hostError bespoke `<p className={styles.warning} role="alert">` replaced with shared `ErrorNotice message={hostError}`; `.warning` CSS retained (still used by the interruption banner).
+- `SettingsPage.tsx` `readableError`: `unsupported` now gated through the same CJK/`localized` check as `invalid_config`/`internal`; raw non-displayable backend messages surface only inside a collapsed 「详细信息」 (`Details`) at both render sites (image `errorBadge` and text-model feedback line). No new locale keys needed — reused existing `当前模型不支持此项。` fallback and shared `Details` 详细信息 summary.
+
+Check after: `NL_REPLAY=strict pnpm check` exit 0 — lint 33 warnings / 2 infos / 0 errors; vitest Test Files 77 passed | 1 skipped (78), Tests 1212 passed | 3 skipped (1215), duration 192.92s. E2E: the exact full-glob command `pnpm test:e2e --grep 'M0 desktop shell|M0 UI shell|M0 settings|M4 usage|M5 locales|M5 share UI'` crashes at spec-load time with `TypeError: Module "…/packages/ui/src/locales/en/agent.json" needs an import attribute of "type: json"` — pre-existing on clean ui-polish/integration (verified with rework changes stashed); cause: e184fa8 (ui-polish/06) added `import { msg } from '../../../i18n'` to `packages/ui/src/pages/player/controls/controller.ts`, so tests/e2e/m3-controls.spec.ts's Node-side import chain reaches the runtime i18n locale JSONs and kills the whole grep-mode run before any test executes; fix belongs to task 06 rework. Scoped equivalent run (only the spec files whose titles the grep matches — m0-shell, m0-settings, m4-usage, m5-locales — so m3-controls.spec.ts is never loaded): `xvfb-run -a env NL_REPLAY=strict pnpm playwright test tests/e2e/m0-shell.spec.ts tests/e2e/m0-settings.spec.ts tests/e2e/m4-usage.spec.ts tests/e2e/m5-locales.spec.ts --grep 'M0 desktop shell|M0 UI shell|M0 settings|M4 usage|M5 locales|M5 share UI'` exit 0 — `11 passed (14.4s)`.
+Review: pass (base 7f6938607279e010942e5f0743ef27c0d5a4c62b, reviewer uipo-02-rework.Review02) — no actionable findings; ErrorNotice API correct, `.warning` retention justified, detail confined to collapsed Details, tokens only.
+
 ### Residuals
 
 - (a) tests/e2e/m4-gate.spec.ts (not owned by task 02) still asserts removed usage regions `已发生用量` (~lines 811-817 → should now be region `按模型汇总`) and `过期素材` (~865-870, section deleted per maintainer decision) — gate task 08 must update.

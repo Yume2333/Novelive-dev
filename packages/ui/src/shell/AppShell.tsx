@@ -40,6 +40,7 @@ import {
 	useNavigate,
 } from 'react-router-dom'
 import { Dropdown } from '../components/Dropdown'
+import { ErrorNotice } from '../components/Feedback'
 import { GradientCover } from '../components/GradientCover'
 import { usePresence } from '../components/Motion'
 import { ScrollArea } from '../components/ScrollArea'
@@ -650,11 +651,7 @@ export function AppShell() {
 							</button>
 						</div>
 					)}
-					{hostError && (
-						<p className={styles.warning} role="alert">
-							{hostError}
-						</p>
-					)}
+					{hostError && <ErrorNotice message={hostError} />}
 					<ScrollArea viewportRef={mainScrollRef} className={styles.mainScroll}>
 						<Outlet key={i18n.language} context={outletContext} />
 					</ScrollArea>

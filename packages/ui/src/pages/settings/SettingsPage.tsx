@@ -80,16 +80,24 @@ const thirdPartyLicenses: ReadonlyArray<readonly [string, string]> = [
 
 type ImageTests = CommandOutput<'model.testImage'>
 type TestResult = ImageTests | CommandOutput<'model.testText'>
+/** 测试错误：本地化正文 + 只进「详细信息」的原始细节 */
+export type ReadableError = CommandError & { detail?: string }
 
-export function readableError(error: unknown): CommandError {
+export function readableError(error: unknown): ReadableError {
 	const failure =
 		error && typeof error === 'object' && 'code' in error
 			? (error as CommandError)
 			: undefined
 	const code = failure?.code ?? 'internal'
+	// 只有后端已本地化（或含 CJK）的 message 才能直接展示；
+	// 英文原文等技术细节只能进折叠的「详细信息」。
 	const readable =
 		failure?.message &&
 		('localized' in failure || /[\u3400-\u9fff]/.test(failure.message))
+			? failure.message
+			: undefined
+	const detail =
+		failure?.message && failure.message !== readable
 			? failure.message
 			: undefined
 	const message = {
@@ -104,12 +112,12 @@ export function readableError(error: unknown): CommandError {
 		stale_revision: t('内容已改变，请刷新后重试。'),
 		invalid_config:
 			readable ?? t('配置无效，请检查接口地址、API Key、模型名和上下文长度。'),
-		unsupported: failure?.message ?? t('当前模型不支持此项。'),
+		unsupported: readable ?? t('当前模型不支持此项。'),
 		cancelled: t('已取消测试。'),
 		creator_down: t('创作端已断开，重新连接后可再测试。'),
 		internal: readable ?? t('操作失败，请重试。'),
 	}[code]
-	return { code, message }
+	return detail ? { code, message, detail } : { code, message }
 }
 
 function IconTile({ icon: Icon }: { icon: LucideIcon }) {
@@ -149,6 +157,11 @@ function ImageResults({ results }: { results: ImageTests }) {
 								data-error-code={error?.code}
 							>
 								{error?.message}
+								{error?.detail ? (
+									<Details>
+										<pre className={styles.errorDetail}>{error.detail}</pre>
+									</Details>
+								) : null}
 							</small>
 						)}
 					</div>
@@ -177,7 +190,7 @@ function ModelCard({
 	const [open, setOpen] = useState(false)
 	const [phase, setPhase] = useState<'idle' | 'saving' | 'testing'>('idle')
 	const [result, setResult] = useState<TestResult>()
-	const [error, setError] = useState<CommandError>()
+	const [error, setError] = useState<ReadableError>()
 	const [saved, setSaved] = useState(false)
 	const work = useRef<AbortController | undefined>(undefined)
 	useEffect(() => () => work.current?.abort(), [])
@@ -298,6 +311,11 @@ function ModelCard({
 					) : error ? (
 						<>
 							{feedbackIcon} {error.message}
+							{error.detail ? (
+								<Details>
+									<pre className={styles.errorDetail}>{error.detail}</pre>
+								</Details>
+							) : null}
 						</>
 					) : complete ? (
 						<>
