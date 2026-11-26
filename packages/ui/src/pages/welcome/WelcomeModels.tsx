@@ -1,9 +1,15 @@
 import type { ConfigUpdate, MaskedConfig } from '@novelive/creator/contract'
-import { Cable, Check, CircleAlert } from 'lucide-react'
+import { Cable, Check } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/Button'
+import { ErrorNotice } from '../../components/Feedback'
 import { Field, Select, TextInput } from '../../components/Form'
 import { msg, scoped } from '../../i18n'
+import {
+	ApiKeyInput,
+	compatibilityOptions,
+	formatOptions,
+} from '../settings/ModelFields'
 import { readableError } from '../settings/SettingsPage'
 import styles from './WelcomePage.module.css'
 
@@ -13,11 +19,6 @@ const slots = [
 	['main', msg('主模型')],
 	['writing', msg('写作模型')],
 	['visual', msg('视觉模型')],
-] as const
-const formats = [
-	['openai-completions', 'OpenAI Chat Completions'],
-	['openai-responses', 'OpenAI Responses'],
-	['anthropic-messages', 'Anthropic Messages'],
 ] as const
 
 export function WelcomeModels({
@@ -29,6 +30,7 @@ export function WelcomeModels({
 	update(patch: ConfigUpdate): Promise<MaskedConfig>
 	onDone(): void
 }) {
+	const [compat, setCompat] = useState(models.fast.compat)
 	const [format, setFormat] = useState(models.fast.format)
 	const [baseUrl, setBaseUrl] = useState(models.fast.baseUrl)
 	const [apiKey, setApiKey] = useState<string>(models.fast.apiKeyMasked)
@@ -55,9 +57,9 @@ export function WelcomeModels({
 				fast: {
 					model: names.fast.trim(),
 					format,
+					compat,
 					baseUrl: baseUrl.trim(),
 					apiKey,
-					...(format !== models.fast.format ? { compat: 'auto' } : {}),
 				},
 				...Object.fromEntries(
 					slots.slice(1).map(([slot]) => [
@@ -113,44 +115,54 @@ export function WelcomeModels({
 		>
 			<fieldset className={styles.modelForm} disabled={busy}>
 				<div className={styles.modelGrid}>
+					<Field label={t('兼容哪家')}>
+						<Select
+							aria-label={t('兼容哪家')}
+							value={compat}
+							options={compatibilityOptions.map(([value, name]) => ({
+								value,
+								label: t(name),
+							}))}
+							onChange={(value) => {
+								const preset = compatibilityOptions.find(
+									([name]) => name === value,
+								)?.[2]
+								setCompat(value)
+								if (preset) setBaseUrl(preset)
+								setTested(false)
+							}}
+						/>
+					</Field>
 					<Field label={t('接口格式')}>
 						<Select
 							aria-label={t('接口格式')}
 							value={format}
-							options={formats.map(([value, label]) => ({ value, label }))}
+							options={[...formatOptions]}
 							onChange={(value) => {
 								setFormat(value)
 								setTested(false)
 							}}
 						/>
 					</Field>
-					<Field label={t('接口地址')}>
-						<TextInput
-							value={baseUrl}
-							placeholder="https://…"
-							autoComplete="off"
-							onChange={(value) => {
-								setBaseUrl(value)
-								setTested(false)
-							}}
-						/>
-					</Field>
 				</div>
-				<Field label="API Key">
+				<Field label={t('接口地址')}>
 					<TextInput
-						type="password"
-						value={apiKey}
-						placeholder="sk-…"
-						autoComplete="new-password"
-						onFocus={(event) => {
-							if (apiKey === '••••') event.currentTarget.select()
-						}}
+						value={baseUrl}
+						placeholder="https://…"
+						autoComplete="off"
 						onChange={(value) => {
-							setApiKey(value)
+							setBaseUrl(value)
 							setTested(false)
 						}}
 					/>
 				</Field>
+				<ApiKeyInput
+					value={apiKey}
+					onChange={(value) => {
+						setApiKey(value)
+						setTested(false)
+					}}
+				/>
 				<div className={styles.modelTest}>
 					<Button
 						size="sm"
@@ -166,13 +178,8 @@ export function WelcomeModels({
 							{t('连接成功')}
 						</span>
 					)}
-					{error && (
-						<span role="alert" className={styles.testFail}>
-							<CircleAlert size={14} strokeWidth={1.8} aria-hidden="true" />
-							{error}
-						</span>
-					)}
 				</div>
+				{error && <ErrorNotice message={error} />}
 				<div className={styles.modelGrid}>
 					{slots.map(([slot, title]) => (
 						<Field key={slot} label={t(title)}>
@@ -208,20 +215,12 @@ export function WelcomeModels({
 							}
 						/>
 					</Field>
-					<Field label="API Key">
-						<TextInput
-							type="password"
-							value={image.apiKey}
-							placeholder="sk-…"
-							autoComplete="new-password"
-							onFocus={(event) => {
-								if (image.apiKey === '••••') event.currentTarget.select()
-							}}
-							onChange={(value) =>
-								setImage((previous) => ({ ...previous, apiKey: value }))
-							}
-						/>
-					</Field>
+					<ApiKeyInput
+						value={image.apiKey}
+						onChange={(value) =>
+							setImage((previous) => ({ ...previous, apiKey: value }))
+						}
+					/>
 				</div>
 			</fieldset>
 		</form>

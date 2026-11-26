@@ -15,7 +15,14 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Banner, Button, ConfirmDialog, Drawer, useToast } from '../components'
+import {
+	ConfirmDialog,
+	Drawer,
+	ErrorNotice,
+	LoadingState,
+	useToast,
+} from '../components'
+import { type HumanizedError, humanizeError } from '../format/errors'
 import { scoped } from '../i18n'
 import { ProductionQueuePanel } from '../pages/production/queue/ProductionQueuePanel'
 import styles from './GlobalProductionQueue.module.css'
@@ -31,7 +38,8 @@ const toneIcon = {
 
 export function GlobalProductionQueue() {
 	const [queue, setQueue] = useState<CommandOutput<'production.getQueue'>>()
-	const [error, setError] = useState('')
+	const [loadError, setLoadError] = useState<HumanizedError>()
+	const [opError, setOpError] = useState<HumanizedError>()
 	const [busy, setBusy] = useState(false)
 	const [open, setOpen] = useState(false)
 	const [reload, setReload] = useState(0)
@@ -54,12 +62,13 @@ export function GlobalProductionQueue() {
 				(next) => {
 					if (active && current === revision) {
 						setQueue(next)
-						setError('')
+						setLoadError(undefined)
+						setOpError(undefined)
 					}
 				},
-				() => {
+				(failure) => {
 					if (active && current === revision)
-						setError(t('无法读取制作队列，请重试'))
+						setLoadError(humanizeError(failure))
 				},
 			)
 		}
@@ -68,13 +77,14 @@ export function GlobalProductionQueue() {
 				return
 			revision++
 			setQueue(event.event.payload)
-			setError('')
+			setLoadError(undefined)
+			setOpError(undefined)
 		})
 		const offReady = window.novelive.on('creator.ready', load)
 		const offDown = window.novelive.on('creator.down', () => {
 			revision++
 			setQueue(undefined)
-			setError(t('创作端已断开，等待重新连接。'))
+			setLoadError(humanizeError('creator_down'))
 		})
 		// An explicit reload (drawer open, 重新读取, creator.ready) must always
 		// fetch when the creator is ready: events emitted before an external
@@ -141,23 +151,25 @@ export function GlobalProductionQueue() {
 		toastIcon?: typeof ArrowUpDown,
 	): Promise<boolean> {
 		setBusy(true)
-		setError('')
+		setOpError(undefined)
 		try {
 			await action()
 			setReload((value) => value + 1)
 			if (toastText) toast(toastText, toastIcon)
 			return true
 		} catch (failure) {
+			// invalid_config 的中文消息是后端针对具体场景的引导文案（如「请先继续制作前卷：…」），
+			// 直接透传；英文细节统一替换为面向创作者的检查指引，原始文本不外泄。
 			if (commandError.check(failure) && failure.code === 'invalid_config') {
-				setError(
-					/[\u3400-\u9fff]/.test(failure.message)
+				setOpError({
+					message: /[\u3400-\u9fff]/.test(failure.message)
 						? failure.message
 						: t(
 								'模型配置无效，请在设置中检查接口地址、API Key、模型名和上下文长度。',
 							),
-				)
+				})
 			} else {
-				setError(t('队列操作失败，请重试'))
+				setOpError(humanizeError(failure))
 			}
 			return false
 		} finally {
@@ -217,6 +229,11 @@ export function GlobalProductionQueue() {
 		}
 		return t('没有排队的作品')
 	})()
+	const pendingStopTitle = pendingStop
+		? (queue?.active?.link.workId === pendingStop && queue.active.title) ||
+			queue?.queued.find((work) => work.link.workId === pendingStop)?.title ||
+			queue?.inactive.find((work) => work.link.workId === pendingStop)?.title
+		: undefined
 	return (
 		<>
 			<button
@@ -252,30 +269,19 @@ export function GlobalProductionQueue() {
 				onClose={() => {
 					if (!pendingStop) setOpen(false)
 				}}
-				width={400}
+				width={432}
 			>
 				<div className={styles.drawerBody}>
-					{error && (
-						<Banner
-							kind="error"
-							action={
-								<Button
-									variant="ghost"
-									size="sm"
-									disabled={busy}
-									onClick={() => setReload((value) => value + 1)}
-								>
-									{t('重新读取')}
-								</Button>
-							}
-						>
-							<span role="alert">{error}</span>
-						</Banner>
+					{loadError !== undefined && (
+						<ErrorNotice
+							error={loadError}
+							onRetry={() => setReload((value) => value + 1)}
+							retryLabel={t('重新读取')}
+						/>
 					)}
-					{!queue && !error && (
-						<p role="status" className={styles.loading}>
-							{t('正在读取制作队列')}
-						</p>
+					{opError !== undefined && <ErrorNotice error={opError} />}
+					{!queue && loadError === undefined && (
+						<LoadingState text={t('正在读取制作队列')} />
 					)}
 					{queue && (
 						<ProductionQueuePanel
@@ -309,7 +315,10 @@ export function GlobalProductionQueue() {
 			<ConfirmDialog
 				open={Boolean(pendingStop)}
 				title={t('停止制作')}
-				message={t('正在进行的请求会中断，下次继续时重做被中断的部分。')}
+				message={t(
+					'将停止制作《{{title}}》。正在进行的请求会中断，下次继续时重做被中断的部分。',
+					{ title: pendingStopTitle ?? '' },
+				)}
 				confirmLabel={t('立即停止')}
 				danger
 				busy={busy}

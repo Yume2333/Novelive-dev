@@ -9,8 +9,10 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../../../components/Button'
 import { Banner } from '../../../components/Extended'
+import { ErrorNotice, LoadingState } from '../../../components/Feedback'
 import { Modal } from '../../../components/Modal'
 import { useToast } from '../../../components/Toast'
+import { type HumanizedError, humanizeError } from '../../../format/errors'
 import { scoped } from '../../../i18n'
 import styles from '../LibraryPage.module.css'
 
@@ -65,7 +67,7 @@ export function ImportPackage({
 		works: InspectedWork[]
 	}>()
 	const [busy, setBusy] = useState(false)
-	const [error, setError] = useState('')
+	const [error, setError] = useState<HumanizedError>()
 	const [imported, setImported] = useState<number>()
 	const [projectImported, setProjectImported] = useState(false)
 	const busyRef = useRef(false)
@@ -92,7 +94,7 @@ export function ImportPackage({
 			if (packagePath) await inspectPath(packagePath)
 		} catch {
 			setOpen(true)
-			setError(t('无法检查作品包，请重新选择。'))
+			setError({ message: t('无法检查作品包，请重新选择。') })
 		}
 	}
 
@@ -100,23 +102,26 @@ export function ImportPackage({
 		busyRef.current = true
 		setBusy(true)
 		setOpen(true)
-		setError('')
+		setError(undefined)
 		setReview(undefined)
 		setImported(undefined)
 		setProjectImported(false)
+		let response: ShareResponse | undefined
 		try {
-			const response = await api.call({
+			response = await api.call({
 				operation: 'inspectImport',
 				packagePath,
 			})
-			if (response.ok) setReview({ packagePath, works: response.result.works })
-			else setError(response.error.message)
-		} catch {
-			setError(t('无法检查作品包，请重新选择。'))
+		} catch (failure) {
+			setError(humanizeError(failure))
 		} finally {
 			busyRef.current = false
 			setBusy(false)
 		}
+		if (!response) return
+		if (response.ok && response.result.operation === 'inspectImport')
+			setReview({ packagePath, works: response.result.works })
+		else if (!response.ok) setError(humanizeError(response.error))
 	}).current
 	const inspectLatest = useRef(inspect)
 	inspectLatest.current = inspect
@@ -148,7 +153,7 @@ export function ImportPackage({
 	async function importPackage(asProject: boolean) {
 		if (!review) return
 		setBusy(true)
-		setError('')
+		setError(undefined)
 		try {
 			const { packagePath } = review
 			if (asProject) {
@@ -160,7 +165,7 @@ export function ImportPackage({
 					destination,
 				})
 				if (!response.ok) {
-					setError(response.error.message)
+					setError(humanizeError(response.error))
 					return
 				}
 				setProjectImported(true)
@@ -172,19 +177,15 @@ export function ImportPackage({
 					approvedUpdates: updates,
 				})
 				if (!response.ok) {
-					setError(response.error.message)
+					setError(humanizeError(response.error))
 					return
 				}
 				setImported(response.result.works.length)
 				toast(t('作品包导入完成'), CircleCheck)
 			}
 			onImported()
-		} catch {
-			setError(
-				asProject
-					? t('无法导入为工程，请重试。')
-					: t('无法导入作品包，请重试。'),
-			)
+		} catch (failure) {
+			setError(humanizeError(failure))
 		} finally {
 			setBusy(false)
 		}
@@ -232,13 +233,15 @@ export function ImportPackage({
 			>
 				<div className={styles.packageContent}>
 					{busy ? (
-						<p role="status">
-							{review ? t('正在导入…') : t('正在检查作品包…')}
-						</p>
+						<LoadingState
+							text={review ? t('正在导入…') : t('正在检查作品包…')}
+						/>
 					) : projectImported ? (
-						<p role="status">{t('已导入为新工程，可以在书库中编辑。')}</p>
+						<p role="status" className={styles.packageDone}>
+							{t('已导入为新工程，可以在书库中编辑。')}
+						</p>
 					) : imported !== undefined ? (
-						<p role="status">
+						<p role="status" className={styles.packageDone}>
 							{t('已导入或更新 {{count}} 部作品。', { count: imported })}
 						</p>
 					) : (
@@ -292,7 +295,7 @@ export function ImportPackage({
 							{t('导入为工程会创建可编辑的副本，再次导出时将使用新的作品 ID。')}
 						</p>
 					)}
-					{error && <p role="alert">{error}</p>}
+					{error !== undefined && <ErrorNotice error={error} />}
 				</div>
 			</Modal>
 		</>

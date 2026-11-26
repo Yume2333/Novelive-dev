@@ -16,11 +16,14 @@
 }
 
 .alert {
-	padding: var(--space-px-11) var(--space-4);
-	border-radius: var(--radius-lg);
-	background: var(--color-error-container);
-	color: var(--color-on-error-container);
-	font-size: 13px;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-2);
+}
+
+.alertDetail {
+	margin: 0;
 }
 
 .group {
@@ -37,11 +40,14 @@
 }
 
 .groupPath {
+	overflow: hidden;
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 	font-weight: 400;
-	letter-spacing: 0;
+	letter-spacing: normal;
+	text-overflow: ellipsis;
 	text-transform: none;
+	white-space: nowrap;
 }
 
 .volume {
@@ -52,7 +58,9 @@
 
 .volumeTitle {
 	color: var(--color-on-surface-variant);
-	font: 600 13px var(--font-body);
+	font-family: var(--font-body);
+	font-size: var(--text-13);
+	font-weight: 600;
 }
 
 .grid {
@@ -70,9 +78,15 @@
 	gap: var(--space-4);
 	height: 100%;
 	padding: var(--space-3);
-	border-radius: var(--radius-xl);
+	border-radius: var(--radius-2xl);
 	color: inherit;
 	text-decoration: none;
+}
+
+/* 不可点击的卡片（暂无可游玩章节）：降低存在感，不暗示可交互 */
+.card[data-disabled="true"] {
+	cursor: default;
+	opacity: 0.72;
 }
 
 .cover {
@@ -107,7 +121,7 @@
 .cardBody .title {
 	overflow: hidden;
 	margin-bottom: var(--space-px-2);
-	font-size: 16px;
+	font-size: var(--text-16);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -131,7 +145,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-px-6);
-	font-size: 12px;
+	font-size: var(--text-12);
 	font-weight: 500;
 }
 
@@ -151,7 +165,7 @@
 	display: flex;
 	justify-content: space-between;
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 }
 
 .readingPercent {
@@ -166,7 +180,7 @@
 
 .emptyGuide button {
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 	cursor: pointer;
 	transition: color var(--dur-fast) var(--ease-out);
 }
@@ -203,7 +217,7 @@
 
 .packageMeta {
 	color: var(--color-on-surface-variant);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 .packageWorks {
@@ -235,7 +249,7 @@
 .packageWorkVersion {
 	flex-shrink: 0;
 	color: var(--color-on-surface-variant);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 .packageWorkVersion[data-relation="update"] {
@@ -245,8 +259,15 @@
 .packageNote {
 	margin: 0;
 	color: var(--color-on-surface-variant);
-	font-size: 13px;
+	font-size: var(--text-13);
 	line-height: 1.7;
+}
+
+.packageDone {
+	margin: 0;
+	padding: var(--space-4) var(--space-1);
+	color: var(--color-on-surface-variant);
+	font-size: var(--text-13);
 }
 
 .packageContent {

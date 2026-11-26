@@ -268,7 +268,13 @@ test('M5 share surfaces review export, approve updates and import as a project i
 			)
 			await expect(pick).toHaveCSS('background-color', glass)
 			await pick.click()
-			await expect(preview.getByRole('alert')).toHaveText('不支持此作品包格式')
+			// 错误横幅为本地化的人话文案（不直接展示后端原始消息），
+			// 后端原始消息收进折叠的「详细信息」
+			await expect(preview.getByRole('alert')).toContainText(
+				'无法打开文件，格式不受支持。',
+			)
+			await preview.getByRole('button', { name: '详细信息' }).click()
+			await expect(preview.getByText('不支持此作品包格式')).toBeVisible()
 			await preview.getByRole('button', { name: '关闭' }).click()
 			await pick.click()
 			await expect(preview.getByText('v1 → v2 · 可更新')).toBeVisible()
