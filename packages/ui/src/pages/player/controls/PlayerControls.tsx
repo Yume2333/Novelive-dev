@@ -33,6 +33,7 @@ import { Toggle } from '../../../components/Form'
 import { ScrollArea } from '../../../components/ScrollArea'
 import { useToast } from '../../../components/Toast'
 import { formatChapterLabel } from '../../../format/chapter'
+import { formatErrorText, humanizeError } from '../../../format/errors'
 import {
 	chapterPhaseFraction,
 	defaultPlayerSettings,
@@ -276,9 +277,7 @@ export function PlayerControls({
 			else await onLoad(slot)
 			setNotice(save ? t('存档成功') : t('读档完成'))
 		} catch (error) {
-			toastError(
-				error instanceof Error ? error.message : t('存读档失败，请重试。'),
-			)
+			toastError(formatErrorText(humanizeError(error)))
 		}
 	}
 	const title =

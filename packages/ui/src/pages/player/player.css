@@ -28,16 +28,6 @@
 	pointer-events: none;
 }
 
-.nl-player-textbox {
-	width: 100%;
-	min-height: 20%;
-	padding: var(--space-6);
-	background: var(--veil-90);
-	box-shadow: var(--shadow-glass);
-	font-size: 1.25rem;
-	line-height: 1.8;
-}
-
 .nl-player-name {
 	color: var(--color-primary);
 	font-weight: 700;
@@ -54,7 +44,6 @@
 	padding: var(--space-6);
 	border-radius: var(--radius-lg);
 	background: var(--veil-90);
-	font-size: 1.5rem;
 }
 
 .nl-player-open {
