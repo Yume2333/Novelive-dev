@@ -38,6 +38,7 @@ import {
 	formatChapterLabel,
 	formatParagraphLabel,
 	formatSceneLabel,
+	formatVolumeLabel,
 } from '../../format/chapter'
 import { humanizeError } from '../../format/errors'
 import { scoped } from '../../i18n'
@@ -95,7 +96,7 @@ export function EditorPage() {
 	const chapterIdParam = params.get('chapterId')
 	const sceneIdParam = params.get('sceneId')
 	const lineIdParam = params.get('lineId')
-	const [workTitle, setWorkTitle] = useState<string>()
+	const [workEyebrow, setWorkEyebrow] = useState<string>()
 	const [workVolumeId, setWorkVolumeId] = useState<string>()
 	const [workChapters, setWorkChapters] =
 		useState<
@@ -108,16 +109,21 @@ export function EditorPage() {
 		pending.promise.then(
 			(library) => {
 				const item = library.works.find((entry) => entry.workId === id)
-				setWorkTitle(
+				setWorkEyebrow(
 					item &&
 						(item.project
-							? `${item.project.seriesTitle} · ${item.title}`
+							? [
+									item.project.seriesTitle,
+									formatVolumeLabel({ index: item.project.volumeIndex }),
+								]
+									.filter(Boolean)
+									.join(' · ')
 							: item.title),
 				)
 				setWorkVolumeId(item?.project?.volumeId)
 			},
 			() => {
-				setWorkTitle(undefined)
+				setWorkEyebrow(undefined)
 				setWorkVolumeId(undefined)
 			},
 		)
@@ -996,7 +1002,7 @@ export function EditorPage() {
 		<Page
 			title={t('编辑器')}
 			width="full"
-			eyebrow={workTitle}
+			eyebrow={workEyebrow}
 			subtitle={
 				scene &&
 				chapter && (

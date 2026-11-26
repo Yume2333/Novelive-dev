@@ -27,6 +27,14 @@
 - Unrelated baseline failure (proof): the exact command `pnpm exec playwright test --grep 'M2 editor|M3 custom marks'` fails at collection on the integration baseline before running any test: `TypeError: Module ".../packages/ui/src/locales/en/agent.json" needs an import attribute of "type: json"` (exit 1, 0 tests run). Root cause is task 06's e184fa8 adding `import { msg } from '../../../i18n'` to `packages/ui/src/pages/player/controls/controller.ts`, which `tests/e2e/m3-controls.spec.ts` imports statically; playwright enumerates every spec in `tests/e2e`, so node ESM hits the bare json imports in `packages/ui/src/locales/index.ts`. Proof it is not this rework: enumeration succeeds with the identical tree when only `m3-controls.spec.ts` is absent (`--list` shows exactly the 12 tests above, my modified `m2-editor.spec.ts` included); none of my changed files are in the failing import chain. Reported to Main for task 01/06 ownership.
 - Review: pass (base 7f69386, self-review — small diff, reviewer step optional per rework brief)
 
+### Rework round 2 (gate 08)
+
+- Rework item: the editor eyebrow rendered `纸船与灯火 · 纸船与灯火` because import writes the same title into series and work.
+- Fix: `EditorPage.tsx` composes the eyebrow like production/confirm/bible — `seriesTitle · formatVolumeLabel({ index: volumeIndex })` (bible-style `[...].filter(Boolean).join(' · ')`, no copy added); package works (no project) keep the work title; state renamed `workTitle` → `workEyebrow`.
+- Base commit: d43308159dd615858cfac1664fff7580f352457f
+- Check after: `NL_REPLAY=strict pnpm check` exit 0 (Test Files 77 passed | 1 skipped (78); Tests 1212 passed | 3 skipped (1215)); `pnpm build` exit 0; playwright with gate JSON hook (Node 24 JSON-import workaround, same as gate 08) `nl-headless pnpm exec playwright test --grep 'M2 editor|M3 custom marks'`: 12 passed / 0 failed (36.1s).
+- Review: pass (base d43308159dd615858cfac1664fff7580f352457f, reviewer w04-review)
+
 ### Residuals
 
 - Rewrite-modal screenshot not captured (needs model worker; covered by contract-fixture e2e).
