@@ -2,6 +2,7 @@ import { ImagePlus, Maximize2, Minimize2, Send, Square, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Chip } from '../../components/Card'
 import { Tooltip } from '../../components/Extended'
+import { ErrorNotice } from '../../components/Feedback'
 import { OverlayScrollbar } from '../../components/ScrollArea'
 import { scoped } from '../../i18n'
 import styles from './AgentPanel.module.css'
@@ -91,7 +92,7 @@ export function Composer({
 				])
 			}
 		} catch {
-			setError(t('图片没能加进来'))
+			setError(t('无法添加图片，请重试'))
 		}
 	}
 	const remove = (id: string) =>
@@ -115,7 +116,7 @@ export function Composer({
 			setText('')
 			onExpandedChange(false)
 		} catch {
-			setError(t('没能发出，请重试'))
+			setError(t('无法发出，请重试'))
 		} finally {
 			setBusy(false)
 		}
@@ -166,7 +167,7 @@ export function Composer({
 			<textarea
 				ref={input}
 				className={`nl-input nl-scroll-hidden ${styles.input}`}
-				aria-label={t('给 Agent 发消息')}
+				aria-label={t('给 Novelive Agent 发消息')}
 				placeholder={t('说说想改什么，可以直接贴图')}
 				rows={1}
 				data-expanded={expanded}
@@ -306,11 +307,7 @@ export function Composer({
 					{sendOrStop}
 				</div>
 			)}
-			{error && (
-				<p className={styles.error} role="alert">
-					{error}
-				</p>
-			)}
+			{error && <ErrorNotice className={styles.errorNotice} message={error} />}
 		</div>
 	)
 }
