@@ -112,12 +112,12 @@ export function EditorPage() {
 				setWorkEyebrow(
 					item &&
 						(item.project
-							? [
-									item.project.seriesTitle,
-									formatVolumeLabel({ index: item.project.volumeIndex }),
-								]
-									.filter(Boolean)
-									.join(' · ')
+							? t('{{series}} · {{volume}}', {
+									series: item.project.seriesTitle,
+									volume: formatVolumeLabel({
+										index: item.project.volumeIndex,
+									}),
+								})
 							: item.title),
 				)
 				setWorkVolumeId(item?.project?.volumeId)

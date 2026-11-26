@@ -3,6 +3,7 @@
 	"Agent": "Agent",
 	"{ruby よみ}": "{ruby よみ}",
 	"{{name}}在这一场没有台词": "{{name}}在這一場沒有台詞",
+	"{{series}} · {{volume}}": "{{series}} · {{volume}}",
 	"{{speaker}}：": "{{speaker}}：",
 	"{{speaker}}：{{text}}": "{{speaker}}：{{text}}",
 	"…另有 {{count}} 条": "…另有 {{count}} 條",

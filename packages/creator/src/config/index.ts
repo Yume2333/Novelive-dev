@@ -232,7 +232,17 @@ export function createConfigStore(userData: string) {
 
 	function requireConfig(result: Config | ConfigError): Config {
 		if ('configError' in result) {
-			throw { code: 'invalid_config', message: result.configError.reason }
+			const { path: configPath, reason } = result.configError
+			const detail: Record<ConfigErrorReason, string> = {
+				unreadable: 'config file could not be read',
+				invalid_json: 'config file is not valid JSON',
+				invalid_fields: 'config fields are invalid',
+				decrypt_failed: 'config secrets could not be decrypted',
+			}
+			throw {
+				code: 'invalid_config',
+				message: `${detail[reason] ?? 'config file is broken'}: ${configPath}`,
+			}
 		}
 		return result
 	}

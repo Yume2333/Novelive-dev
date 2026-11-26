@@ -325,7 +325,7 @@ export function CharacterDetail({
 	regenKeys?: Readonly<Record<string, boolean>>
 	onPreview?: (target: PreviewTarget) => void
 	onRegen?: (assetId: string, label: string) => void
-	onAskAgent?: (entryId: string, label: string) => void
+	onAskAgent?: (entryId: string) => void
 }) {
 	const beforeFirst =
 		Boolean(character.firstSeenChapter) &&
@@ -417,11 +417,7 @@ export function CharacterDetail({
 					)}
 				</div>
 				<span className={styles.cardActions}>
-					<AskAgentButton
-						onAskAgent={onAskAgent}
-						entryId={character.id}
-						label={character.name}
-					/>
+					<AskAgentButton onAskAgent={onAskAgent} entryId={character.id} />
 				</span>
 			</header>
 

@@ -439,11 +439,9 @@ export function StatusChip({ status }: { status: string }) {
 export function AskAgentButton({
 	onAskAgent,
 	entryId,
-	label,
 }: {
-	onAskAgent: ((entryId: string, label: string) => void) | undefined
+	onAskAgent: ((entryId: string) => void) | undefined
 	entryId: string
-	label: string
 }) {
 	if (!onAskAgent) return null
 	return (
@@ -451,7 +449,7 @@ export function AskAgentButton({
 			icon={Sparkles}
 			label={t('问 Agent 修改')}
 			size={28}
-			onClick={() => onAskAgent(entryId, label)}
+			onClick={() => onAskAgent(entryId)}
 		/>
 	)
 }
@@ -740,7 +738,7 @@ export function LocationCard({
 	occurrences?: ReactNode
 	onPreview?: (target: PreviewTarget) => void
 	onRegen?: (assetId: string, label: string) => void
-	onAskAgent?: (entryId: string, label: string) => void
+	onAskAgent?: (entryId: string) => void
 }) {
 	const candidates = locationCandidateAssetIds(location)
 	const drawnId = candidates.find((id) => resolvedAssets?.[id])
@@ -797,11 +795,7 @@ export function LocationCard({
 					</span>
 				)}
 				<span className={styles.cardActions}>
-					<AskAgentButton
-						onAskAgent={onAskAgent}
-						entryId={location.id}
-						label={location.name}
-					/>
+					<AskAgentButton onAskAgent={onAskAgent} entryId={location.id} />
 				</span>
 			</header>
 
@@ -939,14 +933,13 @@ export function RelationCard({
 	chapterCutoff?: number
 	chapterOrder?: ReadonlyMap<string, number>
 	occurrences?: ReactNode
-	onAskAgent?: (entryId: string, label: string) => void
+	onAskAgent?: (entryId: string) => void
 }) {
 	const fromName =
 		characters.find((item) => item.id === relation.from)?.name ??
 		t('未命名角色')
 	const toName =
 		characters.find((item) => item.id === relation.to)?.name ?? t('未命名角色')
-	const label = `${fromName} / ${toName}`
 	return (
 		<article
 			className={styles.card}
@@ -973,11 +966,7 @@ export function RelationCard({
 					</span>
 				)}
 				<span className={styles.cardActions}>
-					<AskAgentButton
-						onAskAgent={onAskAgent}
-						entryId={relation.id}
-						label={label}
-					/>
+					<AskAgentButton onAskAgent={onAskAgent} entryId={relation.id} />
 				</span>
 			</header>
 
@@ -1018,7 +1007,7 @@ export function TimelineView({
 	chapterCutoff?: number
 	chapterOrder?: ReadonlyMap<string, number>
 	renderOccurrences?: (entry: BibleTimeline) => ReactNode
-	onAskAgent?: (entryId: string, label: string) => void
+	onAskAgent?: (entryId: string) => void
 }) {
 	const shown = entries.filter((entry) =>
 		isWithinChapter(entry.chapterId, chapterCutoff, chapterOrder),
@@ -1062,11 +1051,7 @@ export function TimelineView({
 							{entry.status !== 'confirmed' && <Chip active>{t('候选')}</Chip>}
 							{onAskAgent && (
 								<span className={`row-actions ${styles.rowAskBtn}`}>
-									<AskAgentButton
-										onAskAgent={onAskAgent}
-										entryId={entry.id}
-										label={entry.event}
-									/>
+									<AskAgentButton onAskAgent={onAskAgent} entryId={entry.id} />
 								</span>
 							)}
 						</div>
@@ -1091,7 +1076,7 @@ export function ForeshadowingView({
 	chapterCutoff?: number
 	chapterOrder?: ReadonlyMap<string, number>
 	renderOccurrences?: (entry: BibleForeshadowing) => ReactNode
-	onAskAgent?: (entryId: string, label: string) => void
+	onAskAgent?: (entryId: string) => void
 }) {
 	const shown = entries.filter((entry) =>
 		isWithinChapter(entry.plantedChapter, chapterCutoff, chapterOrder),
@@ -1154,7 +1139,6 @@ export function ForeshadowingView({
 										<AskAgentButton
 											onAskAgent={onAskAgent}
 											entryId={entry.id}
-											label={entry.description}
 										/>
 									</span>
 								)}
@@ -1204,7 +1188,7 @@ export function StylesView({
 	chapterOrder?: ReadonlyMap<string, number>
 	renderOccurrences?: (entry: BibleStyle) => ReactNode
 	onPreview?: (target: PreviewTarget) => void
-	onAskAgent?: (entryId: string, label: string) => void
+	onAskAgent?: (entryId: string) => void
 }) {
 	if (!entries.length)
 		return (
@@ -1229,11 +1213,7 @@ export function StylesView({
 						<StatusChip status={style.status} />
 						<LayerChip entry={style} />
 						<span className={styles.cardActions}>
-							<AskAgentButton
-								onAskAgent={onAskAgent}
-								entryId={style.id}
-								label={t('风格')}
-							/>
+							<AskAgentButton onAskAgent={onAskAgent} entryId={style.id} />
 						</span>
 					</header>
 
@@ -1338,7 +1318,7 @@ function GlossaryEntryRows({
 	focused?: boolean
 	chapterOrder?: ReadonlyMap<string, number>
 	colSpan: number
-	onAskAgent?: (entryId: string, label: string) => void
+	onAskAgent?: (entryId: string) => void
 }) {
 	const [open, setOpen] = useState(false)
 	const contentId = useId()
@@ -1369,11 +1349,7 @@ function GlossaryEntryRows({
 						/>
 						{onAskAgent && (
 							<span className={`row-actions ${styles.rowAskBtn}`}>
-								<AskAgentButton
-									onAskAgent={onAskAgent}
-									entryId={entry.id}
-									label={entry.written}
-								/>
+								<AskAgentButton onAskAgent={onAskAgent} entryId={entry.id} />
 							</span>
 						)}
 					</div>
@@ -1399,7 +1375,7 @@ export function GlossaryTable({
 	entries: readonly BibleGlossary[]
 	focused?: string
 	chapterOrder?: ReadonlyMap<string, number>
-	onAskAgent?: (entryId: string, label: string) => void
+	onAskAgent?: (entryId: string) => void
 }) {
 	if (!entries.length)
 		return (

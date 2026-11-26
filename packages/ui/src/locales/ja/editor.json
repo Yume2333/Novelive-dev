@@ -3,6 +3,7 @@
 	"Agent": "Agent",
 	"{ruby よみ}": "{ruby よみ}",
 	"{{name}}在这一场没有台词": "{{name}}はこのシーンにセリフがありません",
+	"{{series}} · {{volume}}": "{{series}} · {{volume}}",
 	"{{speaker}}：": "{{speaker}}：",
 	"{{speaker}}：{{text}}": "{{speaker}}：{{text}}",
 	"…另有 {{count}} 条": "…ほか {{count}} 件",
