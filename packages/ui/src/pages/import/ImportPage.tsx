@@ -537,19 +537,16 @@ export function ImportPage() {
 						)}
 						{joining ? (
 							joinTarget && (
-								<Field label={t('系列')}>
-									<Select
-										value={joinTarget.seriesId}
-										disabled={busy}
-										onChange={() => {}}
-										options={[
-											{
-												value: joinTarget.seriesId,
-												label: joinTarget.title.trim() || t('未命名系列'),
-											},
-										]}
-									/>
-								</Field>
+								<div className={styles.field}>
+									<span
+										className={`label-caps label-caps-zh ${styles.fieldLabel}`}
+									>
+										{t('系列')}
+									</span>
+									<span className={styles.seriesValue}>
+										{joinTarget.title.trim() || t('未命名系列')}
+									</span>
+								</div>
 							)
 						) : (
 							<Field label={t('作品名')}>

@@ -79,8 +79,12 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 		).toBeDisabled()
 		await page.getByRole('button', { name: '选择已有工程' }).click()
 		await expect(
-			page.getByRole('combobox', { name: '系列', exact: true }),
-		).toHaveValue('series')
+			page.getByRole('main').getByText('系列', { exact: true }),
+		).toBeVisible()
+		await expect(
+			page.getByRole('main').getByText('已有系列', { exact: true }),
+		).toBeVisible()
+		await expect(page.getByRole('combobox', { name: '系列' })).toHaveCount(0)
 		await expect(
 			page.getByRole('button', { name: '下一步', exact: true }),
 		).toBeEnabled()
