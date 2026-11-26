@@ -315,18 +315,6 @@ button.glass-panel:active:not(:disabled) {
 	border-color: var(--color-primary);
 }
 
-/* soft-pulse keyframes 目前仅 panels/agent 的思考图标引用 */
-@keyframes soft-pulse {
-	0% {
-		opacity: 0.7;
-		box-shadow: 0 0 3px var(--glow);
-	}
-	100% {
-		opacity: 1;
-		box-shadow: 0 0 8px var(--glow);
-	}
-}
-
 /* 列表行：次要操作平时隐藏，悬停或键盘聚焦到这一行时出现 */
 .hover-row .row-actions {
 	opacity: 0;

@@ -5,16 +5,27 @@ import { useEffect, useState } from 'react'
  * 超长路径中间省略。绝不隐藏用户选择的路径本身。
  */
 
-/** 把 `home` 前缀折叠为 `~`，并去掉末尾斜杠。 */
+/** 把 `home` 前缀折叠为 `~`，并去掉末尾斜杠。分隔符跟随输入路径。 */
 export function collapseHome(path: string, home?: string): string {
 	let collapsed = path
 	if (home) {
-		const prefix = home.endsWith('/') ? home.slice(0, -1) : home
-		if (collapsed === prefix) collapsed = '~'
-		else if (collapsed.startsWith(`${prefix}/`))
-			collapsed = `~${collapsed.slice(prefix.length)}`
+		const prefix = /[/\\]$/.test(home) ? home.slice(0, -1) : home
+		// Windows 下盘符大小写、两个方向的斜杠都等价，比较前归一化
+		const normalizedPrefix = prefix.toLowerCase().replaceAll('\\', '/')
+		const normalizedHead = collapsed
+			.slice(0, prefix.length)
+			.toLowerCase()
+			.replaceAll('\\', '/')
+		if (normalizedHead === normalizedPrefix) {
+			if (collapsed.length === prefix.length) collapsed = '~'
+			else {
+				const rest = collapsed.slice(prefix.length)
+				if (rest.startsWith('/') || rest.startsWith('\\'))
+					collapsed = `~${rest}`
+			}
+		}
 	}
-	while (collapsed.length > 1 && collapsed.endsWith('/'))
+	while (collapsed.length > 1 && /[/\\]$/.test(collapsed))
 		collapsed = collapsed.slice(0, -1)
 	return collapsed
 }

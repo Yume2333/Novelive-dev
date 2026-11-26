@@ -71,7 +71,6 @@
 
 	/* 质感：玻璃描边、柔光 */
 	--glass-border: rgba(255, 255, 255, 0.8);
-	--glow: rgba(24, 25, 22, 0.35);
 
 	/* 纸张底纹：细颗粒 + 横向纤维 + 顶部一点自然光 */
 	--page-texture:
@@ -153,7 +152,6 @@
 	--shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.5);
 	--shadow-focus: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 0 3px var(--accent-wash);
 	--glass-border: rgba(120, 118, 140, 0.1);
-	--glow: rgba(110, 106, 130, 0.35);
 
 	/* 黑曜石的冷色反光，左上方一片、右下方一片 */
 	--page-texture:

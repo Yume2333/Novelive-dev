@@ -22,7 +22,11 @@ import {
 	paragraphOrdinal,
 } from '../../packages/ui/src/format/chapter'
 import { formatCost } from '../../packages/ui/src/format/cost'
-import { humanizeError } from '../../packages/ui/src/format/errors'
+import {
+	formatConfigErrorReason,
+	formatUnreadableProjectReason,
+	humanizeError,
+} from '../../packages/ui/src/format/errors'
 import { formatLanguage } from '../../packages/ui/src/format/language'
 import {
 	collapseHome,
@@ -124,6 +128,23 @@ describe('path formatting', () => {
 		)
 		expect(collapseHome('/home/ada', '/home/ada')).toBe('~')
 		expect(collapseHome('/home/adam/work', '/home/ada')).toBe('/home/adam/work')
+	})
+
+	it('collapses Windows home directories with backslash separators', () => {
+		expect(
+			collapseHome('C:\\Users\\ada\\Documents\\novelive', 'C:\\Users\\ada'),
+		).toBe('~\\Documents\\novelive')
+		expect(collapseHome('C:\\Users\\ada', 'C:\\Users\\ada')).toBe('~')
+		// 兄弟目录（前缀相同但不是同一路径）不折叠
+		expect(collapseHome('C:\\Users\\adam\\work', 'C:\\Users\\ada')).toBe(
+			'C:\\Users\\adam\\work',
+		)
+		// 盘符大小写不敏感
+		expect(collapseHome('c:\\users\\ada\\work', 'C:\\Users\\ada')).toBe(
+			'~\\work',
+		)
+		// 混合分隔符：路径里的斜杠方向决定折叠后的分隔符
+		expect(collapseHome('C:/Users/ada/work', 'C:\\Users\\ada')).toBe('~/work')
 	})
 
 	it('strips trailing slashes', () => {
@@ -297,6 +318,38 @@ describe('humanizeError', () => {
 		expect(result.detail).toBe('DOCTYPE is not supported')
 	})
 
+	it('splits command-level internal and not_found from their model-flavoured kinds', () => {
+		// `{ code }` 形状的命令错误不是模型调用：`internal` 绝不能说成
+		// 「模型返回了无法理解的回复」，`not_found` 也不是「找不到所选模型」。
+		const commandInternal = humanizeError({
+			code: 'internal',
+			message: 'disk full',
+		})
+		expect(commandInternal.message).toBe('无法完成操作，请重试。')
+		expect(commandInternal.message).not.toContain('模型')
+		expect(commandInternal.detail).toBe('disk full')
+		const commandNotFound = humanizeError({
+			code: 'not_found',
+			message: 'no such work',
+		})
+		expect(commandNotFound.message).toBe('找不到相关内容，请刷新后重试。')
+		expect(commandNotFound.message).not.toContain('模型')
+		// issue kind（字符串或 `{ kind }`）仍是模型口吻
+		expect(humanizeError('internal').message).toBe(
+			'模型返回了无法理解的回复，请重试。',
+		)
+		expect(humanizeError({ kind: 'internal' }).message).toBe(
+			'模型返回了无法理解的回复，请重试。',
+		)
+		expect(humanizeError({ kind: 'not_found' }).message).toBe(
+			'无法找到所选模型，请在设置中检查模型配置。',
+		)
+		// 导入／工程错误码在命令形状下仍按自身文案走
+		expect(
+			humanizeError({ code: 'invalid_join_target', message: 'x' }).message,
+		).toBe('无法加入，所选文件夹不是有效的工程。')
+	})
+
 	it('reads code-bearing Error subclasses before the message fallback', () => {
 		const failure = Object.assign(new Error('DOCTYPE is not supported'), {
 			code: 'epub_doctype' as const,
@@ -347,5 +400,28 @@ describe('humanizeError', () => {
 		expect(humanizeError(undefined).message).toBe('无法完成操作，请重试。')
 		expect(humanizeError(null).detail).toBeUndefined()
 		expect(humanizeError({}).message).toBe('无法完成操作，请重试。')
+	})
+})
+
+describe('backend reason enums', () => {
+	it('localizes every config error reason without leaking the machine code', () => {
+		expect(formatConfigErrorReason('unreadable')).toBe('无法读取配置文件。')
+		expect(formatConfigErrorReason('invalid_json')).toBe(
+			'配置文件不是有效的 JSON。',
+		)
+		expect(formatConfigErrorReason('invalid_fields')).toBe('配置字段无效。')
+		expect(formatConfigErrorReason('decrypt_failed')).toBe('无法解密 API Key。')
+		for (const reason of [
+			'unreadable',
+			'invalid_json',
+			'invalid_fields',
+			'decrypt_failed',
+		] as const)
+			expect(formatConfigErrorReason(reason)).not.toContain(reason)
+	})
+
+	it('localizes every unreadable project reason without leaking the machine code', () => {
+		expect(formatUnreadableProjectReason('moved')).toBe('项目已移动或删除')
+		expect(formatUnreadableProjectReason('unreadable')).toBe('项目无法读取')
 	})
 })

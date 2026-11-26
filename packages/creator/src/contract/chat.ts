@@ -96,6 +96,14 @@ export const proposalSchema = obj({
 })
 export type Proposal = Static<typeof proposalSchema>
 
+export const subtaskRoles = [
+	'organizer',
+	'writer',
+	'reviewer',
+	'artDirector',
+	'visualAuditor',
+] as const
+
 const messagePart = union([
 	obj({ type: lit('text'), text: str() }),
 	obj({ type: lit('reasoning'), text: str() }),
@@ -106,13 +114,7 @@ const messagePart = union([
 		id,
 		// The delegated task text trimmed to one line.
 		label: id,
-		role: oneOf([
-			'organizer',
-			'writer',
-			'reviewer',
-			'artDirector',
-			'visualAuditor',
-		]),
+		role: oneOf(subtaskRoles),
 		status: oneOf(['running', 'done', 'failed', 'cancelled']),
 	}),
 	obj({

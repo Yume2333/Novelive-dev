@@ -231,7 +231,15 @@ describe('M0 configuration store', () => {
 			await writeFile(path, broken)
 
 			expect(await store.get()).toEqual({
-				configError: { path, reason: expect.any(String) },
+				configError: {
+					path,
+					reason:
+						kind === 'invalid JSON'
+							? 'invalid_json'
+							: kind === 'invalid fields'
+								? 'invalid_fields'
+								: 'decrypt_failed',
+				},
 			})
 			await expect(store.update({ theme: 'dark' })).rejects.toMatchObject({
 				code: 'invalid_config',
