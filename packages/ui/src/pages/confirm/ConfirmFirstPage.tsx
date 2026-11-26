@@ -174,10 +174,7 @@ export function ConfirmFirstPage() {
 				project
 					? `${t('{{series}} · {{volume}}', {
 							series: project.seriesTitle,
-							volume: formatVolumeLabel({
-								index: project.volumeIndex,
-								title: project.volumeTitle,
-							}),
+							volume: formatVolumeLabel({ index: project.volumeIndex }),
 						})} · ${t('确认点 2 / 2')}`
 					: t('确认点 2 / 2')
 			}
