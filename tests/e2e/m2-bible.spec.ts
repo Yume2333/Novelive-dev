@@ -373,8 +373,10 @@ test('M2 bible and glossary views, accepts, rejects and preserves confirmed cont
 			await expect(
 				confirmed.getByText('小夏', { exact: true }).first(),
 			).toBeVisible()
-			await confirmed.getByText('跨章节定位（2）').first().click()
-			await expect(confirmed.getByText('ch02 · p0002').first()).toBeVisible()
+			await confirmed.getByText('出现位置（2）').first().click()
+			await expect(
+				confirmed.getByText('第 2 章 · 第 2 段').first(),
+			).toBeVisible()
 			await openCandidates(page)
 			const accept = page.getByRole('article', {
 				name: '更新角色与地点',
@@ -608,7 +610,7 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 					name: /^综合候选：character\/ada\//,
 				})
 				.filter({ hasText: 'Ada → Ava' })
-				.filter({ hasText: '待确认' })
+				.filter({ hasNotText: '候选来源已' })
 			await expect(character).toBeVisible()
 			await project.write(synthesisFiles('v1').result, {
 				...synthesis,
@@ -637,11 +639,16 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 			).toBeEnabled()
 			const relation = page
 				.getByRole('article')
-				.filter({ hasText: 'Unknown character reference: unpublished' })
+				.filter({ hasText: 'Unpublished friend' })
+				.filter({ hasNotText: '候选来源已' })
 			await expect(
 				relation.getByRole('button', { name: '接受候选' }),
 			).toBeDisabled()
-			await expect(relation).toContainText('unpublished')
+			// 关系条目按人类可读名展示：找不到的角色回退为通用名，绝不渲染内部 id
+			await expect(relation.getByText('Ada → 未命名角色')).toBeVisible()
+			await expect(
+				relation.getByText('unpublished', { exact: true }),
+			).toHaveCount(0)
 			await expect(
 				character.getByRole('button', { name: '接受候选' }),
 			).toBeEnabled()
@@ -655,7 +662,7 @@ test('M2 bible and glossary bridges a synthesized conflict into persistent appro
 				.getByRole('article', {
 					name: /^综合候选：glossary\/tower\//,
 				})
-				.filter({ hasText: '待确认' })
+				.filter({ hasNotText: '候选来源已' })
 			await page.getByRole('button', { name: /^角色/ }).click()
 			await openCandidates(page)
 			await character.getByRole('button', { name: '接受候选' }).click()

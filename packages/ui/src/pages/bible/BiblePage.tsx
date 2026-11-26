@@ -19,18 +19,18 @@ import {
 	RefreshCw,
 	Users,
 } from 'lucide-react'
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import {
 	Banner,
 	Button,
-	Card,
 	Chip,
-	Collapse,
 	CompactSelect,
 	Drawer,
 	EmptyState,
+	ErrorNotice,
 	IconButton,
+	LoadingState,
 	Modal,
 	Page,
 	ScrollArea,
@@ -40,15 +40,23 @@ import {
 	Tooltip,
 	useToast,
 } from '../../components'
+import { formatVolumeLabel } from '../../format/chapter'
+import {
+	formatErrorText,
+	type HumanizedError,
+	humanizeError,
+} from '../../format/errors'
 import { msg, scoped } from '../../i18n'
 import {
-	Fields,
+	EntryDetails,
 	ForeshadowingView,
 	formatConflictValue,
 	GlossaryTable,
 	LocationCard,
 	labelFor,
+	Occurrences,
 	RelationCard,
+	StatusChip,
 	StylesView,
 	TimelineView,
 } from './BibleFields'
@@ -58,12 +66,15 @@ import {
 	type Bible,
 	type BibleCharacter,
 	type BibleEntry,
+	chapterText,
 	isWithinChapter,
 	locationCandidateAssetIds,
+	nameOrSlug,
 	type PreviewTarget,
 	parseChapterNumber,
 	type ResolvedAssetMap,
 } from './bibleHelpers'
+import candidateStyles from './Candidates.module.css'
 import { CharacterAvatar, CharacterDetail } from './CharacterDetail'
 
 const t = scoped('bible')
@@ -95,17 +106,96 @@ const icons: Record<CategoryKey, LucideIcon> = {
 	glossary: Languages,
 }
 
-const message = (error: unknown) =>
-	error && typeof error === 'object' && 'message' in error
-		? String(error.message)
-		: t('读取失败，请重试。')
+/**
+ * 设定集页的命令错误 → 人读提示。`not_found` 在格式层映射的是模型错误，
+ * 在本页只可能是「找不到这部作品或卷」，因此换成页内文案；
+ * 后端原文只进折叠的 detail。
+ */
+function bibleError(failure: unknown): HumanizedError {
+	const record =
+		failure && typeof failure === 'object'
+			? (failure as { code?: unknown; message?: unknown })
+			: undefined
+	if (record?.code === 'not_found')
+		return {
+			message: t('工程中找不到这部作品或卷。'),
+			...(typeof record.message === 'string' && record.message
+				? { detail: record.message }
+				: {}),
+		}
+	return humanizeError(failure)
+}
 
-const title = (entry: Entry | ProposalEntry) =>
-	'name' in entry
-		? String(entry.name)
-		: 'written' in entry
-			? String(entry.written)
-			: entry.id
+/** 关系候选条目里 from / to 的展示名： confirmed 列表 → 同批候选 → 通用名，绝不回退到内部 id。 */
+function relationSideName(
+	id: unknown,
+	bible: Bible,
+	proposals: readonly Proposal[],
+): string {
+	if (typeof id !== 'string' || !id) return t('未命名角色')
+	const confirmed = bible.characters.find((character) => character.id === id)
+	if (confirmed?.name) return confirmed.name
+	for (const proposal of proposals) {
+		const payload = proposal.payload
+		if (payload.kind !== 'bible') continue
+		for (const change of payload.changes) {
+			if (
+				change.kind === 'character' &&
+				change.entry.id === id &&
+				'name' in change.entry &&
+				typeof change.entry.name === 'string' &&
+				change.entry.name
+			)
+				return change.entry.name
+		}
+	}
+	return t('未命名角色')
+}
+
+/** 候选小节标题：按条目类型合成人类可读名，绝不回退到内部 id。 */
+function candidateTitle(
+	kind: keyof typeof collection,
+	entry: Entry | ProposalEntry,
+	bible: Bible,
+	proposals: readonly Proposal[],
+): string {
+	const record = entry as Record<string, unknown>
+	switch (kind) {
+		case 'character':
+			return typeof record.name === 'string' && record.name
+				? record.name
+				: t('未命名角色')
+		case 'location':
+			return typeof record.name === 'string' && record.name
+				? record.name
+				: t('未命名条目')
+		case 'glossary': {
+			const written = typeof record.written === 'string' ? record.written : ''
+			const original =
+				typeof record.original === 'string' ? record.original : ''
+			if (original && written && original !== written)
+				return `${original} → ${written}`
+			if (written) return written
+			if (original) return original
+			return t('未命名条目')
+		}
+		case 'relation':
+			return `${relationSideName(record.from, bible, proposals)} → ${relationSideName(record.to, bible, proposals)}`
+		case 'timeline':
+			return typeof record.event === 'string' && record.event
+				? record.event
+				: t('未命名条目')
+		case 'foreshadowing':
+			return typeof record.description === 'string' && record.description
+				? record.description
+				: t('未命名条目')
+		case 'style': {
+			const description =
+				typeof record.description === 'string' ? record.description.trim() : ''
+			return description ? `${t('画风')} · ${description}` : t('画风')
+		}
+	}
+}
 
 const collection = {
 	character: 'characters',
@@ -166,63 +256,18 @@ export function approvalNotice(proposal: Proposal, bible: Bible) {
 	)
 }
 
-function Occurrences({ entry }: { entry: Entry }) {
-	const [open, setOpen] = useState(false)
-	const id = useId()
-	const occurrences =
-		(
-			entry as Entry & {
-				occurrences?: {
-					chapterId: string
-					paragraphId: string
-					quote: string
-				}[]
-			}
-		).occurrences ?? []
-	return (
-		<div>
-			<button
-				type="button"
-				className={styles.disclosure}
-				aria-expanded={open}
-				aria-controls={id}
-				onClick={() => setOpen((value) => !value)}
-			>
-				{t('跨章节定位（{{length}}）', { length: occurrences.length })}
-			</button>
-			<Collapse open={open}>
-				<div id={id}>
-					{occurrences.length ? (
-						<ul className={styles.occurrencesList}>
-							{occurrences.map(({ chapterId, paragraphId, quote }) => (
-								<li
-									key={`${chapterId}/${paragraphId}`}
-									className={styles.occurrencesItem}
-								>
-									<strong>
-										{chapterId} · {paragraphId}
-									</strong>
-									<p>{quote}</p>
-								</li>
-							))}
-						</ul>
-					) : (
-						<p className={styles.muted}>{t('暂无原文匹配')}</p>
-					)}
-				</div>
-			</Collapse>
-		</div>
-	)
-}
-
 function Candidate({
 	proposal,
+	proposals,
 	bible,
+	chapterOrder,
 	busy,
 	resolve,
 }: {
 	proposal: Proposal
+	proposals: readonly Proposal[]
 	bible: Bible
+	chapterOrder?: ReadonlyMap<string, number>
 	busy: boolean
 	resolve(id: string, reason?: string): void
 }) {
@@ -242,10 +287,15 @@ function Candidate({
 	return (
 		<article className={styles.proposalCard} aria-label={proposal.prompt}>
 			<header className={styles.proposalHead}>
-				<h3 className={styles.proposalPrompt}>{proposal.prompt}</h3>
-				<Chip>{t('候选')}</Chip>
+				<p className={candidateStyles.promptText}>{proposal.prompt}</p>
+				<StatusChip status="candidate" />
 			</header>
-			<p className={styles.proposalStatus}>{action?.reason ?? t('待确认')}</p>
+			{stale && (
+				<Banner kind="warning" className={candidateStyles.staleBanner}>
+					{action?.reason ??
+						t('这条候选已过期或暂不能应用，因此无法接受；仍可拒绝。')}
+				</Banner>
+			)}
 			{changes.map(({ kind, op, entry }) => {
 				const confirmed = (bible[collection[kind]] as Entry[]).find(
 					({ id }) => id === entry.id,
@@ -279,8 +329,11 @@ function Candidate({
 						className={styles.proposalSection}
 						key={`${kind}/${entry.id}`}
 					>
-						<h4 className={styles.proposalSectionTitle}>
-							{title(entry)} ·{' '}
+						<h4
+							className={`${styles.proposalSectionTitle} ${candidateStyles.clampTitle}`}
+						>
+							{candidateTitle(kind, entry, bible, proposals)}
+							{' · '}
 							{
 								{
 									add: t('新增'),
@@ -298,9 +351,16 @@ function Candidate({
 								{conflicts.map(([key, value]) => {
 									const before = formatConflictValue(
 										(confirmed as unknown as Record<string, unknown>)[key],
+										{ key, chapterOrder, characters: bible.characters },
 									)
 									const after =
-										value === undefined ? t('移除') : formatConflictValue(value)
+										value === undefined
+											? t('移除')
+											: formatConflictValue(value, {
+													key,
+													chapterOrder,
+													characters: bible.characters,
+												})
 									return (
 										<div className={styles.conflictRow} key={key}>
 											<div>
@@ -330,7 +390,12 @@ function Candidate({
 						{entry.conflict && (
 							<p className={styles.conflictSummary}>{entry.conflict}</p>
 						)}
-						<Fields entry={entry as unknown as Record<string, unknown>} />
+						<EntryDetails
+							kind={kind}
+							entry={entry as unknown as Record<string, unknown>}
+							chapterOrder={chapterOrder}
+							characters={bible.characters}
+						/>
 						{kind === 'style' && (
 							<p className={styles.muted}>
 								{t('风格变更不会自动标记图片过期，请自行检查已有图片。')}
@@ -408,7 +473,7 @@ function BibleProjection({
 	const [bible, setBible] = useState<Bible>()
 	const [proposals, setProposals] = useState<Proposal[]>([])
 	const [category, setCategory] = useState<CategoryKey>('characters')
-	const [error, setError] = useState('')
+	const [error, setError] = useState<HumanizedError>()
 	const [busy, setBusy] = useState(false)
 	const [candidatesOpen, setCandidatesOpen] = useState(false)
 	const [focused, setFocused] = useState('')
@@ -433,7 +498,7 @@ function BibleProjection({
 	useEffect(() => {
 		if (!workId) return
 		let active = true
-		setError('')
+		setError(undefined)
 		async function load() {
 			try {
 				const next = await window.novelive.call('bible.get', {
@@ -454,7 +519,7 @@ function BibleProjection({
 					setProposals(candidates)
 				}
 			} catch (failure) {
-				if (active) setError(message(failure))
+				if (active) setError(bibleError(failure))
 			}
 		}
 		void load()
@@ -564,22 +629,35 @@ function BibleProjection({
 				seen.add(project.volumeId)
 				volumes.push({
 					value: project.volumeId,
-					label:
-						project.volumeTitle ||
-						t('卷 {{volume}}', { volume: project.volumeId }),
+					label: formatVolumeLabel({
+						index: project.volumeIndex,
+						title: project.volumeTitle,
+					}),
 				})
 			}
 		}
-		if (!seen.has(volumeId))
+		if (!seen.has(volumeId)) {
+			const currentIndex = works?.find(
+				(work) => work.project?.volumeId === volumeId,
+			)?.project?.volumeIndex
 			volumes.push({
 				value: volumeId,
-				label: t('卷 {{volume}}', { volume: volumeId }),
+				label: formatVolumeLabel({ index: currentIndex }),
 			})
+		}
 		return volumes
 	})()
 	const eyebrow = currentWork?.project
-		? `${currentWork.project.seriesTitle} · ${currentWork.project.volumeTitle}`
-		: t('卷 {{volume}}', { volume: volumeId })
+		? [
+				currentWork.project.seriesTitle,
+				formatVolumeLabel({
+					index: currentWork.project.volumeIndex,
+					title: currentWork.project.volumeTitle,
+				}),
+			]
+				.filter(Boolean)
+				.join(' · ')
+		: undefined
 
 	const entries: Entry[] = bible ? bible[category] : []
 	const selected = entries.find((entry) => entry.id === focused) ?? entries[0]
@@ -743,7 +821,7 @@ function BibleProjection({
 					)
 				}
 			} catch (failure) {
-				toast(message(failure), ImageIcon)
+				toast(formatErrorText(humanizeError(failure)), ImageIcon)
 			} finally {
 				setRegenKeys((previous) => {
 					const next = { ...previous }
@@ -758,7 +836,7 @@ function BibleProjection({
 	async function resolve(proposalId: string, reason?: string) {
 		if (!workId || busy) return
 		setBusy(true)
-		setError('')
+		setError(undefined)
 		try {
 			const result = await window.novelive.call('proposal.resolve', {
 				workId,
@@ -791,31 +869,41 @@ function BibleProjection({
 			setProposals(candidates)
 			toast(noticeText, Check)
 		} catch (failure) {
-			setError(message(failure))
+			setError(bibleError(failure))
 		} finally {
 			setBusy(false)
 		}
 	}
 
-	const timelineCount = bible
-		? bible.timeline.filter((entry) =>
-				isWithinChapter(entry.chapterId, chapterCutoff, chapterOrder),
-			).length
-		: 0
-	const foreshadowingCount = bible
-		? bible.foreshadowing.filter((entry) =>
-				isWithinChapter(entry.plantedChapter, chapterCutoff, chapterOrder),
-			).length
-		: 0
 	const countFor = (key: CategoryKey): number => {
 		if (!bible) return 0
-		if (key === 'timeline') return timelineCount
-		if (key === 'foreshadowing') return foreshadowingCount
+		if (key === 'characters')
+			return bible.characters.filter((entry) =>
+				isWithinChapter(entry.firstSeenChapter, chapterCutoff, chapterOrder),
+			).length
+		if (key === 'relations')
+			return bible.relations.filter((entry) =>
+				isWithinChapter(entry.revealedChapter, chapterCutoff, chapterOrder),
+			).length
+		if (key === 'locations')
+			return bible.locations.filter((entry) =>
+				isWithinChapter(entry.firstSeenChapter, chapterCutoff, chapterOrder),
+			).length
+		if (key === 'timeline')
+			return bible.timeline.filter((entry) =>
+				isWithinChapter(entry.chapterId, chapterCutoff, chapterOrder),
+			).length
+		if (key === 'foreshadowing')
+			return bible.foreshadowing.filter((entry) =>
+				isWithinChapter(entry.plantedChapter, chapterCutoff, chapterOrder),
+			).length
 		return bible[key].length
 	}
 
 	const label = t(categories.find(([key]) => key === category)?.[1] ?? '')
-	const occurrencesOf = (entry: Entry) => <Occurrences entry={entry} />
+	const occurrencesOf = (entry: Entry) => (
+		<Occurrences entry={entry} chapterOrder={chapterOrder} />
+	)
 
 	// 灯箱数据派生
 	const previewRegen =
@@ -860,7 +948,11 @@ function BibleProjection({
 						onClick={refresh}
 					/>
 					<div className={styles.cutoffControl}>
-						<Tooltip text={t('模型写第 N 章时只拿到截至第 N 章的设定')}>
+						<Tooltip
+							text={t(
+								'只显示截至所选章节的设定；模型写第 N 章时也只会拿到这些设定',
+							)}
+						>
 							<button
 								type="button"
 								className={styles.cutoffHelp}
@@ -869,7 +961,9 @@ function BibleProjection({
 								<CircleHelp aria-hidden="true" size={16} strokeWidth={1.8} />
 							</button>
 						</Tooltip>
-						<span className={styles.cutoffLabel}>{t('截至第')}</span>
+						<span className={styles.cutoffLabel}>
+							{t('显示至第 {{chapter}} 章', { chapter: chapterCutoff })}
+						</span>
 						<Slider
 							aria-label={t('截至章节')}
 							value={chapterCutoff}
@@ -879,23 +973,14 @@ function BibleProjection({
 							}}
 							min={1}
 							max={totalChapters}
-							suffix={t(' 章')}
 						/>
 					</div>
 				</div>
 			}
 		>
 			<div className={styles.root}>
-				{error && (
-					<div role="alert">
-						<Banner kind="error">{error}</Banner>
-					</div>
-				)}
-				{!bible && !error && (
-					<p className={styles.muted} role="status">
-						{t('正在读取设定集…')}
-					</p>
-				)}
+				{error && <ErrorNotice error={error} />}
+				{!bible && !error && <LoadingState text={t('正在读取设定集…')} />}
 				{bible && (
 					<ScrollArea className={styles.scroll}>
 						<div className={styles.layout}>
@@ -952,12 +1037,11 @@ function BibleProjection({
 										category !== 'foreshadowing' &&
 										category !== 'styles' &&
 										category !== 'glossary' && (
-											<Card>
-												<EmptyState
-													icon={icons[category]}
-													text={t('暂无条目')}
-												/>
-											</Card>
+											<EmptyState
+												card
+												icon={icons[category]}
+												text={t('暂无条目')}
+											/>
 										)}
 									{category === 'characters' && entries.length > 0 ? (
 										<div className={styles.characters}>
@@ -977,7 +1061,11 @@ function BibleProjection({
 															</span>
 															{entry.firstSeenChapter !== undefined && (
 																<span className={styles.characterSub}>
-																	{t('首次出场')} {entry.firstSeenChapter}
+																	{t('首次出场')}{' '}
+																	{chapterText(
+																		entry.firstSeenChapter,
+																		chapterOrder,
+																	)}
 																</span>
 															)}
 														</span>
@@ -1063,6 +1151,7 @@ function BibleProjection({
 										<StylesView
 											entries={bible.styles}
 											focused={focused}
+											chapterOrder={chapterOrder}
 											renderOccurrences={occurrencesOf}
 											onPreview={setPreview}
 											onAskAgent={handleAskAgent}
@@ -1072,7 +1161,7 @@ function BibleProjection({
 										<GlossaryTable
 											entries={bible.glossary}
 											focused={focused}
-											renderOccurrences={occurrencesOf}
+											chapterOrder={chapterOrder}
 											onAskAgent={handleAskAgent}
 										/>
 									)}
@@ -1101,7 +1190,9 @@ function BibleProjection({
 							<Candidate
 								key={proposal.id}
 								proposal={proposal}
+								proposals={proposals}
 								bible={bible}
+								chapterOrder={chapterOrder}
 								busy={busy}
 								resolve={(id, reason) => void resolve(id, reason)}
 							/>
@@ -1196,16 +1287,8 @@ function BibleProjection({
 						{preview.kind === 'location' && preview.variants?.length ? (
 							<div className={styles.lightboxChips}>
 								{preview.variants.map((variant) => (
-									<Chip key={variant.id}>
-										{variant.id} · {variant.description}
-									</Chip>
+									<Chip key={variant.id}>{nameOrSlug(variant)}</Chip>
 								))}
-							</div>
-						) : null}
-						{preview.kind === 'styleRef' ? (
-							<div className={styles.lightboxFooterRow}>
-								<span>{preview.title}</span>
-								<Chip>{preview.source}</Chip>
 							</div>
 						) : null}
 					</div>
