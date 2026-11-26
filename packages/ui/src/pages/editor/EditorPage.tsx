@@ -92,14 +92,15 @@ export function EditorPage() {
 		openAgent?(): void
 	}>()
 	const [params, setParams] = useSearchParams()
-	const chapterId = params.get('chapterId') ?? 'ch0001'
+	const chapterIdParam = params.get('chapterId')
 	const sceneIdParam = params.get('sceneId')
 	const lineIdParam = params.get('lineId')
 	const [workTitle, setWorkTitle] = useState<string>()
 	const [workVolumeId, setWorkVolumeId] = useState<string>()
-	const [workChapters, setWorkChapters] = useState<
-		{ chapterId: string; index: number; title: string; published: boolean }[]
-	>([])
+	const [workChapters, setWorkChapters] =
+		useState<
+			{ chapterId: string; index: number; title: string; published: boolean }[]
+		>()
 	const toast = useToast()
 
 	useEffect(() => {
@@ -136,10 +137,18 @@ export function EditorPage() {
 						published: item.published,
 					})),
 				),
-			() => setWorkChapters([]),
+			(cause) => {
+				setWorkChapters([])
+				// 没有深层链接时章节清单是唯一入口；拉不到就如实报错，
+				// 不谎称「这部作品还没有章节」。
+				if (!chapterIdParam) setError(toPageError(cause))
+			},
 		)
 		return () => pending.cancel()
-	}, [id])
+	}, [id, chapterIdParam])
+
+	// 没有章节参数时退回作品的第一章；深层链接的章节优先。
+	const chapterId = chapterIdParam ?? workChapters?.[0]?.chapterId
 
 	const [opening, setOpening] = useState<Opening>()
 	const [sceneIndex, setSceneIndex] = useState(0)
@@ -234,7 +243,7 @@ export function EditorPage() {
 		: -1
 
 	const currentChapterIndex =
-		workChapters.find((c) => c.chapterId === chapterId)?.index ?? 0
+		workChapters?.find((c) => c.chapterId === chapterId)?.index ?? 0
 
 	const sceneOrdinal = formatSceneLabel(sceneIndex + 1)
 	const sceneDisplay = snapshot.sceneTitle || sceneOrdinal
@@ -277,7 +286,7 @@ export function EditorPage() {
 
 	// --- Agent integration ---
 	useEffect(() => {
-		if (scene)
+		if (scene && chapterId)
 			outlet?.setAgentPosition?.({
 				kind: 'editor',
 				chapterId,
@@ -313,7 +322,7 @@ export function EditorPage() {
 			return
 		}
 		selectSentenceLine(sentence.lineNumber)
-		if (scene) {
+		if (scene && chapterId) {
 			outlet?.setAgentPosition?.({
 				kind: 'editor',
 				chapterId,
@@ -347,6 +356,7 @@ export function EditorPage() {
 
 	// --- Chapter/asset change listeners ---
 	useEffect(() => {
+		if (!chapterId) return
 		const changed = (event: Event) => {
 			const { workId, chapterId: changedChapter } = (event as CustomEvent)
 				.detail
@@ -424,6 +434,8 @@ export function EditorPage() {
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: 外部应用差异后重开编辑会话
 	useEffect(() => {
+		// 章节 id 还没解析出来（章节清单未返回）时先不打开。
+		if (!chapterId) return
 		let disposed = false
 		let opened: Opening | undefined
 		setOpening(undefined)
@@ -567,7 +579,7 @@ export function EditorPage() {
 	}
 
 	const target =
-		opening && chapter
+		opening && chapter && chapterId
 			? {
 					workId: id,
 					chapterId,
@@ -856,16 +868,19 @@ export function EditorPage() {
 	) : null
 	const rewriting = rewriteOpen || !!proposal
 
-	const listed = workChapters.filter(
+	// 章节清单未返回时先用打开中的章节占位，选择器不闪空。
+	const listed = (workChapters ?? []).filter(
 		(item) => item.published || item.chapterId === chapterId,
 	)
-	const chapters = listed.some((item) => item.chapterId === chapterId)
-		? listed.map((item) =>
-				item.chapterId === chapterId
-					? { ...item, title: item.title ?? chapter?.title }
-					: item,
-			)
-		: [...listed, { chapterId, index: 0, title: chapter?.title }]
+	const chapters: { chapterId: string; index: number; title?: string }[] =
+		chapterId === undefined ||
+		listed.some((item) => item.chapterId === chapterId)
+			? listed.map((item) =>
+					item.chapterId === chapterId
+						? { ...item, title: item.title ?? chapter?.title }
+						: item,
+				)
+			: [...listed, { chapterId, index: 0, title: chapter?.title }]
 
 	const chooseChapter = (value: string) =>
 		setParams((current) => {
@@ -933,7 +948,7 @@ export function EditorPage() {
 			const request = ++rewriteRequest.current
 			const value = await window.novelive.call('editor.rewriteScene', {
 				workId: id,
-				chapterId,
+				chapterId: target.chapterId,
 				sceneId: scene.sceneId,
 				expectedRevision: target.expectedRevision,
 				instruction,
@@ -952,7 +967,7 @@ export function EditorPage() {
 		void run(async () => {
 			const applied = await window.novelive.call('editor.applyRewrite', {
 				workId: id,
-				chapterId,
+				chapterId: target.chapterId,
 				sceneId: proposal.sceneId,
 				expectedRevision: proposal.expectedRevision,
 				proposalId: proposal.proposalId,
@@ -960,7 +975,7 @@ export function EditorPage() {
 			}).promise
 			const fresh = await window.novelive.call('editor.snapshot', {
 				workId: id,
-				chapterId,
+				chapterId: target.chapterId,
 				editorId: opening?.editorId,
 			}).promise
 			setUndoLines(fresh.undoLines)
@@ -988,7 +1003,7 @@ export function EditorPage() {
 					<div className="editor-subtitle">
 						<CompactSelect
 							aria-label={t('章节')}
-							value={chapterId}
+							value={chapterId ?? ''}
 							disabled={busy || dirty}
 							onChange={chooseChapter}
 							options={chapters.map((item) => ({
@@ -1140,7 +1155,15 @@ export function EditorPage() {
 		>
 			<div className="editor-workbench" aria-busy={busy}>
 				{error && !rewriting && alert}
-				{!opening && !error && <LoadingState text={t('正在打开编辑器')} />}
+				{!opening &&
+					!error &&
+					(workChapters !== undefined &&
+					workChapters.length === 0 &&
+					chapterIdParam === null ? (
+						<EmptyState icon={BookOpen} text={t('这部作品还没有章节')} />
+					) : (
+						<LoadingState text={t('正在打开编辑器')} />
+					))}
 				{opening && (
 					<>
 						{chapter && chapter.markSuggestions.length > 0 && (
@@ -1179,7 +1202,7 @@ export function EditorPage() {
 													'editor.snapshot',
 													{
 														workId: id,
-														chapterId,
+														chapterId: target.chapterId,
 														editorId: opening?.editorId,
 													},
 												).promise
@@ -1483,7 +1506,7 @@ export function EditorPage() {
 								)}
 							</div>
 						)}
-						{scene && (
+						{scene && chapterId && (
 							<EditorPanels
 								workId={id}
 								chapterId={chapterId}
@@ -1599,7 +1622,7 @@ export function EditorPage() {
 										'editor.rewriteScene',
 										{
 											workId: id,
-											chapterId,
+											chapterId: target.chapterId,
 											sceneId: targetScene.sceneId,
 											expectedRevision: target.expectedRevision,
 											instruction: instructionText,

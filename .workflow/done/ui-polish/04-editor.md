@@ -18,6 +18,15 @@
 - Check after: `NL_REPLAY=strict pnpm check` exit 0 (Test Files 76 passed | 1 skipped (77); Tests 1195 passed | 3 skipped (1198)); `xvfb-run -a env NL_REPLAY=strict pnpm test:e2e --grep 'M2 editor|M3 custom marks'`: 10 passed / 0 failed, run twice consecutively (27.8s, 28.1s).
 - Review: pass (base 3765fcb, reviewer R-reviewer-04)
 
+### Rework (gate 08)
+
+- Rework item: `EditorPage.tsx` `params.get('chapterId') ?? 'ch0001'` hardcoded an internal id as fallback.
+- Fix: `chapterId` is now `chapterIdParam ?? workChapters?.[0]?.chapterId` — no param falls back to the first chapter once `production.playerStatus` arrives; the `editor.open` and chapter-changed-listener effects bail out while the id is unresolved; when the loaded work has no chapters (and no deep link) the page shows the shared `EmptyState` (「这部作品还没有章节」, added to all four locales); loading otherwise uses `LoadingState` as before. A `playerStatus` failure with no deep link now surfaces an honest `ErrorNotice` instead of a fake empty state. No `ch0001` remains anywhere in `packages/ui/src` (grep clean). No unit test depended on the old fallback; the e2e specs already pass explicit `chapterId` params, and the contract fixture gained `library.list`/`production.playerStatus` handlers plus two new modes covering the new behavior: `firstchapter` (no param → opens the first chapter, asserts `editor.open` fired exactly once with the first chapter id and no `ch0001` in the DOM) and `nochapters` (empty work → shared EmptyState, `editor.open` never fired).
+- Rework base commit: 7f6938607279e010942e5f0743ef27c0d5a4c62b
+- Check after: `NL_REPLAY=strict pnpm check` exit 0 (Test Files 77 passed | 1 skipped (78); Tests 1212 passed | 3 skipped (1215)); `pnpm build` exit 0 (built in 5.29s); `nl-headless pnpm exec playwright test tests/e2e/m2-editor.spec.ts tests/e2e/m3-custom-marks.spec.ts`: 12 passed / 0 failed (30.1s) — the same 12 tests the `--grep 'M2 editor|M3 custom marks'` filter selects (verified via `--list`).
+- Unrelated baseline failure (proof): the exact command `pnpm exec playwright test --grep 'M2 editor|M3 custom marks'` fails at collection on the integration baseline before running any test: `TypeError: Module ".../packages/ui/src/locales/en/agent.json" needs an import attribute of "type: json"` (exit 1, 0 tests run). Root cause is task 06's e184fa8 adding `import { msg } from '../../../i18n'` to `packages/ui/src/pages/player/controls/controller.ts`, which `tests/e2e/m3-controls.spec.ts` imports statically; playwright enumerates every spec in `tests/e2e`, so node ESM hits the bare json imports in `packages/ui/src/locales/index.ts`. Proof it is not this rework: enumeration succeeds with the identical tree when only `m3-controls.spec.ts` is absent (`--list` shows exactly the 12 tests above, my modified `m2-editor.spec.ts` included); none of my changed files are in the failing import chain. Reported to Main for task 01/06 ownership.
+- Review: pass (base 7f69386, self-review — small diff, reviewer step optional per rework brief)
+
 ### Residuals
 
 - Rewrite-modal screenshot not captured (needs model worker; covered by contract-fixture e2e).
