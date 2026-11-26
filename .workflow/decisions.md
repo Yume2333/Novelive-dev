@@ -959,3 +959,11 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** [合入 #98 的真书恢复](evidence/m1b/owner/live-run-03fcb97.md) 通过演出，但绘制开始时项目已核销加预留达到 1,808,588 tokens，正常触发监看停止线，未发布或试玩。
 - **Effort:** m1b-production
 - **Decided by:** agent (m1b-production/11)
+
+## 2026-11-26 - UI 打磨:显示名、用量、原始数据与错误码
+
+- **Decided:** [ui-polish](specs/ui-polish.md) 中服装、表情、地点变体不改作品格式,显示名取设定集描述,缺失时整理编号;用量页逐次调用列表改为按天/按模型汇总,删除「过期素材」栏;Agent 工具卡主视图只显示中文标题与 1–3 行整理信息,原始参数与结果收进默认折叠的「详细信息」;后端改为传结构化错误类型与错误码,界面按四种语言转成用户能懂的话。
+- **Instead of:** 给格式加 displayName 字段并改生成流程;保留折叠的逐次列表或全部删除;完全不显示原始数据;只在界面按文本模式识别后端报错。
+- **Because:** 四份界面审计([ui-polish-audit](research/ui-polish-audit.md))显示内部编号、英文报错与原始 JSON 遍布各页;选定方案本轮即可完成、不动作品包格式,错误码契约保证新报错也不会以英文原文漏到界面。
+- **Effort:** ui-polish
+- **Decided by:** user
