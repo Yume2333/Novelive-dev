@@ -43,3 +43,16 @@
   - `context_limit` copy is chapter-scoped; correct for every current producer (chapter writing/scene repair/revision).
   - `@keyframes soft-pulse` kept only for `panels/agent/MessageView.module.css` thinking icon; task 07 removes the pulse, then the keyframes and `--glow`.
   - Dark theme muted secondary text is low-contrast on settings model cards and the welcome 界面语言 label; usage date inputs show native `mm/dd/yyyy` placeholder — surface task 02 (settings/welcome/usage).
+
+## Rework round 2 (gate 08 feedback)
+
+Rework round 2 base commit: d433081 (ui-polish/08 merged; branch fast-forwarded, no merge commit needed)
+
+Fixed items:
+- **1.** Wire command error enum in `packages/creator/src/contract/index.ts` now derives `...importErrorCodes`/`...projectErrorCodes` spreads from the exported lists, so `creatorCommandError` preserves `invalid_join_target` (and every sibling import/project code) across IPC instead of flattening to `internal`; `ImportPage` join-target failures again render 「无法加入，所选文件夹不是有效的工程。」 and `tests/e2e/m4-import-join.spec.ts` asserts the specific sentence; new `creator-contract` test iterates every import/project code through the boundary. Ripple: `failureKind` in `scheduler/chapter` now runtime-narrows `TextModelError.code` via `issueKinds` membership (widened union type).
+- **2.** `format/errors.ts` splits command errors from model error kinds: `{code}`-shaped `internal` → 「无法完成操作，请重试。」 and `not_found` → 「找不到相关内容，请刷新后重试。」 (new key in all four `format.json`); kind-typed inputs keep the model-flavoured copy. `SettingsPage` `readableError` map made total over the widened union; `BiblePage` keeps its more specific page copy with a refreshed comment.
+- **3.** Backend zh-CN reason strings replaced by contract enums: `configErrorReasons` (`unreadable`/`invalid_json`/`invalid_fields`/`decrypt_failed`) in `config/schema.ts` and `unreadableProjectReasons` (`moved`/`unreadable`) in `usage/contract.ts`; UI maps them via new `formatConfigErrorReason`/`formatUnreadableProjectReason` helpers in `format/errors.ts` with keys in all four `format.json` (usage keys moved out of `usage.json` symmetrically); `SettingsPage`/`UsagePage` migrated, creator unit tests and `tests/e2e/m4-usage.spec.ts` updated.
+- **Nit.** `chat/tools.ts` `childRoles` copy deleted; `ChildRole`/`spawnTool` now derive from the contract's `subtaskRoles`.
+
+Check after: `NL_REPLAY=strict pnpm check && pnpm build` → exit 0; `Test Files  77 passed | 1 skipped (78)`; `Tests  1218 passed | 3 skipped (1221)`; `✓ built` (first run failed on the other worker's unsorted import in `tests/unit/m2-chat.test.ts` — biome safe-autofixed, rerun green). Targeted rerun after the childRoles fix: `pnpm typecheck` exit 0; `npx biome check` on touched chat files clean; `NL_REPLAY=strict npx vitest run tests/unit/m2-chat.test.ts tests/unit/m2-chat-events.test.ts tests/unit/m2-bible-chat.test.ts tests/unit/m2-bible-sources.test.ts` → `Test Files 4 passed (4)`, `Tests 44 passed (44)`.
+- Review: pass (base d433081, reviewer w01-review)

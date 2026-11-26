@@ -36,6 +36,7 @@ import { CompactSelect } from '../../components/Form'
 import { Modal } from '../../components/Modal'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
+import { formatConfigErrorReason } from '../../format/errors'
 import { formatPath, useHomeDir } from '../../format/path'
 import { localeNames, locales, msg, scoped } from '../../i18n'
 import type { SettingsHost } from '../../shell/AppShell'
@@ -100,7 +101,7 @@ export function readableError(error: unknown): ReadableError {
 		failure?.message && failure.message !== readable
 			? failure.message
 			: undefined
-	const message = {
+	const copy: Partial<Record<CommandError['code'], string>> = {
 		auth: t('鉴权失败，请检查接口地址、API Key 和模型名。'),
 		not_found: t('接口或模型不存在，请检查接口地址和模型名。'),
 		network: t(
@@ -116,7 +117,10 @@ export function readableError(error: unknown): ReadableError {
 		cancelled: t('已取消测试。'),
 		creator_down: t('创作端已断开，重新连接后可再测试。'),
 		internal: readable ?? t('操作失败，请重试。'),
-	}[code]
+	}
+	// 模型测试只会产出上面的码；导入／工程错误码不可能出现在这里，
+	// 真出现时也退回通用句而不是露枚举值。
+	const message = copy[code] ?? readable ?? t('操作失败，请重试。')
 	return detail ? { code, message, detail } : { code, message }
 }
 
@@ -503,7 +507,7 @@ export function SettingsPage() {
 							}
 						>
 							<strong>{t('配置文件无法读取')}</strong>
-							{config.configError.reason}
+							{formatConfigErrorReason(config.configError.reason)}
 						</Banner>
 						<Details>
 							<span className={styles.path}>

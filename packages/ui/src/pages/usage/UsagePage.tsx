@@ -24,7 +24,7 @@ import { CompactSelect } from '../../components/Form'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { EmptyState, Page } from '../../components/Page'
 import { formatCost } from '../../format/cost'
-import { formatErrorText, humanizeError } from '../../format/errors'
+import { formatUnreadableProjectReason } from '../../format/errors'
 import { formatWorkTitle, workTitlesFromList } from '../../format/work'
 import { i18n, msg, scoped } from '../../i18n'
 import styles from './UsagePage.module.css'
@@ -333,14 +333,6 @@ function BarTooltip({ tip, id }: { tip: BarTip; id: string }) {
 	)
 }
 
-/** 后端在 usage.list 里写死的简体中文原因（contract 尚未结构化），
-    UI 侧映射到本地化文案；不认识的原因交给 humanizeError 兜底，
-    原文只进折叠的「详细信息」。 */
-const unreadableReason: Record<string, string> = {
-	项目已移动或不存在: msg('项目已移动或删除'),
-	项目无法读取: msg('项目无法读取'),
-}
-
 export function UsagePage() {
 	const [granularity, setGranularity] = useState<Granularity>('day')
 	const [from, setFrom] = useState('')
@@ -464,10 +456,9 @@ export function UsagePage() {
 	// 无法读取的作品按本地化原因归组：每条原因一行，
 	// 同因多部合成「N 部作品无法读取」（DESIGN.md 同类问题合成一条）
 	const unreadableGroups = [
-		...Map.groupBy(data?.unreadableProjects ?? [], (project) => {
-			const known = unreadableReason[project.reason]
-			return known ? t(known) : formatErrorText(humanizeError(project.reason))
-		}).entries(),
+		...Map.groupBy(data?.unreadableProjects ?? [], (project) =>
+			formatUnreadableProjectReason(project.reason),
+		).entries(),
 	]
 
 	const tipContent = (day: string, dayTotals: UsageTotals) => (
@@ -598,7 +589,7 @@ export function UsagePage() {
 										<div key={project.projectId}>
 											{project.projectId}
 											{' · '}
-											{project.reason}
+											{formatUnreadableProjectReason(project.reason)}
 										</div>
 									))}
 								</Details>

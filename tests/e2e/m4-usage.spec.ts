@@ -343,8 +343,8 @@ test('M4 usage and stale assets', async () => {
 					a.projectId.localeCompare(b.projectId),
 				),
 			).toEqual([
-				{ projectId: 'broken', reason: '项目已移动或不存在' },
-				{ projectId: 'broken-too', reason: '项目已移动或不存在' },
+				{ projectId: 'broken', reason: 'moved' },
+				{ projectId: 'broken-too', reason: 'moved' },
 			])
 			await page.reload()
 			// 警示横幅：人话条目（一部作品无法读取 + 本地化原因），
@@ -367,10 +367,10 @@ test('M4 usage and stale assets', async () => {
 			await expect(detailsToggle).toHaveAttribute('aria-expanded', 'true')
 			// 两个 broken 绑定的原始行都留在「详细信息」里
 			await expect(
-				warning.getByText(/^broken · 项目已移动或不存在$/),
+				warning.getByText(/^broken · 项目已移动或删除$/),
 			).toBeVisible()
 			await expect(
-				warning.getByText(/^broken-too · 项目已移动或不存在$/),
+				warning.getByText(/^broken-too · 项目已移动或删除$/),
 			).toBeVisible()
 			await expect(
 				page.getByRole('region', { name: '按模型汇总' }),

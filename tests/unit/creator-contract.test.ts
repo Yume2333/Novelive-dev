@@ -7,6 +7,7 @@ import {
 	importFailure,
 	issueKinds,
 	productionChapterRecordEvent,
+	projectErrorCodes,
 } from '../../packages/creator/src/contract'
 import { ImportFailureError } from '../../packages/creator/src/contract/errors'
 import { TextModelError } from '../../packages/creator/src/models/text'
@@ -68,6 +69,37 @@ describe('creator transport schemas', () => {
 			code: 'context_limit',
 			message: failure.message,
 		})
+	})
+
+	test('preserves every import and project error code across the command boundary', () => {
+		// import.target 等命令抛出的 ImportFailureError 必须原样穿过
+		// IPC 错误 schema，绝不能被压成 internal（否则 UI 只能显示通用文案）。
+		for (const code of importErrorCodes) {
+			const failure = creatorCommandError(
+				new ImportFailureError(code, `detail for ${code}`),
+			)
+			expect(failure.code, code).toBe(code)
+			expect(failure.message, code).toBe(`detail for ${code}`)
+			expect(
+				creatorFrame.check({
+					type: 'error',
+					generation: 1,
+					requestId: 1,
+					error: failure,
+				}),
+				code,
+			).toBe(true)
+		}
+		for (const code of projectErrorCodes)
+			expect(
+				creatorCommandError({ code, message: 'raw detail' }).code,
+				code,
+			).toBe(code)
+		// 未登记的码仍然压成 internal
+		expect(creatorCommandError({ code: 'not-a-code', message: 'x' }).code).toBe(
+			'internal',
+		)
+		expect(creatorCommandError(new Error('plain')).code).toBe('internal')
 	})
 })
 

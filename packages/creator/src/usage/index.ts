@@ -128,8 +128,8 @@ export async function listUsage(
 				projectId: name,
 				reason:
 					(error as NodeJS.ErrnoException).code === 'ENOENT'
-						? '项目已移动或不存在'
-						: '项目无法读取',
+						? 'moved'
+						: 'unreadable',
 			})
 		}
 	}

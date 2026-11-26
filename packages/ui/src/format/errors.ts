@@ -1,9 +1,11 @@
 import type {
 	CommandError,
+	ConfigErrorReason,
 	ImportErrorCode,
 	IssueKind,
 	ProjectErrorCode,
 	ShareErrorCode,
+	UnreadableProjectReason,
 } from '@novelive/creator/contract'
 import { msg, scoped } from '../i18n'
 
@@ -177,12 +179,27 @@ const table: Record<AnyCode, Entry> = {
 	creator_down: { message: msg('无法连接创作端，请重试。') },
 }
 
+// 命令错误（`{ code, message }` 形状）里与模型错误同码但含义不同的条目：
+// 此时的 `internal` 不是模型返回了怪回复，`not_found` 也不是模型不存在，
+// 不能用模型口吻的文案误导创作者。
+const commandOverrides: Partial<Record<AnyCode, Entry>> = {
+	internal: { message: msg('无法完成操作，请重试。') },
+	not_found: { message: msg('找不到相关内容，请刷新后重试。') },
+}
+
 const fallback: Entry = { message: msg('无法完成操作，请重试。') }
 
 const prefixedCode = /^\[([a-z_]+)\]\s*(.*)$/i
 
 function entryFor(code: string): Entry | undefined {
 	return (table as Record<string, Entry | undefined>)[code]
+}
+
+function commandEntryFor(code: string): Entry | undefined {
+	return (
+		(commandOverrides as Record<string, Entry | undefined>)[code] ??
+		entryFor(code)
+	)
 }
 
 function render(entry: Entry, detail?: string, count?: number): HumanizedError {
@@ -200,8 +217,9 @@ function render(entry: Entry, detail?: string, count?: number): HumanizedError {
 /**
  * 统一入口：接受 issue kind、错误码字符串、`{ kind, detail }`、
  * `{ code, message }`（命令错误／作品包错误／导入失败）或 Error。
- * Error 会尝试解析遗留的 `[code] …` 前缀；都不认识时退回通用文案，
- * 原始文本只进 detail。
+ * `{ code }` 形状按命令错误解读（`internal`/`not_found` 用非模型口吻）；
+ * 其余形状按模型／流水线错误解读。Error 会尝试解析遗留的 `[code] …` 前缀；
+ * 都不认识时退回通用文案，原始文本只进 detail。
  */
 export function humanizeError(input: unknown): HumanizedError {
 	if (typeof input === 'string') {
@@ -231,7 +249,7 @@ export function humanizeError(input: unknown): HumanizedError {
 			if (entry) return render(entry, detail, count)
 		}
 		if (typeof record.code === 'string') {
-			const entry = entryFor(record.code)
+			const entry = commandEntryFor(record.code)
 			if (entry) return render(entry, detail, count)
 		}
 		if (input instanceof Error) {
@@ -252,4 +270,38 @@ export function humanizeError(input: unknown): HumanizedError {
  */
 export function formatErrorText(error: HumanizedError): string {
 	return error.hint ? `${error.message} ${error.hint}` : error.message
+}
+
+// 配置文件损坏原因（contract 枚举）→ 本地化病因句。
+// 后端只传机器码，文案全部在这里。
+const configReasonCopy: Record<ConfigErrorReason, string> = {
+	unreadable: msg('无法读取配置文件。'),
+	invalid_json: msg('配置文件不是有效的 JSON。'),
+	invalid_fields: msg('配置字段无效。'),
+	decrypt_failed: msg('无法解密 API Key。'),
+}
+
+/** 设置页配置错误横幅的病因句；不认识的码退回通用句，绝不露枚举值。 */
+export function formatConfigErrorReason(reason: ConfigErrorReason): string {
+	return t(
+		(configReasonCopy as Record<string, string | undefined>)[reason] ??
+			fallback.message,
+	)
+}
+
+// 用量统计里读不了的工程原因（contract 枚举）→ 本地化短语：
+// 横幅里接在「N 部作品无法读取 · 」后面，所以用病因短语而非完整句。
+const unreadableReasonCopy: Record<UnreadableProjectReason, string> = {
+	moved: msg('项目已移动或删除'),
+	unreadable: msg('项目无法读取'),
+}
+
+/** 用量页不可读工程的原因短语；不认识的码退回通用句。 */
+export function formatUnreadableProjectReason(
+	reason: UnreadableProjectReason,
+): string {
+	return t(
+		(unreadableReasonCopy as Record<string, string | undefined>)[reason] ??
+			fallback.message,
+	)
 }
