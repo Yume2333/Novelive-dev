@@ -1,0 +1,28 @@
+/* 候选抽屉与灯箱的新增样式（worker C 私有）。
+   全部使用 tokens：颜色只取 var(--*)，字号只取 --text-*，间距只取 --space-*。 */
+
+/* S8：长 Agent 提示是正文文本，不是标题 */
+.promptText {
+	flex: 1;
+	min-width: 0;
+	margin: 0;
+	font-size: var(--text-13);
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+}
+
+/* U5：候选过期 / 受限时解释为何不能接受的警示横幅 */
+.staleBanner {
+	margin: 0;
+	font-size: var(--text-13);
+}
+
+/* 长标题（时间线事件、伏笔描述、画风描述）截断为两行 */
+.clampTitle {
+	display: -webkit-box;
+	margin: 0;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+}
