@@ -31,7 +31,7 @@
 
 - Rework item: the editor eyebrow rendered `纸船与灯火 · 纸船与灯火` because import writes the same title into series and work.
 - Fix: `EditorPage.tsx` composes the eyebrow like production/confirm/bible — `seriesTitle · formatVolumeLabel({ index: volumeIndex })` (bible-style `[...].filter(Boolean).join(' · ')`, no copy added); package works (no project) keep the work title; state renamed `workTitle` → `workEyebrow`.
-- Rework round 2 base commit: d43308159dd615858cfac1664fff7580f352457f
+- Rework base commit: d43308159dd615858cfac1664fff7580f352457f
 - Check after: `NL_REPLAY=strict pnpm check` exit 0 (Test Files 77 passed | 1 skipped (78); Tests 1212 passed | 3 skipped (1215)); `pnpm build` exit 0; playwright with gate JSON hook (Node 24 JSON-import workaround, same as gate 08) `nl-headless pnpm exec playwright test --grep 'M2 editor|M3 custom marks'`: 12 passed / 0 failed (36.1s).
 - Review: pass (base d43308159dd615858cfac1664fff7580f352457f, reviewer w04-review)
 

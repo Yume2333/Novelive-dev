@@ -5,7 +5,8 @@ import {
 	History,
 	Save,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
 	PlaybackHistory,
 	SaveEntry,
@@ -58,6 +59,21 @@ export function ProgressPanel({
 	chapters?: readonly HistoryChapter[]
 	onSlot(slot: SaveSlot): void
 }) {
+	const { i18n } = useTranslation()
+	/** 存档时间跟随 UI 语言，精确到分（不显示秒），与运行记录格式一致 */
+	const saveTimeFormatter = useMemo(
+		() =>
+			new Intl.DateTimeFormat(i18n.language, {
+				dateStyle: 'medium',
+				timeStyle: 'short',
+			}),
+		[i18n.language],
+	)
+	const formatSaveTime = (savedAt: string): string => {
+		const date = new Date(savedAt)
+		if (Number.isNaN(date.getTime())) return ''
+		return saveTimeFormatter.format(date)
+	}
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
 	const [failure, setFailure] = useState('')
 	const [page, setPage] = useState(0)
@@ -233,7 +249,7 @@ export function ProgressPanel({
 						</span>
 						{quickEntry ? (
 							<time dateTime={quickEntry.savedAt}>
-								{new Date(quickEntry.savedAt).toLocaleString()}
+								{formatSaveTime(quickEntry.savedAt)}
 							</time>
 						) : (
 							<span className="nl-save-meta">—</span>
@@ -281,7 +297,7 @@ export function ProgressPanel({
 							</span>
 							{entry ? (
 								<time dateTime={entry.savedAt}>
-									{new Date(entry.savedAt).toLocaleString()}
+									{formatSaveTime(entry.savedAt)}
 								</time>
 							) : (
 								<span className="nl-save-meta">—</span>
