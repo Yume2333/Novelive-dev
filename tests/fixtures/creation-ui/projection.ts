@@ -115,6 +115,7 @@ export async function installProjection(app: ElectronApplication) {
 			const generation = 100
 			let snapshot = fixture.beforeVisual
 			let seq = 3
+			const persistentEvents = [...fixture.records]
 			const calls: ProjectionDriver['calls'] = []
 			const sendEvent = (envelope: EventEnvelope) =>
 				port1.postMessage({ type: 'event', generation, envelope })
@@ -175,11 +176,14 @@ export async function installProjection(app: ElectronApplication) {
 								: fixture.second
 						respond(snapshot)
 						break
-					case 'production.retryChapter':
+					case 'production.retryChapter': {
 						snapshot = fixture.second
 						respond(snapshot)
-						sendEvent({ ...fixture.live, seq: ++seq })
+						const liveEvent = { ...fixture.live, seq: ++seq }
+						persistentEvents.push(liveEvent)
+						sendEvent(liveEvent)
 						break
+					}
 					case 'production.stop':
 						snapshot = {
 							...fixture.second,
@@ -194,7 +198,7 @@ export async function installProjection(app: ElectronApplication) {
 						})
 						break
 					case 'events.list':
-						respond({ events: fixture.records, gap: false, snapshot: null })
+						respond({ events: persistentEvents, gap: false, snapshot: null })
 						break
 					case 'production.playerChapter': {
 						const chapterId =
@@ -256,6 +260,9 @@ export async function installProjection(app: ElectronApplication) {
 							type: 'error',
 							error: { code: 'unsupported', message: 'Test projection' },
 						})
+						break
+					case 'usage.list':
+						respond({ records: [], staleAssets: [], unreadableProjects: [] })
 						break
 					default:
 						throw new Error(`Unexpected command: ${data.command}`)

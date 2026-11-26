@@ -1,0 +1,157 @@
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-px-6);
+}
+
+.fieldLabel {
+	color: var(--color-on-surface-variant);
+}
+
+.hint {
+	font-size: 12px;
+	color: var(--color-outline);
+}
+
+.input:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+/* ---- 下拉（自定义 chevron，隐藏原生箭头） ---- */
+.selectShell {
+	position: relative;
+	display: inline-flex;
+	width: 100%;
+}
+
+.compactSelectShell {
+	position: relative;
+	display: inline-flex;
+	width: fit-content;
+}
+
+.select {
+	width: 100%;
+	appearance: none;
+	padding: var(--space-px-10) 34px var(--space-px-10) var(--space-px-14);
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-md);
+	background: var(--white-60);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-surface);
+	font-size: 14px;
+}
+
+.compactSelect {
+	width: 100%;
+	appearance: none;
+	padding: var(--space-px-7) 30px var(--space-px-7) var(--space-px-10);
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-md);
+	background: var(--white-60);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-surface);
+	font-size: 13px;
+}
+
+.select:disabled,
+.compactSelect:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.chevron {
+	position: absolute;
+	top: 50%;
+	right: var(--space-px-10);
+	transform: translateY(-50%);
+	pointer-events: none;
+	color: var(--color-on-surface-variant);
+}
+
+.compactSelectShell .chevron {
+	right: var(--space-px-9);
+}
+
+/* ---- 三档选择卡 ---- */
+.tierGrid {
+	display: grid;
+	gap: var(--space-3);
+}
+
+.tier {
+	padding: var(--space-px-14) var(--space-4);
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-lg);
+	background: var(--white-50);
+	text-align: left;
+	transition: all var(--dur-base) var(--ease-out);
+	cursor: pointer;
+}
+
+.tierActive {
+	border: 1px solid var(--color-primary);
+	background: var(--accent-wash);
+}
+
+.tierHead {
+	display: flex;
+	align-items: center;
+	gap: var(--space-px-6);
+	margin-bottom: var(--space-px-6);
+}
+
+.tierCheck {
+	color: var(--color-primary);
+	flex-shrink: 0;
+}
+
+.tierLabel {
+	font-size: 14px;
+	font-weight: 700;
+}
+
+.tierDesc {
+	display: block;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--color-on-surface-variant);
+}
+
+/* ---- 开关 ---- */
+.toggle {
+	position: relative;
+	width: 40px;
+	height: 23px;
+	flex-shrink: 0;
+	border-radius: var(--radius-full);
+	background: var(--color-surface-container-highest);
+	transition: background var(--dur-base) var(--ease-out);
+	cursor: pointer;
+}
+
+.toggleOn {
+	background: var(--color-primary);
+}
+
+.toggle:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.knob {
+	position: absolute;
+	top: var(--space-px-3);
+	left: var(--space-px-3);
+	width: 17px;
+	height: 17px;
+	border-radius: var(--radius-full);
+	background: var(--color-surface-container-lowest);
+	box-shadow: var(--shadow-raised);
+	transition: left var(--dur-base) var(--ease-out);
+}
+
+.knobOn {
+	left: var(--space-px-20);
+}

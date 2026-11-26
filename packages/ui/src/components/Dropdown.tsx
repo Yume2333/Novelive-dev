@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import styles from './Dropdown.module.css'
+import { usePresence } from './Motion'
 import { ScrollArea } from './ScrollArea'
 
 export interface DropdownItem {
@@ -27,6 +28,7 @@ export function Dropdown({
 	const [position, setPosition] = useState({ top: 0, right: 0, maxHeight: 0 })
 	const button = useRef<HTMLButtonElement>(null)
 	const menu = useRef<HTMLDivElement>(null)
+	const { mounted, state } = usePresence(open, 140)
 
 	useEffect(() => {
 		if (!open) return
@@ -112,13 +114,14 @@ export function Dropdown({
 			>
 				{trigger}
 			</button>
-			{open &&
+			{mounted &&
 				createPortal(
 					<div
 						ref={menu}
 						role="menu"
 						aria-label={label}
 						className={`glass-panel ${styles.menu}`}
+						data-state={state}
 						style={{ top: position.top, right: position.right }}
 					>
 						<ScrollArea viewportStyle={{ maxHeight: position.maxHeight }}>

@@ -105,12 +105,20 @@ async function missingI18n(page: Page, rawKeys: readonly string[]) {
 				NodeFilter.SHOW_TEXT,
 			)
 			for (let node = iterator.nextNode(); node; node = iterator.nextNode())
-				if (node.parentElement && visible(node.parentElement))
+				if (
+					node.parentElement &&
+					visible(node.parentElement) &&
+					// Toast text is emitted at action time in the then-active locale
+					// and cannot retro-translate; the aria-live stack is excluded so a
+					// toast still fading out during a locale switch is not a false
+					// positive (task 01 ToastProvider).
+					!node.parentElement.closest('[aria-live]')
+				)
 					inspect(node.textContent, 'text')
 			for (const element of root.querySelectorAll(
 				'[title], [aria-label], [placeholder], [alt]',
 			))
-				if (visible(element))
+				if (visible(element) && !element.closest('[aria-live]'))
 					for (const name of [
 						'title',
 						'aria-label',
@@ -143,8 +151,25 @@ async function aboutSurfaces(page: Page, locale: Locale) {
 	// exercise the real path without touching the desktop or the network.
 	await button('开源许可').click()
 	await button('源代码').click()
-	// Dev checkout: packaged === false, so no third-party notices entry.
-	await expect(button('第三方许可')).toHaveCount(0)
+	// The in-app third-party licenses modal is always available (task 03);
+	// opening it must list license rows, and the `打开完整文本` host link only
+	// exists in packaged builds — never in this dev checkout.
+	await button('第三方许可').click()
+	const licenses = page.getByRole('dialog', {
+		name: text(locale, 'settings', '第三方许可'),
+	})
+	await expect(licenses).toBeVisible()
+	await expect(licenses.getByRole('strong').first()).toBeVisible()
+	await expect(
+		licenses.getByRole('button', {
+			name: text(locale, 'settings', '打开完整文本'),
+		}),
+	).toHaveCount(0)
+	await licenses
+		.getByRole('button', { name: text(locale, 'settings', '关闭') })
+		.last()
+		.click()
+	await expect(licenses).toHaveCount(0)
 
 	const check = button('检查更新')
 	await check.click()

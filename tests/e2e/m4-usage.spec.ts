@@ -288,6 +288,13 @@ test('M4 usage and stale assets', async () => {
 			expect(
 				(await listUsage(profile)).staleAssets.map((row) => row.assetKey),
 			).toEqual(expected)
+			// 候选与冲突现在是有意保持打开的模态 Drawer（原型组件升级：
+			// 内嵌面板 → Drawer），接受最后一个候选后渲染空态；
+			// 离开前必须显式关闭，否则 scrim 会拦截后续导航点击。
+			const drawer = page.getByRole('dialog', { name: '候选与冲突' })
+			await expect(drawer.getByText('暂无待确认候选')).toBeVisible()
+			await drawer.getByRole('button', { name: '关闭' }).click()
+			await expect(drawer).toBeHidden()
 			await page.getByRole('link', { name: '用量', exact: true }).click()
 			const stale = page.getByRole('region', { name: '过期素材' })
 			for (const key of expected)

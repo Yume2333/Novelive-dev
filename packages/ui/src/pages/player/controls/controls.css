@@ -86,7 +86,7 @@
 	background: transparent;
 }
 
-.nl-controls-panel button,
+.nl-controls-panel button:where(:not([role="switch"])),
 .nl-control-row {
 	display: flex;
 	align-items: center;
@@ -103,18 +103,29 @@
 	text-align: left;
 }
 
-.nl-controls-panel button:hover,
-.nl-controls-panel button:focus-visible {
+/* 开关行的标签占据图标列之后的剩余宽度，让开关贴齐右缘 */
+.nl-control-row .nl-control-row-label {
+	flex: 1;
+}
+
+.nl-controls-panel button:where(:not([role="switch"])):hover,
+.nl-controls-panel button:where(:not([role="switch"])):focus-visible {
 	background: var(--white-90);
 	box-shadow: var(--shadow-focus);
 }
 
-.nl-controls-panel button {
+.nl-controls-panel button:where(:not([role="switch"])) {
 	justify-content: flex-start;
 }
 
-.nl-controls-panel button:disabled {
+.nl-controls-panel button:where(:not([role="switch"])):disabled {
 	color: var(--color-outline);
+}
+
+/* Tooltip 外壳（禁用的编辑器入口）不能把整行挤成内容宽度；
+   inline-flex 的内联样式无法覆盖，只补宽度 */
+.nl-controls-panel span:has(> button) {
+	width: 100%;
 }
 
 .nl-control-row select {
@@ -126,22 +137,104 @@
 	padding: var(--space-2);
 }
 
-.nl-chapter-wait {
+.nl-end-overlay {
 	position: absolute;
-	z-index: 2;
-	inset: var(--space-6) auto auto var(--space-6);
-	padding: var(--space-6);
-	border: var(--glass-border);
-	border-radius: var(--radius-xl);
-	background: var(--veil-95);
+	inset: 0;
+	z-index: 4;
+	pointer-events: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--space-5);
+	/* 不做全屏 scrim/模糊：舞台画布在章末仍需保持像素纯净
+	   （m1b 会断言章末背景色）。视觉收束由卡片自身的面纱底色承担。 */
+	background: transparent;
+	animation: nl-screen-in 0.24s var(--ease-out) both;
 	font-family: var(--font-body);
 }
 
-.nl-chapter-wait button {
-	font: inherit;
-	color: inherit;
-	background: transparent;
-	border: none;
+.nl-end-card {
+	width: min(100%, 460px);
+	padding: var(--space-6);
+	border: var(--glass-border);
+	border-radius: var(--radius-2xl);
+	background: var(--veil-95);
+	/* 不用投影：卡片悬在舞台上方，shadow 的模糊外延会渗进舞台画布像素，
+	   破坏章末舞台纯净度的像素级断言。层次由面纱底色和玻璃描边承担。 */
+	box-shadow: none;
+	color: var(--color-on-surface);
+}
+
+.nl-end-card,
+.nl-end-card button {
+	pointer-events: auto;
+}
+
+.nl-end-card-center {
+	text-align: center;
+}
+
+.nl-end-label {
+	display: block;
+	margin-bottom: var(--space-2);
+	color: var(--color-outline);
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+}
+
+.nl-end-headline {
+	margin: 0 0 var(--space-4);
+	font-family: var(--font-display);
+	font-size: 20px;
+	font-weight: 600;
+}
+
+.nl-end-progress {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+}
+
+.nl-end-note {
+	margin: 0;
+	color: var(--color-on-surface-variant);
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.nl-end-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 48px;
+	height: 48px;
+	margin: 0 auto var(--space-4);
+	border: var(--glass-border);
+	border-radius: var(--radius-xl);
+	background: var(--white-40);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-surface-variant);
+}
+
+.nl-end-actions {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-3);
+	margin-top: var(--space-5);
+}
+
+.nl-end-card-click .nl-end-headline {
+	font-size: 22px;
+}
+
+.nl-end-card-click {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	width: min(100%, 400px);
+	text-align: center;
 }
 
 .nl-player-surface[data-ui-hidden="true"] .nl-player-overlay {
@@ -156,18 +249,32 @@
 	font-size: var(--player-font-size, 30px);
 }
 
+/* ruby 注音凸出在基字字形上方，而 Chromium 不会为注音撑大行盒，
+   注音因此会越过翻页裁剪边界。给 ruby 元素更大的行高，把注音
+   收进自己的行盒内，让翻页裁剪始终把整行（含注音）留在窗口内；
+   普通行的 strut 仍是 1.8，不受此规则影响。 */
+.nl-player .nl-text-viewport ruby {
+	line-height: 2;
+}
+
 .nl-player .nl-player-textbox {
 	position: relative;
 	display: flex;
 	flex-direction: column;
 	justify-content: flex-start;
 	width: 100%;
-	min-height: 22%;
-	padding: 3.5vh 8% var(--space-6);
-	background: color-mix(
-		in srgb,
-		black calc(min(var(--player-dialogue-opacity, 0.9) + 0.12, 1) * 100%),
-		transparent
+	min-height: 34%;
+	padding: 8.5vh 8% var(--space-6);
+	background: linear-gradient(
+		180deg,
+		transparent 0%,
+		color-mix(in srgb, var(--stage-scrim) 82%, var(--color-primary)) 68%,
+		color-mix(
+				in srgb,
+				var(--stage-frame) calc(var(--player-dialogue-opacity, 0.9) * 100%),
+				transparent
+			)
+			100%
 	);
 	box-shadow: none;
 	color: color-mix(in srgb, white 90%, transparent);
@@ -178,29 +285,10 @@
 	animation: nl-box-in 0.32s var(--ease-out) both;
 }
 
-.nl-player .nl-player-textbox::before {
-	content: "";
-	position: absolute;
-	right: 0;
-	bottom: 100%;
-	left: 0;
-	height: 6vh;
-	background: linear-gradient(
-		180deg,
-		transparent,
-		color-mix(
-			in srgb,
-			black calc(min(var(--player-dialogue-opacity, 0.9) + 0.12, 1) * 100%),
-			transparent
-		)
-	);
-	pointer-events: none;
-}
-
 .nl-player .nl-player-textbox::after {
 	content: "";
 	position: absolute;
-	top: 0;
+	top: 15%;
 	left: 9%;
 	right: 9%;
 	height: 1px;
@@ -239,24 +327,28 @@
 	padding: 28px 44px 46px 48px;
 	border: var(--glass-border);
 	border-radius: var(--radius-xl);
-	background: linear-gradient(
-		172deg,
-		color-mix(
-				in srgb,
-				color-mix(in srgb, white 90%, burlywood) 94%,
-				transparent
-			)
-			0%,
-		color-mix(
-				in srgb,
-				color-mix(in srgb, white 84%, burlywood)
-					calc(min(var(--player-dialogue-opacity, 0.9) + 0.14, 0.98) * 100%),
-				transparent
-			)
-			100%
-	);
+	background:
+		linear-gradient(
+			172deg,
+			color-mix(
+					in srgb,
+					color-mix(in srgb, white 90%, burlywood) 94%,
+					transparent
+				)
+				0%,
+			color-mix(
+					in srgb,
+					color-mix(in srgb, white 84%, burlywood)
+						calc(min(var(--player-dialogue-opacity, 0.9) + 0.14, 0.98) * 100%),
+					transparent
+				)
+				100%
+		),
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.42 0 0 0 0 0.36 0 0 0 0 0.28 0 0 0 0.055 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
 	backdrop-filter: blur(12px) saturate(1.1);
-	box-shadow: var(--shadow-glass);
+	box-shadow:
+		inset 0 1px 0 var(--white-80),
+		var(--shadow-glass);
 	color: color-mix(in srgb, black 82%, transparent);
 	text-shadow: none;
 }
@@ -460,10 +552,9 @@
 .nl-controls-backdrop:not(.nl-controls-screen)
 	.nl-controls-panel
 	.nl-menu-secondary
-	:is(button, .nl-control-row) {
+	:is(button:where(:not([role="switch"])), .nl-control-row) {
 	min-height: 32px;
 	color: var(--color-on-surface-variant);
-	font-size: 12px;
 }
 
 .nl-menu-divider {
@@ -474,10 +565,39 @@
 	background: var(--divider);
 }
 
-.nl-controls-backdrop:not(.nl-controls-screen) .nl-controls-panel button,
+.nl-controls-backdrop:not(.nl-controls-screen)
+	.nl-controls-panel
+	button:where(:not([role="switch"])),
 .nl-controls-backdrop:not(.nl-controls-screen) .nl-control-row {
 	min-height: 36px;
 	padding: var(--space-2) var(--space-3);
+}
+
+.nl-controls-panel button[role="switch"] {
+	display: block;
+	width: 40px;
+	min-width: 40px;
+	min-height: 0;
+	height: 23px;
+	padding: 0;
+	border: none;
+	border-radius: var(--radius-full);
+	background: var(--color-surface-container-highest);
+}
+
+.nl-controls-panel button[role="switch"]:hover,
+.nl-controls-panel button[role="switch"]:focus-visible {
+	background: var(--color-surface-container-highest);
+	box-shadow: var(--shadow-focus);
+}
+
+.nl-controls-panel button[role="switch"][aria-checked="true"] {
+	background: var(--color-primary);
+}
+
+.nl-controls-panel button[role="switch"][aria-checked="true"]:hover,
+.nl-controls-panel button[role="switch"][aria-checked="true"]:focus-visible {
+	background: var(--color-primary);
 }
 
 .nl-controls-panel button svg {
@@ -593,6 +713,103 @@
 	letter-spacing: 0.02em;
 	line-height: 1.35;
 	white-space: nowrap;
+}
+
+.nl-chapter-row {
+	align-items: center;
+}
+
+img.nl-chapter-thumb {
+	flex: none;
+	width: 112px;
+	height: 63px;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-md);
+	object-fit: cover;
+}
+
+span.nl-chapter-thumb {
+	position: relative;
+	flex: none;
+	width: 112px;
+	height: 63px;
+	overflow: hidden;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-md);
+}
+
+span.nl-chapter-thumb[data-dim] {
+	opacity: 0.4;
+}
+
+.nl-chapter-thumb-0 {
+	background:
+		radial-gradient(
+			ellipse 90% 70% at 24% 78%,
+			color-mix(in srgb, var(--color-outline) 26%, transparent),
+			transparent
+		),
+		linear-gradient(
+			148deg,
+			var(--color-surface-container-highest),
+			var(--color-tertiary-fixed)
+		);
+}
+
+.nl-chapter-thumb-1 {
+	background:
+		radial-gradient(
+			ellipse 70% 55% at 76% 22%,
+			color-mix(in srgb, var(--color-primary) 14%, transparent),
+			transparent
+		),
+		linear-gradient(
+			152deg,
+			var(--color-secondary-container),
+			var(--color-surface-container-high)
+		);
+}
+
+.nl-chapter-thumb-2 {
+	background:
+		radial-gradient(
+			ellipse 85% 60% at 50% 100%,
+			color-mix(in srgb, var(--color-outline) 20%, transparent),
+			transparent
+		),
+		linear-gradient(
+			164deg,
+			var(--color-surface-container),
+			var(--color-secondary-container)
+		);
+}
+
+.nl-chapter-thumb-3 {
+	background:
+		radial-gradient(
+			ellipse 65% 60% at 18% 18%,
+			color-mix(in srgb, var(--color-primary) 10%, transparent),
+			transparent
+		),
+		linear-gradient(
+			140deg,
+			var(--color-tertiary-fixed),
+			var(--color-surface-container-highest)
+		);
+}
+
+.nl-chapter-thumb-badge {
+	position: absolute;
+	right: 6px;
+	bottom: 5px;
+	padding: 1px 6px;
+	border-radius: var(--radius-sm);
+	background: var(--white-80);
+	box-shadow: var(--shadow-chip);
+	color: var(--color-on-surface-variant);
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
 }
 
 .nl-history-navigation button {
@@ -740,98 +957,6 @@
 	letter-spacing: 0.08em;
 }
 
-.nl-setting-track {
-	display: flex;
-	align-items: center;
-	gap: var(--space-4);
-}
-
-.nl-setting-value {
-	min-width: 48px;
-	color: var(--color-on-surface);
-	font-size: 12px;
-	font-weight: 600;
-	font-variant-numeric: tabular-nums;
-	text-align: right;
-}
-
-.nl-setting-track input[type="range"] {
-	flex: 1;
-	height: 18px;
-	margin: 0;
-	background: transparent;
-	appearance: none;
-	cursor: pointer;
-}
-
-.nl-setting-track input[type="range"]::-webkit-slider-runnable-track {
-	height: 3px;
-	border-radius: var(--radius-full);
-	background: linear-gradient(
-		90deg,
-		var(--color-primary) var(--fill, 0%),
-		var(--color-outline-variant) var(--fill, 0%)
-	);
-}
-
-.nl-setting-track input[type="range"]::-webkit-slider-thumb {
-	width: 16px;
-	height: 16px;
-	margin-top: -6.5px;
-	border: 2px solid var(--color-surface-container-lowest);
-	border-radius: var(--radius-full);
-	background: var(--color-primary);
-	box-shadow: var(--shadow-glass);
-	appearance: none;
-}
-
-.nl-setting-track input[type="range"]:focus-visible {
-	outline: none;
-}
-
-.nl-setting-track input[type="range"]:focus-visible::-webkit-slider-thumb {
-	box-shadow: var(--shadow-focus);
-}
-
-.nl-switch {
-	position: relative;
-	flex: none;
-	width: 32px;
-	height: 18px;
-	margin: 0;
-	border-radius: var(--radius-full);
-	background: var(--color-outline-variant);
-	appearance: none;
-	cursor: pointer;
-	transition: background var(--dur-fast) var(--ease-out);
-}
-
-.nl-switch::after {
-	content: "";
-	position: absolute;
-	top: 2px;
-	left: 2px;
-	width: 14px;
-	height: 14px;
-	border-radius: var(--radius-full);
-	background: var(--color-surface-container-lowest);
-	box-shadow: var(--shadow-glass);
-	transition: transform var(--dur-fast) var(--ease-out);
-}
-
-.nl-switch:checked {
-	background: var(--color-primary);
-}
-
-.nl-switch:checked::after {
-	transform: translateX(14px);
-}
-
-.nl-switch:focus-visible {
-	outline: none;
-	box-shadow: var(--shadow-focus);
-}
-
 .nl-controls-screen .nl-settings-card .nl-control-row select {
 	padding: 6px var(--space-4);
 	border: var(--glass-border);
@@ -870,6 +995,15 @@
 	font-family: var(--font-display);
 	font-size: 13.5px;
 	font-weight: 600;
+}
+
+.nl-save-excerpt {
+	padding: 2px 14px 0;
+	overflow: hidden;
+	color: var(--color-outline);
+	font-size: 12px;
+	white-space: nowrap;
+	text-overflow: ellipsis;
 }
 
 .nl-controls-screen .nl-save-grid time,
@@ -954,4 +1088,77 @@
 	background: var(--color-surface-container-lowest);
 	color: var(--color-on-surface);
 	box-shadow: var(--shadow-glass);
+}
+
+.nl-quicksave-strip {
+	margin-bottom: var(--space-4);
+}
+
+.nl-controls-screen .nl-controls-panel .nl-quicksave-strip button {
+	position: relative;
+	display: grid;
+	grid-template-columns: 168px minmax(0, 1fr);
+	grid-template-rows: auto auto auto;
+	column-gap: var(--space-4);
+	width: 100%;
+	min-height: 0;
+	padding: var(--space-2);
+	overflow: hidden;
+	border: var(--glass-border);
+	border-radius: var(--radius-xl);
+	background: var(--panel-70);
+	box-shadow: var(--shadow-glass);
+	text-align: left;
+}
+
+.nl-controls-screen
+	.nl-controls-panel
+	.nl-quicksave-strip
+	button:hover:not(:disabled) {
+	box-shadow: var(--shadow-pop);
+	transform: translateY(-1px);
+}
+
+.nl-controls-screen .nl-controls-panel .nl-quicksave-strip img,
+.nl-controls-screen .nl-controls-panel .nl-quicksave-strip .nl-save-empty {
+	grid-row: 1 / 4;
+	width: 100%;
+	height: auto;
+	aspect-ratio: 16 / 9;
+	border: none;
+	border-radius: var(--radius-md);
+}
+
+.nl-controls-screen .nl-controls-panel .nl-quicksave-strip .nl-save-empty {
+	display: grid;
+	place-items: center;
+	background: var(--color-surface-container-low);
+	color: var(--color-outline);
+}
+
+.nl-quicksave-badge {
+	position: absolute;
+	top: var(--space-3);
+	left: var(--space-3);
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 7px;
+	border-radius: var(--radius-sm);
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.nl-controls-screen .nl-controls-panel .nl-quicksave-strip .nl-save-title {
+	align-self: end;
+	padding: 0;
+}
+
+.nl-controls-screen .nl-controls-panel .nl-quicksave-strip time,
+.nl-controls-screen .nl-controls-panel .nl-quicksave-strip .nl-save-meta {
+	padding: 0;
+	color: var(--color-outline);
+	font-size: 12px;
 }

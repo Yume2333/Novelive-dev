@@ -3,6 +3,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Maximize2,
+	MessageCircle,
 	Minimize2,
 	Pencil,
 	Plus,
@@ -11,6 +12,10 @@ import {
 	X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { IconButton } from '../../components/Button'
+import { Collapse } from '../../components/Collapse'
+import { ConfirmDialog, Tooltip } from '../../components/Extended'
+import { Modal } from '../../components/Modal'
 import { ScrollArea } from '../../components/ScrollArea'
 import { scoped } from '../../i18n'
 import styles from './AgentPanel.module.css'
@@ -20,9 +25,12 @@ import {
 	MessageParts,
 	type ProposalActions,
 	ScrollField,
+	StreamingPlaceholder,
+	SummaryDivider,
 } from './MessageView'
 import {
 	branchPath,
+	type ChatSession,
 	headWithin,
 	type Message,
 	type Position,
@@ -34,15 +42,60 @@ const t = scoped('agent')
 
 type Chat = ReturnType<typeof useAgentChat>
 
-function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
+function RenameInput({
+	initial,
+	onCancel,
+	onSend,
+}: {
+	initial: string
+	onCancel(): void
+	onSend(title: string): void
+}) {
+	const [title, setTitle] = useState(initial)
+	return (
+		<form
+			className={styles.renameForm}
+			onSubmit={(event) => {
+				event.preventDefault()
+				if (title.trim()) onSend(title.trim())
+				else onCancel()
+			}}
+		>
+			<input
+				// biome-ignore lint/a11y/noAutofocus: 点了重命名就该能直接打字
+				autoFocus
+				className={`nl-input ${styles.field}`}
+				aria-label={t('会话名称')}
+				value={title}
+				onChange={(event) => setTitle(event.target.value)}
+				onKeyDown={(event) => {
+					if (event.key === 'Escape') {
+						event.stopPropagation()
+						onCancel()
+					}
+				}}
+				onBlur={onCancel}
+				onClick={(event) => event.stopPropagation()}
+			/>
+		</form>
+	)
+}
+
+function SessionMenu({
+	chat,
+	onDelete,
+	onClose,
+}: {
+	chat: Chat
+	onDelete(session: ChatSession): void
+	onClose(): void
+}) {
 	const [renaming, setRenaming] = useState<string>()
-	const [title, setTitle] = useState('')
-	const [deleting, setDeleting] = useState<string>()
 	const current = chat.snapshot?.session.sessionId
 	const guard = (action: Promise<unknown>, message: string) =>
 		void action.catch(() => chat.setError(message))
 	return (
-		<div className={styles.menu}>
+		<>
 			<button
 				type="button"
 				className={styles.menuItem}
@@ -51,58 +104,21 @@ function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
 					onClose()
 				}}
 			>
-				<Plus aria-hidden="true" size={15} /> {t('新会话')}
+				<Plus aria-hidden="true" size={15} strokeWidth={1.8} /> {t('新会话')}
 			</button>
 			<ScrollArea className={styles.menuScroll}>
 				<ul aria-label={t('会话')} className={styles.menuList}>
 					{chat.sessions.map((session) => (
-						<li key={session.sessionId} className={styles.sessionRow}>
+						<li key={session.sessionId} className="hover-row">
 							{renaming === session.sessionId ? (
-								<form
-									className={styles.renameForm}
-									onSubmit={(event) => {
-										event.preventDefault()
-										if (title.trim())
-											guard(
-												chat.rename(session.sessionId, title.trim()),
-												t('没能重命名'),
-											)
+								<RenameInput
+									initial={session.title}
+									onCancel={() => setRenaming(undefined)}
+									onSend={(next) => {
 										setRenaming(undefined)
+										guard(chat.rename(session.sessionId, next), t('没能重命名'))
 									}}
-								>
-									<input
-										// biome-ignore lint/a11y/noAutofocus: 点了重命名就该能直接打字
-										autoFocus
-										className={styles.field}
-										aria-label={t('会话名称')}
-										value={title}
-										onChange={(event) => setTitle(event.target.value)}
-										onBlur={() => setRenaming(undefined)}
-									/>
-								</form>
-							) : deleting === session.sessionId ? (
-								<div className={styles.renameForm}>
-									<span className={styles.cardTitle}>
-										{t('删除「{{title}}」？', { title: session.title })}
-									</span>
-									<button
-										type="button"
-										className={styles.button}
-										onClick={() => setDeleting(undefined)}
-									>
-										{t('取消')}
-									</button>
-									<button
-										type="button"
-										className={styles.danger}
-										onClick={() => {
-											guard(chat.remove(session.sessionId), t('没能删除'))
-											setDeleting(undefined)
-										}}
-									>
-										{t('删除')}
-									</button>
-								</div>
+								/>
 							) : (
 								<>
 									<button
@@ -114,34 +130,43 @@ function SessionMenu({ chat, onClose }: { chat: Chat; onClose(): void }) {
 											onClose()
 										}}
 									>
+										<MessageCircle
+											aria-hidden="true"
+											size={14}
+											strokeWidth={1.8}
+											className={styles.sessionIcon}
+										/>
 										{session.title}
 									</button>
-									<button
-										type="button"
-										className={styles.iconButton}
-										aria-label={t('重命名 {{title}}', { title: session.title })}
-										onClick={() => {
-											setTitle(session.title)
-											setRenaming(session.sessionId)
-										}}
-									>
-										<Pencil aria-hidden="true" size={14} />
-									</button>
-									<button
-										type="button"
-										className={styles.iconButton}
-										aria-label={t('删除 {{title}}', { title: session.title })}
-										onClick={() => setDeleting(session.sessionId)}
-									>
-										<Trash2 aria-hidden="true" size={14} />
-									</button>
+									<span className={`row-actions ${styles.rowActions}`}>
+										<button
+											type="button"
+											className={styles.iconButton}
+											aria-label={t('重命名 {{title}}', {
+												title: session.title,
+											})}
+											title={t('重命名 {{title}}', { title: session.title })}
+											onClick={() => setRenaming(session.sessionId)}
+										>
+											<Pencil aria-hidden="true" size={13} strokeWidth={1.8} />
+										</button>
+										<button
+											type="button"
+											className={styles.iconButton}
+											aria-label={t('删除 {{title}}', { title: session.title })}
+											title={t('删除 {{title}}', { title: session.title })}
+											onClick={() => onDelete(session)}
+										>
+											<Trash2 aria-hidden="true" size={13} strokeWidth={1.8} />
+										</button>
+									</span>
 								</>
 							)}
 						</li>
 					))}
 				</ul>
 			</ScrollArea>
-		</div>
+		</>
 	)
 }
 
@@ -165,6 +190,12 @@ function EditBox({
 				rows={3}
 				value={text}
 				onChange={(event) => setText(event.target.value)}
+				onKeyDown={(event) => {
+					if (event.key === 'Escape') {
+						event.stopPropagation()
+						onCancel()
+					}
+				}}
 			/>
 			<div className={styles.actions}>
 				<button type="button" className={styles.button} onClick={onCancel}>
@@ -183,6 +214,25 @@ function EditBox({
 	)
 }
 
+function contextLabelOf(
+	position: Position | undefined,
+	chapterTitles: Record<string, string>,
+): string | null {
+	if (!position) return null
+	if (position.kind === 'editor') {
+		const chapter = chapterTitles[position.chapterId] ?? position.chapterId
+		return position.sourceIds?.length
+			? t('编辑器 · {{chapter}} · {{count}} 段', {
+					chapter,
+					count: position.sourceIds.length,
+				})
+			: t('编辑器 · {{chapter}}', { chapter })
+	}
+	return position.entryId
+		? t('设定集 · {{entry}}', { entry: position.entryId })
+		: t('设定集')
+}
+
 export function AgentPanel({
 	workId,
 	full,
@@ -199,19 +249,24 @@ export function AgentPanel({
 	const chat = useAgentChat(workId)
 	const { snapshot } = chat
 	const [menu, setMenu] = useState(false)
+	const [renamingCurrent, setRenamingCurrent] = useState(false)
 	const [editing, setEditing] = useState<string>()
 	const [preview, setPreview] = useState<{ src: string; name: string }>()
+	const [deleting, setDeleting] = useState<ChatSession>()
+	const [composerExpanded, setComposerExpanded] = useState(false)
+	const [detached, setDetached] = useState(false)
 	const panel = useRef<HTMLElement>(null)
-	const dialog = useRef<HTMLDialogElement>(null)
 	const end = useRef<HTMLDivElement>(null)
 	const path = snapshot ? branchPath(snapshot.entries, snapshot.headId) : []
 	const streaming = snapshot?.status === 'streaming'
 	const last = path.at(-1)
+	const positionKey = JSON.stringify(position ?? null)
 
 	useEffect(() => panel.current?.focus(), [])
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 位置变化时重新附带
 	useEffect(() => {
-		if (preview) dialog.current?.showModal()
-	}, [preview])
+		setDetached(false)
+	}, [positionKey])
 	// biome-ignore lint/correctness/useExhaustiveDependencies: 新内容到达时贴底
 	useEffect(() => {
 		end.current?.scrollIntoView({ block: 'end' })
@@ -231,7 +286,12 @@ export function AgentPanel({
 		text: string,
 		attachmentIds: string[],
 		parentId: string | null,
-	) => chat.send(text, attachmentIds, parentId, position)
+	) => chat.send(text, attachmentIds, parentId, detached ? undefined : position)
+	const contextLabel = detached
+		? null
+		: contextLabelOf(position, chat.chapterTitles)
+	const awaiting =
+		streaming && (last?.kind !== 'message' || last.role === 'user')
 
 	return (
 		<aside
@@ -241,9 +301,12 @@ export function AgentPanel({
 			data-full={full}
 			aria-label="Agent"
 			onKeyDown={(event) => {
-				if (event.key !== 'Escape' || dialog.current?.open) return
+				if (event.key !== 'Escape') return
+				if (event.defaultPrevented) return
+				if (preview || deleting) return
 				event.preventDefault()
-				if (menu) setMenu(false)
+				if (composerExpanded) setComposerExpanded(false)
+				else if (menu) setMenu(false)
 				else if (full) onToggleFull()
 				else onClose()
 			}}
@@ -252,42 +315,80 @@ export function AgentPanel({
 				<span className={styles.badge} aria-hidden="true">
 					<Sparkles size={17} strokeWidth={1.8} />
 				</span>
-				<button
-					type="button"
-					className={styles.sessionButton}
-					aria-expanded={menu}
-					aria-label={t('切换会话')}
-					onClick={() => setMenu(!menu)}
-				>
-					<span className={styles.sessionTitle}>
-						{snapshot?.session.title ?? t('新会话')}
-					</span>
-					<ChevronDown aria-hidden="true" size={15} />
-				</button>
-				<button
-					type="button"
-					className={styles.iconButton}
-					aria-label={full ? t('退出全屏') : t('全屏')}
-					title={full ? t('退出全屏') : t('全屏')}
-					onClick={onToggleFull}
-				>
-					{full ? (
-						<Minimize2 aria-hidden="true" size={16} />
-					) : (
-						<Maximize2 aria-hidden="true" size={16} />
-					)}
-				</button>
-				<button
-					type="button"
-					className={styles.iconButton}
-					aria-label={t('关闭 Agent')}
-					title={t('关闭（Ctrl/⌘+J）')}
-					onClick={onClose}
-				>
-					<X aria-hidden="true" size={16} />
-				</button>
-				{menu && <SessionMenu chat={chat} onClose={() => setMenu(false)} />}
+				{renamingCurrent && snapshot ? (
+					<RenameInput
+						initial={snapshot.session.title}
+						onCancel={() => setRenamingCurrent(false)}
+						onSend={(next) => {
+							setRenamingCurrent(false)
+							void chat
+								.rename(snapshot.session.sessionId, next)
+								.catch(() => chat.setError(t('没能重命名')))
+						}}
+					/>
+				) : (
+					<button
+						type="button"
+						className={styles.sessionButton}
+						aria-expanded={menu}
+						aria-label={t('切换会话')}
+						onClick={() => setMenu(!menu)}
+					>
+						<span className={styles.sessionTitle}>
+							{snapshot?.session.title ?? t('新会话')}
+						</span>
+						<span className="nl-chevron" data-open={menu}>
+							<ChevronDown aria-hidden="true" size={15} strokeWidth={1.8} />
+						</span>
+					</button>
+				)}
+				<Tooltip text={t('重命名会话')}>
+					<IconButton
+						icon={Pencil}
+						label={t('重命名会话')}
+						size={28}
+						iconSize={15}
+						disabled={!snapshot || renamingCurrent}
+						onClick={() => setRenamingCurrent(true)}
+					/>
+				</Tooltip>
+				<Tooltip text={full ? t('退出全屏') : t('全屏')}>
+					<button
+						type="button"
+						className={styles.iconButton}
+						aria-label={full ? t('退出全屏') : t('全屏')}
+						onClick={onToggleFull}
+					>
+						{full ? (
+							<Minimize2 aria-hidden="true" size={16} strokeWidth={1.8} />
+						) : (
+							<Maximize2 aria-hidden="true" size={16} strokeWidth={1.8} />
+						)}
+					</button>
+				</Tooltip>
+				<Tooltip text={t('关闭（Ctrl/⌘+J）')}>
+					<button
+						type="button"
+						className={styles.iconButton}
+						aria-label={t('关闭 Agent')}
+						onClick={onClose}
+					>
+						<X aria-hidden="true" size={16} strokeWidth={1.8} />
+					</button>
+				</Tooltip>
 			</header>
+			<Collapse open={menu} className={styles.menuCollapse}>
+				<div className={styles.menu}>
+					<SessionMenu
+						chat={chat}
+						onDelete={(session) => {
+							setDeleting(session)
+							setMenu(false)
+						}}
+						onClose={() => setMenu(false)}
+					/>
+				</div>
+			</Collapse>
 			<ScrollArea className={styles.thread}>
 				<div className={styles.messages}>
 					{chat.loaded && path.length === 0 && (
@@ -301,14 +402,11 @@ export function AgentPanel({
 						path.map((entry) => {
 							if (entry.kind !== 'message')
 								return (
-									<details key={entry.id} className={styles.summary}>
-										<summary>
-											{entry.kind === 'compaction'
-												? t('较早的内容已压缩成摘要')
-												: t('另一条分支的摘要')}
-										</summary>
-										<p>{entry.summary}</p>
-									</details>
+									<SummaryDivider
+										key={entry.id}
+										kind={entry.kind}
+										summary={entry.summary}
+									/>
 								)
 							const siblings = siblingsOf(snapshot.entries, entry)
 							const index = siblings.findIndex((other) => other.id === entry.id)
@@ -353,6 +451,7 @@ export function AgentPanel({
 												parts={entry.parts}
 												activity={activityOf(entry)}
 												actions={actions}
+												mine={entry.role === 'user'}
 												onPreview={(attachment) =>
 													setPreview({
 														src: window.novelive.resourceUrl(
@@ -374,7 +473,11 @@ export function AgentPanel({
 													disabled={index === 0 || streaming}
 													onClick={() => go(-1)}
 												>
-													<ChevronLeft aria-hidden="true" size={14} />
+													<ChevronLeft
+														aria-hidden="true"
+														size={14}
+														strokeWidth={1.8}
+													/>
 												</button>
 												<span className={styles.caption}>
 													{index + 1}/{siblings.length}
@@ -386,26 +489,44 @@ export function AgentPanel({
 													disabled={index === siblings.length - 1 || streaming}
 													onClick={() => go(1)}
 												>
-													<ChevronRight aria-hidden="true" size={14} />
+													<ChevronRight
+														aria-hidden="true"
+														size={14}
+														strokeWidth={1.8}
+													/>
 												</button>
 											</nav>
 										)}
 										{entry.role === 'user' && text && editing !== entry.id && (
-											<button
-												type="button"
-												className={styles.iconButton}
-												aria-label={t('编辑后重新发送')}
-												title={t('编辑后重新发送')}
-												disabled={streaming}
-												onClick={() => setEditing(entry.id)}
-											>
-												<Pencil aria-hidden="true" size={14} />
-											</button>
+											<Tooltip text={t('编辑后重新发送')}>
+												<button
+													type="button"
+													className={styles.iconButton}
+													aria-label={t('编辑后重新发送')}
+													disabled={streaming}
+													onClick={() => setEditing(entry.id)}
+												>
+													<Pencil
+														aria-hidden="true"
+														size={14}
+														strokeWidth={1.8}
+													/>
+												</button>
+											</Tooltip>
 										)}
 									</div>
 								</article>
 							)
 						})}
+					{awaiting && (
+						<article
+							className={styles.message}
+							data-role="assistant"
+							aria-label={t('Agent 回复')}
+						>
+							<StreamingPlaceholder />
+						</article>
+					)}
 					<div ref={end} />
 				</div>
 			</ScrollArea>
@@ -415,9 +536,13 @@ export function AgentPanel({
 				</p>
 			)}
 			<Composer
-				streaming={streaming}
+				streaming={streaming ?? false}
 				sessionId={snapshot?.session.sessionId ?? null}
 				disabled={!chat.loaded}
+				contextLabel={contextLabel}
+				expanded={composerExpanded}
+				onExpandedChange={setComposerExpanded}
+				onDetachContext={() => setDetached(true)}
 				onAttach={chat.attach}
 				onSend={(text, ids) => send(text, ids, snapshot?.headId ?? null)}
 				onStop={() =>
@@ -425,24 +550,43 @@ export function AgentPanel({
 				}
 				onPreview={(src, name) => setPreview({ src, name })}
 			/>
-			{preview && (
-				<dialog
-					ref={dialog}
-					className={styles.preview}
-					aria-label={preview.name}
-					onClose={() => setPreview(undefined)}
-				>
-					<img src={preview.src} alt={preview.name} />
-					<button
-						type="button"
-						className={styles.iconButton}
-						aria-label={t('关闭预览')}
-						onClick={() => dialog.current?.close()}
-					>
-						<X aria-hidden="true" size={16} />
-					</button>
-				</dialog>
-			)}
+			<ConfirmDialog
+				open={Boolean(deleting)}
+				title={t('删除会话')}
+				message={
+					deleting
+						? t('删除「{{title}}」后，这个会话里的消息记录都找不回来了。', {
+								title: deleting.title,
+							})
+						: ''
+				}
+				confirmLabel={t('删除')}
+				danger
+				onConfirm={() => {
+					if (deleting)
+						void chat
+							.remove(deleting.sessionId)
+							.catch(() => chat.setError(t('没能删除')))
+					setDeleting(undefined)
+				}}
+				onCancel={() => setDeleting(undefined)}
+			/>
+			<Modal
+				open={Boolean(preview)}
+				title={preview?.name || t('图片预览')}
+				onClose={() => setPreview(undefined)}
+				width={760}
+			>
+				{preview && (
+					<div className={styles.previewFrame}>
+						<img
+							src={preview.src}
+							alt={preview.name}
+							className={styles.previewImage}
+						/>
+					</div>
+				)}
+			</Modal>
 		</aside>
 	)
 }

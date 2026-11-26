@@ -17,6 +17,7 @@ import {
 	playerWorkId,
 	seedPlayerProject,
 } from '../fixtures/minimal-player'
+import { expectSwitch, setSwitch } from './support/toggle'
 
 const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
@@ -74,7 +75,7 @@ test.describe('M3 player controls', () => {
 			const display = viewport.locator('.nl-text-display')
 			await expect(display).toHaveText('开始')
 			await page.keyboard.press('Escape')
-			await page.getByLabel('跳过已读').check()
+			await setSwitch(page.getByLabel('跳过已读'), true)
 			await page.keyboard.press('Escape')
 			await expect(display).toHaveText('未读自动', { timeout: 3000 })
 			await expect(viewport).toHaveAttribute('data-revealed', '0')
@@ -140,7 +141,7 @@ test.describe('M3 player controls', () => {
 				.getByRole('slider', { name: '自动播放倍率', exact: true })
 				.press('Home')
 			await page.getByRole('button', { name: '返回菜单' }).click()
-			await page.getByLabel('自动播放', { exact: true }).check()
+			await setSwitch(page.getByLabel('自动播放', { exact: true }), true)
 			await page.keyboard.press('Escape')
 			await expect(viewport).toHaveAttribute('data-page', '1')
 			await page.waitForTimeout(3000)
@@ -151,7 +152,7 @@ test.describe('M3 player controls', () => {
 			)
 			await page.keyboard.press('Escape')
 			await page.getByRole('button', { name: '设置', exact: true }).click()
-			await page.getByLabel('瞬间显示').check()
+			await setSwitch(page.getByLabel('瞬间显示'), true)
 			const firstEnd = Number(await viewport.getAttribute('data-revealed'))
 			const pages = Number(await viewport.getAttribute('data-pages'))
 			expect(firstEnd).toBeGreaterThan(50)
@@ -172,7 +173,9 @@ test.describe('M3 player controls', () => {
 			})
 			await page.keyboard.press('Escape')
 			await page.getByRole('button', { name: '快速存档', exact: true }).click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(
+				page.getByRole('status').filter({ hasText: '存档成功' }),
+			).toHaveText('存档成功')
 			await page.keyboard.press('Escape')
 			await page.getByRole('button', { name: '快速读档', exact: true }).click()
 			await expect(display).toHaveText(read)
@@ -193,7 +196,7 @@ test.describe('M3 player controls', () => {
 				})
 			}, read)
 			await page.keyboard.press('Escape')
-			await page.getByLabel('跳过已读').check()
+			await setSwitch(page.getByLabel('跳过已读'), true)
 			await page.keyboard.press('Escape')
 			await expect(display).toHaveText(unread)
 			await expect(page.locator('body')).toHaveAttribute(
@@ -278,26 +281,28 @@ test.describe('M3 player controls', () => {
 				page.getByRole('button', { name: '快速读档', exact: true }),
 			).toBeDisabled()
 			await page.getByRole('button', { name: '快速存档', exact: true }).click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(
+				page.getByRole('status').filter({ hasText: '存档成功' }),
+			).toHaveText('存档成功')
 			await advance()
 			await expect(text()).toHaveText('我在想什么？')
 			await menu()
-			await page.getByLabel('自动播放', { exact: true }).check()
-			await page.getByLabel('跳过已读').check()
+			await setSwitch(page.getByLabel('自动播放', { exact: true }), true)
+			await setSwitch(page.getByLabel('跳过已读'), true)
 			await page.getByRole('button', { name: '快速读档', exact: true }).click()
 			await expect(text()).toHaveText('你好，世界。')
 			await menu()
-			await expect(
-				page.getByLabel('自动播放', { exact: true }),
-			).not.toBeChecked()
-			await expect(page.getByLabel('跳过已读')).not.toBeChecked()
+			await expectSwitch(page.getByLabel('自动播放', { exact: true }), false)
+			await expectSwitch(page.getByLabel('跳过已读'), false)
 			const savePages = page.getByRole('navigation', { name: '存档分页' })
 			await page.getByRole('button', { name: '存档', exact: true }).click()
 			await savePages.getByRole('button', { name: '2', exact: true }).click()
 			await page
 				.getByRole('button', { name: '存档槽位 7', exact: true })
 				.click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(
+				page.getByRole('status').filter({ hasText: '存档成功' }),
+			).toHaveText('存档成功')
 			await menu()
 			await page.getByRole('button', { name: '读档', exact: true }).click()
 			await expect(
@@ -333,7 +338,9 @@ test.describe('M3 player controls', () => {
 			await page
 				.getByRole('button', { name: '存档槽位 1', exact: true })
 				.click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(
+				page.getByRole('status').filter({ hasText: '存档成功' }),
+			).toHaveText('存档成功')
 			await menu()
 			await page.getByRole('button', { name: '读档', exact: true }).click()
 			await expect(
@@ -538,7 +545,9 @@ test.describe('M3 player controls', () => {
 			await expect(text()).toHaveText('你好，世界。')
 			await menu()
 			await page.getByRole('button', { name: '快速存档', exact: true }).click()
-			await expect(page.getByRole('status')).toHaveText('存档成功')
+			await expect(
+				page.getByRole('status').filter({ hasText: '存档成功' }),
+			).toHaveText('存档成功')
 			const savedText = await page.evaluate(
 				async (id) =>
 					(await window.novelive.host.progress?.load(id))?.saves.find(
@@ -766,11 +775,9 @@ test.describe('M3 player controls', () => {
 					await expect(
 						page.getByRole('dialog', { name: '系统菜单' }),
 					).toBeVisible()
-					await page.getByLabel('自动播放', { exact: true }).check()
-					await expect(
-						page.getByLabel('自动播放', { exact: true }),
-					).toBeChecked()
-					await page.getByLabel('自动播放', { exact: true }).uncheck()
+					await setSwitch(page.getByLabel('自动播放', { exact: true }), true)
+					await expectSwitch(page.getByLabel('自动播放', { exact: true }), true)
+					await setSwitch(page.getByLabel('自动播放', { exact: true }), false)
 					await page.keyboard.press('Escape')
 					await expect(page.getByRole('dialog')).toHaveCount(0)
 					await canvas.click({ button: 'right', position: { x: 20, y: 20 } })
@@ -780,7 +787,7 @@ test.describe('M3 player controls', () => {
 					await page
 						.getByRole('slider', { name: '文字速度（毫秒 / 字）', exact: true })
 						.press('End')
-					await page.getByLabel('瞬间显示').check()
+					await setSwitch(page.getByLabel('瞬间显示'), true)
 					await range('自动播放倍率', 2)
 					await page
 						.getByRole('button', { name: '浅色纸笺', exact: true })
@@ -809,7 +816,7 @@ test.describe('M3 player controls', () => {
 					await expect
 						.poll(() => page.evaluate(() => !!document.fullscreenElement))
 						.toBe(true)
-					await expect(page.getByLabel('全屏', { exact: true })).toBeChecked()
+					await expectSwitch(page.getByLabel('全屏', { exact: true }), true)
 					await page.getByLabel('全屏', { exact: true }).click()
 					await expect
 						.poll(() => page.evaluate(() => !!document.fullscreenElement))
@@ -851,11 +858,11 @@ test.describe('M3 player controls', () => {
 						mainline ?? '',
 					)
 					await page.keyboard.press('Escape')
-					await page.getByLabel('跳过已读').check()
+					await setSwitch(page.getByLabel('跳过已读'), true)
 					await page.keyboard.press('Escape')
 					await expect(text).toHaveText('风从窗边吹过。')
 					await page.keyboard.press('Escape')
-					await expect(page.getByLabel('跳过已读')).toBeChecked()
+					await expectSwitch(page.getByLabel('跳过已读'), true)
 					await mkdir('.workflow/evidence/m3-playback', { recursive: true })
 					await page.screenshot({
 						path: '.workflow/evidence/m3-playback/05-controls-menu.png',
@@ -868,7 +875,7 @@ test.describe('M3 player controls', () => {
 					await expect(
 						page.getByRole('button', { name: '在编辑器中打开这里' }),
 					).toBeDisabled()
-					await page.getByLabel('跳过已读').uncheck()
+					await setSwitch(page.getByLabel('跳过已读'), false)
 					await page.getByRole('button', { name: '返回游戏' }).focus()
 					await page.keyboard.press('Shift+Tab')
 					await expect(
@@ -878,9 +885,18 @@ test.describe('M3 player controls', () => {
 					await expect(
 						page.getByRole('button', { name: '返回游戏' }),
 					).toBeFocused()
-					await expect(
-						page.getByRole('button', { name: '在编辑器中打开这里' }),
-					).toHaveAttribute('title', '请先将本地工程关联到作品')
+					const editorOpen = page.getByRole('button', {
+						name: '在编辑器中打开这里',
+					})
+					await expect(editorOpen).not.toHaveAttribute('title', /.+/)
+					const linkHint = page
+						.getByRole('tooltip')
+						.filter({ hasText: '请先将本地工程关联到作品' })
+					await expect(linkHint).toHaveCount(0)
+					await editorOpen.hover()
+					await expect(linkHint).toBeVisible()
+					await page.mouse.move(0, 0)
+					await expect(linkHint).toHaveCount(0)
 					await mkdir(join(directory, 'profile', 'projects'), {
 						recursive: true,
 					})
@@ -940,8 +956,12 @@ test.describe('M3 player controls', () => {
 					)
 				} else {
 					for (let index = 0; index < 6; index++) await advance()
-					await expect(page.getByRole('status')).toContainText('下一章 · 晨光')
-					await expect(page.getByRole('status')).toContainText('制作中')
+					await expect(
+						page.getByRole('status').filter({ hasText: '下一章 · 晨光' }),
+					).toContainText('下一章 · 晨光')
+					await expect(
+						page.getByRole('status').filter({ hasText: '制作中' }),
+					).toContainText('制作中')
 					{
 						using project = await Project.open(root)
 						project.database

@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import styles from './InfoTooltip.module.css'
 
+/** ⓘ 提示：悬停/聚焦/点击触发，外层定位壳与内层 fade-up 动画严格分离（与 Tooltip 同一模式） */
 export function InfoTooltip({ label, text }: { label: string; text: string }) {
 	const id = useId()
 	const trigger = useRef<HTMLButtonElement>(null)
@@ -59,12 +60,12 @@ export function InfoTooltip({ label, text }: { label: string; text: string }) {
 				onBlur={() => setOpen(false)}
 				onClick={() => setOpen(true)}
 			>
-				<Info aria-hidden="true" size={14} />
+				<Info aria-hidden="true" size={14} strokeWidth={1.8} />
 			</button>
 			{open &&
 				createPortal(
-					<span className={styles.tip} ref={tip} id={id} role="tooltip">
-						{text}
+					<span className={styles.tipShell} ref={tip} id={id} role="tooltip">
+						<span className={styles.tipBubble}>{text}</span>
 					</span>,
 					document.body,
 				)}

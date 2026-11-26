@@ -4,9 +4,11 @@ import type {
 	ShareResponse,
 } from '@novelive/creator/contract'
 import { useState } from 'react'
+import { Button } from '../../../components/Button'
+import { Banner, Checkbox, RadioGroup } from '../../../components/Extended'
 import { ShareDialog } from '../../../components/ShareDialog'
-import styles from '../../../components/ShareDialog.module.css'
 import { msg, scoped } from '../../../i18n'
+import local from '../WorkPage.module.css'
 
 const t = scoped('work')
 
@@ -19,12 +21,15 @@ type Warnings = Extract<
 	Extract<ShareResponse, { ok: true }>['result'],
 	{ operation: 'previewExport' }
 >['warnings']
+type Level = Scope['level']
 
-const scopes = [
-	['work', msg('单部作品')],
-	['volume', msg('整卷')],
-	['series', msg('整个系列')],
-] as const
+const scopes: readonly Level[] = ['work', 'volume', 'series']
+
+const scopeLabel = {
+	work: msg('单部作品'),
+	volume: msg('整卷'),
+	series: msg('整个系列'),
+} as const
 
 export function ExportPackage({
 	api,
@@ -32,6 +37,9 @@ export function ExportPackage({
 	projectRoot,
 	volumeId,
 	workId,
+	workTitle,
+	volumeTitle,
+	seriesTitle,
 	onClose,
 }: {
 	onClose?: () => void
@@ -40,9 +48,12 @@ export function ExportPackage({
 	projectRoot: string
 	volumeId: string
 	workId: string
+	workTitle?: string
+	volumeTitle?: string
+	seriesTitle?: string
 }) {
 	const [open, setOpen] = useState(Boolean(onClose))
-	const [level, setLevel] = useState<Scope['level']>('work')
+	const [level, setLevel] = useState<Level>('work')
 	const [includeSource, setIncludeSource] = useState(false)
 	const [warnings, setWarnings] = useState<Warnings>()
 	const [busy, setBusy] = useState(false)
@@ -55,6 +66,11 @@ export function ExportPackage({
 				? { level, volumeId }
 				: { level, volumeId, workId }
 	const selection = { projectRoot, scope, includeSource }
+	const scopeNames: Partial<Record<Level, string>> = {
+		work: workTitle,
+		volume: volumeTitle,
+		series: seriesTitle,
+	}
 
 	function resetReview() {
 		setWarnings(undefined)
@@ -94,9 +110,7 @@ export function ExportPackage({
 	return (
 		<>
 			{!onClose && (
-				<button
-					type="button"
-					className={styles.button}
+				<Button
 					onClick={() => {
 						setLevel('work')
 						setIncludeSource(false)
@@ -106,7 +120,7 @@ export function ExportPackage({
 					}}
 				>
 					{t('导出作品包')}
-				</button>
+				</Button>
 			)}
 			{open && (
 				<ShareDialog
@@ -115,14 +129,13 @@ export function ExportPackage({
 					onClose={onClose ?? (() => setOpen(false))}
 					actions={
 						!versions && (
-							<button
-								type="button"
-								className={styles.primary}
-								disabled={busy}
+							<Button
+								variant="primary"
+								loading={busy}
 								onClick={() => void advance()}
 							>
 								{warnings ? t('导出 .novelive') : t('检查导出内容')}
-							</button>
+							</Button>
 						)
 					}
 				>
@@ -137,49 +150,62 @@ export function ExportPackage({
 						</p>
 					) : (
 						<>
-							<fieldset className={styles.options} disabled={busy}>
-								<legend>{t('导出范围')}</legend>
-								{scopes.map(([value, label]) => (
-									<label key={value}>
-										<input
-											type="radio"
-											name="export-scope"
-											checked={level === value}
-											onChange={() => {
-												setLevel(value)
-												resetReview()
-											}}
-										/>
-										{t(label)}
-									</label>
-								))}
-							</fieldset>
-							<label>
-								<input
-									type="checkbox"
-									checked={includeSource}
+							<div>
+								<div
+									className={`label-caps label-caps-zh ${local.settingsGroup}`}
+								>
+									{t('导出范围')}
+								</div>
+								<RadioGroup
+									value={level}
 									disabled={busy}
-									onChange={(event) => {
-										setIncludeSource(event.target.checked)
+									onChange={(value) => {
+										setLevel(value)
 										resetReview()
 									}}
+									options={scopes.map((value) => ({
+										value,
+										label: (
+											<span>
+												{t(scopeLabel[value])}
+												{scopeNames[value] ? (
+													<span aria-hidden="true">
+														{' · '}
+														<span className={local.exportScopeName}>
+															{scopeNames[value]}
+														</span>
+													</span>
+												) : null}
+											</span>
+										),
+									}))}
 								/>
-								{t('包含原文')}
-							</label>
+							</div>
+							<Checkbox
+								checked={includeSource}
+								disabled={busy}
+								onChange={(checked) => {
+									setIncludeSource(checked)
+									resetReview()
+								}}
+								label={t('包含原文')}
+							/>
 							{warnings &&
 								(warnings.length ? (
-									<div className={styles.notice}>
-										<p>
+									<Banner kind="warning">
+										<span>
 											{t(
 												'以下章节使用了占位图。导出后仍会显示占位图，可以继续导出。',
 											)}
-										</p>
-										<ul>
-											{warnings.map(({ workId, chapterId, title }) => (
-												<li key={`${workId}/${chapterId}`}>{title}</li>
-											))}
-										</ul>
-									</div>
+											<span className={local.exportWarnings}>
+												{warnings.map((warning) => (
+													<span key={`${warning.workId}/${warning.chapterId}`}>
+														{warning.title}
+													</span>
+												))}
+											</span>
+										</span>
+									</Banner>
 								) : !busy ? (
 									<p role="status">{t('检查完成，没有使用占位图的章节。')}</p>
 								) : null)}

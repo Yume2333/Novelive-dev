@@ -1,0 +1,349 @@
+/* 扩展控件库样式 — 全部取 Tokens，不写硬编码颜色 */
+
+/* ---- Banner ---- */
+.banner {
+	display: flex;
+	align-items: center;
+	gap: var(--space-px-10);
+	padding: var(--space-px-11) var(--space-4);
+	border-radius: var(--radius-lg);
+	font-size: 13px;
+	animation: fade-up var(--dur-base) var(--ease-out);
+}
+
+.bannerInfo {
+	background: var(--accent-wash);
+	color: var(--color-on-surface-variant);
+}
+
+.bannerWarning {
+	background: color-mix(in srgb, var(--color-error-container) 55%, transparent);
+	color: var(--color-on-error-container);
+}
+
+.bannerError {
+	background: var(--color-error-container);
+	color: var(--color-on-error-container);
+}
+
+.bannerSuccess {
+	background: var(--color-success-container);
+	color: var(--color-success);
+}
+
+.bannerBody {
+	flex: 1;
+	min-width: 0;
+}
+
+/* ---- Tooltip：外层定位壳与内层入场动画严格分离 ---- */
+.tipShell {
+	position: fixed;
+	z-index: 200;
+	transform: translate(-50%, -100%);
+	pointer-events: none;
+}
+
+.tipShell[data-below="true"] {
+	transform: translate(-50%, 0);
+}
+
+.tipBubble {
+	display: block;
+	max-width: calc(100vw - var(--space-5));
+	padding: var(--space-px-5) var(--space-px-10);
+	border-radius: var(--radius-md);
+	background: var(--color-primary);
+	box-shadow: var(--shadow-pop);
+	color: var(--color-on-primary);
+	font-size: 12px;
+	white-space: nowrap;
+	animation: fade-up var(--dur-fast) var(--ease-out);
+}
+
+/* ---- Checkbox / RadioGroup ---- */
+.checkLabel {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.checkLabelDisabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.checkInput {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	opacity: 0;
+	cursor: inherit;
+}
+
+.checkBox {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	border: 1px solid var(--color-outline-variant);
+	border-radius: var(--radius-sm);
+	background: var(--white-60);
+	transition: all var(--dur-fast) var(--ease-out);
+}
+
+.checkBoxActive {
+	border-color: var(--color-primary);
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+}
+
+.radioGroup {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-px-14);
+}
+
+.radioBox {
+	box-sizing: border-box;
+	display: inline-flex;
+	flex-shrink: 0;
+	width: 17px;
+	height: 17px;
+	border: 1px solid var(--color-outline-variant);
+	border-radius: var(--radius-full);
+	background: var(--white-60);
+	transition: all var(--dur-fast) var(--ease-out);
+}
+
+.radioBoxActive {
+	border: 5px solid var(--color-primary);
+}
+
+/* ---- Slider ---- */
+.slider {
+	display: flex;
+	align-items: center;
+	gap: var(--space-3);
+	width: 100%;
+}
+
+.sliderInput {
+	flex: 1;
+	height: 4px;
+	accent-color: var(--color-primary);
+}
+
+.slider .sliderReadout {
+	min-width: 52px;
+	color: var(--color-primary);
+	text-align: right;
+	text-transform: none;
+}
+
+/* ---- SearchInput ---- */
+.search {
+	position: relative;
+	width: 100%;
+}
+
+.searchIcon {
+	position: absolute;
+	top: 50%;
+	left: var(--space-px-11);
+	transform: translateY(-50%);
+	color: var(--color-outline);
+	pointer-events: none;
+}
+
+.searchInput {
+	width: 100%;
+	padding: var(--space-px-9) 34px;
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-md);
+	background: var(--white-60);
+	color: var(--color-on-surface);
+	font-size: 13px;
+}
+
+.searchClear {
+	position: absolute;
+	top: 50%;
+	right: var(--space-2);
+	transform: translateY(-50%);
+}
+
+/* ---- Skeleton ---- */
+.skeleton {
+	display: block;
+	background: linear-gradient(
+		90deg,
+		var(--color-surface-container) 25%,
+		var(--color-surface-container-high) 50%,
+		var(--color-surface-container) 75%
+	);
+	background-size: 200% 100%;
+	animation: skeleton-wave 1.4s ease infinite;
+}
+
+/* ---- Stepper ---- */
+.stepper {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.stepperItem {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.step {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-px-7) var(--space-px-14);
+	border: 1px solid var(--white-60);
+	border-radius: var(--radius-md);
+	transition: all var(--dur-base) var(--ease-out);
+}
+
+.stepCurrent {
+	background: var(--color-primary);
+	color: var(--color-on-primary);
+}
+
+.stepPassed {
+	background: var(--accent-wash);
+	color: var(--color-primary);
+}
+
+.stepFuture {
+	background: var(--white-50);
+	color: var(--color-outline);
+}
+
+.stepIndex {
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.connector {
+	width: 24px;
+	height: 1px;
+	background: var(--color-outline-variant);
+	transition: background var(--dur-base) var(--ease-out);
+}
+
+.connectorPassed {
+	background: var(--color-primary);
+}
+
+/* ---- Drawer ---- */
+.drawerRoot {
+	position: fixed;
+	z-index: 100;
+	inset: 0;
+}
+
+.drawerScrim {
+	position: absolute;
+	inset: 0;
+	padding: 0;
+	border: 0;
+	background: var(--scrim);
+	cursor: default;
+}
+
+.drawerScrimEnter {
+	animation: scrim-in var(--dur-fast) var(--ease-out) forwards;
+}
+
+.drawerScrimExit {
+	animation: scrim-out var(--dur-fast) var(--ease-out) forwards;
+}
+
+.drawer {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	flex-direction: column;
+	max-width: 90vw;
+	border-radius: var(--radius-2xl) 0 0 var(--radius-2xl);
+	background: var(--veil-95);
+}
+
+.drawerEnter {
+	animation: drawer-in var(--dur-base) var(--ease-out) forwards;
+}
+
+.drawerExit {
+	animation: drawer-out var(--dur-base) var(--ease-out) forwards;
+}
+
+.drawerHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-px-18) var(--space-px-20) var(--space-px-10);
+}
+
+.drawerHeader .drawerTitle {
+	font-size: 17px;
+}
+
+/* ---- ConfirmDialog ---- */
+.confirmMessage {
+	color: var(--color-on-surface-variant);
+	font-size: 14px;
+	line-height: 1.7;
+}
+
+/* ---- Pagination ---- */
+.pagination {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.pageButton {
+	display: flex;
+	padding: var(--space-px-6);
+	border: none;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	cursor: pointer;
+}
+
+.pageButton:disabled {
+	color: var(--color-outline-variant);
+	cursor: default;
+}
+
+.pageReadout {
+	color: var(--color-on-surface-variant);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.banner,
+	.tipBubble,
+	.skeleton,
+	.drawerScrimEnter,
+	.drawerScrimExit,
+	.drawerEnter,
+	.drawerExit {
+		animation: none;
+	}
+}

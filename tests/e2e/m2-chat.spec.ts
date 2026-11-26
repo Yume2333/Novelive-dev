@@ -340,7 +340,7 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 				sessionId: 'keeper',
 				headId: 'a1',
 			})
-			await panel.getByRole('button', { name: /read_bible/ }).click()
+			await panel.getByRole('button', { name: /读取设定集/ }).click()
 			await expect(panel.getByText('"field": "年龄"')).toBeVisible()
 			await expect(panel.getByText('"来源": "第一章"')).toBeVisible()
 			await expect(panel.getByText('核对第二章称呼')).toBeVisible()

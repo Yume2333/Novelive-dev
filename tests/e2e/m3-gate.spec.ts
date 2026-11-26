@@ -11,6 +11,7 @@ import {
 	playerWorkId,
 	seedPlayerProject,
 } from '../fixtures/minimal-player'
+import { expectSwitch, setSwitch } from './support/toggle'
 
 const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
@@ -103,7 +104,7 @@ listener (inner): 演出已经清除。 #0002
 		)
 		await mkdir(evidence, { recursive: true })
 
-		async function launch(published: number) {
+		async function launch() {
 			const start = performance.now()
 			const app = await electron.launch({
 				executablePath: packaged || require('electron'),
@@ -131,9 +132,7 @@ listener (inner): 演出已经清除。 #0002
 					)
 				await expect(page.getByRole('alert')).toHaveText('有 1 部作品无法读取')
 				const work = page.getByRole('link', { name: '黄昏', exact: true })
-				await expect(work).toHaveAccessibleDescription(
-					`已发布 ${published} / 2 章`,
-				)
+				await expect(work).toHaveAccessibleDescription('全部 2 章已发布')
 				await work.click()
 				await page.getByRole('link', { name: '游玩', exact: true }).click()
 				return { app, page }
@@ -142,7 +141,7 @@ listener (inner): 演出已经清除。 #0002
 				throw error
 			}
 		}
-		const { app, page } = await launch(1)
+		const { app, page } = await launch()
 		try {
 			const player = page.getByRole('main', { name: '播放器' })
 			const viewport = player.locator('.nl-player-text')
@@ -193,7 +192,7 @@ listener (inner): 演出已经清除。 #0002
 			await expect(viewport).toHaveAttribute('data-revealed', '1')
 			await idle()
 			await settings()
-			await instant.check()
+			await setSwitch(instant, true)
 			await page.keyboard.press('Escape')
 			await expect
 				.poll(async () => Number(await viewport.getAttribute('data-revealed')))
@@ -201,9 +200,9 @@ listener (inner): 演出已经清除。 #0002
 			await advance()
 			await expect(viewport).toHaveAttribute('data-page', '2')
 			await settings()
-			await instant.uncheck()
+			await setSwitch(instant, false)
 			await expect(viewport).toHaveAttribute('data-page', '1')
-			await instant.check()
+			await setSwitch(instant, true)
 			await page.keyboard.press('Escape')
 
 			for (const [ratio, width, height] of [
@@ -279,7 +278,7 @@ listener (inner): 演出已经清除。 #0002
 			await status('读档完成')
 			await expect(viewport).toHaveAttribute('data-page', '1')
 			await page.keyboard.press('Escape')
-			await page.getByLabel('跳过已读').check()
+			await setSwitch(page.getByLabel('跳过已读'), true)
 			await page.keyboard.press('Escape')
 			const wait = player
 				.getByRole('status')
@@ -319,7 +318,7 @@ listener (inner): 演出已经清除。 #0002
 		} finally {
 			await app.close()
 		}
-		const restarted = await launch(2)
+		const restarted = await launch()
 		try {
 			await expect(restarted.page.locator('.nl-text-display')).toHaveText(
 				'晨光来了。',
@@ -328,7 +327,7 @@ listener (inner): 演出已经清除。 #0002
 			await restarted.page
 				.getByRole('button', { name: '设置', exact: true })
 				.click()
-			await expect(restarted.page.getByLabel('瞬间显示')).not.toBeChecked()
+			await expectSwitch(restarted.page.getByLabel('瞬间显示'), false)
 		} finally {
 			await restarted.app.close()
 		}

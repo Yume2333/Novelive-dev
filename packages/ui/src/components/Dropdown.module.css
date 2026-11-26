@@ -5,7 +5,14 @@
 	padding: var(--space-px-6);
 	border-radius: var(--radius-lg);
 	background: var(--veil-95);
-	animation: fade-up var(--dur-fast) var(--ease-out);
+}
+
+.menu[data-state="enter"] {
+	animation: fade-up var(--dur-fast) var(--ease-out) forwards;
+}
+
+.menu[data-state="exit"] {
+	animation: fade-down-out 130ms var(--ease-out) forwards;
 }
 
 .item {

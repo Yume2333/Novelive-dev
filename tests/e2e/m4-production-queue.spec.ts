@@ -68,11 +68,24 @@ test('M4 global production drawer shows paused rows, refetches and reorders a se
 		const drawer = page.getByRole('dialog', { name: '制作队列' })
 		await expect(drawer.getByText('异常退出后已暂停')).toHaveCount(2)
 		await expect(drawer.getByRole('link', { name: '排队甲' })).toBeVisible()
-		const first = drawer
-			.getByRole('listitem')
-			.filter({ has: page.getByRole('link', { name: '排队甲' }) })
-		await first.hover()
-		await first.getByRole('button', { name: '继续制作' }).click()
+		// The first resumable paused work's continue is the drawer's full-width
+		// top action instead of a per-row button; which work is promoted depends
+		// on the backend's inactive ordering, so resolve the control per row.
+		const continueWork = async (title: string) => {
+			const row = drawer
+				.getByRole('listitem')
+				.filter({ has: page.getByRole('link', { name: title }) })
+			const perRow = row.getByRole('button', { name: '继续制作' })
+			if (await perRow.count()) {
+				await perRow.click()
+				return
+			}
+			await drawer
+				.getByRole('button', { name: '继续制作', exact: true })
+				.first()
+				.click()
+		}
+		await continueWork('排队甲')
 		await expect(drawer.getByRole('alert')).toHaveText(
 			'模型配置无效，请在设置中检查接口地址、API Key、模型名和上下文长度。',
 		)
@@ -80,11 +93,7 @@ test('M4 global production drawer shows paused rows, refetches and reorders a se
 			(patch) => window.novelive.call('config.update', patch).promise,
 			configuration,
 		)
-		const sequel = drawer
-			.getByRole('listitem')
-			.filter({ has: page.getByRole('link', { name: '排队乙' }) })
-		await sequel.hover()
-		await sequel.getByRole('button', { name: '继续制作' }).click()
+		await continueWork('排队乙')
 		await expect(drawer.getByRole('alert')).toHaveText(
 			'请先继续制作前卷：排队甲',
 		)
@@ -111,7 +120,10 @@ test('M4 global production drawer shows paused rows, refetches and reorders a se
 			.toBeGreaterThan(before.generation)
 		await expect(drawer.getByText('异常退出后已暂停')).toHaveCount(1)
 		await expect(drawer.getByText('已暂停', { exact: true })).toHaveCount(1)
-		await page.getByRole('button', { name: '关闭制作队列' }).click()
+		await page
+			.getByRole('dialog', { name: '制作队列' })
+			.getByRole('button', { name: '关闭', exact: true })
+			.click()
 		for (const workId of works)
 			await page.evaluate(
 				(workId) => window.novelive.call('production.get', { workId }).promise,
@@ -126,7 +138,6 @@ test('M4 global production drawer shows paused rows, refetches and reorders a se
 		await page.getByRole('button', { name: /全局制作状态/ }).click()
 		const queued = drawer.getByRole('list', { name: '排队中' })
 		await expect(queued.getByRole('link')).toHaveText(['排队甲', '排队乙'])
-		await queued.getByRole('listitem').nth(1).hover()
 		await drawer.getByRole('button', { name: '提前：排队乙' }).click()
 		await expect(queued.getByRole('link')).toHaveText(['排队乙', '排队甲'])
 		const order = await page.evaluate(

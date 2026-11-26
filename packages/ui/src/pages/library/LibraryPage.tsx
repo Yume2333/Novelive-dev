@@ -1,15 +1,31 @@
-import type { CommandOutput } from '@novelive/creator/contract'
 import {
-	CheckCircle2,
-	Clock,
+	type CommandOutput,
+	installedProgressKey,
+	productionQueueEvent,
+} from '@novelive/creator/contract'
+import {
+	BookMarked,
+	BookOpen,
+	CircleAlert,
+	CircleCheck,
+	Clapperboard,
 	LibraryBig,
 	NotebookPen,
+	Palette,
+	Play,
 	PlayCircle,
 	Plus,
+	Upload,
 } from 'lucide-react'
-import { type ReactNode, useEffect, useState } from 'react'
-import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
-import { ProgressBar } from '../../components/Card'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import {
+	Link,
+	useNavigate,
+	useOutletContext,
+	useSearchParams,
+} from 'react-router-dom'
+import { Button } from '../../components/Button'
+import { Card, Chip, ProgressBar } from '../../components/Card'
 import { GradientCover } from '../../components/GradientCover'
 import { EmptyState, Page, PageAction } from '../../components/Page'
 import { Tabs, tabPanel } from '../../components/Tabs'
@@ -22,6 +38,7 @@ import { ImportPackage } from './share/ImportPackage'
 const t = scoped('library')
 
 type Tab = 'projects' | 'imported'
+type Queue = CommandOutput<'production.getQueue'>
 
 interface Group {
 	key: string
@@ -73,45 +90,182 @@ function groupWorks(works: LibraryWork[]) {
 	return groups
 }
 
+/** 队列里一部作品的状态：确认点、暂停（需要处理）、制作中或已完成。 */
+type QueueState =
+	| { kind: 'confirm-visual' | 'confirm-first' }
+	| { kind: 'attention' }
+	| { kind: 'producing' }
+	| { kind: 'done' }
+
+function queueState(
+	queue: Queue | undefined,
+	workId: string,
+): QueueState | null {
+	if (!queue) return null
+	if (queue.active?.link.workId === workId) return { kind: 'producing' }
+	if (queue.queued.some((work) => work.link.workId === workId))
+		return { kind: 'producing' }
+	for (const work of queue.inactive) {
+		if (work.link.workId !== workId) continue
+		if (work.status === 'awaiting_confirm')
+			return {
+				kind:
+					work.reason === 'confirm_visual' ? 'confirm-visual' : 'confirm-first',
+			}
+		if (work.status === 'paused')
+			return work.reason === 'stopped' || work.reason === 'crashed'
+				? null
+				: { kind: 'attention' }
+		if (work.status === 'done') return { kind: 'done' }
+	}
+	return null
+}
+
+interface ReadingProgress {
+	read: number
+	total: number
+}
+
+function statusLine({
+	state,
+	published,
+	chapters,
+	imported,
+}: {
+	state: QueueState | null
+	published: number
+	chapters: number
+	imported?: boolean
+}) {
+	const counts = { published, chapters }
+	if (imported)
+		return {
+			text: t('共 {{chapters}} 章', { chapters }),
+			icon: BookOpen,
+			tone: 'quiet' as const,
+		}
+	if (state?.kind === 'confirm-visual')
+		return {
+			text: t('等你确认角色设定'),
+			icon: Palette,
+			tone: 'attention' as const,
+		}
+	if (state?.kind === 'confirm-first')
+		return {
+			text: t('第一章等你过目'),
+			icon: Play,
+			tone: 'attention' as const,
+		}
+	if (state?.kind === 'attention')
+		return {
+			text: t('已发布 {{published}} / {{chapters}} 章 · 需要处理', counts),
+			icon: CircleAlert,
+			tone: 'attention' as const,
+		}
+	if (state?.kind === 'done' || (chapters > 0 && published === chapters))
+		return {
+			text: t('全部 {{chapters}} 章已发布', { chapters }),
+			icon: CircleCheck,
+			tone: 'done' as const,
+		}
+	if (chapters === 0)
+		return {
+			text: t('全书预览中'),
+			icon: BookOpen,
+			tone: 'quiet' as const,
+		}
+	return {
+		text: t('已发布 {{published}} / {{chapters}} 章', counts),
+		icon: state?.kind === 'producing' ? Clapperboard : BookOpen,
+		tone: 'quiet' as const,
+	}
+}
+
 function WorkCard({
 	id,
 	title,
 	to,
-	status,
-	icon: Icon,
 	published,
 	chapters,
-	meta,
+	state,
+	reading,
+	badge,
+	imported,
 }: {
 	id: string
 	title: string
 	to?: string
-	status: string
-	icon: typeof Clock
 	published: number
 	chapters: number
-	meta?: ReactNode
+	state?: QueueState | null
+	reading?: ReadingProgress
+	badge?: ReactNode
+	imported?: boolean
 }) {
+	const line = statusLine({
+		state: state ?? null,
+		published,
+		chapters,
+		imported,
+	})
+	const Icon = line.icon
+	const producing = state?.kind === 'producing'
+	const showProduction = !imported && chapters > 0 && (!reading || producing)
 	const body = (
 		<>
 			<span className={`cover-tilt ${styles.cover}`}>
 				<GradientCover seed={id} compact />
 			</span>
 			<span className={styles.cardBody}>
-				<strong className={`headline ${styles.title}`} id={`work-title-${id}`}>
-					{title}
-				</strong>
-				<span className={styles.status} id={`work-progress-${id}`}>
-					<Icon aria-hidden="true" size={12} strokeWidth={2} />
-					{status}
-				</span>
-				<span className={styles.progressRow}>
-					<ProgressBar value={chapters ? published / chapters : 0} height={5} />
-					<span>
-						{published}/{chapters}
+				<span className={styles.cardHead}>
+					<span className={styles.cardTitles}>
+						<strong
+							className={`headline ${styles.title}`}
+							id={`work-title-${id}`}
+						>
+							{title}
+						</strong>
 					</span>
+					{badge ? <span className={styles.cardBadge}>{badge}</span> : null}
 				</span>
-				{meta}
+				<div className={styles.cardFoot}>
+					<span
+						className={`${styles.status} ${
+							line.tone === 'attention'
+								? styles.statusAttention
+								: line.tone === 'done'
+									? styles.statusDone
+									: styles.statusQuiet
+						}`}
+						id={`work-progress-${id}`}
+					>
+						<Icon aria-hidden="true" size={14} strokeWidth={1.8} />
+						{line.text}
+					</span>
+					{showProduction ? (
+						<ProgressBar
+							value={chapters ? published / chapters : 0}
+							height={5}
+							active={producing}
+						/>
+					) : null}
+					{reading && !producing ? (
+						<>
+							<ProgressBar value={reading.read / reading.total} height={5} />
+							<span className={styles.readingCaption}>
+								<span>
+									{t('已读 {{read}} / {{total}} 章', {
+										read: reading.read,
+										total: reading.total,
+									})}
+								</span>
+								<span className={styles.readingPercent}>
+									{Math.round((reading.read / reading.total) * 100)}%
+								</span>
+							</span>
+						</>
+					) : null}
+				</div>
 			</span>
 		</>
 	)
@@ -129,6 +283,11 @@ function WorkCard({
 	)
 }
 
+const emptyLibrary: CommandOutput<'library.list'> = {
+	works: [],
+	unreadableCount: 0,
+}
+
 export function LibraryPage() {
 	const { refreshLibrary } = useOutletContext<{ refreshLibrary(): void }>()
 	const [loaded, setLibrary] = useState<CommandOutput<'library.list'>>()
@@ -138,11 +297,16 @@ export function LibraryPage() {
 	const [tab, setTab] = useState<Tab>(
 		searchParams.get('tab') === 'imported' ? 'imported' : 'projects',
 	)
+	const navigate = useNavigate()
 	const share = window.novelive.host.share
 	const installed = window.novelive.host.installed
+	const progressApi = window.novelive.host.progress
 	const [packages, setPackages] = useState<
 		Awaited<ReturnType<NonNullable<typeof installed>['list']>>
 	>([])
+	const [queue, setQueue] = useState<Queue>()
+	const [reading, setReading] = useState<Record<string, ReadingProgress>>({})
+	const importInspect = useRef<(() => void) | null>(null)
 
 	useEffect(() => {
 		void revision
@@ -205,10 +369,87 @@ export function LibraryPage() {
 			active = false
 		}
 	}, [revision, installed])
+	useEffect(() => {
+		void revision
+		let active = true
+		let revisionNow = 0
+		const load = () => {
+			const current = ++revisionNow
+			void window.novelive.call('production.getQueue', {}).promise.then(
+				(next) => {
+					if (active && current === revisionNow) setQueue(next)
+				},
+				() => {},
+			)
+		}
+		const offEvent = window.novelive.on('event', (envelope) => {
+			if (
+				envelope.scope !== 'app' ||
+				!productionQueueEvent.check(envelope.event)
+			)
+				return
+			revisionNow++
+			setQueue(envelope.event.payload)
+		})
+		const offReady = window.novelive.on('creator.ready', load)
+		const offDown = window.novelive.on('creator.down', () => {
+			revisionNow++
+			setQueue(undefined)
+		})
+		void window.novelive.host.appState().then((state) => {
+			if (active && revisionNow === 0 && state.creator === 'ready') load()
+		})
+		return () => {
+			active = false
+			offEvent()
+			offReady()
+			offDown()
+		}
+	}, [revision])
 
-	const library =
-		loaded ??
-		(packages.length > 0 ? { works: [], unreadableCount: 0 } : undefined)
+	const library = loaded ?? (packages.length > 0 ? emptyLibrary : undefined)
+
+	useEffect(() => {
+		if (!progressApi || !library) return
+		let active = true
+		const keys: { key: string; total: number }[] = []
+		for (const work of library.works)
+			keys.push({ key: work.workId, total: work.published })
+		for (const pack of packages)
+			keys.push({
+				key: installedProgressKey(pack.workId, pack.version),
+				total: pack.published,
+			})
+		void Promise.allSettled(
+			keys.map(({ key, total }) =>
+				progressApi.load(key).then((progress) => ({ key, total, progress })),
+			),
+		).then((results) => {
+			if (!active) return
+			const next: Record<string, ReadingProgress> = {}
+			for (const result of results) {
+				if (result.status !== 'fulfilled' || !result.value.progress) continue
+				const { key, total, progress } = result.value
+				if (!total) continue
+				const chapters = new Set(
+					progress.read.map((sentence) => sentence.chapterId),
+				)
+				if (progress.mainline) chapters.add(progress.mainline.chapterId)
+				const read = Math.min(chapters.size, total)
+				if (read > 0) next[key] = { read, total }
+			}
+			setReading(next)
+		})
+		return () => {
+			active = false
+		}
+	}, [progressApi, library, packages])
+
+	const empty =
+		library !== undefined &&
+		library.works.length === 0 &&
+		library.unreadableCount === 0 &&
+		packages.length === 0
 
 	return (
 		<Page
@@ -227,11 +468,15 @@ export function LibraryPage() {
 								refreshLibrary()
 								setTab('imported')
 							}}
+							inspectRef={importInspect}
+							hideTrigger={empty}
 						/>
 					)}
-					<PageAction icon={Plus} to={productionRoutes.import}>
-						{t('新建工程')}
-					</PageAction>
+					{!empty && (
+						<PageAction icon={Plus} to={productionRoutes.import}>
+							{t('新建工程')}
+						</PageAction>
+					)}
 				</div>
 			}
 		>
@@ -242,17 +487,37 @@ export function LibraryPage() {
 			) : library.works.length === 0 &&
 				library.unreadableCount === 0 &&
 				packages.length === 0 ? (
-				<EmptyState
-					icon={LibraryBig}
-					title={t('书库还是空的')}
-					text={t('导入一部小说原文，Novelive 会把它做成可以游玩的视觉小说。')}
-					card
-					actions={
-						<Link className="nl-btn nl-btn-ghost" to="/welcome">
-							{t('开始引导')}
-						</Link>
-					}
-				/>
+				<Card>
+					<EmptyState
+						icon={LibraryBig}
+						title={t('书库还是空的')}
+						text={t('新建工程开始改编小说，或导入 .novelive 作品包直接游玩')}
+						actions={
+							<>
+								<PageAction icon={Plus} to={productionRoutes.import}>
+									{t('新建工程')}
+								</PageAction>
+								{share && (
+									<Button
+										icon={Upload}
+										onClick={() => importInspect.current?.()}
+									>
+										{t('导入作品包')}
+									</Button>
+								)}
+							</>
+						}
+					/>
+					<div className={styles.emptyGuide}>
+						<button
+							type="button"
+							className="label-caps label-caps-zh"
+							onClick={() => navigate('/welcome')}
+						>
+							{t('重看首次引导')} →
+						</button>
+					</div>
+				</Card>
 			) : (
 				<>
 					<div className={styles.tabs}>
@@ -294,8 +559,13 @@ export function LibraryPage() {
 											<h2
 												className={`label-caps label-caps-zh ${styles.groupTitle}`}
 											>
+												<BookMarked
+													aria-hidden="true"
+													size={15}
+													strokeWidth={1.8}
+												/>
 												{group.title}
-												<span className={styles.groupPath}>{group.key}</span>
+												<span className={styles.groupPath}>· {group.key}</span>
 											</h2>
 										)}
 										{group.volumes.map((volume) => (
@@ -305,29 +575,29 @@ export function LibraryPage() {
 												)}
 												<ul className={styles.grid}>
 													{volume.works.map(
-														({ workId, title, published, chapters }) => (
-															<li key={workId}>
-																<WorkCard
-																	id={workId}
-																	title={title}
-																	to={workRoute('work', workId)}
-																	icon={
-																		published === chapters && chapters
-																			? CheckCircle2
-																			: Clock
-																	}
-																	status={t(
-																		'已发布 {{published}} / {{chapters}} 章',
-																		{
-																			published,
-																			chapters,
-																		},
-																	)}
-																	published={published}
-																	chapters={chapters}
-																/>
-															</li>
-														),
+														({ workId, title, published, chapters }) => {
+															const state = queueState(queue, workId)
+															return (
+																<li key={workId}>
+																	<WorkCard
+																		id={workId}
+																		title={title}
+																		to={workRoute('work', workId)}
+																		published={published}
+																		chapters={chapters}
+																		state={state}
+																		reading={reading[workId]}
+																		badge={
+																			state?.kind === 'confirm-visual' ? (
+																				<Chip active>{t('确认点 1')}</Chip>
+																			) : state?.kind === 'confirm-first' ? (
+																				<Chip active>{t('确认点 2')}</Chip>
+																			) : undefined
+																		}
+																	/>
+																</li>
+															)
+														},
 													)}
 												</ul>
 											</div>
@@ -360,17 +630,13 @@ export function LibraryPage() {
 															? `/package/${workId}/${version}`
 															: undefined
 													}
-													icon={PlayCircle}
-													status={t(
-														'v{{version}} · 已发布 {{published}} / {{chapters}} 章',
-														{
-															version,
-															published,
-															chapters,
-														},
-													)}
 													published={published}
 													chapters={chapters}
+													reading={
+														reading[installedProgressKey(workId, version)]
+													}
+													badge={<Chip>v{version}</Chip>}
+													imported
 												/>
 											</li>
 										),

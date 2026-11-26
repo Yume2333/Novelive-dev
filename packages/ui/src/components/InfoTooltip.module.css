@@ -18,20 +18,33 @@
 	box-shadow: var(--shadow-focus);
 }
 
-.tip {
+/* 外层定位壳：只负责 fixed 定位与 translate，不做位移动画 */
+.tipShell {
 	position: fixed;
 	z-index: 200;
-	max-width: calc(100vw - var(--space-5));
-	padding: var(--space-1) var(--space-2);
 	transform: translate(-50%, -100%);
+	pointer-events: none;
+}
+
+.tipShell[data-below="true"] {
+	transform: translate(-50%, 0);
+}
+
+/* 内层气泡：fade-up 入场动画 */
+.tipBubble {
+	display: block;
+	max-width: calc(100vw - var(--space-5));
+	padding: var(--space-px-5) var(--space-px-10);
 	border-radius: var(--radius-md);
 	background: var(--color-primary);
 	box-shadow: var(--shadow-pop);
 	color: var(--color-on-primary);
 	font-size: 12px;
-	pointer-events: none;
+	animation: fade-up var(--dur-fast) var(--ease-out);
 }
 
-.tip[data-below="true"] {
-	transform: translateX(-50%);
+@media (prefers-reduced-motion: reduce) {
+	.tipBubble {
+		animation: none;
+	}
 }

@@ -1033,17 +1033,26 @@ test('M3 stage directions render the direction set and four landscape fill crops
 					await page.screenshot({ path: `${evidence}/stage-${label}.png` })
 				if (label === '合成基准') {
 					panelWithoutParticles = await panelPixels()
-					expect(
-						panelWithoutParticles.every(
-							(value, i, pixels) => value === pixels[i % 3],
-						),
-					).toBe(true)
+					// 柔边对话框是对舞台的实时半透明渐变复合（原型设计），
+					// 面板颜色随高度渐变，不可能在整面上逐像素同色；
+					// 静态场景下面板必须逐帧稳定——任何合成噪声、
+					// 动画渗漏或错位都会破坏逐字节一致。
+					expect((await panelPixels()).equals(panelWithoutParticles)).toBe(true)
 				}
 				if (label === '合成演出') {
-					for (let frame = 0; frame < 3; frame++)
-						expect((await panelPixels()).equals(panelWithoutParticles)).toBe(
-							true,
-						)
+					// 粒子按设计会透过渐变上缘微弱显影，逐像素不变已不再成立；
+					// 但 scrim 必须把粒子压成稀疏微弱的显影——偏离基线超过 8 的
+					// 采样点不得超过 2%（实测约 0.4%，若 scrim 丢失或粒子层
+					// 错误地盖到对话框上方，偏离采样会成片出现）。
+					for (let frame = 0; frame < 3; frame++) {
+						const current = await panelPixels()
+						expect(current.length).toBe(panelWithoutParticles.length)
+						let deviating = 0
+						for (let i = 0; i < current.length; i++)
+							if (Math.abs(current[i] - panelWithoutParticles[i]) > 8)
+								deviating++
+						expect(deviating / current.length).toBeLessThan(0.02)
+					}
 					await page.screenshot({ path: `${evidence}/stage-composite.png` })
 				}
 				if (label === '空场')

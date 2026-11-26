@@ -201,6 +201,13 @@ test('prototype sidebar switches from a project to an installed work', async () 
 			await expect(sidebar.getByText('工程作品', { exact: true })).toBeVisible()
 			await sidebar.getByRole('button', { name: '换一部作品' }).click()
 			await page.getByRole('menuitem', { name: '导入的作品包 · v3' }).click()
+			await expect(page).toHaveURL(new RegExp(`#/package/${packageWorkId}/3$`))
+			// Package selection in the switcher now navigates straight into the
+			// player (task 02); returning to the library must surface the package
+			// as the sidebar's recent work.
+			await page.evaluate(() => {
+				location.hash = '/'
+			})
 			await expect(page).toHaveURL(/#\/$/)
 			const play = page
 				.getByRole('navigation', { name: '作品导航' })
@@ -679,7 +686,7 @@ test('agent drawer captures matched-viewport parity evidence', async () => {
 				.getByRole('navigation', { name: '分支' })
 				.getByRole('button', { name: '上一个分支' })
 				.click()
-			await panel.getByRole('button', { name: /read_bible/ }).click()
+			await panel.getByRole('button', { name: /读取设定集/ }).click()
 			await expect(panel.getByText('"field": "年龄"')).toBeVisible()
 			for (const theme of ['light', 'dark'] as const) {
 				await page.evaluate((value) => {

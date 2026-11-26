@@ -1,0 +1,639 @@
+/* MessageView 专属样式 — 全部取 Tokens，不写硬编码颜色 */
+
+/* ---- 通用玻璃卡片（工具卡 / 子任务卡） ---- */
+.glassCard {
+	overflow: hidden;
+	border-radius: var(--radius-lg);
+}
+
+.cardHead {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	width: 100%;
+	padding: var(--space-2) var(--space-3);
+	color: var(--color-on-surface);
+	text-align: start;
+	cursor: pointer;
+}
+
+.cardHead[data-static="true"] {
+	cursor: default;
+}
+
+.statusIcon {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: 15px;
+	height: 15px;
+	color: var(--color-primary);
+}
+
+.statusIcon[data-tone="success"] {
+	color: var(--color-success);
+}
+
+.statusIcon[data-tone="error"] {
+	color: var(--color-error);
+}
+
+.statusIcon[data-tone="muted"] {
+	color: var(--color-outline);
+}
+
+.cardTitle {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	font-size: 12.5px;
+	font-weight: 600;
+}
+
+.statusLabel {
+	flex-shrink: 0;
+	font-size: 10px;
+	color: var(--color-outline);
+}
+
+.statusLabel[data-tone="error"] {
+	color: var(--color-error);
+}
+
+.chevron {
+	display: inline-flex;
+	flex-shrink: 0;
+	color: var(--color-outline);
+}
+
+/* ---- 工具卡正文 ---- */
+.toolBody {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	padding: 0 var(--space-3) var(--space-px-10);
+}
+
+.toolId {
+	align-self: flex-start;
+	color: var(--color-outline);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	line-height: 1.6;
+}
+
+.kvRow {
+	display: flex;
+	gap: var(--space-2);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.kvLabel {
+	flex-shrink: 0;
+	color: var(--color-outline);
+}
+
+.kvValue {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	color: var(--color-on-surface-variant);
+}
+
+.checkRow {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-px-6);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.checkIcon {
+	flex-shrink: 0;
+	margin-top: var(--space-px-2);
+	color: var(--color-success);
+}
+
+.checkIcon[data-pass="false"] {
+	color: var(--color-error);
+}
+
+.checkNote {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	color: var(--color-on-surface-variant);
+}
+
+.checkNote[data-pass="false"] {
+	color: var(--color-on-error-container);
+}
+
+.errorCallout {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-px-6);
+	padding: var(--space-px-7) var(--space-2);
+	border-radius: var(--radius-md);
+	background: var(--color-error-container);
+	color: var(--color-on-error-container);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.errorCallout svg {
+	flex-shrink: 0;
+	margin-top: var(--space-px-2);
+}
+
+.errorText {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+
+.resultText {
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.6;
+	overflow-wrap: anywhere;
+	color: var(--color-on-surface-variant);
+}
+
+.imagePreview {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 168px;
+	aspect-ratio: 16 / 9;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-md);
+	overflow: hidden;
+	background: var(--color-surface-container-high);
+	color: var(--color-outline);
+}
+
+.imagePreview img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+/* ---- 原始数据折叠 ---- */
+.rawToggle {
+	display: inline-flex;
+	align-items: center;
+	align-self: flex-start;
+	gap: var(--space-px-5);
+	padding: var(--space-px-2) 0;
+	color: var(--color-outline);
+	font-size: 11px;
+	cursor: pointer;
+}
+
+.code {
+	margin: 0;
+	padding: var(--space-2);
+	overflow-x: auto;
+	border-radius: var(--radius-md);
+	background: var(--color-surface-container);
+	color: var(--color-on-surface-variant);
+	font-family: var(--font-mono);
+	font-size: 12px;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	scrollbar-width: none;
+}
+
+/* ---- 子任务 ---- */
+.subtaskBody {
+	margin-left: var(--space-px-18);
+	margin-bottom: var(--space-2);
+	padding: var(--space-px-2) var(--space-3) var(--space-px-10)
+		var(--space-px-20);
+	border-left: 2px solid var(--divider);
+}
+
+.subtaskDetail {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-px-6);
+	font-size: 12px;
+	line-height: 1.6;
+	color: var(--color-on-surface-variant);
+}
+
+/* ---- 思考块 ---- */
+.thinkingHead {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-6);
+	padding: var(--space-px-2) 0;
+	color: var(--color-outline);
+	font-family: var(--font-body);
+	font-size: 11.5px;
+	cursor: pointer;
+}
+
+.thinkingIcon {
+	border-radius: var(--radius-full);
+}
+
+.thinkingIcon[data-active="true"] {
+	color: var(--color-primary);
+	animation: soft-pulse var(--dur-breath) var(--ease-in-out) infinite alternate;
+}
+
+.thinkingBody {
+	margin-top: var(--space-1);
+	padding-left: var(--space-px-10);
+	border-left: 2px solid var(--divider);
+	font-size: 12px;
+	line-height: 1.65;
+	color: var(--color-outline);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+/* ---- 发送图片缩略图 ---- */
+.thumb {
+	max-width: 160px;
+	max-height: 110px;
+}
+
+.thumb img {
+	display: block;
+	max-width: 160px;
+	max-height: 110px;
+	object-fit: cover;
+}
+
+/* ---- 助手文本气泡 ---- */
+.textBubble {
+	align-self: flex-start;
+	max-width: 92%;
+	padding: var(--space-px-9) 13px;
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg)
+		var(--radius-sm);
+	background: var(--white-60);
+	color: var(--color-on-surface);
+	font-size: 13px;
+	line-height: 1.65;
+}
+
+/* ---- 流式占位气泡 ---- */
+.streamBubble {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-2);
+	width: fit-content;
+	padding: var(--space-px-9) 13px;
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg)
+		var(--radius-sm);
+	background: var(--white-60);
+	animation: fade-up var(--dur-base) var(--ease-out);
+}
+
+.streamBubbleText {
+	font-size: 12.5px;
+}
+
+/* ---- 确认卡 ---- */
+.proposal {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	padding: var(--space-3);
+	border-radius: var(--radius-lg);
+	opacity: 1;
+	transition: opacity var(--dur-base) var(--ease-out);
+	animation: fade-up var(--dur-base) var(--ease-out);
+}
+
+.proposal[data-resolved="rejected"] {
+	opacity: 0.55;
+}
+
+.proposalHead {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.proposalKindIcon,
+.branchIcon {
+	flex-shrink: 0;
+	color: var(--color-primary);
+}
+
+.proposalTitle {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.proposalPrompt {
+	margin: 0;
+	font-size: 12.5px;
+	line-height: 1.6;
+	color: var(--color-on-surface-variant);
+}
+
+.diffLines {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-px-2);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.diffBefore {
+	overflow-wrap: anywhere;
+	color: var(--color-outline);
+	text-decoration: line-through;
+	text-decoration-color: var(--color-outline-variant);
+}
+
+.diffAfter {
+	overflow-wrap: anywhere;
+	color: var(--color-on-surface);
+}
+
+.diffNote {
+	font-size: 11.5px;
+	line-height: 1.55;
+	color: var(--color-on-surface-variant);
+	overflow-wrap: anywhere;
+}
+
+.impact {
+	margin: 0;
+	font-size: 12.5px;
+	color: var(--color-on-surface-variant);
+}
+
+.resolution {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+	margin: 0;
+	font-size: 12.5px;
+	color: var(--color-on-surface-variant);
+}
+
+.resolution[data-tone="error"] {
+	color: var(--color-error);
+}
+
+/* ---- 重写差异 ---- */
+.rewrite {
+	display: grid;
+	gap: var(--space-2);
+}
+
+.rewriteHunk {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	align-items: start;
+	gap: var(--space-1) var(--space-2);
+	padding: var(--space-2);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-container);
+	font-size: 12px;
+}
+
+.rewriteHunkId {
+	color: var(--color-outline);
+	font-family: var(--font-mono);
+	font-size: 11px;
+}
+
+.rewriteHunk del,
+.rewriteHunk ins {
+	grid-column: 1 / -1;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	font-family: var(--font-mono);
+}
+
+.rewriteHunk del {
+	color: var(--color-outline);
+	text-decoration-color: var(--color-outline-variant);
+}
+
+.rewriteHunk ins {
+	color: var(--color-on-surface);
+	text-decoration: none;
+}
+
+/* ---- 操作行 ---- */
+.rejectBox {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	width: 100%;
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-2);
+}
+
+.error {
+	margin: 0;
+	font-size: 12.5px;
+	color: var(--color-error);
+}
+
+/* ---- 滚动文本域（拒绝理由 / 编辑） ---- */
+.fieldWrap {
+	position: relative;
+	display: flex;
+	flex: 1;
+	min-width: 0;
+}
+
+.field {
+	flex: 1;
+	min-width: 0;
+	padding: var(--space-2);
+	border: 1px solid var(--glass-border);
+	border-radius: var(--radius-md);
+	color: var(--color-on-surface);
+	background: var(--color-surface-container-lowest);
+	font: inherit;
+	resize: none;
+	scrollbar-width: none;
+}
+
+.field:focus-visible {
+	outline: none;
+	box-shadow: var(--shadow-focus);
+}
+
+/* ---- 摘要分隔条 ---- */
+.summaryDivider {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-px-6);
+}
+
+.summaryToggle {
+	display: flex;
+	align-items: center;
+	gap: var(--space-px-10);
+	width: 100%;
+	color: var(--color-outline);
+	font-family: var(--font-body);
+	font-size: 11.5px;
+	cursor: pointer;
+}
+
+.summaryRule {
+	flex: 1;
+	height: 1px;
+	background: var(--divider);
+}
+
+.summaryLabel {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: var(--space-px-5);
+}
+
+.summaryBox {
+	padding: var(--space-2) var(--space-3);
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-md);
+	background: var(--white-45);
+	font-size: 12px;
+	line-height: 1.65;
+	color: var(--color-on-surface-variant);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+/* ---- Markdown 正文 ---- */
+.markdown {
+	overflow-wrap: anywhere;
+}
+
+.markdown :is(p, ul, ol, pre) {
+	margin-block: 0 var(--space-2);
+}
+
+.markdown :last-child {
+	margin-block-end: 0;
+}
+
+.markdown [data-streamdown="code-block"] {
+	position: relative;
+	min-width: 0;
+	margin-block: var(--space-3);
+	overflow: hidden;
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-lg);
+	background: var(--color-surface-container);
+	color: var(--color-on-surface);
+	font-family: var(--font-mono);
+}
+
+.markdown [data-streamdown="code-block-header"] {
+	display: flex;
+	align-items: center;
+	min-height: calc(var(--space-6) + var(--space-2));
+	padding-inline: var(--space-3) calc(var(--space-6) * 2 + var(--space-4));
+	border-bottom: 1px solid var(--divider);
+	color: var(--color-on-surface-variant);
+	font-size: 12px;
+}
+
+.markdown [data-streamdown="code-block-actions"] {
+	position: absolute;
+	inset-block-start: var(--space-1);
+	inset-inline-end: var(--space-2);
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+}
+
+.markdown [data-streamdown="code-block-actions"] button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--space-6);
+	height: var(--space-6);
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--color-on-surface-variant);
+	cursor: pointer;
+}
+
+.markdown [data-streamdown="code-block-actions"] button:hover:not(:disabled) {
+	background: var(--accent-wash);
+}
+
+.markdown [data-streamdown="code-block-actions"] button:focus-visible {
+	outline: none;
+	box-shadow: var(--shadow-focus);
+}
+
+.markdown [data-streamdown="code-block-actions"] button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.markdown [data-streamdown="code-block-actions"] output {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.markdown [data-streamdown="code-block-body"] {
+	min-width: 0;
+	padding: var(--space-3);
+	background: var(--color-surface-container-low);
+}
+
+.markdown [data-streamdown="code-block-body"] pre {
+	margin: 0;
+	font-family: var(--font-mono);
+	font-size: 12px;
+	line-height: 1.7;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.markdown [data-streamdown="code-block-body"] code > span {
+	display: block;
+}
+
+/* ---- 消息部件排布 ---- */
+.parts {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.proposal,
+	.streamBubble {
+		animation: none;
+	}
+
+	.thinkingIcon[data-active="true"] {
+		animation: none;
+	}
+}

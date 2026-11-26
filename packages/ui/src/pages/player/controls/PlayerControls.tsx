@@ -7,21 +7,28 @@ import {
 	FolderOpen,
 	History,
 	LibraryBig,
+	LogOut,
 	type LucideIcon,
 	Menu,
 	PencilLine,
 	Play,
+	RotateCcw,
 	Save,
 	ScrollText,
 	Settings2,
 	Undo2,
 	X,
 } from 'lucide-react'
-import { type CSSProperties, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
 	PlayerSettings,
 	SentenceRef,
 } from '../../../../../player/src/contract/playback'
+import type { SaveSlot } from '../../../../../player/src/contract/progress'
+import { Button } from '../../../components/Button'
+import { Chip, ProgressBar } from '../../../components/Card'
+import { ConfirmDialog, Slider, Tooltip } from '../../../components/Extended'
+import { Toggle } from '../../../components/Form'
 import { ScrollArea } from '../../../components/ScrollArea'
 import {
 	defaultPlayerSettings,
@@ -31,6 +38,14 @@ import {
 import './controls.css'
 import { msg, scoped } from '../../../i18n'
 import { type ProgressControlsProps, ProgressPanel } from './ProgressPanel'
+
+// Chromium（Electron）支持 focus({ focusVisible: false })，lib.dom 尚未收录，
+// 在此补齐类型，避免程序化聚焦把 :focus-visible 焦点环画进系统菜单。
+declare global {
+	interface FocusOptions {
+		focusVisible?: boolean
+	}
+}
 
 const t = scoped('player')
 const progressWords = new Set<string>([
@@ -78,6 +93,13 @@ export function PlayerControls({
 	waiting,
 	awaitingClick,
 	onResume,
+	workTitle,
+	onWorkPage,
+	ended = false,
+	reread = false,
+	nextChapter,
+	onReplayChapter,
+	onOverlayChange,
 }: ProgressControlsProps & {
 	controller?: PlayerControlsController
 	surface: HTMLElement | null
@@ -89,16 +111,25 @@ export function PlayerControls({
 	waiting?: ControlChapter
 	awaitingClick: boolean
 	onResume(): void
+	workTitle?: string
+	onWorkPage?: () => void
+	ended?: boolean
+	reread?: boolean
+	nextChapter?: ControlChapter
+	onReplayChapter?: () => void
+	onOverlayChange?: (active: boolean) => void
 }) {
 	const [screen, setScreen] = useState<
 		'menu' | 'settings' | 'chapters' | 'save' | 'load' | 'history' | null
 	>(null)
 	const [hidden, setHidden] = useState(false)
+	const [confirmExit, setConfirmExit] = useState(false)
 	const [settings, setSettings] = useState(rememberedSettings)
 	const [auto, setAuto] = useState(false)
 	const [revision, setRevision] = useState(0)
 	const [failure, setFailure] = useState('')
 	const [notice, setNotice] = useState('')
+	const [chapterThumbs, setChapterThumbs] = useState<Record<string, string>>({})
 	const panel = useRef<HTMLElement>(null)
 	useEffect(() => {
 		if (screen)
@@ -106,8 +137,13 @@ export function PlayerControls({
 				?.querySelector<HTMLElement>(
 					'button:not(:disabled, [hidden], .nl-page-close, .nl-focus-skip), input:not(:disabled), select:not(:disabled)',
 				)
-				?.focus()
+				// 程序化聚焦不能触发 :focus-visible 的焦点卡片，
+				// 键盘导航仍由浏览器正常绘制焦点环。
+				?.focus({ focusVisible: false })
 	}, [screen])
+	useEffect(() => {
+		onOverlayChange?.(Boolean(screen) || hidden || confirmExit)
+	}, [screen, hidden, confirmExit, onOverlayChange])
 	useEffect(
 		() => controller?.subscribe(() => setRevision((value) => value + 1)),
 		[controller],
@@ -139,7 +175,8 @@ export function PlayerControls({
 			}
 			if (event.key === 'Escape') {
 				event.preventDefault()
-				setScreen((value) => (value ? null : 'menu'))
+				if (confirmExit) setConfirmExit(false)
+				else setScreen((value) => (value ? null : 'menu'))
 			}
 		}
 		const context = (event: MouseEvent) => {
@@ -161,7 +198,7 @@ export function PlayerControls({
 			surface?.removeEventListener('contextmenu', context)
 			window.removeEventListener('click', click, true)
 		}
-	}, [hidden, surface])
+	}, [hidden, surface, confirmExit])
 	useEffect(() => {
 		const sync = () =>
 			setSettings((value) => ({
@@ -171,6 +208,35 @@ export function PlayerControls({
 		document.addEventListener('fullscreenchange', sync)
 		return () => document.removeEventListener('fullscreenchange', sync)
 	}, [])
+	useEffect(() => {
+		if (screen !== 'chapters') return
+		let cancelled = false
+		const slotsByChapter = new Map<string, SaveSlot>()
+		for (const entry of progress.saves)
+			if (!slotsByChapter.has(entry.snapshot.position.chapterId))
+				slotsByChapter.set(entry.snapshot.position.chapterId, entry.slot)
+		void Promise.all(
+			chapters.map(async (chapter) => {
+				const slot = slotsByChapter.get(chapter.chapterId)
+				if (!slot) return null
+				const image = await window.novelive.host.progress?.thumbnail(
+					workId,
+					slot,
+				)
+				return image ? ([chapter.chapterId, image] as const) : null
+			}),
+		)
+			.then((images) => {
+				if (!cancelled)
+					setChapterThumbs(
+						Object.fromEntries(images.filter((entry) => entry !== null)),
+					)
+			})
+			.catch(() => {})
+		return () => {
+			cancelled = true
+		}
+	}, [screen, workId, progress.saves, chapters])
 	function update<K extends keyof PlayerSettings>(
 		key: K,
 		value: PlayerSettings[K],
@@ -195,9 +261,9 @@ export function PlayerControls({
 		setNotice('')
 		setFailure('')
 		try {
-			await new Promise<void>((resolve) =>
-				requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-			)
+			const { promise, resolve } = Promise.withResolvers<void>()
+			requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+			await promise
 			if (save) await onSave(slot)
 			else await onLoad(slot)
 			setNotice(save ? t('存档成功') : t('读档完成'))
@@ -257,18 +323,19 @@ export function PlayerControls({
 	const hasQuickSave = progress.saves.some(
 		(entry) => entry.slot.kind === 'quick',
 	)
-	const toggle = (label: string, checked: boolean, change: () => void) => (
-		<label className="nl-control-row">
-			<span>{label}</span>
-			<input
-				type="checkbox"
-				className="nl-switch"
-				checked={checked}
-				onChange={change}
-			/>
-		</label>
+	const switchRow = (
+		label: string,
+		on: boolean,
+		change: (next: boolean) => void,
+		Icon?: LucideIcon,
+	) => (
+		<div className="nl-control-row">
+			{Icon ? icon(Icon, 17) : null}
+			<span className="nl-control-row-label">{label}</span>
+			<Toggle on={on} onChange={change} aria-label={label} />
+		</div>
 	)
-	const slider = (
+	const sliderRow = (
 		label: string,
 		key:
 			| 'autoPlaySpeedMultiplier'
@@ -278,28 +345,49 @@ export function PlayerControls({
 		min: number,
 		max: number,
 		step: number,
-		format: (value: number) => string = String,
+		suffix?: string,
 	) => (
-		<label className="nl-setting-slider">
+		<div className="nl-setting-slider">
 			<span className="nl-setting-label">{label}</span>
-			<span className="nl-setting-track">
-				<input
-					type="range"
-					aria-label={label}
-					min={min}
-					max={max}
-					step={step}
-					value={settings[key]}
-					style={
-						{
-							'--fill': `${((settings[key] - min) / (max - min)) * 100}%`,
-						} as CSSProperties
-					}
-					onChange={(event) => update(key, Number(event.target.value))}
-				/>
-				<span className="nl-setting-value">{format(settings[key])}</span>
-			</span>
-		</label>
+			<Slider
+				aria-label={label}
+				min={min}
+				max={max}
+				step={step}
+				value={Math.round(settings[key] * 100) / 100}
+				suffix={suffix}
+				onChange={(value) => update(key, Math.round(value * 100) / 100)}
+			/>
+		</div>
+	)
+	const waitSteps: Record<string, number> = {
+		[msg('写作')]: 0.25,
+		[msg('审稿')]: 0.5,
+		[msg('演出')]: 0.72,
+		[msg('出图')]: 0.88,
+	}
+	const waitProgress = waiting
+		? waitSteps[
+				waiting.progress.split(' · ').find((part) => part in waitSteps) ?? ''
+			]
+		: undefined
+	const finalePrimary = onWorkPage
+		? { label: t('返回作品页'), action: onWorkPage }
+		: onLibrary
+			? { label: t('返回书库'), action: onLibrary }
+			: null
+	const editorButton = (
+		<button
+			type="button"
+			disabled={!editorLinked || !controller?.frame().position}
+			onClick={() => {
+				const position = controller?.frame().position
+				if (position) onEditor(position)
+			}}
+		>
+			{icon(PencilLine, 17)}
+			{t('在编辑器中打开这里')}
+		</button>
 	)
 	return (
 		<>
@@ -313,20 +401,79 @@ export function PlayerControls({
 					{failure}
 				</p>
 			)}
-			{!hidden && (waiting || awaitingClick) && (
-				<div className="nl-chapter-wait" role="status">
-					{awaitingClick ? (
-						<button type="button" onClick={onResume}>
-							{t('下一章已就绪，点击开始')}
-						</button>
-					) : (
-						<>
-							{t('下一章 · {{title}}', { title: waiting?.title })}
-							<p>{progressText(waiting?.progress)}</p>
-						</>
-					)}
+			{!hidden && waiting && (
+				<div className="nl-end-overlay" role="status">
+					<div className="nl-end-card nl-chapter-wait">
+						<span className="nl-end-label">{t('本章结束')}</span>
+						<h3 className="nl-end-headline">
+							{t('下一章 · {{title}}', { title: waiting.title })}
+						</h3>
+						{waiting.progress.includes(msg('等待')) &&
+						!waiting.progress.includes(msg('制作中')) ? (
+							<p className="nl-end-note">
+								{progressText(waiting.progress)} · {t('做完会自动载入开头')}
+							</p>
+						) : (
+							<div className="nl-end-progress">
+								<ProgressBar value={waitProgress ?? 0.55} height={6} active />
+								<p className="nl-end-note">
+									{progressText(waiting.progress)} · {t('做完会自动载入开头')}
+								</p>
+							</div>
+						)}
+					</div>
 				</div>
 			)}
+			{!hidden && !waiting && awaitingClick && (
+				<div className="nl-end-overlay" role="status">
+					<div className="nl-end-card nl-end-card-click">
+						<span className="nl-end-label">{t('已载入开头')}</span>
+						{nextChapter && (
+							<h3 className="nl-end-headline">
+								{t('「{{title}}」', { title: nextChapter.title })}
+							</h3>
+						)}
+						<Button variant="primary" icon={Play} onClick={onResume}>
+							{t('下一章已就绪，点击开始')}
+						</Button>
+					</div>
+				</div>
+			)}
+			{!hidden &&
+				ended &&
+				!waiting &&
+				!awaitingClick &&
+				!screen &&
+				!nextChapter?.published && (
+					<div className="nl-end-overlay" role="status">
+						<div className="nl-end-card nl-end-card-center">
+							<span className="nl-end-icon">
+								<BookOpen size={22} strokeWidth={1.8} aria-hidden="true" />
+							</span>
+							<h3 className="nl-end-headline">
+								{reread ? t('重看结束') : t('已读到最新进度')}
+							</h3>
+							<div className="nl-end-actions">
+								{finalePrimary && (
+									<Button
+										variant="primary"
+										icon={onWorkPage ? LogOut : LibraryBig}
+										onClick={finalePrimary.action}
+									>
+										{finalePrimary.label}
+									</Button>
+								)}
+								<Button
+									variant="secondary"
+									icon={RotateCcw}
+									onClick={() => onReplayChapter?.()}
+								>
+									{t('重新播放')}
+								</Button>
+							</div>
+						</div>
+					</div>
+				)}
 			{!hidden && !screen && (auto || settings.skipRead) && (
 				<div className="nl-play-indicator" aria-hidden="true">
 					{icon(settings.skipRead ? FastForward : Play, 15)}
@@ -417,7 +564,7 @@ export function PlayerControls({
 						}}
 					>
 						{screen === 'menu' ? (
-							<h2 className="nl-menu-title">{title}</h2>
+							<h2 className="nl-menu-title">{workTitle || title}</h2>
 						) : (
 							<header className="nl-page-header">
 								<h2>
@@ -468,20 +615,20 @@ export function PlayerControls({
 										{icon(Settings2, 17)}
 										{t('设置')}
 									</button>
-									<button
-										type="button"
-										disabled={!editorLinked || !controller?.frame().position}
-										title={
-											editorLinked ? undefined : t('请先将本地工程关联到作品')
-										}
-										onClick={() => {
-											const position = controller?.frame().position
-											if (position) onEditor(position)
-										}}
-									>
-										{icon(PencilLine, 17)}
-										{t('在编辑器中打开这里')}
-									</button>
+									{editorLinked ? (
+										editorButton
+									) : (
+										<Tooltip text={t('请先将本地工程关联到作品')}>
+											{editorButton}
+										</Tooltip>
+									)}
+									<hr className="nl-menu-divider" />
+									{onWorkPage && (
+										<button type="button" onClick={() => setConfirmExit(true)}>
+											{icon(LogOut, 17)}
+											{t('返回作品页')}
+										</button>
+									)}
 									<hr className="nl-menu-divider" />
 									<div className="nl-menu-secondary">
 										<button
@@ -507,9 +654,12 @@ export function PlayerControls({
 											{icon(BookmarkCheck, 17)}
 											{t('快速读档')}
 										</button>
-										{toggle(t('自动播放'), auto, () => setAuto(!auto))}
-										{toggle(t('跳过已读'), settings.skipRead, () =>
-											update('skipRead', !settings.skipRead),
+										{switchRow(t('自动播放'), auto, () => setAuto(!auto), Play)}
+										{switchRow(
+											t('跳过已读'),
+											settings.skipRead,
+											() => update('skipRead', !settings.skipRead),
+											FastForward,
 										)}
 										<button
 											type="button"
@@ -534,22 +684,23 @@ export function PlayerControls({
 								</>
 							) : screen === 'settings' ? (
 								<div className="nl-settings-card">
-									{slider(
+									{sliderRow(
 										t('自动播放倍率'),
 										'autoPlaySpeedMultiplier',
 										0.25,
 										3,
 										0.25,
+										'×',
 									)}
-									{slider(
+									{sliderRow(
 										t('文字速度（毫秒 / 字）'),
 										'textMillisecondsPerCharacter',
 										3,
 										153,
 										1,
-										(value) => `${value}ms`,
+										'ms',
 									)}
-									{toggle(
+									{switchRow(
 										t('瞬间显示'),
 										settings.textMillisecondsPerCharacter === 0,
 										() =>
@@ -558,24 +709,16 @@ export function PlayerControls({
 												settings.textMillisecondsPerCharacter === 0 ? 30 : 0,
 											),
 									)}
-									{slider(
-										t('字号'),
-										'fontSize',
-										15,
-										48,
-										1,
-										(value) => `${value}px`,
-									)}
-									{slider(
+									{sliderRow(t('字号'), 'fontSize', 15, 48, 1, 'px')}
+									{sliderRow(
 										t('对话框不透明度'),
 										'dialogueOpacity',
 										0.1,
 										1,
 										0.05,
-										(value) => `${Math.round(value * 100)}%`,
 									)}
 									<hr className="nl-menu-divider" />
-									{toggle(
+									{switchRow(
 										t('全屏'),
 										settings.fullscreen,
 										() => void fullscreen(),
@@ -631,7 +774,7 @@ export function PlayerControls({
 								/>
 							) : chapters.length ? (
 								<div className="nl-chapter-list">
-									{chapters.map((chapter) => (
+									{chapters.map((chapter, index) => (
 										<button
 											key={chapter.chapterId}
 											type="button"
@@ -642,17 +785,37 @@ export function PlayerControls({
 											}}
 											className="nl-chapter-row"
 										>
+											{chapterThumbs[chapter.chapterId] ? (
+												<img
+													className="nl-chapter-thumb"
+													src={chapterThumbs[chapter.chapterId]}
+													width={112}
+													height={63}
+													alt=""
+												/>
+											) : (
+												<span
+													className={`nl-chapter-thumb nl-chapter-thumb-${index % 4}`}
+													data-dim={!chapter.published || undefined}
+													aria-hidden="true"
+												>
+													<span className="nl-chapter-thumb-badge">
+														{index + 1}
+													</span>
+												</span>
+											)}
 											<span className="nl-chapter-text">
 												<span className="nl-chapter-title">
-													{chapter.title}
+													{t('第 {{index}} 章 · {{title}}', {
+														index: index + 1,
+														title: chapter.title,
+													})}
 												</span>
 												<span className="nl-chapter-meta">
 													{chapter.published
 														? t('已发布')
 														: progressText(chapter.progress)}
-													{chapter.read && (
-														<span className="nl-chapter-chip">{t('已读')}</span>
-													)}
+													{chapter.read && <Chip>{t('已读')}</Chip>}
 												</span>
 											</span>
 										</button>
@@ -671,6 +834,18 @@ export function PlayerControls({
 					</section>
 				</div>
 			)}
+			<ConfirmDialog
+				open={confirmExit}
+				title={t('返回作品页？')}
+				message={t('当前阅读进度已自动保存。')}
+				confirmLabel={t('返回')}
+				cancelLabel={t('继续玩')}
+				onConfirm={() => {
+					setConfirmExit(false)
+					onWorkPage?.()
+				}}
+				onCancel={() => setConfirmExit(false)}
+			/>
 		</>
 	)
 }

@@ -13,6 +13,26 @@ const shift = (layout: ImportLayout, from: number, by: number) =>
 		volume.start > from ? { ...volume, start: volume.start + by } : volume,
 	)
 
+/** Moves the boundary at the end of a volume by whole chapters, keeping every volume non-empty. */
+export function nudgeVolume(
+	layout: ImportLayout,
+	index: number,
+	delta: number,
+	chapters: number,
+): ImportLayout {
+	if (index < 0 || index >= layout.volumes.length - 1) return layout
+	const boundary = layout.volumes[index + 1].start
+	const end = layout.volumes[index + 2]?.start ?? chapters
+	const next = boundary + delta
+	if (next <= layout.volumes[index].start || next >= end) return layout
+	return {
+		...layout,
+		volumes: layout.volumes.map((volume, i) =>
+			i === index + 1 ? { ...volume, start: next } : volume,
+		),
+	}
+}
+
 export const chapterLength = (
 	layout: ImportLayout,
 	index: number,

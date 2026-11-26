@@ -11,6 +11,23 @@ const variantClass: Record<ButtonVariant, string> = {
 	danger: `nl-btn nl-btn-danger ${styles.danger}`,
 }
 
+export function Spinner({
+	size = 16,
+	className,
+}: {
+	size?: number
+	className?: string
+}) {
+	return (
+		<LoaderCircle
+			className={[styles.spin, className].filter(Boolean).join(' ')}
+			size={size}
+			strokeWidth={1.8}
+			aria-hidden="true"
+		/>
+	)
+}
+
 export function Button({
 	variant = 'secondary',
 	size,
@@ -44,12 +61,7 @@ export function Button({
 				.join(' ')}
 		>
 			{loading ? (
-				<LoaderCircle
-					className={styles.spin}
-					size={iconSize}
-					strokeWidth={1.8}
-					aria-hidden="true"
-				/>
+				<Spinner size={iconSize} />
 			) : (
 				Icon && <Icon size={iconSize} strokeWidth={1.8} aria-hidden="true" />
 			)}
@@ -61,13 +73,15 @@ export function Button({
 export function IconButton({
 	icon: Icon,
 	label,
-	size = 32,
+	size = 34,
+	iconSize,
 	className,
 	...rest
 }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
 	icon: LucideIcon
 	label: string
 	size?: number
+	iconSize?: number
 }) {
 	return (
 		<button
@@ -81,7 +95,7 @@ export function IconButton({
 			style={{ width: size, height: size, ...rest.style }}
 		>
 			<Icon
-				size={Math.round(size * 0.52)}
+				size={iconSize ?? Math.round(size * 0.5)}
 				strokeWidth={1.8}
 				aria-hidden="true"
 			/>

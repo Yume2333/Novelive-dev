@@ -1,10 +1,30 @@
-import type { ProductionSnapshot } from '@novelive/creator/contract'
-import { ChevronsUp, CircleStop, History, Play, RotateCcw } from 'lucide-react'
-import { useState } from 'react'
+import {
+	type CommandOutput,
+	type ProductionSnapshot,
+	productionQueueEvent,
+} from '@novelive/creator/contract'
+import {
+	ChevronRight,
+	ChevronsUp,
+	CircleStop,
+	Ellipsis,
+	History,
+	ImageOff,
+	Play,
+	RotateCcw,
+	SquarePen,
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Chip, ProgressBar } from '../../components/Card'
-import { Collapse } from '../../components/Collapse'
-import { Page } from '../../components/Page'
+import {
+	Button,
+	Chip,
+	ConfirmDialog,
+	Dropdown,
+	Page,
+	ProgressBar,
+	useToast,
+} from '../../components'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import { chapterTitle, useWorkProduction } from '../work/WorkProduction'
@@ -12,6 +32,7 @@ import { ChapterRecords } from './ChapterRecords'
 import { ChapterState, stepName, stepProgress, steps } from './ChapterState'
 import styles from './Production.module.css'
 import { ProductionNotice } from './ProductionNotice'
+import { StaleAssetsDrawer, useStaleAssets } from './StaleAssets'
 
 const t = scoped('production')
 
@@ -22,128 +43,216 @@ const workStatus = {
 	confirm: msg('待确认'),
 }
 
+type Chapter = ProductionSnapshot['chapters'][number]
+type Queue = CommandOutput<'production.getQueue'>
+
 export const chapterIndex = (index: number) =>
 	String(index + 1).padStart(2, '0')
+
+/** 制作队列快照：进入页面读取一次，随后跟随 production.queue 事件实时更新 */
+function useProductionQueue() {
+	const [queue, setQueue] = useState<Queue>()
+	useEffect(() => {
+		let active = true
+		const request = window.novelive.call('production.getQueue', {})
+		void request.promise.then(
+			(next) => {
+				if (active) setQueue(next)
+			},
+			() => {},
+		)
+		const offEvent = window.novelive.on('event', (event) => {
+			if (event.scope !== 'app' || !productionQueueEvent.check(event.event))
+				return
+			setQueue(event.event.payload)
+		})
+		return () => {
+			active = false
+			request.cancel()
+			offEvent()
+		}
+	}, [])
+	return queue
+}
+
+/** 四步流水线：写 › 审稿 › 演出 › 出图；当前步墨水微扫光 + 2px 下划条，已完成 / 未到的步用字重与颜色分层 */
+function StepChain({ chapter, live }: { chapter: Chapter; live: boolean }) {
+	if (chapter.status !== 'producing') return null
+	const current = steps.indexOf(chapter.step)
+	return (
+		<span className={styles.steps}>
+			{steps.map((step, index) => {
+				const isCurrent = index === current
+				const isDone = index < current
+				return (
+					<span className={styles.stepItem} key={step}>
+						{index > 0 ? (
+							<span className={styles.stepSep}>
+								<ChevronRight aria-hidden="true" size={11} strokeWidth={1.8} />
+							</span>
+						) : null}
+						{isCurrent ? (
+							<span className={styles.stepActive}>
+								<span className={live ? 'ink-shimmer' : styles.stepActiveIdle}>
+									{t(stepName[step])}
+								</span>
+							</span>
+						) : (
+							<span className={isDone ? styles.stepDone : styles.stepUpcoming}>
+								{t(stepName[step])}
+							</span>
+						)}
+					</span>
+				)
+			})}
+		</span>
+	)
+}
 
 function ChapterRow({
 	chapter,
 	index,
+	previous,
+	live,
+	onOpenRuns,
 }: {
-	chapter: ProductionSnapshot['chapters'][number]
+	chapter: Chapter
 	index: number
+	previous?: Chapter
+	live: boolean
+	onOpenRuns(chapterId: string): void
 }) {
 	const { snapshot, busy, run } = useWorkProduction()
 	const { chapterId, issue, priority, status } = chapter
 	const { workId, blockedChapterId, phase } = snapshot
-	const [showRecords, setShowRecords] = useState(false)
 	const title = chapterTitle(snapshot, chapterId)
+	const waitForPrev =
+		status === 'waiting' && (priority || previous?.status === 'producing')
+	const canPrioritize =
+		phase === 'producing' &&
+		status === 'waiting' &&
+		!priority &&
+		blockedChapterId !== chapterId
 
 	return (
-		<li aria-label={title}>
+		<li aria-label={title} className="hover-row">
 			<div className={styles.chapterRow}>
 				<span className={styles.index}>{chapterIndex(index)}</span>
 				<span className={styles.name}>{title}</span>
-				{chapter.status === 'producing' && (
-					<span className={styles.steps}>
-						{steps.map((step) => (
-							<span key={step} data-current={step === chapter.step}>
-								{t(stepName[step])}
-							</span>
-						))}
+				{priority ? (
+					<span className={styles.priorityMark}>
+						<ChevronsUp aria-hidden="true" size={13} strokeWidth={1.8} />
+						{t('优先')}
 					</span>
-				)}
-				{priority && status === 'waiting' && (
-					<Chip>
-						<ChevronsUp aria-hidden="true" size={12} />
-						{t('已优先')}
-					</Chip>
-				)}
+				) : null}
+				{waitForPrev ? (
+					<span className={styles.waitChip}>{t('等上一章')}</span>
+				) : null}
+				<StepChain chapter={chapter} live={live} />
 				<span className={styles.spacer} />
 				{status === 'producing' && (
 					<span className={styles.stepBar}>
-						<ProgressBar value={stepProgress(chapter)} height={4} />
+						<ProgressBar
+							value={stepProgress(chapter)}
+							height={4}
+							active={live}
+							label={t('章节制作进度')}
+						/>
 					</span>
 				)}
 				<ChapterState chapter={chapter} />
-				<span className={styles.rowActions} data-expanded={showRecords}>
+				<span className={`row-actions ${styles.rowActions}`}>
 					{status === 'published' && (
 						<Link
 							className={styles.ghost}
 							to={`${workRoute('play', workId)}?chapter=${encodeURIComponent(chapterId)}`}
 						>
-							<Play aria-hidden="true" size={14} />
+							<Play aria-hidden="true" size={13} strokeWidth={1.8} />
 							{t('游玩')}
 						</Link>
 					)}
 					{blockedChapterId === chapterId && (
-						<button
-							className={styles.ghost}
-							type="button"
+						<Button
+							variant="ghost"
+							size="sm"
+							icon={RotateCcw}
 							disabled={busy}
 							onClick={() =>
 								void run('production.retryChapter', { workId, chapterId })
 							}
 						>
-							<RotateCcw size={14} aria-hidden="true" />
 							{t('重试')}
-						</button>
+						</Button>
 					)}
-					{phase === 'producing' &&
-						status === 'waiting' &&
-						!priority &&
-						blockedChapterId !== chapterId && (
-							<button
-								className={styles.ghost}
-								type="button"
-								disabled={busy}
-								onClick={() =>
-									void run('production.prioritizeChapter', {
-										workId,
-										chapterId,
-									})
-								}
-							>
-								<ChevronsUp size={14} aria-hidden="true" />
-								{t('优先制作')}
-							</button>
-						)}
-					<button
-						className={styles.ghost}
-						type="button"
-						aria-expanded={showRecords}
-						onClick={() => setShowRecords((open) => !open)}
+					{status === 'published' && (
+						<Link
+							className={styles.ghost}
+							to={`${workRoute('editor', workId)}?chapterId=${encodeURIComponent(chapterId)}`}
+						>
+							<SquarePen aria-hidden="true" size={13} strokeWidth={1.8} />
+							{t('编辑')}
+						</Link>
+					)}
+					<Button
+						variant="ghost"
+						size="sm"
+						icon={History}
+						onClick={() => onOpenRuns(chapterId)}
 					>
-						<History size={14} aria-hidden="true" />
 						{t('运行记录')}
-					</button>
+					</Button>
+					{status !== 'published' && canPrioritize ? (
+						<Dropdown
+							label={t('更多')}
+							trigger={
+								<Ellipsis aria-hidden="true" size={17} strokeWidth={1.8} />
+							}
+							items={[
+								{
+									label: t('优先制作'),
+									icon: ChevronsUp,
+									disabled: busy,
+									onSelect: () =>
+										void run('production.prioritizeChapter', {
+											workId,
+											chapterId,
+										}),
+								},
+							]}
+						/>
+					) : null}
 				</span>
 			</div>
-			{issue && !showRecords && (
-				<p className={`${styles.muted} ${styles.recordsSlot}`}>{issue}</p>
-			)}
-			<Collapse open={showRecords}>
-				{showRecords && (
-					<div className={styles.recordsSlot}>
-						{issue && <p className={styles.muted}>{issue}</p>}
-						<ChapterRecords workId={workId} chapterId={chapterId} />
-					</div>
-				)}
-			</Collapse>
+			{issue ? (
+				<p className={`${styles.muted} ${styles.issueLine}`}>{issue}</p>
+			) : null}
 		</li>
 	)
 }
 
 export function ProductionPage() {
 	const { snapshot, run, busy, project } = useWorkProduction()
+	const toast = useToast()
 	const { workId, phase, status, blockedChapterId, chapters } = snapshot
+	const queue = useProductionQueue()
+	const { assets: staleAssets, resolve: resolveStale } = useStaleAssets(workId)
+	const [staleOpen, setStaleOpen] = useState(false)
+	const [confirmStop, setConfirmStop] = useState(false)
+	const [runChapterId, setRunChapterId] = useState<string | null>(null)
 	const published = chapters.filter(
 		(chapter) => chapter.status === 'published',
 	).length
 	const flagged = chapters.filter((chapter) => chapter.issue)
-	const current = chapters.findIndex(
-		(chapter) => chapter.status === 'producing',
+	const writing = chapters.find(
+		(chapter) => chapter.status === 'producing' && chapter.step !== 'draw',
 	)
-	const producing = chapters[current]
+	const painting = chapters.find(
+		(chapter) => chapter.status === 'producing' && chapter.step === 'draw',
+	)
+	const current = writing ?? painting
+	const currentIndex = current
+		? chapters.findIndex((chapter) => chapter.chapterId === current.chapterId)
+		: -1
 	const gate =
 		phase === 'confirm-visual'
 			? 'confirmVisual'
@@ -151,6 +260,37 @@ export function ProductionPage() {
 				? 'confirmFirst'
 				: undefined
 	const running = status === 'producing'
+	const inactive = queue?.inactive.find(
+		(work) => work.link.workId === workId && work.status === 'paused',
+	)
+	const crashed = inactive?.status === 'paused' && inactive.reason === 'crashed'
+	const queueIndex = queue
+		? queue.queued.findIndex((work) => work.link.workId === workId)
+		: -1
+	const queuePosition =
+		queueIndex === -1 ? -1 : queueIndex + (queue?.active ? 2 : 1)
+	const isActiveWork = queue?.active?.link.workId === workId
+	const live = queue ? isActiveWork && running : running
+	const runChapter = runChapterId
+		? chapters.find((chapter) => chapter.chapterId === runChapterId)
+		: undefined
+
+	async function resume() {
+		if (await run('production.continue', { workId }))
+			toast(t('继续制作，被中断的任务会重做一遍'), Play)
+	}
+
+	async function retryAll() {
+		for (const chapter of flagged) {
+			if (
+				!(await run('production.retryChapter', {
+					workId,
+					chapterId: chapter.chapterId,
+				}))
+			)
+				return
+		}
+	}
 
 	return (
 		<Page
@@ -165,26 +305,24 @@ export function ProductionPage() {
 			actions={
 				<div className={styles.actions}>
 					{running && (
-						<button
-							className={styles.danger}
-							type="button"
+						<Button
+							variant="danger"
+							icon={CircleStop}
 							disabled={busy}
-							onClick={() => void run('production.stop', { workId })}
+							onClick={() => setConfirmStop(true)}
 						>
-							<CircleStop size={16} aria-hidden="true" />
 							{t('立即停止')}
-						</button>
+						</Button>
 					)}
 					{status === 'stopped' && !blockedChapterId && !gate && (
-						<button
-							className={styles.primary}
-							type="button"
+						<Button
+							variant="primary"
+							icon={Play}
 							disabled={busy}
-							onClick={() => void run('production.continue', { workId })}
+							onClick={() => void resume()}
 						>
-							<Play size={16} aria-hidden="true" />
 							{t('继续制作')}
-						</button>
+						</Button>
 					)}
 					{gate && (
 						<Link className={styles.primary} to={workRoute(gate, workId)}>
@@ -195,6 +333,24 @@ export function ProductionPage() {
 			}
 		>
 			<div className={styles.flow}>
+				{crashed ? (
+					<ProductionNotice
+						kind="warning"
+						action={
+							<Button
+								variant="primary"
+								size="sm"
+								icon={Play}
+								disabled={busy}
+								onClick={() => void resume()}
+							>
+								{t('继续制作')}
+							</Button>
+						}
+					>
+						<p>{t('上次异常退出，制作已停止')}</p>
+					</ProductionNotice>
+				) : null}
 				{flagged.length > 0 && (
 					<ProductionNotice
 						kind="warning"
@@ -202,6 +358,17 @@ export function ProductionPage() {
 							blockedChapterId,
 							...flagged.map(({ chapterId, issue }) => [chapterId, issue]),
 						])}
+						action={
+							<Button
+								variant="ghost"
+								size="sm"
+								icon={RotateCcw}
+								disabled={busy}
+								onClick={() => void retryAll()}
+							>
+								{t('全部重试')}
+							</Button>
+						}
 					>
 						<p>{t('{{length}} 章需要处理', { length: flagged.length })}</p>
 						{blockedChapterId && (
@@ -216,19 +383,51 @@ export function ProductionPage() {
 					<div className={styles.statusGrid}>
 						<div>
 							<p className={styles.sectionLabel}>
-								{current === -1 ? t('作品进度') : t('当前章节')}
+								{currentIndex === -1 ? t('作品进度') : t('当前章节')}
 							</p>
-							<h2 className={styles.headline}>
-								{producing?.status !== 'producing'
-									? published === chapters.length && chapters.length
+							{currentIndex === -1 ? (
+								<h2 className={styles.headline}>
+									{published === chapters.length && chapters.length
 										? t('全部章节已发布')
-										: t('等待下一个章节')
-									: `${chapterIndex(current)} · ${chapterTitle(snapshot, producing.chapterId)} · ${t(stepName[producing.step])}`}
-							</h2>
+										: t('等待下一个章节')}
+								</h2>
+							) : (
+								<>
+									{painting ? (
+										<h2 className={styles.headline}>
+											{chapterIndex(
+												chapters.findIndex(
+													(chapter) => chapter.chapterId === painting.chapterId,
+												),
+											)}
+											{' · '}
+											{chapterTitle(snapshot, painting.chapterId)}
+											<span className={styles.headlineStep}>
+												{t('（{{step}}）', { step: t(stepName.draw) })}
+											</span>
+										</h2>
+									) : null}
+									{writing ? (
+										<h2 className={styles.headline}>
+											{chapterIndex(currentIndex)}
+											{' · '}
+											{chapterTitle(snapshot, writing.chapterId)}
+											<span className={styles.headlineStep}>
+												{writing.status === 'producing'
+													? t('（{{step}}）', {
+															step: t(stepName[writing.step]),
+														})
+													: ''}
+											</span>
+										</h2>
+									) : null}
+								</>
+							)}
 							{chapters.length > 0 && (
 								<ProgressBar
 									value={published / chapters.length}
 									label={t('已发布章节进度')}
+									active={live}
 								/>
 							)}
 							<span className={styles.muted}>
@@ -238,18 +437,36 @@ export function ProductionPage() {
 								})}
 							</span>
 						</div>
-						<Chip active={running}>{t(workStatus[status])}</Chip>
+						{queuePosition > 0 ? (
+							<Chip>
+								{t('排在第 {{position}} 位', { position: queuePosition })}
+							</Chip>
+						) : (
+							<Chip active={running}>{t(workStatus[status])}</Chip>
+						)}
 					</div>
 				</section>
-				<h2 className={styles.sectionLabel} id="production-chapters">
-					{project
-						? t('第 {{index}} 卷 · {{volume}} · 共 {{length}} 章', {
-								index: project.volumeIndex,
-								volume: project.volumeTitle,
-								length: chapters.length,
-							})
-						: t('章节')}
-				</h2>
+				<div className={styles.sectionHead}>
+					<h2 className={styles.sectionLabel} id="production-chapters">
+						{project
+							? t('第 {{index}} 卷 · {{volume}} · 共 {{length}} 章', {
+									index: project.volumeIndex,
+									volume: project.volumeTitle,
+									length: chapters.length,
+								})
+							: t('章节')}
+					</h2>
+					{staleAssets.length > 0 ? (
+						<button
+							type="button"
+							className={styles.staleButton}
+							onClick={() => setStaleOpen(true)}
+						>
+							<ImageOff aria-hidden="true" size={13} strokeWidth={1.8} />
+							{t('{{count}} 张图过期', { count: staleAssets.length })}
+						</button>
+					) : null}
+				</div>
 				<section className={styles.panel} aria-labelledby="production-chapters">
 					{chapters.length ? (
 						<ol className={styles.rows}>
@@ -258,6 +475,9 @@ export function ProductionPage() {
 									key={chapter.chapterId}
 									chapter={chapter}
 									index={index}
+									previous={index > 0 ? chapters[index - 1] : undefined}
+									live={live}
+									onOpenRuns={setRunChapterId}
 								/>
 							))}
 						</ol>
@@ -268,6 +488,41 @@ export function ProductionPage() {
 					)}
 				</section>
 			</div>
+			<StaleAssetsDrawer
+				workId={workId}
+				assets={staleAssets}
+				open={staleOpen}
+				onClose={() => setStaleOpen(false)}
+				onResolved={resolveStale}
+			/>
+			<ChapterRecords
+				workId={workId}
+				chapter={runChapter}
+				title={
+					runChapter
+						? `${chapterIndex(chapters.findIndex((chapter) => chapter.chapterId === runChapter.chapterId))} · ${chapterTitle(snapshot, runChapter.chapterId)}`
+						: ''
+				}
+				open={runChapterId !== null}
+				onClose={() => setRunChapterId(null)}
+			/>
+			<ConfirmDialog
+				open={confirmStop}
+				title={t('立即停止')}
+				message={t(
+					'取消排队任务并中断正在跑的请求，下次继续时重做被中断的部分。',
+				)}
+				confirmLabel={t('立即停止')}
+				danger
+				busy={busy}
+				onConfirm={() => {
+					setConfirmStop(false)
+					void run('production.stop', { workId }).then((done) => {
+						if (done) toast(t('已立即停止'), CircleStop)
+					})
+				}}
+				onCancel={() => setConfirmStop(false)}
+			/>
 		</Page>
 	)
 }
