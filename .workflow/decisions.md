@@ -967,3 +967,11 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** 四份界面审计([ui-polish-audit](research/ui-polish-audit.md))显示内部编号、英文报错与原始 JSON 遍布各页;选定方案本轮即可完成、不动作品包格式,错误码契约保证新报错也不会以英文原文漏到界面。
 - **Effort:** ui-polish
 - **Decided by:** user
+
+## 2026-11-26 - M5 免物理真机复检，不做图标、签名和译文抽查
+
+- **Decided:** Windows/macOS 物理桌面复检（Explorer/Finder 双击 `.novelive`、更高版本 NSIS 覆盖安装、macOS `.zip` 解压启动）免测，按 CI 原生证据视为通过；品牌图标重绘、代码签名与公证、繁中/英/日译文人工抽查都不做。正式仓库另议；自动更新要做，另立任务。
+- **Instead of:** 等物理真机复检和所有者抽查后再关闭 M5。
+- **Because:** 所有者判断现有 CI 原生构建与无头实测足够，剩余项不值得等待。
+- **Effort:** m5-delivery
+- **Decided by:** user

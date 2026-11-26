@@ -1,6 +1,7 @@
 # M5 分享、迁移与三平台交付
 
-**Status:** in progress
+**Status:** done
+**Accepted:** 2026-11-26 by user (物理真机复检免测)
 **Priority:** high
 **Blocked by:** m4-longform/10
 

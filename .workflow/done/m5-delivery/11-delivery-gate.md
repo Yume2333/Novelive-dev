@@ -6,10 +6,11 @@
 **Files:** tests/e2e/m5-delivery.spec.ts, .workflow/evidence/m5/closeout/, .workflow/owner-review.md
 **Read first:** `.workflow/specs/m5-delivery.md`、`.workflow/research/handoff-defaults.md` 对应阶段、`docs/product.md`。
 **Check:** `pnpm check && NL_REPLAY=strict pnpm test:e2e --grep 'M5 full delivery'` → 全链路与离线回归通过，各原生平台安装、导入、游玩、卸载另有回执。
+**Base commit:** 7e0c8a68f112e322fce012b1e4b248f3184bbe0d
 
 **付费调用：** 只由协调者在交接中明确指定的串行主线会话按[用量计划](../../delivery-plan.md#测试模型与额度)调用付费模型，且每次调用须记入私有 `usage.csv`；其余会话只用 `NL_REPLAY=strict` 回放已提交的 cassette，缺档就在任务 `Progress` 记明所需用例并向主线会话请求录制。此规则不放宽本任务的离线限制，私有录制不提交。
 
-- [ ] 汇总三个原生平台的安装回执，校验产物版本、校验和与下载位置；完整功能验收含两次确认、编辑、分享、更新；记录未签名和待抽查事项。
+- [x] 汇总三个原生平台的安装回执，校验产物版本、校验和与下载位置；完整功能验收含两次确认、编辑、分享、更新；记录未签名和待抽查事项。
 
 ## Progress
 
@@ -22,3 +23,7 @@
   - Windows CI 原生未签名（`windows-2025-vs2026`，run `45556159242`，`1ac35cb`）：NSIS 构建与校验（SHA-256 `0cce42ff41137ec2b7dd386c36d3345b46164125344fd929a5a134788a71d8e4`）、`/S` 安装/卸载、`HKCU` 注册表、许可、`m5-packaged.spec.ts` + `m5-share.spec.ts`、同版本 `latest.yml` 检查通过；物理 Explorer 双击 `.novelive`、新版 NSIS `quitAndInstall`、SmartScreen（未签名）与非 `zh-CN` 打包切换未测（[Windows](../../evidence/m5/windows/README.md)）。
   - macOS CI 原生未签名（`macos-15-arm64`，run `45556159242`，`1ac35cb`）：DMG + ZIP 构建与校验（DMG SHA-256 `ad463ef2d9527d4cd59195f41dc1c6bb1d04d4627e3217f96276823de865e6b3`；ZIP `89c5848b9d616480c6d54ab8491c0f55b83ddb4b9fd3795a2`）、DMG 挂载拷贝、`Info.plist`、许可、`m5-packaged.spec.ts`、`99.0.0` 未签名手动下载提示、`m5-share.spec.ts` 通过；物理 Finder 双击与 LaunchServices `open-file` AppleEvent、`.zip` 直接解压启动、Gatekeeper（未签名/未公证）与非 `zh-CN` 打包切换未测（[macOS](../../evidence/m5/macos/README.md)）。
   - 未签名与翻译状态：三平台均为 `0.0.0` 未签名构建，不配置正式自动更新源/公开 Release；繁中/英/日译文待所有者抽查。
+- 2026-11-26 所有者指示：物理 Windows/macOS 真机复检免测直接通过；品牌图标、签名公证、译文抽查不做；正式仓库另议；自动更新另立任务。07/09/10 据此归档。
+- Check after: `7e0c8a6` 上 `NL_REPLAY=strict pnpm check` exit 0（Vitest 77 文件通过 + 1 跳过，1218 用例通过 + 3 跳过）；`NL_REPLAY=strict playwright test --grep 'M5 full delivery'`（无头隔离 HOME/XDG）1 passed（17.4s）。
+- Check waived: 三平台中 Windows/macOS 的物理桌面回执（见 07/09/10）；所有者；2026-11-26
+- Review: skipped — 所有者 2026-11-26 指示直接通过；本次只更新证据与工作流文件。

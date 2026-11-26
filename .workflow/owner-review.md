@@ -4,11 +4,7 @@
 
 ## 等所有者决定
 
-- **品牌图标**：发布前重新设计；在那之前安装包用现有图标。
-- **签名与公证**：Windows 代码签名证书、Apple 开发者账号要不要买。在那之前 M5 只出未签名的安装包。
-- **正式仓库与自动更新**：正式仓库建在哪，自动更新从哪个仓库的 Releases 下载。在那之前不发公开 Release。
-- **界面翻译抽查**：M5 前模型翻成繁体中文、英文、日文后，由所有者抽查。机器译文在 `packages/ui/src/locales/{zh-TW,en,ja}/`，四种语言的书库、用量、设置截图在 `.workflow/evidence/m5/localization/`；改动译文直接编辑对应 JSON，单元测试会校验键与插值。
-- **物理 Windows/macOS 桌面复检**：两平台 CI 原生构建与无头测试已通过（见 `.workflow/evidence/m5/windows/README.md` 与 `macos/README.md`），但物理 Windows Explorer / macOS Finder 图形界面双击 `.novelive`（含 LaunchServices `open-file` AppleEvent）、新版 NSIS 覆盖安装 `quitAndInstall`、macOS `.zip` 直接解压启动及打包后非 `zh-CN` 界面切换仍待物理真机复验。
+- **正式仓库**：建在哪另议；在那之前不发公开 Release。自动更新所有者 2026-11-26 确认要做，更新源依赖正式仓库，另立任务。
 
 ## 付费账本对账
 
