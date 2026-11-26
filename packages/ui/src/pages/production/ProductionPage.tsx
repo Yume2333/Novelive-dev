@@ -37,6 +37,7 @@ import { ChapterState, stepName, stepProgress, steps } from './ChapterState'
 import styles from './Production.module.css'
 import { ProductionNotice } from './ProductionNotice'
 import { StaleAssetsDrawer, useStaleAssets } from './StaleAssets'
+import { volumeLabelUnlessOrdinal } from './volumeLabel'
 
 const t = scoped('production')
 
@@ -435,7 +436,7 @@ export function ProductionPage() {
 					<h2 className={styles.sectionLabel} id="production-chapters">
 						{project
 							? t('{{volume}} · 共 {{length}} 章', {
-									volume: formatVolumeLabel({
+									volume: volumeLabelUnlessOrdinal({
 										index: project.volumeIndex,
 										title: project.volumeTitle,
 									}),

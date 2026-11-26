@@ -410,7 +410,7 @@ test('import wizard pages capture matched-viewport parity evidence', async () =>
 			await shot('import-step2')
 			await page.getByRole('button', { name: '下一步', exact: true }).click()
 			await expect(
-				page.locator('[aria-current="step"]', { hasText: '改编设置' }),
+				page.locator('[aria-current="step"]', { hasText: '插图与参考' }),
 			).toBeVisible()
 			await shot('import-step3')
 		} finally {

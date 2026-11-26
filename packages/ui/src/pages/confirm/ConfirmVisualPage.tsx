@@ -303,10 +303,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 				project
 					? `${t('{{series}} · {{volume}}', {
 							series: project.seriesTitle,
-							volume: formatVolumeLabel({
-								index: project.volumeIndex,
-								title: project.volumeTitle,
-							}),
+							volume: formatVolumeLabel({ index: project.volumeIndex }),
 						})} · ${t('确认点 1 / 2')}`
 					: t('确认点 1 / 2')
 			}
@@ -486,9 +483,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 										>
 											<legend className={local.outfitHeader}>
 												<SectionLabel>
-													{t('造型 · {{value}}', {
-														value: names.costumes.get(key) ?? '',
-													})}
+													{names.costumes.get(key) ?? ''}
 												</SectionLabel>
 											</legend>
 											<Card className={`${local.cardBody} ${local.grid}`}>
