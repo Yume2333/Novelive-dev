@@ -38,4 +38,4 @@ The owner pre-authorized autonomous delivery; no separate sign-off was sought.
 
 - 13 follow-up items at `/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/followups.md` — all MINOR, none affecting the shipping surface: legacy run-record `errorKind` fallback, `shareErrorCodes` literal duplication, NULL-meta defensive parse, DOCX dead error code, TXT fallback mis-classification, pre-existing-on-main editor draft/effect-deps/double-fetch items, two test-assertion nits, a cosmetic path-collapse inconsistency, bespoke read-only field markup, and the Xvfb minimize harness limitation.
 - Join-mode read-only 系列 field never visually captured (would need invented fixtures); covered by the `m4-import-join` e2e assertion instead.
-- Landing onto main is directed by the maintainer; the gate itself does not merge.
+- Landed onto main by gate 08 (merge of ui-polish/integration).
