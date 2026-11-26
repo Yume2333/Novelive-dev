@@ -2,7 +2,10 @@ import type { CommandOutput } from '@novelive/creator/contract'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { Fields } from '../../packages/ui/src/pages/bible/BibleFields'
+import {
+	labelFor,
+	OtherFields,
+} from '../../packages/ui/src/pages/bible/BibleFields'
 import { CharacterDetail } from '../../packages/ui/src/pages/bible/CharacterDetail'
 
 type BibleCharacter = CommandOutput<'bible.get'>['characters'][number]
@@ -68,7 +71,6 @@ describe('Story Bible structured character details', () => {
 		expect(html).toContain('深棕')
 		expect(html).toContain('海事局实习制服')
 		expect(html).toContain('小林')
-		expect(html).toContain('refs/xia-base.png')
 		expect(html).toContain('还有 1 条变化')
 
 		expect(html).not.toContain('描述：')
@@ -79,21 +81,60 @@ describe('Story Bible structured character details', () => {
 		expect(html).not.toContain('ID：')
 	})
 
-	it('renders nested object and array fields structurally in generic Fields without key:value concatenation', () => {
+	it('never shows raw reference file paths or raw chapter ids', () => {
 		const html = renderToStaticMarkup(
-			createElement(Fields, {
-				entry: {
-					name: '旧码头',
-					variants: [{ id: 'fog', description: '大雾清晨' }],
-					references: [{ path: 'refs/dock.png', description: '远景透视' }],
-				},
+			createElement(CharacterDetail, {
+				character: xia,
+				characters: [xia, lin],
 			}),
 		)
 
-		expect(html).toContain('<dt>变体</dt>')
-		expect(html).toContain('<dt>ID</dt><dd>fog</dd>')
-		expect(html).toContain('<dt>描述</dt><dd>大雾清晨</dd>')
-		expect(html).not.toContain('ID：fog')
-		expect(html).not.toContain('描述：大雾清晨')
+		expect(html).toContain('半身正面参考')
+		expect(html).not.toContain('refs/xia-base.png')
+		expect(html).not.toContain('ch01')
+		expect(html).not.toContain('ch02')
+		expect(html).toContain('第 1 章')
+	})
+
+	it('keeps leftover open-schema keys inside a collapsed 其他信息 disclosure without raw English keys', () => {
+		const html = renderToStaticMarkup(
+			createElement(OtherFields, {
+				entry: {
+					name: '旧码头',
+					signatureMove: '撑伞回头',
+					variants: [{ id: 'fog', description: '大雾清晨' }],
+				},
+				omit: ['name'],
+			}),
+		)
+
+		// 其余键收进「其他信息」折叠区，正文仍在 DOM 里（默认收起）
+		expect(html).toContain('其他信息')
+		expect(html).toContain('大雾清晨')
+		// 未知键人性化，绝不出现原始 camelCase
+		expect(html).not.toContain('signatureMove')
+		expect(html).toContain('Signature move')
+		// id 不作为标签展示
+		expect(html).not.toContain('<dt>ID</dt>')
+		expect(html).not.toContain('>id</dt>')
+	})
+
+	it('formats chapter-valued keys in 其他信息 as ordinals, never raw ids', () => {
+		const html = renderToStaticMarkup(
+			createElement(OtherFields, {
+				entry: { firstSeenChapter: 'ch03' },
+			}),
+		)
+
+		expect(html).toContain('首次出场')
+		expect(html).toContain('第 3 章')
+		expect(html).not.toContain('ch03')
+	})
+
+	it('humanizes unknown keys and keeps localized labels for known keys', () => {
+		expect(labelFor('personality')).toBe('性格')
+		expect(labelFor('firstSeenChapter')).toBe('首次出场')
+		expect(labelFor('someNewField')).toBe('Some new field')
+		expect(labelFor('snake_case_key')).toBe('Snake case key')
 	})
 })

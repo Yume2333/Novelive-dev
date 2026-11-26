@@ -5,7 +5,7 @@
 }
 
 .sectionLabel {
-	margin-bottom: 10px;
+	margin-bottom: var(--space-px-10);
 	color: var(--color-outline);
 }
 
@@ -27,7 +27,7 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-3);
-	padding: 10px var(--space-3);
+	padding: var(--space-px-10) var(--space-3);
 	border-radius: var(--radius-lg);
 }
 
@@ -49,7 +49,7 @@ a.row {
 	flex: 1;
 	flex-direction: column;
 	align-items: flex-start;
-	gap: 2px;
+	gap: var(--space-px-2);
 }
 
 .rowLink {
@@ -64,7 +64,7 @@ a.rowLink {
 .title {
 	overflow: hidden;
 	max-width: 100%;
-	font-size: 14px;
+	font-size: var(--text-14);
 	font-weight: 600;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -76,7 +76,7 @@ a.rowLink {
 
 .status {
 	color: var(--color-outline);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 .confirm {
@@ -86,11 +86,6 @@ a.rowLink {
 .chevron {
 	flex-shrink: 0;
 	color: var(--color-outline);
-}
-
-.empty {
-	margin: 0;
-	color: var(--color-on-surface-variant);
 }
 
 .topAction {

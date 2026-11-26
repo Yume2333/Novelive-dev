@@ -38,7 +38,9 @@
 	align-items: center;
 	gap: var(--space-px-10);
 	padding: var(--space-px-2) var(--space-3) var(--space-px-14);
-	font: 700 16px var(--font-display);
+	font-family: var(--font-display);
+	font-size: var(--text-16);
+	font-weight: 700;
 	letter-spacing: 0.12em;
 }
 
@@ -62,7 +64,7 @@
 	padding: var(--space-px-9) var(--space-3);
 	border-radius: var(--radius-lg);
 	color: var(--color-on-surface-variant);
-	font-size: 14px;
+	font-size: var(--text-14);
 	font-weight: 500;
 	transition:
 		background var(--dur-fast) var(--ease-out),
@@ -80,7 +82,7 @@
 .sectionTitle {
 	padding: var(--space-px-18) var(--space-3) var(--space-2);
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 }
 
 .currentWork {
@@ -112,20 +114,34 @@
 }
 
 .workTitle {
-	font-size: 14px;
+	font-size: var(--text-14);
 	font-weight: 600;
 }
 
 .workMeta {
 	color: var(--color-outline);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 .switcher {
 	display: flex;
-	padding: var(--space-px-6);
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	flex-shrink: 0;
+	border: 1px solid var(--white-60);
 	border-radius: var(--radius-full);
-	color: var(--color-outline);
+	background: var(--white-40);
+	color: var(--color-on-surface-variant);
+	transition:
+		background var(--dur-fast) var(--ease-out),
+		color var(--dur-fast) var(--ease-out);
+}
+
+.switcher:hover {
+	background: var(--white-90);
+	color: var(--color-primary);
 }
 
 .agent {
@@ -136,7 +152,7 @@
 	padding: var(--space-px-9) var(--space-3);
 	border-radius: var(--radius-lg);
 	color: var(--color-primary);
-	font-size: 14px;
+	font-size: var(--text-14);
 	font-weight: 600;
 	text-align: left;
 }
@@ -151,7 +167,9 @@
 
 .agent kbd {
 	color: var(--color-outline);
-	font: 500 11px var(--font-body);
+	font-family: var(--font-body);
+	font-size: var(--text-11);
+	font-weight: 500;
 }
 
 .footer {
@@ -197,29 +215,13 @@
 	min-width: 0;
 }
 
-.warning {
+.interruption {
 	display: flex;
-	align-items: center;
-	gap: var(--space-2);
 	margin: var(--space-3) var(--space-3) 0;
-	padding: var(--space-3) var(--space-4);
-	border-radius: var(--radius-lg);
-	background: var(--color-error-container);
-	color: var(--color-on-error-container);
 }
 
-.warning span {
+.interruption > * {
 	flex: 1;
-}
-
-.warning button {
-	padding: var(--space-1) var(--space-2);
-	border: 1px solid var(--accent-border-20);
-	border-radius: var(--radius-md);
-	color: inherit;
-	background: var(--white-55);
-	white-space: nowrap;
-	cursor: pointer;
 }
 
 .announcer {
@@ -257,4 +259,19 @@
 	.agentOverlay {
 		animation: none;
 	}
+}
+
+/* 切换菜单的分组标题（禁用菜单项）不参与悬停高亮，呈现为安静的分组标签。
+   `.nl-dropdown-item` 是全局工具类，这条规则语义上适用于所有禁用菜单项。 */
+:global(.nl-dropdown-item):disabled:hover {
+	background: transparent;
+}
+
+:global(.nl-dropdown-item):disabled {
+	opacity: 1;
+	color: var(--color-outline);
+	font-size: var(--text-11);
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	cursor: default;
 }

@@ -1,5 +1,12 @@
-import { BookmarkPlus, ChevronLeft, ChevronRight, Save } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import {
+	BookmarkPlus,
+	ChevronLeft,
+	ChevronRight,
+	History,
+	Save,
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
 	PlaybackHistory,
 	SaveEntry,
@@ -8,6 +15,9 @@ import type {
 } from '../../../../../player/src/contract'
 import { manualSaveSlots } from '../../../../../player/src/contract'
 import { slotKey } from '../../../../../player/src/progress'
+import { ErrorNotice } from '../../../components/Feedback'
+import { EmptyState } from '../../../components/Page'
+import { formatChapterLabel } from '../../../format/chapter'
 import { scoped } from '../../../i18n'
 import {
 	type LegacySaveActions,
@@ -49,6 +59,21 @@ export function ProgressPanel({
 	chapters?: readonly HistoryChapter[]
 	onSlot(slot: SaveSlot): void
 }) {
+	const { i18n } = useTranslation()
+	/** 存档时间跟随 UI 语言，精确到分（不显示秒），与运行记录格式一致 */
+	const saveTimeFormatter = useMemo(
+		() =>
+			new Intl.DateTimeFormat(i18n.language, {
+				dateStyle: 'medium',
+				timeStyle: 'short',
+			}),
+		[i18n.language],
+	)
+	const formatSaveTime = (savedAt: string): string => {
+		const date = new Date(savedAt)
+		if (Number.isNaN(date.getTime())) return ''
+		return saveTimeFormatter.format(date)
+	}
 	const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
 	const [failure, setFailure] = useState('')
 	const [page, setPage] = useState(0)
@@ -69,13 +94,13 @@ export function ProgressPanel({
 		if (last?.chapterId === chapterId) last.rows.push({ ...entry, index })
 		else historyGroups.push({ chapterId, rows: [{ ...entry, index }] })
 	})
-	const chapterLabel = (chapterId: string) => {
+	const chapterLabelFor = (chapterId: string) => {
 		const order = chapters.findIndex(
 			(chapter) => chapter.chapterId === chapterId,
 		)
 		return order === -1
-			? chapterId
-			: t('第 {{index}} 章 · {{title}}', {
+			? t('未知章节')
+			: formatChapterLabel({
 					index: order + 1,
 					title: chapters[order].title,
 				})
@@ -102,7 +127,7 @@ export function ProgressPanel({
 				if (!cancelled) setThumbnails(Object.fromEntries(images))
 			})
 			.catch(() => {
-				if (!cancelled) setFailure(t('无法加载存档缩略图'))
+				if (!cancelled) setFailure(t('无法加载存档缩略图，请重试。'))
 			})
 		return () => {
 			cancelled = true
@@ -136,10 +161,10 @@ export function ProgressPanel({
 							<section
 								key={rows[0].key}
 								className="nl-history-list"
-								aria-label={chapterLabel(chapterId)}
+								aria-label={chapterLabelFor(chapterId)}
 							>
 								<h3 className="nl-history-chapter">
-									{chapterLabel(chapterId)}
+									{chapterLabelFor(chapterId)}
 								</h3>
 								{rows.map(({ snapshot, key, index }) => (
 									<button
@@ -166,21 +191,12 @@ export function ProgressPanel({
 						))}
 					</div>
 				) : (
-					<p>{t('暂无历史记录')}</p>
+					<EmptyState icon={History} text={t('暂无历史记录')} />
 				)}
 			</>
 		)
 	const slotMeta = (entry: SaveEntry) => {
-		const order = chapters.findIndex(
-			(chapter) => chapter.chapterId === entry.snapshot.position.chapterId,
-		)
-		const chapter =
-			order === -1
-				? entry.snapshot.position.chapterId
-				: t('第 {{index}} 章 · {{title}}', {
-						index: order + 1,
-						title: chapters[order].title,
-					})
+		const chapter = chapterLabelFor(entry.snapshot.position.chapterId)
 		const line = entry.snapshot.stage.text.content
 			.map((part) => (part.type === 'text' ? part.text : ''))
 			.join('')
@@ -190,9 +206,14 @@ export function ProgressPanel({
 	const quickEntry = progress.saves.find((entry) => entry.slot.kind === 'quick')
 	return (
 		<>
-			{failure && <p role="alert">{failure}</p>}
-			{legacySaves && (
-				<LegacySavePanel key={workId} workId={workId} actions={legacySaves} />
+			{failure && <ErrorNotice message={failure} />}
+			{view === 'load' && legacySaves && (
+				<LegacySavePanel
+					key={workId}
+					workId={workId}
+					chapters={chapters}
+					actions={legacySaves}
+				/>
 			)}
 			{page === 0 && (
 				<div className="nl-quicksave-strip">
@@ -228,7 +249,7 @@ export function ProgressPanel({
 						</span>
 						{quickEntry ? (
 							<time dateTime={quickEntry.savedAt}>
-								{new Date(quickEntry.savedAt).toLocaleString()}
+								{formatSaveTime(quickEntry.savedAt)}
 							</time>
 						) : (
 							<span className="nl-save-meta">—</span>
@@ -250,8 +271,8 @@ export function ProgressPanel({
 							hidden={Math.floor(index / slotsPerPage) !== page}
 							aria-label={
 								view === 'save'
-									? t('存档槽位 {{index}}', { index: index + 1 })
-									: t('读档槽位 {{index}}', { index: index + 1 })
+									? t('存入存档 {{index}}', { index: index + 1 })
+									: t('读取存档 {{index}}', { index: index + 1 })
 							}
 							disabled={view === 'load' && !entry}
 							onClick={() => onSlot(slot)}
@@ -261,7 +282,7 @@ export function ProgressPanel({
 									src={thumbnails[name]}
 									width={480}
 									height={270}
-									alt={t('槽位 {{value}} 缩略图', { value: index + 1 })}
+									alt={t('存档 {{index}} 缩略图', { index: index + 1 })}
 								/>
 							) : (
 								<span className="nl-save-empty">
@@ -269,16 +290,14 @@ export function ProgressPanel({
 								</span>
 							)}
 							<span className="nl-save-title">
-								{entry
-									? t('槽位 {{value}}', { value: index + 1 })
-									: t('空存档位')}
+								{entry ? slotMeta(entry) : t('空存档位')}
 							</span>
-							{entry && (
-								<span className="nl-save-excerpt">{slotMeta(entry)}</span>
-							)}
+							<span className="nl-save-excerpt">
+								{t('存档 {{index}}', { index: index + 1 })}
+							</span>
 							{entry ? (
 								<time dateTime={entry.savedAt}>
-									{new Date(entry.savedAt).toLocaleString()}
+									{formatSaveTime(entry.savedAt)}
 								</time>
 							) : (
 								<span className="nl-save-meta">—</span>

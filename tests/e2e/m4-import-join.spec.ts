@@ -67,16 +67,22 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 		await page.getByRole('radio', { name: '加入已有系列' }).check()
 		await expect(page.getByRole('textbox', { name: '作品名' })).toHaveCount(0)
 		await page.getByRole('button', { name: '选择已有工程' }).click()
-		await expect(page.getByRole('alert')).toHaveText(
-			'请选择有效的 Novelive 工程文件夹',
+		// import.target 的 invalid_join_target 穿过 IPC 后按码本地化，
+		// 必须是指明原因的句子而不是通用的模型错误文案
+		await expect(page.getByRole('alert')).toContainText(
+			'无法加入，所选文件夹不是有效的工程。',
 		)
 		await expect(
 			page.getByRole('button', { name: '下一步', exact: true }),
 		).toBeDisabled()
 		await page.getByRole('button', { name: '选择已有工程' }).click()
 		await expect(
-			page.getByRole('combobox', { name: '系列', exact: true }),
-		).toHaveValue('series')
+			page.getByRole('main').getByText('系列', { exact: true }),
+		).toBeVisible()
+		await expect(
+			page.getByRole('main').getByText('已有系列', { exact: true }),
+		).toBeVisible()
+		await expect(page.getByRole('combobox', { name: '系列' })).toHaveCount(0)
 		await expect(
 			page.getByRole('button', { name: '下一步', exact: true }),
 		).toBeEnabled()

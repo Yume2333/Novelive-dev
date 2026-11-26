@@ -69,6 +69,7 @@ function appState(): HostState {
 		generation,
 		breakerOpen: failures >= failureLimit,
 		logDir: logDir(),
+		homeDir: app.getPath('home'),
 	}
 }
 

@@ -2,7 +2,7 @@ import { installedProgressKey } from '@novelive/creator/contract'
 import type { WorkSettings } from '@novelive/format/model'
 import { type CompiledScene, compileScript } from '@novelive/format/script'
 import { mountMinimalPlayer } from '@novelive/player'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, CircleAlert, FolderOpen } from 'lucide-react'
 import {
 	type RefObject,
 	useCallback,
@@ -33,6 +33,14 @@ import { type ControlChapter, PlayerControls } from './controls/PlayerControls'
 import { containsSentence, restoredChapterMode } from './controls/position'
 import { useChapterWait } from './controls/useChapterWait'
 import './player.css'
+import { Button } from '../../components/Button'
+import { ErrorNotice } from '../../components/Feedback'
+import { useToast } from '../../components/Toast'
+import {
+	formatErrorText,
+	type HumanizedError,
+	humanizeError,
+} from '../../format/errors'
 import { scoped } from '../../i18n'
 
 const t = scoped('player')
@@ -133,8 +141,17 @@ export function PlayerPage({
 	const [veiled, setVeiled] = useState(true)
 	const [textFinished, setTextFinished] = useState(false)
 	const wheelAt = useRef(0)
-	const [error, setError] = useState('')
+	const [loadError, setLoadError] = useState<{
+		error: HumanizedError
+		retry?: () => void
+	}>()
+	const transientFailure = useRef<HumanizedError | undefined>(undefined)
 	const [loading, setLoading] = useState(false)
+	const toast = useToast()
+	const toastError = useCallback(
+		(message: string) => toast(message, CircleAlert),
+		[toast],
+	)
 	useEffect(() => {
 		void progressId
 		progressReady.current = undefined
@@ -209,9 +226,32 @@ export function PlayerPage({
 			restore?: StageSnapshot,
 			onValidated?: () => PlaybackMode,
 			fromStart = false,
+			report: 'block' | 'none' = 'block',
 		) => {
 			if (!id || !progressId) return
-			setError('')
+			// 播放中途的失败（report: 'none'）不弹全屏错误层——播放器仍在运行，
+			// 全屏层会永久挡住菜单与舞台；只把人话错误存进 transientFailure，
+			// 由调用方以 toast 呈现。初始载入失败（report: 'block'）才用全屏层。
+			const fail = (error: HumanizedError) => {
+				transientFailure.current = error
+				if (report === 'block')
+					setLoadError({
+						error,
+						retry: () =>
+							void loadProject(
+								directory,
+								chapterId,
+								mode,
+								waitForClick,
+								restore,
+								onValidated,
+								fromStart,
+								report,
+							),
+					})
+			}
+			setLoadError(undefined)
+			transientFailure.current = undefined
 			setLoading(true)
 			try {
 				progressReady.current ??= (async () => {
@@ -258,14 +298,21 @@ export function PlayerPage({
 					speakers,
 					customMarks: Object.keys(customMarks),
 				})
-				if (!result.ok)
-					throw new Error(
-						result.diagnostics.map((item) => item.message).join('\n'),
-					)
-				if (!result.scenes.some((scene) => scene.beats.length))
-					throw new Error(t('本章还没有可播放的剧本'))
-				if (restore && !containsSentence(result.scenes, restore.position))
-					throw new Error(t('存档中的句子已不存在'))
+				if (!result.ok) {
+					fail?.({
+						message: t('这部作品的内容有问题，无法播放。'),
+						detail: result.diagnostics.map((item) => item.message).join('\n'),
+					})
+					return false
+				}
+				if (!result.scenes.some((scene) => scene.beats.length)) {
+					fail?.({ message: t('本章还没有可播放的剧本') })
+					return false
+				}
+				if (restore && !containsSentence(result.scenes, restore.position)) {
+					fail?.({ message: t('存档中的句子已不存在') })
+					return false
+				}
 				const validatedMode =
 					onValidated?.() ??
 					(mode === 'select-chapter'
@@ -324,16 +371,16 @@ export function PlayerPage({
 				})
 				return true
 			} catch (cause) {
-				if (
-					directory ||
-					chapterId ||
-					!cause ||
-					typeof cause !== 'object' ||
-					!('code' in cause) ||
-					cause.code !== 'not_found'
-				)
-					setError(
-						cause instanceof Error ? cause.message : t('无法打开本地工程'),
+				const silent =
+					!directory &&
+					!chapterId &&
+					cause &&
+					typeof cause === 'object' &&
+					'code' in cause &&
+					cause.code === 'not_found'
+				if (!silent)
+					fail?.(
+						cause ? humanizeError(cause) : { message: t('无法打开本地工程') },
 					)
 				return false
 			} finally {
@@ -382,7 +429,18 @@ export function PlayerPage({
 						.textFinished === 'true',
 			)
 		})
-		const fail = () => setError(t('无法加载舞台素材'))
+		const stageFail = () =>
+			setLoadError({
+				error: { message: t('无法加载舞台素材，请重试。') },
+				retry: () =>
+					void loadProject(
+						undefined,
+						loaded.chapterId,
+						loaded.mode,
+						false,
+						loaded.restore,
+					),
+			})
 		let restoring = !!loaded.restore
 		void mountMinimalPlayer(
 			host.current,
@@ -395,7 +453,7 @@ export function PlayerPage({
 				},
 			},
 			controller.signal,
-			fail,
+			stageFail,
 			loaded.speakerNames,
 			controls.rendered,
 			{
@@ -420,15 +478,23 @@ export function PlayerPage({
 					if (progressId)
 						void progressApi
 							?.save(progressId, progress.current.data)
-							.catch(() => setError(t('无法保存阅读进度')))
+							.catch(() => toastError(t('无法保存阅读进度，请重试。')))
 				},
 			},
-		).catch(fail)
+		).catch(stageFail)
 		return () => {
 			unsubscribe()
 			controller.abort()
 		}
-	}, [loaded, awaitingClick, id, progressApi, progressId])
+	}, [
+		loaded,
+		awaitingClick,
+		id,
+		progressApi,
+		progressId,
+		loadProject,
+		toastError,
+	])
 	async function save(slot: SaveSlot) {
 		const api = window.novelive.host.progress
 		const stage = host.current?.querySelector('.nl-player-stage')
@@ -448,8 +514,11 @@ export function PlayerPage({
 	async function restore(
 		snapshot: StageSnapshot | null,
 		onValidated: () => PlaybackMode,
+		background = false,
 	) {
 		if (snapshot) {
+			// 读档／回退发生在播放中途：播放器仍在运行，全屏错误层会永久挡住
+			// 菜单与舞台，因此一律用 'none' 上报，由 slotAction 的 catch 以 toast 呈现。
 			const loaded = await loadProject(
 				undefined,
 				snapshot.position.chapterId,
@@ -457,20 +526,31 @@ export function PlayerPage({
 				false,
 				snapshot,
 				onValidated,
+				false,
+				'none',
 			)
-			if (!loaded) throw new Error(t('无法读取存档'))
+			if (!loaded)
+				throw new Error(
+					transientFailure.current
+						? formatErrorText(transientFailure.current)
+						: t('无法读取存档，请重试。'),
+				)
 		}
 	}
 	function restoreHistory(index: number) {
 		const snapshot = progress.current.history.entries[index]
 		if (snapshot)
-			void restore(snapshot, () => {
-				progress.current.jump(index)
-				return restoredChapterMode(
-					progress.current.data,
-					snapshot.position.chapterId,
-				)
-			}).catch(() => setError(t('无法读取历史记录')))
+			void restore(
+				snapshot,
+				() => {
+					progress.current.jump(index)
+					return restoredChapterMode(
+						progress.current.data,
+						snapshot.position.chapterId,
+					)
+				},
+				true,
+			).catch(() => toastError(t('无法读取历史记录，请重试。')))
 	}
 	const nextChapter = loaded
 		? chapters[
@@ -489,7 +569,7 @@ export function PlayerPage({
 		directory: directoryRef.current,
 		loadChapter: loadProject,
 		setChapters,
-		onError: setError,
+		onError: toastError,
 		offline: Boolean(version),
 	})
 	const replayChapter = useCallback(() => {
@@ -628,18 +708,34 @@ export function PlayerPage({
 					onOverlayChange={setOverlayActive}
 				/>
 			)}
-			{!loaded && !version && (
-				<button
-					type="button"
-					disabled={loading}
-					onClick={() => void openProject()}
-				>
-					{loading ? t('正在加载') : t('打开本地工程')}
-				</button>
+			{!loaded && !version && !loadError && (
+				<div className="nl-player-open">
+					<Button
+						variant="primary"
+						icon={FolderOpen}
+						loading={loading}
+						onClick={() => void openProject()}
+					>
+						{loading ? t('正在加载') : t('打开本地工程')}
+					</Button>
+				</div>
 			)}
-			{error && (
-				<div role="alert" className="nl-player-error">
-					{error}
+			{loadError && (
+				<div className="nl-player-error">
+					<div className="nl-player-error-card nl-scroll-hidden">
+						<ErrorNotice error={loadError.error} onRetry={loadError.retry} />
+						{!version && (
+							<Button
+								variant="secondary"
+								icon={FolderOpen}
+								loading={loading}
+								className="nl-player-error-open"
+								onClick={() => void openProject()}
+							>
+								{loading ? t('正在加载') : t('打开本地工程')}
+							</Button>
+						)}
+					</div>
 				</div>
 			)}
 		</main>

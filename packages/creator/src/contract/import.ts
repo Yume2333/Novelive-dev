@@ -12,6 +12,16 @@ import {
 } from '@earendil-works/pi-schema'
 import { entityId, workId } from '@novelive/format/model'
 import { encodings } from '../import/txt/encoding'
+import { importErrorCodes } from './errors'
+
+// Import failures reach the UI as command output with a machine-readable code;
+// `detail` is the raw backend text for the details disclosure only.
+export const importFailureSchema = obj({
+	status: lit('error'),
+	format: str({ minLength: 1 }),
+	code: oneOf(importErrorCodes),
+	detail: opt(str()),
+})
 
 const text = str({ minLength: 1 })
 const encoding = oneOf(encodings)
@@ -158,6 +168,7 @@ const fileImport = {
 			format: lit('pdf'),
 			reason: lit('no_extractable_text'),
 		}),
+		importFailureSchema,
 	]),
 }
 
@@ -174,6 +185,6 @@ export const importCommands = {
 			layout: importLayoutSchema,
 			selectedIllustrations: opt(arr(text, { maxItems: 3, uniqueItems: true })),
 		}),
-		output: importWizardSchema,
+		output: union([importWizardSchema, importFailureSchema]),
 	},
 }

@@ -1,15 +1,12 @@
-import {
-	type CommandOutput,
-	productionQueueEvent,
-} from '@novelive/creator/contract'
+import type { CommandOutput } from '@novelive/creator/contract'
 import {
 	BookOpen,
 	ChevronDown,
 	ChevronsUp,
-	CircleAlert,
 	CircleCheck,
 	Clapperboard,
 	Ellipsis,
+	NotebookPen,
 	Package,
 	Palette,
 	Play,
@@ -17,7 +14,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Button } from '../../components/Button'
+import { Button, buttonClasses } from '../../components/Button'
 import {
 	Card,
 	ChapterStatusMark,
@@ -27,11 +24,14 @@ import {
 } from '../../components/Card'
 import { Dropdown } from '../../components/Dropdown'
 import { Pagination, Tooltip } from '../../components/Extended'
+import { ButtonLink } from '../../components/Feedback'
 import { GradientCover } from '../../components/GradientCover'
-import { Page } from '../../components/Page'
+import { EmptyState, Page } from '../../components/Page'
+import { formatChapterNumeral, formatVolumeLabel } from '../../format/chapter'
+import { formatErrorText, humanizeError } from '../../format/errors'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
-import { chapterIndex } from '../production/ProductionPage'
+import { queuePosition, useProductionQueue } from './queue'
 import { ExportPackage } from './share/ExportPackage'
 import local from './WorkPage.module.css'
 import { chapterTitle, useWorkProduction } from './WorkProduction'
@@ -47,65 +47,20 @@ const stepLabel = {
 	draw: msg('出图'),
 } as const
 
-type Queue = CommandOutput<'production.getQueue'>
-
-/** 队列位置：active 为 0，queued 依次后排；不在队列返回 undefined。 */
-function queuePosition(queue: Queue | undefined, workId: string) {
-	if (!queue) return undefined
-	if (queue.active?.link.workId === workId) return 0
-	const index = queue.queued.findIndex((work) => work.link.workId === workId)
-	return index === -1 ? undefined : index + 1
-}
-
-function useProductionQueue() {
-	const [queue, setQueue] = useState<Queue>()
-	useEffect(() => {
-		let active = true
-		let revision = 0
-		const load = () => {
-			const current = ++revision
-			void window.novelive.call('production.getQueue', {}).promise.then(
-				(next) => {
-					if (active && current === revision) setQueue(next)
-				},
-				() => {},
-			)
-		}
-		const offEvent = window.novelive.on('event', (event) => {
-			if (event.scope !== 'app' || !productionQueueEvent.check(event.event))
-				return
-			revision++
-			setQueue(event.event.payload)
-		})
-		const offReady = window.novelive.on('creator.ready', load)
-		const offDown = window.novelive.on('creator.down', () => {
-			revision++
-			setQueue(undefined)
-		})
-		void window.novelive.host.appState().then((state) => {
-			if (active && revision === 0 && state.creator === 'ready') load()
-		})
-		return () => {
-			active = false
-			offEvent()
-			offReady()
-			offDown()
-		}
-	}, [])
-	return queue
-}
-
 function QueueChip({
 	position,
 	running,
+	stopped,
 }: {
 	position?: number
 	running: boolean
+	stopped: boolean
 }) {
 	if (position === 0 && running) return <Chip active>{t('正在处理')}</Chip>
 	if (position !== undefined && position > 0)
-		return <Chip>{t('排在第 {{value}} 位', { value: position + 1 })}</Chip>
-	return <Chip>{t('已停止')}</Chip>
+		return <Chip>{t('排在第 {{value}} 位', { value: position })}</Chip>
+	if (stopped) return <Chip>{t('已停止')}</Chip>
+	return null
 }
 
 function PhaseCard({ position }: { position?: number }) {
@@ -136,12 +91,12 @@ function PhaseCard({ position }: { position?: number }) {
 							: t('第一章已发布，可以先试玩，再继续制作。')}
 					</p>
 				</div>
-				<Link
-					className={local.primaryLink}
+				<ButtonLink
+					variant="primary"
 					to={workRoute(visual ? 'confirmVisual' : 'confirmFirst', workId)}
 				>
 					{visual ? t('选择主视觉') : t('确认第一章')}
-				</Link>
+				</ButtonLink>
 			</Card>
 		)
 	}
@@ -174,11 +129,18 @@ function PhaseCard({ position }: { position?: number }) {
 						</div>
 					)}
 				</div>
-				<QueueChip position={position} running={running} />
-				<Link className={local.buttonLink} to={workRoute('production', workId)}>
-					<Clapperboard aria-hidden="true" size={16} strokeWidth={1.8} />
+				<QueueChip
+					position={position}
+					running={running}
+					stopped={status === 'stopped'}
+				/>
+				<ButtonLink
+					variant="secondary"
+					icon={Clapperboard}
+					to={workRoute('production', workId)}
+				>
 					{t('打开制作面板')}
-				</Link>
+				</ButtonLink>
 			</Card>
 		)
 	}
@@ -197,7 +159,7 @@ function PhaseCard({ position }: { position?: number }) {
 							: status === 'stopped'
 								? t('制作中 · 已停止')
 								: position !== undefined && position > 0
-									? t('制作中 · 排在第 {{value}} 位', { value: position + 1 })
+									? t('制作中 · 排在第 {{value}} 位', { value: position })
 									: t('制作中')}
 					</p>
 					<p className={local.phaseText}>
@@ -227,10 +189,13 @@ function PhaseCard({ position }: { position?: number }) {
 						</p>
 					)}
 				</div>
-				<Link className={local.buttonLink} to={workRoute('production', workId)}>
-					<Clapperboard aria-hidden="true" size={16} strokeWidth={1.8} />
+				<ButtonLink
+					variant="secondary"
+					icon={Clapperboard}
+					to={workRoute('production', workId)}
+				>
 					{t('打开制作面板')}
-				</Link>
+				</ButtonLink>
 			</Card>
 		)
 	}
@@ -278,10 +243,12 @@ function HeroCard() {
 			<div className={local.heroText}>
 				{project && (
 					<p className={`label-caps label-caps-zh ${local.heroEyebrow}`}>
-						{t('{{series}} · 第 {{index}} 卷 · {{volume}}', {
+						{t('{{series}} · {{volume}}', {
 							series: project.seriesTitle,
-							index: project.volumeIndex,
-							volume: project.volumeTitle,
+							volume: formatVolumeLabel({
+								index: project.volumeIndex,
+								title: project.volumeTitle,
+							}),
 						})}
 					</p>
 				)}
@@ -336,7 +303,7 @@ function ChapterRow({
 	const playable = chapter.status === 'published'
 	const body = (
 		<>
-			<span className={local.index}>{chapterIndex(index)}</span>
+			<span className={local.index}>{formatChapterNumeral(index)}</span>
 			<span className={local.name}>{title}</span>
 			{chapter.priority && chapter.status === 'waiting' && (
 				<span className={`label-caps label-caps-zh ${local.priority}`}>
@@ -347,16 +314,16 @@ function ChapterRow({
 			{chapter.status === 'producing' && (
 				<span className={local.step}>{t(stepLabel[chapter.step])}</span>
 			)}
-			{chapter.issue && (
-				<Tooltip text={chapter.issue}>
-					<span className={local.issue}>
-						<CircleAlert aria-hidden="true" size={13} strokeWidth={1.8} />
-						{chapter.issue}
+			<span className={local.spacer} />
+			{chapter.issue ? (
+				<Tooltip text={formatErrorText(humanizeError(chapter.issue))}>
+					<span className={local.issueWrap}>
+						<ChapterStatusMark status={chapter.status} attention />
 					</span>
 				</Tooltip>
+			) : (
+				<ChapterStatusMark status={chapter.status} />
 			)}
-			<span className={local.spacer} />
-			<ChapterStatusMark status={chapter.status} attention={!!chapter.issue} />
 			<span className={`row-actions ${local.rowActions}`}>
 				{playable && (
 					<span className={local.playAffordance} aria-hidden="true">
@@ -408,7 +375,7 @@ export function WorkPage() {
 				<div className={local.actions}>
 					<Dropdown
 						label={t('更多')}
-						className={local.buttonLink}
+						className={buttonClasses('secondary')}
 						trigger={
 							<>
 								<Ellipsis aria-hidden="true" size={16} />
@@ -445,10 +412,13 @@ export function WorkPage() {
 						/>
 					)}
 					{firstPublished && (
-						<Link className={local.primaryLink} to={workRoute('play', workId)}>
-							<Play aria-hidden="true" size={16} />
+						<ButtonLink
+							variant="primary"
+							icon={Play}
+							to={workRoute('play', workId)}
+						>
 							{t('开始游玩')}
-						</Link>
+						</ButtonLink>
 					)}
 				</div>
 			}
@@ -473,9 +443,11 @@ export function WorkPage() {
 							))}
 						</ol>
 					) : (
-						<p className={`${local.muted} ${local.panelBody}`}>
-							{t('暂无章节')}
-						</p>
+						<EmptyState
+							icon={NotebookPen}
+							text={t('暂无章节')}
+							title={t('还没有章节')}
+						/>
 					)}
 				</Card>
 				{pages > 1 && (

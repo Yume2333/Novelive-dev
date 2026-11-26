@@ -151,7 +151,7 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			await capture(page, 'first-confirmation')
 			await page.getByRole('button', { name: '继续制作' }).click()
 			const failed = page.getByRole('listitem', { name: '潮汐' })
-			await expect(failed).toContainText('写手请求超时')
+			await expect(failed).toContainText('无法连接模型服务，请检查网络后重试。')
 			await expect(
 				page.getByRole('region', { name: '制作状态' }),
 			).toContainText('待确认')
@@ -162,11 +162,15 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			await failed.getByRole('button', { name: '运行记录' }).click()
 			const drawer = page.getByRole('dialog', { name: /运行记录/ })
 			const records = drawer.getByRole('region', { name: '章节运行记录' })
-			await expect(records).toContainText('第二章写手请求超时')
-			await expect(records).not.toContainText('第一章剧本生成完成')
-			await expect(records).not.toContainText('其他作品的记录')
-			await records.getByText('详情', { exact: true }).click()
-			await expect(records.getByText('重试将重新运行写剧本')).toBeVisible()
+			await expect(records).toContainText(
+				'写剧本 · 无法连接模型服务，请检查网络后重试。',
+			)
+			await expect(records).not.toContainText('写剧本 · 完成')
+			await expect(records.getByRole('listitem')).toHaveCount(1)
+			await records.getByText('详细信息', { exact: true }).click()
+			await expect(
+				records.getByText('[network] Model connection interrupted'),
+			).toBeVisible()
 			await capture(page, 'production-records')
 			// ChapterRecords 现在通过 portal 挂在 body 上，scrim 覆盖整个视口；
 			// 列表项里的「重试」被遮罩挡住，先关闭抽屉再用真实点击触发重试。
@@ -179,7 +183,7 @@ test('M1b creation surfaces show the two gates, blocked chapters and live record
 			])
 			await expect(failed).toContainText('出图')
 			await failed.getByRole('button', { name: '运行记录' }).click()
-			await expect(records).toContainText('重试已启动')
+			await expect(records).toContainText('写剧本 · 进行中')
 			await drawer.getByRole('button', { name: '关闭' }).click()
 			await expect(drawer).toHaveCount(0)
 			await page.getByRole('button', { name: '立即停止' }).click()

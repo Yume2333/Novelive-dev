@@ -83,7 +83,7 @@ export function useChapterWait({
 						})),
 					)
 			} catch {
-				if (!cancelled) onError(t('无法更新章节制作进度'))
+				if (!cancelled) onError(t('无法更新章节制作进度，请重试。'))
 			} finally {
 				busy = false
 			}

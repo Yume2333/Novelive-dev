@@ -19,6 +19,13 @@ import {
 	seedPlayerProject,
 } from '../fixtures/minimal-player'
 
+declare global {
+	interface Window {
+		fixtureCalls: { command: string; input: { chapterId?: string } }[]
+		fixtureMode?: string
+	}
+}
+
 const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
 )
@@ -43,7 +50,7 @@ async function editAndPreview(page: Page, _secondLine = 4) {
 		page.getByRole('heading', { name: '编辑器', exact: true }),
 	).toBeVisible()
 	await expect(page.getByText('这一场的句子', { exact: true })).toBeVisible()
-	await expect(page.getByRole('textbox', { name: 'NVS 剧本' })).toHaveCount(0)
+	await expect(page.getByRole('textbox', { name: '剧本文本' })).toHaveCount(0)
 	const firstCard = page
 		.locator('.editor-sentence-trigger')
 		.filter({ hasText: '第一句。' })
@@ -67,15 +74,19 @@ async function editAndPreview(page: Page, _secondLine = 4) {
 		page.getByRole('button', { name: '撤销', exact: true }),
 	).toBeDisabled()
 	await page.getByRole('button', { name: '原文对照' }).click()
-	const source = page.getByRole('button', { name: 'p0002 · 门外原文。' })
+	const source = page.getByRole('button', { name: '门外原文。', exact: true })
 	await source.click()
 	await expect(
 		page.locator('.editor-sentence-trigger').filter({ hasText: '门外的风。' }),
 	).toBeVisible()
 	await expect(source).toHaveAttribute('aria-pressed', 'true')
+	// 内部 id（p0001 / #0001）不作为可见文本出现在原文对照面板里
+	await expect(page.locator('.editor-source-panel')).not.toContainText(
+		/p000\d|#[0-9a-f]{4}\b/,
+	)
 	await page.getByLabel('场景', { exact: true }).selectOption('0')
 	await expect(
-		page.getByRole('button', { name: 'p0001 · 空屋原文。' }),
+		page.getByRole('button', { name: '空屋原文。', exact: true }),
 	).toHaveAttribute('aria-pressed', 'true')
 	await secondCard.click()
 	await expect(secondCard).toHaveAttribute('aria-expanded', 'true')
@@ -147,6 +158,12 @@ test('M2 editor preview locates source and current line, edits, undoes and previ
 				NL_E2E: '1',
 				NL_REPLAY: 'strict',
 				ELECTRON_RENDERER_URL: '',
+				// 宿主是 Wayland 会话时，泄漏的 WAYLAND_DISPLAY / XDG_SESSION_TYPE
+				// 会让 Electron 按宿主合成器的分数缩放（如 1.667x）渲染，xvfb 里的
+				// 画布纹理被二次重采样，像素断言不再纯净。强制 x11 会话保持 1:1。
+				WAYLAND_DISPLAY: '',
+				XDG_SESSION_TYPE: 'x11',
+				ELECTRON_OZONE_PLATFORM_HINT: 'x11',
 			},
 		})
 		try {
@@ -315,7 +332,7 @@ test.describe('contract-render', () => {
 			window.fixtureCalls.push({command,input});
 			const promise = Promise.resolve().then(() => {
 				if (!compile(commands[command].input).check(input)) throw Error('fixture input schema: ' + command);
-				if (window.fixtureMode === 'failure' || window.fixtureMode === 'stale' && command === 'editor.editLine') throw Error('版本已改变');
+				if (window.fixtureMode === 'failure' || window.fixtureMode === 'stale' && command === 'editor.editLine') throw Error('[stale_revision] 版本已改变');
 				let result;
 				if (command === 'editor.open') { history=[]; result={editorId:'opening1',chapter,registry:{formatVersion:1,entries:[]},speakerNames:{},settings:defaultWorkSettings(),settingsRevision:'s1'}; }
 				else if (command === 'editor.close') result={closed:true};
@@ -325,13 +342,15 @@ test.describe('contract-render', () => {
 				else if (command === 'editor.rewriteScene') result={workId,chapterId:'ch1',sceneId:input.sceneId,expectedRevision:input.expectedRevision,proposalId:'rewrite1',hunks:[{id:'h1',afterLineId:null,before:[': 第一句。 #0001'],after:[': 重写第一句。 #0001']},{id:'h2',afterLineId:'0001',before:[': 第二句。 #0002'],after:[': 重写第二句。 #0002']}]};
 				else if (command === 'editor.applyRewrite') { chapter=structuredClone(chapter); for(const h of input.hunkIds) chapter.scenes[0].nvs=chapter.scenes[0].nvs.replace(h==='h1'?'第一句。':'第二句。',h==='h1'?'重写第一句。':'重写第二句。'); chapter.revision='r'+(++revision); result=chapter; }
 				else if (command === 'editor.snapshot') result={chapter,settings:defaultWorkSettings(),settingsRevision:'s1',undoLines:history.map(()=>'aaaabbbb:0001')};
+				else if (command === 'library.list') result={works:[{workId,title:'固定作品',published:1,chapters:1}],unreadableCount:0};
+				else if (command === 'production.playerStatus') result={chapters:window.fixtureMode==='nochapters'?[]:[{chapterId:'ch1',title:'固定编辑章',published:true,progress:'已发布'}]};
 				else throw Error('unhandled fixture command '+command);
 				if (!compile(commands[command].output).check(result)) throw Error('fixture output schema: '+command);
 				return result;
 			}); return {promise,cancel(){}};
 		},resourceUrl:path=>path};
 		const root=document.createElement('div');root.id='root';document.body.append(root);
-		createRoot(root).render(React.createElement(ScrollArea,{style:{height:'100%'}},React.createElement(MemoryRouter,{initialEntries:['/work/'+workId+'/edit?chapterId=ch1']},React.createElement(Routes,null,React.createElement(Route,{path:'/work/:id/edit',element:React.createElement(EditorPage)})))));
+		createRoot(root).render(React.createElement(ScrollArea,{style:{height:'100%'}},React.createElement(MemoryRouter,{initialEntries:['/work/'+workId+'/edit'+(window.fixtureMode==='firstchapter'||window.fixtureMode==='nochapters'?'':'?chapterId=ch1')]},React.createElement(Routes,null,React.createElement(Route,{path:'/work/:id/edit',element:React.createElement(EditorPage)})))));
 	`
 							: undefined,
 				},
@@ -370,6 +389,8 @@ test.describe('contract-render', () => {
 		'leading',
 		'effects',
 		'long',
+		'firstchapter',
+		'nochapters',
 	]) {
 		test(`M2 editor contract fixture ${mode}`, async () => {
 			const profile = await mkdtemp(
@@ -396,6 +417,35 @@ test.describe('contract-render', () => {
 				)
 				await page.addStyleTag({ content: fixtureCss })
 				await page.addScriptTag({ content: fixtureJs })
+				if (mode === 'firstchapter') {
+					// 无 chapterId 参数：清单返回后自动落到第一章，编辑器照常打开
+					await expect(
+						page.getByRole('heading', { name: '编辑器', exact: true }),
+					).toBeVisible()
+					await expect(
+						page
+							.locator('.editor-sentence-trigger')
+							.filter({ hasText: '第一句。' }),
+					).toBeVisible()
+					const openCalls = await page.evaluate(() =>
+						window.fixtureCalls.filter((c) => c.command === 'editor.open'),
+					)
+					expect(openCalls).toHaveLength(1)
+					expect(openCalls[0].input.chapterId).toBe('ch1')
+					// URL 里不得回显章节 id 之外的内部 id，也不得出现 ch0001
+					await expect(page.locator('body')).not.toContainText('ch0001')
+					return
+				}
+				if (mode === 'nochapters') {
+					// 作品没有章节且未深层链接：展示共享空状态，不打开编辑器
+					await expect(page.getByText('这部作品还没有章节')).toBeVisible()
+					const openCalls = await page.evaluate(() =>
+						window.fixtureCalls.filter((c) => c.command === 'editor.open'),
+					)
+					expect(openCalls).toHaveLength(0)
+					await expect(page.locator('body')).not.toContainText('ch0001')
+					return
+				}
 				if (mode === 'empty') {
 					await expect(page.getByText('本章还没有剧本')).toBeVisible()
 					await expect(
@@ -404,7 +454,9 @@ test.describe('contract-render', () => {
 					return
 				}
 				if (mode === 'failure') {
-					await expect(page.getByRole('alert')).toHaveText('版本已改变')
+					const alert = page.getByRole('alert')
+					await expect(alert).toContainText('内容刚在别处更新过')
+					await expect(alert.locator('pre')).toContainText('版本已改变')
 					return
 				}
 				if (mode === 'long') {
@@ -455,7 +507,7 @@ test.describe('contract-render', () => {
 				}
 				if (mode === 'effects') {
 					await enterAdvancedMode(page)
-					const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
+					const editor = page.getByRole('textbox', { name: '剧本文本' })
 					await expect(editor).toContainText('标题')
 					for (const [line, next] of [
 						['3', '  @caption {em}{/em}标题 wait #0001'],
@@ -497,7 +549,7 @@ test.describe('contract-render', () => {
 				if (mode === 'leading') {
 					await enterAdvancedMode(page)
 					await expect(
-						page.getByRole('textbox', { name: 'NVS 剧本' }),
+						page.getByRole('textbox', { name: '剧本文本' }),
 					).toContainText('第一句。')
 					for (const [line, text] of [
 						['5', '第一句。'],
@@ -528,7 +580,7 @@ test.describe('contract-render', () => {
 				}
 				if (mode === 'stale') {
 					await enterAdvancedMode(page)
-					const editor = page.getByRole('textbox', { name: 'NVS 剧本' })
+					const editor = page.getByRole('textbox', { name: '剧本文本' })
 					await expect(editor).toContainText('第一句。')
 					await jumpTo(page, 3)
 					await editor.press('End')
@@ -537,7 +589,9 @@ test.describe('contract-render', () => {
 					await editor.press('ArrowRight')
 					await page.keyboard.insertText('草稿')
 					await page.getByRole('button', { name: '保存当前句' }).click()
-					await expect(page.getByRole('alert')).toHaveText('版本已改变')
+					const staleAlert = page.getByRole('alert')
+					await expect(staleAlert).toContainText('内容刚在别处更新过')
+					await expect(staleAlert.locator('pre')).toContainText('版本已改变')
 					await expect(editor).toContainText('草稿')
 					return
 				}
@@ -555,7 +609,7 @@ test.describe('contract-render', () => {
 				await jumpTo(page, 3)
 				await page.getByRole('button', { name: '强调', exact: true }).click()
 				await expect(
-					page.getByRole('textbox', { name: 'NVS 剧本' }),
+					page.getByRole('textbox', { name: '剧本文本' }),
 				).toContainText('{em}{/em}')
 				await page.getByRole('button', { name: '撤销', exact: true }).click()
 				await page.getByRole('button', { name: '让 Agent 重写本场景' }).click()
@@ -563,18 +617,22 @@ test.describe('contract-render', () => {
 				await page
 					.getByRole('button', { name: '重写场景', exact: true })
 					.click()
-				await page.locator('label').filter({ hasText: 'h2' }).click()
-				await page.locator('label').filter({ hasText: 'h1' }).click()
+				await page.locator('label').filter({ hasText: '第 2 处' }).click()
+				// 重写差异里不出现行尾 id / h 序号等内部标识
+				await expect(page.locator('.editor-diffs')).not.toContainText(
+					/#[0-9a-f]{4}\b|\bh\d\b/,
+				)
+				await page.locator('label').filter({ hasText: '第 1 处' }).click()
 				await expect(
 					page.getByRole('button', { name: '应用勾选差异' }),
 				).toBeDisabled()
-				await page.locator('label').filter({ hasText: 'h1' }).click()
+				await page.locator('label').filter({ hasText: '第 1 处' }).click()
 				await page.getByRole('button', { name: '应用勾选差异' }).click()
 				await expect(
-					page.getByRole('textbox', { name: 'NVS 剧本' }),
+					page.getByRole('textbox', { name: '剧本文本' }),
 				).toContainText('重写第一句。')
 				await expect(
-					page.getByRole('textbox', { name: 'NVS 剧本' }),
+					page.getByRole('textbox', { name: '剧本文本' }),
 				).not.toContainText('重写第二句。')
 				await page.evaluate(async () => {
 					await document.fonts.ready

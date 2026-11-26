@@ -548,7 +548,8 @@ export class ChatService {
 		const part: Extract<Part, { type: 'subtask' }> = {
 			type: 'subtask',
 			id,
-			label: role,
+			label: task.replace(/\s+/g, ' ').trim() || role,
+			role,
 			status: 'running',
 		}
 		run.message.parts.push(part)

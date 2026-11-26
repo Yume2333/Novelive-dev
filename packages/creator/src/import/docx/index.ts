@@ -17,6 +17,7 @@ export class DocxImportError extends Error {
 			| 'invalid_docx'
 			| 'missing_document'
 			| 'invalid_xml'
+			| 'docx_doctype'
 			| 'no_extractable_text',
 		message: string,
 		options?: ErrorOptions,
@@ -37,7 +38,7 @@ function xml(source: string): Element {
 	const stack = [root]
 	const parser = new SaxesParser({ xmlns: true })
 	parser.on('doctype', () => {
-		throw new Error('DOCTYPE is not supported')
+		throw new DocxImportError('docx_doctype', 'DOCTYPE is not supported')
 	})
 	parser.on('opentag', (tag) => {
 		const node: Element = {

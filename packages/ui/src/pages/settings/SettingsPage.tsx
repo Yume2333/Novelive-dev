@@ -20,6 +20,7 @@ import {
 	Globe,
 	Image,
 	type LucideIcon,
+	RefreshCw,
 	RotateCcw,
 	X,
 	Zap,
@@ -27,15 +28,19 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Button, Spinner } from '../../components/Button'
+import { Card } from '../../components/Card'
 import { Collapse } from '../../components/Collapse'
+import { Banner } from '../../components/Extended'
+import { Details, ErrorNotice, LoadingState } from '../../components/Feedback'
 import { CompactSelect } from '../../components/Form'
 import { Modal } from '../../components/Modal'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
+import { formatConfigErrorReason } from '../../format/errors'
+import { formatPath, useHomeDir } from '../../format/path'
 import { localeNames, locales, msg, scoped } from '../../i18n'
 import type { SettingsHost } from '../../shell/AppShell'
 import {
-	formatLabel,
 	type ModelDraft,
 	themes,
 	useImageFields,
@@ -76,19 +81,27 @@ const thirdPartyLicenses: ReadonlyArray<readonly [string, string]> = [
 
 type ImageTests = CommandOutput<'model.testImage'>
 type TestResult = ImageTests | CommandOutput<'model.testText'>
+/** 测试错误：本地化正文 + 只进「详细信息」的原始细节 */
+export type ReadableError = CommandError & { detail?: string }
 
-export function readableError(error: unknown): CommandError {
+export function readableError(error: unknown): ReadableError {
 	const failure =
 		error && typeof error === 'object' && 'code' in error
 			? (error as CommandError)
 			: undefined
 	const code = failure?.code ?? 'internal'
+	// 只有后端已本地化（或含 CJK）的 message 才能直接展示；
+	// 英文原文等技术细节只能进折叠的「详细信息」。
 	const readable =
 		failure?.message &&
 		('localized' in failure || /[\u3400-\u9fff]/.test(failure.message))
 			? failure.message
 			: undefined
-	const message = {
+	const detail =
+		failure?.message && failure.message !== readable
+			? failure.message
+			: undefined
+	const copy: Partial<Record<CommandError['code'], string>> = {
 		auth: t('鉴权失败，请检查接口地址、API Key 和模型名。'),
 		not_found: t('接口或模型不存在，请检查接口地址和模型名。'),
 		network: t(
@@ -100,12 +113,15 @@ export function readableError(error: unknown): CommandError {
 		stale_revision: t('内容已改变，请刷新后重试。'),
 		invalid_config:
 			readable ?? t('配置无效，请检查接口地址、API Key、模型名和上下文长度。'),
-		unsupported: failure?.message ?? t('当前模型不支持此项。'),
+		unsupported: readable ?? t('当前模型不支持此项。'),
 		cancelled: t('已取消测试。'),
 		creator_down: t('创作端已断开，重新连接后可再测试。'),
 		internal: readable ?? t('操作失败，请重试。'),
-	}[code]
-	return { code, message }
+	}
+	// 模型测试只会产出上面的码；导入／工程错误码不可能出现在这里，
+	// 真出现时也退回通用句而不是露枚举值。
+	const message = copy[code] ?? readable ?? t('操作失败，请重试。')
+	return detail ? { code, message, detail } : { code, message }
 }
 
 function IconTile({ icon: Icon }: { icon: LucideIcon }) {
@@ -145,6 +161,11 @@ function ImageResults({ results }: { results: ImageTests }) {
 								data-error-code={error?.code}
 							>
 								{error?.message}
+								{error?.detail ? (
+									<Details>
+										<pre className={styles.errorDetail}>{error.detail}</pre>
+									</Details>
+								) : null}
 							</small>
 						)}
 					</div>
@@ -173,7 +194,7 @@ function ModelCard({
 	const [open, setOpen] = useState(false)
 	const [phase, setPhase] = useState<'idle' | 'saving' | 'testing'>('idle')
 	const [result, setResult] = useState<TestResult>()
-	const [error, setError] = useState<CommandError>()
+	const [error, setError] = useState<ReadableError>()
 	const [saved, setSaved] = useState(false)
 	const work = useRef<AbortController | undefined>(undefined)
 	useEffect(() => () => work.current?.abort(), [])
@@ -222,7 +243,7 @@ function ModelCard({
 	) : null
 
 	return (
-		<section aria-label={title} className={styles.card}>
+		<section aria-label={title} className={`glass-panel ${styles.card}`}>
 			<div className={styles.cardHeader}>
 				<button
 					className={styles.expand}
@@ -294,6 +315,11 @@ function ModelCard({
 					) : error ? (
 						<>
 							{feedbackIcon} {error.message}
+							{error.detail ? (
+								<Details>
+									<pre className={styles.errorDetail}>{error.detail}</pre>
+								</Details>
+							) : null}
 						</>
 					) : complete ? (
 						<>
@@ -353,7 +379,6 @@ function TextCard({
 			icon={icon}
 			summary={[
 				model.model || t('未填模型'),
-				formatLabel(connection.format),
 				slot !== 'fast' && 'inheritFast' in model && model.inheritFast
 					? t('同快速模型')
 					: '',
@@ -440,6 +465,7 @@ export function SettingsPage() {
 	const [about, setAbout] = useState<{ version: string; packaged: boolean }>()
 	const [checkingUpdates, setCheckingUpdates] = useState(false)
 	const [licensesOpen, setLicensesOpen] = useState(false)
+	const home = useHomeDir()
 	const aboutHost = window.novelive.host.about
 	useEffect(() => {
 		void aboutHost?.info().then(setAbout, () => setAbout(undefined))
@@ -455,35 +481,39 @@ export function SettingsPage() {
 	return (
 		<Page title={t('设置')} width={760}>
 			<div className={styles.page}>
-				{error && (
-					<p role="alert" className={styles.warning}>
-						{error}
-					</p>
-				)}
+				{error && <ErrorNotice message={error} />}
 				{!config ? (
-					<p className={styles.muted}>{t('正在读取设置…')}</p>
+					<LoadingState text={t('正在读取设置…')} />
 				) : 'configError' in config ? (
-					<div className={styles.warning} role="alert">
-						<AlertTriangle size={19} strokeWidth={1.8} aria-hidden="true" />
-						<div>
-							<strong>{t('配置文件无法读取')}</strong>
-							<p>{config.configError.reason}</p>
-							<p className={styles.path}>{config.configError.path}</p>
-						</div>
-						<Button
-							size="sm"
-							icon={RotateCcw}
-							disabled={resetting}
-							onClick={() => {
-								setResetting(true)
-								void apply(async () => {
-									await resetConfig()
-									toast(t('配置已重置'), RotateCcw)
-								}).finally(() => setResetting(false))
-							}}
+					<div role="alert" className={styles.configError}>
+						<Banner
+							kind="error"
+							action={
+								<Button
+									size="sm"
+									variant="ghost"
+									icon={RotateCcw}
+									disabled={resetting}
+									onClick={() => {
+										setResetting(true)
+										void apply(async () => {
+											await resetConfig()
+											toast(t('配置已重置'), RotateCcw)
+										}).finally(() => setResetting(false))
+									}}
+								>
+									{t('重置配置')}
+								</Button>
+							}
 						>
-							{t('重置配置')}
-						</Button>
+							<strong>{t('配置文件无法读取')}</strong>
+							{formatConfigErrorReason(config.configError.reason)}
+						</Banner>
+						<Details>
+							<span className={styles.path}>
+								{formatPath(config.configError.path, home)}
+							</span>
+						</Details>
 					</div>
 				) : (
 					<>
@@ -501,7 +531,7 @@ export function SettingsPage() {
 							<h2 id="appearance-settings" className="label-caps label-caps-zh">
 								{t('界面')}
 							</h2>
-							<div className={`${styles.card} ${styles.appearance}`}>
+							<Card className={styles.appearance}>
 								<SettingRow title={t('界面语言')} icon={Globe}>
 									<CompactSelect
 										aria-label={t('界面语言')}
@@ -530,16 +560,21 @@ export function SettingsPage() {
 										}
 									/>
 								</SettingRow>
-							</div>
+							</Card>
 						</section>
 						<section aria-labelledby="project-settings">
 							<h2 id="project-settings" className="label-caps label-caps-zh">
 								{t('工程')}
 							</h2>
-							<div className={styles.card}>
+							<Card>
 								<SettingRow title={t('默认工程位置')} icon={FolderOpen}>
-									<small className={styles.path}>
-										{config.projectDir || t('未设置')}
+									<small
+										className={styles.path}
+										title={config.projectDir || undefined}
+									>
+										{config.projectDir
+											? formatPath(config.projectDir, home)
+											: t('未设置')}
 									</small>
 									<Button
 										size="sm"
@@ -555,7 +590,7 @@ export function SettingsPage() {
 										{t('更改')}
 									</Button>
 								</SettingRow>
-							</div>
+							</Card>
 						</section>
 					</>
 				)}
@@ -563,14 +598,20 @@ export function SettingsPage() {
 					<h2 id="about-settings" className="label-caps label-caps-zh">
 						{t('关于')}
 					</h2>
-					<div className={`${styles.card} ${styles.about}`}>
-						<div className={styles.row}>
+					<Card className={styles.about}>
+						<div className={styles.aboutBrand}>
 							<IconTile icon={BookOpen} />
-							<span>
-								<strong>Novelive</strong>
-								<small>{t('把小说改编为视觉小说并直接游玩。')}</small>
-							</span>
-							<small>{about && `v${about.version} · `}AGPL-3.0</small>
+							<div className={styles.aboutNames}>
+								<span className={styles.aboutTitleRow}>
+									<strong>Novelive</strong>
+									<small className={styles.aboutVersion}>
+										{about ? `v${about.version} · ` : ''}AGPL-3.0
+									</small>
+								</span>
+								<small className={styles.aboutTagline}>
+									{t('把小说改编为视觉小说并直接游玩。')}
+								</small>
+							</div>
 						</div>
 						{aboutHost && (
 							<div className={styles.aboutLinks}>
@@ -578,31 +619,31 @@ export function SettingsPage() {
 									type="button"
 									onClick={() => void apply(() => aboutHost.open('license'))}
 								>
-									{t('开源许可')}
 									<ExternalLink
 										size={12}
 										strokeWidth={1.8}
 										aria-hidden="true"
 									/>
+									{t('开源许可')}
 								</button>
 								<button type="button" onClick={() => setLicensesOpen(true)}>
-									{t('第三方许可')}
 									<ExternalLink
 										size={12}
 										strokeWidth={1.8}
 										aria-hidden="true"
 									/>
+									{t('第三方许可')}
 								</button>
 								<button
 									type="button"
 									onClick={() => void apply(() => aboutHost.open('source'))}
 								>
-									{t('源代码')}
 									<ExternalLink
 										size={12}
 										strokeWidth={1.8}
 										aria-hidden="true"
 									/>
+									{t('源代码')}
 								</button>
 								<button
 									type="button"
@@ -614,11 +655,12 @@ export function SettingsPage() {
 										)
 									}}
 								>
+									<RefreshCw size={12} strokeWidth={1.8} aria-hidden="true" />
 									{checkingUpdates ? t('正在检查…') : t('检查更新')}
 								</button>
 							</div>
 						)}
-					</div>
+					</Card>
 				</section>
 			</div>
 			<Modal

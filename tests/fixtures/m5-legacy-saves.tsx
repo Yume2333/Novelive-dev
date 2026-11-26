@@ -1,3 +1,6 @@
+import '../../packages/ui/src/styles/tokens.css'
+import '../../packages/ui/src/styles/base.css'
+
 import { createRoot } from 'react-dom/client'
 import { ProgressPanel } from '../../packages/ui/src/pages/player/controls/ProgressPanel'
 

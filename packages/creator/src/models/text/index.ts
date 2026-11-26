@@ -20,7 +20,6 @@ import { estimateContextTokens } from '@earendil-works/pi-ai/utils/estimate'
 import { isRetryableAssistantError } from '@earendil-works/pi-ai/utils/retry'
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import type { MaskedConfig } from '../../config/index.js'
-import type { CommandError } from '../../contract/index.js'
 import {
 	checkpointReplyRejection,
 	createReplayFetch,
@@ -34,7 +33,26 @@ import { textUsageSlots } from '../../usage/text-slots'
 
 type Settings = MaskedConfig['models']['fast']
 type Format = Settings['format']
-type Code = CommandError['code']
+/**
+ * Text-model error codes actually produced here: classified HTTP/stream
+ * outcomes, spend-guard refusals, reasoning-only exhaustion and cancellation.
+ * These flow into `CommandError['code']` at the command boundary, but the
+ * model layer never emits import/project/scheduler codes, so the union is
+ * narrower than the wire type.
+ */
+export const textModelErrorCodes = [
+	'network',
+	'auth',
+	'not_found',
+	'moderation',
+	'invalid_config',
+	'reasoning_limit',
+	'context_limit',
+	'cancelled',
+	'internal',
+] as const
+export type TextModelErrorCode = (typeof textModelErrorCodes)[number]
+type Code = TextModelErrorCode
 export type TextConnection = Omit<Settings, 'apiKeyMasked'> & {
 	apiKey: string
 }

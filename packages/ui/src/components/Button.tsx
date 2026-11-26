@@ -11,6 +11,22 @@ const variantClass: Record<ButtonVariant, string> = {
 	danger: `nl-btn nl-btn-danger ${styles.danger}`,
 }
 
+/** 按钮外观类链：Button 与 ButtonLink 共用同一份实现，保证视觉完全一致 */
+export function buttonClasses(
+	variant: ButtonVariant = 'secondary',
+	size?: 'sm',
+	className?: string,
+): string {
+	return [
+		styles.button,
+		size === 'sm' && styles.sm,
+		variantClass[variant],
+		className,
+	]
+		.filter(Boolean)
+		.join(' ')
+}
+
 export function Spinner({
 	size = 16,
 	className,
@@ -51,14 +67,7 @@ export function Button({
 			{...rest}
 			type={type}
 			disabled={disabled || loading}
-			className={[
-				styles.button,
-				size === 'sm' && styles.sm,
-				variantClass[variant],
-				className,
-			]
-				.filter(Boolean)
-				.join(' ')}
+			className={buttonClasses(variant, size, className)}
 		>
 			{loading ? (
 				<Spinner size={iconSize} />

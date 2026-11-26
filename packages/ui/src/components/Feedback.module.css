@@ -1,0 +1,70 @@
+/* 错误 / 加载 / 折叠详情 — 全部取 Tokens */
+
+.notice {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.noticeText {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: var(--space-2);
+}
+
+.noticeHint {
+	color: inherit;
+	opacity: 0.75;
+	font-size: var(--text-12);
+}
+
+.noticeDetail {
+	margin: 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.details {
+	border-radius: var(--radius-md);
+}
+
+.detailsToggle {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-px-6);
+	padding: var(--space-px-3) 0;
+	color: var(--color-outline);
+	font-size: var(--text-12);
+	transition: color var(--dur-fast) var(--ease-out);
+	cursor: pointer;
+}
+
+.detailsToggle:hover {
+	color: var(--color-on-surface-variant);
+}
+
+.detailsScroll {
+	margin-top: var(--space-px-6);
+	border: 1px solid var(--divider);
+	border-radius: var(--radius-md);
+	background: var(--white-40);
+}
+
+.detailsBody {
+	padding: var(--space-px-10) var(--space-3);
+	font-family: var(--font-mono);
+	font-size: var(--text-12);
+	line-height: 1.6;
+	color: var(--color-on-surface-variant);
+}
+
+.loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	padding: var(--space-6) var(--space-4);
+	color: var(--color-on-surface-variant);
+	font-size: var(--text-13);
+}

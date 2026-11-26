@@ -7,6 +7,7 @@ import type {
 	Proposal,
 	RewriteProposal,
 } from '../contract'
+import { subtaskRoles } from '../contract'
 import { markProposalKind } from '../editor/marks'
 
 export type Snapshot = CommandOutput<'chat.get'>
@@ -359,9 +360,7 @@ export class ChatStore {
 						proposal: this.proposal(part.proposal.id).proposal,
 						rewrite: this.proposal(part.proposal.id).rewrite,
 					}
-				: !streaming && part.type === 'subtask' && part.status === 'running'
-					? { ...part, status: 'cancelled' }
-					: part,
+				: normalizeSubtask(part, streaming),
 		)
 	}
 }
@@ -378,4 +377,29 @@ export function lineage(rows: EntryRow[], headId: string | null) {
 		id = row.parentId
 	}
 	return path.reverse()
+}
+
+type SubtaskRole = (typeof subtaskRoles)[number]
+
+/**
+ * 旧版存档的子任务没有 `role` 字段，角色存在 `label` 里；
+ * 读入时归一化为新形状，保证 chat.get 输出始终过契约校验。
+ */
+function normalizeSubtask(part: Part, streaming: boolean): Part {
+	if (part.type !== 'subtask') return part
+	type Subtask = Extract<Part, { type: 'subtask' }>
+	let subtask: Subtask
+	if ('role' in part) {
+		subtask = part as Subtask
+	} else {
+		// 旧形状：label 存的是角色枚举值
+		const { label, ...rest } = part as Omit<Subtask, 'role'>
+		const role = subtaskRoles.includes(label as SubtaskRole)
+			? (label as SubtaskRole)
+			: 'organizer'
+		subtask = { ...rest, role, label: role }
+	}
+	return !streaming && subtask.status === 'running'
+		? { ...subtask, status: 'cancelled' }
+		: subtask
 }

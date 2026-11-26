@@ -1,4 +1,10 @@
-export { Button, type ButtonVariant, IconButton, Spinner } from './Button'
+export {
+	Button,
+	type ButtonVariant,
+	buttonClasses,
+	IconButton,
+	Spinner,
+} from './Button'
 export {
 	attentionMeta,
 	Card,
@@ -26,16 +32,15 @@ export {
 	Stepper,
 	Tooltip,
 } from './Extended'
+export { ButtonLink, Details, ErrorNotice, LoadingState } from './Feedback'
 export {
 	CompactSelect,
 	Field,
-	inputStyle,
 	Select,
 	Textarea,
 	TextInput,
 	TierPicker,
 	Toggle,
-	textareaStyle,
 } from './Form'
 export {
 	type CoverMotif,

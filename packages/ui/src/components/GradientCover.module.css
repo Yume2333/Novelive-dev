@@ -72,7 +72,7 @@
 .title {
 	margin-right: -0.3em;
 	color: var(--cover-title);
-	font: 600 16px / 1.6 var(--font-display);
+	font: 600 var(--text-16) / 1.6 var(--font-display);
 	letter-spacing: 0.3em;
 	text-align: center;
 	text-shadow: var(--cover-title-shadow);
@@ -80,7 +80,7 @@
 
 .author {
 	color: var(--cover-author);
-	font-size: 10px;
+	font-size: var(--text-10);
 	letter-spacing: 0.25em;
 }
 

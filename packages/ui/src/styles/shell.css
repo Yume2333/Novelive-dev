@@ -15,7 +15,7 @@ body {
 	background-image: var(--page-texture);
 	background-attachment: fixed;
 	color: var(--color-on-surface);
-	font: 14px / 1.5 var(--font-body);
+	font: var(--text-14) / 1.5 var(--font-body);
 	-webkit-font-smoothing: antialiased;
 }
 

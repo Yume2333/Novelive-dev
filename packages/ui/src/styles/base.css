@@ -315,20 +315,6 @@ button.glass-panel:active:not(:disabled) {
 	border-color: var(--color-primary);
 }
 
-.soft-glow {
-	animation: soft-pulse var(--dur-pulse) infinite alternate;
-}
-@keyframes soft-pulse {
-	0% {
-		opacity: 0.7;
-		box-shadow: 0 0 3px var(--glow);
-	}
-	100% {
-		opacity: 1;
-		box-shadow: 0 0 8px var(--glow);
-	}
-}
-
 /* 列表行：次要操作平时隐藏，悬停或键盘聚焦到这一行时出现 */
 .hover-row .row-actions {
 	opacity: 0;
@@ -364,7 +350,7 @@ button.glass-panel:active:not(:disabled) {
 /* ---- 通用排版类 ---- */
 .label-caps {
 	font-family: var(--font-body);
-	font-size: 12px;
+	font-size: var(--text-12);
 	font-weight: 600;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
@@ -376,13 +362,13 @@ button.glass-panel:active:not(:disabled) {
 
 .headline {
 	font-family: var(--font-display);
-	font-size: 24px;
+	font-size: var(--text-24);
 	font-weight: 600;
 	line-height: 1.3;
 }
 .display {
 	font-family: var(--font-display);
-	font-size: 36px;
+	font-size: var(--text-36);
 	font-weight: 700;
 	line-height: 1.2;
 	letter-spacing: -0.01em;

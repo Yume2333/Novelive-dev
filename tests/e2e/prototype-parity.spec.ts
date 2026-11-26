@@ -398,7 +398,7 @@ test('import wizard pages capture matched-viewport parity evidence', async () =>
 			await page.getByRole('button', { name: '选择原文' }).click()
 			await expect(page.getByLabel('作品名')).toHaveValue('风')
 			await page.getByRole('button', { name: '选择文件夹' }).click()
-			await expect(page.getByText(projects, { exact: true })).toBeVisible()
+			await expect(page.getByText(/projects$/)).toBeVisible()
 			await shot('import-step1')
 			await page.getByRole('button', { name: '下一步', exact: true }).click()
 			await expect(
@@ -410,7 +410,7 @@ test('import wizard pages capture matched-viewport parity evidence', async () =>
 			await shot('import-step2')
 			await page.getByRole('button', { name: '下一步', exact: true }).click()
 			await expect(
-				page.locator('[aria-current="step"]', { hasText: '改编设置' }),
+				page.locator('[aria-current="step"]', { hasText: '插图与参考' }),
 			).toBeVisible()
 			await shot('import-step3')
 		} finally {
@@ -606,6 +606,7 @@ test('agent drawer captures matched-viewport parity evidence', async () => {
 					type: 'subtask',
 					id: 'sub-1',
 					label: '核对第二章称呼',
+					role: 'reviewer',
 					status: 'done',
 				},
 				{
@@ -680,13 +681,14 @@ test('agent drawer captures matched-viewport parity evidence', async () => {
 				location.hash = `#/work/${id}/bible`
 			}, chatWorkId)
 			await page.keyboard.press('Control+J')
-			const panel = page.getByRole('complementary', { name: 'Agent' })
+			const panel = page.getByRole('complementary', { name: 'Novelive Agent' })
 			await expect(panel).toBeVisible()
 			await panel
 				.getByRole('navigation', { name: '分支' })
 				.getByRole('button', { name: '上一个分支' })
 				.click()
 			await panel.getByRole('button', { name: /读取设定集/ }).click()
+			await panel.getByRole('button', { name: '详细信息' }).first().click()
 			await expect(panel.getByText('"field": "年龄"')).toBeVisible()
 			for (const theme of ['light', 'dark'] as const) {
 				await page.evaluate((value) => {

@@ -158,31 +158,30 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			).toBeVisible()
 			await page.getByRole('button', { name: '高级模式', exact: true }).click()
 			await expect(
-				page.getByRole('textbox', { name: 'NVS 剧本' }),
+				page.getByRole('textbox', { name: '剧本文本' }),
 			).toContainText('纸船')
 		}
 		await openEditor()
 		await page.getByRole('button', { name: '原文对照' }).click()
-		await expect(
-			page.getByRole('button', { name: /p0001 · 暮色中/ }),
-		).toBeVisible()
+		await expect(page.getByRole('button', { name: /^暮色中/ })).toBeVisible()
 		await page.getByLabel('场景', { exact: true }).selectOption('1')
 		await expect(
-			page.getByRole('button', { name: /p0002 · 夜风吹过岸边/ }),
+			page.getByRole('button', { name: /^夜风吹过岸边/ }),
 		).toHaveAttribute('aria-pressed', 'true')
-		await page.getByRole('button', { name: /p0001 · 暮色中/ }).click()
-		await expect(
-			page.getByRole('button', { name: /p0001 · 暮色中/ }),
-		).toHaveAttribute('aria-pressed', 'true')
+		await page.getByRole('button', { name: /^暮色中/ }).click()
+		await expect(page.getByRole('button', { name: /^暮色中/ })).toHaveAttribute(
+			'aria-pressed',
+			'true',
+		)
 		await page.getByRole('button', { name: '快捷位置', exact: true }).click()
-		await page.getByRole('menuitem').filter({ hasText: '#0001' }).click()
+		await page.getByRole('menuitem').filter({ hasText: '暮色中' }).click()
 		await page.getByRole('button', { name: '从当前句预览' }).click()
 		await expect(page.locator('.nl-player-text')).toHaveText(
 			'暮色中，一只纸船从桥下漂过。',
 			{ useInnerText: true },
 		)
 		await capture(page, '01-source-and-preview')
-		const script = page.getByRole('textbox', { name: 'NVS 剧本' })
+		const script = page.getByRole('textbox', { name: '剧本文本' })
 		await page.getByRole('button', { name: '注音', exact: true }).click()
 		await expect(script).toContainText('{ruby よみ}{/ruby}')
 		await page.getByRole('button', { name: '放弃修改', exact: true }).click()
@@ -225,9 +224,11 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 					: 'offline-placeholder',
 			},
 		)
-		await page.getByRole('button', { name: 'Novelive Agent' }).click()
-		const agent = page.getByRole('complementary', { name: 'Agent' })
-		const composer = agent.getByRole('textbox', { name: '给 Agent 发消息' })
+		await page.getByRole('button', { name: /^Novelive Agent Ctrl/ }).click()
+		const agent = page.getByRole('complementary', { name: 'Novelive Agent' })
+		const composer = agent.getByRole('textbox', {
+			name: '给 Novelive Agent 发消息',
+		})
 		await expect(agent.getByText('无法读取会话')).toHaveCount(0)
 		await expect(composer).toBeEnabled()
 		await capture(page, '03-agent-loaded')
@@ -315,8 +316,8 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(
 			agent.getByRole('button', { name: '停止', exact: true }),
 		).toHaveCount(0, { timeout: 95_000 })
-		await page.getByRole('button', { name: 'Novelive Agent' }).click()
-		await page.getByRole('button', { name: 'Novelive Agent' }).click()
+		await page.getByRole('button', { name: /^Novelive Agent Ctrl/ }).click()
+		await page.getByRole('button', { name: /^Novelive Agent Ctrl/ }).click()
 		await expect(chatDiff).toBeVisible()
 		for (const label of await chatDiff.locator('label').all())
 			await label.click()
@@ -338,7 +339,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			page.getByText('章节已更新，当前修改已保留；放弃修改后加载新版本'),
 		).toBeVisible()
 		await expect(script).toContainText('未保存的桥下修改')
-		await page.getByRole('button', { name: 'Novelive Agent' }).click()
+		await page.getByRole('button', { name: /^Novelive Agent Ctrl/ }).click()
 		await script.fill(beforeAgent)
 		await expect(
 			page.getByRole('button', { name: '放弃修改', exact: true }),
@@ -347,7 +348,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await expect(script).toContainText('笛声')
 		await expect(script).toContainText('慢慢')
 		await expect(script).not.toContainText('缓缓')
-		await page.getByRole('button', { name: 'Novelive Agent' }).click()
+		await page.getByRole('button', { name: /^Novelive Agent Ctrl/ }).click()
 		await capture(page, '05-agent-rewrite-applied')
 		const history = await page.evaluate(
 			(target) => window.novelive.call('editor.history', target).promise,
@@ -364,7 +365,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		page = await app.firstWindow()
 		await expect(page.getByText('创作端已就绪')).toBeAttached()
 		await openEditor()
-		await expect(page.getByRole('textbox', { name: 'NVS 剧本' })).toContainText(
+		await expect(page.getByRole('textbox', { name: '剧本文本' })).toContainText(
 			'笛声',
 		)
 		const reopened = await page.evaluate(
@@ -372,13 +373,13 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			{ workId, chapterId },
 		)
 		expect(reopened).toEqual(history)
-		await page.getByRole('button', { name: 'Novelive Agent' }).click()
+		await page.getByRole('button', { name: /^Novelive Agent Ctrl/ }).click()
 		await expect(
 			page.getByRole('status').filter({ hasText: '已确认' }).first(),
 		).toBeVisible()
 		await expect(page.getByRole('region', { name: '重写差异' })).toHaveCount(0)
 		await capture(page, '06-reopened-persisted')
-		await page.getByRole('button', { name: 'Novelive Agent' }).click()
+		await page.getByRole('button', { name: /^Novelive Agent Ctrl/ }).click()
 		await page.evaluate(
 			(patch) => window.novelive.call('config.update', patch).promise,
 			configuration,
@@ -411,14 +412,14 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		)
 		const beforeImage = (
 			await page
-				.getByRole('textbox', { name: 'NVS 剧本' })
+				.getByRole('textbox', { name: '剧本文本' })
 				.locator('.cm-line')
 				.allTextContents()
 		).join('\n')
 		await page
-			.getByRole('textbox', { name: 'NVS 剧本' })
+			.getByRole('textbox', { name: '剧本文本' })
 			.fill(beforeImage.replace('桥下很安静', '桥下依然很安静'))
-		await page.getByRole('textbox', { name: 'NVS 剧本' }).press('Control+Home')
+		await page.getByRole('textbox', { name: '剧本文本' }).press('Control+Home')
 		await page.getByRole('button', { name: '保存当前句', exact: true }).click()
 		await expect(
 			page.getByRole('button', { name: '撤销', exact: true }),
@@ -522,7 +523,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		).toBeEnabled()
 		await page.getByRole('button', { name: '撤销', exact: true }).click()
 		await expect(
-			page.getByRole('textbox', { name: 'NVS 剧本' }),
+			page.getByRole('textbox', { name: '剧本文本' }),
 		).not.toContainText('依然')
 		await expect(page.locator('canvas')).toBeVisible()
 		await expect(page.locator('.nl-player-text')).toHaveText(
@@ -591,8 +592,8 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		)
 		await capture(page, '08-image-candidate-applied')
 		await page.getByRole('button', { name: '快捷位置', exact: true }).click()
-		await page.getByRole('menuitem').filter({ hasText: '#0002' }).click()
-		const reopenedScript = page.getByRole('textbox', { name: 'NVS 剧本' })
+		await page.getByRole('menuitem').filter({ hasText: '桥下很安静' }).click()
+		const reopenedScript = page.getByRole('textbox', { name: '剧本文本' })
 		await reopenedScript.press('End')
 		await reopenedScript.press('Home')
 		await reopenedScript.press('ArrowRight')
@@ -617,10 +618,10 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 			page
 				.getByRole('combobox', { name: '图片', exact: true })
 				.locator('option'),
-		).toHaveText('ada / uniform / neutral')
+		).toHaveText('Ada · Uniform · Neutral')
 		await page.keyboard.press('Escape')
 		await page.getByRole('button', { name: '快捷位置', exact: true }).click()
-		await page.getByRole('menuitem').filter({ hasText: '#0003' }).click()
+		await page.getByRole('menuitem').filter({ hasText: '夜风吹过岸边' }).click()
 		await page.getByRole('button', { name: '从当前句预览' }).click()
 		await expect(page.locator('.nl-player-text')).toHaveText('夜风吹过岸边。', {
 			useInnerText: true,
@@ -654,11 +655,11 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		}, workId)
 		await openEditor()
 		await page.getByRole('button', { name: '快捷位置', exact: true }).click()
-		await page.getByRole('menuitem').filter({ hasText: '#0002' }).click()
+		await page.getByRole('menuitem').filter({ hasText: '桥下很安静' }).click()
 		const expressionSelect = page.getByLabel('表情', { exact: true })
 		await expect(expressionSelect).toHaveValue('ada/uniform/neutral')
 		await expressionSelect.selectOption('ada/uniform/smile')
-		await expect(page.getByRole('textbox', { name: 'NVS 剧本' })).toContainText(
+		await expect(page.getByRole('textbox', { name: '剧本文本' })).toContainText(
 			'@show ada/uniform/smile center',
 		)
 		await page.getByRole('button', { name: '从当前句预览' }).click()
@@ -673,7 +674,7 @@ test('M2 revise a work through editor and Agent in real Electron', async () => {
 		await page.getByRole('button', { name: '关闭', exact: true }).click()
 		await page.getByLabel('撤销', { exact: true }).click()
 		await expect(
-			page.getByRole('textbox', { name: 'NVS 剧本' }),
+			page.getByRole('textbox', { name: '剧本文本' }),
 		).not.toContainText('ada/uniform/smile')
 	} finally {
 		await app.close()

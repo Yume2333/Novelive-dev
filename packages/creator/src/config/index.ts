@@ -20,6 +20,7 @@ import {
 	apiKeyMasked,
 	type Config,
 	type ConfigError,
+	type ConfigErrorReason,
 	type ConfigUpdate,
 	configUpdateSchema,
 	type MaskedConfig,
@@ -33,7 +34,9 @@ import {
 export {
 	apiKeyMasked,
 	type ConfigError,
+	type ConfigErrorReason,
 	type ConfigUpdate,
+	configErrorReasons,
 	configErrorSchema,
 	configUpdateSchema,
 	type MaskedConfig,
@@ -197,7 +200,7 @@ export function createConfigStore(userData: string) {
 	const path = join(userData, 'config.json')
 	let writes: Promise<unknown> = Promise.resolve()
 
-	function configError(reason: string): ConfigError {
+	function configError(reason: ConfigErrorReason): ConfigError {
 		return { configError: { path, reason } }
 	}
 
@@ -207,29 +210,39 @@ export function createConfigStore(userData: string) {
 			content = await readFile(path, 'utf8')
 		} catch (error) {
 			if (isFsError(error, 'ENOENT')) return defaultConfig()
-			return configError('无法读取配置文件')
+			return configError('unreadable')
 		}
 		let input: unknown
 		try {
 			input = JSON.parse(content)
 		} catch {
-			return configError('配置文件不是有效的 JSON')
+			return configError('invalid_json')
 		}
 		if (
 			!configValidator.check(input) ||
 			(input.production && !validWriter(input.production))
 		)
-			return configError('配置字段无效')
+			return configError('invalid_fields')
 		try {
 			return mapKeys(input, decrypt)
 		} catch {
-			return configError('无法解密 API Key')
+			return configError('decrypt_failed')
 		}
 	}
 
 	function requireConfig(result: Config | ConfigError): Config {
 		if ('configError' in result) {
-			throw { code: 'invalid_config', message: result.configError.reason }
+			const { path: configPath, reason } = result.configError
+			const detail: Record<ConfigErrorReason, string> = {
+				unreadable: 'config file could not be read',
+				invalid_json: 'config file is not valid JSON',
+				invalid_fields: 'config fields are invalid',
+				decrypt_failed: 'config secrets could not be decrypted',
+			}
+			throw {
+				code: 'invalid_config',
+				message: `${detail[reason] ?? 'config file is broken'}: ${configPath}`,
+			}
 		}
 		return result
 	}

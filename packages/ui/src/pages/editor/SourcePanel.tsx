@@ -3,6 +3,10 @@ import type { RefObject } from 'react'
 import { IconButton } from '../../components/Button'
 import { SectionLabel } from '../../components/Card'
 import { ScrollArea } from '../../components/ScrollArea'
+import {
+	formatParagraphLabel,
+	formatParagraphRange,
+} from '../../format/chapter'
 import { scoped } from '../../i18n'
 
 const t = scoped('editor')
@@ -27,11 +31,14 @@ export function SourcePanel({
 	onAskParagraph,
 }: SourcePanelProps) {
 	const range =
-		activeSourceIds.length > 0
-			? activeSourceIds.length === 1
-				? activeSourceIds[0]
-				: `${activeSourceIds[0]} – ${activeSourceIds[activeSourceIds.length - 1]}`
-			: ''
+		activeSourceIds.length === 1
+			? formatParagraphLabel(activeSourceIds[0])
+			: activeSourceIds.length > 1
+				? formatParagraphRange(
+						activeSourceIds[0],
+						activeSourceIds[activeSourceIds.length - 1],
+					)
+				: ''
 
 	return (
 		<>
@@ -46,7 +53,7 @@ export function SourcePanel({
 				/>
 			</div>
 			{range ? (
-				<p className="editor-source-range">{t('原文 {{range}}', { range })}</p>
+				<p className="editor-source-range">{t('原文{{range}}', { range })}</p>
 			) : null}
 			<ScrollArea className="editor-source" viewportRef={viewportRef}>
 				{paragraphs.map((paragraph) => {
@@ -64,7 +71,6 @@ export function SourcePanel({
 								aria-pressed={linked}
 								onClick={() => onJumpParagraph(paragraph.id)}
 							>
-								<span className="editor-source-id">{paragraph.id} · </span>
 								{paragraph.text}
 							</button>
 							<div className="row-actions editor-source-actions">

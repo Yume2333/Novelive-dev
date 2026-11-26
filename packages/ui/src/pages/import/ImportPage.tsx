@@ -1,8 +1,4 @@
-import type {
-	CommandError,
-	CommandInput,
-	CommandOutput,
-} from '@novelive/creator/contract'
+import type { CommandInput, CommandOutput } from '@novelive/creator/contract'
 import {
 	ArrowDown,
 	ArrowLeft,
@@ -34,9 +30,20 @@ import {
 	Stepper,
 	Tooltip,
 } from '../../components/Extended'
+import { ErrorNotice } from '../../components/Feedback'
 import { Field, Select, TextInput, Toggle } from '../../components/Form'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { Page } from '../../components/Page'
+import {
+	formatChapterLabel,
+	formatChapterNumeral,
+	formatChapterRange,
+	formatParagraphLabel,
+	formatVolumeLabel,
+} from '../../format/chapter'
+import { type HumanizedError, humanizeError } from '../../format/errors'
+import { formatLanguage, languages } from '../../format/language'
+import { formatPath, useHomeDir } from '../../format/path'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import type { SettingsHost } from '../../shell/AppShell'
@@ -61,13 +68,6 @@ type Wizard = Extract<Result, { status: 'ready' }>
 type Candidates = Extract<Result, { status: 'encoding' }>['candidates']
 type Encoding = NonNullable<CommandInput<'import.file'>['encoding']>
 
-const languages = [
-	['zh-CN', msg('简体中文')],
-	['zh-TW', msg('繁体中文')],
-	['ja', msg('日语')],
-	['en', msg('英语')],
-	['ko', msg('韩语')],
-] as const
 const encodingNames: Record<Encoding, string> = {
 	'utf-8': 'UTF-8',
 	gb18030: msg('GB18030（简体）'),
@@ -77,7 +77,7 @@ const encodingNames: Record<Encoding, string> = {
 	'utf-16be': 'UTF-16 BE',
 }
 
-const steps = [msg('选择文件'), msg('核对信息'), msg('改编设置')]
+const steps = [msg('选择文件'), msg('核对信息'), msg('插图与参考')]
 
 /** 向导步骤指示：共享 Stepper 负责视觉，这里补上 aria-current 步骤语义。 */
 function WizardStepper({ current }: { current: number }) {
@@ -103,11 +103,6 @@ const extIcon: Record<string, LucideIcon> = {
 	docx: FileType2,
 	pdf: FileImage,
 }
-
-const message = (error: unknown) =>
-	error && typeof error === 'object' && 'message' in error
-		? String((error as CommandError).message)
-		: t('导入失败，请重试。')
 
 /** 文件行：图标 + 文件名 + 类型标签，悬停/聚焦浮出移除按钮 */
 function FileRow({
@@ -183,19 +178,33 @@ function DropZone({
 function PickerField({
 	label,
 	value,
+	placeholder,
 	action,
 }: {
 	label: string
 	value: string
+	placeholder: string
 	action: ReactNode
 }) {
+	const home = useHomeDir()
+	const empty = value.trim() === ''
+	const display = empty ? placeholder : formatPath(value, home)
+	const shown = (
+		<span
+			className={styles.pickerValue}
+			data-placeholder={empty || undefined}
+			title={empty ? undefined : value}
+		>
+			{display}
+		</span>
+	)
 	return (
 		<div className={styles.field}>
 			<span className={`label-caps label-caps-zh ${styles.fieldLabel}`}>
 				{label}
 			</span>
 			<span className={styles.picker}>
-				<span className={styles.pickerValue}>{value}</span>
+				{shown}
 				{action}
 			</span>
 		</div>
@@ -220,17 +229,17 @@ export function ImportPage() {
 	const [joined, setJoined] = useState<Extract<Result, { status: 'joined' }>>()
 	const [layout, setLayout] = useState<ImportLayout>()
 	const [busy, setBusy] = useState(false)
-	const [error, setError] = useState('')
+	const [error, setError] = useState<HumanizedError>()
 	const location =
 		folder ?? (config && 'projectDir' in config ? config.projectDir : '')
 
 	async function run(action: () => Promise<void>) {
 		setBusy(true)
-		setError('')
+		setError(undefined)
 		try {
 			await action()
 		} catch (failure) {
-			setError(message(failure))
+			setError(humanizeError(failure))
 		} finally {
 			setBusy(false)
 		}
@@ -290,7 +299,10 @@ export function ImportPage() {
 						: undefined,
 			}).promise
 			if (result.status === 'unsupported') {
-				setError(t('扫描版 PDF 无可提取文字，暂不支持 OCR'))
+				setError({
+					...humanizeError('no_extractable_text'),
+					hint: t('扫描版 PDF 暂不支持识别文字，请换用带文字的文件。'),
+				})
 				return
 			}
 			if (result.status === 'encoding') {
@@ -300,6 +312,10 @@ export function ImportPage() {
 			}
 			if (result.status === 'joined') {
 				setJoined(result)
+				return
+			}
+			if (result.status === 'error') {
+				setError(humanizeError(result))
 				return
 			}
 			setWizard(result)
@@ -314,14 +330,19 @@ export function ImportPage() {
 				revise ||
 				selectedIllustrations.length ||
 				confirm !== wizard.layout.confirmWithReferences
-			)
-				await window.novelive.call('import.revise', {
+			) {
+				const revised = await window.novelive.call('import.revise', {
 					projectDir: wizard.projectDir,
 					layout: revise
 						? { ...layout, title: layout.title.trim() }
 						: { ...wizard.layout, confirmWithReferences: confirm },
 					selectedIllustrations,
 				}).promise
+				if (revised.status === 'error') {
+					setError(humanizeError(revised))
+					return
+				}
+			}
 			navigate(workRoute('work', wizard.workId))
 		})
 
@@ -400,11 +421,7 @@ export function ImportPage() {
 		<Page eyebrow={t('从原文开始')} title={t('新建工程')} width={760}>
 			<div className={styles.flow}>
 				<WizardStepper current={0} />
-				{error && (
-					<div role="alert">
-						<Banner kind="error">{error}</Banner>
-					</div>
-				)}
+				{error && <ErrorNotice error={error} />}
 				<Card className={styles.cardBody}>
 					<div className={styles.drops}>
 						<DropZone
@@ -461,37 +478,6 @@ export function ImportPage() {
 						</div>
 					)}
 					<div className={styles.grid}>
-						{joining ? (
-							<PickerField
-								label={t('已有工程')}
-								value={joinTarget?.projectDir ?? t('未选择')}
-								action={
-									<Button
-										size="sm"
-										icon={FolderOpen}
-										disabled={busy}
-										onClick={() => void pickJoinTarget()}
-									>
-										{t('选择已有工程')}
-									</Button>
-								}
-							/>
-						) : (
-							<PickerField
-								label={t('工程文件夹')}
-								value={location || t('未设置')}
-								action={
-									<Button
-										size="sm"
-										icon={FolderOpen}
-										disabled={busy}
-										onClick={() => void pickLocation()}
-									>
-										{t('选择文件夹')}
-									</Button>
-								}
-							/>
-						)}
 						<div className={styles.field}>
 							<span className={styles.placementLabel}>
 								<span
@@ -517,20 +503,50 @@ export function ImportPage() {
 							/>
 						</div>
 						{joining ? (
-							joinTarget && (
-								<Field label={t('系列')}>
-									<Select
-										value={joinTarget.seriesId}
+							<PickerField
+								label={t('已有工程')}
+								value={joinTarget?.projectDir ?? ''}
+								placeholder={t('未选择')}
+								action={
+									<Button
+										size="sm"
+										icon={FolderOpen}
 										disabled={busy}
-										onChange={() => {}}
-										options={[
-											{
-												value: joinTarget.seriesId,
-												label: joinTarget.title || joinTarget.seriesId,
-											},
-										]}
-									/>
-								</Field>
+										onClick={() => void pickJoinTarget()}
+									>
+										{t('选择已有工程')}
+									</Button>
+								}
+							/>
+						) : (
+							<PickerField
+								label={t('工程文件夹')}
+								value={location}
+								placeholder={t('未设置')}
+								action={
+									<Button
+										size="sm"
+										icon={FolderOpen}
+										disabled={busy}
+										onClick={() => void pickLocation()}
+									>
+										{t('选择文件夹')}
+									</Button>
+								}
+							/>
+						)}
+						{joining ? (
+							joinTarget && (
+								<div className={styles.field}>
+									<span
+										className={`label-caps label-caps-zh ${styles.fieldLabel}`}
+									>
+										{t('系列')}
+									</span>
+									<span className={styles.seriesValue}>
+										{joinTarget.title.trim() || t('未命名系列')}
+									</span>
+								</div>
 							)
 						) : (
 							<Field label={t('作品名')}>
@@ -545,6 +561,9 @@ export function ImportPage() {
 							>
 								{t('原文编码')}
 							</legend>
+							<p className={styles.encodingLead}>
+								{t('自动识别失败，请选一个能正常显示原文的编码')}
+							</p>
 							<RadioGroup
 								className={styles.encodingOptions}
 								value={encoding ?? ''}
@@ -592,7 +611,7 @@ function Review({
 	onSelectIllustrations(ids: string[]): void
 	layout: ImportLayout
 	busy: boolean
-	error: string
+	error: HumanizedError | undefined
 	onChange(layout: ImportLayout): void
 	onFinish(revise: boolean): void
 }) {
@@ -611,7 +630,7 @@ function Review({
 		setStep(2)
 	}
 	const languageOptions = [
-		...languages.map(([value, name]) => ({ value, label: t(name) })),
+		...languages.map(([value]) => ({ value, label: formatLanguage(value) })),
 		...(!languages.some(([value]) => value === layout.language)
 			? [{ value: layout.language, label: layout.language }]
 			: []),
@@ -620,11 +639,7 @@ function Review({
 		<Page eyebrow={t('从原文开始')} title={t('新建工程')} width={760}>
 			<div className={styles.flow}>
 				<WizardStepper current={step} />
-				{error && (
-					<div role="alert">
-						<Banner kind="error">{error}</Banner>
-					</div>
-				)}
+				{error && <ErrorNotice error={error} />}
 				{step === 1 && (
 					<Card className={styles.cardBody}>
 						<div className={styles.grid}>
@@ -703,17 +718,11 @@ function Review({
 								<section
 									key={volume.start}
 									className={styles.volume}
-									aria-label={t('第 {{value}} 卷', { value: v + 1 })}
+									aria-label={formatVolumeLabel({ index: v + 1 })}
 								>
 									<div className={`hover-row ${styles.volumeHead}`}>
 										<TextInput
 											className={styles.volumeTitle}
-											style={{
-												width: 150,
-												padding: 'var(--space-px-5) var(--space-px-10)',
-												fontSize: 13,
-												fontWeight: 600,
-											}}
 											aria-label={t('第 {{value}} 卷标题', { value: v + 1 })}
 											value={volume.title}
 											onChange={(title) =>
@@ -721,10 +730,9 @@ function Review({
 											}
 										/>
 										<span className={styles.meta}>
-											{t('第 {{start}}–{{end}} 章', {
-												start: volume.start + 1,
-												end,
-											})}
+											{volume.start + 1 === end
+												? formatChapterLabel({ index: end })
+												: formatChapterRange(volume.start + 1, end)}
 										</span>
 										<span className={`row-actions ${styles.volumeActions}`}>
 											<Tooltip text={t('往下挪一章')}>
@@ -784,17 +792,13 @@ function Review({
 												<fieldset
 													key={`${i}-${chapter.start}`}
 													className={`hover-row ${styles.chapter}`}
-													aria-label={t('第 {{value}} 章', { value: i + 1 })}
+													aria-label={formatChapterLabel({ index: i + 1 })}
 												>
 													<span className={styles.index}>
-														{String(i + 1).padStart(2, '0')}
+														{formatChapterNumeral(i)}
 													</span>
 													<TextInput
 														className={styles.chapterTitle}
-														style={{
-															padding: 'var(--space-px-7) var(--space-px-10)',
-															fontSize: 13,
-														}}
 														aria-label={t('第 {{value}} 章标题', {
 															value: i + 1,
 														})}
@@ -868,6 +872,26 @@ function Review({
 								</legend>
 								{wizard.illustrations.map((candidate, index) => {
 									const checked = selectedIllustrations.includes(candidate.id)
+									const chapter = formatChapterLabel({
+										index: candidate.chapter + 1,
+									})
+									const coordinate = [
+										formatVolumeLabel({ index: candidate.volume + 1 }),
+										chapter,
+										candidate.paragraph === undefined
+											? ''
+											: formatParagraphLabel(candidate.paragraph + 1),
+									]
+										.filter(Boolean)
+										.join(' · ')
+									const caption = (
+										<span>
+											{t('插图 {{value}} · {{chapter}}', {
+												value: index + 1,
+												chapter,
+											})}
+										</span>
+									)
 									return (
 										<Checkbox
 											key={candidate.id}
@@ -891,21 +915,7 @@ function Review({
 														src={candidate.preview}
 														alt={t('插图 {{value}}', { value: index + 1 })}
 													/>
-													<span>
-														{t(
-															'使用插图 {{value}} · 第 {{value2}} 卷 · 第 {{value3}} 章',
-															{
-																value: index + 1,
-																value2: candidate.volume + 1,
-																value3: candidate.chapter + 1,
-															},
-														)}
-														{candidate.paragraph === undefined
-															? ''
-															: t(' · 第 {{value}} 段', {
-																	value: candidate.paragraph + 1,
-																})}
-													</span>
+													<Tooltip text={coordinate}>{caption}</Tooltip>
 												</span>
 											}
 										/>

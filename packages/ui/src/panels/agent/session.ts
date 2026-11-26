@@ -4,6 +4,10 @@ import type {
 	EventEnvelope,
 } from '@novelive/creator/contract'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+	type AssetLabelInfo,
+	assetLabelInfoFromBible,
+} from '../../format/asset'
 import { scoped } from '../../i18n'
 
 const t = scoped('agent')
@@ -12,6 +16,38 @@ export type Snapshot = CommandOutput<'chat.get'>
 export type ChatSession = Snapshot['session']
 export type Entry = Snapshot['entries'][number]
 export type Message = Extract<Entry, { kind: 'message' }>
+export type EntryNames = Readonly<Record<string, string>>
+export type ChapterOrder = Readonly<Record<string, number>>
+
+function collectEntryNames(
+	bible: CommandOutput<'bible.get'> | null,
+): Record<string, string> {
+	const names: Record<string, string> = {}
+	if (!bible) return names
+	const characterNames = Object.fromEntries(
+		bible.characters.map((entry) => [entry.id, entry.name]),
+	)
+	for (const entry of bible.characters)
+		if (entry.name) names[entry.id] = entry.name
+	for (const entry of bible.locations)
+		if (entry.name) names[entry.id] = entry.name
+	for (const entry of bible.relations) {
+		const from = characterNames[entry.from]
+		const to = characterNames[entry.to]
+		if (from && to) names[entry.id] = `${from} / ${to}`
+	}
+	for (const entry of bible.glossary) {
+		const label = entry.written || entry.original
+		if (label) names[entry.id] = label
+	}
+	for (const entry of bible.timeline)
+		if (entry.event) names[entry.id] = entry.event
+	for (const entry of bible.foreshadowing)
+		if (entry.description) names[entry.id] = entry.description
+	for (const entry of bible.styles)
+		if (entry.description) names[entry.id] = entry.description
+	return names
+}
 export type Part = Message['parts'][number]
 export type Attachment = CommandOutput<'chat.attach'>
 export type Position = CommandInput<'chat.send'>['position']
@@ -113,6 +149,10 @@ export function useAgentChat(workId: string) {
 	const [sessions, setSessions] = useState<ChatSession[]>()
 	const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
 	const [chapterTitles, setChapterTitles] = useState<Record<string, string>>({})
+	const [chapterOrder, setChapterOrder] = useState<Record<string, number>>({})
+	const [entryNames, setEntryNames] = useState<Record<string, string>>({})
+	const [volumeTitles, setVolumeTitles] = useState<Record<string, string>>({})
+	const [assetInfo, setAssetInfo] = useState<AssetLabelInfo>({})
 	const [error, setError] = useState('')
 	const [stopped, setStopped] = useState<ReadonlySet<string>>(new Set())
 	const active = useRef<string | null>(null)
@@ -150,9 +190,48 @@ export function useAgentChat(workId: string) {
 		setError('')
 		void load().catch(fail(t('无法读取会话')))
 		void call('production.get', { workId }).then(
-			(production) => setChapterTitles(production.chapterTitles ?? {}),
-			() => setChapterTitles({}),
+			(production) => {
+				setChapterTitles(production.chapterTitles ?? {})
+				setChapterOrder(
+					Object.fromEntries(
+						(production.chapters ?? []).map((chapter, index) => [
+							chapter.chapterId,
+							index + 1,
+						]),
+					),
+				)
+			},
+			() => {
+				setChapterTitles({})
+				setChapterOrder({})
+			},
 		)
+		void call('library.list', {})
+			.then(({ works }) => {
+				setVolumeTitles(
+					Object.fromEntries(
+						works.flatMap((work) =>
+							work.project
+								? [[work.project.volumeId, work.project.volumeTitle]]
+								: [],
+						),
+					),
+				)
+				const volumeId = works.find((work) => work.workId === workId)?.project
+					?.volumeId
+				if (!volumeId) throw new Error('no volume')
+				return call('bible.get', { workId, volumeId })
+			})
+			.then(
+				(bible) => {
+					setEntryNames(collectEntryNames(bible))
+					setAssetInfo(assetLabelInfoFromBible(bible))
+				},
+				() => {
+					setEntryNames({})
+					setAssetInfo({})
+				},
+			)
 		const offEvent = window.novelive.on('event', (envelope: EventEnvelope) => {
 			if (envelope.event.type !== 'chat.message') return
 			const payload = envelope.event.payload as MessageEvent
@@ -199,6 +278,10 @@ export function useAgentChat(workId: string) {
 		loaded: sessions !== undefined,
 		snapshot,
 		chapterTitles,
+		chapterOrder,
+		entryNames,
+		volumeTitles,
+		assetInfo,
 		stopped,
 		error,
 		setError,
@@ -256,7 +339,7 @@ export function useAgentChat(workId: string) {
 			try {
 				next = await call('chat.get', { workId, sessionId, headId })
 			} catch {
-				setError(t('消息已发出，但没能刷新会话'))
+				setError(t('消息已发出，但无法刷新会话，请重试'))
 				return
 			}
 			if (active.current === sessionId)

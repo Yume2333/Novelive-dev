@@ -22,13 +22,17 @@ import {
 import { usageCommands } from '../usage/contract'
 import { chatCommands } from './chat'
 import { editorCommands } from './editor'
+import { importErrorCodes } from './errors'
 import { importCommands } from './import'
 import type { DesktopProgressApi } from './player-progress'
 import { productionCommands } from './production'
+import { projectErrorCodes } from './project'
 import type { DesktopShareApi } from './share'
 
 export {
+	type ConfigErrorReason,
 	type ConfigUpdate,
+	configErrorReasons,
 	type MaskedConfig,
 	type ProductionRole,
 	type ProductionSettings,
@@ -37,11 +41,17 @@ export {
 	type WriterPreset,
 	type WriterSettings,
 } from '../config/schema'
+export {
+	type UnreadableProjectReason,
+	unreadableProjectReasons,
+} from '../usage/contract'
 export * from './chat'
 export * from './editor'
+export * from './errors'
 export * from './import'
 export { installedProgressKey } from './player-progress'
 export * from './production'
+export { type ProjectErrorCode, projectErrorCodes } from './project'
 export * from './queue'
 export * from './share'
 
@@ -58,6 +68,8 @@ const envelope = obj({
 	event: obj({ type: str(), payload: anyValue() }),
 })
 const error = obj({
+	// 命令错误的机器码：通用命令码之外，导入／工程错误码也能原样穿过
+	// IPC 边界，UI 按码本地化（派生自导出列表，禁止重复字面量）。
 	code: oneOf([
 		'auth',
 		'not_found',
@@ -71,6 +83,8 @@ const error = obj({
 		'cancelled',
 		'creator_down',
 		'internal',
+		...importErrorCodes,
+		...projectErrorCodes,
 	]),
 	message: str(),
 })
@@ -193,6 +207,7 @@ export interface HostState {
 	generation: number
 	breakerOpen: boolean
 	logDir: string
+	homeDir: string
 }
 
 export interface NoveliveEvents {

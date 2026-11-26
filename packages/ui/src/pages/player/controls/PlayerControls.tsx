@@ -2,6 +2,7 @@ import {
 	BookmarkCheck,
 	BookmarkPlus,
 	BookOpen,
+	CircleAlert,
 	EyeOff,
 	FastForward,
 	FolderOpen,
@@ -27,13 +28,21 @@ import type {
 import type { SaveSlot } from '../../../../../player/src/contract/progress'
 import { Button } from '../../../components/Button'
 import { Chip, ProgressBar } from '../../../components/Card'
-import { ConfirmDialog, Slider, Tooltip } from '../../../components/Extended'
+import { ConfirmDialog, Slider } from '../../../components/Extended'
 import { Toggle } from '../../../components/Form'
 import { ScrollArea } from '../../../components/ScrollArea'
+import { useToast } from '../../../components/Toast'
+import { formatChapterLabel } from '../../../format/chapter'
+import { formatErrorText, humanizeError } from '../../../format/errors'
 import {
+	chapterPhaseFraction,
 	defaultPlayerSettings,
 	type PlayerControlsController,
 	schedulePlayback,
+	textSpeedFromSlider,
+	textSpeedSliderMax,
+	textSpeedSliderMin,
+	textSpeedToSlider,
 } from './controller'
 import './controls.css'
 import { msg, scoped } from '../../../i18n'
@@ -127,8 +136,9 @@ export function PlayerControls({
 	const [settings, setSettings] = useState(rememberedSettings)
 	const [auto, setAuto] = useState(false)
 	const [revision, setRevision] = useState(0)
-	const [failure, setFailure] = useState('')
 	const [notice, setNotice] = useState('')
+	const toast = useToast()
+	const toastError = (message: string) => toast(message, CircleAlert)
 	const [chapterThumbs, setChapterThumbs] = useState<Record<string, string>>({})
 	const panel = useRef<HTMLElement>(null)
 	useEffect(() => {
@@ -248,7 +258,7 @@ export function PlayerControls({
 			if (document.fullscreenElement) await document.exitFullscreen()
 			else await document.documentElement.requestFullscreen()
 		} catch {
-			setFailure(t('无法切换全屏'))
+			toastError(t('无法切换全屏，请重试。'))
 		}
 	}
 	function stopPlayback() {
@@ -259,7 +269,6 @@ export function PlayerControls({
 		setScreen(null)
 		if (!save) stopPlayback()
 		setNotice('')
-		setFailure('')
 		try {
 			const { promise, resolve } = Promise.withResolvers<void>()
 			requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
@@ -268,7 +277,7 @@ export function PlayerControls({
 			else await onLoad(slot)
 			setNotice(save ? t('存档成功') : t('读档完成'))
 		} catch (error) {
-			setFailure(error instanceof Error ? error.message : t('存读档失败'))
+			toastError(formatErrorText(humanizeError(error)))
 		}
 	}
 	const title =
@@ -337,11 +346,7 @@ export function PlayerControls({
 	)
 	const sliderRow = (
 		label: string,
-		key:
-			| 'autoPlaySpeedMultiplier'
-			| 'fontSize'
-			| 'dialogueOpacity'
-			| 'textMillisecondsPerCharacter',
+		key: 'autoPlaySpeedMultiplier' | 'fontSize' | 'dialogueOpacity',
 		min: number,
 		max: number,
 		step: number,
@@ -360,26 +365,18 @@ export function PlayerControls({
 			/>
 		</div>
 	)
-	const waitSteps: Record<string, number> = {
-		[msg('写作')]: 0.25,
-		[msg('审稿')]: 0.5,
-		[msg('演出')]: 0.72,
-		[msg('出图')]: 0.88,
-	}
 	const waitProgress = waiting
-		? waitSteps[
-				waiting.progress.split(' · ').find((part) => part in waitSteps) ?? ''
-			]
+		? chapterPhaseFraction(waiting.progress.split(' · '))
 		: undefined
 	const finalePrimary = onWorkPage
 		? { label: t('返回作品页'), action: onWorkPage }
 		: onLibrary
 			? { label: t('返回书库'), action: onLibrary }
 			: null
-	const editorButton = (
+	const editorButton = editorLinked ? (
 		<button
 			type="button"
-			disabled={!editorLinked || !controller?.frame().position}
+			disabled={!controller?.frame().position}
 			onClick={() => {
 				const position = controller?.frame().position
 				if (position) onEditor(position)
@@ -388,17 +385,12 @@ export function PlayerControls({
 			{icon(PencilLine, 17)}
 			{t('在编辑器中打开这里')}
 		</button>
-	)
+	) : null
 	return (
 		<>
 			{notice && !screen && (
 				<p className="nl-progress-notice" role="status">
 					{notice}
-				</p>
-			)}
-			{failure && !screen && (
-				<p className="nl-progress-notice" role="alert">
-					{failure}
 				</p>
 			)}
 			{!hidden && waiting && (
@@ -615,13 +607,7 @@ export function PlayerControls({
 										{icon(Settings2, 17)}
 										{t('设置')}
 									</button>
-									{editorLinked ? (
-										editorButton
-									) : (
-										<Tooltip text={t('请先将本地工程关联到作品')}>
-											{editorButton}
-										</Tooltip>
-									)}
+									{editorButton}
 									<hr className="nl-menu-divider" />
 									{onWorkPage && (
 										<button type="button" onClick={() => setConfirmExit(true)}>
@@ -692,23 +678,28 @@ export function PlayerControls({
 										0.25,
 										'×',
 									)}
-									{sliderRow(
-										t('文字速度（毫秒 / 字）'),
-										'textMillisecondsPerCharacter',
-										3,
-										153,
-										1,
-										'ms',
-									)}
-									{switchRow(
-										t('瞬间显示'),
-										settings.textMillisecondsPerCharacter === 0,
-										() =>
-											update(
-												'textMillisecondsPerCharacter',
-												settings.textMillisecondsPerCharacter === 0 ? 30 : 0,
-											),
-									)}
+									<div className="nl-setting-slider nl-setting-slider-speed">
+										<span className="nl-setting-label">{t('文字速度')}</span>
+										<Slider
+											aria-label={t('文字速度')}
+											min={textSpeedSliderMin}
+											max={textSpeedSliderMax}
+											step={1}
+											value={textSpeedToSlider(
+												settings.textMillisecondsPerCharacter,
+											)}
+											onChange={(value) =>
+												update(
+													'textMillisecondsPerCharacter',
+													textSpeedFromSlider(value),
+												)
+											}
+										/>
+										<span className="nl-setting-slider-ends" aria-hidden="true">
+											<span>{t('慢')}</span>
+											<span>{t('快')}</span>
+										</span>
+									</div>
 									{sliderRow(t('字号'), 'fontSize', 15, 48, 1, 'px')}
 									{sliderRow(
 										t('对话框不透明度'),
@@ -806,7 +797,7 @@ export function PlayerControls({
 											)}
 											<span className="nl-chapter-text">
 												<span className="nl-chapter-title">
-													{t('第 {{index}} 章 · {{title}}', {
+													{formatChapterLabel({
 														index: index + 1,
 														title: chapter.title,
 													})}
@@ -825,7 +816,6 @@ export function PlayerControls({
 								<p>{t('暂无章节')}</p>
 							)}
 						</ScrollArea>
-						{failure && <p role="alert">{failure}</p>}
 						{screen !== 'menu' && (
 							<button type="button" onClick={() => setScreen('menu')}>
 								{t('返回菜单')}

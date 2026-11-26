@@ -1,5 +1,18 @@
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, expect, test } from 'vitest'
-import { chatMessageEvent } from '../../packages/creator/src/contract'
+import { ChatService, registerChat } from '../../packages/creator/src/chat'
+import { ChatStore } from '../../packages/creator/src/chat/store'
+import {
+	type CommandOutput,
+	chatMessageEvent,
+} from '../../packages/creator/src/contract'
+import {
+	openProjectDatabase,
+	ProjectTasks,
+} from '../../packages/creator/src/project/database'
+import { createRegistry } from '../../packages/creator/src/registry'
 import {
 	createChatFixture,
 	image,
@@ -383,7 +396,7 @@ test('delegates with fresh context and gives child agents no dispatch or proposa
 		expect.arrayContaining([
 			expect.objectContaining({
 				type: 'subtask',
-				label: 'reviewer',
+				role: 'reviewer',
 				status: 'done',
 			}),
 			expect.objectContaining({
@@ -432,4 +445,67 @@ test('waits for an in-flight approval before closing the project database', asyn
 		status: 'approved',
 	})
 	expect(chat.work.writes).toBe(1)
+})
+
+test('hydrates a legacy subtask part without role so chat.get output passes validation', async () => {
+	const directory = await mkdtemp(join(tmpdir(), 'novelive-legacy-chat-'))
+	try {
+		const db = openProjectDatabase(join(directory, 'project.db'), true)
+		new ProjectTasks(db).registerWork({ workId, title: 'Paper Boats' })
+		const session = new ChatStore(db, workId).create('Legacy')
+		const at = Date.now()
+		// 旧版存档的子任务没有 role 字段，角色存在 label 里
+		for (const [entryId, label] of [
+			['legacy-entry-1', 'reviewer'],
+			['legacy-entry-2', 'unrecognized-label'],
+		] as const) {
+			db.prepare(
+				`INSERT INTO session_entry (session_id, entry_id, parent_id, kind, at, content)
+				VALUES (?, ?, NULL, 'message', ?, ?)`,
+			).run(
+				session.sessionId,
+				entryId,
+				at,
+				JSON.stringify({
+					role: 'assistant',
+					parts: [{ type: 'subtask', id: entryId, label, status: 'done' }],
+				}),
+			)
+		}
+		const service = new ChatService({
+			database: db,
+			workId,
+			cacheDir: directory,
+			mainModel() {
+				throw new Error('Network forbidden')
+			},
+			emit() {},
+		})
+		const registry = createRegistry()
+		registerChat(registry, () => service)
+		// 走 registry 调用：输出不符合契约会直接抛错
+		const snapshot = await registry.run(
+			'chat.get',
+			{ workId, sessionId: session.sessionId },
+			new AbortController().signal,
+		)
+		const subtasks = (snapshot as CommandOutput<'chat.get'>).entries.flatMap(
+			(entry) =>
+				entry.kind === 'message'
+					? entry.parts.filter((part) => part.type === 'subtask')
+					: [],
+		)
+		expect(subtasks).toHaveLength(2)
+		// label 是合法角色时直接恢复 role
+		expect(subtasks[0]).toMatchObject({ role: 'reviewer', label: 'reviewer' })
+		// label 不是合法角色时退回默认角色
+		expect(subtasks[1]).toMatchObject({
+			role: 'organizer',
+			label: 'organizer',
+		})
+		await service.close()
+		db.close()
+	} finally {
+		await rm(directory, { force: true, recursive: true })
+	}
 })

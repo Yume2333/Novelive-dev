@@ -11,6 +11,7 @@ import {
 	Clapperboard,
 	LibraryBig,
 	NotebookPen,
+	PackageOpen,
 	Palette,
 	Play,
 	PlayCircle,
@@ -24,11 +25,14 @@ import {
 	useOutletContext,
 	useSearchParams,
 } from 'react-router-dom'
+import { Banner, Details, ErrorNotice, LoadingState } from '../../components'
 import { Button } from '../../components/Button'
-import { Card, Chip, ProgressBar } from '../../components/Card'
+import { Chip, ProgressBar } from '../../components/Card'
 import { GradientCover } from '../../components/GradientCover'
 import { EmptyState, Page, PageAction } from '../../components/Page'
 import { Tabs, tabPanel } from '../../components/Tabs'
+import { formatVolumeLabel } from '../../format/chapter'
+import { formatPath, useHomeDir } from '../../format/path'
 import { scoped } from '../../i18n'
 import { productionRoutes, workRoute } from '../../routes/production'
 import type { LibraryWork } from '../../shell/AppShell'
@@ -69,7 +73,7 @@ function groupWorks(works: LibraryWork[]) {
 		if (!volume) {
 			volume = {
 				key: project.volumeId,
-				title: t('第 {{index}} 卷 · {{title}}', {
+				title: formatVolumeLabel({
 					index: project.volumeIndex,
 					title: project.volumeTitle,
 				}),
@@ -139,11 +143,17 @@ function statusLine({
 }) {
 	const counts = { published, chapters }
 	if (imported)
-		return {
-			text: t('共 {{chapters}} 章', { chapters }),
-			icon: BookOpen,
-			tone: 'quiet' as const,
-		}
+		return published > 0
+			? {
+					text: t('共 {{chapters}} 章', { chapters }),
+					icon: BookOpen,
+					tone: 'quiet' as const,
+				}
+			: {
+					text: t('暂无可游玩章节'),
+					icon: PackageOpen,
+					tone: 'quiet' as const,
+				}
 	if (state?.kind === 'confirm-visual')
 		return {
 			text: t('等你确认角色设定'),
@@ -242,16 +252,27 @@ function WorkCard({
 						<Icon aria-hidden="true" size={14} strokeWidth={1.8} />
 						{line.text}
 					</span>
+					{/* 卡内只保留一条进度：制作中展示发布进度，其余情况有阅读进度时展示阅读进度 */}
 					{showProduction ? (
 						<ProgressBar
 							value={chapters ? published / chapters : 0}
 							height={5}
 							active={producing}
+							label={t('已发布 {{published}} / {{chapters}} 章', {
+								published,
+								chapters,
+							})}
 						/>
-					) : null}
-					{reading && !producing ? (
+					) : reading && !producing ? (
 						<>
-							<ProgressBar value={reading.read / reading.total} height={5} />
+							<ProgressBar
+								value={reading.read / reading.total}
+								height={5}
+								label={t('已读 {{read}} / {{total}} 章', {
+									read: reading.read,
+									total: reading.total,
+								})}
+							/>
 							<span className={styles.readingCaption}>
 								<span>
 									{t('已读 {{read}} / {{total}} 章', {
@@ -279,7 +300,13 @@ function WorkCard({
 			{body}
 		</Link>
 	) : (
-		<div className={`glass-panel ${styles.card}`}>{body}</div>
+		<div
+			className={`glass-panel ${styles.card}`}
+			data-disabled="true"
+			title={imported ? t('这部作品还没有可游玩的章节') : undefined}
+		>
+			{body}
+		</div>
 	)
 }
 
@@ -298,6 +325,7 @@ export function LibraryPage() {
 		searchParams.get('tab') === 'imported' ? 'imported' : 'projects',
 	)
 	const navigate = useNavigate()
+	const home = useHomeDir()
 	const share = window.novelive.host.share
 	const installed = window.novelive.host.installed
 	const progressApi = window.novelive.host.progress
@@ -454,7 +482,7 @@ export function LibraryPage() {
 	return (
 		<Page
 			title={t('书库')}
-			action={
+			actions={
 				<div className={styles.actions}>
 					{share && (
 						<ImportPackage
@@ -481,14 +509,18 @@ export function LibraryPage() {
 			}
 		>
 			{error && !library ? (
-				<p role="alert">{t('无法读取书库')}</p>
+				<ErrorNotice
+					message={t('无法读取书库，请重试')}
+					onRetry={() => setRevision((n) => n + 1)}
+				/>
 			) : !library ? (
-				<p role="status">{t('正在读取书库')}</p>
+				<LoadingState text={t('正在读取书库')} />
 			) : library.works.length === 0 &&
 				library.unreadableCount === 0 &&
 				packages.length === 0 ? (
-				<Card>
+				<div>
 					<EmptyState
+						card
 						icon={LibraryBig}
 						title={t('书库还是空的')}
 						text={t('新建工程开始改编小说，或导入 .novelive 作品包直接游玩')}
@@ -517,7 +549,7 @@ export function LibraryPage() {
 							{t('重看首次引导')} →
 						</button>
 					</div>
-				</Card>
+				</div>
 			) : (
 				<>
 					<div className={styles.tabs}>
@@ -538,17 +570,42 @@ export function LibraryPage() {
 							className={styles.projects}
 						>
 							{library.unreadableCount > 0 && (
-								<p role="alert" className={styles.alert}>
-									{t('有 {{unreadableCount}} 部作品无法读取', {
-										unreadableCount: library.unreadableCount,
-									})}
-								</p>
+								<div className={styles.alert}>
+									<Banner
+										kind="warning"
+										action={
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => setRevision((n) => n + 1)}
+											>
+												{t('重新读取')}
+											</Button>
+										}
+									>
+										<span role="alert">
+											{t('有 {{unreadableCount}} 部作品无法读取', {
+												unreadableCount: library.unreadableCount,
+											})}
+										</span>
+									</Banner>
+									<Details>
+										<p className={styles.alertDetail}>
+											{t(
+												'这些作品的工程文件夹可能已被移动、重命名或删除，也可能文件已损坏。把文件夹放回原位置后重新读取即可找回。',
+											)}
+										</p>
+									</Details>
+								</div>
 							)}
 							{!loaded ? (
 								error ? (
-									<p role="alert">{t('无法读取书库')}</p>
+									<ErrorNotice
+										message={t('无法读取书库，请重试')}
+										onRetry={() => setRevision((n) => n + 1)}
+									/>
 								) : (
-									<p role="status">{t('正在读取书库')}</p>
+									<LoadingState text={t('正在读取书库')} />
 								)
 							) : library.works.length === 0 ? (
 								<EmptyState icon={NotebookPen} text={t('还没有作品')} card />
@@ -565,7 +622,9 @@ export function LibraryPage() {
 													strokeWidth={1.8}
 												/>
 												{group.title}
-												<span className={styles.groupPath}>· {group.key}</span>
+												<span className={styles.groupPath}>
+													· {formatPath(group.key, home)}
+												</span>
 											</h2>
 										)}
 										{group.volumes.map((volume) => (

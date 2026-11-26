@@ -4,9 +4,13 @@ import { Check, WandSparkles } from 'lucide-react'
 import { Button, Spinner } from '../../components/Button'
 import { Chip } from '../../components/Card'
 import { Checkbox, Skeleton } from '../../components/Extended'
+import { Details, ErrorNotice } from '../../components/Feedback'
 import { TextInput } from '../../components/Form'
 import { Modal } from '../../components/Modal'
+import { formatParagraphLabel } from '../../format/chapter'
 import { msg, scoped } from '../../i18n'
+import { describeDirective } from './directive-display'
+import { type AssetLabelInfo, speakerDisplayName } from './display'
 import { RichText } from './RichText'
 import { parseSentenceLines } from './sentence-lines'
 
@@ -26,11 +30,15 @@ export interface RewriteModalProps {
 	proposal: RewriteProposal | undefined
 	selected: readonly string[]
 	loading: boolean
-	error: string
+	error: { text: string; detail?: string } | undefined
 	dirty: boolean
 	busy: boolean
 	speakerNames: Readonly<Record<string, string>>
 	customMarks: WorkSettings['customMarks']
+	/** 被重写场景当前保存的 NVS 文本，用来推导「第 N 句」。 */
+	sceneNvs: string
+	/** 设定集资产名查找表，用来人类化演出指令里的素材键。 */
+	assetInfo: AssetLabelInfo
 	onInstructionChange(value: string): void
 	onToggleHunk(hunkId: string, checked: boolean): void
 	onGenerate(): void
@@ -41,9 +49,11 @@ export interface RewriteModalProps {
 function HunkText({
 	lines,
 	customMarks,
+	assetInfo,
 }: {
 	lines: string[]
 	customMarks: WorkSettings['customMarks']
+	assetInfo: AssetLabelInfo
 }) {
 	return (
 		<>
@@ -53,6 +63,16 @@ function HunkText({
 					.slice(0, index)
 					.filter((l) => l === rawLine).length
 				const key = occurrences > 0 ? `${rawLine}#${occurrences}` : rawLine
+				const directive = parsed
+					? undefined
+					: describeDirective(rawLine, assetInfo)
+				if (!parsed && !directive)
+					// 无法人类化的指令行：整条收进折叠详情，不作主文本
+					return (
+						<Details key={key} summary={t('详细信息')}>
+							{rawLine}
+						</Details>
+					)
 				return (
 					<span key={key} className="editor-hunk-line">
 						{parsed ? (
@@ -62,13 +82,39 @@ function HunkText({
 								customMarks={customMarks}
 							/>
 						) : (
-							<code className="editor-hunk-directive">{rawLine}</code>
+							<span className="editor-hunk-note">{directive}</span>
 						)}
 					</span>
 				)
 			})}
 		</>
 	)
+}
+
+/**
+ * 重写差异在场景里的位置：能定位到具体句子时是「第 M 句」，
+ * 纯新增（hunk 没有 before 行）时是「第 M 句之后」；都定位
+ * 不到时返回空串，标题里舍弃这一段。
+ */
+function hunkPosition(
+	hunk: RewriteProposal['hunks'][number],
+	sceneNvs: string,
+): string {
+	const sentences = parseSentenceLines(sceneNvs)
+	const firstBefore = hunk.before.length
+		? parseSentenceLines(hunk.before[0])[0]?.lineId
+		: undefined
+	if (firstBefore) {
+		const index = sentences.findIndex((line) => line.lineId === firstBefore)
+		if (index >= 0) return t('第 {{index}} 句', { index: index + 1 })
+	}
+	if (!hunk.before.length && hunk.afterLineId) {
+		const index = sentences.findIndex(
+			(line) => line.lineId === hunk.afterLineId,
+		)
+		if (index >= 0) return t('第 {{index}} 句之后', { index: index + 1 })
+	}
+	return ''
 }
 
 export function RewriteModal({
@@ -83,6 +129,8 @@ export function RewriteModal({
 	busy,
 	speakerNames,
 	customMarks,
+	sceneNvs,
+	assetInfo,
 	onInstructionChange,
 	onToggleHunk,
 	onGenerate,
@@ -98,9 +146,11 @@ export function RewriteModal({
 			closeDisabled={busy}
 		>
 			{error ? (
-				<div className="editor-alert" role="alert">
-					{error}
-				</div>
+				<ErrorNotice
+					className="editor-error"
+					message={error.text}
+					detail={error.detail}
+				/>
 			) : null}
 			{sourceParagraph ? (
 				<div className="editor-source-excerpt">{sourceParagraph.text}</div>
@@ -161,16 +211,17 @@ export function RewriteModal({
 							<Chip active>{t('已应用自定义指令')}</Chip>
 						) : null}
 					</div>
-					{proposal.hunks.map((hunk) => {
+					{proposal.hunks.map((hunk, hunkIndex) => {
 						const beforeLines = parseSentenceLines(hunk.before.join('\n'))
 						const firstLine =
 							beforeLines[0] ?? parseSentenceLines(hunk.after.join('\n'))[0]
 						const kindText = firstLine
-							? t(hunkKindLabel[firstLine.kind] ?? firstLine.kind)
+							? t(hunkKindLabel[firstLine.kind] ?? msg('文本'))
 							: ''
 						const speaker = firstLine?.speaker
-							? (speakerNames[firstLine.speaker] ?? firstLine.speaker)
+							? speakerDisplayName(speakerNames, firstLine.speaker)
 							: ''
+						const position = hunkPosition(hunk, sceneNvs)
 						return (
 							<div key={hunk.id} className="glass-panel editor-hunk-card">
 								<Checkbox
@@ -181,15 +232,17 @@ export function RewriteModal({
 									label={
 										<span className="editor-hunk-body">
 											<span className="label-caps label-caps-zh editor-hunk-head">
-												{kindText}
-												{speaker ? ` ${speaker}` : ''}
-												{` · ${hunk.id}`}
+												{t('第 {{index}} 处', { index: hunkIndex + 1 })}
+												{kindText ? ` · ${kindText}` : ''}
+												{speaker ? ` · ${speaker}` : ''}
+												{position ? ` · ${position}` : ''}
 											</span>
 											{hunk.before.length ? (
 												<span className="editor-hunk-old">
 													<HunkText
 														lines={hunk.before}
 														customMarks={customMarks}
+														assetInfo={assetInfo}
 													/>
 												</span>
 											) : null}
@@ -198,6 +251,7 @@ export function RewriteModal({
 													<HunkText
 														lines={hunk.after}
 														customMarks={customMarks}
+														assetInfo={assetInfo}
 													/>
 												</span>
 											) : null}
@@ -267,7 +321,14 @@ export function SourceRewriteModal({
 		>
 			{paragraph ? (
 				<div className="editor-source-rewrite-body">
-					<div className="editor-source-excerpt">{paragraph.text}</div>
+					<div className="editor-source-excerpt">
+						{formatParagraphLabel(paragraph.id) ? (
+							<span className="label-caps label-caps-zh editor-source-excerpt-label">
+								{formatParagraphLabel(paragraph.id)}
+							</span>
+						) : null}
+						{paragraph.text}
+					</div>
 					<TextInput
 						aria-label={t('补充要求')}
 						value={instruction}

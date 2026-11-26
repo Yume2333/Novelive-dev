@@ -5,7 +5,6 @@ import type {
 	MaskedConfig,
 } from '@novelive/creator/contract'
 import {
-	AlertTriangle,
 	BarChart3,
 	BookOpen,
 	BookOpenText,
@@ -39,10 +38,14 @@ import {
 	useMatch,
 	useNavigate,
 } from 'react-router-dom'
+import { Button } from '../components/Button'
 import { Dropdown } from '../components/Dropdown'
+import { Banner } from '../components/Extended'
+import { ErrorNotice } from '../components/Feedback'
 import { GradientCover } from '../components/GradientCover'
 import { usePresence } from '../components/Motion'
 import { ScrollArea } from '../components/ScrollArea'
+import { formatWorkTitle, workTitlesFromList } from '../format/work'
 import { msg, scoped } from '../i18n'
 import { AgentPanel } from '../panels/agent/AgentPanel'
 import { workRoute } from '../routes/production'
@@ -140,8 +143,6 @@ export interface ShellOutletContext extends SettingsHost {
 	openAgent(): void
 	closeAgent(): void
 	setAgentPosition(position: CommandInput<'chat.send'>['position']): void
-	agentContextLabel: string | null
-	setAgentContextLabel(label: string | null): void
 	refreshLibrary(): void
 }
 
@@ -151,8 +152,6 @@ interface ShellApi {
 	closeAgent(): void
 	agentPosition: CommandInput<'chat.send'>['position'] | undefined
 	setAgentPosition(position: CommandInput<'chat.send'>['position']): void
-	agentContextLabel: string | null
-	setAgentContextLabel(label: string | null): void
 }
 
 const ShellContext = createContext<ShellApi>({
@@ -161,8 +160,6 @@ const ShellContext = createContext<ShellApi>({
 	closeAgent: () => {},
 	agentPosition: undefined,
 	setAgentPosition: () => {},
-	agentContextLabel: null,
-	setAgentContextLabel: () => {},
 })
 
 export function useShell() {
@@ -193,6 +190,8 @@ export function AppShell() {
 		: undefined
 	const workId = routeWorkId ?? (packageRef ? undefined : recentWorkId)
 	const work = works.find((item) => item.workId === workId)
+	// 侧边栏与切换菜单的作品名统一经过格式化：查不到绝不回退到 UUID
+	const workTitles = workTitlesFromList(works)
 	const showWork = Boolean(routeWorkId || work)
 	const isImportedPackage =
 		Boolean(recentPackage) || Boolean(routePackage && !work)
@@ -201,9 +200,6 @@ export function AppShell() {
 	const [agentFull, setAgentFull] = useState(false)
 	const [agentPosition, setAgentPosition] =
 		useState<CommandInput<'chat.send'>['position']>()
-	const [agentContextLabel, setAgentContextLabel] = useState<string | null>(
-		null,
-	)
 	const [pendingTheme, setPendingTheme] = useState<ThemeMode>()
 	const { theme, setTheme } = useAppearance(config)
 	const { i18n } = useTranslation()
@@ -267,7 +263,7 @@ export function AppShell() {
 		} catch {
 			setHostError(
 				action === 'openLogDir'
-					? t('无法打开日志目录')
+					? t('无法打开诊断信息')
 					: t('无法重新启动创作端'),
 			)
 		}
@@ -304,9 +300,8 @@ export function AppShell() {
 			active = false
 		}
 	}, [installed, pathname, libraryRevision])
-	// biome-ignore lint/correctness/useExhaustiveDependencies: 换作品时清空 Agent 的上下文与位置；同作品内的页面切换保留
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 换作品时清空 Agent 的位置；同作品内的页面切换保留
 	useEffect(() => {
-		setAgentContextLabel(null)
 		setAgentPosition(undefined)
 	}, [workId])
 	const showAgent = isProject
@@ -372,8 +367,6 @@ export function AppShell() {
 		closeAgent,
 		agentPosition,
 		setAgentPosition,
-		agentContextLabel,
-		setAgentContextLabel,
 	}
 	const outletContext: ShellOutletContext = {
 		config,
@@ -383,8 +376,6 @@ export function AppShell() {
 		openAgent,
 		closeAgent,
 		setAgentPosition,
-		agentContextLabel,
-		setAgentContextLabel,
 		refreshLibrary: () => setLibraryRevision((n) => n + 1),
 	}
 
@@ -394,35 +385,57 @@ export function AppShell() {
 			localStorage.setItem(recentWorkKey, ref)
 		} catch {}
 	}
+	// 切换菜单按「工程 / 作品包」分组：分组标题是禁用的菜单项，
+	// 靠 menuitem 样式内的 disabled 态渲染成分组标签（不干预 Dropdown 组件）。
+	const projectItems = works.map((item) => ({
+		label: workTitles.get(item.workId) ?? item.title,
+		icon: item.workId === workId ? Check : NotebookPen,
+		onSelect: () => navigate(workRoute('work', item.workId)),
+	}))
+	const packageItems = packages.map((item) => {
+		const ref = `package:${item.workId}:${item.version}`
+		return {
+			label: t('{{title}} · v{{version}}', {
+				title: item.title,
+				version: item.version,
+			}),
+			icon: recentPackage === item ? Check : PlayCircle,
+			onSelect: () => {
+				rememberRecent(ref)
+				if (item.published > 0)
+					navigate(`/package/${item.workId}/${item.version}`)
+				else if (routeWorkId) navigate('/?tab=imported')
+			},
+		}
+	})
 	const switchItems = [
-		...works.map((item) => ({
-			label: item.title,
-			icon: item.workId === workId ? Check : NotebookPen,
-			onSelect: () => navigate(workRoute('work', item.workId)),
-		})),
-		...packages.map((item) => {
-			const ref = `package:${item.workId}:${item.version}`
-			return {
-				label: t('{{title}} · v{{version}}', {
-					title: item.title,
-					version: item.version,
-				}),
-				icon: recentPackage === item ? Check : PlayCircle,
-				onSelect: () => {
-					rememberRecent(ref)
-					if (item.published > 0)
-						navigate(`/package/${item.workId}/${item.version}`)
-					else if (routeWorkId) navigate('/?tab=imported')
-				},
-			}
-		}),
+		...(projectItems.length
+			? [
+					{
+						label: t('工程'),
+						disabled: true,
+						onSelect: () => {},
+					},
+					...projectItems,
+				]
+			: []),
+		...(packageItems.length
+			? [
+					{
+						label: t('作品包'),
+						disabled: true,
+						onSelect: () => {},
+					},
+					...packageItems,
+				]
+			: []),
 	]
 	const switcher = switchItems.length > 1 && (
 		<Dropdown
 			label={t('换一部作品')}
 			className={`nl-icon-btn ${styles.switcher}`}
 			trigger={
-				<ChevronsUpDown aria-hidden="true" size={17} strokeWidth={1.8} />
+				<ChevronsUpDown aria-hidden="true" size={16} strokeWidth={1.8} />
 			}
 			items={switchItems}
 		/>
@@ -519,7 +532,7 @@ export function AppShell() {
 										</div>
 										<div className={styles.workText}>
 											<div className={styles.workTitle}>
-												{work?.title ?? workId}
+												{work?.title ?? formatWorkTitle(workTitles, workId)}
 											</div>
 											{work && (
 												<div className={styles.workMeta}>
@@ -602,34 +615,37 @@ export function AppShell() {
 				</aside>
 				<main className={styles.main}>
 					{interruption && (
-						<div className={styles.warning} role="alert">
-							<AlertTriangle aria-hidden="true" size={18} />
-							<span>
+						<div className={styles.interruption} role="alert">
+							<Banner
+								kind="error"
+								action={
+									<>
+										<Button
+											size="sm"
+											variant="ghost"
+											onClick={() => void runHostAction('openLogDir')}
+										>
+											{t('查看诊断信息')}
+										</Button>
+										<Button
+											size="sm"
+											variant="ghost"
+											onClick={() => void runHostAction('restartCreator')}
+										>
+											{t('重新启动')}
+										</Button>
+									</>
+								}
+							>
 								{interruption === 'breaker'
 									? t('创作端连续 3 次未能启动，自动重启已暂停。')
 									: interruption === 'failed'
 										? t('创作端启动失败。')
 										: t('创作端已断开，正在尝试重新连接。')}
-							</span>
-							<button
-								type="button"
-								onClick={() => void runHostAction('openLogDir')}
-							>
-								{t('日志')}
-							</button>
-							<button
-								type="button"
-								onClick={() => void runHostAction('restartCreator')}
-							>
-								{t('重新启动')}
-							</button>
+							</Banner>
 						</div>
 					)}
-					{hostError && (
-						<p className={styles.warning} role="alert">
-							{hostError}
-						</p>
-					)}
+					{hostError && <ErrorNotice message={hostError} />}
 					<ScrollArea viewportRef={mainScrollRef} className={styles.mainScroll}>
 						<Outlet key={i18n.language} context={outletContext} />
 					</ScrollArea>

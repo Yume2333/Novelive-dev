@@ -26,6 +26,7 @@ export function connectDevBridge({
 		generation: 0,
 		breakerOpen: false,
 		logDir: '',
+		homeDir: '',
 	}
 	const initial = Promise.withResolvers<void>()
 	const pending = new Map<

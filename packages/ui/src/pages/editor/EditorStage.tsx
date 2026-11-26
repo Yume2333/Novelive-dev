@@ -11,6 +11,11 @@ import { type RefObject, useState } from 'react'
 import { Spinner } from '../../components/Button'
 import { Tooltip } from '../../components/Extended'
 import { scoped } from '../../i18n'
+import {
+	type AssetLabelInfo,
+	expressionLabel,
+	speakerDisplayName,
+} from './display'
 import { RichText } from './RichText'
 import type { StageSnapshot } from './scene-assets'
 import type { SentenceLine } from './sentence-lines'
@@ -24,6 +29,7 @@ export interface EditorStageProps {
 	sentences: readonly SentenceLine[]
 	activeSentence: SentenceLine | undefined
 	speakerNames: Readonly<Record<string, string>>
+	assetInfo: AssetLabelInfo
 	customMarks: WorkSettings['customMarks']
 	playing: boolean
 	paused: boolean
@@ -41,6 +47,7 @@ export function EditorStage({
 	sentences,
 	activeSentence,
 	speakerNames,
+	assetInfo,
 	customMarks,
 	playing,
 	paused,
@@ -68,7 +75,7 @@ export function EditorStage({
 	const shownSpeaker =
 		activeSentence?.displayAs ||
 		(activeSentence?.speaker
-			? (speakerNames[activeSentence.speaker] ?? activeSentence.speaker)
+			? speakerDisplayName(speakerNames, activeSentence.speaker)
 			: undefined)
 
 	return (
@@ -101,8 +108,8 @@ export function EditorStage({
 						const shownName =
 							speaking && activeSentence?.displayAs
 								? activeSentence.displayAs
-								: (speakerNames[member.charId] ?? member.charId)
-						const expr = member.expression
+								: speakerDisplayName(speakerNames, member.charId)
+						const expr = expressionLabel(member.assetId, assetInfo)
 						const badgeText = expr ? `${shownName} · ${expr}` : shownName
 						return (
 							<button
@@ -135,9 +142,11 @@ export function EditorStage({
 							</button>
 						)
 					})}
-					<span className="editor-stage-chip editor-stage-chip-left label-caps label-caps-zh">
-						{snapshot.sceneTitle}
-					</span>
+					{snapshot.sceneTitle ? (
+						<span className="editor-stage-chip editor-stage-chip-left label-caps label-caps-zh">
+							{snapshot.sceneTitle}
+						</span>
+					) : null}
 					{sentences.length > 0 && (
 						<span className="editor-stage-chip editor-stage-chip-right label-caps">
 							{activeIdx + 1} / {sentences.length}

@@ -1,4 +1,5 @@
 import { SaxesParser } from 'saxes'
+import { ImportFailureError } from '../../contract/errors'
 
 export interface Element {
 	name: string
@@ -11,10 +12,15 @@ export function xml(source: string): Element {
 	const stack = [root]
 	const parser = new SaxesParser({ xmlns: true })
 	parser.on('doctype', (doctype) => {
-		if (doctype.includes('[')) throw new Error('EPUB DTD is not supported')
+		if (doctype.includes('['))
+			throw new ImportFailureError('epub_doctype', 'EPUB DTD is not supported')
 	})
 	parser.on('opentag', (tag) => {
-		if (stack.length > 128) throw new Error('EPUB XML depth limit exceeded')
+		if (stack.length > 128)
+			throw new ImportFailureError(
+				'epub_limit_exceeded',
+				'EPUB XML depth limit exceeded',
+			)
 		const element: Element = {
 			name: tag.local,
 			attrs: Object.fromEntries(

@@ -471,19 +471,19 @@ export function createProduction(
 						const key = `${run.runId}/${index}`
 						if (seen.has(key)) return
 						seen.add(key)
-						const [status, message] =
+						const status =
 							step.status === 'completed'
-								? ['done', '已完成']
+								? 'done'
 								: step.status === 'cancelled'
-									? ['cancelled', '已取消']
-									: ['failed', '运行失败']
+									? 'cancelled'
+									: 'failed'
 						const event = envelope('production.chapterRecord', {
 							workId,
 							chapterId: run.ref,
 							step: step.purpose,
 							status,
-							message,
-							...(step.errorType ? { detail: step.errorType } : {}),
+							...(step.errorKind ? { errorKind: step.errorKind } : {}),
+							...(step.errorMessage ? { detail: step.errorMessage } : {}),
 						})
 						records.push(event)
 						publish(event)

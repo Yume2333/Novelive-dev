@@ -620,6 +620,24 @@ test.each([
 	await expect(extractEpub(await epub(overrides))).rejects.toThrow(message)
 })
 
+test('an encrypted EPUB entry classifies as epub_encrypted', async () => {
+	const files: Record<string, string> = {
+		mimetype: 'application/epub+zip',
+		'META-INF/container.xml':
+			'<container><rootfiles><rootfile full-path="OPS/book.opf"/></rootfiles></container>',
+	}
+	const zip = new ZipWriter(new Uint8ArrayWriter())
+	for (const [path, source] of Object.entries(files))
+		await zip.add(path, new TextReader(source))
+	await zip.add('OPS/secret.xhtml', new TextReader('<p>secret</p>'), {
+		password: 'hunter2',
+	})
+	const bytes = await zip.close()
+	await expect(extractEpub(bytes)).rejects.toMatchObject({
+		code: 'epub_encrypted',
+	})
+})
+
 test('all labels remain human-selected candidates and receive nearby text and bible', async () => {
 	const extraction = await extractEpub(await epub())
 	expect(illustrationCandidates(extraction)[0]).toMatchObject({

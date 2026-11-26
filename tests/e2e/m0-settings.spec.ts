@@ -395,7 +395,8 @@ test('M0 settings backs up a damaged config before resetting it', async () => {
 			const warning = page
 				.getByRole('alert')
 				.filter({ hasText: '配置文件无法读取' })
-			await expect(warning).toContainText(join(profile, 'config.json'))
+			await warning.getByRole('button', { name: '详细信息' }).click()
+			await expect(warning).toContainText('config.json')
 			const about = page.getByRole('region', { name: '关于' })
 			await expect(
 				about.getByRole('button', { name: '检查更新' }),

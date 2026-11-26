@@ -1967,3 +1967,257 @@ describe('Extended 静态结构', () => {
 		await view.unmount()
 	})
 })
+
+describe('Feedback: ErrorNotice / LoadingState / Details / ButtonLink', () => {
+	it('ErrorNotice 渲染错误横幅与 message，hint 安静展示', async () => {
+		const { ErrorNotice } = await import(
+			'../../packages/ui/src/components/Feedback'
+		)
+		const view = await mount(
+			createElement(ErrorNotice, {
+				error: {
+					message: '网络连接中断，请重试。',
+					hint: '检查网络后重试',
+				},
+			}),
+		)
+		expect(view.host.querySelector('[role="alert"]')).toBeTruthy()
+		expect(view.host.textContent).toContain('网络连接中断，请重试。')
+		expect(view.host.textContent).toContain('检查网络后重试')
+		// 没有 detail 时不渲染详细信息
+		expect(view.host.textContent).not.toContain('详细信息')
+		await view.unmount()
+	})
+
+	it('ErrorNotice 带 detail 时收进默认折叠的详细信息，点击展开', async () => {
+		const { ErrorNotice } = await import(
+			'../../packages/ui/src/components/Feedback'
+		)
+		const view = await mount(
+			createElement(ErrorNotice, {
+				error: {
+					message: '无法读取，请重试。',
+					detail: '[network] Model connection interrupted',
+				},
+			}),
+		)
+		const toggle = view.host.querySelector(
+			'button[aria-expanded]',
+		) as HTMLButtonElement
+		expect(toggle).toBeTruthy()
+		expect(toggle.textContent).toContain('详细信息')
+		expect(toggle.getAttribute('aria-expanded')).toBe('false')
+		// 折叠时 detail 仍在 Collapse 容器中但容器是 0fr/隐藏的；展开后 aria-expanded 翻转
+		await act(async () => {
+			toggle.click()
+		})
+		expect(
+			view.host
+				.querySelector('button[aria-expanded]')
+				?.getAttribute('aria-expanded'),
+		).toBe('true')
+		expect(view.host.textContent).toContain(
+			'[network] Model connection interrupted',
+		)
+		await view.unmount()
+	})
+
+	it('ErrorNotice 渲染重试按钮并触发 onRetry', async () => {
+		const { ErrorNotice } = await import(
+			'../../packages/ui/src/components/Feedback'
+		)
+		let retries = 0
+		const view = await mount(
+			createElement(ErrorNotice, {
+				error: { message: '读取失败，请重试。' },
+				onRetry: () => {
+					retries += 1
+				},
+			}),
+		)
+		const retry = [...view.host.querySelectorAll('button')].find((button) =>
+			button.textContent?.includes('重试'),
+		) as HTMLButtonElement | undefined
+		expect(retry).toBeTruthy()
+		await act(async () => {
+			retry?.click()
+		})
+		expect(retries).toBe(1)
+		await view.unmount()
+	})
+
+	it('ErrorNotice 不传 onRetry 时不渲染重试按钮', async () => {
+		const { ErrorNotice } = await import(
+			'../../packages/ui/src/components/Feedback'
+		)
+		const view = await mount(
+			createElement(ErrorNotice, { error: { message: '出错了。' } }),
+		)
+		expect(
+			[...view.host.querySelectorAll('button')].some((button) =>
+				button.textContent?.includes('重试'),
+			),
+		).toBe(false)
+		await view.unmount()
+	})
+
+	it('LoadingState 输出 role=status 与文案', async () => {
+		const { LoadingState } = await import(
+			'../../packages/ui/src/components/Feedback'
+		)
+		const view = await mount(
+			createElement(LoadingState, { text: '正在读取书库' }),
+		)
+		const status = view.host.querySelector('[role="status"]')
+		expect(status).toBeTruthy()
+		expect(status?.textContent).toContain('正在读取书库')
+		expect(status?.querySelector('svg')).toBeTruthy()
+		await view.unmount()
+	})
+
+	it('Details 默认折叠，summary 默认详细信息', async () => {
+		const { Details } = await import(
+			'../../packages/ui/src/components/Feedback'
+		)
+		const view = await mount(
+			createElement(Details, {
+				children: createElement('pre', null, 'raw json'),
+			}),
+		)
+		const toggle = view.host.querySelector(
+			'button[aria-expanded]',
+		) as HTMLButtonElement
+		expect(toggle.getAttribute('aria-expanded')).toBe('false')
+		expect(toggle.textContent).toContain('详细信息')
+		await view.unmount()
+	})
+
+	it('ButtonLink 渲染链接并带 nl-btn 变体类', async () => {
+		const { ButtonLink } = await import(
+			'../../packages/ui/src/components/Feedback'
+		)
+		const { MemoryRouter } = await import('react-router-dom')
+		const view = await mount(
+			createElement(
+				MemoryRouter,
+				null,
+				createElement(ButtonLink, {
+					to: '/library',
+					variant: 'primary',
+					children: '新建工程',
+				}),
+			),
+		)
+		const link = view.host.querySelector('a') as HTMLAnchorElement
+		expect(link).toBeTruthy()
+		expect(link.className).toContain('nl-btn')
+		expect(link.className).toContain('nl-btn-primary')
+		expect(link.textContent).toContain('新建工程')
+		expect(link.getAttribute('href')).toBe('/library')
+		await view.unmount()
+	})
+
+	it('ButtonLink size=sm 带尺寸类', async () => {
+		const { ButtonLink } = await import(
+			'../../packages/ui/src/components/Feedback'
+		)
+		const { MemoryRouter } = await import('react-router-dom')
+		const view = await mount(
+			createElement(
+				MemoryRouter,
+				null,
+				createElement(ButtonLink, { to: '/x', size: 'sm', children: '小号' }),
+			),
+		)
+		const link = view.host.querySelector('a') as HTMLAnchorElement
+		expect(link.className).toContain('nl-btn')
+		await view.unmount()
+	})
+})
+
+describe('Page & EmptyState', () => {
+	it('Page 渲染标题与 actions 槽', async () => {
+		const { Page } = await import('../../packages/ui/src/components/Page')
+		const { MemoryRouter } = await import('react-router-dom')
+		const view = await mount(
+			createElement(
+				MemoryRouter,
+				null,
+				createElement(Page, {
+					title: '书库',
+					actions: createElement('button', { type: 'button' }, '主操作'),
+					children: createElement('p', null, '正文'),
+				}),
+			),
+		)
+		expect(view.host.querySelector('h1')?.textContent).toBe('书库')
+		expect(view.host.textContent).toContain('主操作')
+		expect(view.host.textContent).toContain('正文')
+		await view.unmount()
+	})
+
+	it('EmptyState 渲染图标、标题、文本与操作', async () => {
+		const { EmptyState } = await import('../../packages/ui/src/components/Page')
+		const { LibraryBig } = await import('lucide-react')
+		const view = await mount(
+			createElement(EmptyState, {
+				icon: LibraryBig,
+				title: '书库还是空的',
+				text: '新建工程开始改编小说',
+				actions: createElement('button', { type: 'button' }, '新建'),
+			}),
+		)
+		expect(view.host.querySelector('h2')?.textContent).toBe('书库还是空的')
+		expect(view.host.textContent).toContain('新建工程开始改编小说')
+		expect(view.host.textContent).toContain('新建')
+		expect(view.host.querySelector('svg')).toBeTruthy()
+		await view.unmount()
+	})
+
+	it('PageAction 渲染为 nl-btn-primary 链接', async () => {
+		const { PageAction } = await import('../../packages/ui/src/components/Page')
+		const { MemoryRouter } = await import('react-router-dom')
+		const { Plus } = await import('lucide-react')
+		const view = await mount(
+			createElement(
+				MemoryRouter,
+				null,
+				createElement(PageAction, {
+					icon: Plus,
+					to: '/import',
+					children: '新建工程',
+				}),
+			),
+		)
+		const link = view.host.querySelector('a') as HTMLAnchorElement
+		expect(link.className).toContain('nl-btn')
+		expect(link.className).toContain('nl-btn-primary')
+		expect(link.textContent).toContain('新建工程')
+		await view.unmount()
+	})
+})
+
+describe('Form inputs CSS-only styling', () => {
+	it('TextInput/Textarea 不再内联合并样式对象，保留 nl-input 类', async () => {
+		const { TextInput, Textarea } = await import(
+			'../../packages/ui/src/components/Form'
+		)
+		const inputView = await mount(
+			createElement(TextInput, { value: 'x', onChange: () => {} }),
+		)
+		const input = inputView.host.querySelector('input') as HTMLInputElement
+		expect(input.className).toContain('nl-input')
+		// 内联 style 不再注入 width/padding（样式全部走 CSS 类）
+		expect(input.style.width).toBe('')
+		expect(input.style.padding).toBe('')
+		await inputView.unmount()
+
+		const areaView = await mount(
+			createElement(Textarea, { value: 'x', onChange: () => {} }),
+		)
+		const area = areaView.host.querySelector('textarea') as HTMLTextAreaElement
+		expect(area.className).toContain('nl-input')
+		expect(area.style.resize).toBe('')
+		await areaView.unmount()
+	})
+})

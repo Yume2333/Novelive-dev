@@ -18,17 +18,20 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { Card, SectionLabel } from '../../components/Card'
+import { Banner } from '../../components/Extended'
+import { Details, ErrorNotice, LoadingState } from '../../components/Feedback'
 import { CompactSelect } from '../../components/Form'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { EmptyState, Page } from '../../components/Page'
-import { msg, scoped } from '../../i18n'
+import { formatCost } from '../../format/cost'
+import { formatUnreadableProjectReason } from '../../format/errors'
+import { formatWorkTitle, workTitlesFromList } from '../../format/work'
+import { i18n, msg, scoped } from '../../i18n'
 import styles from './UsagePage.module.css'
 
 const t = scoped('usage')
 
 type UsageRecord = CommandOutput<'usage.list'>['records'][number]['usage']
-
-type LibraryWork = CommandOutput<'library.list'>['works'][number]
 
 const all = ''
 
@@ -49,17 +52,12 @@ const phaseName: Record<string, string> = {
 const phaseLabel = (phase: string) =>
 	phaseName[phase] ? t(phaseName[phase]) : phase
 
-const money = (usd: number) =>
-	usd.toLocaleString(undefined, {
-		style: 'currency',
-		currency: 'USD',
-		maximumFractionDigits: usd > 0 && usd < 1 ? 4 : 2,
-	})
-
 interface UsageTotals {
 	calls: number
 	input: number
 	output: number
+	cacheRead: number
+	cacheWrite: number
 	images: number
 	cost: number | null
 	unpriced: number
@@ -68,6 +66,8 @@ interface UsageTotals {
 function totals(records: UsageRecord[]): UsageTotals {
 	let input = 0
 	let output = 0
+	let cacheRead = 0
+	let cacheWrite = 0
 	let images = 0
 	let cost = 0
 	let priced = 0
@@ -76,6 +76,8 @@ function totals(records: UsageRecord[]): UsageTotals {
 		else {
 			input += record.inputTokens
 			output += record.outputTokens
+			cacheRead += record.cacheReadTokens
+			cacheWrite += record.cacheWriteTokens
 		}
 		if (record.costUsd !== null) {
 			cost += record.costUsd
@@ -86,18 +88,12 @@ function totals(records: UsageRecord[]): UsageTotals {
 		calls: records.length,
 		input,
 		output,
+		cacheRead,
+		cacheWrite,
 		images,
 		cost: priced ? cost : null,
 		unpriced: records.length - priced,
 	}
-}
-
-function volumeTitleOf(work: LibraryWork): string | undefined {
-	if ('project' in work && work.project && typeof work.project === 'object') {
-		const volume = (work.project as Record<string, unknown>).volumeTitle
-		if (typeof volume === 'string') return volume
-	}
-	return undefined
 }
 
 function Stat({
@@ -123,11 +119,176 @@ function Stat({
 	)
 }
 
+/** 汇总表的数字列：零值用安静的 —，表头/单元格文案一致（窄屏折叠时靠 data-label 回放） */
+function AggregateTable({
+	leadHeader,
+	quietLead,
+	rows,
+}: {
+	leadHeader: string
+	/** 模型列等次级信息：不加粗、安静呈现（L11） */
+	quietLead?: boolean
+	rows: { key: string; label: string; dateTime?: string; totals: UsageTotals }[]
+}) {
+	const headers = [
+		t('调用次数'),
+		t('输入'),
+		t('输出'),
+		t('缓存命中'),
+		t('缓存写入'),
+		t('图片'),
+		t('参考金额'),
+	]
+	const numeric = (row: UsageTotals) => [
+		row.calls,
+		row.input,
+		row.output,
+		row.cacheRead,
+		row.cacheWrite,
+		row.images,
+	]
+	return (
+		<table className={styles.table}>
+			<thead>
+				<tr>
+					<th>{leadHeader}</th>
+					{headers.map((header) => (
+						<th key={header}>{header}</th>
+					))}
+				</tr>
+			</thead>
+			<tbody>
+				{rows.map((row) => (
+					<tr key={row.key} className="hover-row">
+						<td className={quietLead ? styles.quietLead : undefined}>
+							{row.dateTime ? (
+								<time dateTime={row.dateTime}>{row.label}</time>
+							) : (
+								row.label
+							)}
+						</td>
+						{numeric(row.totals).map((value, index) => (
+							<td key={headers[index]} data-label={headers[index]}>
+								{value ? (
+									value.toLocaleString(i18n.language)
+								) : (
+									<span className={styles.none}>—</span>
+								)}
+							</td>
+						))}
+						<td data-label={t('参考金额')}>
+							{row.totals.cost === null ? (
+								<span className={styles.none}>{t('没有单价')}</span>
+							) : (
+								formatCost(row.totals.cost)
+							)}
+						</td>
+					</tr>
+				))}
+			</tbody>
+		</table>
+	)
+}
+
+/** 本地化日期显示：zh-CN/ja 取 Intl 短格式（如 2026/3/4），month 粒度只有年、月两段。 */
+function formatPeriodDisplay(value: string, granularity: Granularity): string {
+	const [year, month, day] = value.split('-').map(Number)
+	if (!year || !month) return value
+	return new Intl.DateTimeFormat(i18n.language, {
+		year: 'numeric',
+		month: granularity === 'month' ? 'long' : 'numeric',
+		...(granularity === 'day' ? { day: 'numeric' } : {}),
+		timeZone: 'UTC',
+	}).format(new Date(Date.UTC(year, month - 1, day || 1)))
+}
+
+/** 柱状图轴标签：day 粒度用本地化月/日短格式（zh 3/4、en 3/4 顺序随 locale），
+    month 粒度用本地化年月。 */
+function formatAxisLabel(period: string, granularity: Granularity): string {
+	if (granularity === 'month') return formatPeriodDisplay(period, granularity)
+	const [year, month, day] = period.split('-').map(Number)
+	return new Intl.DateTimeFormat(i18n.language, {
+		month: 'numeric',
+		day: 'numeric',
+		timeZone: 'UTC',
+	}).format(new Date(Date.UTC(year, month - 1, day || 1)))
+}
+
+/** 空输入时按 UI 语言推导的格式占位（如 yyyy/mm/dd、mm/dd/yyyy）：
+    取 Intl 部件顺序，绝不写死英文 mm/dd/yyyy。 */
+function formatPlaceholder(granularity: Granularity): string {
+	const parts = new Intl.DateTimeFormat(i18n.language, {
+		year: 'numeric',
+		month: 'numeric',
+		day: 'numeric',
+	}).formatToParts(new Date(Date.UTC(2026, 2, 4)))
+	const letter: Record<string, string> = {
+		year: 'yyyy',
+		month: 'mm',
+		day: 'dd',
+	}
+	return parts
+		.filter(
+			(part) =>
+				part.type === 'literal' ||
+				(granularity === 'day' ? part.type in letter : part.type !== 'day'),
+		)
+		.map((part) =>
+			part.type === 'literal' ? part.value : (letter[part.type] ?? ''),
+		)
+		.join('')
+}
+
+/** 日期/月范围输入：原生 input[type=date|month] 负责交互、校验与无障碍，
+    lang 钉在 UI 语言上；未聚焦时原生编辑文本透明、用覆盖层展示本地化格式，
+    规避 Linux Chromium/Electron 无视 lang、按系统区域显示 mm/dd/yyyy 的问题。 */
+function RangeInput({
+	granularity,
+	ariaLabel,
+	value,
+	min,
+	max,
+	onChange,
+}: {
+	granularity: Granularity
+	ariaLabel: string
+	value: string
+	min?: string
+	max?: string
+	onChange: (value: string) => void
+}) {
+	return (
+		<span className={styles.dateField}>
+			<input
+				type={granularity === 'month' ? 'month' : 'date'}
+				lang={i18n.language}
+				className={`nl-input ${styles.rangeInput}`}
+				aria-label={ariaLabel}
+				value={value}
+				min={min}
+				max={max}
+				onChange={(event) => onChange(event.target.value)}
+			/>
+			<span className={styles.dateOverlay} aria-hidden="true">
+				{value ? (
+					formatPeriodDisplay(value, granularity)
+				) : (
+					<span className={styles.datePlaceholder}>
+						{formatPlaceholder(granularity)}
+					</span>
+				)}
+			</span>
+		</span>
+	)
+}
+
 interface BarTip {
 	/** 悬停/聚焦柱条的 key，用于 aria-describedby 与激活高亮 */
 	day: string
 	/** 锚点柱条元素：定位随滚动/缩放重算 */
 	anchor: HTMLElement
+	/** 点击柱条可把提示卡钉住（aria-pressed），再点或 Escape 收起 */
+	pinned: boolean
 	content: ReactNode
 }
 
@@ -181,17 +342,16 @@ export function UsagePage() {
 	const [workId, setWorkId] = useState(all)
 	const [phase, setPhase] = useState(all)
 	const [model, setModel] = useState(all)
-	const [titles, setTitles] = useState(new Map<string, string>())
+	const [titles, setTitles] = useState<ReadonlyMap<string, string>>(new Map())
 	const [tip, setTip] = useState<BarTip | null>(null)
 	const tooltipId = useId()
 	useEffect(() => {
 		let active = true
-		let request:
-			| ReturnType<typeof window.novelive.call<'usage.list'>>
-			| undefined
+		let cancelCurrent: (() => void) | undefined
 		function load() {
-			request?.cancel()
-			request = window.novelive.call('usage.list', {})
+			cancelCurrent?.()
+			const request = window.novelive.call('usage.list', {})
+			cancelCurrent = () => request.cancel()
 			request.promise.then(
 				(value) => {
 					if (active) {
@@ -204,47 +364,31 @@ export function UsagePage() {
 				},
 			)
 		}
-		const off = window.novelive.on('creator.ready', () => {
-			load()
-			loadTitles()
-		})
 		function loadTitles() {
 			window.novelive.call('library.list', {}).promise.then(
 				({ works }) => {
-					if (!active) return
-					const count = new Map<string, number>()
-					for (const w of works)
-						count.set(w.title, (count.get(w.title) ?? 0) + 1)
-					setTitles(
-						new Map(
-							works.map((w) => {
-								const volume = volumeTitleOf(w)
-								return [
-									w.workId,
-									(count.get(w.title) ?? 0) > 1 && volume
-										? `${w.title} · ${volume}`
-										: w.title,
-								]
-							}),
-						),
-					)
+					if (active) setTitles(workTitlesFromList(works))
 				},
 				() => {},
 			)
 		}
+		const off = window.novelive.on('creator.ready', () => {
+			load()
+			loadTitles()
+		})
 		load()
 		loadTitles()
 		return () => {
 			active = false
 			off()
-			request?.cancel()
+			cancelCurrent?.()
 		}
 	}, [])
 	const records = useMemo(
 		() => data?.records.map(({ usage }) => usage) ?? [],
 		[data],
 	)
-	const titleOf = (workId: string) => titles.get(workId) ?? workId
+	const titleOf = (workId: string) => formatWorkTitle(titles, workId)
 	const selectOptions = (
 		pick: (record: UsageRecord) => string,
 		label: string,
@@ -271,8 +415,8 @@ export function UsagePage() {
 		)
 	})
 	const sum = totals(shown)
-	const shownSet = new Set(shown)
 	const byPeriod = new Map<string, UsageRecord[]>()
+	const byModel = new Map<string, UsageRecord[]>()
 	const byWork = new Map<
 		string,
 		{ records: UsageRecord[]; phases: Map<string, UsageRecord[]> }
@@ -282,6 +426,9 @@ export function UsagePage() {
 		const rows = byPeriod.get(period)
 		if (rows) rows.push(record)
 		else byPeriod.set(period, [record])
+		const modelRows = byModel.get(record.model)
+		if (modelRows) modelRows.push(record)
+		else byModel.set(record.model, [record])
 		let work = byWork.get(record.link.workId)
 		if (!work) {
 			work = { records: [], phases: new Map() }
@@ -292,58 +439,94 @@ export function UsagePage() {
 		if (phaseRows) phaseRows.push(record)
 		else work.phases.set(record.phase, [record])
 	}
-	const perDay = [...byPeriod]
+	const perPeriod = [...byPeriod]
 		.sort(([a], [b]) => a.localeCompare(b))
-		.map(([day, rows]) => ({ day, ...totals(rows) }))
-	const labelEvery = Math.ceil(perDay.length / 16)
-	const maxDay = Math.max(1, ...perDay.map(({ calls }) => calls))
+		.map(([period, rows]) => ({ period, ...totals(rows) }))
+	const perModel = [...byModel]
+		.map(([name, rows]) => ({ key: name, label: name, totals: totals(rows) }))
+		.sort((a, b) => b.totals.calls - a.totals.calls)
+	const labelEvery = Math.ceil(perPeriod.length / 16)
+	const maxDay = Math.max(1, ...perPeriod.map(({ calls }) => calls))
 	const works = [...byWork].sort(([a], [b]) => a.localeCompare(b))
 	const phaseOrder = Object.keys(phaseName)
 	const phases = [...new Set(shown.map((r) => r.phase))].sort(
 		(a, b) => phaseOrder.indexOf(a) - phaseOrder.indexOf(b),
 	)
 
+	// 无法读取的作品按本地化原因归组：每条原因一行，
+	// 同因多部合成「N 部作品无法读取」（DESIGN.md 同类问题合成一条）
+	const unreadableGroups = [
+		...Map.groupBy(data?.unreadableProjects ?? [], (project) =>
+			formatUnreadableProjectReason(project.reason),
+		).entries(),
+	]
+
+	const tipContent = (day: string, dayTotals: UsageTotals) => (
+		<>
+			<span className={styles.tipTitle}>
+				{formatPeriodDisplay(day, granularity)}
+			</span>
+			<span className={styles.tipLine}>
+				{t('{{calls}} 次', {
+					calls: dayTotals.calls.toLocaleString(i18n.language),
+				})}
+				{' · '}
+				{t('输入 {{input}} / 输出 {{output}}', {
+					input: dayTotals.input.toLocaleString(i18n.language),
+					output: dayTotals.output.toLocaleString(i18n.language),
+				})}
+				{dayTotals.images
+					? t(' · {{images}} 张', {
+							images: dayTotals.images.toLocaleString(i18n.language),
+						})
+					: ''}
+			</span>
+			<span className={styles.tipCost}>
+				{dayTotals.cost === null
+					? t('暂无单价')
+					: t('参考 {{cost}}', { cost: formatCost(dayTotals.cost) })}
+			</span>
+		</>
+	)
 	const showTip = (
 		day: string,
 		dayTotals: UsageTotals,
 		target: HTMLElement,
 	) => {
-		setTip({
+		setTip((current) => ({
 			day,
 			anchor: target,
-			content: (
-				<>
-					<span className={styles.tipTitle}>{day}</span>
-					<span className={styles.tipLine}>
-						{t('{{calls}} 次', {
-							calls: dayTotals.calls.toLocaleString(),
-						})}
-						{' · '}
-						{t('输入 {{input}} / 输出 {{output}}', {
-							input: dayTotals.input.toLocaleString(),
-							output: dayTotals.output.toLocaleString(),
-						})}
-						{dayTotals.images
-							? t(' · {{images}} 张', {
-									images: dayTotals.images.toLocaleString(),
-								})
-							: ''}
-					</span>
-					<span className={styles.tipCost}>
-						{dayTotals.cost === null
-							? t('暂无单价')
-							: t('参考 {{cost}}', { cost: money(dayTotals.cost) })}
-					</span>
-				</>
-			),
-		})
+			pinned: current?.day === day ? current.pinned : false,
+			content: tipContent(day, dayTotals),
+		}))
 	}
+	/** 点击柱条切换钉住：钉住的提示卡不随 hover/blur 收起（aria-pressed） */
+	const togglePin = (
+		day: string,
+		dayTotals: UsageTotals,
+		target: HTMLElement,
+	) => {
+		setTip((current) =>
+			current?.day === day && current.pinned
+				? null
+				: {
+						day,
+						anchor: target,
+						pinned: true,
+						content: tipContent(day, dayTotals),
+					},
+		)
+	}
+	// hover/blur 只收起未钉住的提示卡
 	const hideTip = (day: string) =>
-		setTip((current) => (current?.day === day ? null : current))
+		setTip((current) =>
+			current?.day === day && !current.pinned ? null : current,
+		)
 
 	// 提示卡打开期间按 Escape 关闭（与控件库 Tooltip 一致）；
 	// 数据刷新后锚点柱条已不在当前过滤结果中时一并收起
-	const tipGone = tip !== null && !perDay.some((row) => row.day === tip.day)
+	const tipGone =
+		tip !== null && !perPeriod.some((row) => row.period === tip.day)
 	useEffect(() => {
 		if (!tip) return
 		if (tipGone) {
@@ -377,25 +560,40 @@ export function UsagePage() {
 			}
 		>
 			<div className={styles.content}>
-				{error && <p role="alert">{error}</p>}
-				{!data && !error && <p role="status">{t('正在读取用量')}</p>}
+				{error && <ErrorNotice message={error} />}
+				{!data && !error && <LoadingState text={t('正在读取用量')} />}
 				{data && (
 					<>
 						{data.unreadableProjects.length > 0 && (
-							<section role="alert" aria-label={t('部分项目无法读取')}>
-								<h2>{t('部分项目无法读取')}</h2>
-								<p>{t('以下项目未计入统计，其他项目的记录仍然显示。')}</p>
-								<ul>
+							<div role="alert">
+								<Banner kind="warning">
+									<span className={styles.unreadable}>
+										<span className={styles.unreadableLead}>
+											{t('部分作品无法读取，未计入统计')}
+										</span>
+										{unreadableGroups.map(([reason, group]) => (
+											<span key={reason}>
+												{group.length === 1
+													? t('一部作品无法读取')
+													: t('{{count}} 部作品无法读取', {
+															count: group.length,
+														})}
+												{' · '}
+												{reason}
+											</span>
+										))}
+									</span>
+								</Banner>
+								<Details className={styles.unreadableDetails}>
 									{data.unreadableProjects.map((project) => (
-										<li key={project.projectId}>
-											{t('{{projectId}}：{{reason}}', {
-												projectId: project.projectId,
-												reason: project.reason,
-											})}
-										</li>
+										<div key={project.projectId}>
+											{project.projectId}
+											{' · '}
+											{formatUnreadableProjectReason(project.reason)}
+										</div>
 									))}
-								</ul>
-							</section>
+								</Details>
+							</div>
 						)}
 						<div className={styles.filters}>
 							<CompactSelect
@@ -425,28 +623,26 @@ export function UsagePage() {
 								onChange={setModel}
 							/>
 							<span className={styles.range}>
-								<input
-									type={granularity === 'month' ? 'month' : 'date'}
-									className={`nl-input ${styles.rangeInput}`}
-									aria-label={t('开始日期')}
+								<RangeInput
+									granularity={granularity}
+									ariaLabel={t('开始日期')}
 									value={from || first}
 									max={to || last || undefined}
-									onChange={(event) => setFrom(event.target.value)}
+									onChange={setFrom}
 								/>
 								<span>{t('到')}</span>
-								<input
-									type={granularity === 'month' ? 'month' : 'date'}
-									className={`nl-input ${styles.rangeInput}`}
-									aria-label={t('结束日期')}
+								<RangeInput
+									granularity={granularity}
+									ariaLabel={t('结束日期')}
 									value={to || last}
 									min={from || first || undefined}
-									onChange={(event) => setTo(event.target.value)}
+									onChange={setTo}
 								/>
 							</span>
 							<InfoTooltip
 								label={t('用量说明')}
 								text={t(
-									'文本按 tokens，图片按张数；参考金额只计入有单价的调用，仅供参考，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
+									'文本按 tokens，图片按张数；参考金额只计入有单价的调用，仅供参考，不设预算或自动停机。',
 								)}
 							/>
 						</div>
@@ -463,28 +659,32 @@ export function UsagePage() {
 									<Stat
 										icon={ArrowUpRight}
 										label={t('调用次数')}
-										value={sum.calls.toLocaleString()}
+										value={sum.calls.toLocaleString(i18n.language)}
 									/>
 									<Stat
 										icon={FileText}
 										label={t('文本 tokens')}
-										value={(sum.input + sum.output).toLocaleString()}
+										value={(sum.input + sum.output).toLocaleString(
+											i18n.language,
+										)}
 										hint={t('输入 {{input}} / 输出 {{output}}', {
-											input: sum.input.toLocaleString(),
-											output: sum.output.toLocaleString(),
+											input: sum.input.toLocaleString(i18n.language),
+											output: sum.output.toLocaleString(i18n.language),
 										})}
 									/>
 									<Stat
 										icon={Image}
 										label={t('图片')}
 										value={t('{{images}} 张', {
-											images: sum.images.toLocaleString(),
+											images: sum.images.toLocaleString(i18n.language),
 										})}
 									/>
 									<Stat
 										icon={Wallet}
 										label={t('参考金额')}
-										value={sum.cost === null ? t('没有单价') : money(sum.cost)}
+										value={
+											sum.cost === null ? t('没有单价') : formatCost(sum.cost)
+										}
 										hint={
 											sum.cost !== null && sum.unpriced
 												? t('部分调用拿不到单价，未计入')
@@ -492,34 +692,39 @@ export function UsagePage() {
 										}
 									/>
 								</div>
-								<Card className={styles.panel}>
+								<Card
+									className={styles.panel}
+									role="region"
+									aria-label={
+										granularity === 'month' ? t('各月调用量') : t('各天调用量')
+									}
+								>
 									<SectionLabel>
 										{granularity === 'month'
 											? t('各月调用量')
 											: t('各天调用量')}
 									</SectionLabel>
-									<div
-										className={
-											labelEvery > 1
-												? `${styles.chart} ${styles.dense}`
-												: styles.chart
-										}
-									>
-										{perDay.map((dayRow, index) => {
-											const active = tip?.day === dayRow.day
+									<div className={styles.chart}>
+										{perPeriod.map((dayRow, index) => {
+											const active = tip?.day === dayRow.period
+											const pinned = active && tip.pinned
 											return (
 												<button
-													key={dayRow.day}
+													key={dayRow.period}
 													type="button"
 													className={
 														active
 															? `${styles.bar} ${styles.barActive}`
 															: styles.bar
 													}
+													aria-pressed={pinned}
 													aria-label={t(
 														'{{day}}：{{calls}} 次 · 输入 {{input}} / 输出 {{output}} · {{images}} 张图片',
 														{
-															day: dayRow.day,
+															day: formatPeriodDisplay(
+																dayRow.period,
+																granularity,
+															),
 															calls: dayRow.calls,
 															input: dayRow.input,
 															output: dayRow.output,
@@ -528,20 +733,21 @@ export function UsagePage() {
 													)}
 													aria-describedby={active ? tooltipId : undefined}
 													onMouseEnter={(event) =>
-														showTip(dayRow.day, dayRow, event.currentTarget)
+														showTip(dayRow.period, dayRow, event.currentTarget)
 													}
-													onMouseLeave={() => hideTip(dayRow.day)}
+													onMouseLeave={() => hideTip(dayRow.period)}
 													onFocus={(event) =>
-														showTip(dayRow.day, dayRow, event.currentTarget)
+														showTip(dayRow.period, dayRow, event.currentTarget)
 													}
-													onBlur={() => hideTip(dayRow.day)}
+													onBlur={() => hideTip(dayRow.period)}
 													onClick={(event) =>
-														showTip(dayRow.day, dayRow, event.currentTarget)
+														togglePin(
+															dayRow.period,
+															dayRow,
+															event.currentTarget,
+														)
 													}
 												>
-													<span className={styles.barCalls}>
-														{labelEvery > 1 ? '' : dayRow.calls}
-													</span>
 													<span className={styles.barTrack}>
 														<span
 															className={
@@ -554,21 +760,57 @@ export function UsagePage() {
 															}}
 														/>
 													</span>
-													<time
-														dateTime={dayRow.day}
-														hidden={index % labelEvery !== 0}
-													>
-														{granularity === 'month'
-															? dayRow.day
-															: dayRow.day.slice(5).replace('-', '/')}
-													</time>
+													{index % labelEvery === 0 ? (
+														<time
+															className={styles.barTime}
+															dateTime={dayRow.period}
+														>
+															{formatAxisLabel(dayRow.period, granularity)}
+														</time>
+													) : null}
 												</button>
 											)
 										})}
 									</div>
 									{tip ? <BarTooltip tip={tip} id={tooltipId} /> : null}
 								</Card>
-								<Card className={styles.panel}>
+								<Card
+									className={styles.panel}
+									role="region"
+									aria-label={
+										granularity === 'month' ? t('按月汇总') : t('按日汇总')
+									}
+								>
+									<SectionLabel>
+										{granularity === 'month' ? t('按月汇总') : t('按日汇总')}
+									</SectionLabel>
+									<AggregateTable
+										leadHeader={granularity === 'month' ? t('月份') : t('日期')}
+										rows={perPeriod.map((row) => ({
+											key: row.period,
+											label: formatPeriodDisplay(row.period, granularity),
+											dateTime: row.period,
+											totals: row,
+										}))}
+									/>
+								</Card>
+								<Card
+									className={styles.panel}
+									role="region"
+									aria-label={t('按模型汇总')}
+								>
+									<SectionLabel>{t('按模型汇总')}</SectionLabel>
+									<AggregateTable
+										leadHeader={t('模型')}
+										quietLead
+										rows={perModel}
+									/>
+								</Card>
+								<Card
+									className={styles.panel}
+									role="region"
+									aria-label={t('按作品 × 阶段')}
+								>
 									<SectionLabel>{t('按作品 × 阶段')}</SectionLabel>
 									<table className={styles.table}>
 										<thead>
@@ -591,10 +833,16 @@ export function UsagePage() {
 															return (
 																<td key={p} data-label={phaseLabel(p)}>
 																	{cell.calls ? (
-																		t('{{calls}} 次', { calls: cell.calls }) +
+																		t('{{calls}} 次', {
+																			calls: cell.calls.toLocaleString(
+																				i18n.language,
+																			),
+																		}) +
 																		(cell.images
 																			? t(' · {{images}} 张', {
-																					images: cell.images,
+																					images: cell.images.toLocaleString(
+																						i18n.language,
+																					),
 																				})
 																			: '')
 																	) : (
@@ -609,7 +857,7 @@ export function UsagePage() {
 																	{t('没有单价')}
 																</span>
 															) : (
-																money(row.cost)
+																formatCost(row.cost)
 															)}
 														</td>
 													</tr>
@@ -618,66 +866,8 @@ export function UsagePage() {
 										</tbody>
 									</table>
 								</Card>
-								<Card
-									className={styles.panel}
-									role="region"
-									aria-label={t('已发生用量')}
-								>
-									<SectionLabel>{t('已发生用量')}</SectionLabel>
-									<ul className={styles.list}>
-										{data.records
-											.filter(({ usage }) => shownSet.has(usage))
-											.map(({ id, usage: record }) => (
-												<li className={styles.row} key={id}>
-													<strong>{record.model}</strong>
-													<span>
-														{titleOf(record.link.workId)} ·{' '}
-														{record.link.volumeId} · {phaseLabel(record.phase)}
-													</span>
-													<span>
-														{record.kind === 'image'
-															? t('{{imageCount}} 张图片', {
-																	imageCount: record.imageCount,
-																})
-															: t(
-																	'输入 {{inputTokens}} / 输出 {{outputTokens}} · 缓存读取 {{cacheReadTokens}} / 写入 {{cacheWriteTokens}}',
-																	{
-																		inputTokens: record.inputTokens,
-																		outputTokens: record.outputTokens,
-																		cacheReadTokens: record.cacheReadTokens,
-																		cacheWriteTokens: record.cacheWriteTokens,
-																	},
-																)}
-													</span>
-													<time>{new Date(record.at).toLocaleString()}</time>
-												</li>
-											))}
-									</ul>
-								</Card>
 							</>
 						)}
-						<Card
-							className={styles.panel}
-							role="region"
-							aria-label={t('过期素材')}
-						>
-							<SectionLabel>{t('过期素材')}</SectionLabel>
-							{!data.staleAssets.length ? (
-								<p>{t('暂无过期素材')}</p>
-							) : (
-								<ul className={styles.list}>
-									{data.staleAssets.map((asset) => (
-										<li
-											className={styles.row}
-											key={`${asset.workId}/${asset.assetKey}`}
-										>
-											<span>{asset.assetKey}</span>
-											<span>{asset.workId}</span>
-										</li>
-									))}
-								</ul>
-							)}
-						</Card>
 					</>
 				)}
 			</div>

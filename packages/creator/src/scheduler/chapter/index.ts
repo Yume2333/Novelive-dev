@@ -1,12 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite'
 import type {
-	ChapterProduction,
 	ImageJobResult,
 	ImageQueueItem,
 	WorkPhase,
 } from '@novelive/format/model'
-import type { ProductionSnapshot } from '../../contract/production'
+import type { IssueKind } from '../../contract/errors'
+import { issueKinds } from '../../contract/errors'
+import type {
+	ProductionChapter,
+	ProductionSnapshot,
+} from '../../contract/production'
+import { TextModelError } from '../../models/text'
 import { spriteFrameIssue } from '../../pipeline/art/check'
 import type { StageTrim } from '../../pipeline/art/trim'
 import { SpendBudgetError } from '../../usage/spend'
@@ -55,9 +60,14 @@ export interface ProductionWorker {
 }
 
 export class ProductionTaskError extends Error {
+	/**
+	 * `kind` steers scheduler retry/pause handling; `code` is the machine-
+	 * readable model error code the failure carries to the creator-facing UI.
+	 */
 	constructor(
 		readonly kind: 'transient' | 'moderation' | 'final' | 'reasoning_limit',
 		message: string,
+		readonly code?: IssueKind,
 	) {
 		super(message)
 	}
@@ -82,12 +92,64 @@ export type RunLogEntry = {
 	status: string
 	errorType: string | null
 	errorMessage: string | null
+	errorKind: IssueKind | null
 	steps: {
 		role: string
 		purpose: string
 		status: string
 		errorType: string | null
+		errorMessage: string | null
+		errorKind: IssueKind | null
 	}[]
+}
+
+/** Classify a step/task failure into the creator-facing issue kind. */
+export function failureKind(error: Error): IssueKind {
+	if (budgetRefusal(error)) return 'budget_paused'
+	if (error instanceof ProductionTaskError) {
+		if (error.kind === 'moderation') return 'moderation'
+		if (error.kind === 'reasoning_limit') return 'reasoning_limit'
+		if (error.code) return error.code
+	}
+	// Production steps mostly rethrow the model error bare; every text model
+	// error code is already an issue kind; command-transport codes
+	// (unsupported/stale_revision/creator_down) and anything else collapse to unknown.
+	if (error instanceof TextModelError)
+		return (issueKinds as readonly string[]).includes(error.code)
+			? (error.code as IssueKind)
+			: 'unknown'
+	return 'unknown'
+}
+
+/** Narrow a persisted metadata value to an issue kind. */
+function issueKindOf(value: unknown): IssueKind | undefined {
+	return typeof value === 'string' &&
+		(issueKinds as readonly string[]).includes(value)
+		? (value as IssueKind)
+		: undefined
+}
+
+/**
+ * Pre-structured runs only have the scheduler error type and the formatted
+ * `[code] …` message; classify those once at the boundary. Runs written
+ * after this change carry `meta.errorKind` and never reach this fallback.
+ */
+function legacyFailureKind(failure: {
+	error_type: string | null
+	error_message: string | null
+}): IssueKind {
+	const type = failure.error_type
+	if (
+		type === 'budget_paused' ||
+		type === 'portrait_framing' ||
+		type === 'matting_unavailable' ||
+		type === 'reasoning_limit' ||
+		type === 'moderation' ||
+		type === 'placeholder'
+	)
+		return type
+	const match = /^\[([a-z_]+)\] /.exec(failure.error_message ?? '')?.[1]
+	return issueKindOf(match) ?? 'unknown'
 }
 
 type TaskRow = {
@@ -469,7 +531,7 @@ export class ChapterScheduler {
 			workId,
 		)
 		let blockedChapterId: string | undefined
-		const chapters = rows.map((row): ChapterProduction => {
+		const chapters = rows.map((row): ProductionChapter => {
 			const issue = row.flagged ? this.chapterIssue(row) : undefined
 			if (work.reason === 'chapter_failed' && this.failed(row.task_id)) {
 				blockedChapterId = row.chapter_id
@@ -503,32 +565,43 @@ export class ChapterScheduler {
 			status: string
 			error_type: string | null
 			error_message: string | null
+			meta: string
 		}>(
-			`SELECT run_id, kind, ref, status, error_type, error_message FROM run
+			`SELECT run_id, kind, ref, status, error_type, error_message, meta FROM run
 			WHERE work_id = ? ORDER BY started_at, rowid`,
 			workId,
-		).map((run) => ({
-			runId: run.run_id,
-			kind: run.kind,
-			ref: run.ref,
-			status: run.status,
-			errorType: run.error_type,
-			errorMessage: run.error_message,
-			steps: this.all<{
-				role: string
-				purpose: string
-				status: string
-				error_type: string | null
-			}>(
-				'SELECT role, purpose, status, error_type FROM run_step WHERE run_id = ? ORDER BY seq',
-				run.run_id,
-			).map((step) => ({
-				role: step.role,
-				purpose: step.purpose,
-				status: step.status,
-				errorType: step.error_type,
-			})),
-		}))
+		).map((run) => {
+			const meta = JSON.parse(run.meta) as {
+				errorKind?: IssueKind
+				stepKinds?: Record<string, IssueKind>
+			}
+			return {
+				runId: run.run_id,
+				kind: run.kind,
+				ref: run.ref,
+				status: run.status,
+				errorType: run.error_type,
+				errorMessage: run.error_message,
+				errorKind: meta.errorKind ?? null,
+				steps: this.all<{
+					role: string
+					purpose: string
+					status: string
+					error_type: string | null
+					error_message: string | null
+				}>(
+					'SELECT role, purpose, status, error_type, error_message FROM run_step WHERE run_id = ? ORDER BY seq',
+					run.run_id,
+				).map((step) => ({
+					role: step.role,
+					purpose: step.purpose,
+					status: step.status,
+					errorType: step.error_type,
+					errorMessage: step.error_message,
+					errorKind: meta.stepKinds?.[step.purpose] ?? null,
+				})),
+			}
+		})
 	}
 
 	async idle(): Promise<void> {
@@ -764,6 +837,7 @@ export class ChapterScheduler {
 						? error.kind
 						: 'final'
 				this.step(task, purpose, started, 'failed', kind, error.message)
+				this.recordStepKind(task, purpose, failureKind(error))
 				if (kind === 'transient' && task.attempts < transientRetries) {
 					task.attempts++
 					this.exec(
@@ -901,23 +975,30 @@ export class ChapterScheduler {
 			| 'reasoning_limit'
 			| 'portrait_framing'
 			| undefined
+		// The creator-facing kind of the failure, when there is one.
+		let errorKind: IssueKind | undefined
 		if (result.ok) {
 			outcome = result.value
 			if (
 				outcome.status === 'unsupported' &&
 				outcome.issue === spriteFrameIssue
-			)
+			) {
 				reason = 'portrait_framing'
+				errorKind = 'portrait_framing'
+			}
 		} else if (budgetRefusal(result.error)) {
 			outcome = { status: 'unsupported', issue: result.error.message }
 			reason = 'budget_paused'
+			errorKind = 'budget_paused'
 		} else if (
 			result.error instanceof ProductionTaskError &&
 			result.error.kind === 'reasoning_limit'
 		) {
 			outcome = { status: 'unsupported', issue: result.error.message }
 			reason = 'reasoning_limit'
+			errorKind = 'reasoning_limit'
 		} else {
+			errorKind = failureKind(result.error)
 			const signal = this.inflight.get(task.task_id)?.controller.signal
 			if (!signal) return
 			try {
@@ -940,6 +1021,7 @@ export class ChapterScheduler {
 				outcome.status,
 				'issue' in outcome ? outcome.issue : undefined,
 				outcome.status === 'placeholder' ? outcome.reason : reason,
+				errorKind,
 			)
 			this.inflight.delete(task.task_id)
 		})
@@ -954,6 +1036,7 @@ export class ChapterScheduler {
 			| 'budget_paused'
 			| 'reasoning_limit'
 			| 'portrait_framing',
+		errorKind?: IssueKind,
 	) {
 		const assetStatus = outcome === 'unsupported' ? 'failed' : outcome
 		this.exec(
@@ -983,6 +1066,16 @@ export class ChapterScheduler {
 			outcome === 'drawn' ? undefined : (reason ?? outcome),
 			issue,
 		)
+		if (outcome !== 'drawn')
+			this.endRunKind(
+				task,
+				errorKind ??
+					(outcome === 'placeholder' && reason === 'matting_unavailable'
+						? 'matting_unavailable'
+						: outcome === 'placeholder'
+							? 'placeholder'
+							: 'unknown'),
+			)
 		const dependents = this.all<{ task_id: string }>(
 			"SELECT d.task_id FROM task_dep d JOIN task t ON t.task_id = d.task_id WHERE d.depends_on = ? AND t.kind = 'chapter'",
 			task.task_id,
@@ -1034,6 +1127,7 @@ export class ChapterScheduler {
 			task.task_id,
 		)
 		this.endRun(task, 'needs_attention', kind, error.message)
+		this.endRunKind(task, failureKind(error))
 		this.inflight.delete(task.task_id)
 		this.exec(
 			'UPDATE chapter SET flagged = 1 WHERE work_id = ? AND chapter_id = ?',
@@ -1131,6 +1225,29 @@ export class ChapterScheduler {
 			errorMessage ?? null,
 			started,
 			this.now(),
+			task.run_id,
+		)
+	}
+
+	/**
+	 * The structured issue kind rides in the run's JSON meta (keyed by step
+	 * purpose) so the contract layer never re-parses formatted messages.
+	 */
+	private recordStepKind(task: TaskRow, purpose: string, kind: IssueKind) {
+		if (!task.run_id) return
+		this.exec(
+			`UPDATE run SET meta = json_set(meta, '$.stepKinds.' || ?, ?) WHERE run_id = ?`,
+			purpose,
+			kind,
+			task.run_id,
+		)
+	}
+
+	private endRunKind(task: TaskRow, kind: IssueKind) {
+		if (!task.run_id) return
+		this.exec(
+			`UPDATE run SET meta = json_set(meta, '$.errorKind', ?) WHERE run_id = ?`,
+			kind,
 			task.run_id,
 		)
 	}
@@ -1419,9 +1536,22 @@ export class ChapterScheduler {
 		)
 	}
 
-	private chapterIssue(row: { task_id: string; placeholder: number }) {
-		const failure = this.get<{ error_message: string | null }>(
-			`SELECT r.error_message FROM run r
+	/**
+	 * The chapter's creator-facing issue. The kind is machine-readable; the
+	 * detail is the raw backend text for the details disclosure only.
+	 */
+	private chapterIssue(row: {
+		task_id: string
+		placeholder: number
+	}): ProductionChapter['issue'] {
+		const failure = this.get<{
+			error_message: string | null
+			error_type: string | null
+			meta_kind: unknown
+		}>(
+			`SELECT r.error_message, r.error_type,
+				json_extract(r.meta, '$.errorKind') AS meta_kind
+			FROM run r
 			JOIN task t ON t.task_id = json_extract(r.meta, '$.taskId')
 			WHERE r.status = 'needs_attention' AND t.status = 'needs_attention'
 				AND (t.task_id = ? OR t.task_id IN (SELECT depends_on FROM task_dep WHERE task_id = ?))
@@ -1429,14 +1559,20 @@ export class ChapterScheduler {
 			row.task_id,
 			row.task_id,
 		)
-		if (failure?.error_message) return failure.error_message
+		if (failure?.error_message) {
+			return {
+				kind: issueKindOf(failure.meta_kind) ?? legacyFailureKind(failure),
+				detail: failure.error_message,
+			}
+		}
 		if (row.placeholder) {
-			const count = this.get<{ n: number }>(
-				`SELECT COUNT(*) AS n FROM task_dep d JOIN task t ON t.task_id = d.depends_on
-				JOIN asset a ON a.work_id = t.work_id AND a.asset_key = t.ref_id
-				WHERE d.task_id = ? AND a.status = 'placeholder'`,
-				row.task_id,
-			)?.n
+			const count =
+				this.get<{ n: number }>(
+					`SELECT COUNT(*) AS n FROM task_dep d JOIN task t ON t.task_id = d.depends_on
+					JOIN asset a ON a.work_id = t.work_id AND a.asset_key = t.ref_id
+					WHERE d.task_id = ? AND a.status = 'placeholder'`,
+					row.task_id,
+				)?.n ?? 0
 			const matting = this.get<{ error_message: string }>(
 				`SELECT r.error_message FROM task_dep d JOIN task t ON t.task_id = d.depends_on
 				JOIN asset a ON a.work_id = t.work_id AND a.asset_key = t.ref_id
@@ -1445,7 +1581,11 @@ export class ChapterScheduler {
 				LIMIT 1`,
 				row.task_id,
 			)
-			return `${count} 张图用了占位图${matting ? `；${matting.error_message}` : ''}`
+			return {
+				kind: matting ? 'matting_unavailable' : 'placeholder',
+				count,
+				...(matting ? { detail: matting.error_message } : {}),
+			}
 		}
 		return undefined
 	}

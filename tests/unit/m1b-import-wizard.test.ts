@@ -124,6 +124,7 @@ test('revisions rewrite chapters, volumes, settings and findings', async () => {
 		})),
 	}
 	const revised = await reviseTxtProject(view.projectDir, layout)
+	if (revised.status !== 'ready') throw new Error('Expected a ready wizard')
 	expect(revised.layout).toEqual(layout)
 	expect(revised.workId).toBe(view.workId)
 	const root = view.projectDir

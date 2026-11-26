@@ -1,16 +1,32 @@
 import { useId, useRef, useState } from 'react'
 import { ScrollArea } from '../../components/ScrollArea'
 import { scoped } from '../../i18n'
+import { type SpeakerNames, speakerDisplayName } from './display'
+import { parseRich, parseSentenceLines } from './sentence-lines'
 
 const t = scoped('editor')
+
+/** 菜单条目只保留说话的文字：标记取标记内文字（嵌套递归展开），注音取正文，停顿舍弃。 */
+function plainText(src: string): string {
+	return parseRich(src)
+		.map((seg) => {
+			if (seg.kind === 'wait') return ''
+			if (seg.kind === 'text' || seg.kind === 'ruby') return seg.text
+			return seg.text.includes('{') ? plainText(seg.text) : seg.text
+		})
+		.join('')
+		.trim()
+}
 
 export function JumpPoints({
 	script,
 	disabled,
+	speakerNames,
 	onJump,
 }: {
 	script: string
 	disabled: boolean
+	speakerNames: SpeakerNames
 	onJump: (line: number) => void
 }) {
 	const id = useId()
@@ -18,9 +34,23 @@ export function JumpPoints({
 	const menu = useRef<HTMLDivElement>(null)
 	const [expanded, setExpanded] = useState(false)
 	const [position, setPosition] = useState({ top: 0, left: 0 })
-	const points = script.split(/\r\n?|\n/).flatMap((text, index) => {
-		const id = text.match(/ #([0-9a-f]{4})\s*$/)?.[1]
-		return id ? [{ id, line: index + 1, text }] : []
+	const points = script.split(/\r\n?|\n/).flatMap((raw, index) => {
+		const parsed = parseSentenceLines(raw)[0]
+		if (!parsed?.lineId) return []
+		const text = plainText(parsed.text)
+		if (!text) return []
+		const speaker = parsed.displayAs?.trim()
+			? parsed.displayAs.trim()
+			: parsed.speaker
+				? speakerDisplayName(speakerNames, parsed.speaker)
+				: ''
+		return [
+			{
+				id: parsed.lineId,
+				line: index + 1,
+				text: speaker ? t('{{speaker}}：{{text}}', { speaker, text }) : text,
+			},
+		]
 	})
 	function positionMenu() {
 		const bounds = trigger.current?.getBoundingClientRect()

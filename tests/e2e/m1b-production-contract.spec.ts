@@ -74,8 +74,13 @@ test('M1b fixed scene renders two host resources from the built Electron rendere
 			const pixels = await sharp(await canvas.screenshot())
 				.raw()
 				.toBuffer({ resolveWithObject: true })
+			// canvas backing store scales with devicePixelRatio (HiDPI/系统缩放)；
+			// 采样坐标按实际像素比换算回场景逻辑坐标，断言与 DPR 无关。
+			const scale = pixels.info.width / 960
 			const at = (x: number, y: number) => {
-				const offset = (y * pixels.info.width + x) * pixels.info.channels
+				const sx = Math.round(x * scale)
+				const sy = Math.round(y * scale)
+				const offset = (sy * pixels.info.width + sx) * pixels.info.channels
 				return Array.from(pixels.data.subarray(offset, offset + 3))
 			}
 			expect(at(5, 5)).toEqual([32, 48, 96])

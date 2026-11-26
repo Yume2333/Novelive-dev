@@ -39,30 +39,6 @@ export function Field({
 	)
 }
 
-export const inputStyle: CSSProperties = {
-	width: '100%',
-	background: 'var(--white-60)',
-	border: '1px solid var(--white-80)',
-	borderRadius: 'var(--radius-md)',
-	padding: '10px 14px',
-	fontSize: 14,
-	color: 'var(--color-on-surface)',
-	boxShadow: 'var(--shadow-glass)',
-}
-
-export const textareaStyle: CSSProperties = {
-	width: '100%',
-	border: '1px solid var(--white-80)',
-	borderRadius: 'var(--radius-md)',
-	background: 'var(--white-60)',
-	padding: 10,
-	fontSize: 13,
-	lineHeight: 1.6,
-	resize: 'vertical',
-	color: 'var(--color-on-surface)',
-	boxShadow: 'var(--shadow-glass)',
-}
-
 export function TextInput({
 	value,
 	onChange,
@@ -86,7 +62,7 @@ export function TextInput({
 				.filter(Boolean)
 				.join(' ')}
 			type={type}
-			style={{ ...inputStyle, ...style }}
+			style={style}
 			value={value}
 			disabled={disabled}
 			onChange={(event) => onChange?.(event.target.value)}
@@ -107,10 +83,10 @@ export function Textarea({
 	return (
 		<textarea
 			{...rest}
-			className={['nl-input', styles.input, className]
+			className={['nl-input', styles.input, styles.textarea, className]
 				.filter(Boolean)
 				.join(' ')}
-			style={{ ...textareaStyle, ...style }}
+			style={style}
 			value={value}
 			onChange={(event) => onChange?.(event.target.value)}
 		/>

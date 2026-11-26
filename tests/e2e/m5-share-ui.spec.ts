@@ -268,7 +268,13 @@ test('M5 share surfaces review export, approve updates and import as a project i
 			)
 			await expect(pick).toHaveCSS('background-color', glass)
 			await pick.click()
-			await expect(preview.getByRole('alert')).toHaveText('不支持此作品包格式')
+			// 错误横幅为本地化的人话文案（不直接展示后端原始消息），
+			// 后端原始消息收进折叠的「详细信息」
+			await expect(preview.getByRole('alert')).toContainText(
+				'无法打开文件，格式不受支持。',
+			)
+			await preview.getByRole('button', { name: '详细信息' }).click()
+			await expect(preview.getByText('不支持此作品包格式')).toBeVisible()
 			await preview.getByRole('button', { name: '关闭' }).click()
 			await pick.click()
 			await expect(preview.getByText('v1 → v2 · 可更新')).toBeVisible()
@@ -367,7 +373,9 @@ test('M5 share surfaces review export, approve updates and import as a project i
 			)
 			await expect(dialog.getByText('已导出', { exact: false })).toBeHidden()
 			await exportButton.click()
-			await expect(dialog.getByRole('alert')).toHaveText('无法写入作品包')
+			await expect(dialog.getByRole('alert')).toContainText(
+				'无法写入文件，请检查磁盘空间和文件夹权限。',
+			)
 			await expect(dialog.getByText('已导出', { exact: false })).toBeHidden()
 			await exportButton.click()
 			await expect(dialog.getByRole('status')).toHaveText(
@@ -424,24 +432,35 @@ test('M5 share surfaces review export, approve updates and import as a project i
 			await page.addScriptTag({ content: fixture.code })
 			const legacy = page.getByRole('region', { name: '旧版本存档' })
 			await expect(legacy).toBeVisible()
-			const deleteSave = legacy.getByRole('button', { name: '删除 v1 槽位 1' })
+			const deleteSave = legacy.getByRole('button', {
+				name: '删除版本 1 的存档 1',
+			})
+			const deleteActions = legacy.locator('.row-actions', {
+				has: page.getByRole('button', { name: '删除版本 1 的存档 1' }),
+			})
 			await legacy.getByRole('heading', { name: '旧版本存档' }).hover()
-			await expect(deleteSave).toHaveCSS('opacity', '0')
+			await expect(deleteActions).toHaveCSS('opacity', '0')
 			await deleteSave.hover()
-			await expect(deleteSave).toHaveCSS('opacity', '1')
+			await expect(deleteActions).toHaveCSS('opacity', '1')
 			await legacy.getByRole('heading', { name: '旧版本存档' }).hover()
 			await deleteSave.focus()
-			await expect(deleteSave).toHaveCSS('opacity', '1')
+			await expect(deleteActions).toHaveCSS('opacity', '1')
 			await deleteSave.press('Enter')
-			await legacy.getByRole('button', { name: '取消' }).click()
+			const confirmOne = page.getByRole('dialog', { name: '删除这个存档？' })
+			await expect(confirmOne).toBeVisible()
+			await confirmOne.getByRole('button', { name: '取消' }).click()
 			await expect(
-				legacy.getByRole('region', { name: '版本 v1' }),
+				legacy.getByRole('region', { name: '旧版本的存档（版本 1）' }),
 			).toBeVisible()
-			await legacy.getByRole('button', { name: '删除 v1 槽位 1' }).click()
-			await legacy.getByRole('button', { name: '确认删除' }).click()
-			await expect(legacy.getByRole('region', { name: '版本 v1' })).toBeHidden()
+			await legacy.getByRole('button', { name: '删除版本 1 的存档 1' }).click()
+			await confirmOne
+				.getByRole('button', { name: '删除', exact: true })
+				.click()
 			await expect(
-				legacy.getByRole('region', { name: '版本 v2' }),
+				legacy.getByRole('region', { name: '旧版本的存档（版本 1）' }),
+			).toBeHidden()
+			await expect(
+				legacy.getByRole('region', { name: '旧版本的存档（版本 2）' }),
 			).toBeVisible()
 			await expect(page.locator('[data-removed]')).toHaveAttribute(
 				'data-removed',
@@ -451,8 +470,25 @@ test('M5 share surfaces review export, approve updates and import as a project i
 					slot: { kind: 'manual', slot: 1 },
 				}),
 			)
+			await legacy.getByRole('button', { name: '全部删除' }).click()
+			const confirmAll = page.getByRole('dialog', { name: '全部删除' })
+			await expect(confirmAll).toBeVisible()
+			await confirmAll
+				.getByRole('button', { name: '全部删除', exact: true })
+				.click()
 			await expect(
-				page.getByRole('button', { name: '读档槽位 1', exact: true }),
+				page.getByRole('region', { name: '旧版本存档' }),
+			).toHaveCount(0)
+			await expect(page.locator('[data-removed]')).toHaveAttribute(
+				'data-removed',
+				JSON.stringify({
+					workId: 'work',
+					version: 2,
+					slot: { kind: 'manual', slot: 1 },
+				}),
+			)
+			await expect(
+				page.getByRole('button', { name: '读取存档 1', exact: true }),
 			).toBeEnabled()
 		} finally {
 			await app.close()

@@ -107,23 +107,30 @@ test.each(['epub', 'docx'] as const)(
 		}
 		await expect(
 			reviseTxtProject(result.projectDir, result.layout, ['unknown']),
-		).rejects.toMatchObject({ message: '插图选择无效' })
+		).resolves.toMatchObject({
+			status: 'error',
+			code: 'invalid_illustration_selection',
+		})
 		await expect(
 			reviseTxtProject(result.projectDir, result.layout, [
 				'illustration-1',
 				'illustration-1',
 			]),
-		).rejects.toMatchObject({ message: '插图选择无效' })
+		).resolves.toMatchObject({
+			status: 'error',
+			code: 'invalid_illustration_selection',
+		})
 		await expect(
 			reviseTxtProject(result.projectDir, result.layout, [
 				'illustration-1',
 				'illustration-2',
 				'illustration-3',
 			]),
-		).rejects.toMatchObject({ message: '最多选择 3 张参考图' })
+		).resolves.toMatchObject({ status: 'error', code: 'reference_limit' })
 		const selected = await reviseTxtProject(result.projectDir, result.layout, [
 			'illustration-2',
 		])
+		if (selected.status !== 'ready') throw new Error('Expected a ready wizard')
 		expect(selected.references).toEqual([
 			'source/references/01.png',
 			'source/references/illustration-2.png',
@@ -140,12 +147,12 @@ test.each(['epub', 'docx'] as const)(
 		expect(await readdir(join(result.projectDir, 'source/references'))).toEqual(
 			['01.png', 'illustration-2.png'],
 		)
-		expect(
-			(await reviseTxtProject(result.projectDir, result.layout)).references,
-		).toEqual(selected.references)
-		expect(
-			(await reviseTxtProject(result.projectDir, result.layout, [])).references,
-		).toEqual(['source/references/01.png'])
+		const kept = await reviseTxtProject(result.projectDir, result.layout)
+		if (kept.status !== 'ready') throw new Error('Expected a ready wizard')
+		expect(kept.references).toEqual(selected.references)
+		const cleared = await reviseTxtProject(result.projectDir, result.layout, [])
+		if (cleared.status !== 'ready') throw new Error('Expected a ready wizard')
+		expect(cleared.references).toEqual(['source/references/01.png'])
 	},
 )
 
@@ -280,6 +287,7 @@ test.each(['txt', 'epub', 'md', 'markdown', 'docx', 'pdf'])(
 				title: `章节 ${i + 1}`,
 			})),
 		})
+		if (revised.status !== 'ready') throw new Error('Expected a ready wizard')
 		expect(revised.format).toBe(result.format)
 		expect(revised.workIds).toEqual(result.workIds)
 		expect(revised.layout.title).toBe('修订')
@@ -311,6 +319,13 @@ test('scanned and blank PDFs return unsupported without creating a project', asy
 })
 
 test('unsupported extensions and corrupt files leave no project', async () => {
+	const codes: Record<string, string> = {
+		html: 'unsupported_source_format',
+		epub: 'invalid_epub',
+		docx: 'invalid_docx',
+		pdf: 'invalid_pdf',
+		md: 'markdown_encoding',
+	}
 	for (const extension of ['html', 'epub', 'docx', 'pdf', 'md']) {
 		const root = await workspace()
 		const sourcePath = join(root, `broken.${extension}`)
@@ -322,7 +337,7 @@ test('unsupported extensions and corrupt files leave no project', async () => {
 				title: '损坏',
 				references: [],
 			}),
-		).rejects.toBeDefined()
+		).resolves.toMatchObject({ status: 'error', code: codes[extension] })
 		expect(await readdir(root)).toEqual([`broken.${extension}`])
 	}
 })

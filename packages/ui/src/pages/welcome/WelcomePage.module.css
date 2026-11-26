@@ -31,26 +31,17 @@
 	gap: var(--space-3);
 }
 
-.testOk,
-.testFail {
+.testOk {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-px-5);
 	padding: var(--space-px-3) var(--space-2);
 	border-radius: var(--radius-sm);
-	font-size: 12px;
-	font-weight: 600;
-	animation: fade-in var(--dur-fast) var(--ease-out);
-}
-
-.testOk {
 	background: var(--color-success-container);
 	color: var(--color-success);
-}
-
-.testFail {
-	background: var(--color-error-container);
-	color: var(--color-on-error-container);
+	font-size: var(--text-12);
+	font-weight: 600;
+	animation: fade-in var(--dur-fast) var(--ease-out);
 }
 
 .page {
@@ -68,7 +59,9 @@
 	align-items: center;
 	gap: var(--space-3);
 	margin-bottom: var(--space-1);
-	font: 700 18px var(--font-display);
+	font-family: var(--font-display);
+	font-size: var(--text-18);
+	font-weight: 700;
 	letter-spacing: 0.14em;
 }
 
@@ -82,28 +75,18 @@
 
 .card h1 {
 	margin: 0 0 var(--space-5);
-	font-size: 24px;
+	font-size: var(--text-24);
 }
 
-.dots {
-	display: flex;
-	justify-content: center;
-	gap: var(--space-px-6);
+.steps {
 	margin-bottom: var(--space-5);
 }
 
-.dots span {
-	display: inline-block;
-	width: 7px;
-	height: 7px;
-	border-radius: var(--radius-full);
-	background: var(--color-outline-variant);
-	transition: all var(--dur-base) var(--ease-in-out);
-}
-
-.dots span[data-active="true"] {
-	width: 18px;
-	background: var(--color-primary);
+.modelIntro {
+	margin: 0 0 var(--space-4);
+	color: var(--color-on-surface-variant);
+	font-size: var(--text-13);
+	line-height: 1.6;
 }
 
 .languages {
@@ -149,12 +132,12 @@
 }
 
 .path strong {
-	font-size: 14px;
+	font-size: var(--text-14);
 }
 
 .path > span:last-child {
 	color: var(--color-on-surface-variant);
-	font-size: 12px;
+	font-size: var(--text-12);
 	line-height: 1.6;
 }
 
@@ -172,7 +155,7 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-	margin-bottom: var(--space-4);
+	margin-bottom: var(--space-2);
 	color: var(--color-outline);
 }
 
@@ -183,11 +166,6 @@
 
 .playerNotice {
 	margin-bottom: var(--space-4);
-}
-
-.muted {
-	color: var(--color-outline);
-	font-size: 13px;
 }
 
 .footer {

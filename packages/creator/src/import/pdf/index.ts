@@ -5,6 +5,7 @@ import {
 	GlobalWorkerOptions,
 	getDocument,
 } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { ImportFailureError } from '../../contract/errors'
 import type { ImportExtraction } from '../../contract/import'
 import { headingRules, parseTxt } from '../txt/structure'
 
@@ -221,7 +222,8 @@ export async function extractPdf(bytes: Uint8Array): Promise<ImportExtraction> {
 				}))
 			return chapters.length ? [{ title: volume.title, chapters }] : []
 		})
-		if (!volumes.length) throw new Error('PDF 无可导入的正文')
+		if (!volumes.length)
+			throw new ImportFailureError('no_body_text', 'PDF 无可导入的正文')
 		return {
 			status: 'ready',
 			book: { format: 'pdf', metadata: title ? { title } : {}, volumes },

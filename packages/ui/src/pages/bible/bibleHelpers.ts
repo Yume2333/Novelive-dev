@@ -1,4 +1,6 @@
 import type { CommandOutput } from '@novelive/creator/contract'
+import { humanizeSlug } from '../../format/asset'
+import { formatChapterLabel, formatParagraphLabel } from '../../format/chapter'
 
 export type Bible = CommandOutput<'bible.get'>
 export type BibleCharacter = Bible['characters'][number]
@@ -46,7 +48,6 @@ export type PreviewTarget =
 			index: number
 			title: string
 			path: string
-			source: string
 			gradientIndex: number
 	  }
 
@@ -71,6 +72,43 @@ export function parseChapterNumber(chapterId?: string): number | undefined {
 	if (!match) return undefined
 	const value = Number.parseInt(match[1], 10)
 	return Number.isFinite(value) ? value : undefined
+}
+
+/**
+ * 章节标签：`第 N 章`，空 id 返回空串；
+ * 序号查不出时退回「未命名章节」，绝不返回内部 id。
+ */
+export function chapterText(
+	chapterId: string | undefined,
+	chapterOrder?: ReadonlyMap<string, number>,
+): string {
+	if (!chapterId) return ''
+	return formatChapterLabel({
+		index: resolveChapterOrdinal(chapterId, chapterOrder),
+	})
+}
+
+/**
+ * 原文出处标签：`第 N 章 · 第 M 段`；
+ * 段落 id 无法解析时舍弃段落部分，只留章节标签。
+ */
+export function occurrenceText(
+	chapterId: string,
+	paragraphId: string,
+	chapterOrder?: ReadonlyMap<string, number>,
+): string {
+	const chapter = chapterText(chapterId, chapterOrder)
+	const paragraph = formatParagraphLabel(paragraphId)
+	if (!paragraph) return chapter
+	return `${chapter} · ${paragraph}`
+}
+
+/**
+ * 造型 / 表情 / 变体的展示名：优先用描述，
+ * 描述缺失时把 slug 人性化，绝不原样渲染内部 id。
+ */
+export function nameOrSlug(item: { id: string; description?: string }): string {
+	return item.description?.trim() || humanizeSlug(item.id)
 }
 
 /** 章节序号：优先取播放器章节顺序表（1 基），否则退化为章节 ID 里的数字 */

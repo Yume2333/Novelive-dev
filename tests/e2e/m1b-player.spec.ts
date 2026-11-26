@@ -156,7 +156,9 @@ for (const missingAsset of [false, true]) {
 				await expect.poll(() => at(0.25, 0.4)).toEqual([224, 96, 48])
 				await advance()
 				if (missingAsset)
-					await expect(page.getByRole('alert')).toHaveText('无法加载舞台素材')
+					await expect(page.getByRole('alert')).toContainText(
+						'无法加载舞台素材，请重试。',
+					)
 				else {
 					await expect(page.locator('.nl-player-overlay')).toHaveText(
 						'本章结束',
