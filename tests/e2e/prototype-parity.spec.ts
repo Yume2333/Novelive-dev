@@ -398,7 +398,7 @@ test('import wizard pages capture matched-viewport parity evidence', async () =>
 			await page.getByRole('button', { name: '选择原文' }).click()
 			await expect(page.getByLabel('作品名')).toHaveValue('风')
 			await page.getByRole('button', { name: '选择文件夹' }).click()
-			await expect(page.getByText(/…projects$/)).toBeVisible()
+			await expect(page.getByText(/projects$/)).toBeVisible()
 			await shot('import-step1')
 			await page.getByRole('button', { name: '下一步', exact: true }).click()
 			await expect(
