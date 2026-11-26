@@ -1,0 +1,492 @@
+# UI Leak Sweep — ui-polish/08 gate evidence
+# Date: 2026-11-26. Branch: ui-polish/08.
+# Scope: packages/ui/src/{shell,pages,panels} (tsx/ts/css) plus packages/ui/src/components for fractional font-size.
+# Verdicts: JUSTIFIED (test-only data-*, inside Details, non-rendered logic) / FIX NEEDED.
+
+================================================================================
+## 1. Rendered `?? *\w*Id\b` / `?? *\w*Key\b` fallbacks
+================================================================================
+
+### Command A2
+$ rg -n '\?\?\s*[a-zA-Z_$][\w.$]*?(Id|Key)\b' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.{ts,tsx}'
+
+Verbatim output:
+```
+packages/ui/src/pages/work/WorkSettings.tsx:367:				const id = presetId ?? writer.defaultPresetId
+packages/ui/src/panels/agent/session.ts:85:		) ?? entryId
+```
+
+### Command A3 (member-expression variant)
+$ rg -n '\?\?\s*[a-zA-Z_$][\w.$]*\.(id|key)\b' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.{ts,tsx}'
+
+Verbatim output:
+```
+packages/ui/src/pages/bible/BibleFields.tsx:747:	const primaryAssetId = drawnId ?? candidates[0] ?? location.id
+```
+
+### Verdicts
+
+- packages/ui/src/pages/work/WorkSettings.tsx:367 — `const id = presetId ?? writer.defaultPresetId`
+  JUSTIFIED: non-rendered logic. `id` is used only to look up `writer.presets.find((preset) => preset.id === id)?.name`;
+  the rendered text is `preset.name` (a maintainer-written preset name), and nothing renders if the lookup misses (`if (name) setPresetName(name)`).
+  No internal id reaches JSX.
+
+- packages/ui/src/panels/agent/session.ts:85 — `) ?? entryId`
+  JUSTIFIED: non-rendered logic. `headWithin` returns an entry id used purely for tree navigation (`branchPath`/`headId` bookkeeping).
+  It is a data-structure key, never display text.
+
+- packages/ui/src/pages/bible/BibleFields.tsx:747 — `const primaryAssetId = drawnId ?? candidates[0] ?? location.id`
+  JUSTIFIED: non-rendered logic. `primaryAssetId` feeds `resolvedAssets`/`assetVersions`/`regenKeys` lookups and the `onPreview` payload.
+  The preview modal title is `location.name` (line 764), not the id. The asset id itself is never rendered as text.
+
+================================================================================
+## 2. `ch\d{4}` / `p\d{4}` literals
+================================================================================
+
+### Command B
+$ rg -n '\b(ch\d{4}|p\d{4})\b' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.{ts,tsx,css}'
+
+Verbatim output:
+```
+packages/ui/src/pages/editor/EditorPage.tsx:95:	const chapterId = params.get('chapterId') ?? 'ch0001'
+packages/ui/src/pages/editor/diagnostics.ts:23:/** `p0007` 形的原文段落 id。 */
+packages/ui/src/pages/editor/directive-display.ts:62:	// 非连续列表（`p0001, p0003`）：逐段标注后并列
+packages/ui/src/pages/editor/directive-display.ts:90:		// 单个区间写法 `p0001-p0005` 先拆成起止两个 id
+```
+
+### Verdicts
+
+- packages/ui/src/pages/editor/EditorPage.tsx:95 — `params.get('chapterId') ?? 'ch0001'`
+  FIX NEEDED (residual risk, not direct rendering): the literal `ch0001` is a routing/data-loading fallback, not directly rendered —
+  `chapterId` drives `editor.open` calls and the CompactSelect `value`. However the select options map ids through
+  `formatChapterLabel({ index, title })`, so the *label* is humanized. The leak vector: when the URL lacks `chapterId`,
+  the editor loads chapter `ch0001` by raw id convention; if a work's first chapter is not literally `ch0001` the page
+  silently targets a nonexistent chapter, and `chapters` fallback at line 868 (`title: chapter?.title`) can leave the select
+  showing a raw-id-backed entry with no ordinal. The correct fallback is the first chapter of the loaded work
+  (`workChapters[0]?.chapterId`), not a hardcoded internal id. Owner: 04-editor.
+
+- packages/ui/src/pages/editor/diagnostics.ts:23 — doc comment `/** p0007 形的原文段落 id。 */`
+  JUSTIFIED: comment only, never rendered. The actual runtime path (line 117-121, `humanizeIds`) converts `pNNNN` → `formatParagraphLabel` ordinal text.
+
+- packages/ui/src/pages/editor/directive-display.ts:62,90 — comments `p0001, p0003` / `p0001-p0005`
+  JUSTIFIED: comments only. Runtime parses these tokens into ordinals via `formatParagraphLabel`/`formatParagraphRange` (lines 55-68);
+  unrecognized directives return `undefined` and callers fold the raw line into `<Details>` (verified in RewriteModal.tsx:69-75).
+
+================================================================================
+## 3. `{part.name}`-style tool-name rendering
+================================================================================
+
+### Command C
+$ rg -n '\{[^}]*\.name\}' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.{ts,tsx}'
+
+Verbatim output:
+```
+packages/ui/src/pages/bible/BibleFields.tsx:783:				<h3>{location.name}</h3>
+packages/ui/src/pages/bible/BibleFields.tsx:803:						label={location.name}
+packages/ui/src/pages/bible/BibleFields.tsx:833:							alt={location.name}
+packages/ui/src/pages/bible/BiblePage.tsx:1060:										{entry.name}
+packages/ui/src/pages/bible/CharacterDetail.tsx:391:					<h3 className="headline">{character.name}</h3>
+packages/ui/src/pages/bible/CharacterDetail.tsx:423:						label={character.name}
+packages/ui/src/pages/bible/CharacterDetail.tsx:495:							const base = `${address.speakerId}-${address.name}`
+packages/ui/src/pages/bible/CharacterDetail.tsx:506:									<strong>{address.name}</strong>
+packages/ui/src/pages/production/ProductionPage.tsx:115:				<span className={styles.name}>{title}</span>
+packages/ui/src/pages/settings/production/ProductionSettings.tsx:154:									<strong className={styles.presetName}>{preset.name}</strong>
+packages/ui/src/pages/work/WorkPage.tsx:307:			<span className={local.name}>{title}</span>
+packages/ui/src/panels/agent/AgentPanel.tsx:629:							alt={preview.name}
+packages/ui/src/panels/agent/Composer.tsx:264:								alt={attachment.name}
+packages/ui/src/panels/agent/MessageView.tsx:1095:							title={part.attachment.name}
+packages/ui/src/panels/agent/MessageView.tsx:1100:								alt={part.attachment.name}
+```
+
+Supplemental tool-name check:
+$ rg -n 'part\.(tool|name)\b|describeTool' packages/ui/src/panels/agent -g '*.{ts,tsx}'
+```
+packages/ui/src/panels/agent/MessageView.tsx:287:	const display = describeTool(part.name, input, result, toolContext(actions))
+```
+
+### Verdicts
+
+- Tool-name rendering (the actual target of this pattern): `MessageView.tsx:287` passes `part.name` into `describeTool`,
+  which never renders it — `tool-display.ts:410-437` maps through a registry of localized titles and unregistered tools
+  fall back to `t('执行操作')` with the comment 「未登记的工具名退回通用的本地化标题，绝不渲染原始工具名」.
+  JUSTIFIED: no raw tool name (`read_bible`, `spawn_agent`) reaches the UI. The literals in tool-display.ts:50-66,389-431
+  are registry keys, not rendered text.
+
+- bible hits (`location.name`, `entry.name`, `character.name`, `address.name`): these are bible entity *display names*
+  authored in the work content (character/location names), i.e. creator-facing data, not internal ids.
+  JUSTIFIED: rendering a character's name is exactly correct. `CharacterDetail.tsx:495` uses speakerId only as a React `key` (non-rendered).
+  `address.name` at :506 is the how-they-address-each-other text (e.g. 「姐姐」), user content.
+
+- ProductionPage.tsx:115 / WorkPage.tsx:307 `{title}` — `title` is `chapterTitle(snapshot, chapterId)` which resolves through
+  `formatChapterLabel` with 「第 N 章」 fallback (verified WorkProduction.tsx:43-51). JUSTIFIED.
+
+- ProductionSettings.tsx:154 `{preset.name}` — maintainer-authored preset display name. JUSTIFIED.
+
+- AgentPanel.tsx:629 `alt={preview.name}`, Composer.tsx:264 `alt={attachment.name}`, MessageView.tsx:1095/1100 `title`/`alt={part.attachment.name}`
+  — `Attachment.name` is the original filename of a user-picked image file (contract `chat.attach` input, chat/attachments.ts `create({name,…})`),
+  i.e. user content, not an internal id. These are `alt`/`title` accessibility attributes, not primary text.
+  JUSTIFIED: user-chosen file names are legitimate display content.
+
+================================================================================
+## 4. `JSON.stringify` / `pretty(` outside a `Details` component
+================================================================================
+
+### Command D
+$ rg -n 'JSON\.stringify|[^a-zA-Z_.]pretty\(' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.{ts,tsx}'
+
+Verbatim output:
+```
+packages/ui/src/pages/bible/BibleFields.tsx:298:					const raw = JSON.stringify(item) ?? 'item'
+packages/ui/src/pages/bible/BiblePage.tsx:227:						JSON.stringify(current.appearance) !==
+packages/ui/src/pages/bible/BiblePage.tsx:228:							JSON.stringify(entry.appearance) ||
+packages/ui/src/pages/bible/BiblePage.tsx:247:							JSON.stringify(current[field]) !== JSON.stringify(entry[field]),
+packages/ui/src/pages/bible/BiblePage.tsx:322:										JSON.stringify(
+packages/ui/src/pages/bible/BiblePage.tsx:324:										) !== JSON.stringify(value),
+packages/ui/src/pages/player/PlayerPage.tsx:609:			data-mainline={JSON.stringify(progress.current.data.mainline)}
+packages/ui/src/pages/player/controls/ProgressPanel.tsx:66:		const position = JSON.stringify(snapshot.position)
+packages/ui/src/pages/player/controls/minimal-controller.ts:12:	return JSON.stringify([
+packages/ui/src/pages/production/ProductionPage.tsx:331:						key={JSON.stringify([
+packages/ui/src/pages/settings/ModelFields.tsx:151:		dirty: JSON.stringify(draft) !== JSON.stringify(textDraft(saved)),
+packages/ui/src/pages/settings/ModelFields.tsx:285:		dirty: JSON.stringify(draft) !== JSON.stringify(imageDraft(saved)),
+packages/ui/src/pages/work/WorkSettings.tsx:237:					JSON.stringify(current) === JSON.stringify(next)
+packages/ui/src/panels/agent/AgentPanel.tsx:301:	const positionKey = JSON.stringify(position ?? null)
+packages/ui/src/panels/agent/MessageView.tsx:139:function pretty(value: string) {
+packages/ui/src/panels/agent/MessageView.tsx:141:		return JSON.stringify(JSON.parse(value), null, 2)
+packages/ui/src/panels/agent/MessageView.tsx:165:		return JSON.stringify(value)
+packages/ui/src/panels/agent/MessageView.tsx:426:								? `${t('参数')}\n${pretty(part.input)}\n${t('结果')}\n${pretty(part.result ?? '')}`
+packages/ui/src/panels/agent/MessageView.tsx:427:								: pretty(part.input)}
+```
+
+### Verdicts
+
+- MessageView.tsx:139-145 `pretty()` + :426-427 usage — the ONLY rendering use. Verified lines 423-429: the `<pre>` sits inside
+  `<Details>` inside the collapsed `Collapse` of the tool card. This matches the maintainer decision exactly
+  (「raw arguments and results go only inside a collapsed 详细信息」).
+  JUSTIFIED: inside Details.
+
+- MessageView.tsx:165 `summarize()` — helper producing a string for structured rows; input to curated display logic, not raw JSON dump of a payload.
+  JUSTIFIED: non-rendered logic feeding curated rows (values are already scalars; stringify is a fallback for odd shapes and returns text
+  that goes through the same curated row pipeline, not a raw JSON blob of the tool payload). Borderline but consistent with curated-rows intent.
+
+- PlayerPage.tsx:609 `data-mainline={JSON.stringify(...)}` — a `data-*` attribute consumed by e2e tests, never visible text.
+  JUSTIFIED: test-only data-*.
+
+- ProgressPanel.tsx:66, minimal-controller.ts:12, ProductionPage.tsx:331, BibleFields.tsx:298, BiblePage.tsx:227-228/247/322-324,
+  ModelFields.tsx:151/285, WorkSettings.tsx:237, AgentPanel.tsx:301 — all are React keys, dirty-check comparisons, or effect dependency
+  serialization. None reach the DOM as text.
+  JUSTIFIED: non-rendered logic.
+
+================================================================================
+## 5. Raw `error.message` / `err.message` / `String(error)` rendering
+================================================================================
+
+### Command E
+$ rg -n '\b(error|err|e)\.message\b|String\((error|err)\)' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.{ts,tsx}'
+
+Verbatim output:
+```
+packages/ui/src/pages/player/controls/PlayerControls.tsx:280:				error instanceof Error ? error.message : t('存读档失败，请重试。'),
+packages/ui/src/pages/settings/SettingsPage.tsx:300:							{feedbackIcon} {error.message}
+packages/ui/src/pages/work/WorkProduction.tsx:55:	if (error.message === humanizeError(undefined).message)
+packages/ui/src/pages/work/share/ExportPackage.tsx:109:				error.message === humanizeError(undefined).message
+```
+
+### Verdicts
+
+- packages/ui/src/pages/player/controls/PlayerControls.tsx:280 —
+  `error instanceof Error ? error.message : t('存读档失败，请重试。')` rendered via `toastError` (toast at line 140).
+  FIX NEEDED: when the thrown value is an `Error` its raw `.message` is toasted verbatim. Save/load failures come from the
+  creator backend (`onSave`/`onLoad` → player persistence or host fs) and produce English/technical strings
+  (`[code] …` prefixed legacy strings, DOCTYPE-type parser errors, fs errors). The fallback order is also inverted:
+  raw message wins, localized text only when the throw isn't an Error. Expected: route through `humanizeError` and render
+  `formatErrorText(humanizeError(error))`, with raw detail inside a Details or dropped for a toast. Owner: 06-player.
+
+- packages/ui/src/pages/settings/SettingsPage.tsx:300 — `{feedbackIcon} {error.message}` inside the model-test feedback `<p role="status">`.
+  JUSTIFIED: `error` here is a `CommandError` produced exclusively by `readableError()` (lines 212-216, :128), which maps every code
+  to a localized `t('…')` sentence. The two `readable`/`unsupported` passthroughs either require CJK content in the message
+  (`/[\u3400-\u9fff]/` test at line 91-93) or use `failure?.message` only for the `unsupported` code — a narrow residual:
+  an English `unsupported` message could pass through. Borderline-justified; noted as a hardening item for 02, not a leak of
+  backend debug text in practice (backend model errors are structured `{code}` objects).
+
+- WorkProduction.tsx:55 and ExportPackage.tsx:109 — `error.message === humanizeError(undefined).message` is a *comparison* used to detect
+  the generic fallback and substitute page-context copy; the rendered text is the localized message. JUSTIFIED: non-rendered logic.
+
+================================================================================
+## 6. `assetKey` / `assetId` in JSX text
+================================================================================
+
+### Command F
+$ rg -n 'assetKey|assetId' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.{ts,tsx}'
+
+Verbatim output (full, 87 lines — see section 6a condensed):
+```
+packages/ui/src/pages/bible/BibleFields.tsx:742 / 763
+packages/ui/src/pages/bible/BiblePage.tsx:689-709, 789-828, 911-923, 1089-1125, 1223
+packages/ui/src/pages/bible/CharacterDetail.tsx:77, 98-102, 117, 185, 327
+packages/ui/src/pages/bible/bibleHelpers.ts:31, 39
+packages/ui/src/pages/editor/EditorPage.tsx:385-401, 978, 1279-1293
+packages/ui/src/pages/editor/EditorPanels.tsx:152
+packages/ui/src/pages/editor/EditorStage.tsx:112
+packages/ui/src/pages/editor/SceneImages.tsx:35, 74-174, 302
+packages/ui/src/pages/editor/diagnostics.ts:21, 117
+packages/ui/src/pages/editor/display.ts:25-26
+packages/ui/src/pages/editor/scene-assets.ts:69, 130, 210-217, 349-350
+packages/ui/src/pages/production/StaleAssets.tsx:29-402 (multiple)
+packages/ui/src/panels/agent/MessageView.tsx:709, 841
+packages/ui/src/panels/agent/tool-display.ts:348, 352
+```
+
+### Verdicts (examined each JSX-reaching hit)
+
+- MessageView.tsx:841 `{formatAssetLabel(payload.assetId, actions.assetInfo)}` — rendered inside the redrawImage proposal diff,
+  but routed through `formatAssetLabel` which produces bible description / humanized slug per the maintainer decision. JUSTIFIED.
+
+- tool-display.ts:348-352 — `assetLabel(assetId, ctx)` row value; same humanization pipeline (tool-display.ts:139-142 → formatAssetLabel).
+  If humanization yields empty the row is dropped (`row()` filters falsy). JUSTIFIED.
+
+- EditorStage.tsx:112 `expressionLabel(member.assetId, assetInfo)` — humanizes the expression segment, used in aria-label badge. JUSTIFIED.
+
+- EditorPanels.tsx:152 `formatAssetLabel(String(entry.assetId), assetInfo)` — history target text, humanized. JUSTIFIED.
+
+- SceneImages.tsx:129/132 `name: formatAssetLabel(assetId, assetInfo)` — choice menu labels, humanized. JUSTIFIED.
+
+- StaleAssets.tsx:237 `const label = formatAssetLabel(assetKey, labelInfo)` — rendered at :307 `{label}` and toast. Humanized. JUSTIFIED.
+  All other assetKey uses in this file are params/keys/callback plumbing, never JSX text.
+
+- All remaining hits (BiblePage/BibleFields/CharacterDetail/EditorPage/scene-assets/bibleHelpers) — asset ids used as lookup keys,
+  API parameters, React keys, and event payloads; none reach JSX as raw text. diagnostics.ts:21/117 *replaces* asset keys in
+  backend messages with `formatAssetLabel` output. JUSTIFIED: non-rendered logic.
+
+================================================================================
+## 7. Absolute-path rendering without `formatPath`
+================================================================================
+
+### Command G1 (JSX text nodes starting with a slash)
+$ rg -n '>/?[A-Za-z][\w./~-]*(/?[\w.~-]+)+<' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.tsx'
+
+Verbatim output:
+```
+packages/ui/src/shell/AppShell.tsx:482:								<span>NOVELIVE</span>
+packages/ui/src/pages/settings/SettingsPage.tsx:584:									<strong>Novelive</strong>
+packages/ui/src/pages/welcome/WelcomePage.tsx:95:					<span>NOVELIVE</span>
+```
+(false positives on the brand word — regex artifact, no path content.)
+
+### Command G2 (path-ish variables rendered in JSX braces)
+$ rg -n '\{[a-zA-Z_$][\w.]*?(path|Path)\}' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.tsx'
+
+Verbatim output:
+```
+packages/ui/src/pages/bible/BibleFields.tsx:1278:											const base = `${ref.path}-${ref.description}`
+packages/ui/src/pages/bible/BibleFields.tsx:1298:														path={ref.path}
+packages/ui/src/pages/bible/CharacterDetail.tsx:557:								const base = `${ref.path}-${ref.description}`
+packages/ui/src/pages/library/LibraryPage.tsx:625:												<span className={styles.groupPath}>
+packages/ui/src/pages/settings/SettingsPage.tsx:491:							<span className={styles.path}>
+packages/ui/src/pages/settings/SettingsPage.tsx:550:										className={styles.path}
+packages/ui/src/pages/welcome/WelcomePage.tsx:152:									className={styles.path}
+packages/ui/src/pages/player/PlayerPage.tsx:273:									? { directory: directory ?? directoryRef.current }
+```
+
+### Verdicts
+
+- LibraryPage.tsx:625-627 — `· {formatPath(group.key, home)}`: home-collapsed via formatPath. JUSTIFIED.
+- SettingsPage.tsx:491-492 — `{formatPath(config.configError.path, home)}` inside `<Details>`. JUSTIFIED (and inside Details regardless).
+- SettingsPage.tsx:550-554 — `formatPath(config.projectDir, home)` with raw full path only in `title` tooltip
+  (`title={config.projectDir || undefined}` at :551).
+  Borderline JUSTIFIED: the spec says user-chosen paths stay visible home-collapsed — satisfied; the `title` attribute exposes the
+  uncollapsed absolute path on hover, which is standard OS-file-picker behavior and consistent with "user-chosen paths stay visible".
+  Not a leak: it's the user's own chosen directory, not a temp/internal path.
+- WelcomePage.tsx:152 — `className={styles.path}` is a *wizard-path card* class name ("创作/改编/游玩" choice), not a filesystem path. JUSTIFIED: false positive.
+- BibleFields.tsx:1278/1298, CharacterDetail.tsx:557 — `ref.path` here is a bible *reference asset path* used as React key / passed to
+  preview components as data, not rendered as text. The rendered label is `ref.description`. JUSTIFIED: non-rendered logic.
+- PlayerPage.tsx:273 — object literal passed to a call, never rendered. JUSTIFIED: false positive.
+- ImportPage.tsx:191 — `formatPath(value, home)` for file pickers, with raw path only in `title` tooltip (same pattern as Settings). JUSTIFIED.
+
+No absolute temp/builder paths rendered anywhere in scope.
+
+================================================================================
+## 8. Fractional `font-size`
+================================================================================
+
+### Command H
+$ rg -n 'font-size:\s*[0-9]*\.[0-9]+(px|rem|em)' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels packages/ui/src/components -g '*.{ts,tsx,css}'
+
+Verbatim output:
+```
+packages/ui/src/pages/player/controls/controls.css:305:	font-size: 0.72em;
+packages/ui/src/pages/player/player.css:37:	font-size: 1.25rem;
+packages/ui/src/pages/player/player.css:57:	font-size: 1.5rem;
+```
+
+### Command H2 (inline-style fontSize)
+$ rg -n 'fontSize:\s*['"'"'"]?[0-9]*\.[0-9]+' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels packages/ui/src/components -g '*.{ts,tsx,css}'
+
+Verbatim output:
+```
+packages/ui/src/pages/editor/RichText.tsx:25:			return { opacity: 0.72, fontSize: '0.88em' }
+packages/ui/src/pages/editor/RichText.tsx:27:			return { fontWeight: 800, fontSize: '1.2em', letterSpacing: '0.04em' }
+packages/ui/src/pages/editor/RichText.tsx:102:									fontSize: '0.55em',
+```
+
+Supplement: full non-token `font-size` scan (`font-size` not using `var(--`):
+```
+packages/ui/src/pages/player/controls/controls.css:305:	font-size: 0.72em;
+packages/ui/src/pages/player/controls/controls.css:378:	font-size: 15px;
+packages/ui/src/pages/player/player.css:37:	font-size: 1.25rem;
+packages/ui/src/pages/player/player.css:57:	font-size: 1.5rem;
+packages/ui/src/pages/settings/SettingsPage.module.css:544:	font-size: inherit;
+packages/ui/src/panels/agent/MessageView.module.css:175:	font-size: inherit;
+```
+Type tokens available: --text-10/11/12/13/14/16/18/20/22/24/28/32/36 (tokens.css:182-194).
+
+### Verdicts
+
+- player/controls/controls.css:305 `font-size: 0.72em` (`.nl-player-name`) — relative to `--player-font-size` (default 30px),
+  this is the speaker name inside the player dialogue box, scaling proportionally with the user's chosen dialogue font size.
+  The player text scale is a user setting (minimal-controller.ts:98), not a type-token context: proportional em sizing is the correct
+  mechanism here (a fixed token would break user font scaling). JUSTIFIED: deliberate proportional scaling of player dialogue chrome,
+  not a fractional-token hack. Same reasoning as ruby `0.55em` below.
+
+- player/controls/controls.css:378 `font-size: 15px` (paper-style `.nl-player-name` badge) — NOT fractional, but a hardcoded px outside
+  the type scale and outside `--player-font-size` scaling: the paper-theme speaker badge ignores the user's font-size setting.
+  FIX NEEDED (style rule "font sizes only from type tokens"): should derive from the player scale (em) or a token.
+  Owner: 06-player.
+
+- player/player.css:37 `font-size: 1.25rem` (`.nl-player-textbox`) and :57 `font-size: 1.5rem` (`.nl-player-caption`) —
+  FIX NEEDED: two problems. (1) fractional/off-scale rem sizing not from type tokens; (2) more importantly these legacy rules compete with
+  the user-scaled `--player-font-size` architecture — controls.css:276 also sets `.nl-player-textbox` font-size with higher specificity
+  (`.nl-player .nl-player-textbox` beats `.nl-player-textbox`), so player.css:37 is dead in the scoped player but still applies
+  to any unscoped usage, and player.css:57 `.nl-player-caption` has no scoped override at all, so captions never follow the user's
+  font-size setting. Expected: caption sizing in em relative to `--player-font-size` like the rest of the player chrome.
+  Owner: 06-player.
+
+- editor/RichText.tsx:25 `0.88em` (whisper), :27 `1.2em` (shout), :102 `0.55em` (ruby) —
+  these are *proportional text-effect marks* from the work's own NVS markup (`{whisper}`/`{shout}`/ruby annotations): whisper must be
+  slightly smaller than surrounding prose, shout slightly larger, ruby annotation text must be proportional to its base character.
+  em-relative is the only correct mechanism — they must scale with whatever context they appear in (stage vs list).
+  JUSTIFIED: typographic effect proportions, not font-size choices; the base sizes come from tokens.
+
+- settings/SettingsPage.module.css:544, panels/agent/MessageView.module.css:175 `font-size: inherit` — reset/inherit, not a size choice. JUSTIFIED.
+
+================================================================================
+## 9. Bare `<p role="alert">`
+================================================================================
+
+### Command I
+$ rg -n '<p[^>]*role="alert"' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels packages/ui/src/components -g '*.tsx'
+
+Verbatim output:
+```
+packages/ui/src/shell/AppShell.tsx:654:						<p className={styles.warning} role="alert">
+packages/ui/src/panels/agent/MessageView.tsx:936:				<p className={styles.error} role="alert">
+```
+
+### Command I2 (all role="alert" for context)
+```
+packages/ui/src/shell/AppShell.tsx:630:				<div className={styles.warning} role="alert">
+packages/ui/src/shell/AppShell.tsx:654:				<p className={styles.warning} role="alert">
+packages/ui/src/pages/library/LibraryPage.tsx:586:							<span role="alert">
+packages/ui/src/pages/settings/SettingsPage.tsx:466:				<div role="alert" className={styles.configError}>
+packages/ui/src/pages/usage/UsagePage.tsx:577:						<div role="alert">
+packages/ui/src/panels/agent/MessageView.tsx:370:					<div className={styles.errorCallout} role="alert">
+packages/ui/src/panels/agent/MessageView.tsx:936:				<p className={styles.error} role="alert">
+packages/ui/src/components/Feedback.tsx:115:			role="alert"
+```
+
+### Verdicts
+
+- AppShell.tsx:654 `<p className={styles.warning} role="alert">{hostError}</p>` —
+  `hostError` content is always a localized sentence (`t('无法打开日志目录')`, `t('无法重新启动创作端')`, `t('无法保存主题')` — lines 271-276, 341, 610),
+  so the copy is clean. BUT the spec mandates `ErrorNotice` for every error (one error presentation), and sibling line 630 builds
+  the same warning as a `<div>` with a different construction.
+  FIX NEEDED (style unification, not copy): bespoke per-shell error presentation instead of `ErrorNotice`; also a `<p>` wrapping only
+  text is not the shared `Banner`-based notice. Note the message content is a status/action failure without recovery-hint structure.
+  Expected: shared `ErrorNotice` with `message` prop. Owner: 02-shell.
+
+- MessageView.tsx:936 `<p className={styles.error} role="alert">{error}</p>` — the proposal-action error. `error` state is set only to
+  `t('无法提交，请重试')` (verified :718-720) — clean copy, but again a bespoke error presentation inside the agent panel rather than
+  `ErrorNotice`. FIX NEEDED (style unification): replace with shared `ErrorNotice`. Owner: 07-agent-panel.
+
+- MessageView.tsx:370 `<div className={styles.errorCallout} role="alert">` — tool-card failure callout rendering
+  `formatErrorText(humanized)` where `humanized = humanizeError(errorValue)`: fully localized message+hint. It's a `<div>`, not the bare
+  `<p>` pattern, and content is humanized; it is an intentional in-card compact presentation. Borderline JUSTIFIED: copy-clean;
+  arguably should share ErrorNotice styling, but the in-card inline context (inside a Collapse) is a distinct compact presentation
+  the task-07 design chose deliberately. Not counted as a leak.
+
+- LibraryPage.tsx:586 `<span role="alert">` inside `Banner` — localized unreadable-count copy; `<Details>` holds the explanation.
+  JUSTIFIED: localized copy inside the shared Banner component (span is just the live-region hook).
+
+- UsagePage.tsx:577 `<div role="alert">` wrapping `Banner` — reasons are mapped through `unreadableReason` table +
+  `formatErrorText(humanizeError(...))` fallback (lines 466-470). Raw `project.reason`/`project.projectId` appear only inside the `<Details>`
+  at :596-604. JUSTIFIED.
+
+- SettingsPage.tsx:466 `<div role="alert" className={styles.configError}>` wrapping Banner + localized copy; raw path inside Details. JUSTIFIED.
+
+- components/Feedback.tsx:115 — this IS `ErrorNotice` itself, the mandated component. JUSTIFIED (reference implementation).
+
+================================================================================
+## 10. Supplemental checks (no hits / verified clean)
+================================================================================
+
+- Rendered `{chapterId}`/`{workId}`/`{entryId}` etc. as bare JSX text:
+  $ rg -n '\{(chapterId|workId|sceneId|lineId|entryId|projectId|sessionId|assetKey)\}' packages/ui/src/shell packages/ui/src/pages packages/ui/src/panels -g '*.tsx'
+  All hits are React keys, component props (`id={workId}` for WorkCard routing), select `value` bindings (EditorPage:991 — label humanized
+  via formatChapterLabel at :995-998), or route construction. No bare id rendered as text.
+
+- `\{[^}]*\bid\b[^}]*\?\?[^}]*\}` — no hits (exit 1).
+
+- `String(error)`/`${error}` interpolation — no hits (exit 1).
+
+- `/tmp/`, `/home/`, `/var/` literals in rendering — no hits (exit 1).
+
+- Raw enum rendering: all status/phase/reason displays verified mapped through label tables
+  (pausedLabel ProductionQueuePanel.tsx:36-56, stepName ChapterState.tsx:7-12, StatusChip BibleFields.tsx:433-436,
+  GlobalProductionQueue status/detail lines 195-232 — all localized ordinals/titles).
+
+- Raw NVS directive lines: RewriteModal.tsx:69-75 folds unrecognized directives into `<Details summary={t('详细信息')}>`;
+  recognized ones go through describeDirective → humanized text. SentenceList renders sentence text via parseSentenceLines/RichText.
+
+- UUID/slug id rows in agent tool cards: tool-display.ts:146-162 drops id-shaped values entirely (「绝不渲染原始 id」).
+
+================================================================================
+## SUMMARY — FIX NEEDED hits grouped by owning task
+================================================================================
+
+### 06-player (packages/ui/src/pages/player/, tests/e2e/{m3-controls,m3-stage,m3-text,m1b-player}.spec.ts)
+
+1. **PlayerControls.tsx:280 `slotAction` catch** — `error instanceof Error ? error.message : t('存读档失败，请重试。')` toasted raw.
+   Expected: `formatErrorText(humanizeError(error))` so save/load failures render localized copy (e.g. 「无法保存，请重试。」+hint),
+   raw detail dropped for a toast or behind Details.
+
+2. **controls.css:378 `.nl-player-surface[data-dialogue-style="paper"] .nl-player-name` `font-size: 15px`** —
+   hardcoded px, ignores `--player-font-size` user scaling. Expected: em proportion of the player font scale (like the `0.72em` default-theme rule).
+
+3. **player.css:37 `.nl-player-textbox` `font-size: 1.25rem` and player.css:57 `.nl-player-caption` `font-size: 1.5rem`** —
+   fractional/off-token rem sizes; caption sizing bypasses the `--player-font-size` architecture entirely.
+   Expected: express caption/textbox sizing as em proportions of `--player-font-size` in controls.css (scoped) and drop the legacy fixed-rem rules.
+
+### 02-shell (packages/ui/src/shell/, tests/e2e/m0-shell etc.)
+
+4. **AppShell.tsx:653-657 `<p className={styles.warning} role="alert">{hostError}</p>`** — bespoke error presentation, third construction
+   in the same file (sibling `<div>` banner at :630). Expected: shared `ErrorNotice` (`message={hostError}`).
+
+### 07-agent-panel (packages/ui/src/panels/agent/, tests/e2e/m2-chat.spec.ts)
+
+5. **MessageView.tsx:935-939 `<p className={styles.error} role="alert">{error}</p>`** (proposal approve/reject failure) —
+   bespoke error presentation. Expected: shared `ErrorNotice` (`message={error}`); copy itself is already localized.
+
+### 04-editor (packages/ui/src/pages/editor/, tests/e2e/m2-editor.spec.ts)
+
+6. **EditorPage.tsx:95 `params.get('chapterId') ?? 'ch0001'`** — hardcoded internal-id literal as routing fallback.
+   Expected: fall back to the first chapter of the loaded work (`workChapters[0]?.chapterId`) once library data arrives,
+   or redirect/empty-state when no chapters exist; never assume the raw id `ch0001`.
+
+### Hardening note (not counted as FIX NEEDED)
+
+- SettingsPage.tsx `readableError` `unsupported:` passthrough uses `failure?.message` unconditionally (line 108) — an English backend
+  message could reach the settings feedback line for the `unsupported` code. Consider gating with the same CJK/`localized` test used for
+  `invalid_config`/`internal`. Owner: 02-shell-and-global-pages.
+
+Everything else in the sweep is JUSTIFIED: test-only `data-*` attributes, React keys, non-rendered lookup/navigation logic,
+content inside `<Details>` disclosures, humanized-via-`format/` rendering, proportional em typography for player/editor text effects,
+or user-authored content names (character names, attachment filenames, preset names).

@@ -157,7 +157,9 @@ test('M1b make and play publishes through both confirmation points in real Elect
 				.getByRole('link', { name: '确认第一章' })
 				.click({ timeout: 20_000 })
 			await expect(page.getByText(/确认点 2/)).toBeVisible()
-			await expect(page.getByText(/已发布，可以试玩/)).toBeVisible()
+			await expect(
+				page.getByRole('link', { name: '试玩第一章' }),
+			).toBeVisible()
 			expect(published()).toEqual(['ch0001'])
 			await capture(page, '03-confirm-first')
 			const priorUrl = await page.evaluate(() => location.hash)
@@ -225,15 +227,19 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			await page.getByRole('button', { name: '继续制作' }).click()
 			const second = page.getByRole('listitem').filter({ hasText: '灯火' })
 			await expect(second.getByRole('button', { name: '重试' })).toBeVisible()
-			await expect(second.getByText(/\[invalid_config\]/)).toBeVisible()
+			await expect(
+				second.getByText(/模型请求的配置无效/),
+			).toBeVisible()
 			await setWritingModel(recoveredWriter)
 			await second.getByRole('button', { name: '重试' }).click()
 			await expect(second.getByText('已发布', { exact: true })).toBeVisible({
 				timeout: 20_000,
 			})
 			await expect(second.getByText('需要处理', { exact: true })).toBeVisible()
-			await expect(second.getByText('1 张图用了占位图')).toBeVisible()
-			await expect(second.getByText(/\[invalid_config\]/)).toHaveCount(0)
+			await expect(
+				second.getByText(/无法生成 1 张图像，已先用占位图代替/),
+			).toBeVisible()
+			await expect(second.getByText(/模型请求的配置无效/)).toHaveCount(0)
 			await expect(
 				page.getByText('1 章需要处理', { exact: true }),
 			).toBeVisible()
@@ -243,7 +249,7 @@ test('M1b make and play publishes through both confirmation points in real Elect
 			await expect(
 				page
 					.getByRole('region', { name: '章节运行记录' })
-					.getByText('运行失败'),
+					.getByText(/模型请求的配置无效/),
 			).toBeVisible()
 			await capture(page, '05-chapter-two-published')
 			expect(published()).toEqual(['ch0001', 'ch0002'])
@@ -634,7 +640,9 @@ test('M1b creation surfaces a writing budget pause and resumes without repeat di
 			await expect(retry).toBeVisible()
 			expect(calls).toHaveLength(malformedAttempts)
 			await retry.click()
-			await expect(page.getByText(/软停止线 80000 tokens/)).toBeVisible()
+			await expect(
+				page.getByText(/制作花费达到预算上限，已暂停/),
+			).toBeVisible()
 			const queue = await openQueue(page)
 			await expect(queue.getByText('已暂停：模型预算不足')).toBeVisible()
 			expect(calls).toHaveLength(malformedAttempts + 1)

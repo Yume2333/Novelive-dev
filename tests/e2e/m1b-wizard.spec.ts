@@ -115,7 +115,9 @@ test('M1b TXT wizard reviews findings, revises chapter divisions and keeps a ref
 		await page.getByRole('button', { name: '添加图片' }).click()
 		await expect(page.getByText('ref.png')).toBeVisible()
 		await page.getByRole('button', { name: '选择文件夹' }).click()
-		await expect(page.getByText(projects, { exact: true })).toBeVisible()
+		await expect(
+			page.getByText(/…projects$/),
+		).toBeVisible()
 		await page.getByRole('button', { name: '下一步', exact: true }).click()
 
 		await expect(

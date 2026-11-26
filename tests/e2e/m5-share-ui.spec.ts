@@ -373,7 +373,9 @@ test('M5 share surfaces review export, approve updates and import as a project i
 			)
 			await expect(dialog.getByText('已导出', { exact: false })).toBeHidden()
 			await exportButton.click()
-			await expect(dialog.getByRole('alert')).toHaveText('无法写入作品包')
+			await expect(dialog.getByRole('alert')).toContainText(
+				'无法写入文件，请检查磁盘空间和文件夹权限。',
+			)
 			await expect(dialog.getByText('已导出', { exact: false })).toBeHidden()
 			await exportButton.click()
 			await expect(dialog.getByRole('status')).toHaveText(

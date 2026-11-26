@@ -479,7 +479,7 @@ test.describe('M4 longform and queue', () => {
 			}
 			await importBook(app, page, join(root, 'scan.pdf'), projects)
 			await expect(
-				page.getByText(/扫描版 PDF 无可提取文字，暂不支持 OCR/),
+				page.getByText(/扫描版 PDF 暂不支持识别文字/),
 			).toBeVisible()
 			await capture(page, 'w1-scanned-pdf')
 			const legacySource = join(root, 'legacy.md')
@@ -809,10 +809,10 @@ test.describe('M4 longform and queue', () => {
 				location.hash = '/usage'
 			})
 			await expect(
-				page.getByRole('region', { name: '已发生用量' }),
+				page.getByRole('region', { name: '按模型汇总' }),
 			).toContainText('devin-swe-2')
 			await expect(
-				page.getByRole('region', { name: '已发生用量' }),
+				page.getByRole('region', { name: '按模型汇总' }),
 			).toContainText('fixture-art-image')
 			await capture(page, 'w3-actual-usage')
 			{
@@ -859,15 +859,15 @@ test.describe('M4 longform and queue', () => {
 			await expect(
 				page.getByRole('status').filter({ hasText: '已接受候选' }),
 			).toContainText('已标记过期')
-			await page.evaluate(() => {
-				location.hash = '/usage'
-			})
+			await page.evaluate((id) => {
+				location.hash = `/work/${id}/production`
+			}, a)
+			const staleToggle = page.getByRole('button', { name: /张图过期/ })
+			await expect(staleToggle).toBeVisible()
+			await staleToggle.click()
 			await expect(
-				page.getByRole('region', { name: '过期素材' }),
-			).toContainText('gate-room/day')
-			await page
-				.getByRole('region', { name: '过期素材' })
-				.scrollIntoViewIfNeeded()
+				page.getByRole('dialog', { name: '过期图片' }),
+			).toContainText('河岸 · Day')
 			await capture(page, 'w2-stale-image-reminder')
 			await expect
 				.poll(() =>
