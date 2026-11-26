@@ -188,6 +188,7 @@
 	"这一行无法保存，请只修改句子内容": "This line cannot be saved; edit only the sentence text",
 	"这句改过了": "This line was edited",
 	"这句里的标记": "Marks in this line",
+	"这部作品还没有章节": "This work has no chapters yet",
 	"选择标记": "Select mark",
 	"选择版本 {{value}}": "Select version {{value}}",
 	"逐字": "Character by character",

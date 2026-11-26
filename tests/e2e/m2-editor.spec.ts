@@ -19,6 +19,13 @@ import {
 	seedPlayerProject,
 } from '../fixtures/minimal-player'
 
+declare global {
+	interface Window {
+		fixtureCalls: { command: string; input: { chapterId?: string } }[]
+		fixtureMode?: string
+	}
+}
+
 const require = createRequire(
 	new URL('../../apps/desktop/package.json', import.meta.url),
 )
@@ -335,13 +342,15 @@ test.describe('contract-render', () => {
 				else if (command === 'editor.rewriteScene') result={workId,chapterId:'ch1',sceneId:input.sceneId,expectedRevision:input.expectedRevision,proposalId:'rewrite1',hunks:[{id:'h1',afterLineId:null,before:[': 第一句。 #0001'],after:[': 重写第一句。 #0001']},{id:'h2',afterLineId:'0001',before:[': 第二句。 #0002'],after:[': 重写第二句。 #0002']}]};
 				else if (command === 'editor.applyRewrite') { chapter=structuredClone(chapter); for(const h of input.hunkIds) chapter.scenes[0].nvs=chapter.scenes[0].nvs.replace(h==='h1'?'第一句。':'第二句。',h==='h1'?'重写第一句。':'重写第二句。'); chapter.revision='r'+(++revision); result=chapter; }
 				else if (command === 'editor.snapshot') result={chapter,settings:defaultWorkSettings(),settingsRevision:'s1',undoLines:history.map(()=>'aaaabbbb:0001')};
+				else if (command === 'library.list') result={works:[{workId,title:'固定作品',published:1,chapters:1}],unreadableCount:0};
+				else if (command === 'production.playerStatus') result={chapters:window.fixtureMode==='nochapters'?[]:[{chapterId:'ch1',title:'固定编辑章',published:true,progress:'已发布'}]};
 				else throw Error('unhandled fixture command '+command);
 				if (!compile(commands[command].output).check(result)) throw Error('fixture output schema: '+command);
 				return result;
 			}); return {promise,cancel(){}};
 		},resourceUrl:path=>path};
 		const root=document.createElement('div');root.id='root';document.body.append(root);
-		createRoot(root).render(React.createElement(ScrollArea,{style:{height:'100%'}},React.createElement(MemoryRouter,{initialEntries:['/work/'+workId+'/edit?chapterId=ch1']},React.createElement(Routes,null,React.createElement(Route,{path:'/work/:id/edit',element:React.createElement(EditorPage)})))));
+		createRoot(root).render(React.createElement(ScrollArea,{style:{height:'100%'}},React.createElement(MemoryRouter,{initialEntries:['/work/'+workId+'/edit'+(window.fixtureMode==='firstchapter'||window.fixtureMode==='nochapters'?'':'?chapterId=ch1')]},React.createElement(Routes,null,React.createElement(Route,{path:'/work/:id/edit',element:React.createElement(EditorPage)})))));
 	`
 							: undefined,
 				},
@@ -380,6 +389,8 @@ test.describe('contract-render', () => {
 		'leading',
 		'effects',
 		'long',
+		'firstchapter',
+		'nochapters',
 	]) {
 		test(`M2 editor contract fixture ${mode}`, async () => {
 			const profile = await mkdtemp(
@@ -406,6 +417,35 @@ test.describe('contract-render', () => {
 				)
 				await page.addStyleTag({ content: fixtureCss })
 				await page.addScriptTag({ content: fixtureJs })
+				if (mode === 'firstchapter') {
+					// 无 chapterId 参数：清单返回后自动落到第一章，编辑器照常打开
+					await expect(
+						page.getByRole('heading', { name: '编辑器', exact: true }),
+					).toBeVisible()
+					await expect(
+						page
+							.locator('.editor-sentence-trigger')
+							.filter({ hasText: '第一句。' }),
+					).toBeVisible()
+					const openCalls = await page.evaluate(() =>
+						window.fixtureCalls.filter((c) => c.command === 'editor.open'),
+					)
+					expect(openCalls).toHaveLength(1)
+					expect(openCalls[0].input.chapterId).toBe('ch1')
+					// URL 里不得回显章节 id 之外的内部 id，也不得出现 ch0001
+					await expect(page.locator('body')).not.toContainText('ch0001')
+					return
+				}
+				if (mode === 'nochapters') {
+					// 作品没有章节且未深层链接：展示共享空状态，不打开编辑器
+					await expect(page.getByText('这部作品还没有章节')).toBeVisible()
+					const openCalls = await page.evaluate(() =>
+						window.fixtureCalls.filter((c) => c.command === 'editor.open'),
+					)
+					expect(openCalls).toHaveLength(0)
+					await expect(page.locator('body')).not.toContainText('ch0001')
+					return
+				}
 				if (mode === 'empty') {
 					await expect(page.getByText('本章还没有剧本')).toBeVisible()
 					await expect(
