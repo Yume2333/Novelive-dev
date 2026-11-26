@@ -1,6 +1,7 @@
 # UI Prototype Fidelity
 
-**Status:** in progress
+**Status:** done
+**Accepted:** 2026-11-25 by agent (omp-vibe-windows)
 **Priority:** high
 **Integration branch:** ui-prototype-fidelity/integration
 

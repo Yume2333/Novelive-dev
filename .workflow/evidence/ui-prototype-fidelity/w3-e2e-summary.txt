@@ -1,0 +1,60 @@
+W3 — full offline Electron E2E, gate round 3 (effort ui-prototype-fidelity, task 08)
+===================================================================================
+
+HEAD: 2329b89f4bca58bbc2ccbf0e2ee5c870d72bdd0e (contains ui-prototype-fidelity/integration;
+working tree additionally carries round-2 gate test migrations in tests/e2e/m3-controls.spec.ts,
+m3-gate.spec.ts, m4-usage.spec.ts, support/m5-locales-surface.ts and untracked helper
+tests/e2e/support/toggle.ts — selector migrations only, no weakened assertions)
+
+Command:
+  export PATH="$HOME/.local/share/pnpm/bin:$PATH"
+  HOME=/tmp/uip-win-08-e2e XDG_CONFIG_HOME=/tmp/uip-win-08-e2e/.config \
+  XDG_DATA_HOME=/tmp/uip-win-08-e2e/.local/share xvfb-run -a env NL_REPLAY=strict \
+    npx playwright test --workers=3
+Build: reused the step-2 build (apps/desktop/out, renderer built 03:36); NOT rebuilt.
+
+Result: 85 tests, 3 workers, 3.9 min
+  80 passed / 2 failed / 3 skipped
+
+Skipped (all environment-gated, same as round 2):
+  - m4-tray.spec.ts x2  (test.skip: requires isolated Linux desktop/session bus / Dunst)
+  - m5-packaged.spec.ts x1 (test.skip: requires NL_M5_EXECUTABLE packaged binary)
+
+Failure 1 — m1b-production-contract.spec.ts:14 (assertion at line 82)
+  Classification: (c) PRE-EXISTING on main — environment/pixi issue, not attributable.
+  Evidence:
+    * Deterministic in this tree: 3/3 isolated reruns (--workers=1) fail identically.
+      at(5,5) = [32,48,96] passes (background dusk.png IS rendered); at(480,270) returns
+      [32,48,96] (background) instead of [224,96,48] (traveler/coat/calm texture #e06030):
+      the pixi canvas appears but the character sprite texture is never sampled —
+      consistent with swiftshader/ANGLE WebGL texture upload limitations under xvfb.
+    * Re-confirmed on pristine main: /home/shizuku/Project/Novelive @ 3a8ba3b (clean tree,
+      its own node_modules + existing build) fails the SAME spec at the SAME line with the
+      SAME received array ([32,48,96] vs expected [224,96,48]). Spec file is byte-identical
+      between main and this tree (diff empty). Round 2 reported the identical signature.
+    * No round-1/round-2 ui-prototype-fidelity change touches pixi stage texture upload;
+      packages/player, packages/ui stage code paths involved here predate the effort.
+
+Failure 2 — m4-single-instance.spec.ts:12 (assertion at line 55)
+  Classification: (c) PRE-EXISTING on main — xvfb window-focus environment limitation.
+  Evidence:
+    * Deterministic in this tree: 3/3 isolated reruns fail identically —
+      window becomes visible:true after the duplicate instance exits, but focused never
+      becomes true (5s poll timeout). Spec file byte-identical to main (diff empty).
+    * Re-confirmed on pristine main 3a8ba3b: same failure, same line, same received object
+      {visible:true, focused:false, minimized:false}; reproduced twice on main.
+    * Root cause is environmental: xvfb-run provides an X server with no window manager,
+      so X11 input-focus semantics for a previously-hidden window are not reliable.
+      The single-instance handoff itself works (visible:true, exactly 1 window, duplicate
+      exits 0, independent-profile checks pass); only isFocused() cannot be satisfied
+      without a WM. Not attributable to ui-prototype-fidelity: no effort commit touches
+      apps/desktop single-instance or focus logic.
+
+Notes:
+  - m3-stage.spec.ts (round-2 flake) passed in this run; no flakes observed anywhere else.
+  - All round-2 DOM rework migrations hold: queue drawer (2a-2g), editor banner stack (5a),
+    player gradient/inline chevron (7a/7b), agent tool titles/rename pencil/send icon (7c-7e)
+    pass their specs — m4-production-queue, m4-gate, m1b-gate, m2-chat, m2-editor, m3-controls,
+    m3-text, m3-stage, m5-share, m5-share-ui, prototype-parity, m0-ui-shell all green.
+  - Gate net change vs round 2: same totals (80/2/3), same two failure signatures,
+    both re-verified as pre-existing on main rather than merely asserted.

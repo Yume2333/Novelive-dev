@@ -1,0 +1,661 @@
+======================================================================
+CONTROL AUDIT — ui-prototype-fidelity gate 08 (W1)
+repo: /home/shizuku/Project/Novelive-worktrees/uip-08
+HEAD: ea4b05c8d6850cad5413e117e03e91a2d8396a5a
+date: 2026-11-26T01:11:23Z
+======================================================================
+
+## A. Component kit export check — packages/ui/src/components/index.ts
+----------------------------------------------------------------------
+-- index.ts verbatim:
+export { Button, type ButtonVariant, IconButton, Spinner } from './Button'
+export {
+	attentionMeta,
+	Card,
+	type ChapterStatus,
+	ChapterStatusMark,
+	Chip,
+	ProgressBar,
+	SectionLabel,
+	type StatusMetaItem,
+	StatusPill,
+	statusMeta,
+} from './Card'
+export { Collapse } from './Collapse'
+export { Dropdown, type DropdownItem } from './Dropdown'
+export {
+	Banner,
+	Checkbox,
+	ConfirmDialog,
+	Drawer,
+	Pagination,
+	RadioGroup,
+	SearchInput,
+	Skeleton,
+	Slider,
+	Stepper,
+	Tooltip,
+} from './Extended'
+export {
+	CompactSelect,
+	Field,
+	inputStyle,
+	Select,
+	Textarea,
+	TextInput,
+	TierPicker,
+	Toggle,
+	textareaStyle,
+} from './Form'
+export {
+	type CoverMotif,
+	coverGradient,
+	coverPalette,
+	GradientCover,
+} from './GradientCover'
+export { InfoTooltip } from './InfoTooltip'
+export { Modal } from './Modal'
+export { usePresence } from './Motion'
+export { EmptyState, Page, PageAction } from './Page'
+export { OverlayScrollbar, ScrollArea } from './ScrollArea'
+export { ShareDialog } from './ShareDialog'
+export { Tabs, tabPanel } from './Tabs'
+export { type ToastFn, ToastProvider, useToast } from './Toast'
+
+-- re-export specifiers found in index.ts:
+./Button
+./Card
+./Collapse
+./Dropdown
+./Extended
+./Form
+./GradientCover
+./InfoTooltip
+./Modal
+./Motion
+./Page
+./ScrollArea
+./ShareDialog
+./Tabs
+./Toast
+
+-- per-name export verdict (searched in index.ts + all re-exported sources):
+PRESENT  Button
+PRESENT  IconButton
+PRESENT  Spinner
+PRESENT  Card
+PRESENT  StatusPill
+PRESENT  ChapterStatusMark
+PRESENT  ProgressBar
+PRESENT  SectionLabel
+PRESENT  Field
+PRESENT  TextInput
+PRESENT  Textarea
+PRESENT  Select
+PRESENT  CompactSelect
+PRESENT  TierPicker
+PRESENT  Toggle
+PRESENT  Tabs
+PRESENT  Banner
+PRESENT  Chip
+PRESENT  Tooltip
+PRESENT  InfoTooltip
+PRESENT  Checkbox
+PRESENT  RadioGroup
+PRESENT  Slider
+PRESENT  SearchInput
+PRESENT  Skeleton
+PRESENT  Stepper
+PRESENT  Drawer
+PRESENT  ConfirmDialog
+PRESENT  Pagination
+PRESENT  Modal
+PRESENT  Dropdown
+PRESENT  ToastProvider
+PRESENT  useToast
+PRESENT  usePresence
+PRESENT  Collapse
+PRESENT  GradientCover
+PRESENT  ScrollArea
+PRESENT  OverlayScrollbar
+PRESENT  Page
+PRESENT  EmptyState
+
+MISSING count: 0
+
+## B1. Native elements & attributes in pages/shell/panels
+----------------------------------------------------------------------
+### native <dialog element — pattern: <dialog
+hits: 0
+(no hits)
+
+### native <details element — pattern: <details
+hits: 0
+(no hits)
+
+### native <summary element — pattern: <summary
+hits: 0
+(no hits)
+
+### native <select element — pattern: <select
+hits: 0
+(no hits)
+
+### native checkbox input — pattern: type="checkbox"
+hits: 0
+(no hits)
+
+### native radio input — pattern: type="radio"
+hits: 0
+(no hits)
+
+### native range input — pattern: type="range"
+hits: 0
+(no hits)
+
+### JSX title attribute (native tooltip) — pattern: [[:space:]]title=
+hits: 67
+packages/ui/src/pages/bible/BibleFields.tsx:651:					title={t('这之前没有事件')}
+packages/ui/src/pages/bible/BibleFields.tsx:725:					title={t('这之前还没有伏笔')}
+packages/ui/src/pages/bible/BibleFields.tsx:850:					title={t('暂无风格设定')}
+packages/ui/src/pages/bible/BibleFields.tsx:971:					title={t('还没有术语')}
+packages/ui/src/pages/bible/BiblePage.tsx:844:			title={t('设定集')}
+packages/ui/src/pages/bible/BiblePage.tsx:1088:				title={t('候选与冲突')}
+packages/ui/src/pages/bible/BiblePage.tsx:1114:				title={preview?.title ?? ''}
+packages/ui/src/pages/confirm/ConfirmFirstPage.tsx:158:			title={
+packages/ui/src/pages/confirm/ConfirmVisualPage.tsx:108:		<Page title={t('角色设定 / 主视觉')}>
+packages/ui/src/pages/confirm/ConfirmVisualPage.tsx:287:			title={
+packages/ui/src/pages/confirm/ConfirmVisualPage.tsx:540:				title={preview?.label ?? ''}
+packages/ui/src/pages/editor/EditorPage.tsx:896:			title={t('编辑器')}
+packages/ui/src/pages/editor/EditorPanels.tsx:190:				title={t('修改历史')}
+packages/ui/src/pages/editor/EditorPanels.tsx:244:							title={t('还没有修改')}
+packages/ui/src/pages/editor/EditorPanels.tsx:252:				title={t('存为规则')}
+packages/ui/src/pages/editor/RewriteModal.tsx:95:			title={t('让 Agent 重写本场景')}
+packages/ui/src/pages/editor/RewriteModal.tsx:250:			title={t('让 Agent 按这段原文修改')}
+packages/ui/src/pages/editor/SceneImages.tsx:254:				title={
+packages/ui/src/pages/editor/SceneImages.tsx:305:				title={choicesTitle}
+packages/ui/src/pages/import/ImportPage.tsx:332:				title={t('已加入系列')}
+packages/ui/src/pages/import/ImportPage.tsx:400:		<Page eyebrow={t('从原文开始')} title={t('新建工程')} width={760}>
+packages/ui/src/pages/import/ImportPage.tsx:412:							title={t('选择原文文件')}
+packages/ui/src/pages/import/ImportPage.tsx:420:							title={t('参考图（可选）')}
+packages/ui/src/pages/import/ImportPage.tsx:620:		<Page eyebrow={t('从原文开始')} title={t('新建工程')} width={760}>
+packages/ui/src/pages/library/LibraryPage.tsx:456:			title={t('书库')}
+packages/ui/src/pages/library/LibraryPage.tsx:493:						title={t('书库还是空的')}
+packages/ui/src/pages/library/LibraryPage.tsx:584:																		title={title}
+packages/ui/src/pages/library/LibraryPage.tsx:627:													title={title}
+packages/ui/src/pages/library/share/ImportPackage.tsx:203:				title={t('导入作品包')}
+packages/ui/src/pages/player/controls/PlayerControls.tsx:839:				title={t('返回作品页？')}
+packages/ui/src/pages/production/ChapterRecords.tsx:179:					title={t('尚未开始制作')}
+packages/ui/src/pages/production/ChapterRecords.tsx:234:			title={t('运行记录 · {{title}}', { title })}
+packages/ui/src/pages/production/ProductionPage.tsx:304:			title={snapshot.title ? `${snapshot.title} · ${t('制作')}` : t('制作')}
+packages/ui/src/pages/production/ProductionPage.tsx:501:				title={
+packages/ui/src/pages/production/ProductionPage.tsx:511:				title={t('立即停止')}
+packages/ui/src/pages/production/StaleAssets.tsx:181:		<Drawer open={open} title={t('过期图片')} onClose={onClose} width={420}>
+packages/ui/src/pages/settings/SettingsPage.tsx:352:			title={title}
+packages/ui/src/pages/settings/SettingsPage.tsx:382:			title={t('图片模型')}
+packages/ui/src/pages/settings/SettingsPage.tsx:406:					title={t(title)}
+packages/ui/src/pages/settings/SettingsPage.tsx:456:		<Page title={t('设置')} width={760}>
+packages/ui/src/pages/settings/SettingsPage.tsx:505:								<SettingRow title={t('界面语言')} icon={Globe}>
+packages/ui/src/pages/settings/SettingsPage.tsx:519:								<SettingRow title={t('主题')} icon={Contrast}>
+packages/ui/src/pages/settings/SettingsPage.tsx:540:								<SettingRow title={t('默认工程位置')} icon={FolderOpen}>
+packages/ui/src/pages/settings/SettingsPage.tsx:626:				title={t('第三方许可')}
+packages/ui/src/pages/settings/production/ProductionSettings.tsx:281:				title={t('删除写手预设')}
+packages/ui/src/pages/settings/production/WriterPresetEditor.tsx:93:			title={
+packages/ui/src/pages/usage/UsagePage.tsx:362:			title={t('用量统计')}
+packages/ui/src/pages/usage/UsagePage.tsx:456:								title={t('暂无用量记录')}
+packages/ui/src/pages/work/WorkPage.tsx:276:				<GradientCover seed={workId} title={snapshot.title} />
+packages/ui/src/pages/work/WorkPage.tsx:406:			title={title}
+packages/ui/src/pages/work/WorkProduction.tsx:185:				<Page title={t('制作提示')}>
+packages/ui/src/pages/work/WorkProduction.tsx:202:					<Page title={t('作品')}>
+packages/ui/src/pages/work/WorkSettings.tsx:346:		<Drawer open={open} title={t('作品设置')} onClose={onClose} width={520}>
+packages/ui/src/pages/work/share/ExportPackage.tsx:127:					title={t('导出作品包')}
+packages/ui/src/shell/AppShell.tsx:578:											title={t(name)}
+packages/ui/src/shell/GlobalProductionQueue.tsx:244:					<span className={styles.badge} title={t('待确认')}>
+packages/ui/src/shell/GlobalProductionQueue.tsx:251:				title={t('制作队列')}
+packages/ui/src/shell/GlobalProductionQueue.tsx:311:				title={t('停止制作')}
+packages/ui/src/panels/agent/AgentPanel.tsx:148:											title={t('重命名 {{title}}', { title: session.title })}
+packages/ui/src/panels/agent/AgentPanel.tsx:157:											title={t('删除 {{title}}', { title: session.title })}
+packages/ui/src/panels/agent/AgentPanel.tsx:555:				title={t('删除会话')}
+packages/ui/src/panels/agent/AgentPanel.tsx:576:				title={preview?.name || t('图片预览')}
+packages/ui/src/panels/agent/Composer.tsx:240:									title={t('不附带')}
+packages/ui/src/panels/agent/Composer.tsx:258:								title={t('查看图片 {{name}}', { name: attachment.name })}
+packages/ui/src/panels/agent/Composer.tsx:274:								title={t('移除 {{name}}', { name: attachment.name })}
+packages/ui/src/panels/agent/MessageView.tsx:871:				title={t(proposalKinds[payload.kind])}
+packages/ui/src/panels/agent/MessageView.tsx:1024:							title={part.attachment.name}
+
+
+## B2. Raw colors in css files (hex/rgb/rgba/hsl) under pages/shell/panels
+----------------------------------------------------------------------
+### hex color literals in .css — pattern: #[0-9a-fA-F]{3,8}\b
+hits: 0
+(no hits)
+
+### rgb()/rgba() in .css — pattern: \brgba?\(
+hits: 0
+(no hits)
+
+### hsl()/hsla() in .css — pattern: \bhsla?\(
+hits: 0
+(no hits)
+
+
+## B3. Raw colors inside inline style props in tsx under pages/shell/panels
+----------------------------------------------------------------------
+### hex color literals in .tsx — pattern: #[0-9a-fA-F]{3,8}\b
+hits: 0
+(no hits)
+
+### rgb()/rgba() in .tsx — pattern: \brgba?\(
+hits: 0
+(no hits)
+
+### hsl()/hsla() in .tsx — pattern: \bhsla?\(
+hits: 0
+(no hits)
+
+
+## B4. Native scrollbars — overflow auto/scroll in css + tsx
+----------------------------------------------------------------------
+### overflow auto/scroll in .css — pattern: overflow(-x|-y)?:[[:space:]]*(auto|scroll)
+hits: 2
+packages/ui/src/pages/bible/BiblePage.module.css:857:	overflow-x: auto;
+packages/ui/src/panels/agent/MessageView.module.css:198:	overflow-x: auto;
+
+### overflowY/overflowX inline in .tsx — pattern: overflow[YX]?:[[:space:]]*["']?(auto|scroll)
+hits: 0
+(no hits)
+
+### overflow shorthand inline in .tsx — pattern: overflow:[[:space:]]*["']?(auto|scroll)
+hits: 0
+(no hits)
+
+
+## C. Kit component usage counts in pages/shell/panels
+----------------------------------------------------------------------
+(files importing each kit symbol from the components barrel)
+kit-usage Modal: 8 file(s)
+    packages/ui/src/pages/confirm/ConfirmVisualPage.tsx
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/editor/RewriteModal.tsx
+    packages/ui/src/pages/editor/SceneImages.tsx
+    packages/ui/src/pages/library/share/ImportPackage.tsx
+    packages/ui/src/pages/settings/SettingsPage.tsx
+    packages/ui/src/pages/settings/production/WriterPresetEditor.tsx
+    packages/ui/src/panels/agent/AgentPanel.tsx
+kit-usage CompactSelect: 7 file(s)
+    packages/ui/src/pages/editor/EditorPage.tsx
+    packages/ui/src/pages/editor/SceneImages.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/settings/ModelFields.tsx
+    packages/ui/src/pages/settings/SettingsPage.tsx
+    packages/ui/src/pages/settings/production/ProductionSettings.tsx
+    packages/ui/src/pages/usage/UsagePage.tsx
+kit-usage Checkbox: 4 file(s)
+    packages/ui/src/pages/editor/RewriteModal.tsx
+    packages/ui/src/pages/settings/ModelFields.tsx
+    packages/ui/src/pages/work/share/ExportPackage.tsx
+    packages/ui/src/panels/agent/MessageView.tsx
+kit-usage Tooltip: 11 file(s)
+    packages/ui/src/pages/bible/CharacterDetail.tsx
+    packages/ui/src/pages/editor/EditorPage.tsx
+    packages/ui/src/pages/editor/EditorStage.tsx
+    packages/ui/src/pages/editor/RichText.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/player/controls/PlayerControls.tsx
+    packages/ui/src/pages/production/ChapterState.tsx
+    packages/ui/src/pages/welcome/WelcomePage.tsx
+    packages/ui/src/pages/work/WorkPage.tsx
+    packages/ui/src/panels/agent/AgentPanel.tsx
+    packages/ui/src/panels/agent/Composer.tsx
+kit-usage InfoTooltip: 5 file(s)
+    packages/ui/src/pages/confirm/ConfirmFirstPage.tsx
+    packages/ui/src/pages/confirm/ConfirmVisualPage.tsx
+    packages/ui/src/pages/import/ImportPage.tsx
+    packages/ui/src/pages/settings/ModelFields.tsx
+    packages/ui/src/pages/usage/UsagePage.tsx
+kit-usage ScrollArea: 7 file(s)
+    packages/ui/src/pages/editor/JumpPoints.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/editor/SourcePanel.tsx
+    packages/ui/src/pages/player/controls/PlayerControls.tsx
+    packages/ui/src/pages/welcome/WelcomePage.tsx
+    packages/ui/src/panels/agent/AgentPanel.tsx
+    packages/ui/src/shell/AppShell.tsx
+kit-usage OverlayScrollbar: 5 file(s)
+    packages/ui/src/pages/editor/ScriptEditor.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/settings/production/WriterPresetEditor.tsx
+    packages/ui/src/panels/agent/Composer.tsx
+    packages/ui/src/panels/agent/MessageView.tsx
+kit-usage Drawer: 5 file(s)
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/production/ChapterRecords.tsx
+    packages/ui/src/pages/production/StaleAssets.tsx
+    packages/ui/src/pages/work/WorkSettings.tsx
+    packages/ui/src/shell/GlobalProductionQueue.tsx
+kit-usage ConfirmDialog: 5 file(s)
+    packages/ui/src/pages/player/controls/PlayerControls.tsx
+    packages/ui/src/pages/settings/production/ProductionSettings.tsx
+    packages/ui/src/panels/agent/AgentPanel.tsx
+    packages/ui/src/panels/agent/MessageView.tsx
+    packages/ui/src/shell/GlobalProductionQueue.tsx
+kit-usage Dropdown: 7 file(s)
+    packages/ui/src/pages/confirm/ConfirmFirstPage.tsx
+    packages/ui/src/pages/confirm/ConfirmVisualPage.tsx
+    packages/ui/src/pages/editor/EditorPage.tsx
+    packages/ui/src/pages/editor/SceneImages.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/work/WorkPage.tsx
+    packages/ui/src/shell/AppShell.tsx
+kit-usage Toggle: 2 file(s)
+    packages/ui/src/pages/import/ImportPage.tsx
+    packages/ui/src/pages/player/controls/PlayerControls.tsx
+kit-usage RadioGroup: 3 file(s)
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/welcome/WelcomePage.tsx
+    packages/ui/src/pages/work/share/ExportPackage.tsx
+kit-usage Slider: 1 file(s)
+    packages/ui/src/pages/player/controls/PlayerControls.tsx
+kit-usage Tabs: 1 file(s)
+    packages/ui/src/pages/library/LibraryPage.tsx
+kit-usage Banner: 7 file(s)
+    packages/ui/src/pages/editor/EditorPage.tsx
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/library/share/ImportPackage.tsx
+    packages/ui/src/pages/production/ProductionNotice.tsx
+    packages/ui/src/pages/welcome/WelcomePage.tsx
+    packages/ui/src/pages/work/share/ExportPackage.tsx
+    packages/ui/src/shell/GlobalProductionQueue.tsx
+kit-usage Chip: 10 file(s)
+    packages/ui/src/pages/bible/CharacterDetail.tsx
+    packages/ui/src/pages/editor/EditorPage.tsx
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/editor/RewriteModal.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/library/LibraryPage.tsx
+    packages/ui/src/pages/player/controls/PlayerControls.tsx
+    packages/ui/src/pages/work/WorkSettings.tsx
+    packages/ui/src/panels/agent/Composer.tsx
+    packages/ui/src/panels/agent/MessageView.tsx
+kit-usage SearchInput: 0 file(s)
+kit-usage Skeleton: 1 file(s)
+    packages/ui/src/pages/editor/RewriteModal.tsx
+kit-usage Stepper: 0 file(s)
+kit-usage Pagination: 1 file(s)
+    packages/ui/src/pages/work/WorkPage.tsx
+kit-usage Select: 2 file(s)
+    packages/ui/src/pages/import/ImportPage.tsx
+    packages/ui/src/pages/welcome/WelcomeModels.tsx
+kit-usage TierPicker: 0 file(s)
+kit-usage TextInput: 8 file(s)
+    packages/ui/src/pages/editor/RewriteModal.tsx
+    packages/ui/src/pages/editor/SceneImages.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/import/ImportPage.tsx
+    packages/ui/src/pages/settings/ModelFields.tsx
+    packages/ui/src/pages/settings/production/WriterPresetEditor.tsx
+    packages/ui/src/pages/welcome/WelcomeModels.tsx
+    packages/ui/src/pages/work/WorkSettings.tsx
+kit-usage Textarea: 1 file(s)
+    packages/ui/src/pages/editor/EditorPanels.tsx
+kit-usage Field: 7 file(s)
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/editor/SceneImages.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/import/ImportPage.tsx
+    packages/ui/src/pages/settings/ModelFields.tsx
+    packages/ui/src/pages/settings/production/WriterPresetEditor.tsx
+    packages/ui/src/pages/welcome/WelcomeModels.tsx
+kit-usage Button: 23 file(s)
+    packages/ui/src/pages/bible/CharacterDetail.tsx
+    packages/ui/src/pages/confirm/ConfirmFirstPage.tsx
+    packages/ui/src/pages/confirm/ConfirmVisualPage.tsx
+    packages/ui/src/pages/editor/EditorPage.tsx
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/editor/RewriteModal.tsx
+    packages/ui/src/pages/editor/SceneImages.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/import/ImportPage.tsx
+    packages/ui/src/pages/library/LibraryPage.tsx
+    packages/ui/src/pages/library/share/ImportPackage.tsx
+    packages/ui/src/pages/player/controls/PlayerControls.tsx
+    packages/ui/src/pages/production/StaleAssets.tsx
+    packages/ui/src/pages/settings/SettingsPage.tsx
+    packages/ui/src/pages/settings/production/ProductionSettings.tsx
+    packages/ui/src/pages/settings/production/WriterPresetEditor.tsx
+    packages/ui/src/pages/welcome/WelcomeModels.tsx
+    packages/ui/src/pages/welcome/WelcomePage.tsx
+    packages/ui/src/pages/work/WorkPage.tsx
+    packages/ui/src/pages/work/WorkSettings.tsx
+    packages/ui/src/pages/work/share/ExportPackage.tsx
+    packages/ui/src/panels/agent/MessageView.tsx
+    packages/ui/src/shell/GlobalProductionQueue.tsx
+kit-usage IconButton: 9 file(s)
+    packages/ui/src/pages/confirm/ConfirmVisualPage.tsx
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/editor/SourcePanel.tsx
+    packages/ui/src/pages/import/ImportPage.tsx
+    packages/ui/src/pages/production/ProductionNotice.tsx
+    packages/ui/src/pages/settings/production/WriterPresetEditor.tsx
+    packages/ui/src/pages/work/WorkSettings.tsx
+    packages/ui/src/panels/agent/AgentPanel.tsx
+kit-usage StatusPill: 0 file(s)
+kit-usage ChapterStatusMark: 1 file(s)
+    packages/ui/src/pages/production/ChapterState.tsx
+kit-usage ProgressBar: 2 file(s)
+    packages/ui/src/pages/library/LibraryPage.tsx
+    packages/ui/src/pages/player/controls/PlayerControls.tsx
+kit-usage SectionLabel: 8 file(s)
+    packages/ui/src/pages/bible/CharacterDetail.tsx
+    packages/ui/src/pages/confirm/ConfirmFirstPage.tsx
+    packages/ui/src/pages/confirm/ConfirmVisualPage.tsx
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/editor/SourcePanel.tsx
+    packages/ui/src/pages/import/ImportPage.tsx
+    packages/ui/src/pages/usage/UsagePage.tsx
+kit-usage Collapse: 6 file(s)
+    packages/ui/src/pages/editor/SentenceList.tsx
+    packages/ui/src/pages/production/ChapterRecords.tsx
+    packages/ui/src/pages/settings/SettingsPage.tsx
+    packages/ui/src/pages/settings/production/ProductionSettings.tsx
+    packages/ui/src/panels/agent/AgentPanel.tsx
+    packages/ui/src/panels/agent/MessageView.tsx
+kit-usage GradientCover: 3 file(s)
+    packages/ui/src/pages/library/LibraryPage.tsx
+    packages/ui/src/pages/work/WorkPage.tsx
+    packages/ui/src/shell/AppShell.tsx
+kit-usage Page: 9 file(s)
+    packages/ui/src/pages/confirm/ConfirmFirstPage.tsx
+    packages/ui/src/pages/confirm/ConfirmVisualPage.tsx
+    packages/ui/src/pages/editor/EditorPage.tsx
+    packages/ui/src/pages/import/ImportPage.tsx
+    packages/ui/src/pages/library/LibraryPage.tsx
+    packages/ui/src/pages/settings/SettingsPage.tsx
+    packages/ui/src/pages/usage/UsagePage.tsx
+    packages/ui/src/pages/work/WorkPage.tsx
+    packages/ui/src/pages/work/WorkProduction.tsx
+kit-usage EmptyState: 6 file(s)
+    packages/ui/src/pages/confirm/ConfirmVisualPage.tsx
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/library/LibraryPage.tsx
+    packages/ui/src/pages/production/ChapterRecords.tsx
+    packages/ui/src/pages/production/StaleAssets.tsx
+    packages/ui/src/pages/usage/UsagePage.tsx
+kit-usage useToast: 12 file(s)
+    packages/ui/src/pages/confirm/ConfirmFirstPage.tsx
+    packages/ui/src/pages/confirm/ConfirmVisualPage.tsx
+    packages/ui/src/pages/editor/EditorPage.tsx
+    packages/ui/src/pages/editor/EditorPanels.tsx
+    packages/ui/src/pages/editor/SceneImages.tsx
+    packages/ui/src/pages/library/share/ImportPackage.tsx
+    packages/ui/src/pages/production/StaleAssets.tsx
+    packages/ui/src/pages/settings/SettingsPage.tsx
+    packages/ui/src/pages/settings/production/ProductionSettings.tsx
+    packages/ui/src/pages/welcome/WelcomePage.tsx
+    packages/ui/src/pages/work/WorkSettings.tsx
+    packages/ui/src/shell/GlobalProductionQueue.tsx
+kit-usage usePresence: 1 file(s)
+    packages/ui/src/shell/AppShell.tsx
+kit-usage ToastProvider: 0 file(s)
+
+======================================================================
+END OF AUTOMATED AUDIT
+======================================================================
+
+## Classification
+
+(re-validated 2026-11-26 against merged HEAD ea4b05c8d6850cad5413e117e03e91a2d8396a5a,
+after ff-merge of ui-prototype-fidelity/integration — round-5 regeneration)
+
+### Delta since first run (pre-merge HEAD 772e8dc → merged HEAD ea4b05c)
+
+Integration's task-07 round-4 rework (agent bubble shrink-wrap, session-row
+icons) shifted line numbers but introduced **zero new audit hits and removed
+none**: hit counts are identical in every section (0 native elements, 67
+` title=`, 0 raw colors in css/tsx, 2 overflow-x). Renumbered hits, same code
+verified in context: PlayerControls `返回作品页？` ConfirmDialog 823→839;
+WorkPage Page title 407→406; AgentPanel rename/delete row-actions
+141/150→148/157, delete-session ConfirmDialog 547→555, image-preview Modal
+568→576; MessageView sent-image thumb 1021→1024. Composer hits (240/258/274),
+shell hits (AppShell 578, GlobalProductionQueue 244/251/311) and both
+overflow-x css hits (BiblePage.module.css:857, MessageView.module.css:198)
+are unchanged. The 7-R kit `Tooltip` conversion in PlayerControls
+(`Tooltip text={t('请先将本地工程关联到作品')}` at line 621) survived the
+merge intact — no new native `title` appeared in player controls.
+
+### A. Kit export check — 42/42 PRESENT, 0 MISSING
+No action. (`SearchInput`, `Stepper`, `TierPicker`, `StatusPill`, `ToastProvider`
+are exported but currently unused in pages/shell/panels — a usage observation,
+not a regression; the kit spec does not require every control to have a
+consumer. `ToastProvider` is mounted in `main.tsx:5,44` at the app root,
+outside the audited folders — verified this round.)
+
+### B1. Native elements — `<dialog>/<details>/<summary>/<select>/type=checkbox|radio|range`
+**Zero hits. All clean.**
+
+Found-by-hand dynamic-type inputs the static regex cannot see (re-verified
+post-merge):
+1. `packages/ui/src/pages/confirm/ConfirmVisualPage.tsx:69` —
+   `<input type={multiple ? 'checkbox' : 'radio'}>` inside the candidate
+   thumbnail picker. JUSTIFIED — the input is visually hidden
+   (`.thumbLabel input { position:absolute; width:1px; height:1px; opacity:0 }`
+   in `Confirm.module.css:212-217`) inside a fully custom visual control with
+   label-wrapping, focus-visible ring via `:has(input:focus-visible)` and
+   disabled-state styling — the standard accessible visually-hidden-input
+   pattern, same class as the brief's hidden `<input type="file">` example.
+   Surface: pages/confirm.
+2. `packages/ui/src/pages/usage/UsagePage.tsx:429` and `:438` —
+   `<input type={granularity === 'month' ? 'month' : 'date'}>` range pickers.
+   JUSTIFIED — date/month pickers have no kit equivalent (`TextInput` supports
+   `type: 'date'` but NOT `'month'`, so the shared control cannot express this
+   widget); both inputs already wear the kit `nl-input` glass styling class and
+   proper `aria-label`s. Surface: pages/usage.
+3. `packages/ui/src/panels/agent/Composer.tsx:283-286` — hidden
+   `<input type="file" hidden>` attachment picker. JUSTIFIED per the brief's own
+   example. Surface: panels/agent.
+4. `packages/ui/src/panels/agent/AgentPanel.tsx:63` — inline session-rename
+   `<input className="nl-input ...">` (text). OBSERVATION, not a regression per
+   the audit's native-control list (text inputs are not in the audit set; the
+   input carries the kit `nl-input` class so it is visually the kit input).
+   Surface: panels/agent.
+
+### B1-cont. JSX ` title=` attributes — 67 hits, classified individually
+
+**59 hits — component-props, JUSTIFIED (never reach the DOM as an attribute):**
+the `title` is a declared prop of a kit or local composite component and renders
+as visible text content (`<h1>/<h2>/<strong>` heading), never as a native
+tooltip attribute. Verified per component:
+- `Page title` → `<h1 class="display">` content (Page.tsx:37)
+- `Modal/Drawer/ConfirmDialog title` → `<h2 class="headline">` content
+  (Modal.tsx:68, Extended.tsx:461/502-via-Modal)
+- `EmptyState title` → `<h2 class="headline">` content (Page.tsx:67)
+- `DropZone title` → `<strong>` content (ImportPage.tsx:176)
+- `WorkCard title` → `<strong class="headline">` content (LibraryPage.tsx:219)
+- `GradientCover title` → cover `<div>` text (GradientCover.tsx:84)
+- `ModelCard title` → `<strong>` + `aria-label` (SettingsPage.tsx:221-236)
+- `SettingRow title` → `<strong>` content (SettingsPage.tsx:427)
+- `ChapterRecords title` prop → forwarded into Drawer heading text
+- `ShareDialog title` → dialog heading (work/share/ExportPackage.tsx:127)
+Applies to: BibleFields 651/725/850/971; BiblePage 844/1088/1114;
+ConfirmFirstPage 158; ConfirmVisualPage 108/287/540; EditorPage 896;
+EditorPanels 190/244/252; RewriteModal 95/250; SceneImages 254/305;
+ImportPage 332/400/412/420/620; LibraryPage 456/493/584/627;
+ImportPackage 203; PlayerControls 839 (renumbered); ChapterRecords 179/234;
+ProductionPage 304/501/511; StaleAssets 181; SettingsPage 352/382/406/456/505/
+519/540/626; ProductionSettings 281; WriterPresetEditor 93; UsagePage 362/456;
+WorkPage 276/406 (renumbered); WorkProduction 185/202; WorkSettings 346;
+ExportPackage 127; GlobalProductionQueue 251/311; AgentPanel 555/576
+(renumbered); MessageView 871.
+
+**8 hits — `title` on raw DOM elements (button/span): all JUSTIFIED as
+PROTOTYPE PARITY.** Each one duplicates the element's `aria-label` and mirrors
+the prototype, which carries a native `title` on the same element (verified in
+`prototype/src/` and re-verified post-merge — integration did not touch these
+elements):
+
+| production hit | surface | prototype counterpart |
+|---|---|---|
+| shell/AppShell.tsx:578 theme-switch `<button title={t(name)}>` | shell | `prototype/src/shell/AppShell.tsx:310` ThemeSwitch `title={o.title}` (identical aria-label+title pairing) |
+| shell/GlobalProductionQueue.tsx:244 queue badge `<span title={t('待确认')}>` | shell | `prototype/src/shell/AppShell.tsx:197` `<span title="等你确认">` same badge |
+| panels/agent/AgentPanel.tsx:148 rename `<button title=重命名…>` (renumbered from 141) | panels/agent | `prototype/src/pages/chat/ChatPanel.tsx:811` row-actions `title="改名"` |
+| panels/agent/AgentPanel.tsx:157 delete `<button title=删除…>` (renumbered from 150) | panels/agent | `prototype/src/pages/chat/ChatPanel.tsx:818` row-actions `title="删除会话"` |
+| panels/agent/Composer.tsx:240 detach `<button title=不附带>` | panels/agent | `prototype/src/pages/chat/ChatPanel.tsx:629` `title="不附带"` (same context chip) |
+| panels/agent/Composer.tsx:258 pending-thumb `<button title=查看图片…>` | panels/agent | `prototype/src/pages/chat/ChatPanel.tsx:645` `title={点击放大 · name}` |
+| panels/agent/Composer.tsx:274 remove-thumb `<button title=移除…>` | panels/agent | `prototype/src/pages/chat/ChatPanel.tsx:659` `title="移除"` |
+| panels/agent/MessageView.tsx:1024 sent-image `<button title={part.attachment.name}>` (renumbered from 1021) | panels/agent | `prototype/src/pages/chat/MessageView.tsx:366,458` `title={p.name}` |
+
+Supporting evidence: the round-4 audit (`audit.md` item 2-R) already closed
+the shell cases as "correct parity — the prototype itself carries native
+titles on those exact elements … Round-3 audit item F1 was therefore a false
+positive". The single place where a native title was removed (PlayerControls
+7-R) was different in kind: there the tooltip was the *only* accessible hint
+on a disabled control and the spec called for the styled kit Tooltip; the
+prototype has no such element. Since gate 08 is prototype-fidelity, converging
+away from the prototype here would itself be the regression. VERDICT: no
+regression among the 67 hits.
+
+### B2/B3. Raw colors in css/tsx (hex, rgb(), rgba(), hsl()) — zero hits in both
+All clean. Every color in pages/shell/panels resolves through `var(--*)`
+tokens. (The component kit itself — outside the audited folders — likewise
+uses tokens; inline `inputStyle` in `components/Form.tsx` references only
+`var(--white-60)` etc.)
+
+### B4. Native scrollbars — 2 hits, both JUSTIFIED
+1. `packages/ui/src/pages/bible/BiblePage.module.css:857`
+   `.glossaryTableWrap { overflow-x: auto }` — horizontal scroll containment
+   for a wide data `<table>`. JUSTIFIED on two grounds: (a) the kit
+   `ScrollArea` is vertical-only (`overflow: hidden auto` — x locked hidden,
+   custom overlay scrollbar vertical-only), so the kit cannot express
+   horizontal scrolling at all; (b) the wrapper additionally carries the global
+   `.nl-scroll-hidden` utility (`BibleFields.tsx:981`, `base.css:41-49` →
+   `scrollbar-width:none` + webkit `display:none`), so no native scrollbar is
+   ever painted. Surface: pages/bible.
+2. `packages/ui/src/panels/agent/MessageView.module.css:198`
+   `.code { overflow-x: auto; …; scrollbar-width: none }` — horizontal
+   containment inside a `<pre>` code block (with `pre-wrap`+`overflow-wrap:
+   anywhere` so it rarely even overflows); the native scrollbar is explicitly
+   suppressed by `scrollbar-width: none` in the same rule. JUSTIFIED.
+   Surface: panels/agent.
+
+### C. Kit usage — the kit is genuinely adopted
+23 files import `Button`; 12 `useToast`; 11 `Tooltip`; 10 `Chip`; 9
+`IconButton`/`Page`; 8 `Modal`/`TextInput`/`SectionLabel`; 7 `CompactSelect`/
+`ScrollArea`/`Dropdown`/`Banner`/`Field`; 6 `EmptyState`/`Collapse`; 5
+`InfoTooltip`/`OverlayScrollbar`/`Drawer`/`ConfirmDialog`; plus `Checkbox`(4),
+`RadioGroup`(3), `GradientCover`(3), `Toggle`(2), `Select`(2), `ProgressBar`(2),
+`Pagination`(1), `Slider`(1), `Tabs`(1), `Skeleton`(1), `ChapterStatusMark`(1),
+`Textarea`(1), `usePresence`(1). Unused-in-surface but exported:
+`SearchInput`, `Stepper`, `TierPicker`, `StatusPill`, `ToastProvider` (mounted
+at app root, outside audited folders).
+
+### Overall verdict
+**No real regressions found in this audit.** 0 MISSING kit exports; 0 native
+dialog/details/summary/select/checkbox/radio/range controls; 0 raw colors; 0
+native-visible scrollbars; 8 DOM-level `title` attributes all verified as
+deliberate prototype parity (each mapped to its prototype counterpart);
+4 justified input-pattern cases. Two non-regression observations recorded:
+(a) `AgentPanel.tsx:63` rename input uses raw `<input className="nl-input">`
+instead of the `TextInput` component (visual result identical); (b) five kit
+exports currently have no consumer inside pages/shell/panels.

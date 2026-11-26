@@ -1,0 +1,30 @@
+W2 — pnpm check && pnpm build, gate round 4 (effort ui-prototype-fidelity, task 08)
+===================================================================================
+
+HEAD: ui-prototype-fidelity/integration 772e8dc
+Working tree: round-2/3 gate test migrations in tests/e2e/ (uncommitted, reviewed — see W3 report)
+Node: v24.22.3 (via $HOME/.local/share/pnpm/bin), pnpm 12.21.0
+Replay: NL_REPLAY=strict — zero paid API calls
+
+Command: NL_REPLAY=strict pnpm check  (= pnpm typecheck && pnpm lint && pnpm test)
+Started: 2026-11-26T06:25:13+08:00, wall time 170s
+EXIT CODE: 0
+
+  typecheck (tsc --noEmit):        PASS, no errors
+  lint (biome check + stylelint):  PASS — 35 warnings + 2 infos, 0 errors
+                                   (warnings are pre-existing style diagnostics, e.g.
+                                   noNonNullAssertion in packages/creator/src/share/project.ts,
+                                   noDescendingSpecificity in player controls.css; lint exit 0)
+  test (vitest run):               PASS
+    Test Files:  75 passed | 1 skipped (76)
+    Tests:       1142 passed | 3 skipped (1145)
+    Duration:    161.71s
+    The known round-3 flake `tests/integration/m1b-offline-dry-run.test.ts >
+    concurrent-sunburst` PASSED in this run — no rerun needed.
+
+Command: NL_REPLAY=strict pnpm build  (= pnpm --filter @novelive/desktop build)
+EXIT CODE: 0, wall time ~20s
+  Renderer bundle rebuilt (index-*.js 4.56 MB) + main/preload into apps/desktop/out.
+  No errors in log (single grep hit "error" is the chunk filename error-body-*.js).
+
+Verdict: W2 fully green, both exit codes 0.
