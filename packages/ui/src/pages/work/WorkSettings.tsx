@@ -1,11 +1,14 @@
 import type { CommandOutput } from '@novelive/creator/contract'
 import type { WorkSettings } from '@novelive/format/model'
-import { Check, CircleAlert, Plus, X } from 'lucide-react'
+import { effectiveMarkCss } from '@novelive/player'
+import { Check, CircleAlert, ListPlus, Plus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Button, IconButton } from '../../components/Button'
+import { IconButton } from '../../components/Button'
 import { Chip } from '../../components/Card'
 import { Drawer } from '../../components/Extended'
+import { Details, ErrorNotice, LoadingState } from '../../components/Feedback'
 import { TextInput } from '../../components/Form'
+import { EmptyState } from '../../components/Page'
 import { useToast } from '../../components/Toast'
 import { msg, scoped } from '../../i18n'
 import local from './WorkPage.module.css'
@@ -51,6 +54,42 @@ function SettingRow({
 	)
 }
 
+function MarkEntry({
+	name,
+	mark,
+}: {
+	name: string
+	mark: { css: string; perChar?: boolean }
+}) {
+	const sampleRef = useRef<HTMLSpanElement>(null)
+	const sampleCss = effectiveMarkCss(name, mark.css)
+	useEffect(() => {
+		if (sampleRef.current) sampleRef.current.style.cssText = sampleCss
+	}, [sampleCss])
+	return (
+		<div className={local.mark}>
+			<div className={local.markHead}>
+				<span className={local.markName}>{name}</span>
+				{mark.perChar ? <Chip>{t('逐字')}</Chip> : null}
+			</div>
+			{mark.css ? (
+				<>
+					<p className={local.markSample}>
+						{sampleCss ? (
+							<span ref={sampleRef}>{t('示例文字')}</span>
+						) : (
+							<span className={local.settingValue}>{t('无可渲染样式')}</span>
+						)}
+					</p>
+					<Details>
+						<pre className={local.markCssDetail}>{mark.css}</pre>
+					</Details>
+				</>
+			) : null}
+		</div>
+	)
+}
+
 function SettingsPanels({
 	settings,
 	presetName,
@@ -85,7 +124,7 @@ function SettingsPanels({
 				)}
 				<SettingRow label={t('写手预设')}>
 					<span className={local.settingValue}>
-						{presetName ?? settings.writerPresetId ?? t('默认预设')}
+						{presetName ?? t('默认预设')}
 					</span>
 				</SettingRow>
 				<SettingRow label={t('忠实度检查')}>
@@ -140,13 +179,7 @@ function SettingsPanels({
 						</span>
 					</SettingRow>
 					{marks.map(([name, mark]) => (
-						<div className={local.mark} key={name}>
-							<div className={local.markHead}>
-								<span className={local.markName}>{name}</span>
-								{mark.perChar ? <Chip>{t('逐字')}</Chip> : null}
-							</div>
-							{mark.css ? <p className={local.markCss}>{mark.css}</p> : null}
-						</div>
+						<MarkEntry key={name} name={name} mark={mark} />
 					))}
 				</div>
 			</div>
@@ -258,7 +291,7 @@ function RulesPanel({ workId, loaded }: { workId: string; loaded: Snapshot }) {
 					</div>
 				))}
 				{rules.length === 0 && (
-					<p className={local.emptyNote}>{t('暂无规则')}</p>
+					<EmptyState icon={ListPlus} text={t('暂无规则')} />
 				)}
 				<div className={local.ruleForm}>
 					<TextInput
@@ -345,20 +378,15 @@ export function WorkSettingsDrawer({
 	return (
 		<Drawer open={open} title={t('作品设置')} onClose={onClose} width={520}>
 			{!chapterId ? (
-				<p className={local.emptyNote}>{t('暂无章节，无法读取作品设置。')}</p>
+				<EmptyState icon={ListPlus} text={t('暂无章节，无法读取作品设置。')} />
 			) : error ? (
-				<div>
-					<p className={local.emptyNote} role="alert">
-						{error}
-					</p>
-					<Button size="sm" onClick={() => setReload((n) => n + 1)}>
-						{t('重新读取')}
-					</Button>
-				</div>
+				<ErrorNotice
+					message={error}
+					onRetry={() => setReload((n) => n + 1)}
+					retryLabel={t('重新读取')}
+				/>
 			) : !loaded ? (
-				<p className={local.emptyNote} role="status">
-					{t('正在读取作品设置…')}
-				</p>
+				<LoadingState text={t('正在读取作品设置…')} />
 			) : (
 				<>
 					<SettingsPanels settings={loaded.settings} presetName={presetName} />

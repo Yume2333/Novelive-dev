@@ -6,7 +6,9 @@ import type {
 import { useState } from 'react'
 import { Button } from '../../../components/Button'
 import { Banner, Checkbox, RadioGroup } from '../../../components/Extended'
+import { ErrorNotice } from '../../../components/Feedback'
 import { ShareDialog } from '../../../components/ShareDialog'
+import { type HumanizedError, humanizeError } from '../../../format/errors'
 import { msg, scoped } from '../../../i18n'
 import local from '../WorkPage.module.css'
 
@@ -57,7 +59,7 @@ export function ExportPackage({
 	const [includeSource, setIncludeSource] = useState(false)
 	const [warnings, setWarnings] = useState<Warnings>()
 	const [busy, setBusy] = useState(false)
-	const [error, setError] = useState('')
+	const [error, setError] = useState<HumanizedError>()
 	const [versions, setVersions] = useState<number[]>()
 	const scope: Scope =
 		level === 'series'
@@ -74,12 +76,12 @@ export function ExportPackage({
 
 	function resetReview() {
 		setWarnings(undefined)
-		setError('')
+		setError(undefined)
 	}
 
 	async function advance() {
 		setBusy(true)
-		setError('')
+		setError(undefined)
 		try {
 			if (!warnings) {
 				const response = await api.call({
@@ -87,7 +89,7 @@ export function ExportPackage({
 					...selection,
 				})
 				if (response.ok) setWarnings(response.result.warnings)
-				else setError(response.error.message)
+				else setError(humanizeError(response.error))
 			} else {
 				const destination = await pickDestination()
 				if (!destination) return
@@ -98,10 +100,16 @@ export function ExportPackage({
 				})
 				if (response.ok)
 					setVersions(response.result.works.map((work) => work.version))
-				else setError(response.error.message)
+				else setError(humanizeError(response.error))
 			}
-		} catch {
-			setError(t('无法导出作品包，请重试。'))
+		} catch (failure) {
+			const error = humanizeError(failure)
+			// 未识别的异常退回导出语境的通用句，原始细节仍留在「详细信息」。
+			setError(
+				error.message === humanizeError(undefined).message
+					? { ...error, message: t('无法导出作品包，请重试。') }
+					: error,
+			)
 		} finally {
 			setBusy(false)
 		}
@@ -214,7 +222,7 @@ export function ExportPackage({
 					{busy && (
 						<p role="status">{warnings ? t('正在导出…') : t('正在检查…')}</p>
 					)}
-					{error && <p role="alert">{error}</p>}
+					{error && <ErrorNotice error={error} />}
 				</ShareDialog>
 			)}
 		</>

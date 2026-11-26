@@ -95,7 +95,7 @@ export function startVolume(layout: ImportLayout, index: number): ImportLayout {
 	const volumes = [
 		...layout.volumes,
 		{
-			title: t('第{{value}}卷', { value: layout.volumes.length + 1 }),
+			title: t('第 {{value}} 卷', { value: layout.volumes.length + 1 }),
 			start: index,
 		},
 	].sort((a, b) => a.start - b.start)

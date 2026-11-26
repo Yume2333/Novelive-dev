@@ -1,210 +1,14 @@
-.stack {
-	display: grid;
-	gap: var(--space-7);
-	max-width: 960px;
-	margin-top: var(--space-5);
-}
-
-.stack .stack {
-	gap: var(--space-3);
-	margin-top: 0;
-}
-
-.stack :is(h2, p, ol) {
-	margin-block: 0;
-}
-
-.stack h2 {
-	font: 700 18px var(--font-display);
-}
-
-.lead {
-	color: var(--color-on-surface-variant);
-}
-
-.card {
-	min-width: 0;
-	margin-inline: 0;
-	padding: var(--space-5);
-	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-xl);
-	background: var(--panel-70);
-	box-shadow: var(--shadow-glass);
-}
-
-.card legend {
-	padding-inline: var(--space-2);
-	font-weight: 700;
-}
-
-.actions,
-.row {
+.actions {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--space-2) var(--space-3);
 }
 
-.row {
-	justify-content: space-between;
-	min-height: calc(var(--space-7) + var(--space-1));
-}
-
-.list {
-	padding: 0;
-	list-style: none;
-}
-
-.list > li {
-	padding-block: var(--space-3);
-}
-
-.list > li + li {
-	border-top: 1px solid var(--divider);
-}
-
-.primary,
-.button {
-	display: inline-flex;
-	min-height: 36px;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-2);
-	padding: var(--space-1) var(--space-3);
-	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-md);
-	background: var(--color-surface-container);
-	color: var(--color-on-surface);
-	font: inherit;
-	text-decoration: none;
-	cursor: pointer;
-}
-
-.button:hover {
-	background: var(--color-surface-container-high);
-}
-
-.primary {
-	background: var(--color-primary);
-	color: var(--color-on-primary);
-}
-
-.primary:hover {
-	background: var(--color-primary-container);
-}
-
-:is(.button, .primary):disabled {
-	opacity: 0.5;
-	cursor: default;
-}
-
-.notice {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-2);
-	padding: var(--space-3) var(--space-4);
-	border-radius: var(--radius-md);
-	background: var(--color-secondary-container);
-	color: var(--color-on-secondary-container);
-}
-
-.notice a {
-	color: var(--color-on-surface);
-}
-
-.progress {
-	display: block;
-	width: 100%;
-	accent-color: var(--color-primary);
-}
-
-.badge,
-.issue,
-.published {
-	display: inline-flex;
-	gap: var(--space-1);
-	align-items: center;
-	padding: var(--space-1) var(--space-2);
-	border-radius: var(--radius-sm);
-	background: var(--color-surface-container);
-	color: var(--color-on-surface-variant);
-}
-
-.published {
-	background: var(--color-success-container);
-	color: var(--color-success);
-}
-
-.issue {
-	background: var(--color-error-container);
-	color: var(--color-on-error-container);
-}
-
-.gallery {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: var(--space-3);
-}
-
-.candidate {
-	position: relative;
-	display: grid;
-	align-content: start;
-	padding: var(--space-1);
-	border: 1px solid transparent;
-	border-radius: var(--radius-lg);
-	background: var(--color-surface-container);
-	cursor: pointer;
-}
-
-.candidate[data-selected="true"] {
-	border-color: var(--accent-border-35);
-	background: var(--color-secondary-container);
-}
-
-.candidate:has(input:focus-visible) {
-	box-shadow: var(--shadow-focus);
-}
-
-.candidate:has(input:disabled:not(:checked)) {
-	opacity: 0.55;
-	cursor: default;
-}
-
-.candidate input {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	opacity: 0;
-}
-
-.candidate img {
-	display: block;
-	width: 100%;
-	aspect-ratio: 16 / 9;
-	border-radius: var(--radius-md);
-	background: var(--color-surface-container-high);
-	object-fit: contain;
-}
-
-.portraits .candidate img {
-	aspect-ratio: 2 / 3;
-}
-
-.candidate span {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	padding: var(--space-2);
-}
-
-.sectionLabel,
-.eyebrow {
+.sectionLabel {
 	margin: 0;
 	color: var(--color-on-surface-variant);
-	font-size: 11px;
+	font-size: var(--text-11);
 	font-weight: 600;
 	letter-spacing: 0.12em;
 	text-transform: uppercase;
@@ -246,12 +50,18 @@
 
 .headline {
 	margin: 0;
-	font: 600 20px / 1.3 var(--font-display);
+	font: 600 var(--text-20) / 1.3 var(--font-display);
+}
+
+.secondaryLine {
+	margin: 0;
+	color: var(--color-on-surface-variant);
+	font-size: var(--text-13);
 }
 
 .muted {
 	color: var(--color-on-surface-variant);
-	font-size: 13px;
+	font-size: var(--text-13);
 }
 
 .statusGrid {
@@ -299,7 +109,7 @@
 	flex-shrink: 0;
 	width: 26px;
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 	font-weight: 600;
 	letter-spacing: 0.08em;
 }
@@ -308,18 +118,10 @@
 	min-width: 0;
 	overflow: hidden;
 	color: var(--color-on-surface);
-	font-size: 14px;
+	font-size: var(--text-14);
 	font-weight: 500;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-
-a.name {
-	text-decoration: none;
-}
-
-a.name:hover {
-	color: var(--color-primary);
 }
 
 .spacer {
@@ -340,71 +142,9 @@ a.name:hover {
 	transition: opacity var(--dur-fast) var(--ease-out);
 }
 
-.ghost {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-px-5);
-	min-height: 30px;
-	padding: var(--space-px-5) var(--space-px-10);
-	border: 1px solid transparent;
-	border-radius: var(--radius-md);
-	background: transparent;
-	color: var(--color-on-surface-variant);
-	font: inherit;
-	font-size: 11px;
-	font-weight: 600;
-	letter-spacing: 0.08em;
-	text-decoration: none;
-	white-space: nowrap;
-	cursor: pointer;
-}
-
-.ghost:hover:not(:disabled) {
-	background: var(--white-60);
-	color: var(--color-on-surface);
-}
-
-.ghost:disabled {
-	opacity: 0.5;
-	cursor: default;
-}
-
-.ghost:focus-visible,
-:is(.primary, .button, .danger):focus-visible {
-	outline: none;
-	box-shadow: var(--shadow-focus);
-}
-
-.danger {
-	display: inline-flex;
-	min-height: 36px;
-	align-items: center;
-	gap: var(--space-2);
-	padding: var(--space-1) var(--space-4);
-	border: 1px solid
-		color-mix(in srgb, var(--color-on-error-container) 20%, transparent);
-	border-radius: var(--radius-md);
-	background: var(--color-error-container);
-	color: var(--color-on-error-container);
-	font: inherit;
-	font-size: 13px;
-	font-weight: 600;
-	cursor: pointer;
-}
-
-.danger:hover:not(:disabled) {
-	filter: brightness(0.96);
-}
-
-.danger:disabled {
-	opacity: 0.5;
-	cursor: default;
-}
-
 .headlineStep {
 	color: var(--color-on-surface-variant);
-	font-size: 14px;
+	font-size: var(--text-14);
 	font-weight: 400;
 }
 
@@ -414,14 +154,16 @@ a.name:hover {
 		calc(var(--space-4) + 26px + var(--space-3));
 	overflow-wrap: anywhere;
 }
+
 .steps {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-2);
 	color: var(--color-primary);
-	font-size: 12px;
+	font-size: var(--text-12);
 	white-space: nowrap;
 }
+
 .stepItem {
 	display: inline-flex;
 	align-items: center;
@@ -465,11 +207,11 @@ a.name:hover {
 }
 
 .waitChip {
-	padding: 2px var(--space-2);
+	padding: var(--space-px-2) var(--space-2);
 	border-radius: var(--radius-sm);
 	background: var(--color-surface-container-high);
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 	white-space: nowrap;
 }
 
@@ -478,27 +220,10 @@ a.name:hover {
 	align-items: center;
 	gap: var(--space-1);
 	color: var(--color-primary);
-	font-size: 10px;
+	font-size: var(--text-11);
 	font-weight: 600;
 	letter-spacing: 0.08em;
 	white-space: nowrap;
-}
-
-.staleButton {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-1);
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: var(--color-on-surface-variant);
-	font: inherit;
-	font-size: 11px;
-	cursor: pointer;
-}
-
-.staleButton:hover {
-	color: var(--color-on-surface);
 }
 
 .staleList {
@@ -527,6 +252,15 @@ a.name:hover {
 	overflow: hidden;
 	border: 1px solid var(--divider);
 	border-radius: var(--radius-md);
+	background: linear-gradient(
+		180deg,
+		var(--color-surface-container-high),
+		var(--color-surface-container-highest)
+	);
+}
+
+/* 警示斜纹只在图片真的加载失败时出现（img onError 或素材无法解析） */
+.staleThumb[data-failed="true"] {
 	background:
 		linear-gradient(
 			135deg,
@@ -548,6 +282,7 @@ a.name:hover {
 	height: 100%;
 	object-fit: cover;
 }
+
 .staleMeta {
 	flex: 1;
 	min-width: 0;
@@ -555,7 +290,7 @@ a.name:hover {
 
 .staleName {
 	overflow: hidden;
-	font-size: 14px;
+	font-size: var(--text-14);
 	font-weight: 600;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -564,7 +299,13 @@ a.name:hover {
 .staleKind {
 	margin-top: var(--space-1);
 	color: var(--color-outline);
-	font-size: 12px;
+	font-size: var(--text-12);
+}
+
+.staleUsage {
+	margin-top: var(--space-1);
+	color: var(--color-on-surface-variant);
+	font-size: var(--text-12);
 }
 
 .staleProgress {
@@ -573,7 +314,7 @@ a.name:hover {
 	gap: var(--space-2);
 	margin-top: var(--space-2);
 	color: var(--color-primary);
-	font-size: 12px;
+	font-size: var(--text-12);
 	font-weight: 500;
 }
 
@@ -584,10 +325,26 @@ a.name:hover {
 	margin-top: var(--space-3);
 }
 
-.staleError {
+.staleCascade {
+	flex: 1;
+	min-width: 0;
+	color: var(--color-outline);
+	font-size: var(--text-11);
+	line-height: 1.5;
+}
+
+.staleCandidates {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-1);
 	margin: var(--space-2) 0 0;
-	color: var(--color-on-error-container);
-	font-size: 12px;
+	color: var(--color-on-surface-variant);
+	font-size: var(--text-12);
+}
+
+.staleNotice {
+	margin-top: var(--space-2);
 }
 
 .recordSteps {
@@ -617,14 +374,14 @@ a.name:hover {
 	height: 22px;
 	border-radius: var(--radius-full);
 	color: var(--color-primary);
-	font-size: 11px;
+	font-size: var(--text-11);
 	font-weight: 700;
 }
 
 .recordStepName {
 	color: var(--color-on-surface);
 	font-family: var(--font-display);
-	font-size: 13.5px;
+	font-size: var(--text-13);
 	font-weight: 700;
 	letter-spacing: 0.04em;
 }
@@ -633,7 +390,7 @@ a.name:hover {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-1);
-	font-size: 11px;
+	font-size: var(--text-11);
 }
 
 .recordStatus[data-tone="done"] {
@@ -685,7 +442,7 @@ a.name:hover {
 	flex: 1;
 	min-width: 0;
 	color: var(--color-on-surface);
-	font-size: 12.5px;
+	font-size: var(--text-12);
 	font-weight: 600;
 	line-height: 1.6;
 	overflow-wrap: anywhere;
@@ -694,43 +451,21 @@ a.name:hover {
 .recordTime {
 	flex-shrink: 0;
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 	line-height: 1.8;
-}
-
-.recordDetailToggle {
-	display: inline-flex;
-	flex-shrink: 0;
-	align-items: center;
-	gap: var(--space-1);
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: var(--color-primary);
-	font: inherit;
-	font-size: 11px;
-	font-weight: 600;
-	cursor: pointer;
 }
 
 .recordDetail {
 	padding: 0 var(--space-3) var(--space-px-10);
 }
 
-.recordDetail p {
+.recordDetailText {
 	margin: 0;
-	color: var(--color-on-surface-variant);
-	font-size: 12px;
-	line-height: 1.7;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
 
 .recordNotice {
 	margin: 0 0 var(--space-3);
-	font-size: 13px;
-}
-
-.recordNotice[role="alert"] {
-	color: var(--color-on-error-container);
+	font-size: var(--text-13);
 }

@@ -1,8 +1,16 @@
-import { ArrowDown, ArrowUp, ChevronRight, Play, Square } from 'lucide-react'
+import {
+	ArrowDown,
+	ArrowUp,
+	ChevronRight,
+	ListVideo,
+	Play,
+	Square,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
 	Button,
 	coverGradient,
+	EmptyState,
 	IconButton,
 	SectionLabel,
 } from '../../../components'
@@ -140,7 +148,9 @@ export function ProductionQueuePanel({
 												<span className={styles.title}>{work.title}</span>
 											</Link>
 											<span className={styles.status}>
-												{t('排队中 · {{value}}', { value: index + 1 })}
+												{t('排队中 · {{value}}', {
+													value: index + (queue.active ? 2 : 1),
+												})}
 											</span>
 										</span>
 										<IconButton
@@ -236,7 +246,11 @@ export function ProductionQueuePanel({
 				</section>
 			)}
 			{!queue.active && !queue.queued.length && !queue.inactive.length && (
-				<p className={styles.empty}>{t('暂无制作任务')}</p>
+				<EmptyState
+					icon={ListVideo}
+					title={t('暂无制作任务')}
+					text={t('开始制作一部作品后，它会出现在这里。')}
+				/>
 			)}
 		</section>
 	)
