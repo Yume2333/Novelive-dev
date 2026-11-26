@@ -271,6 +271,7 @@
 
 /* ---- 助手文本气泡 ---- */
 .textBubble {
+	align-self: flex-start;
 	max-width: 92%;
 	padding: var(--space-px-9) 13px;
 	border: 1px solid var(--white-80);
