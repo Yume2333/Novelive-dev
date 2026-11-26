@@ -6,7 +6,10 @@ import {
 } from '@novelive/creator/contract'
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, useOutletContext, useParams } from 'react-router-dom'
+import { ErrorNotice, LoadingState } from '../../components/Feedback'
 import { Page } from '../../components/Page'
+import { formatChapterLabel } from '../../format/chapter'
+import { humanizeError } from '../../format/errors'
 import { scoped } from '../../i18n'
 
 const t = scoped('work')
@@ -17,6 +20,12 @@ type Action =
 	| 'production.stop'
 	| 'production.prioritizeChapter'
 	| 'production.retryChapter'
+
+/** `production.get` 调用句柄：页面只需要 promise 与取消能力。 */
+type ProductionGetHandle = {
+	promise: Promise<ProductionSnapshot>
+	cancel(): void
+}
 
 type WorkProductionContext = {
 	snapshot: ProductionSnapshot
@@ -30,22 +39,22 @@ export function useWorkProduction() {
 	return useOutletContext<WorkProductionContext>()
 }
 
+/** 章节标题：优先后端提供的标题，缺失时退回「第 N 章」序数，绝不显示章节 id。 */
 export const chapterTitle = (snapshot: ProductionSnapshot, chapterId: string) =>
 	snapshot.chapterTitles?.[chapterId] ??
-	t('第 {{value}} 章', {
-		value:
+	formatChapterLabel({
+		index:
 			snapshot.chapters.findIndex(
 				(chapter) => chapter.chapterId === chapterId,
 			) + 1,
 	})
 
-function errorMessage(error: unknown) {
-	return error &&
-		typeof error === 'object' &&
-		'message' in error &&
-		typeof error.message === 'string'
-		? error.message
-		: t('无法读取制作状态，请重试。')
+function humanize(failure: unknown) {
+	const error = humanizeError(failure)
+	// 未识别的输入会退回通用句；在制作状态页换成带着页面语境的文案，detail 保留。
+	if (error.message === humanizeError(undefined).message)
+		return { ...error, message: t('无法读取制作状态，请重试。') }
+	return error
 }
 
 export function WorkProduction() {
@@ -64,7 +73,8 @@ export function WorkProduction() {
 function Projection({ workId, retry }: { workId: string; retry(): void }) {
 	const [snapshot, setSnapshot] = useState<ProductionSnapshot>()
 	const [project, setProject] = useState<WorkProductionContext['project']>()
-	const [error, setError] = useState('')
+	const [failure, setFailure] = useState<unknown>()
+	const [offline, setOffline] = useState<string>()
 	const [busy, setBusy] = useState(false)
 	const eventVersion = useRef(0)
 	const action = useRef(false)
@@ -72,9 +82,7 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 	useEffect(() => {
 		let active = true
 		let loadVersion = 0
-		let pending:
-			| ReturnType<typeof window.novelive.call<'production.get'>>
-			| undefined
+		let pending: ProductionGetHandle | undefined
 		function load() {
 			const current = ++loadVersion
 			const before = eventVersion.current
@@ -88,16 +96,19 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 						before === eventVersion.current
 					) {
 						setSnapshot(next)
-						setError('')
+						setFailure(undefined)
+						setOffline(undefined)
 					}
 				},
-				(failure) => {
+				(error) => {
 					if (
 						active &&
 						current === loadVersion &&
 						before === eventVersion.current
-					)
-						setError(errorMessage(failure))
+					) {
+						setFailure(error)
+						setOffline(undefined)
+					}
 				},
 			)
 		}
@@ -113,7 +124,8 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 					return
 				eventVersion.current++
 				setSnapshot(event.payload)
-				setError('')
+				setFailure(undefined)
+				setOffline(undefined)
 			},
 		)
 		const offReady = window.novelive.on('creator.ready', load)
@@ -121,16 +133,20 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 			loadVersion++
 			eventVersion.current++
 			setSnapshot(undefined)
-			setError(t('创作端已断开，等待重新连接。'))
+			setFailure(undefined)
+			setOffline(t('创作端已断开，等待重新连接。'))
 		})
 		void window.novelive.host.appState().then(
 			(state) => {
 				if (!active || loadVersion !== 0) return
 				if (state.creator === 'ready') load()
-				else if (state.creator !== 'starting') setError(t('创作端未连接。'))
+				else if (state.creator !== 'starting') setOffline(t('创作端未连接。'))
 			},
-			(failure) => {
-				if (active) setError(errorMessage(failure))
+			(error) => {
+				if (active) {
+					setFailure(error)
+					setOffline(undefined)
+				}
 			},
 		)
 		return () => {
@@ -158,7 +174,8 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 		if (action.current) return false
 		action.current = true
 		setBusy(true)
-		setError('')
+		setFailure(undefined)
+		setOffline(undefined)
 		const before = eventVersion.current
 		try {
 			const result = await window.novelive.call<Action>(command, input).promise
@@ -170,8 +187,8 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 						: undefined
 			if (next && eventVersion.current === before) setSnapshot(next)
 			return true
-		} catch (failure) {
-			setError(errorMessage(failure))
+		} catch (error) {
+			setFailure(error)
 			return false
 		} finally {
 			action.current = false
@@ -179,16 +196,21 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 		}
 	}
 
+	const error = offline
+		? { message: offline }
+		: failure !== undefined
+			? humanize(failure)
+			: undefined
+
 	return (
 		<>
 			{error && (
 				<Page title={t('制作提示')}>
-					<p role="alert">{error}</p>
-					{!snapshot && (
-						<button type="button" onClick={retry}>
-							{t('重新读取')}
-						</button>
-					)}
+					<ErrorNotice
+						error={error}
+						onRetry={snapshot ? undefined : retry}
+						retryLabel={snapshot ? undefined : t('重新读取')}
+					/>
 				</Page>
 			)}
 			{snapshot ? (
@@ -200,7 +222,7 @@ function Projection({ workId, retry }: { workId: string; retry(): void }) {
 			) : (
 				!error && (
 					<Page title={t('作品')}>
-						<p role="status">{t('正在读取制作状态…')}</p>
+						<LoadingState text={t('正在读取制作状态…')} />
 					</Page>
 				)
 			)}

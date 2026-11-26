@@ -2,16 +2,23 @@ import type { AssetRegistry } from '@novelive/format/model'
 import { parseScript, type Scene } from '@novelive/format/script'
 import { Check, Ellipsis, Image, NotebookPen, PlayCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Button } from '../../components/Button'
+import { useNavigate } from 'react-router-dom'
+import { Button, buttonClasses } from '../../components/Button'
 import { Card, SectionLabel } from '../../components/Card'
 import { Dropdown } from '../../components/Dropdown'
+import {
+	ButtonLink,
+	ErrorNotice,
+	LoadingState,
+} from '../../components/Feedback'
 import { InfoTooltip } from '../../components/InfoTooltip'
-import { Page } from '../../components/Page'
+import { EmptyState, Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
+import { formatChapterLabel, formatVolumeLabel } from '../../format/chapter'
+import { formatLanguage } from '../../format/language'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
-import { chapterTitle, useWorkProduction } from '../work/WorkProduction'
+import { useWorkProduction } from '../work/WorkProduction'
 import local from './Confirm.module.css'
 
 const t = scoped('confirm')
@@ -83,10 +90,19 @@ type FirstChapter = {
 	workLanguage?: string
 }
 
+/** 第一章读取状态：loading / ready / failed 三段，失败可重试。 */
+type FirstChapterState =
+	| { status: 'loading' }
+	| { status: 'ready'; chapter: FirstChapter }
+	| { status: 'failed' }
+
 function useFirstChapterScenes(workId: string, chapterId?: string) {
-	const [result, setResult] = useState<FirstChapter>()
+	const [state, setState] = useState<FirstChapterState>({ status: 'loading' })
+	const [attempt, setAttempt] = useState(0)
 	useEffect(() => {
+		void attempt
 		if (!chapterId) return
+		setState({ status: 'loading' })
 		const request = window.novelive.call('production.playerChapter', {
 			workId,
 			chapterId,
@@ -105,25 +121,31 @@ function useFirstChapterScenes(workId: string, chapterId?: string) {
 					sourceLanguage?: unknown
 					workLanguage?: unknown
 				}
-				setResult({
-					scenes: parsed.scenes.map((scene, index) =>
-						sceneCard(scene, index, entries),
-					),
-					sourceLanguage:
-						typeof extra.sourceLanguage === 'string'
-							? extra.sourceLanguage
-							: undefined,
-					workLanguage:
-						typeof extra.workLanguage === 'string'
-							? extra.workLanguage
-							: undefined,
+				setState({
+					status: 'ready',
+					chapter: {
+						scenes: parsed.scenes.map((scene, index) =>
+							sceneCard(scene, index, entries),
+						),
+						sourceLanguage:
+							typeof extra.sourceLanguage === 'string'
+								? extra.sourceLanguage
+								: undefined,
+						workLanguage:
+							typeof extra.workLanguage === 'string'
+								? extra.workLanguage
+								: undefined,
+					},
 				})
 			},
-			() => setResult({ scenes: [] }),
+			() => setState({ status: 'failed' }),
 		)
 		return () => request.cancel()
-	}, [workId, chapterId])
-	return result
+	}, [workId, chapterId, attempt])
+	return {
+		state: chapterId ? state : ({ status: 'loading' } as const),
+		retry: () => setAttempt((n) => n + 1),
+	}
 }
 
 export function ConfirmFirstPage() {
@@ -133,25 +155,29 @@ export function ConfirmFirstPage() {
 	const { workId, phase, blockedChapterId } = snapshot
 	const first = snapshot.chapters[0]
 	const ready = phase === 'confirm-first' && first?.status === 'published'
-	const firstChapter = useFirstChapterScenes(
+	const { state, retry } = useFirstChapterScenes(
 		workId,
 		ready ? first.chapterId : undefined,
 	)
+	const firstChapter = state.status === 'ready' ? state.chapter : undefined
 	const scenes = firstChapter?.scenes
 	const languagePair =
 		firstChapter?.sourceLanguage &&
 		firstChapter?.workLanguage &&
 		firstChapter.sourceLanguage !== firstChapter.workLanguage
-			? `${firstChapter.sourceLanguage} → ${firstChapter.workLanguage}`
+			? `${formatLanguage(firstChapter.sourceLanguage)} → ${formatLanguage(firstChapter.workLanguage)}`
 			: null
 
 	return (
 		<Page
 			eyebrow={
 				project
-					? `${t('{{series}} · 第 {{index}} 卷', {
+					? `${t('{{series}} · {{volume}}', {
 							series: project.seriesTitle,
-							index: project.volumeIndex,
+							volume: formatVolumeLabel({
+								index: project.volumeIndex,
+								title: project.volumeTitle,
+							}),
 						})} · ${t('确认点 2 / 2')}`
 					: t('确认点 2 / 2')
 			}
@@ -169,13 +195,16 @@ export function ConfirmFirstPage() {
 			actions={
 				ready && (
 					<div className={local.actions}>
-						<Link className={local.linkButton} to={workRoute('play', workId)}>
-							<PlayCircle aria-hidden="true" size={16} strokeWidth={1.8} />
+						<ButtonLink
+							variant="secondary"
+							icon={PlayCircle}
+							to={workRoute('play', workId)}
+						>
 							{t('试玩第一章')}
-						</Link>
+						</ButtonLink>
 						<Dropdown
 							label={t('更多')}
-							className={local.moreTrigger}
+							className={buttonClasses('ghost')}
 							trigger={
 								<>
 									<Ellipsis aria-hidden="true" size={16} />
@@ -214,54 +243,70 @@ export function ConfirmFirstPage() {
 				{ready ? (
 					<>
 						<SectionLabel>
-							{t('第 1 章 · {{value}}', {
-								value: chapterTitle(snapshot, first.chapterId),
+							{formatChapterLabel({
+								index: 1,
+								title: snapshot.chapterTitles?.[first.chapterId],
 							})}
 							{scenes?.length
 								? t(' · {{count}} 个场景', { count: scenes.length })
 								: ''}
-							<span className={local.aside}>
-								{languagePair ? `${languagePair} · ` : ''}
-								{t('已发布，可以试玩，准备好后再手动继续制作。')}
-							</span>
+							{languagePair ? (
+								<span className={local.aside}>{languagePair}</span>
+							) : null}
 						</SectionLabel>
-						<div className={local.scenes}>
-							{(scenes ?? []).map((scene, index) => (
-								<Card
-									className={local.chapter}
-									key={scene.key}
-									role="region"
-									aria-label={scene.title}
-								>
-									<span className={local.art} aria-hidden="true">
-										{scene.art && <img src={scene.art} alt="" />}
-										<span>{t('场景 {{value}}', { value: index + 1 })}</span>
-									</span>
-									<div className={local.cardBody}>
-										<h2 className={local.cardTitle}>{scene.title}</h2>
-										{scene.desc && (
-											<p className={local.sceneDesc}>{scene.desc}</p>
-										)}
-										{scene.images && (
-											<p className={local.sceneMeta}>
-												<Image aria-hidden="true" size={13} />
-												{scene.images}
-											</p>
-										)}
-									</div>
-								</Card>
-							))}
-						</div>
+						{state.status === 'loading' ? (
+							<LoadingState text={t('正在读取第一章…')} />
+						) : state.status === 'failed' ? (
+							<ErrorNotice
+								message={t('无法读取第一章，请重试。')}
+								onRetry={retry}
+							/>
+						) : scenes && scenes.length === 0 ? (
+							<EmptyState icon={NotebookPen} text={t('这一章还没有场景。')} />
+						) : (
+							<div className={local.scenes}>
+								{(scenes ?? []).map((scene, index) => (
+									<Card
+										className={local.chapter}
+										key={scene.key}
+										role="region"
+										aria-label={scene.title}
+									>
+										<span className={local.art} aria-hidden="true">
+											{scene.art && <img src={scene.art} alt="" />}
+											<span>{t('场景 {{value}}', { value: index + 1 })}</span>
+										</span>
+										<div className={local.cardBody}>
+											<h2 className={local.cardTitle}>{scene.title}</h2>
+											{scene.desc && (
+												<p className={local.sceneDesc}>{scene.desc}</p>
+											)}
+											{scene.images && (
+												<p className={local.sceneMeta}>
+													<Image aria-hidden="true" size={13} />
+													{scene.images}
+												</p>
+											)}
+										</div>
+									</Card>
+								))}
+							</div>
+						)}
 					</>
 				) : (
-					<Card className={local.cardBody}>
-						<p>{t('目前没有待确认的第一章。')}</p>
-						<Link
-							className={local.linkButton}
-							to={workRoute('production', workId)}
-						>
-							{t('查看制作')}
-						</Link>
+					<Card>
+						<EmptyState
+							icon={PlayCircle}
+							text={t('目前没有待确认的第一章。')}
+							actions={
+								<ButtonLink
+									variant="secondary"
+									to={workRoute('production', workId)}
+								>
+									{t('查看制作')}
+								</ButtonLink>
+							}
+						/>
 					</Card>
 				)}
 			</div>

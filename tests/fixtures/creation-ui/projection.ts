@@ -100,7 +100,7 @@ const record = (
 	seq: number,
 	chapterId: string,
 	status: string,
-	message: string,
+	errorKind?: string,
 	detail?: string,
 ): EventEnvelope => ({
 	seq,
@@ -109,7 +109,14 @@ const record = (
 	at: '2026-01-01T08:00:00.000Z',
 	event: {
 		type: 'production.chapterRecord',
-		payload: { workId, chapterId, step: 'write', status, message, detail },
+		payload: {
+			workId,
+			chapterId,
+			step: 'write',
+			status,
+			...(errorKind ? { errorKind } : {}),
+			...(detail ? { detail } : {}),
+		},
 	},
 })
 
@@ -275,7 +282,44 @@ export async function installProjection(app: ElectronApplication) {
 						})
 						break
 					case 'usage.list':
-						respond({ records: [], staleAssets: [], unreadableProjects: [] })
+						respond({
+							records: [],
+							staleAssets: [
+								{ workId, assetKey: 'keeper/coat' },
+								{ workId, assetKey: 'lighthouse/dusk' },
+							],
+							unreadableProjects: [],
+						})
+						break
+					case 'production.resolveAsset':
+						respond({ cachePath: 'creation-ui/visual-1.png' })
+						break
+					case 'bible.get':
+						respond({
+							revision: 1,
+							characters: [
+								{
+									id: 'keeper',
+									name: '守塔人',
+									costumes: [{ id: 'coat', description: '旧外套' }],
+									expressions: [],
+								},
+							],
+							locations: [
+								{
+									id: 'lighthouse',
+									name: '灯塔',
+									variants: [{ id: 'dusk', description: '黄昏' }],
+								},
+							],
+							relations: [],
+							timeline: [],
+							foreshadowing: [],
+							styles: [],
+							glossary: [],
+							proposalIds: [],
+							proposalActions: {},
+						})
 						break
 					default:
 						throw new Error(`Unexpected command: ${data.command}`)
@@ -294,20 +338,20 @@ export async function installProjection(app: ElectronApplication) {
 			finished,
 			waiting: chapters[1],
 			records: [
-				record(1, 'one', 'done', '第一章剧本生成完成'),
+				record(1, 'one', 'done'),
 				record(
 					2,
 					'two',
 					'failed',
-					'第二章写手请求超时',
-					'重试将重新运行写剧本',
+					'network',
+					'[network] Model connection interrupted',
 				),
 				{
-					...record(3, 'two', 'done', '其他作品的记录'),
+					...record(3, 'two', 'done'),
 					scopeId: 'other-work',
 				},
 			],
-			live: record(0, 'two', 'running', '重试已启动'),
+			live: record(0, 'two', 'running'),
 		},
 	)
 	return {

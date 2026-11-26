@@ -9,13 +9,14 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, IconButton } from '../../components/Button'
+import { Button, buttonClasses, IconButton } from '../../components/Button'
 import { Card, SectionLabel } from '../../components/Card'
 import { Dropdown } from '../../components/Dropdown'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { Modal } from '../../components/Modal'
 import { EmptyState, Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
+import { formatVolumeLabel } from '../../format/chapter'
 import { scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import { ProductionNotice } from '../production/ProductionNotice'
@@ -122,6 +123,27 @@ export function ConfirmVisualPage() {
 	)
 }
 
+/** 展示名解析：名字缺失时用组内序数（角色 N / 造型 N），绝不显示内部 id。 */
+function displayNames(groups: CharacterEntry[][]) {
+	const characters = new Map<string, string>()
+	const costumes = new Map<string, string>()
+	groups.forEach((group, groupIndex) => {
+		const first = group[0]
+		if (!first) return
+		characters.set(
+			first.characterId,
+			first.characterName ?? t('角色 {{value}}', { value: groupIndex + 1 }),
+		)
+		group.forEach((entry, entryIndex) => {
+			costumes.set(
+				keyOf(entry),
+				entry.costumeName ?? t('造型 {{value}}', { value: entryIndex + 1 }),
+			)
+		})
+	})
+	return { characters, costumes }
+}
+
 /** 同一角色的多套造型在左侧只占一行；右边每张造型卡单独一个 fieldset */
 function groupByCharacter(entries: CharacterEntry[]) {
 	const order: string[] = []
@@ -197,6 +219,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 	)
 	const workId = snapshot.workId
 	const groups = groupByCharacter(visual.characters)
+	const names = displayNames(groups)
 	const activeGroup =
 		groups.find((group) => group[0]?.characterId === selectedCharacter) ??
 		groups[0]
@@ -242,8 +265,8 @@ function VisualChoices({ visual }: { visual: Visual }) {
 					? t('EPUB 参考方案')
 					: t('方案 {{value}}', { value: index + 1 }),
 			subtitle: t('{{character}} · {{costume}}', {
-				character: entry.characterName ?? entry.characterId,
-				costume: entry.costumeName ?? entry.costumeId,
+				character: names.characters.get(entry.characterId) ?? '',
+				costume: names.costumes.get(key) ?? '',
 			}),
 			source: modalSourceOf(candidate.id),
 			selected: characterIds[key] === candidate.id,
@@ -278,9 +301,12 @@ function VisualChoices({ visual }: { visual: Visual }) {
 		<Page
 			eyebrow={
 				project
-					? `${t('{{series}} · 第 {{index}} 卷', {
+					? `${t('{{series}} · {{volume}}', {
 							series: project.seriesTitle,
-							index: project.volumeIndex,
+							volume: formatVolumeLabel({
+								index: project.volumeIndex,
+								title: project.volumeTitle,
+							}),
 						})} · ${t('确认点 1 / 2')}`
 					: t('确认点 1 / 2')
 			}
@@ -304,7 +330,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 					)}
 					<Dropdown
 						label={t('更多')}
-						className={local.moreTrigger}
+						className={buttonClasses('ghost')}
 						trigger={
 							<>
 								<Ellipsis aria-hidden="true" size={16} />
@@ -371,14 +397,14 @@ function VisualChoices({ visual }: { visual: Visual }) {
 						({ id }) =>
 							!recommended.includes(id) && !imported?.selected.includes(id),
 					) && (
-						<button
-							className={local.toggleAll}
-							type="button"
+						<Button
+							variant="secondary"
+							size="sm"
 							aria-pressed={showAll}
 							onClick={() => setShowAll(!showAll)}
 						>
 							{showAll ? t('收起未推荐的 EPUB 插图') : t('显示全部 EPUB 插图')}
-						</button>
+						</Button>
 					)}
 				<fieldset className={local.section} disabled={busy}>
 					<legend>
@@ -423,7 +449,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 									const allDone = doneCount === group.length
 									const summary =
 										group.length === 1
-											? `${first.costumeName ?? first.costumeId} · ${
+											? `${names.costumes.get(keyOf(first)) ?? ''} · ${
 													doneCount === 1 ? t('已选定') : t('未选定')
 												}`
 											: t('已选 {{done}} / {{total}} 套造型', {
@@ -439,7 +465,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 											onClick={() => setSelectedCharacter(characterId)}
 										>
 											<span>
-												<strong>{first.characterName ?? characterId}</strong>
+												<strong>{names.characters.get(characterId)}</strong>
 												<small>{summary}</small>
 											</span>
 											{allDone && <CircleCheck aria-hidden="true" size={16} />}
@@ -450,7 +476,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 							<div className={local.characterDetail}>
 								{activeGroup.map((entry) => {
 									const key = keyOf(entry)
-									const groupName = `${entry.characterName ?? entry.characterId} · ${entry.costumeName ?? entry.costumeId}`
+									const groupName = `${names.characters.get(entry.characterId) ?? ''} · ${names.costumes.get(key) ?? ''}`
 									return (
 										<fieldset
 											key={key}
@@ -461,7 +487,7 @@ function VisualChoices({ visual }: { visual: Visual }) {
 											<legend className={local.outfitHeader}>
 												<SectionLabel>
 													{t('造型 · {{value}}', {
-														value: entry.costumeName ?? entry.costumeId,
+														value: names.costumes.get(key) ?? '',
 													})}
 												</SectionLabel>
 											</legend>

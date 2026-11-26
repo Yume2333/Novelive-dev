@@ -1,8 +1,4 @@
-import {
-	type CommandOutput,
-	type ProductionSnapshot,
-	productionQueueEvent,
-} from '@novelive/creator/contract'
+import type { ProductionSnapshot } from '@novelive/creator/contract'
 import {
 	ChevronRight,
 	ChevronsUp,
@@ -14,20 +10,27 @@ import {
 	RotateCcw,
 	SquarePen,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import {
 	Button,
+	ButtonLink,
 	Chip,
 	ConfirmDialog,
 	Dropdown,
+	EmptyState,
 	Page,
 	ProgressBar,
 	useToast,
 } from '../../components'
+import {
+	formatChapterLabel,
+	formatChapterNumeral,
+	formatVolumeLabel,
+} from '../../format/chapter'
 import { formatErrorText, humanizeError } from '../../format/errors'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
+import { queuePosition, useProductionQueue } from '../work/queue'
 import { chapterTitle, useWorkProduction } from '../work/WorkProduction'
 import { ChapterRecords } from './ChapterRecords'
 import { ChapterState, stepName, stepProgress, steps } from './ChapterState'
@@ -45,36 +48,6 @@ const workStatus = {
 }
 
 type Chapter = ProductionSnapshot['chapters'][number]
-type Queue = CommandOutput<'production.getQueue'>
-
-export const chapterIndex = (index: number) =>
-	String(index + 1).padStart(2, '0')
-
-/** 制作队列快照：进入页面读取一次，随后跟随 production.queue 事件实时更新 */
-function useProductionQueue() {
-	const [queue, setQueue] = useState<Queue>()
-	useEffect(() => {
-		let active = true
-		const request = window.novelive.call('production.getQueue', {})
-		void request.promise.then(
-			(next) => {
-				if (active) setQueue(next)
-			},
-			() => {},
-		)
-		const offEvent = window.novelive.on('event', (event) => {
-			if (event.scope !== 'app' || !productionQueueEvent.check(event.event))
-				return
-			setQueue(event.event.payload)
-		})
-		return () => {
-			active = false
-			request.cancel()
-			offEvent()
-		}
-	}, [])
-	return queue
-}
 
 /** 四步流水线：写 › 审稿 › 演出 › 出图；当前步墨水微扫光 + 2px 下划条，已完成 / 未到的步用字重与颜色分层 */
 function StepChain({ chapter, live }: { chapter: Chapter; live: boolean }) {
@@ -138,7 +111,7 @@ function ChapterRow({
 	return (
 		<li aria-label={title} className="hover-row">
 			<div className={styles.chapterRow}>
-				<span className={styles.index}>{chapterIndex(index)}</span>
+				<span className={styles.index}>{formatChapterNumeral(index)}</span>
 				<span className={styles.name}>{title}</span>
 				{priority ? (
 					<span className={styles.priorityMark}>
@@ -164,13 +137,14 @@ function ChapterRow({
 				<ChapterState chapter={chapter} />
 				<span className={`row-actions ${styles.rowActions}`}>
 					{status === 'published' && (
-						<Link
-							className={styles.ghost}
+						<ButtonLink
+							variant="ghost"
+							size="sm"
+							icon={Play}
 							to={`${workRoute('play', workId)}?chapter=${encodeURIComponent(chapterId)}`}
 						>
-							<Play aria-hidden="true" size={13} strokeWidth={1.8} />
 							{t('游玩')}
-						</Link>
+						</ButtonLink>
 					)}
 					{blockedChapterId === chapterId && (
 						<Button
@@ -186,13 +160,14 @@ function ChapterRow({
 						</Button>
 					)}
 					{status === 'published' && (
-						<Link
-							className={styles.ghost}
+						<ButtonLink
+							variant="ghost"
+							size="sm"
+							icon={SquarePen}
 							to={`${workRoute('editor', workId)}?chapterId=${encodeURIComponent(chapterId)}`}
 						>
-							<SquarePen aria-hidden="true" size={13} strokeWidth={1.8} />
 							{t('编辑')}
-						</Link>
+						</ButtonLink>
 					)}
 					<Button
 						variant="ghost"
@@ -267,11 +242,7 @@ export function ProductionPage() {
 		(work) => work.link.workId === workId && work.status === 'paused',
 	)
 	const crashed = inactive?.status === 'paused' && inactive.reason === 'crashed'
-	const queueIndex = queue
-		? queue.queued.findIndex((work) => work.link.workId === workId)
-		: -1
-	const queuePosition =
-		queueIndex === -1 ? -1 : queueIndex + (queue?.active ? 2 : 1)
+	const position = queuePosition(queue, workId)
 	const isActiveWork = queue?.active?.link.workId === workId
 	const live = queue ? isActiveWork && running : running
 	const runChapter = runChapterId
@@ -299,9 +270,9 @@ export function ProductionPage() {
 		<Page
 			eyebrow={
 				project &&
-				t('{{series}} · 第 {{index}} 卷', {
+				t('{{series}} · {{volume}}', {
 					series: project.seriesTitle,
-					index: project.volumeIndex,
+					volume: formatVolumeLabel({ index: project.volumeIndex }),
 				})
 			}
 			title={snapshot.title ? `${snapshot.title} · ${t('制作')}` : t('制作')}
@@ -328,9 +299,9 @@ export function ProductionPage() {
 						</Button>
 					)}
 					{gate && (
-						<Link className={styles.primary} to={workRoute(gate, workId)}>
+						<ButtonLink variant="primary" to={workRoute(gate, workId)}>
 							{gate === 'confirmVisual' ? t('选择主视觉') : t('确认第一章')}
-						</Link>
+						</ButtonLink>
 					)}
 				</div>
 			}
@@ -396,23 +367,9 @@ export function ProductionPage() {
 								</h2>
 							) : (
 								<>
-									{painting ? (
-										<h2 className={styles.headline}>
-											{chapterIndex(
-												chapters.findIndex(
-													(chapter) => chapter.chapterId === painting.chapterId,
-												),
-											)}
-											{' · '}
-											{chapterTitle(snapshot, painting.chapterId)}
-											<span className={styles.headlineStep}>
-												{t('（{{step}}）', { step: t(stepName.draw) })}
-											</span>
-										</h2>
-									) : null}
 									{writing ? (
 										<h2 className={styles.headline}>
-											{chapterIndex(currentIndex)}
+											{formatChapterNumeral(currentIndex)}
 											{' · '}
 											{chapterTitle(snapshot, writing.chapterId)}
 											<span className={styles.headlineStep}>
@@ -423,6 +380,31 @@ export function ProductionPage() {
 													: ''}
 											</span>
 										</h2>
+									) : null}
+									{painting ? (
+										writing ? (
+											<p className={styles.secondaryLine}>
+												{t('同时出图：{{chapter}}', {
+													chapter: formatChapterLabel({
+														index:
+															chapters.findIndex(
+																(chapter) =>
+																	chapter.chapterId === painting.chapterId,
+															) + 1,
+														title: chapterTitle(snapshot, painting.chapterId),
+													}),
+												})}
+											</p>
+										) : (
+											<h2 className={styles.headline}>
+												{formatChapterNumeral(currentIndex)}
+												{' · '}
+												{chapterTitle(snapshot, painting.chapterId)}
+												<span className={styles.headlineStep}>
+													{t('（{{step}}）', { step: t(stepName.draw) })}
+												</span>
+											</h2>
+										)
 									) : null}
 								</>
 							)}
@@ -440,34 +422,36 @@ export function ProductionPage() {
 								})}
 							</span>
 						</div>
-						{queuePosition > 0 ? (
-							<Chip>
-								{t('排在第 {{position}} 位', { position: queuePosition })}
+						{position !== undefined && position > 0 ? (
+							<Chip>{t('排在第 {{position}} 位', { position })}</Chip>
+						) : phase === 'preview' && position === undefined ? null : (
+							<Chip active={position === 0 && running}>
+								{t(workStatus[status])}
 							</Chip>
-						) : (
-							<Chip active={running}>{t(workStatus[status])}</Chip>
 						)}
 					</div>
 				</section>
 				<div className={styles.sectionHead}>
 					<h2 className={styles.sectionLabel} id="production-chapters">
 						{project
-							? t('第 {{index}} 卷 · {{volume}} · 共 {{length}} 章', {
-									index: project.volumeIndex,
-									volume: project.volumeTitle,
+							? t('{{volume}} · 共 {{length}} 章', {
+									volume: formatVolumeLabel({
+										index: project.volumeIndex,
+										title: project.volumeTitle,
+									}),
 									length: chapters.length,
 								})
 							: t('章节')}
 					</h2>
 					{staleAssets.length > 0 ? (
-						<button
-							type="button"
-							className={styles.staleButton}
+						<Button
+							variant="ghost"
+							size="sm"
+							icon={ImageOff}
 							onClick={() => setStaleOpen(true)}
 						>
-							<ImageOff aria-hidden="true" size={13} strokeWidth={1.8} />
 							{t('{{count}} 张图过期', { count: staleAssets.length })}
-						</button>
+						</Button>
 					) : null}
 				</div>
 				<section className={styles.panel} aria-labelledby="production-chapters">
@@ -485,9 +469,13 @@ export function ProductionPage() {
 							))}
 						</ol>
 					) : (
-						<p className={`${styles.muted} ${styles.panelBody}`}>
-							{t('暂无章节')}
-						</p>
+						<div className={styles.panelBody}>
+							<EmptyState
+								icon={SquarePen}
+								title={t('暂无章节')}
+								text={t('作品还没有章节。')}
+							/>
+						</div>
 					)}
 				</section>
 			</div>
@@ -503,7 +491,13 @@ export function ProductionPage() {
 				chapter={runChapter}
 				title={
 					runChapter
-						? `${chapterIndex(chapters.findIndex((chapter) => chapter.chapterId === runChapter.chapterId))} · ${chapterTitle(snapshot, runChapter.chapterId)}`
+						? formatChapterLabel({
+								index:
+									chapters.findIndex(
+										(chapter) => chapter.chapterId === runChapter.chapterId,
+									) + 1,
+								title: chapterTitle(snapshot, runChapter.chapterId),
+							})
 						: ''
 				}
 				open={runChapterId !== null}

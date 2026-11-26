@@ -18,21 +18,21 @@
 .field {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: var(--space-px-6);
 	min-width: 0;
 }
 
 .fieldLabel {
 	padding: 0;
 	color: var(--color-on-surface-variant);
-	font-size: 11px;
+	font-size: var(--text-11);
 	font-weight: 600;
 	letter-spacing: 0.12em;
 }
 
 .hint {
 	color: var(--color-outline);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 /* ---- 第一步：文件选择 ---- */
@@ -61,12 +61,12 @@
 
 .drop strong {
 	color: var(--color-on-surface);
-	font-size: 14px;
+	font-size: var(--text-14);
 }
 
 .drop span {
 	color: var(--color-outline);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 .drop:hover:not(:disabled) {
@@ -110,24 +110,24 @@
 	min-width: 0;
 	overflow: hidden;
 	color: var(--color-on-surface);
-	font-size: 13px;
+	font-size: var(--text-13);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 
 .fileTag {
 	flex-shrink: 0;
-	padding: 3px var(--space-2);
+	padding: var(--space-px-3) var(--space-2);
 	border-radius: var(--radius-sm);
 	background: var(--color-tertiary-fixed);
 	color: var(--color-on-secondary-container);
-	font-size: 11px;
+	font-size: var(--text-11);
 }
 
 .meta {
 	flex-shrink: 0;
 	color: var(--color-outline);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 /* ---- 工程位置与系列 ---- */
@@ -150,20 +150,28 @@
 	box-shadow: var(--shadow-glass);
 }
 
+/* formatPath 已按宽度中间省略；这里只兜底头向省略，保住最有意义的末尾 */
 .pickerValue {
 	flex: 1;
 	min-width: 0;
 	overflow: hidden;
 	color: var(--color-on-surface);
-	font-size: 13px;
+	direction: rtl;
+	font-size: var(--text-13);
+	text-align: left;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.pickerValue[data-placeholder] {
+	color: var(--color-outline);
+	direction: ltr;
 }
 
 .placementLabel {
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: var(--space-px-6);
 }
 
 /* ---- 原文编码候选 ---- */
@@ -181,6 +189,12 @@
 	margin-bottom: var(--space-2);
 }
 
+.encodingLead {
+	margin: 0;
+	color: var(--color-outline);
+	font-size: var(--text-12);
+}
+
 .encodings .encodingOptions {
 	flex-direction: column;
 	align-items: stretch;
@@ -189,18 +203,18 @@
 
 .encodingOption {
 	display: grid;
-	gap: 2px;
+	gap: var(--space-px-2);
 	min-width: 0;
 }
 
 .encodingOption strong {
-	font-size: 13px;
+	font-size: var(--text-13);
 }
 
 .encodingPreview {
 	overflow: hidden;
 	color: var(--color-on-surface-variant);
-	font-size: 12px;
+	font-size: var(--text-12);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -238,7 +252,7 @@
 .finding {
 	display: flex;
 	gap: var(--space-3);
-	font-size: 13px;
+	font-size: var(--text-13);
 }
 
 .finding strong {
@@ -264,13 +278,18 @@
 	border-radius: var(--radius-md);
 }
 
+/* 覆盖共享 .input 的宽度、内边距与字号（原内联样式移入此处） */
 .volumeTitle {
 	flex-shrink: 0;
+	width: 150px;
+	padding: var(--space-px-5) var(--space-px-10);
+	font-size: var(--text-13);
+	font-weight: 600;
 }
 
 .volumeActions {
 	display: inline-flex;
-	gap: 2px;
+	gap: var(--space-px-2);
 	margin-left: auto;
 	flex-shrink: 0;
 }
@@ -290,11 +309,13 @@
 .chapterTitle {
 	flex: 1;
 	min-width: 0;
+	padding: var(--space-px-7) var(--space-px-10);
+	font-size: var(--text-13);
 }
 
 .chapterActions {
 	display: inline-flex;
-	gap: 2px;
+	gap: var(--space-px-2);
 	flex-shrink: 0;
 }
 
@@ -302,12 +323,12 @@
 	flex-shrink: 0;
 	width: 26px;
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 	font-weight: 600;
 	letter-spacing: 0.08em;
 }
 
-/* ---- 第三步：改编设置 ---- */
+/* ---- 第三步：插图与参考 ---- */
 .illustrations {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -329,7 +350,7 @@ label.illustration {
 	justify-items: stretch;
 	gap: var(--space-2);
 	color: var(--color-on-surface-variant);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 /* 复选框圆点叠在缩略图左上角 */
@@ -374,5 +395,5 @@ label.illustration {
 .toggleCopy {
 	display: grid;
 	gap: var(--space-1);
-	font-size: 13px;
+	font-size: var(--text-13);
 }

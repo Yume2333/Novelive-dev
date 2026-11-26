@@ -4,11 +4,18 @@ import {
 	type ProductionSnapshot,
 	productionChapterRecordEvent,
 } from '@novelive/creator/contract'
-import { ChevronDown, CircleCheck, CircleX, Clock, XCircle } from 'lucide-react'
+import { CircleCheck, CircleX, Clock, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Collapse, Drawer, EmptyState, Spinner } from '../../components'
+import {
+	Details,
+	Drawer,
+	EmptyState,
+	ErrorNotice,
+	LoadingState,
+	Spinner,
+} from '../../components'
 import { formatErrorText, humanizeError } from '../../format/errors'
-import { scoped } from '../../i18n'
+import { i18n, scoped } from '../../i18n'
 import { stepName, steps } from './ChapterState'
 import styles from './Production.module.css'
 
@@ -70,47 +77,38 @@ function StatusMark({ status }: { status: ChapterRunRecord['status'] }) {
 	)
 }
 
+/** 记录时间跟随 UI 语言，精确到分（不显示秒） */
+function formatRecordTime(at: string): string {
+	const date = new Date(at)
+	if (Number.isNaN(date.getTime())) return ''
+	return new Intl.DateTimeFormat(i18n.language, {
+		dateStyle: 'medium',
+		timeStyle: 'short',
+	}).format(date)
+}
+
 function RecordCard({ record }: { record: ChapterRunRecord }) {
-	const [open, setOpen] = useState(false)
+	const issue = record.errorKind
+		? humanizeError({ kind: record.errorKind, detail: record.detail })
+		: undefined
+	const headline = issue
+		? `${t(stepName[record.step])} · ${formatErrorText(issue)}`
+		: `${t(stepName[record.step])} · ${recordStatus[record.status].label()}`
+	const detail = issue?.detail ?? record.detail
 	return (
 		<li className={`glass-panel ${styles.recordCard}`}>
 			<div className={styles.recordCardMain}>
-				<span className={styles.recordMessage}>
-					{record.errorKind
-						? `${t(stepName[record.step])} · ${formatErrorText(
-								humanizeError({
-									kind: record.errorKind,
-									detail: record.detail,
-								}),
-							)}`
-						: `${t(stepName[record.step])} · ${recordStatus[record.status].label()}`}
-				</span>
-				{record.detail ? (
-					<button
-						type="button"
-						className={styles.recordDetailToggle}
-						aria-expanded={open}
-						onClick={() => setOpen((value) => !value)}
-					>
-						{t('详情')}
-						<ChevronDown
-							aria-hidden="true"
-							size={12}
-							className="nl-chevron"
-							data-open={open ? 'true' : 'false'}
-						/>
-					</button>
-				) : null}
+				<span className={styles.recordMessage}>{headline}</span>
 				<time className={styles.recordTime} dateTime={record.at}>
-					{new Date(record.at).toLocaleString()}
+					{formatRecordTime(record.at)}
 				</time>
 			</div>
-			{record.detail ? (
-				<Collapse open={open}>
-					<div className={styles.recordDetail}>
-						<p>{record.detail}</p>
-					</div>
-				</Collapse>
+			{detail ? (
+				<div className={styles.recordDetail}>
+					<Details>
+						<p className={styles.recordDetailText}>{detail}</p>
+					</Details>
+				</div>
 			) : null}
 		</li>
 	)
@@ -169,15 +167,9 @@ function Records({ workId, chapterId }: { workId: string; chapterId: string }) {
 	const empty = state !== 'loading' && state !== 'failed' && !records.length
 	return (
 		<>
-			{state === 'loading' && (
-				<p className={styles.recordNotice} role="status">
-					{t('正在读取运行记录…')}
-				</p>
-			)}
+			{state === 'loading' && <LoadingState text={t('正在读取运行记录…')} />}
 			{state === 'failed' && (
-				<p className={styles.recordNotice} role="alert">
-					{t('无法读取历史记录，请关闭后重试。')}
-				</p>
+				<ErrorNotice message={t('无法读取历史记录，请关闭后重试。')} />
 			)}
 			{state === 'gap' && !empty && (
 				<p className={styles.recordNotice} role="status">
@@ -188,9 +180,7 @@ function Records({ workId, chapterId }: { workId: string; chapterId: string }) {
 				<EmptyState
 					icon={Clock}
 					title={t('尚未开始制作')}
-					text={t(
-						'排到本章后，写手、审稿、演出和出图的运行记录会实时显示在这里。',
-					)}
+					text={t('排到本章后，写剧本、审稿和演出的运行记录会显示在这里。')}
 				/>
 			) : null}
 			<div className={styles.recordSteps}>
