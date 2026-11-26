@@ -19,6 +19,18 @@
 
 ---
 
+
+## Round 3 (2026-11-26, post-rework-2 verification)
+
+**Audited revision:** `ui-polish/08` @ `13052fe` (integration `a437de7` + gate commits `eaadfaf` spec fix and the gate minor-fix commit).
+**Method:** independent read-only verification reviews of the rework diff (`/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/evidence/task08/review-r3.md` — reviewer gate-verify), then targeted recapture of the surfaces touched by round-2 rework, same cassette pipeline as rounds 1–2.
+**Recaptured surfaces (light+dark, overwriting round-2 files):** editor, usage, import, settings, shell, bible, player-saveload — 14 images.
+**Round-3 verdicts:** every round-2 rework target verified fixed — all 14 feedback bullets pass review-r3 (the single PARTIAL, dead ask-agent `label` plumbing in `BibleFields.tsx`, plus review nits M1/M2/M4, were fixed by the gate in `13052fe` and re-reviewed clean). Visually inspected: editor eyebrow now reads `纸船与灯火 · 第 1 卷` in both themes (no more `纸船与灯火 · 纸船与灯火` duplication); usage banner reads `2 部作品无法读取 · 项目已移动或删除` with localized machine-enum mapping. The join-mode read-only 系列 field is not capturable without inventing fixtures; covered instead by the `m4-import-join` e2e assertion (combobox count 0 + read-only text visible).
+**Checks on `13052fe`:** `NL_REPLAY=strict pnpm check` — typecheck 0 errors, lint 0 errors, `Test Files 77 passed | 1 skipped (78)`, `Tests 1218 passed | 3 skipped (1221)`; `pnpm build` exit 0. Targeted e2e under nl-headless (14 specs covering the rework changes) — 48 tests, 47 passed, 1 failed = m4-gate W3 minimize (accepted residual 8: Xvfb has no window manager; harness limitation). Earlier full run on integration `116987a`: 17 specs, 59 tests, 57 passed, 2 failed (W3 minimize + the picker-path assertion since fixed env-independently in `eaadfaf`).
+**Reviews:** rework round-2 verification — pass (review-r3.md Part A/B, 13 FIXED + 1 PARTIAL, all PARTIAL/M1–M4 closed in `13052fe`); landing review of the full `main...ui-polish/08` diff — **SHIP**, no blocking/major findings, 10 minor follow-ups recorded in `/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/followups.md` (13 items).
+
+---
+
 ## Per-surface matrix
 
 Legend: **fixed** — verified in after-evidence or source; **residual** — accepted with reason; **FAILED** — still broken, needs rework.
@@ -163,7 +175,7 @@ Legend: **fixed** — verified in after-evidence or source; **residual** — acc
 | U7 (med) save errors mention invisible IDs | fixed | reworded without ids (done-04) |
 | U10 (med) rewrite hunks lack positional context | fixed | `第 N 处` ordinals (done-04) |
 | (r2 rework) editor hardcoded `ch0001` fallback when `chapterId` param absent | fixed | rework 663918f: falls back to the work's first chapter (`workChapters[0]`) instead of the literal `ch0001`. **[r2]** verified end-to-end: captured `/work/<id>/edit` **without** `?chapterId=` — editor resolves and renders `第 1 章 · 第一章 纸船` with full stage content (footer asset rows only render after the chapter session opens, proving the fallback completed), zero `ch0001` strings (editor-light/dark) |
-| (r2 NEW) editor eyebrow duplicates the work title (`纸船与灯火 · 纸船与灯火`) | FAILED — owner 04, rework round 2 | `EditorPage.tsx:111-116` composes `` `${item.project.seriesTitle} · ${item.title}` `` (series title · **work** title) consumed at line 999 `eyebrow={workTitle}`. In the data model both fields are always the same string: wizard `Project.create` sets `series.title` = the novel title (creator/import/wizard/index.ts:472-477) and `writeTxtLayout` writes `title: options.title` into every work file (creator/import/txt/index.ts:126) — so every real project renders `X · X`, not just the cassette. Observed: eyebrow reads `纸船与灯火 · 纸船与灯火` (editor-light/dark, both rounds). Expected: `seriesTitle · formatVolumeLabel({ index, … })` matching production (`ProductionPage.tsx:272-277` → `纸船与灯火 · 第 1 卷`), confirm×2, bible (`BiblePage.tsx:650-660`) — the editor already loads `project.volumeId`/`volumeIndex`/`volumeTitle` from the same `library.list` row. Same duplicated-label class as the round-1 volume-title dedup fixed in 03 |
+| (r2 NEW) editor eyebrow duplicates the work title (`纸船与灯火 · 纸船与灯火`) | **fixed — [r3]** | was FAILED in round 2: `EditorPage.tsx:111-116` composed `seriesTitle · workTitle` (both fields always the same string in the data model). Round-3 rework (`13052fe` gate minor fixes) composes `seriesTitle · formatVolumeLabel(...)` with the `{{series}} · {{volume}}` key in all four editor.json locales, mirroring ProductionPage. **[r3]** verified in recaptured editor-light/editor-dark: eyebrow reads `纸船与灯火 · 第 1 卷` in both themes — no duplication |
 
 
 
@@ -237,7 +249,7 @@ Legend: **fixed** — verified in after-evidence or source; **residual** — acc
 
 ## Findings needing rework
 
-Round-2 rework targets (full detail: `/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/rework-feedback.md`):
+Round-2 rework targets — **all resolved in round 3** (verified in review-r3.md Part A; see the round-3 section above) — full detail: `/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/rework-feedback.md`:
 
 1. **owner 01:** import.target failure squashed — `invalid_join_target` collapses to `internal`; model-flavoured generic copy; backend hardcoded zh reason strings in contract; dead `soft-pulse`/`--glow` styling; Windows home-collapse gap in `formatPath`; legacy subtask-role hydrate path.
 2. **owner 02:** bespoke interruption strip in the shell instead of shared presentation; 「日志」 failure copy; raw 「ID」 wording in import-package copy; vestigial `agentContextLabel` plumbing.
@@ -263,9 +275,9 @@ Accepted residuals (no rework needed):
 
 ## Linux AppImage
 
-**round 2, pre-rework revision `b6c68ff` + gate spec formatting; must be rebuilt on the final revision.**
+**round 3 — built on the final revision `13052fe` (post-rework-2, post-gate-fixes).** (Round 2 built pre-rework `b6c68ff`; that artifact is superseded.)
 
-- **Build:** `NL_REPLAY=strict TMPDIR=/home/shizuku/t08-pkg pnpm --filter @novelive/desktop run package:linux` — exit 0 in 53.7s.
-- **Artifact:** `apps/desktop/dist/linux-x64-4TJyBT/artifacts/Novelive-0.0.0-linux-x86_64.AppImage` (git-ignored via `.gitignore:2:dist/`); size 525,779,827 bytes (501.42 MiB).
-- **SHA-256:** `8fdcfefc133269460f338642bfe281b64d81f73cb8ff000fa7931aa65af471b6` (matches the packager's SHA256SUMS).
-- **Smoke:** launched under nl-headless with `HOME=/tmp/uipo-win-08-appimage`, `APPIMAGE_EXTRACT_AND_RUN=1`, TMPDIR on disk (tmpfs cannot mmap the V8 snapshot) — process alive at 15s/20s, library empty state rendered, no creator startup errors. Screenshot: `/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/evidence/task08/r2-appimage-smoke.png`.
+- **Build:** `NL_REPLAY=strict TMPDIR=/home/shizuku/t08-pkg pnpm --filter @novelive/desktop run package:linux` on `13052fe`.
+- **Artifact:** `apps/desktop/dist/linux-x64-y5PXJ5/artifacts/Novelive-0.0.0-linux-x86_64.AppImage` (git-ignored via `.gitignore:2:dist/`); size 525,765,205 bytes.
+- **SHA-256:** `d5e3ad5e9865227df2d5f8cd6aa868bb9a4554b96a5aad36a7b87cbdcfaeb490`.
+- **Smoke:** launched under nl-headless with `HOME=/tmp/uipo-win-08-appimage`, `APPIMAGE_EXTRACT_AND_RUN=1` — process alive ≥ 15s, empty-library state painted. Screenshot: `/home/shizuku/Project/Novelive-omp-artifacts/ui-polish-2026-11-26/evidence/task08/r3-appimage-smoke.png`.

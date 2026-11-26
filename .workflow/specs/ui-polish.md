@@ -1,6 +1,7 @@
 # UI Polish: Consistent Style and Creator-Facing Display
 
-**Status:** in progress
+**Status:** done
+**Accepted:** 2026-11-26 by agent (omp-vibe-windows)
 **Priority:** high
 **Integration branch:** ui-polish/integration
 
