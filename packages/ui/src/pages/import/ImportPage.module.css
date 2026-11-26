@@ -168,6 +168,14 @@
 	direction: ltr;
 }
 
+.seriesValue {
+	overflow: hidden;
+	color: var(--color-on-surface);
+	font-size: var(--text-13);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .placementLabel {
 	display: inline-flex;
 	align-items: center;
