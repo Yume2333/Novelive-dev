@@ -6,8 +6,8 @@ import {
 	productionQueueEvent,
 	productionSnapshotEventSchema,
 } from '../../packages/creator/src/contract'
+import { productionChapterSchema } from '../../packages/creator/src/contract/production'
 import {
-	chapterProductionSchema,
 	imageJobResultSchema,
 	imageQueueItemSchema,
 } from '../../packages/format/src/model'
@@ -21,7 +21,7 @@ const first = {
 	chapterId: 'ch1',
 	status: 'published',
 	priority: true,
-	issue: '占位图',
+	issue: { kind: 'placeholder', count: 2 },
 }
 const waiting = { chapterId: 'ch2', status: 'waiting', priority: false }
 
@@ -60,7 +60,7 @@ test('the first chapter is published while the work awaits confirmation', () => 
 			payload: snapshot,
 		}),
 	).toBe(true)
-	const chapter = compile(chapterProductionSchema)
+	const chapter = compile(productionChapterSchema)
 	expect(chapter.check({ ...first, status: 'needs_attention' })).toBe(false)
 	expect(chapter.check({ ...first, status: 'producing' })).toBe(false)
 	expect(chapter.check({ ...first, status: 'producing', step: 'draw' })).toBe(

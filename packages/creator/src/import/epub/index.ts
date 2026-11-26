@@ -1,5 +1,6 @@
 import { posix } from 'node:path'
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js'
+import { ImportFailureError } from '../../contract/errors'
 import type { ExtractedBook, ImportExtraction } from '../../contract/import'
 import { all, children, type Element, text, xml } from './xml'
 
@@ -33,16 +34,20 @@ function archivePath(path: string) {
 		/[:\\]/.test(path) ||
 		Array.from(path).some((char) => char.charCodeAt(0) < 32)
 	)
-		throw new Error('Unsafe EPUB archive path')
+		throw new ImportFailureError('invalid_epub', 'Unsafe EPUB archive path')
 	return path
 }
 
 function resolve(base: string, href: string) {
 	if (/^(?:[a-z][a-z\d+.-]*:|\/|\\)/i.test(href))
-		throw new Error('External EPUB reference is not supported')
+		throw new ImportFailureError(
+			'invalid_epub',
+			'External EPUB reference is not supported',
+		)
 	const [file, fragment = ''] = href.split('#')
 	const decoded = decodeURIComponent(file)
-	if (/[?#\\]/.test(decoded)) throw new Error('Unsafe EPUB reference')
+	if (/[?#\\]/.test(decoded))
+		throw new ImportFailureError('invalid_epub', 'Unsafe EPUB reference')
 	return {
 		path: archivePath(file ? posix.join(posix.dirname(base), decoded) : base),
 		fragment: decodeURIComponent(fragment),
@@ -51,12 +56,19 @@ function resolve(base: string, href: string) {
 
 async function archive(bytes: Uint8Array) {
 	if (bytes.length > 64 * 1024 * 1024)
-		throw new Error('EPUB input limit exceeded')
+		throw new ImportFailureError(
+			'epub_limit_exceeded',
+			'EPUB input limit exceeded',
+		)
 	const reader = new ZipReader(new Uint8ArrayReader(bytes))
 	const files = new Map<string, Uint8Array>()
 	try {
 		const entries = await reader.getEntries()
-		if (entries.length > 4096) throw new Error('EPUB entry limit exceeded')
+		if (entries.length > 4096)
+			throw new ImportFailureError(
+				'epub_limit_exceeded',
+				'EPUB entry limit exceeded',
+			)
 		let total = 0
 		for (const entry of entries) {
 			if (entry.directory) continue
@@ -66,9 +78,14 @@ async function archive(bytes: Uint8Array) {
 				entry.uncompressedSize > 16 * 1024 * 1024 ||
 				total > 128 * 1024 * 1024
 			)
-				throw new Error('EPUB expansion limit exceeded')
-			if (entry.encrypted || files.has(path))
-				throw new Error('Encrypted or duplicate EPUB entry')
+				throw new ImportFailureError(
+					'epub_limit_exceeded',
+					'EPUB expansion limit exceeded',
+				)
+			if (entry.encrypted)
+				throw new ImportFailureError('epub_encrypted', 'Encrypted EPUB entry')
+			if (files.has(path))
+				throw new ImportFailureError('invalid_epub', 'Duplicate EPUB entry')
 			files.set(path, await entry.getData(new Uint8ArrayWriter()))
 		}
 	} finally {
@@ -207,13 +224,18 @@ export async function extractEpub(
 	const files = await archive(bytes)
 	const read = (path: string) => {
 		const data = files.get(path)
-		if (!data) throw new Error(`Missing EPUB entry: ${path}`)
+		if (!data)
+			throw new ImportFailureError(
+				'invalid_epub',
+				`Missing EPUB entry: ${path}`,
+			)
 		return xml(new TextDecoder('utf-8', { fatal: true }).decode(data))
 	}
 	const rootfile = all(read('META-INF/container.xml'), 'rootfile')[0]?.attrs[
 		'full-path'
 	]
-	if (!rootfile) throw new Error('Missing EPUB rootfile')
+	if (!rootfile)
+		throw new ImportFailureError('invalid_epub', 'Missing EPUB rootfile')
 	const opfPath = archivePath(rootfile)
 	const opf = read(opfPath)
 	const manifest: (Record<string, string> & { path: string })[] = all(
@@ -227,13 +249,14 @@ export async function extractEpub(
 		.filter((ref) => ref.attrs.linear !== 'no')
 		.map((ref) => {
 			const item = manifest.find((item) => item.id === ref.attrs.idref)
-			if (!item) throw new Error('Missing EPUB spine item')
+			if (!item)
+				throw new ImportFailureError('invalid_epub', 'Missing EPUB spine item')
 			return document(item.path, read(item.path))
 		})
 	if (
 		!docs.some((doc) => doc.blocks.some((block) => block.text && !block.note))
 	)
-		throw new Error('EPUB has no extractable text')
+		throw new ImportFailureError('epub_no_text', 'EPUB has no extractable text')
 	const locate = (
 		base: string,
 		href: string,
@@ -400,7 +423,11 @@ export async function extractEpub(
 			for (const block of blocks) {
 				if (!block.image) continue
 				const data = files.get(block.image)
-				if (!data) throw new Error(`Missing EPUB image: ${block.image}`)
+				if (!data)
+					throw new ImportFailureError(
+						'invalid_epub',
+						`Missing EPUB image: ${block.image}`,
+					)
 				images.set(block.image, data)
 				book.illustrations.push({ archivePath: block.image, volume, chapter })
 			}
@@ -430,7 +457,11 @@ export async function extractEpub(
 			if (block.text && !block.note) paragraph++
 			if (!block.image) continue
 			const data = files.get(block.image)
-			if (!data) throw new Error(`Missing EPUB image: ${block.image}`)
+			if (!data)
+				throw new ImportFailureError(
+					'invalid_epub',
+					`Missing EPUB image: ${block.image}`,
+				)
 			images.set(block.image, data)
 			const location: Location = {
 				archivePath: block.image,
@@ -445,7 +476,11 @@ export async function extractEpub(
 		if (!item['media-type']?.startsWith('image/') || images.has(item.path))
 			continue
 		const data = files.get(item.path)
-		if (!data) throw new Error(`Missing EPUB image: ${item.path}`)
+		if (!data)
+			throw new ImportFailureError(
+				'invalid_epub',
+				`Missing EPUB image: ${item.path}`,
+			)
 		images.set(item.path, data)
 		book.illustrations.push({ archivePath: item.path, volume: 0, chapter: 0 })
 	}

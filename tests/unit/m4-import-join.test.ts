@@ -176,9 +176,9 @@ test.each(['md', 'docx', 'txt', 'epub', 'pdf'] as const)(
 			expect(await project.readFile(path), path).toEqual(bytes)
 		await expect(
 			reviseTxtProject(initial.projectDir, initial.layout),
-		).rejects.toMatchObject({
-			code: 'invalid_config',
-			message: '系列已添加新卷，不能重新划分原文',
+		).resolves.toMatchObject({
+			status: 'error',
+			code: 'relayout_volume_added',
 		})
 	},
 )
@@ -290,11 +290,11 @@ test('rejects missing/corrupt targets, wrong series IDs and empty books without 
 	const before = await snapshot(initial.projectDir)
 	const beforeSeries = await readFile(join(initial.projectDir, 'series.json'))
 	await expect(readImportTarget(root)).rejects.toMatchObject({
-		code: 'invalid_config',
+		code: 'invalid_join_target',
 		message: '请选择有效的 Novelive 工程文件夹',
 	})
 	await expect(readImportTarget(join(root, 'missing'))).rejects.toMatchObject({
-		code: 'invalid_config',
+		code: 'invalid_join_target',
 	})
 	const sourcePath = join(root, 'second.md')
 	await writeFile(sourcePath, '# 第二章\n\n正文。')
@@ -305,16 +305,16 @@ test('rejects missing/corrupt targets, wrong series IDs and empty books without 
 		references: [],
 		join: { projectDir: initial.projectDir, seriesId: 'missing-series' },
 	}
-	await expect(importFileProject(options)).rejects.toMatchObject({
-		code: 'invalid_config',
-		message: '所选系列不存在，请重新选择工程',
+	await expect(importFileProject(options)).resolves.toMatchObject({
+		status: 'error',
+		code: 'join_series_missing',
 	})
 	await expect(
 		importFileProject({
 			...options,
 			join: { projectDir: root, seriesId: series.seriesId },
 		}),
-	).rejects.toMatchObject({ code: 'invalid_config' })
+	).resolves.toMatchObject({ status: 'error', code: 'invalid_join_target' })
 	const txt = join(root, 'empty.txt')
 	await writeFile(txt, '')
 	await expect(
@@ -324,16 +324,16 @@ test('rejects missing/corrupt targets, wrong series IDs and empty books without 
 			encoding: 'utf-8',
 			join: { projectDir: initial.projectDir, seriesId: series.seriesId },
 		}),
-	).rejects.toMatchObject({ code: 'invalid_config' })
+	).resolves.toMatchObject({ status: 'error', code: 'join_no_text' })
 	await expect(
 		importFileProject({
 			...options,
 			references: ['external.png'],
 			join: { projectDir: initial.projectDir, seriesId: series.seriesId },
 		}),
-	).rejects.toMatchObject({
-		code: 'invalid_config',
-		message: '加入已有系列时不支持添加参考图',
+	).resolves.toMatchObject({
+		status: 'error',
+		code: 'join_references_unsupported',
 	})
 	expect(await readFile(join(initial.projectDir, 'series.json'))).toEqual(
 		beforeSeries,

@@ -6,6 +6,11 @@ import {
 	type ImportReport,
 	projectFiles,
 } from '@novelive/format/model'
+import {
+	type ImportErrorCode,
+	ImportFailureError,
+	importFailure,
+} from '../../contract/errors'
 import type {
 	ExtractedBook,
 	ImportExtraction,
@@ -25,6 +30,7 @@ import {
 	detectTxtEncoding,
 	importTxt,
 	type TxtEncoding,
+	TxtEncodingError,
 	type TxtStructure,
 	type TxtVolume,
 	writeTxtLayout,
@@ -75,7 +81,8 @@ type WizardReport = ImportReport & {
 
 const referenceTypes = new Set(['.png', '.jpg', '.jpeg', '.webp'])
 
-const invalid = (message: string) => ({ code: 'invalid_config', message })
+const invalid = (code: ImportErrorCode, message: string) =>
+	new ImportFailureError(code, message)
 
 function originals(structure: TxtStructure) {
 	let start = 0
@@ -116,26 +123,28 @@ function suggestedLayout(
 
 export function validateLayout(layout: ImportLayout, paragraphs: number) {
 	const { chapters, volumes } = layout
-	if (!layout.title.trim()) throw invalid('作品名不能为空')
+	if (!layout.title.trim()) throw invalid('invalid_layout', '作品名不能为空')
 	if (!chapters.length || chapters[0].start !== 0)
-		throw invalid('第一章必须从正文开头开始')
+		throw invalid('invalid_layout', '第一章必须从正文开头开始')
 	for (const [i, chapter] of chapters.entries()) {
-		if (!chapter.title.trim()) throw invalid(`第 ${i + 1} 章缺少标题`)
+		if (!chapter.title.trim())
+			throw invalid('invalid_layout', `第 ${i + 1} 章缺少标题`)
 		if (
 			chapter.start > paragraphs ||
 			(i && chapter.start < chapters[i - 1].start)
 		)
-			throw invalid('章节划分顺序无效')
+			throw invalid('invalid_layout', '章节划分顺序无效')
 	}
 	if (!volumes.length || volumes[0].start !== 0)
-		throw invalid('第一卷必须从第一章开始')
+		throw invalid('invalid_layout', '第一卷必须从第一章开始')
 	for (const [i, volume] of volumes.entries()) {
-		if (!volume.title.trim()) throw invalid(`第 ${i + 1} 卷缺少标题`)
+		if (!volume.title.trim())
+			throw invalid('invalid_layout', `第 ${i + 1} 卷缺少标题`)
 		if (
 			volume.start >= chapters.length ||
 			(i && volume.start <= volumes[i - 1].start)
 		)
-			throw invalid('分卷顺序无效')
+			throw invalid('invalid_layout', '分卷顺序无效')
 	}
 }
 
@@ -322,7 +331,10 @@ export async function screenImportedIllustrations(
 			ids.has(`illustration-${index + 1}`),
 		)
 		if (illustrations.length !== candidates.length)
-			throw new Error('EPUB illustration list does not match import')
+			throw new ImportFailureError(
+				'illustration_mismatch',
+				'EPUB illustration list does not match import',
+			)
 		const results = await classifyIllustrations(
 			{ ...extraction, book: { ...extraction.book, illustrations } },
 			bible,
@@ -382,7 +394,10 @@ export async function importFileProject(
 			? 'markdown'
 			: extension.slice(1)
 	if (!['txt', 'epub', 'markdown', 'docx', 'pdf'].includes(format))
-		throw invalid('不支持的原文格式')
+		return importFailure(
+			extname(options.sourcePath).slice(1) || 'txt',
+			invalid('unsupported_source_format', '不支持的原文格式'),
+		)
 	return importProject(options, format as ImportWizardView['format'], register)
 }
 
@@ -393,13 +408,26 @@ async function importProject(
 ) {
 	for (const path of options.references)
 		if (!referenceTypes.has(extname(path).toLowerCase()))
-			throw invalid(`不支持的参考图格式：${basename(path)}`)
-	if (options.references.length > 3) throw invalid('最多选择 3 张参考图')
+			return importFailure(
+				format,
+				invalid(
+					'unsupported_reference_format',
+					`不支持的参考图格式：${basename(path)}`,
+				),
+			)
+	if (options.references.length > 3)
+		return importFailure(
+			format,
+			invalid('reference_limit', '最多选择 3 张参考图'),
+		)
 	const bytes = await readFile(options.sourcePath)
 	if (format === 'txt' && !options.encoding) {
 		const candidates = detectTxtEncoding(bytes)
 		if (!candidates.length)
-			throw { code: 'unsupported', message: '无法识别原文编码' }
+			return importFailure(
+				format,
+				invalid('unknown_encoding', '无法识别原文编码'),
+			)
 		if (candidates.length > 1)
 			return {
 				status: 'encoding' as const,
@@ -411,17 +439,33 @@ async function importProject(
 	}
 	let book: ExtractedBook | undefined
 	if (format !== 'txt') {
-		const extraction: ImportExtraction = await {
-			epub: extractEpub,
-			markdown: extractMarkdown,
-			docx: extractDocx,
-			pdf: extractPdf,
-		}[format](bytes)
+		let extraction: ImportExtraction
+		try {
+			extraction = await {
+				epub: extractEpub,
+				markdown: extractMarkdown,
+				docx: extractDocx,
+				pdf: extractPdf,
+			}[format](bytes)
+		} catch (error) {
+			// Every import failure — extraction or wizard — surfaces through the
+			// same command-output shape; the UI maps the code to localized copy.
+			// importFailure keeps any typed code (ImportFailureError, and the
+			// format-specific Docx/Markdown errors) and falls back per format.
+			return importFailure(format, error)
+		}
 		if (extraction.status === 'unsupported') return extraction
 		book = extraction.book
 	}
-	if (options.join)
-		return joinImportedVolumes(options, bytes, format, book, register)
+	if (options.join) {
+		try {
+			return await joinImportedVolumes(options, bytes, format, book, register)
+		} catch (error) {
+			if (error instanceof ImportFailureError)
+				return importFailure(format, error)
+			throw error
+		}
+	}
 	const root = join(options.folder, folderName(options.title))
 	let project: Project
 	try {
@@ -433,7 +477,10 @@ async function importProject(
 		})
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code === 'EEXIST')
-			throw invalid(`该位置已有同名文件夹：${root}`)
+			return importFailure(
+				format,
+				invalid('project_folder_exists', `该位置已有同名文件夹：${root}`),
+			)
 		throw error
 	}
 	try {
@@ -482,10 +529,17 @@ async function importProject(
 				volumeIds: structure.volumes.map((volume) => volume.volumeId),
 			})
 		} else {
-			await importTxt(opened, bytes, {
-				title: options.title.trim(),
-				encoding: options.encoding,
-			})
+			try {
+				await importTxt(opened, bytes, {
+					title: options.title.trim(),
+					encoding: options.encoding,
+				})
+			} catch (error) {
+				if (error instanceof ImportFailureError) throw error
+				if (error instanceof TxtEncodingError)
+					throw new ImportFailureError(error.code, error.message)
+				throw error
+			}
 		}
 		const references: string[] = []
 		await mkdir(join(opened.root, 'source/references'), { recursive: true })
@@ -513,11 +567,25 @@ async function importProject(
 		return result
 	} catch (error) {
 		await rm(root, { recursive: true, force: true })
+		if (error instanceof ImportFailureError) return importFailure(format, error)
 		throw error
 	}
 }
 
 export async function reviseTxtProject(
+	projectDir: string,
+	layout: ImportLayout,
+	selectedIllustrations?: string[],
+) {
+	try {
+		return await reviseProject(projectDir, layout, selectedIllustrations)
+	} catch (error) {
+		if (error instanceof ImportFailureError) return importFailure('txt', error)
+		throw error
+	}
+}
+
+async function reviseProject(
 	projectDir: string,
 	layout: ImportLayout,
 	selectedIllustrations?: string[],
@@ -528,21 +596,23 @@ export async function reviseTxtProject(
 	const externalReferences =
 		report.externalReferences ?? report.references ?? []
 	const illustrations = report.illustrations ?? []
-	if (new Set(selected).size !== selected.length) throw invalid('插图选择无效')
+	if (new Set(selected).size !== selected.length)
+		throw invalid('invalid_illustration_selection', '插图选择无效')
 	const selectedCandidates = selected.map((id) => {
 		const candidate = illustrations.find((candidate) => candidate.id === id)
-		if (!candidate) throw invalid('插图选择无效')
+		if (!candidate)
+			throw invalid('invalid_illustration_selection', '插图选择无效')
 		return candidate
 	})
 	if (externalReferences.length + selected.length > 3)
-		throw invalid('最多选择 3 张参考图')
+		throw invalid('reference_limit', '最多选择 3 张参考图')
 	const volumes = applyLayout(report.structure, layout)
 	const ids = await workIds(project)
 	if (
 		ids.length !==
 		(report.layout?.volumes.length ?? report.structure.volumes.length)
 	)
-		throw invalid('系列已添加新卷，不能重新划分原文')
+		throw invalid('relayout_volume_added', '系列已添加新卷，不能重新划分原文')
 	const references = [...externalReferences]
 	for (const candidate of selectedCandidates) {
 		const path = `source/references/${candidate.id}.png`

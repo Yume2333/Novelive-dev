@@ -445,7 +445,10 @@ test.each(scenarios)(
 					expect(recoveredFraming).toBe(false)
 					expect(snapshot.chapters[1]).toMatchObject({
 						status: 'producing',
-						issue: '立绘主体缺失，或头部、侧面超出画布。',
+						issue: {
+							kind: 'portrait_framing',
+							detail: '立绘主体缺失，或头部、侧面超出画布。',
+						},
 					})
 					expect((await host.playerStatus(workId)).chapters[1]?.published).toBe(
 						false,
@@ -511,7 +514,11 @@ test.each(scenarios)(
 				) {
 					expect(snapshot.chapters[0]).toMatchObject({
 						status: 'producing',
-						issue: '[reasoning_limit] Model generated reasoning but no answer',
+						issue: {
+							kind: 'reasoning_limit',
+							detail:
+								'[reasoning_limit] Model generated reasoning but no answer',
+						},
 					})
 					expect((await host.playerStatus(workId)).chapters[0]?.published).toBe(
 						false,

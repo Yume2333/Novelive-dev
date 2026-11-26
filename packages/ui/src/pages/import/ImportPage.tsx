@@ -1,8 +1,4 @@
-import type {
-	CommandError,
-	CommandInput,
-	CommandOutput,
-} from '@novelive/creator/contract'
+import type { CommandInput, CommandOutput } from '@novelive/creator/contract'
 import {
 	ArrowDown,
 	ArrowLeft,
@@ -34,9 +30,12 @@ import {
 	Stepper,
 	Tooltip,
 } from '../../components/Extended'
+import { ErrorNotice } from '../../components/Feedback'
 import { Field, Select, TextInput, Toggle } from '../../components/Form'
 import { InfoTooltip } from '../../components/InfoTooltip'
 import { Page } from '../../components/Page'
+import { type HumanizedError, humanizeError } from '../../format/errors'
+import { formatLanguage, languages } from '../../format/language'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import type { SettingsHost } from '../../shell/AppShell'
@@ -61,13 +60,6 @@ type Wizard = Extract<Result, { status: 'ready' }>
 type Candidates = Extract<Result, { status: 'encoding' }>['candidates']
 type Encoding = NonNullable<CommandInput<'import.file'>['encoding']>
 
-const languages = [
-	['zh-CN', msg('简体中文')],
-	['zh-TW', msg('繁体中文')],
-	['ja', msg('日语')],
-	['en', msg('英语')],
-	['ko', msg('韩语')],
-] as const
 const encodingNames: Record<Encoding, string> = {
 	'utf-8': 'UTF-8',
 	gb18030: msg('GB18030（简体）'),
@@ -103,11 +95,6 @@ const extIcon: Record<string, LucideIcon> = {
 	docx: FileType2,
 	pdf: FileImage,
 }
-
-const message = (error: unknown) =>
-	error && typeof error === 'object' && 'message' in error
-		? String((error as CommandError).message)
-		: t('导入失败，请重试。')
 
 /** 文件行：图标 + 文件名 + 类型标签，悬停/聚焦浮出移除按钮 */
 function FileRow({
@@ -220,17 +207,17 @@ export function ImportPage() {
 	const [joined, setJoined] = useState<Extract<Result, { status: 'joined' }>>()
 	const [layout, setLayout] = useState<ImportLayout>()
 	const [busy, setBusy] = useState(false)
-	const [error, setError] = useState('')
+	const [error, setError] = useState<HumanizedError>()
 	const location =
 		folder ?? (config && 'projectDir' in config ? config.projectDir : '')
 
 	async function run(action: () => Promise<void>) {
 		setBusy(true)
-		setError('')
+		setError(undefined)
 		try {
 			await action()
 		} catch (failure) {
-			setError(message(failure))
+			setError(humanizeError(failure))
 		} finally {
 			setBusy(false)
 		}
@@ -290,7 +277,7 @@ export function ImportPage() {
 						: undefined,
 			}).promise
 			if (result.status === 'unsupported') {
-				setError(t('扫描版 PDF 无可提取文字，暂不支持 OCR'))
+				setError({ message: t('扫描版 PDF 无可提取文字，暂不支持 OCR') })
 				return
 			}
 			if (result.status === 'encoding') {
@@ -300,6 +287,10 @@ export function ImportPage() {
 			}
 			if (result.status === 'joined') {
 				setJoined(result)
+				return
+			}
+			if (result.status === 'error') {
+				setError(humanizeError(result))
 				return
 			}
 			setWizard(result)
@@ -314,14 +305,19 @@ export function ImportPage() {
 				revise ||
 				selectedIllustrations.length ||
 				confirm !== wizard.layout.confirmWithReferences
-			)
-				await window.novelive.call('import.revise', {
+			) {
+				const revised = await window.novelive.call('import.revise', {
 					projectDir: wizard.projectDir,
 					layout: revise
 						? { ...layout, title: layout.title.trim() }
 						: { ...wizard.layout, confirmWithReferences: confirm },
 					selectedIllustrations,
 				}).promise
+				if (revised.status === 'error') {
+					setError(humanizeError(revised))
+					return
+				}
+			}
 			navigate(workRoute('work', wizard.workId))
 		})
 
@@ -400,11 +396,7 @@ export function ImportPage() {
 		<Page eyebrow={t('从原文开始')} title={t('新建工程')} width={760}>
 			<div className={styles.flow}>
 				<WizardStepper current={0} />
-				{error && (
-					<div role="alert">
-						<Banner kind="error">{error}</Banner>
-					</div>
-				)}
+				{error && <ErrorNotice error={error} />}
 				<Card className={styles.cardBody}>
 					<div className={styles.drops}>
 						<DropZone
@@ -592,7 +584,7 @@ function Review({
 	onSelectIllustrations(ids: string[]): void
 	layout: ImportLayout
 	busy: boolean
-	error: string
+	error: HumanizedError | undefined
 	onChange(layout: ImportLayout): void
 	onFinish(revise: boolean): void
 }) {
@@ -611,7 +603,7 @@ function Review({
 		setStep(2)
 	}
 	const languageOptions = [
-		...languages.map(([value, name]) => ({ value, label: t(name) })),
+		...languages.map(([value]) => ({ value, label: formatLanguage(value) })),
 		...(!languages.some(([value]) => value === layout.language)
 			? [{ value: layout.language, label: layout.language }]
 			: []),
@@ -620,11 +612,7 @@ function Review({
 		<Page eyebrow={t('从原文开始')} title={t('新建工程')} width={760}>
 			<div className={styles.flow}>
 				<WizardStepper current={step} />
-				{error && (
-					<div role="alert">
-						<Banner kind="error">{error}</Banner>
-					</div>
-				)}
+				{error && <ErrorNotice error={error} />}
 				{step === 1 && (
 					<Card className={styles.cardBody}>
 						<div className={styles.grid}>

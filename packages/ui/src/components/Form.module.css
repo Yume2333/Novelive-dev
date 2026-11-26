@@ -9,8 +9,26 @@
 }
 
 .hint {
-	font-size: 12px;
+	font-size: var(--text-12);
 	color: var(--color-outline);
+}
+
+.input {
+	width: 100%;
+	padding: var(--space-px-10) var(--space-px-14);
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-md);
+	background: var(--white-60);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-surface);
+	font-size: var(--text-14);
+}
+
+.textarea {
+	padding: var(--space-px-10);
+	font-size: var(--text-13);
+	line-height: 1.6;
+	resize: vertical;
 }
 
 .input:disabled {
@@ -40,7 +58,7 @@
 	background: var(--white-60);
 	box-shadow: var(--shadow-glass);
 	color: var(--color-on-surface);
-	font-size: 14px;
+	font-size: var(--text-14);
 }
 
 .compactSelect {
@@ -52,7 +70,7 @@
 	background: var(--white-60);
 	box-shadow: var(--shadow-glass);
 	color: var(--color-on-surface);
-	font-size: 13px;
+	font-size: var(--text-13);
 }
 
 .select:disabled,
@@ -108,13 +126,13 @@
 }
 
 .tierLabel {
-	font-size: 14px;
+	font-size: var(--text-14);
 	font-weight: 700;
 }
 
 .tierDesc {
 	display: block;
-	font-size: 12px;
+	font-size: var(--text-12);
 	line-height: 1.5;
 	color: var(--color-on-surface-variant);
 }

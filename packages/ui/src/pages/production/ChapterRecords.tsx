@@ -1,11 +1,13 @@
 import {
 	type EventEnvelope,
+	type IssueKind,
 	type ProductionSnapshot,
 	productionChapterRecordEvent,
 } from '@novelive/creator/contract'
 import { ChevronDown, CircleCheck, CircleX, Clock, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Collapse, Drawer, EmptyState, Spinner } from '../../components'
+import { formatErrorText, humanizeError } from '../../format/errors'
 import { scoped } from '../../i18n'
 import { stepName, steps } from './ChapterState'
 import styles from './Production.module.css'
@@ -18,7 +20,7 @@ interface ChapterRunRecord {
 	chapterId: string
 	step: 'write' | 'review' | 'stage' | 'draw'
 	status: 'running' | 'done' | 'failed' | 'cancelled'
-	message: string
+	errorKind?: IssueKind
 	detail?: string
 	seq: number
 	at: string
@@ -73,7 +75,16 @@ function RecordCard({ record }: { record: ChapterRunRecord }) {
 	return (
 		<li className={`glass-panel ${styles.recordCard}`}>
 			<div className={styles.recordCardMain}>
-				<span className={styles.recordMessage}>{record.message}</span>
+				<span className={styles.recordMessage}>
+					{record.errorKind
+						? `${t(stepName[record.step])} · ${formatErrorText(
+								humanizeError({
+									kind: record.errorKind,
+									detail: record.detail,
+								}),
+							)}`
+						: `${t(stepName[record.step])} · ${recordStatus[record.status].label()}`}
+				</span>
 				{record.detail ? (
 					<button
 						type="button"

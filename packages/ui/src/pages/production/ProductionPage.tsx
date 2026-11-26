@@ -25,6 +25,7 @@ import {
 	ProgressBar,
 	useToast,
 } from '../../components'
+import { formatErrorText, humanizeError } from '../../format/errors'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import { chapterTitle, useWorkProduction } from '../work/WorkProduction'
@@ -224,7 +225,9 @@ function ChapterRow({
 				</span>
 			</div>
 			{issue ? (
-				<p className={`${styles.muted} ${styles.issueLine}`}>{issue}</p>
+				<p className={`${styles.muted} ${styles.issueLine}`}>
+					{formatErrorText(humanizeError(issue))}
+				</p>
 			) : null}
 		</li>
 	)

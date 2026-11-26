@@ -104,7 +104,15 @@ const messagePart = union([
 	obj({
 		type: lit('subtask'),
 		id,
+		// The delegated task text trimmed to one line.
 		label: id,
+		role: oneOf([
+			'organizer',
+			'writer',
+			'reviewer',
+			'artDirector',
+			'visualAuditor',
+		]),
 		status: oneOf(['running', 'done', 'failed', 'cancelled']),
 	}),
 	obj({

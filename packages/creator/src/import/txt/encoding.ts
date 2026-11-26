@@ -14,11 +14,20 @@ export interface EncodingCandidate {
 	preview: string
 }
 export class TxtEncodingError extends Error {
-	constructor(readonly candidates: EncodingCandidate[]) {
+	/**
+	 * `txt_decoding_failed` when a user-selected encoding fails the quality
+	 * gates; `txt_encoding_unknown` when detection finds no viable encoding.
+	 */
+	constructor(
+		readonly code: 'txt_encoding_unknown' | 'txt_decoding_failed',
+		readonly candidates: EncodingCandidate[],
+	) {
 		super(
 			candidates.length
 				? 'Ambiguous TXT encoding; select a candidate'
-				: 'No supported TXT encoding passed the quality gates',
+				: code === 'txt_decoding_failed'
+					? 'The selected TXT encoding failed the quality gates'
+					: 'No supported TXT encoding passed the quality gates',
 		)
 	}
 }
@@ -151,10 +160,11 @@ export function detectTxtEncoding(bytes: Uint8Array): EncodingCandidate[] {
 export function decodeTxt(bytes: Uint8Array, selected?: TxtEncoding) {
 	if (selected) {
 		const result = candidate(bytes, selected, false)
-		if (!result) throw new TxtEncodingError([])
+		if (!result) throw new TxtEncodingError('txt_decoding_failed', [])
 		return result
 	}
 	const candidates = detectTxtEncoding(bytes)
-	if (candidates.length !== 1) throw new TxtEncodingError(candidates)
+	if (candidates.length !== 1)
+		throw new TxtEncodingError('txt_encoding_unknown', candidates)
 	return candidates[0]
 }

@@ -57,7 +57,11 @@ const first: ProductionSnapshot = {
 	phase: 'confirm-first',
 	status: 'confirm',
 	chapters: [
-		{ ...chapters[0], status: 'published', issue: '背景图已用占位图发布' },
+		{
+			...chapters[0],
+			status: 'published',
+			issue: { kind: 'placeholder', count: 1 },
+		},
 		chapters[1],
 	],
 }
@@ -65,7 +69,16 @@ const blocked: ProductionSnapshot = {
 	...first,
 	phase: 'producing',
 	blockedChapterId: 'two',
-	chapters: [first.chapters[0], { ...chapters[1], issue: '写手请求超时' }],
+	chapters: [
+		first.chapters[0],
+		{
+			...chapters[1],
+			issue: {
+				kind: 'network',
+				detail: '[network] Model connection interrupted',
+			},
+		},
+	],
 }
 const second: ProductionSnapshot = {
 	...first,

@@ -5,7 +5,7 @@
 	gap: var(--space-2);
 	padding: var(--space-px-10) var(--space-px-20);
 	border-radius: var(--radius-md);
-	font-size: 12px;
+	font-size: var(--text-12);
 	font-weight: 600;
 	letter-spacing: 0.08em;
 	white-space: nowrap;
@@ -21,7 +21,7 @@
 .sm {
 	gap: var(--space-px-5);
 	padding: var(--space-px-5) var(--space-px-10);
-	font-size: 11px;
+	font-size: var(--text-11);
 }
 
 .primary {

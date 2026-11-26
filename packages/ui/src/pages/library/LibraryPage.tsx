@@ -454,7 +454,7 @@ export function LibraryPage() {
 	return (
 		<Page
 			title={t('书库')}
-			action={
+			actions={
 				<div className={styles.actions}>
 					{share && (
 						<ImportPackage

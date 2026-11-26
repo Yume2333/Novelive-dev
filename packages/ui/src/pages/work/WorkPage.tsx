@@ -29,6 +29,7 @@ import { Dropdown } from '../../components/Dropdown'
 import { Pagination, Tooltip } from '../../components/Extended'
 import { GradientCover } from '../../components/GradientCover'
 import { Page } from '../../components/Page'
+import { formatErrorText, humanizeError } from '../../format/errors'
 import { msg, scoped } from '../../i18n'
 import { workRoute } from '../../routes/production'
 import { chapterIndex } from '../production/ProductionPage'
@@ -348,10 +349,10 @@ function ChapterRow({
 				<span className={local.step}>{t(stepLabel[chapter.step])}</span>
 			)}
 			{chapter.issue && (
-				<Tooltip text={chapter.issue}>
+				<Tooltip text={formatErrorText(humanizeError(chapter.issue))}>
 					<span className={local.issue}>
 						<CircleAlert aria-hidden="true" size={13} strokeWidth={1.8} />
-						{chapter.issue}
+						{formatErrorText(humanizeError(chapter.issue))}
 					</span>
 				</Tooltip>
 			)}

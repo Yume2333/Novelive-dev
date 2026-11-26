@@ -333,6 +333,7 @@ export function chapterWorker(
 				throw new ProductionTaskError(
 					error.code === 'moderation' ? 'moderation' : 'transient',
 					error.message,
+					error.code,
 				)
 			throw error
 		}

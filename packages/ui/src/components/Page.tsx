@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { ButtonLink } from './Feedback'
 import styles from './Page.module.css'
 
 export function Page({
@@ -8,7 +8,6 @@ export function Page({
 	eyebrow,
 	subtitle,
 	actions,
-	action,
 	width = 960,
 	children,
 }: {
@@ -16,12 +15,9 @@ export function Page({
 	eyebrow?: ReactNode
 	subtitle?: ReactNode
 	actions?: ReactNode
-	/** Alias of `actions` kept for existing callers. */
-	action?: ReactNode
 	width?: number | 'full'
 	children?: ReactNode
 }) {
-	const slot = actions ?? action
 	return (
 		<section
 			className={styles.page}
@@ -37,7 +33,7 @@ export function Page({
 					<h1 className={`display ${styles.title}`}>{title}</h1>
 					{subtitle && <div className={styles.subtitle}>{subtitle}</div>}
 				</div>
-				{slot && <div className={styles.actions}>{slot}</div>}
+				{actions && <div className={styles.actions}>{actions}</div>}
 			</header>
 			{children}
 		</section>
@@ -72,7 +68,7 @@ export function EmptyState({
 }
 
 export function PageAction({
-	icon: Icon,
+	icon,
 	to,
 	children,
 }: {
@@ -81,9 +77,8 @@ export function PageAction({
 	children: ReactNode
 }) {
 	return (
-		<Link className={styles.primary} to={to}>
-			<Icon aria-hidden="true" size={16} />
+		<ButtonLink variant="primary" icon={icon} to={to}>
 			{children}
-		</Link>
+		</ButtonLink>
 	)
 }

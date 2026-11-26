@@ -1,11 +1,13 @@
 import { defaultWorkSettings, projectFiles } from '@novelive/format/model'
+import { type ImportErrorCode, ImportFailureError } from '../../contract/errors'
 import type { ExtractedBook, ImportJoined } from '../../contract/import'
 import { Project } from '../../project'
 import { joinSeriesVolumes } from '../../project/series'
-import { decodeTxt, parseTxt } from '../txt'
+import { decodeTxt, parseTxt, TxtEncodingError } from '../txt'
 import type { ImportWizardView, importTxtProject } from './index'
 
-const invalid = (message: string) => ({ code: 'invalid_config', message })
+const invalid = (code: ImportErrorCode, message: string) =>
+	new ImportFailureError(code, message)
 export type RegisterImported = (
 	workIds: string[],
 	projectDir: string,
@@ -16,12 +18,12 @@ async function openTarget(projectDir: string, seriesId?: string) {
 	try {
 		project = await Project.open(projectDir)
 	} catch {
-		throw invalid('请选择有效的 Novelive 工程文件夹')
+		throw invalid('invalid_join_target', '请选择有效的 Novelive 工程文件夹')
 	}
 	try {
 		const series = await project.read(projectFiles.series)
 		if (seriesId !== undefined && series.seriesId !== seriesId)
-			throw invalid('所选系列不存在，请重新选择工程')
+			throw invalid('join_series_missing', '所选系列不存在，请重新选择工程')
 		for (const volumeId of series.volumeIds) {
 			const volume = await project.read(projectFiles.volume(volumeId))
 			for (const workId of volume.workIds)
@@ -30,8 +32,11 @@ async function openTarget(projectDir: string, seriesId?: string) {
 		return project
 	} catch (error) {
 		project.close()
-		if ((error as { code?: string }).code === 'invalid_config') throw error
-		throw invalid('工程的系列数据无效，请选择有效的 Novelive 工程')
+		if (error instanceof ImportFailureError) throw error
+		throw invalid(
+			'join_series_invalid',
+			'工程的系列数据无效，请选择有效的 Novelive 工程',
+		)
 	}
 }
 
@@ -52,13 +57,17 @@ export async function joinImportedVolumes(
 	book?: ExtractedBook,
 	register?: RegisterImported,
 ): Promise<ImportJoined> {
-	if (!options.join) throw invalid('请选择要加入的系列')
+	if (!options.join) throw invalid('join_target_missing', '请选择要加入的系列')
 	using project = await openTarget(
 		options.join.projectDir,
 		options.join.seriesId,
 	)
-	if (options.references.length) throw invalid('加入已有系列时不支持添加参考图')
-	if (!bytes.length) throw invalid('原文无正文，无法加入系列')
+	if (options.references.length)
+		throw invalid(
+			'join_references_unsupported',
+			'加入已有系列时不支持添加参考图',
+		)
+	if (!bytes.length) throw invalid('join_no_text', '原文无正文，无法加入系列')
 	const series = await project.read(projectFiles.series)
 	const firstVolume = series.volumeIds[0]
 		? await project.read(projectFiles.volume(series.volumeIds[0]))
@@ -68,8 +77,16 @@ export async function joinImportedVolumes(
 				projectFiles.work(firstVolume.volumeId, firstVolume.workIds[0]),
 			)
 		: undefined
-	const decoded =
-		format === 'txt' ? decodeTxt(bytes, options.encoding) : undefined
+	let decoded: ReturnType<typeof decodeTxt> | undefined
+	if (format === 'txt') {
+		try {
+			decoded = decodeTxt(bytes, options.encoding)
+		} catch (error) {
+			if (error instanceof TxtEncodingError)
+				throw invalid(error.code, error.message)
+			throw error
+		}
+	}
 	const volumes =
 		book?.volumes ??
 		parseTxt(decoded?.text ?? '').volumes.map((volume) => ({
@@ -88,7 +105,7 @@ export async function joinImportedVolumes(
 				volume.chapters.some((chapter) => !chapter.paragraphs.length),
 		)
 	)
-		throw invalid('原文含无正文的卷或章节，无法加入系列')
+		throw invalid('join_empty_sections', '原文含无正文的卷或章节，无法加入系列')
 	const language =
 		firstWork?.language ??
 		book?.metadata.language ??

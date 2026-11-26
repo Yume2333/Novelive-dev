@@ -114,7 +114,13 @@ export async function startDevBridge(options: Options = {}) {
 	let nextId = 0
 	const state = (): HostMessage => ({
 		type: 'state',
-		state: { creator: status, generation, breakerOpen: false, logDir },
+		state: {
+			creator: status,
+			generation,
+			breakerOpen: false,
+			logDir,
+			homeDir: homedir(),
+		},
 	})
 	function send(connection: WebSocket, message: string) {
 		if (connection.readyState === WebSocket.OPEN) connection.send(message)

@@ -27,10 +27,10 @@
 	user-select: none;
 }
 
-.host:hover > .track,
-.host:focus-within > .track[data-active="true"],
 .track[data-active="true"],
-.track:hover {
+.track:hover,
+.host:hover > .track,
+.host:focus-within > .track[data-active="true"] {
 	opacity: 1;
 	pointer-events: auto;
 }

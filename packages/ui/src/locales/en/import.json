@@ -23,7 +23,6 @@
 	"参考图": "Reference image",
 	"参考图沿用已有工程": "Reference images come from the existing project",
 	"参考图（可选）": "Reference images (optional)",
-	"导入失败，请重试。": "Import failed. Please try again.",
 	"工程文件夹": "Project folder",
 	"已加入系列": "Added to series",
 	"已有 {{value}} 张参考图时也停在角色设定": "Stop at character setup even with {{value}} reference images",
@@ -45,7 +44,6 @@
 	"新增卷": "Add volume",
 	"新建工程": "New project",
 	"新建系列": "New series",
-	"日语": "Japanese",
 	"最多 3 张，已选 {{length}} 张": "Up to 3, {{length}} selected",
 	"未设置": "Not set",
 	"未选择": "Not selected",
@@ -58,10 +56,7 @@
 	"第 {{value}} 章": "Chapter {{value}}",
 	"第 {{value}} 章标题": "Chapter {{value}} title",
 	"第{{value}}卷": "Volume {{value}}",
-	"简体中文": "Simplified Chinese",
 	"系列": "Series",
-	"繁体中文": "Traditional Chinese",
-	"英语": "English",
 	"跳过核对": "Skip review",
 	"这份原文没有需要额外设置的项目，可以直接开始制作。": "Nothing else to set for this source. You can start production.",
 	"进入作品": "Open work",
@@ -69,6 +64,5 @@
 	"选择原文文件": "Choose source file",
 	"选择已有工程": "Select existing project",
 	"选择文件": "Choose files",
-	"选择文件夹": "Select folder",
-	"韩语": "Korean"
+	"选择文件夹": "Select folder"
 }

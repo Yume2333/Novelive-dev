@@ -383,7 +383,7 @@ test('delegates with fresh context and gives child agents no dispatch or proposa
 		expect.arrayContaining([
 			expect.objectContaining({
 				type: 'subtask',
-				label: 'reviewer',
+				role: 'reviewer',
 				status: 'done',
 			}),
 			expect.objectContaining({

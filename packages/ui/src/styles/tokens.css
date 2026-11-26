@@ -178,6 +178,21 @@
 	--stage-frame: #0a0e13;
 	--stage-scrim: rgba(10, 14, 19, 0.72);
 
+	/* 字号：排版阶梯，界面只用这一组整数值（见 DESIGN.md 排版） */
+	--text-10: 10px;
+	--text-11: 11px;
+	--text-12: 12px;
+	--text-13: 13px;
+	--text-14: 14px;
+	--text-16: 16px;
+	--text-18: 18px;
+	--text-20: 20px;
+	--text-22: 22px;
+	--text-24: 24px;
+	--text-28: 28px;
+	--text-32: 32px;
+	--text-36: 36px;
+
 	/* 字体 */
 	--font-display:
 		"Manrope", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB",
@@ -286,5 +301,4 @@
 	--dur-spin: 1200ms;
 	--dur-blink: 1100ms;
 	--dur-sheen: 2400ms;
-	--dur-pulse: 4000ms;
 }

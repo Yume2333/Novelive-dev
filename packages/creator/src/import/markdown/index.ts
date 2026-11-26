@@ -16,7 +16,15 @@ export type MarkdownBook = Exclude<ExtractedBook, { format: 'epub' }> & {
 type Volume = MarkdownBook['volumes'][number]
 type Chapter = Volume['chapters'][number]
 
-export class MarkdownImportError extends Error {}
+export class MarkdownImportError extends Error {
+	override name = 'MarkdownImportError'
+	constructor(
+		readonly code: 'markdown_encoding' | 'no_body_text',
+		message: string,
+	) {
+		super(message)
+	}
+}
 
 // A section under one of these headings is front or back matter, not story text.
 const matterHeading =
@@ -173,7 +181,7 @@ export function extractMarkdown(bytes: Uint8Array): {
 	try {
 		source = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
 	} catch {
-		throw new MarkdownImportError('Markdown must be UTF-8')
+		throw new MarkdownImportError('markdown_encoding', 'Markdown must be UTF-8')
 	}
 	const { body, metadata } = frontMatter(source.replace(/\r\n?/g, '\n'))
 	const tree = fromMarkdown(body, {
@@ -352,7 +360,8 @@ export function extractMarkdown(bytes: Uint8Array): {
 	flush()
 	closeVolume()
 	const last = volumes.at(-1)?.chapters.at(-1)
-	if (!last) throw new MarkdownImportError('Markdown has no body text')
+	if (!last)
+		throw new MarkdownImportError('no_body_text', 'Markdown has no body text')
 	last.notes.push(...carried)
 	return { status: 'ready', book: { format: 'markdown', metadata, volumes } }
 }

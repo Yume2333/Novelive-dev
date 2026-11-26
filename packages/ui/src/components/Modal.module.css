@@ -57,7 +57,7 @@
 
 .header .title {
 	margin: 0;
-	font-size: 18px;
+	font-size: var(--text-18);
 }
 
 .footer {

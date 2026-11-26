@@ -48,6 +48,21 @@ test('ASCII and empty input pass through, binary and malformed BOM input fail', 
 	)
 	expect(decodeTxt(new Uint8Array()).text).toBe('')
 	expect(() => decodeTxt(Buffer.from([0, 1, 2, 3]))).toThrow(TxtEncodingError)
+	// Detection with no surviving candidate is txt_encoding_unknown; a
+	// user-selected encoding that fails the quality gates is txt_decoding_failed.
+	const code = (run: () => unknown) => {
+		try {
+			run()
+		} catch (error) {
+			return error instanceof TxtEncodingError ? error.code : undefined
+		}
+	}
+	expect(code(() => decodeTxt(Buffer.from([0, 1, 2, 3])))).toBe(
+		'txt_encoding_unknown',
+	)
+	expect(code(() => decodeTxt(Buffer.from([0, 1, 2, 3]), 'gb18030'))).toBe(
+		'txt_decoding_failed',
+	)
 	expect(() => decodeTxt(Buffer.from('efbbbfff', 'hex'))).toThrow(
 		TxtEncodingError,
 	)

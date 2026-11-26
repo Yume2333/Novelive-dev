@@ -16,7 +16,6 @@ import {
 import {
 	assetId,
 	assetRegistrySchema,
-	chapterProductionSchema,
 	chapterSchema,
 	chapterStepSchema,
 	customMarksSchema,
@@ -25,7 +24,33 @@ import {
 	workId,
 	workPhaseSchema,
 } from '@novelive/format/model'
+import { issueKinds } from './errors'
 import { productionQueueSchema } from './queue'
+
+/**
+ * The production chapter failure. `kind` is machine-readable; the optional
+ * `detail` is raw developer-facing text for the details disclosure only.
+ * Placeholder issues carry the affected image `count`.
+ */
+export const issueSchema = obj({
+	kind: oneOf(issueKinds),
+	detail: opt(str()),
+	count: opt(int({ minimum: 1 })),
+})
+
+// The wire shape widens @novelive/format's chapterProductionSchema, whose
+// `issue` stays a free-form string for work-package internals.
+const chapterFields = {
+	chapterId: entityId,
+	issue: opt(issueSchema),
+	priority: bool(),
+}
+export const productionChapterSchema = union([
+	obj({ ...chapterFields, status: lit('waiting') }),
+	obj({ ...chapterFields, status: lit('producing'), step: chapterStepSchema }),
+	obj({ ...chapterFields, status: lit('published') }),
+])
+export type ProductionChapter = Static<typeof productionChapterSchema>
 
 const work = { workId }
 const chapter = { ...work, chapterId: entityId }
@@ -55,7 +80,7 @@ export const productionSnapshotSchema = obj({
 	chapterTitles: opt(map(str())),
 	phase: workPhaseSchema,
 	status: productionStatusSchema,
-	chapters: arr(chapterProductionSchema),
+	chapters: arr(productionChapterSchema),
 	blockedChapterId: opt(entityId),
 	visual: nullable(
 		obj({
@@ -164,7 +189,7 @@ export const productionChapterRecordEvent = compile(
 			...chapter,
 			step: chapterStepSchema,
 			status: oneOf(['running', 'done', 'failed', 'cancelled']),
-			message: str(),
+			errorKind: opt(oneOf(issueKinds)),
 			detail: opt(str()),
 		}),
 	}),

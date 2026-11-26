@@ -3,6 +3,7 @@ import en_bible from './en/bible.json'
 import en_components from './en/components.json'
 import en_confirm from './en/confirm.json'
 import en_editor from './en/editor.json'
+import en_format from './en/format.json'
 import en_import from './en/import.json'
 import en_library from './en/library.json'
 import en_main from './en/main.json'
@@ -18,6 +19,7 @@ import ja_bible from './ja/bible.json'
 import ja_components from './ja/components.json'
 import ja_confirm from './ja/confirm.json'
 import ja_editor from './ja/editor.json'
+import ja_format from './ja/format.json'
 import ja_import from './ja/import.json'
 import ja_library from './ja/library.json'
 import ja_main from './ja/main.json'
@@ -33,6 +35,7 @@ import zhCN_bible from './zh-CN/bible.json'
 import zhCN_components from './zh-CN/components.json'
 import zhCN_confirm from './zh-CN/confirm.json'
 import zhCN_editor from './zh-CN/editor.json'
+import zhCN_format from './zh-CN/format.json'
 import zhCN_import from './zh-CN/import.json'
 import zhCN_library from './zh-CN/library.json'
 import zhCN_main from './zh-CN/main.json'
@@ -48,6 +51,7 @@ import zhTW_bible from './zh-TW/bible.json'
 import zhTW_components from './zh-TW/components.json'
 import zhTW_confirm from './zh-TW/confirm.json'
 import zhTW_editor from './zh-TW/editor.json'
+import zhTW_format from './zh-TW/format.json'
 import zhTW_import from './zh-TW/import.json'
 import zhTW_library from './zh-TW/library.json'
 import zhTW_main from './zh-TW/main.json'
@@ -67,6 +71,7 @@ export const namespaces = [
 	'components',
 	'confirm',
 	'editor',
+	'format',
 	'import',
 	'library',
 	'main',
@@ -86,6 +91,7 @@ export const resources = {
 		components: zhCN_components,
 		confirm: zhCN_confirm,
 		editor: zhCN_editor,
+		format: zhCN_format,
 		import: zhCN_import,
 		library: zhCN_library,
 		main: zhCN_main,
@@ -103,6 +109,7 @@ export const resources = {
 		components: zhTW_components,
 		confirm: zhTW_confirm,
 		editor: zhTW_editor,
+		format: zhTW_format,
 		import: zhTW_import,
 		library: zhTW_library,
 		main: zhTW_main,
@@ -120,6 +127,7 @@ export const resources = {
 		components: en_components,
 		confirm: en_confirm,
 		editor: en_editor,
+		format: en_format,
 		import: en_import,
 		library: en_library,
 		main: en_main,
@@ -137,6 +145,7 @@ export const resources = {
 		components: ja_components,
 		confirm: ja_confirm,
 		editor: ja_editor,
+		format: ja_format,
 		import: ja_import,
 		library: ja_library,
 		main: ja_main,

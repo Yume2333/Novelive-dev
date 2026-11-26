@@ -39,9 +39,11 @@ export {
 } from '../config/schema'
 export * from './chat'
 export * from './editor'
+export * from './errors'
 export * from './import'
 export { installedProgressKey } from './player-progress'
 export * from './production'
+export { type ProjectErrorCode, projectErrorCodes } from './project'
 export * from './queue'
 export * from './share'
 
@@ -193,6 +195,7 @@ export interface HostState {
 	generation: number
 	breakerOpen: boolean
 	logDir: string
+	homeDir: string
 }
 
 export interface NoveliveEvents {

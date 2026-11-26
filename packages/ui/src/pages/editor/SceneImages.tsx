@@ -12,6 +12,7 @@ import { Dropdown, type DropdownItem } from '../../components/Dropdown'
 import { CompactSelect, Field, TextInput } from '../../components/Form'
 import { Modal } from '../../components/Modal'
 import { useToast } from '../../components/Toast'
+import { formatAssetLabel } from '../../format/asset'
 import { scoped } from '../../i18n'
 
 const t = scoped('editor')
@@ -49,18 +50,10 @@ function isPortraitLike(asset: AssetEntry) {
 	return asset.type === 'character' || asset.type === 'expression'
 }
 
-function backgroundLabel(id: string) {
-	return id.split('/').filter(Boolean).join(' · ')
-}
-
-function portraitLabel(
+const assetLabel = (
 	id: string,
 	speakerNames: Readonly<Record<string, string>>,
-) {
-	const [charId, ...rest] = id.split('/')
-	const name = (charId && (speakerNames[charId] ?? charId)) ?? id
-	return [name, ...rest.filter(Boolean)].join(' / ')
-}
+) => formatAssetLabel(id, { characters: speakerNames })
 
 export function SceneImages({
 	workId,
@@ -96,9 +89,9 @@ export function SceneImages({
 	const portraitAsset =
 		assets.find((asset) => asset.id === activePortraitId) ??
 		assets.find(isPortraitLike)
-	const bgLabelText = bgAsset ? backgroundLabel(bgAsset.id) : ''
+	const bgLabelText = bgAsset ? assetLabel(bgAsset.id, speakerNames) : ''
 	const portraitLabelText = portraitAsset
-		? portraitLabel(portraitAsset.id, speakerNames)
+		? assetLabel(portraitAsset.id, speakerNames)
 		: ''
 
 	const generate = (
@@ -138,10 +131,10 @@ export function SceneImages({
 					setChoicesTitle(
 						kind === 'bg'
 							? t('背景 · {{name}}', {
-									name: backgroundLabel(assetId),
+									name: assetLabel(assetId, speakerNames),
 								})
 							: t('立绘 · {{name}}', {
-									name: portraitLabel(assetId, speakerNames),
+									name: assetLabel(assetId, speakerNames),
 								}),
 					)
 				}
@@ -209,8 +202,8 @@ export function SceneImages({
 					value: asset.id,
 					label:
 						customModal.kind === 'bg'
-							? backgroundLabel(asset.id)
-							: portraitLabel(asset.id, speakerNames),
+							? assetLabel(asset.id, speakerNames)
+							: assetLabel(asset.id, speakerNames),
 				}))
 		: []
 	const customOptionsList =

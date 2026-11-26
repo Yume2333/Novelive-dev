@@ -56,7 +56,13 @@ const keeper: Snapshot = {
 				input: '{"entry":"守塔人","field":"年龄"}',
 				result: '{"年龄":"五十八岁","来源":"第一章"}',
 			},
-			{ type: 'subtask', id: 'sub-1', label: '核对第二章称呼', status: 'done' },
+			{
+				type: 'subtask',
+				id: 'sub-1',
+				label: '核对第二章称呼',
+				role: 'reviewer',
+				status: 'done',
+			},
 			{ type: 'text', text: '设定集写的是**五十八岁**，第二章误写成六十岁。' },
 		]),
 		message('u1b', null, 'user', [

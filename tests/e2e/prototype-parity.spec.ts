@@ -606,6 +606,7 @@ test('agent drawer captures matched-viewport parity evidence', async () => {
 					type: 'subtask',
 					id: 'sub-1',
 					label: '核对第二章称呼',
+					role: 'reviewer',
 					status: 'done',
 				},
 				{

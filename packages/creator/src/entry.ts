@@ -422,6 +422,7 @@ registry.register(
 			layout,
 			selectedIllustrations,
 		)
+		if (result.status === 'error') return result
 		const service = await getProduction()
 		for (const workId of result.workIds)
 			await service.remember(workId, result.projectDir)

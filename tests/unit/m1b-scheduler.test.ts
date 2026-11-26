@@ -238,7 +238,11 @@ test('a failed chapter pauses the work until it is retried and resumes from the 
 		chapters: [
 			{ status: 'published' },
 			{ status: 'producing', step: 'draw' },
-			{ status: 'producing', step: 'review', issue: '审稿结果无法解析' },
+			{
+				status: 'producing',
+				step: 'review',
+				issue: { kind: 'unknown', detail: '审稿结果无法解析' },
+			},
 		],
 	})
 	worker.release('draw:cg-x')
@@ -271,13 +275,16 @@ test('a placeholder after retry does not surface the resolved chapter failure', 
 	target.start(workId, ['ch1', 'ch2'])
 	await throughConfirmations(target)
 	await target.idle()
-	expect(snapshot().chapters[1]?.issue).toBe('写作请求失败')
+	expect(snapshot().chapters[1]?.issue).toEqual({
+		kind: 'unknown',
+		detail: '写作请求失败',
+	})
 
 	target.retryChapter(workId, 'ch2')
 	await target.idle()
 	expect(snapshot().chapters[1]).toMatchObject({
 		status: 'published',
-		issue: '1 张图用了占位图',
+		issue: { kind: 'placeholder', count: 1 },
 	})
 	expect(target.runLog(workId)).toContainEqual(
 		expect.objectContaining({ ref: 'ch2', status: 'needs_attention' }),
@@ -301,7 +308,7 @@ test('local matting unavailable publishes with the reason on each affected chapt
 	for (const chapter of snapshot().chapters)
 		expect(chapter).toMatchObject({
 			status: 'published',
-			issue: `1 张图用了占位图；${issue}`,
+			issue: { kind: 'matting_unavailable', count: 1, detail: issue },
 		})
 	expect(target.runLog(workId)).toContainEqual(
 		expect.objectContaining({
@@ -346,7 +353,7 @@ test('image failures fall back to placeholders but unsupported capabilities paus
 	expect(snapshot()).toMatchObject({
 		phase: 'confirm-first',
 		chapters: [
-			{ status: 'published', issue: '3 张图用了占位图' },
+			{ status: 'published', issue: { kind: 'placeholder', count: 3 } },
 			{ status: 'waiting' },
 		],
 	})
@@ -363,7 +370,11 @@ test('image failures fall back to placeholders but unsupported capabilities paus
 		status: 'stopped',
 		chapters: [
 			{},
-			{ status: 'producing', step: 'draw', issue: '图片接口不支持透明底' },
+			{
+				status: 'producing',
+				step: 'draw',
+				issue: { kind: 'unknown', detail: '图片接口不支持透明底' },
+			},
 		],
 	})
 	expect(worker.count('draw:cg-c')).toBe(1)
@@ -381,7 +392,10 @@ test('image failures fall back to placeholders but unsupported capabilities paus
 		phase: 'done',
 		chapters: [{}, { status: 'published' }],
 	})
-	expect(snapshot().chapters[1]?.issue).toBe('1 张图用了占位图')
+	expect(snapshot().chapters[1]?.issue).toEqual({
+		kind: 'placeholder',
+		count: 1,
+	})
 	expect(worker.count('draw:hero/default')).toBe(1)
 })
 
@@ -437,7 +451,7 @@ test('Continue redraws a variant that inherited its repaired base placeholder', 
 	await target.idle()
 	expect(snapshot().chapters[0]).toMatchObject({
 		status: 'published',
-		issue: '2 张图用了占位图',
+		issue: { kind: 'placeholder', count: 2 },
 	})
 	expect(worker.count('placeholder:yard/night')).toBe(1)
 
@@ -488,7 +502,9 @@ test('a budget refusal pauses the queue explicitly and retains the image for con
 			inactive: [entry],
 		}),
 	).toBe(true)
-	expect(snapshot().chapters[0]).toMatchObject({ issue: refused.message })
+	expect(snapshot().chapters[0]).toMatchObject({
+		issue: { kind: 'budget_paused', detail: refused.message },
+	})
 	expect(worker.count('placeholder:cg-budget')).toBe(0)
 	target.continue(workId)
 	await target.idle()
@@ -513,7 +529,10 @@ test('restaging restores the audit continuation for a retained budget-paused ima
 	target.confirmVisual(workId)
 	await target.idle()
 	expect(snapshot().chapters[0]).toMatchObject({
-		issue: expect.stringContaining('超出工程预算'),
+		issue: {
+			kind: 'budget_paused',
+			detail: expect.stringContaining('超出工程预算'),
+		},
 	})
 	expect(draw).toHaveBeenCalledTimes(1)
 	stage.mockResolvedValueOnce([retained])
@@ -551,7 +570,10 @@ test('a refused writing request surfaces the budget pause and continues the same
 			{
 				status: 'producing',
 				step: 'write',
-				issue: expect.stringContaining(refused.message),
+				issue: {
+					kind: 'budget_paused',
+					detail: expect.stringContaining('超出工程预算'),
+				},
 			},
 		],
 	})

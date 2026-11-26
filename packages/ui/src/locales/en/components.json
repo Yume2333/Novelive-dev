@@ -5,9 +5,12 @@
 	"制作中": "Producing",
 	"取消": "Cancel",
 	"已发布": "Published",
+	"正在加载": "Loading",
 	"清除": "Clear",
 	"点击关闭": "Click to dismiss",
 	"确认": "Confirm",
 	"等待": "Waiting",
+	"详细信息": "Details",
+	"重试": "Retry",
 	"需要处理": "Needs attention"
 }

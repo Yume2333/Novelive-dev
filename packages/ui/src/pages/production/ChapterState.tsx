@@ -1,5 +1,6 @@
 import type { ProductionSnapshot } from '@novelive/creator/contract'
 import { ChapterStatusMark, Tooltip } from '../../components'
+import { formatErrorText, humanizeError } from '../../format/errors'
 import { msg } from '../../i18n'
 
 type Chapter = ProductionSnapshot['chapters'][number]
@@ -21,7 +22,7 @@ export function stepProgress(chapter: Chapter) {
 export function ChapterState({ chapter }: { chapter: Chapter }) {
 	if (chapter.issue)
 		return (
-			<Tooltip text={chapter.issue}>
+			<Tooltip text={formatErrorText(humanizeError(chapter.issue))}>
 				<span style={{ display: 'inline-flex' }}>
 					<ChapterStatusMark status={chapter.status} attention />
 				</span>

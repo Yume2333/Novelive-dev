@@ -6,6 +6,7 @@ import {
 	projectFiles,
 	type WorkSettings,
 } from '@novelive/format/model'
+import { ImportFailureError } from '../../contract/errors'
 import type { Project } from '../../project'
 import { decodeTxt, type TxtEncoding } from './encoding'
 import {
@@ -46,7 +47,10 @@ export async function importTxt(
 ) {
 	const series = await project.read(projectFiles.series)
 	if (series.volumeIds.length)
-		throw new Error('TXT import requires an empty project')
+		throw new ImportFailureError(
+			'project_not_empty',
+			'TXT import requires an empty project',
+		)
 	const decoded = decodeTxt(bytes, options.encoding)
 	const structure = parseTxt(decoded.text, options)
 	const language =

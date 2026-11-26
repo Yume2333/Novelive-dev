@@ -1,5 +1,6 @@
 import { obj, oneOf, opt, str } from '@earendil-works/pi-schema'
 import sharp from 'sharp'
+import { ImportFailureError } from '../../contract/errors'
 import type { TextConnection } from '../../models/text'
 import { artJson, type ModelOptions } from '../../pipeline/art/models'
 import type { EpubBook, EpubExtraction } from './index'
@@ -37,7 +38,11 @@ export async function classifyIllustrations(
 						.slice(Math.max(0, paragraph - 1), paragraph + 2)
 						.join('\n')
 		const bytes = extraction.images.get(location.archivePath)
-		if (!bytes) throw new Error(`Missing EPUB image: ${location.archivePath}`)
+		if (!bytes)
+			throw new ImportFailureError(
+				'invalid_epub',
+				`Missing EPUB image: ${location.archivePath}`,
+			)
 		const png = await sharp(bytes).png().toBuffer()
 		const match = characterIds.length
 			? ` If the illustration clearly depicts a single character in this list, include their exact ID as "characterId": ${JSON.stringify(characterIds)}. Otherwise omit "characterId".`

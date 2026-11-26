@@ -348,7 +348,7 @@ test('a painter format error after one repair materializes both base and variant
 		queue.confirmVisual(workId)
 		await queue.idle()
 		expect(queue.snapshot(workId).chapters).toMatchObject([
-			{ status: 'published', issue: '2 张图用了占位图' },
+			{ status: 'published', issue: { kind: 'placeholder', count: 2 } },
 		])
 		const { entries } = await art().registry()
 		expect(entries.map(({ status }) => status)).toEqual([
@@ -431,7 +431,10 @@ test('a later volume publishes with the reason from a reused series placeholder'
 		queue.confirmVisual(laterWork.workId)
 		await queue.idle()
 		expect(queue.snapshot(laterWork.workId).chapters).toMatchObject([
-			{ status: 'published', issue: `1 张图用了占位图；${issue}` },
+			{
+				status: 'published',
+				issue: { kind: 'matting_unavailable', count: 1, detail: issue },
+			},
 		])
 		expect(fetch).toHaveBeenCalledTimes(1)
 		expect(String(fetch.mock.calls[0][1]?.body)).toContain(
@@ -641,7 +644,6 @@ test('records a manually interrupted chapter as cancelled when production reopen
 					chapterId: 'ch0001',
 					step: 'write',
 					status: 'cancelled',
-					message: '已取消',
 				},
 			},
 		])
@@ -987,7 +989,10 @@ test.each([
 				queue.start(workId, ['ch0001'])
 				queue.confirmVisual(workId)
 				await queue.idle()
-				expect(queue.snapshot(workId).chapters[0].issue).toMatch(/超出工程预算/)
+				expect(queue.snapshot(workId).chapters[0].issue).toMatchObject({
+					kind: 'budget_paused',
+					detail: expect.stringContaining('超出工程预算'),
+				})
 				expect(requests).toEqual([
 					models.main.model,
 					...(firstImage ? [] : [models.image.model]),
@@ -1026,7 +1031,10 @@ test.each([
 				const chapter = queue.snapshot(workId).chapters[0]
 				if (redraw || reject) {
 					expect(chapter.status).toBe('producing')
-					expect(chapter.issue).toMatch(/超出工程预算/)
+					expect(chapter.issue).toMatchObject({
+						kind: 'budget_paused',
+						detail: expect.stringContaining('超出工程预算'),
+					})
 				} else expect(chapter.status).toBe('published')
 				const admissions = project.database
 					.prepare(
@@ -1045,7 +1053,10 @@ test.each([
 			try {
 				queue.continue(workId)
 				await queue.idle()
-				expect(queue.snapshot(workId).chapters[0].issue).toMatch(/超出工程预算/)
+				expect(queue.snapshot(workId).chapters[0].issue).toMatchObject({
+					kind: 'budget_paused',
+					detail: expect.stringContaining('超出工程预算'),
+				})
 				expect(requests).toEqual([
 					models.main.model,
 					models.image.model,

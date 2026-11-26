@@ -19,7 +19,7 @@
 	border-radius: var(--radius-lg);
 	background: var(--veil-95);
 	box-shadow: var(--shadow-pop);
-	font-size: 13px;
+	font-size: var(--text-13);
 	font-weight: 500;
 	pointer-events: auto;
 }
