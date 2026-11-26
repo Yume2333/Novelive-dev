@@ -437,7 +437,6 @@ function Candidate({
 
 interface AgentOutlet {
 	setAgentPosition?(position: CommandInput<'chat.send'>['position']): void
-	setAgentContextLabel?(label: string | undefined): void
 	openAgent?(): void
 }
 
@@ -718,37 +717,19 @@ function BibleProjection({
 	// Agent 面板位置同步：选中角色或当前分类。
 	// outlet context 对象每次渲染都是新引用，必须依赖内部稳定的 setter，否则会死循环。
 	const setAgentPosition = outlet?.setAgentPosition
-	const setAgentContextLabel = outlet?.setAgentContextLabel
 	const selectedCharacterId =
 		category === 'characters' ? selectedCharacter?.id : undefined
-	const selectedCharacterName =
-		category === 'characters' ? selectedCharacter?.name : undefined
 	useEffect(() => {
 		if (!setAgentPosition) return
 		if (selectedCharacterId) {
 			setAgentPosition({ kind: 'bible', entryId: selectedCharacterId })
-			setAgentContextLabel?.(
-				t('设定集 · {{label}}', { label: selectedCharacterName ?? '' }),
-			)
 		} else {
 			setAgentPosition({ kind: 'bible' })
-			setAgentContextLabel?.(
-				t('设定集 · {{label}}', {
-					label: t(categories.find(([key]) => key === category)?.[1] ?? ''),
-				}),
-			)
 		}
 		return () => {
 			setAgentPosition(undefined)
-			setAgentContextLabel?.(undefined)
 		}
-	}, [
-		setAgentPosition,
-		setAgentContextLabel,
-		category,
-		selectedCharacterId,
-		selectedCharacterName,
-	])
+	}, [setAgentPosition, selectedCharacterId])
 
 	const openAgentPanel = useCallback(() => {
 		if (outlet?.openAgent) {
@@ -775,11 +756,8 @@ function BibleProjection({
 	}, [outlet])
 
 	const handleAskAgent = useCallback(
-		(entryId: string, entryLabel: string) => {
+		(entryId: string) => {
 			outlet?.setAgentPosition?.({ kind: 'bible', entryId })
-			outlet?.setAgentContextLabel?.(
-				t('设定集 · {{label}}', { label: entryLabel }),
-			)
 			openAgentPanel()
 		},
 		[outlet, openAgentPanel],

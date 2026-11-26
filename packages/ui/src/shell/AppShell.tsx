@@ -5,7 +5,6 @@ import type {
 	MaskedConfig,
 } from '@novelive/creator/contract'
 import {
-	AlertTriangle,
 	BarChart3,
 	BookOpen,
 	BookOpenText,
@@ -39,7 +38,9 @@ import {
 	useMatch,
 	useNavigate,
 } from 'react-router-dom'
+import { Button } from '../components/Button'
 import { Dropdown } from '../components/Dropdown'
+import { Banner } from '../components/Extended'
 import { ErrorNotice } from '../components/Feedback'
 import { GradientCover } from '../components/GradientCover'
 import { usePresence } from '../components/Motion'
@@ -142,8 +143,6 @@ export interface ShellOutletContext extends SettingsHost {
 	openAgent(): void
 	closeAgent(): void
 	setAgentPosition(position: CommandInput<'chat.send'>['position']): void
-	agentContextLabel: string | null
-	setAgentContextLabel(label: string | null): void
 	refreshLibrary(): void
 }
 
@@ -153,8 +152,6 @@ interface ShellApi {
 	closeAgent(): void
 	agentPosition: CommandInput<'chat.send'>['position'] | undefined
 	setAgentPosition(position: CommandInput<'chat.send'>['position']): void
-	agentContextLabel: string | null
-	setAgentContextLabel(label: string | null): void
 }
 
 const ShellContext = createContext<ShellApi>({
@@ -163,8 +160,6 @@ const ShellContext = createContext<ShellApi>({
 	closeAgent: () => {},
 	agentPosition: undefined,
 	setAgentPosition: () => {},
-	agentContextLabel: null,
-	setAgentContextLabel: () => {},
 })
 
 export function useShell() {
@@ -205,9 +200,6 @@ export function AppShell() {
 	const [agentFull, setAgentFull] = useState(false)
 	const [agentPosition, setAgentPosition] =
 		useState<CommandInput<'chat.send'>['position']>()
-	const [agentContextLabel, setAgentContextLabel] = useState<string | null>(
-		null,
-	)
 	const [pendingTheme, setPendingTheme] = useState<ThemeMode>()
 	const { theme, setTheme } = useAppearance(config)
 	const { i18n } = useTranslation()
@@ -271,7 +263,7 @@ export function AppShell() {
 		} catch {
 			setHostError(
 				action === 'openLogDir'
-					? t('无法打开日志目录')
+					? t('无法打开诊断信息')
 					: t('无法重新启动创作端'),
 			)
 		}
@@ -308,9 +300,8 @@ export function AppShell() {
 			active = false
 		}
 	}, [installed, pathname, libraryRevision])
-	// biome-ignore lint/correctness/useExhaustiveDependencies: 换作品时清空 Agent 的上下文与位置；同作品内的页面切换保留
+	// biome-ignore lint/correctness/useExhaustiveDependencies: 换作品时清空 Agent 的位置；同作品内的页面切换保留
 	useEffect(() => {
-		setAgentContextLabel(null)
 		setAgentPosition(undefined)
 	}, [workId])
 	const showAgent = isProject
@@ -376,8 +367,6 @@ export function AppShell() {
 		closeAgent,
 		agentPosition,
 		setAgentPosition,
-		agentContextLabel,
-		setAgentContextLabel,
 	}
 	const outletContext: ShellOutletContext = {
 		config,
@@ -387,8 +376,6 @@ export function AppShell() {
 		openAgent,
 		closeAgent,
 		setAgentPosition,
-		agentContextLabel,
-		setAgentContextLabel,
 		refreshLibrary: () => setLibraryRevision((n) => n + 1),
 	}
 
@@ -628,27 +615,34 @@ export function AppShell() {
 				</aside>
 				<main className={styles.main}>
 					{interruption && (
-						<div className={styles.warning} role="alert">
-							<AlertTriangle aria-hidden="true" size={18} />
-							<span>
+						<div className={styles.interruption} role="alert">
+							<Banner
+								kind="error"
+								action={
+									<>
+										<Button
+											size="sm"
+											variant="ghost"
+											onClick={() => void runHostAction('openLogDir')}
+										>
+											{t('查看诊断信息')}
+										</Button>
+										<Button
+											size="sm"
+											variant="ghost"
+											onClick={() => void runHostAction('restartCreator')}
+										>
+											{t('重新启动')}
+										</Button>
+									</>
+								}
+							>
 								{interruption === 'breaker'
 									? t('创作端连续 3 次未能启动，自动重启已暂停。')
 									: interruption === 'failed'
 										? t('创作端启动失败。')
 										: t('创作端已断开，正在尝试重新连接。')}
-							</span>
-							<button
-								type="button"
-								onClick={() => void runHostAction('openLogDir')}
-							>
-								{t('查看诊断信息')}
-							</button>
-							<button
-								type="button"
-								onClick={() => void runHostAction('restartCreator')}
-							>
-								{t('重新启动')}
-							</button>
+							</Banner>
 						</div>
 					)}
 					{hostError && <ErrorNotice message={hostError} />}
