@@ -4,7 +4,7 @@
 
 ## 等所有者决定
 
-- **正式仓库**：建在哪另议；在那之前不发公开 Release。自动更新所有者 2026-11-26 确认要做，更新源依赖正式仓库，另立任务。
+- **正式仓库**：建在哪另议；在那之前不发公开 Release。自动更新已接好：定了之后把 `apps/desktop/package.json` 的 `updateRepository` 填成 `owner/repo`，推送 `v<version>` tag 即由 **Release** 工作流构建三平台并直接发布（仓库不是 `Yume2333/Novelive-dev` 时另配 `NL_RELEASE_TOKEN`），见 `docs/architecture.md`「本地交付与更新复验」。
 
 ## 付费账本对账
 

@@ -2,8 +2,9 @@ import { access, constants } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { app, type BrowserWindow, dialog, shell } from 'electron'
 import updaters from 'electron-updater'
+import { updateRepository } from '../../../package.json'
 import { languageReady, t } from '../i18n'
-import { checkUpdate, updatePolicy } from './policy'
+import { checkUpdate, updatePolicy, updateSource } from './policy'
 
 export function installUpdates(options: {
 	window: () => BrowserWindow | undefined
@@ -14,7 +15,7 @@ export function installUpdates(options: {
 		app.isPackaged,
 		process.platform,
 		Boolean(appImage),
-		process.env.NL_UPDATE_URL,
+		updateSource(process.env.NL_UPDATE_URL, updateRepository),
 	)
 	const Updater =
 		policy &&

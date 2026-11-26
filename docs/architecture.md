@@ -85,8 +85,10 @@
 
 **本地交付与更新复验**
 
-- 在对应系统上运行 `pnpm --filter @novelive/desktop run package:linux`（x64 AppImage）、`package:windows`（x64 NSIS）或 `package:macos`（原生架构 DMG + ZIP）。打包命令打印 `apps/desktop/dist/` 下的交付目录，包含安装包、更新元数据、`BUILD.txt` 与 `SHA256SUMS`。GitHub Actions 的 **Native packages** 可手动构建三平台并保留同样的产物；不签名、不公证、不发 Release。
-- 更新必须使用可信的通用更新源：启动已安装应用时传入 `NL_UPDATE_URL`（HTTPS；仅回环地址允许 HTTP）。把较新版本的打包产物中对应的 `latest.yml`（Windows）、`latest-linux.yml`（Linux x64）或 `latest-mac.yml`（macOS）以及元数据引用的文件放在源目录，运行较旧版本后等待启动检查或在设置「关于」点击「检查更新」。Windows/AppImage 下载完成后须用户确认；DMG/deb 不下载或安装，提示打开元数据中对应的手动包链接，缺少对应文件时打开源目录。M5 不产出 deb。
+- 在对应系统上运行 `pnpm --filter @novelive/desktop run package:linux`（x64 AppImage）、`package:windows`（x64 NSIS）或 `package:macos`（原生架构 DMG + ZIP）。打包命令打印 `apps/desktop/dist/` 下的交付目录，包含安装包、更新元数据、`BUILD.txt` 与 `SHA256SUMS`。GitHub Actions 的 **Native packages** 可手动构建三平台并保留同样的产物；不签名、不公证。
+- 更新源：`apps/desktop/package.json` 的 `updateRepository`（`owner/repo`）是唯一配置。填了之后，打包出的应用从该仓库最新 Release 读取更新（`https://github.com/<owner/repo>/releases/latest/download/`）；留空则不检查更新。启动时传入 `NL_UPDATE_URL`（HTTPS；仅回环地址允许 HTTP）可覆盖为自建的通用更新源，用于本地复验。
+- 发版：把 `apps/desktop/package.json` 的 `version` 改成新版本，提交后推送同名 tag `v<version>`。**Release** 工作流在三平台原生构建，然后直接在 `updateRepository` 发布 Release，附安装包、`.blockmap` 与 `latest.yml`（Windows）、`latest-linux.yml`（Linux x64）、`latest-mac.yml`（macOS）。`updateRepository` 不是当前仓库时，要在仓库 Secrets 里配置有该仓库 contents 写权限的 `NL_RELEASE_TOKEN`。
+- 已安装的应用在启动时和设置「关于」点击「检查更新」时检查。Windows/AppImage 下载完成后须用户确认；DMG/deb 不下载或安装，提示打开元数据中对应的手动包链接，缺少对应文件时打开更新源目录。M5 不产出 deb。
 - 设置「关于」提供版本号、源码和许可证入口。打包保留 Electron 原始许可并附应用的 AGPL 全文和第三方许可清单（包括 libvips 源码指引、放大侧车与模型权重）。
 
 **版本锁定**（2026-11-21 定稿）：

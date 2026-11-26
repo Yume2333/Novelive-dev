@@ -20,7 +20,11 @@ if (
 
 const desktop = fileURLToPath(new URL('../../apps/desktop/', import.meta.url))
 const require = createRequire(join(desktop, 'package.json'))
-const { version } = require('./package.json')
+const { version, updateRepository } = require('./package.json')
+if (updateRepository && !/^[\w.-]+\/[\w.-]+$/.test(updateRepository))
+	throw new Error(
+		`apps/desktop/package.json updateRepository must be "owner/repo", got ${updateRepository}`,
+	)
 const { build } = require('electron-builder')
 const bin = join(
 	dirname(require.resolve('electron-vite/package.json')),
@@ -70,6 +74,6 @@ for (const name of artifacts.sort()) {
 await writeFile(join(delivery, 'SHA256SUMS'), `${checksums.join('\n')}\n`)
 await writeFile(
 	join(delivery, 'BUILD.txt'),
-	`Novelive ${version}\nTarget: ${platform}/${arch}\nHost: ${process.platform}/${process.arch}\n`,
+	`Novelive ${version}\nTarget: ${platform}/${arch}\nHost: ${process.platform}/${process.arch}\nUpdate source: ${updateRepository || 'none'}\n`,
 )
 console.log(`Novelive ${version} ${platform}/${arch} artifacts: ${delivery}`)

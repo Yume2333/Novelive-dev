@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
 	checkUpdate,
 	updatePolicy,
+	updateSource,
 } from '../../apps/desktop/src/main/update/policy'
 // @ts-expect-error 开发工具的 ESM 入口
 import * as licenses from '../../tools/licenses/generate.mjs'
@@ -46,6 +47,22 @@ describe('M5 本地应用更新', () => {
 		).toEqual({
 			mode: 'nsis',
 			feed: 'https://example.com/feed/',
+		})
+	})
+
+	it('reads the latest GitHub Release of the configured repository unless overridden', () => {
+		expect(updateSource(undefined, '')).toBeUndefined()
+		expect(updateSource(feed, 'novelive/releases')).toBe(feed)
+		expect(
+			updatePolicy(
+				true,
+				'linux',
+				true,
+				updateSource(undefined, 'novelive/releases'),
+			),
+		).toEqual({
+			mode: 'appimage',
+			feed: 'https://github.com/novelive/releases/releases/latest/download/',
 		})
 	})
 

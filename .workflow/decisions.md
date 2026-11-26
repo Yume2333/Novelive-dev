@@ -975,3 +975,12 @@ User waivers of a `Check` or a review finding are recorded in the task file
 - **Because:** 所有者判断现有 CI 原生构建与无头实测足够，剩余项不值得等待。
 - **Effort:** m5-delivery
 - **Decided by:** user
+
+## 2026-11-26 - 自动更新读正式仓库的最新 GitHub Release，打 tag 直接发布
+
+- **Decided:** 打包应用默认从 `apps/desktop/package.json` `updateRepository` 指向的仓库读取更新，地址为 `https://github.com/<owner/repo>/releases/latest/download/`（electron-updater generic provider，沿用现有分平台策略）；留空则不检查更新，`NL_UPDATE_URL` 仍可覆盖。推送 `v<version>` tag 后 **Release** 工作流三平台构建并直接发布 Release，不建草稿。
+- **Instead of:** 先用 `Yume2333/Novelive-dev` 的 Releases；等正式仓库定了再做；tag 后建草稿由所有者手动发布。
+- **Because:** 正式仓库未定，仓库名做成一处配置，定了只改这里；generic provider 复用已验证的检查、下载与手动下载路径，不另起 GitHub provider 分支。
+- **Supersedes:** 2026-11-20 - 界面翻译 M5 前做，应用从 GitHub Releases 自动更新（补全更新源与发版方式）
+- **Effort:** m5-delivery
+- **Decided by:** user

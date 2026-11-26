@@ -1,5 +1,15 @@
 import type { AppUpdater, UpdateInfo } from 'electron-updater'
 
+/**
+ * `NL_UPDATE_URL` overrides the feed; otherwise the latest GitHub Release of
+ * the configured repository serves the update metadata and installers.
+ */
+export function updateSource(override?: string, repository?: string) {
+	if (override) return override
+	if (repository)
+		return `https://github.com/${repository}/releases/latest/download/`
+}
+
 export function updatePolicy(
 	packaged: boolean,
 	platform: NodeJS.Platform,

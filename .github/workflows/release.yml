@@ -1,0 +1,61 @@
+name: Release
+
+# Push a `v<version>` tag matching apps/desktop/package.json to build all three
+# platforms and publish a GitHub Release in `updateRepository`. Installed apps
+# read update metadata from that repository's latest release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  meta:
+    runs-on: ubuntu-24.04
+    outputs:
+      repository: ${{ steps.meta.outputs.repository }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: |
+          node -e '
+            const { version, updateRepository } = require("./apps/desktop/package.json")
+            if (!updateRepository) throw new Error("apps/desktop/package.json updateRepository is empty")
+            if (process.env.GITHUB_REF_NAME !== `v${version}`)
+              throw new Error(`Tag ${process.env.GITHUB_REF_NAME} does not match version v${version}`)
+            require("node:fs").appendFileSync(
+              process.env.GITHUB_OUTPUT,
+              `repository=${updateRepository}\nversion=${version}\n`,
+            )
+          '
+
+  package:
+    needs: meta
+    uses: ./.github/workflows/package.yml
+
+  publish:
+    needs: [meta, package]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: novelive-*
+          path: release
+      - name: Publish GitHub Release
+        env:
+          # A release repository other than this one needs a token with
+          # contents write access stored as NL_RELEASE_TOKEN.
+          GH_TOKEN: ${{ secrets.NL_RELEASE_TOKEN || github.token }}
+          REPOSITORY: ${{ needs.meta.outputs.repository }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          mapfile -t files < <(find release -path '*/artifacts/*' -type f \( \
+            -name '*.AppImage' -o -name '*.exe' -o -name '*.dmg' -o -name '*.zip' \
+            -o -name '*.blockmap' -o -name 'latest*.yml' \) | sort)
+          for metadata in latest.yml latest-linux.yml latest-mac.yml; do
+            printf '%s\n' "${files[@]}" | grep -q "/$metadata$" || { echo "Missing $metadata"; exit 1; }
+          done
+          gh release create "v$VERSION" "${files[@]}" \
+            --repo "$REPOSITORY" --title "Novelive $VERSION" --notes "Novelive $VERSION"

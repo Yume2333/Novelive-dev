@@ -3,6 +3,7 @@
 	"version": "0.0.0",
 	"description": "Novelive desktop",
 	"author": "Novelive",
+	"updateRepository": "",
 	"private": true,
 	"type": "module",
 	"main": "./out/main/index.js",
