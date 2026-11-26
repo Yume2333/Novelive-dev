@@ -53,7 +53,5 @@
 	"输出": "Output",
 	"部分作品无法读取，未计入统计": "Some works could not be read and are not counted",
 	"部分调用拿不到单价，未计入": "Some calls have no price and are excluded",
-	"阶段": "Stage",
-	"项目已移动或删除": "the project was moved or deleted",
-	"项目无法读取": "the project could not be read"
+	"阶段": "Stage"
 }

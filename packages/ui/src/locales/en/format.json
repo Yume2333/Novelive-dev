@@ -6,6 +6,7 @@
 	"原文里没有正文，无法加入系列。": "The source text has no body text, so it cannot join the series.",
 	"在设置中检查图像模型后重试。": "Check the image model in Settings and try again.",
 	"已删除的作品": "Deleted work",
+	"找不到相关内容，请刷新后重试。": "Unable to find the content. Refresh and try again.",
 	"把这章拆短一些，或在设置中换用能处理更长内容的模型。": "Split the chapter into shorter parts, or switch to a model that handles longer content in Settings.",
 	"换一种编码后重试。": "Try again with a different encoding.",
 	"提高预算上限或更换模型后可继续制作。": "Raise the budget limit or switch models to continue production.",
@@ -40,6 +41,7 @@
 	"无法生成 {{count}} 张图像，已先用占位图代替。": "Unable to generate some images ({{count}} affected); placeholders are in use for now.",
 	"无法生成图像，已先用占位图代替。": "Unable to generate the image; a placeholder is in use for now.",
 	"无法继续，所选的作品范围无效，请重新选择。": "Unable to continue; the selected work scope is invalid. Please select again.",
+	"无法解密 API Key。": "Unable to decrypt the API key.",
 	"无法识别原文的编码。": "Unable to detect the source text encoding.",
 	"无法识别这份文本文件的编码，请手动选择。": "Unable to detect this text file’s encoding. Please choose it manually.",
 	"无法读取这个作品包，文件已损坏。": "Unable to read this work package; the file is corrupted.",
@@ -48,6 +50,7 @@
 	"无法读取这份 EPUB。": "Unable to read this EPUB.",
 	"无法读取这份 PDF，文件可能已损坏。": "Unable to read this PDF; the file may be corrupted.",
 	"无法读取这份文件，内容结构不完整。": "Unable to read this file; its content structure is incomplete.",
+	"无法读取配置文件。": "Unable to read the configuration file.",
 	"无法连接创作端，请重试。": "Unable to reach the creator backend. Please try again.",
 	"无法连接模型服务，请检查网络后重试。": "Unable to reach the model service. Check your network connection and try again.",
 	"无法通过模型服务的验证，请检查设置中的密钥。": "Unable to authenticate with the model service. Check the API key in Settings.",
@@ -85,5 +88,9 @@
 	"这份 EPUB 里没有可导入的正文。": "This EPUB contains no importable text.",
 	"这份文件里没有可导入的正文。": "This file contains no importable text.",
 	"这份文件里没有可提取的正文。": "This file contains no extractable text.",
-	"韩语": "Korean"
+	"配置字段无效。": "The configuration fields are invalid.",
+	"配置文件不是有效的 JSON。": "The configuration file is not valid JSON.",
+	"韩语": "Korean",
+	"项目已移动或删除": "the project was moved or deleted",
+	"项目无法读取": "the project could not be read"
 }

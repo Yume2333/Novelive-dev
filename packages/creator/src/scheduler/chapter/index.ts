@@ -112,17 +112,12 @@ export function failureKind(error: Error): IssueKind {
 		if (error.code) return error.code
 	}
 	// Production steps mostly rethrow the model error bare; every text model
-	// error code is already an issue kind. unsupported/stale_revision/
-	// creator_down are command-transport codes, never model outcomes.
-	if (error instanceof TextModelError) {
-		if (
-			error.code === 'unsupported' ||
-			error.code === 'stale_revision' ||
-			error.code === 'creator_down'
-		)
-			return 'unknown'
-		return error.code
-	}
+	// error code is already an issue kind; command-transport codes
+	// (unsupported/stale_revision/creator_down) and anything else collapse to unknown.
+	if (error instanceof TextModelError)
+		return (issueKinds as readonly string[]).includes(error.code)
+			? (error.code as IssueKind)
+			: 'unknown'
 	return 'unknown'
 }
 

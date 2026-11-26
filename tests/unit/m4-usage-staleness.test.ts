@@ -347,8 +347,8 @@ test('usage keeps readable history and distinguishes broken bindings from empty 
 		expect(partial.records).toEqual(history.records)
 		expect(partial.records).toHaveLength(1)
 		expect(partial.unreadableProjects).toEqual([
-			{ projectId: 'invalid-binding', reason: '项目无法读取' },
-			{ projectId: 'moved', reason: '项目已移动或不存在' },
+			{ projectId: 'invalid-binding', reason: 'unreadable' },
+			{ projectId: 'moved', reason: 'moved' },
 		])
 	})
 })

@@ -15,7 +15,7 @@ import {
 	sceneId,
 } from '@novelive/format/model'
 import type { Proposal, RewriteProposal } from '../contract'
-import { proposalSchema } from '../contract'
+import { proposalSchema, subtaskRoles } from '../contract'
 import type { TextConnection } from '../models/text'
 
 const reason = str()
@@ -106,14 +106,7 @@ export function proposalTools(
 	return (Object.keys(schemas) as Kind[]).map(tool)
 }
 
-export const childRoles = [
-	'organizer',
-	'writer',
-	'reviewer',
-	'artDirector',
-	'visualAuditor',
-] as const
-export type ChildRole = (typeof childRoles)[number]
+export type ChildRole = (typeof subtaskRoles)[number]
 export type ChildAgent = {
 	model(): TextConnection | Promise<TextConnection>
 	instructions: string
@@ -128,7 +121,7 @@ export function spawnTool(
 		context?: string,
 	) => Promise<string>,
 ) {
-	const roles = childRoles.filter((role) => children[role])
+	const roles = subtaskRoles.filter((role) => children[role])
 	if (!roles.length) return []
 	const parameters = obj({
 		role: oneOf(roles),

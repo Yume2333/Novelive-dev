@@ -136,8 +136,16 @@ export const privateConfigSchema = obj({
 	...configFields(privateFields),
 	production: opt(productionSettings),
 })
+// 配置文件读取失败的机器原因：UI 按枚举本地化，绝不直接展示后端句子。
+export const configErrorReasons = [
+	'unreadable',
+	'invalid_json',
+	'invalid_fields',
+	'decrypt_failed',
+] as const
+export type ConfigErrorReason = (typeof configErrorReasons)[number]
 const configErrorSchema = obj({
-	configError: obj({ path: str(), reason: str() }),
+	configError: obj({ path: str(), reason: oneOf(configErrorReasons) }),
 })
 
 function optionalFields<T extends Record<string, Schema | Optional>>(

@@ -67,12 +67,10 @@ test('M4 wizard joins a second book to an existing series in real Electron', asy
 		await page.getByRole('radio', { name: '加入已有系列' }).check()
 		await expect(page.getByRole('textbox', { name: '作品名' })).toHaveCount(0)
 		await page.getByRole('button', { name: '选择已有工程' }).click()
-		// import.target 的错误码 invalid_join_target 目前无法穿过 IPC
-		// （contract/index.ts 的 error schema 不含导入错误码，被压成 internal），
-		// 因此断言人性化后的通用错误提示；待 gate 修复 wire schema 后应回到
-		// 更具体的「无法加入，所选文件夹不是有效的工程。」
+		// import.target 的 invalid_join_target 穿过 IPC 后按码本地化，
+		// 必须是指明原因的句子而不是通用的模型错误文案
 		await expect(page.getByRole('alert')).toContainText(
-			'模型返回了无法理解的回复，请重试。',
+			'无法加入，所选文件夹不是有效的工程。',
 		)
 		await expect(
 			page.getByRole('button', { name: '下一步', exact: true }),

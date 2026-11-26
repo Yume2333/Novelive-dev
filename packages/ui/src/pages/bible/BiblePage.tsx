@@ -107,8 +107,8 @@ const icons: Record<CategoryKey, LucideIcon> = {
 }
 
 /**
- * 设定集页的命令错误 → 人读提示。`not_found` 在格式层映射的是模型错误，
- * 在本页只可能是「找不到这部作品或卷」，因此换成页内文案；
+ * 设定集页的命令错误 → 人读提示。`not_found` 在格式层是通用的
+ * 「找不到相关内容」，在本页可以更具体到作品或卷，因此换成页内文案；
  * 后端原文只进折叠的 detail。
  */
 function bibleError(failure: unknown): HumanizedError {
