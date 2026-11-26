@@ -232,8 +232,7 @@ export function stageSnapshotAtLine(
 	options: Omit<CompileOptions, 'sceneIds' | 'previous' | 'makeId'>,
 ): StageSnapshot {
 	const target = scenes[sceneIndex]
-	const sceneTitle =
-		target?.nvs.match(/^scene\s+(.+)/m)?.[1]?.trim() ?? target?.sceneId ?? ''
+	const sceneTitle = target?.nvs.match(/^scene\s+(.+)/m)?.[1]?.trim() ?? ''
 	const paragraphFirstLine = buildParagraphFirstLine(
 		target?.nvs ?? '',
 		target?.sourceIds,

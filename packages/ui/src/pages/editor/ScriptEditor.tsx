@@ -44,7 +44,7 @@ export function ScriptEditor({
 					editable.current.of(EditorView.editable.of(true)),
 					lineNumbers(),
 					EditorView.lineWrapping,
-					EditorView.contentAttributes.of({ 'aria-label': t('NVS 剧本') }),
+					EditorView.contentAttributes.of({ 'aria-label': t('剧本文本') }),
 					keymap.of([
 						{
 							key: 'Mod-z',

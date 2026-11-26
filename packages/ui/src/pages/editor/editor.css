@@ -24,7 +24,6 @@
 
 /* ---- 页头操作区 ---- */
 
-.editor-button,
 .editor-workbench .editor-jumps button:not(.editor-jump-item) {
 	display: inline-flex;
 	align-items: center;
@@ -36,68 +35,11 @@
 	border-radius: var(--radius-md);
 	background: var(--panel-75);
 	color: var(--color-on-surface);
-	font-size: 13px;
+	font-size: var(--text-13);
 	font-weight: 600;
 	white-space: nowrap;
 	cursor: pointer;
 	transition: background var(--dur-fast) var(--ease-out);
-}
-
-.editor-button:hover:not(:disabled) {
-	background: var(--white-90);
-}
-
-.editor-button-primary {
-	border-color: transparent;
-	background: var(--color-primary);
-	color: var(--color-on-primary);
-	box-shadow: var(--shadow-chip);
-}
-
-.editor-button-primary:hover:not(:disabled) {
-	background: var(--color-primary);
-	box-shadow: var(--shadow-raised);
-}
-
-.editor-button-ghost {
-	border-color: transparent;
-	background: transparent;
-	color: var(--color-on-surface-variant);
-}
-
-.editor-icon-button {
-	display: inline-grid;
-	place-items: center;
-	width: 36px;
-	height: 36px;
-	padding: 0;
-	border: 1px solid transparent;
-	border-radius: var(--radius-md);
-	background: transparent;
-	color: var(--color-on-surface-variant);
-	cursor: pointer;
-	transition: background var(--dur-fast) var(--ease-out);
-}
-
-.editor-icon-button:hover:not(:disabled),
-.editor-icon-button[data-active] {
-	background: var(--accent-wash);
-	color: var(--color-primary);
-}
-
-.editor-actions .editor-icon-button {
-	width: 38px;
-	height: 38px;
-	border-color: var(--glass-border);
-	background: var(--panel-75);
-	color: var(--color-primary);
-	box-shadow: var(--shadow-glass);
-}
-
-.editor-icon-button-small {
-	width: 28px;
-	height: 28px;
-	margin-inline-start: auto;
 }
 
 .editor-draft-actions {
@@ -131,7 +73,7 @@
 	border-radius: var(--radius-md);
 	background: var(--panel-70);
 	color: var(--color-primary);
-	font-size: 13px;
+	font-size: var(--text-13);
 	font-weight: 600;
 	white-space: nowrap;
 	cursor: pointer;
@@ -169,47 +111,25 @@
 	cursor: default;
 }
 
-.editor-compact-select,
-.editor-mark-select {
-	min-height: 32px;
-	padding: 0 var(--space-3);
-	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-md);
-	background: var(--panel-75);
-	font-size: 13px;
-}
-
 .editor-label {
 	margin: 0;
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 	font-weight: 700;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 }
 
-.editor-muted {
+.editor-panel-note {
 	margin: 0;
 	color: var(--color-outline);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
-.editor-empty,
-.editor-alert {
-	margin: 0;
-	padding: var(--space-4) var(--space-5);
-	border-radius: var(--radius-lg);
-	background: var(--panel-75);
-	color: var(--color-on-surface-variant);
-	font-size: 13px;
+/* ErrorNotice 里的多行文案（编译诊断）保留换行 */
+.editor-error {
+	white-space: pre-line;
 }
-
-.editor-alert {
-	background: var(--color-error-container);
-	color: var(--color-on-error-container);
-}
-
-/* ---- 新标记提议横幅（页内自绘，非 Banner 组件） ---- */
 
 .editor-banners {
 	display: flex;
@@ -217,46 +137,36 @@
 	gap: var(--space-2);
 }
 
-.editor-banner {
-	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: var(--space-3);
-	padding: 11px var(--space-4);
-	border-radius: var(--radius-lg);
-	background: color-mix(in srgb, var(--color-error-container) 55%, transparent);
-	color: var(--color-on-error-container);
-	font-size: 13px;
+.editor-mark-sample {
+	display: inline-block;
+	padding: 0 var(--space-1);
+	font-size: var(--text-14);
 }
 
-.editor-banner-content,
-.editor-banner-text {
-	display: flex;
-	flex: 1;
-	flex-wrap: wrap;
-	align-items: center;
-	gap: var(--space-3);
-	min-width: 0;
+.editor-mark-sample-empty {
+	color: var(--color-on-surface-variant);
+	font-size: var(--text-12);
+}
+
+.editor-mark-mode {
+	color: var(--color-on-surface-variant);
+	font-size: var(--text-12);
+}
+
+.editor-mark-details {
+	margin-top: var(--space-1);
+}
+
+.editor-mark-css {
+	overflow-wrap: anywhere;
+	font-family: var(--font-mono);
+	font-size: var(--text-12);
 }
 
 .editor-banner-actions {
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-}
-
-.editor-banner code {
-	overflow-wrap: anywhere;
-	font-size: 12px;
-}
-
-.editor-chip {
-	padding: 3px 8px;
-	border-radius: var(--radius-sm);
-	background: var(--color-tertiary-fixed);
-	color: var(--color-on-surface-variant);
-	font-size: 11px;
-	font-weight: 600;
 }
 
 /* ---- 主区编排：舞台列 + 句子列（宽屏并排、容器查询驱动） ---- */
@@ -320,38 +230,26 @@
 	gap: var(--space-2);
 }
 
-.editor-chip-button {
-	min-height: 28px;
-	padding: 0 10px;
-	border: 1px solid var(--glass-border);
+/* 高级模式开关：与 Chip 同一视觉（紧凑圆角矩形标签），
+   但必须是带 aria-pressed 的原生 button。 */
+.editor-mode-toggle {
+	margin-inline-start: auto;
+	padding: var(--space-px-3) var(--space-2);
+	border: 0;
 	border-radius: var(--radius-sm);
-	background: var(--white-60);
-	color: var(--color-on-surface-variant);
-	font-size: 12px;
-	font-weight: 600;
+	background: var(--color-tertiary-fixed);
+	color: var(--color-on-secondary-container);
+	font-size: var(--text-11);
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	line-height: 1.35;
+	white-space: nowrap;
 	cursor: pointer;
 }
 
-.editor-chip-button:hover:not(:disabled) {
-	background: var(--accent-wash);
-	color: var(--color-primary);
-}
-
-.editor-chip-button[aria-pressed="true"] {
-	border-color: var(--accent-border-30);
-	background: var(--accent-wash);
-	color: var(--color-primary);
-}
-
-.editor-mode-toggle {
-	margin-inline-start: auto;
-}
-
-.editor-mark-select {
-	min-height: 28px;
-	border-radius: var(--radius-sm);
-	color: var(--color-on-surface-variant);
-	font-size: 12px;
+.editor-mode-toggle[aria-pressed="true"] {
+	background: var(--color-primary);
+	color: var(--color-on-primary);
 }
 
 /* ============================================================
@@ -576,7 +474,7 @@
 	border-radius: var(--radius-sm);
 	background: color-mix(in srgb, var(--stage-text) 10%, var(--stage-scrim));
 	color: var(--stage-accent);
-	font-size: 10px;
+	font-size: var(--text-10);
 	letter-spacing: 0.02em;
 	white-space: nowrap;
 	opacity: 0;
@@ -598,7 +496,7 @@
 	border-radius: var(--radius-md);
 	background: color-mix(in srgb, var(--stage-text) 10%, var(--stage-scrim));
 	color: var(--stage-accent);
-	font-size: 10px;
+	font-size: var(--text-10);
 }
 
 .editor-stage-chip-left {
@@ -662,7 +560,7 @@
 	background: color-mix(in srgb, var(--stage-text) 10%, var(--stage-scrim));
 	color: var(--stage-text);
 	font-family: var(--font-display);
-	font-size: 16px;
+	font-size: var(--text-16);
 	letter-spacing: 0.16em;
 }
 
@@ -684,7 +582,7 @@
 	background: var(--stage-panel);
 	color: var(--stage-accent);
 	font-family: var(--font-display);
-	font-size: 13px;
+	font-size: var(--text-13);
 	font-weight: 700;
 	letter-spacing: 0.08em;
 }
@@ -696,7 +594,7 @@
 	border-radius: var(--radius-md);
 	background: var(--stage-panel);
 	color: var(--stage-text);
-	font-size: 14px;
+	font-size: var(--text-14);
 	line-height: 1.8;
 	backdrop-filter: blur(6px);
 	-webkit-backdrop-filter: blur(6px);
@@ -735,7 +633,7 @@
 	background: color-mix(in srgb, var(--stage-text) 10%, var(--stage-scrim));
 	color: var(--stage-accent);
 	cursor: pointer;
-	font-size: 11px;
+	font-size: var(--text-11);
 }
 
 /* ---- 重绘扫光遮罩 ---- */
@@ -786,7 +684,7 @@
 	gap: var(--space-2);
 	flex: 1 1 220px;
 	min-width: 0;
-	font-size: 12px;
+	font-size: var(--text-12);
 	color: color-mix(in srgb, var(--stage-text) 72%, transparent);
 }
 
@@ -805,7 +703,7 @@
 	border-radius: var(--radius-md);
 	background: transparent;
 	color: var(--stage-text);
-	font-size: 12px;
+	font-size: var(--text-12);
 	font-weight: 600;
 	cursor: pointer;
 	transition: background var(--dur-fast) var(--ease-out);
@@ -865,7 +763,7 @@
 	border-radius: var(--radius-sm);
 	background: color-mix(in srgb, var(--stage-text) 10%, var(--stage-scrim));
 	color: var(--stage-accent);
-	font-size: 10px;
+	font-size: var(--text-10);
 }
 
 /* ============================================================
@@ -951,7 +849,7 @@
 	min-width: 68px;
 	margin-top: 2px;
 	color: var(--color-on-surface-variant);
-	font-size: 10px;
+	font-size: var(--text-10);
 }
 
 .editor-sentence-kind[data-active] {
@@ -967,7 +865,7 @@
 
 .editor-sentence-speaker {
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 	font-weight: 600;
 }
 
@@ -975,7 +873,7 @@
 	display: -webkit-box;
 	overflow: hidden;
 	color: var(--color-on-surface);
-	font-size: 13px;
+	font-size: var(--text-13);
 	line-height: 1.55;
 	-webkit-line-clamp: 2;
 	-webkit-box-orient: vertical;
@@ -1018,16 +916,6 @@
 	min-width: 0;
 }
 
-.editor-input {
-	width: 100%;
-	min-height: 34px;
-	padding: 6px var(--space-3);
-	border: 1px solid var(--glass-border);
-	border-radius: var(--radius-md);
-	background: var(--white-80);
-	font-size: 13px;
-}
-
 .editor-textarea-wrap {
 	position: relative;
 }
@@ -1039,7 +927,7 @@
 	border: 1px solid var(--glass-border);
 	border-radius: var(--radius-md);
 	background: var(--white-80);
-	font-size: 13.5px;
+	font-size: var(--text-14);
 	line-height: 1.6;
 	resize: vertical;
 }
@@ -1061,7 +949,7 @@
 .editor-more-marks-trigger {
 	gap: var(--space-px-5);
 	padding: var(--space-px-5) var(--space-px-10);
-	font-size: 11px;
+	font-size: var(--text-11);
 }
 
 .editor-more-marks-btn {
@@ -1105,7 +993,7 @@
 	flex: 1;
 	overflow: hidden;
 	color: var(--color-on-surface-variant);
-	font-size: 12px;
+	font-size: var(--text-12);
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -1116,13 +1004,6 @@
 	align-items: center;
 	gap: var(--space-2);
 	padding-top: var(--space-2);
-}
-
-.editor-mark-span-editor .editor-input {
-	flex: 1 1 120px;
-	min-height: 28px;
-	padding: 4px var(--space-2);
-	font-size: 12.5px;
 }
 
 .editor-mark-span-editor .editor-mark-param {
@@ -1151,7 +1032,7 @@
 .editor-source-range {
 	margin: calc(-1 * var(--space-1)) 0 var(--space-2);
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 }
 
 .editor-source {
@@ -1185,15 +1066,10 @@
 	border: 0;
 	background: transparent;
 	color: var(--color-on-surface);
-	font-size: 12.5px;
+	font-size: var(--text-13);
 	line-height: 1.7;
 	text-align: start;
 	cursor: pointer;
-}
-
-.editor-source-id {
-	color: var(--color-outline);
-	font-size: 11px;
 }
 
 .editor-source-actions {
@@ -1211,7 +1087,7 @@
 	border-radius: var(--radius-sm);
 	background: var(--white-60);
 	color: var(--color-on-surface-variant);
-	font-size: 10px;
+	font-size: var(--text-10);
 	letter-spacing: 0.02em;
 	cursor: pointer;
 	transition: background var(--dur-fast) var(--ease-out);
@@ -1242,7 +1118,7 @@
 }
 
 .editor-history-desc {
-	font-size: 13px;
+	font-size: var(--text-13);
 	font-weight: 600;
 }
 
@@ -1250,7 +1126,7 @@
 	grid-column: 1;
 	margin-top: 2px;
 	color: var(--color-outline);
-	font-size: 11px;
+	font-size: var(--text-11);
 }
 
 .editor-history-old,
@@ -1258,7 +1134,7 @@
 	grid-column: 1 / -1;
 	display: block;
 	margin-top: var(--space-1);
-	font-size: 12px;
+	font-size: var(--text-12);
 	line-height: 1.6;
 	overflow-wrap: anywhere;
 	white-space: pre-wrap;
@@ -1281,7 +1157,7 @@
 .editor-rules-body {
 	display: flex;
 	flex-direction: column;
-	gap: 14px;
+	gap: var(--space-4);
 }
 
 .editor-rule-row {
@@ -1291,7 +1167,7 @@
 	padding: 6px 8px;
 	border-radius: var(--radius-md);
 	color: var(--color-on-surface-variant);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 .editor-rule-text {
@@ -1309,8 +1185,15 @@
 	border-radius: var(--radius-md);
 	background: var(--color-secondary-container);
 	color: var(--color-on-surface);
-	font-size: 13px;
+	font-size: var(--text-13);
 	line-height: 1.7;
+}
+
+.editor-source-excerpt-label {
+	display: block;
+	margin-bottom: var(--space-1);
+	color: var(--color-outline);
+	font-size: var(--text-10);
 }
 
 .editor-source-rewrite-body {
@@ -1338,7 +1221,7 @@
 	align-items: center;
 	gap: var(--space-2);
 	color: var(--color-primary);
-	font-size: 12.5px;
+	font-size: var(--text-13);
 }
 
 .editor-rewrite-actions {
@@ -1364,7 +1247,7 @@
 .editor-diffs-summary {
 	margin: 0;
 	color: var(--color-on-surface-variant);
-	font-size: 12px;
+	font-size: var(--text-12);
 }
 
 .editor-hunk-card {
@@ -1398,13 +1281,13 @@
 	display: block;
 	margin-bottom: var(--space-1);
 	color: var(--color-outline);
-	font-size: 10px;
+	font-size: var(--text-10);
 }
 
 .editor-hunk-old {
 	display: block;
 	color: var(--color-outline);
-	font-size: 12.5px;
+	font-size: var(--text-13);
 	line-height: 1.6;
 	text-decoration: line-through;
 	overflow-wrap: anywhere;
@@ -1415,7 +1298,7 @@
 	display: block;
 	margin-top: 3px;
 	color: var(--color-on-surface);
-	font-size: 13px;
+	font-size: var(--text-13);
 	line-height: 1.6;
 	overflow-wrap: anywhere;
 	white-space: pre-wrap;
@@ -1425,10 +1308,9 @@
 	display: block;
 }
 
-.editor-hunk-directive {
-	font-family: var(--font-mono);
-	font-size: 11.5px;
-	opacity: 0.85;
+.editor-hunk-note {
+	color: var(--color-on-surface-variant);
+	font-size: var(--text-12);
 }
 
 .editor-diffs-foot {
@@ -1516,16 +1398,9 @@
 
 /* ---- 底部 aux（历史 / 规则触发区） ---- */
 
-.editor-auxiliary {
-	display: grid;
-	gap: var(--space-3);
-}
-
 /* ---- 动效降级 ---- */
 
 @media (prefers-reduced-motion: reduce) {
-	.editor-button,
-	.editor-icon-button,
 	.editor-stage-cast,
 	.editor-stage-cast-badge,
 	.editor-stage-nav-btn,
