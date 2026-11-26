@@ -28,6 +28,7 @@
 .compactSelectShell {
 	position: relative;
 	display: inline-flex;
+	width: fit-content;
 }
 
 .select {
@@ -43,6 +44,7 @@
 }
 
 .compactSelect {
+	width: 100%;
 	appearance: none;
 	padding: var(--space-px-7) 30px var(--space-px-7) var(--space-px-10);
 	border: 1px solid var(--white-80);
