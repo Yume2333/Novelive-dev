@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/Button'
-import { Banner, RadioGroup, Stepper, Tooltip } from '../../components/Extended'
+import { RadioGroup, Stepper, Tooltip } from '../../components/Extended'
 import { LoadingState } from '../../components/Feedback'
 import { ScrollArea } from '../../components/ScrollArea'
 import { useToast } from '../../components/Toast'
@@ -23,11 +23,12 @@ import styles from './WelcomePage.module.css'
 
 const t = scoped('welcome')
 
-function Steps({ current }: { current: number }) {
+function Steps({ current, play }: { current: number; play: boolean }) {
+	const steps = [t('界面语言'), t('创作还是游玩')]
 	return (
 		<Stepper
 			className={styles.steps}
-			steps={[t('界面语言'), t('创作还是游玩'), t('模型配置')]}
+			steps={play ? steps : [...steps, t('模型配置')]}
 			current={current}
 		/>
 	)
@@ -96,7 +97,7 @@ export function WelcomePage() {
 				</div>
 				{step === 0 && (
 					<section className={`glass-panel ${styles.card}`} key={0}>
-						<Steps current={0} />
+						<Steps current={0} play={path === 'play'} />
 						<h1 className="headline">{t('欢迎使用 Novelive')}</h1>
 						<fieldset className={styles.languages}>
 							<legend className="label-caps label-caps-zh">
@@ -126,7 +127,7 @@ export function WelcomePage() {
 				)}
 				{step === 1 && (
 					<section className={`glass-panel ${styles.card}`} key={1}>
-						<Steps current={1} />
+						<Steps current={1} play={path === 'play'} />
 						<h1 className="headline">{t('创作还是游玩')}</h1>
 						<div className={styles.paths}>
 							{(
@@ -164,15 +165,21 @@ export function WelcomePage() {
 							<Button variant="ghost" onClick={() => setStep(0)}>
 								{t('上一步')}
 							</Button>
-							<Button variant="primary" onClick={() => setStep(2)}>
-								{t('继续')}
-							</Button>
+							{path === 'play' ? (
+								<Button variant="primary" onClick={enterLibrary}>
+									{t('进入书库')}
+								</Button>
+							) : (
+								<Button variant="primary" onClick={() => setStep(2)}>
+									{t('继续')}
+								</Button>
+							)}
 						</div>
 					</section>
 				)}
 				{step === 2 && (
 					<section className={`glass-panel ${styles.card}`} key={2}>
-						<Steps current={2} />
+						<Steps current={2} play={false} />
 						<div className={styles.modelTitle}>
 							<h1 className="headline">{t('模型配置')}</h1>
 							<Tooltip text={t('Key 只保存在本机配置文件中')}>
@@ -184,15 +191,6 @@ export function WelcomePage() {
 								'文字模型负责写作、审稿与视觉分析，图片模型负责绘制场景与立绘。',
 							)}
 						</p>
-						{path === 'play' && (
-							<div className={styles.playerNotice}>
-								<Banner kind="info" icon={PlayCircle}>
-									{t(
-										'已选「游玩」路线：模型配置为可选项，可直接跳过前往书库导入 .novelive 作品包。',
-									)}
-								</Banner>
-							</div>
-						)}
 						{config && 'models' in config ? (
 							<WelcomeModels
 								models={config.models}

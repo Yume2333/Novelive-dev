@@ -91,6 +91,40 @@ test('prototype welcome saves the shared model form with reachable completion', 
 	}
 })
 
+test('welcome play path enters imported works without the model step', async () => {
+	const profile = await mkdtemp(join(tmpdir(), 'novelive-welcome-play-'))
+	try {
+		const app = await electron.launch({
+			executablePath: require('electron'),
+			args: ['apps/desktop', `--user-data-dir=${profile}`],
+			env: { ...process.env, NL_REPLAY: 'strict', ELECTRON_RENDERER_URL: '' },
+		})
+		try {
+			const page = await app.firstWindow()
+			await expect(
+				page.getByText('创作端已就绪', { exact: true }),
+			).toBeAttached()
+			await page.evaluate(() => {
+				location.hash = '/welcome'
+			})
+			await page.getByRole('button', { name: '继续', exact: true }).click()
+			await page.getByRole('button', { name: /^游玩/ }).click()
+			await expect(page.getByText('模型配置', { exact: true })).toHaveCount(0)
+			await page.getByRole('button', { name: '进入书库', exact: true }).click()
+			await expect(
+				page.getByRole('heading', { name: '书库', exact: true }),
+			).toBeVisible()
+			await expect(
+				page.getByRole('button', { name: '导入作品包', exact: true }),
+			).toBeVisible()
+		} finally {
+			await app.close()
+		}
+	} finally {
+		await rm(profile, { recursive: true, force: true })
+	}
+})
+
 test('prototype sidebar resolves a replaced recent package to its installed version', async () => {
 	const profile = await mkdtemp(join(tmpdir(), 'novelive-package-recent-'))
 	const workId = '3d6404ce-00cb-4de7-88a9-eb4aac4e31cf'
