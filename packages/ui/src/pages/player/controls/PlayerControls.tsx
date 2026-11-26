@@ -39,6 +39,14 @@ import './controls.css'
 import { msg, scoped } from '../../../i18n'
 import { type ProgressControlsProps, ProgressPanel } from './ProgressPanel'
 
+// Chromium（Electron）支持 focus({ focusVisible: false })，lib.dom 尚未收录，
+// 在此补齐类型，避免程序化聚焦把 :focus-visible 焦点环画进系统菜单。
+declare global {
+	interface FocusOptions {
+		focusVisible?: boolean
+	}
+}
+
 const t = scoped('player')
 const progressWords = new Set<string>([
 	msg('制作中'),
@@ -129,7 +137,9 @@ export function PlayerControls({
 				?.querySelector<HTMLElement>(
 					'button:not(:disabled, [hidden], .nl-page-close, .nl-focus-skip), input:not(:disabled), select:not(:disabled)',
 				)
-				?.focus()
+				// 程序化聚焦不能触发 :focus-visible 的焦点卡片，
+				// 键盘导航仍由浏览器正常绘制焦点环。
+				?.focus({ focusVisible: false })
 	}, [screen])
 	useEffect(() => {
 		onOverlayChange?.(Boolean(screen) || hidden || confirmExit)
@@ -317,9 +327,11 @@ export function PlayerControls({
 		label: string,
 		on: boolean,
 		change: (next: boolean) => void,
+		Icon?: LucideIcon,
 	) => (
 		<div className="nl-control-row">
-			<span>{label}</span>
+			{Icon ? icon(Icon, 17) : null}
+			<span className="nl-control-row-label">{label}</span>
 			<Toggle on={on} onChange={change} aria-label={label} />
 		</div>
 	)
@@ -610,6 +622,7 @@ export function PlayerControls({
 											{editorButton}
 										</Tooltip>
 									)}
+									<hr className="nl-menu-divider" />
 									{onWorkPage && (
 										<button type="button" onClick={() => setConfirmExit(true)}>
 											{icon(LogOut, 17)}
@@ -641,9 +654,12 @@ export function PlayerControls({
 											{icon(BookmarkCheck, 17)}
 											{t('快速读档')}
 										</button>
-										{switchRow(t('自动播放'), auto, () => setAuto(!auto))}
-										{switchRow(t('跳过已读'), settings.skipRead, () =>
-											update('skipRead', !settings.skipRead),
+										{switchRow(t('自动播放'), auto, () => setAuto(!auto), Play)}
+										{switchRow(
+											t('跳过已读'),
+											settings.skipRead,
+											() => update('skipRead', !settings.skipRead),
+											FastForward,
 										)}
 										<button
 											type="button"

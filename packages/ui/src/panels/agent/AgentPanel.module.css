@@ -160,10 +160,17 @@
 	cursor: pointer;
 }
 
+.menuItem .sessionIcon {
+	flex-shrink: 0;
+	color: var(--color-outline);
+}
+
 .menuItem[aria-current="true"] {
-	background: var(--color-secondary-container);
-	color: var(--color-on-secondary-container);
 	font-weight: 600;
+}
+
+.menuItem[aria-current="true"] .sessionIcon {
+	color: var(--color-primary);
 }
 
 .renameForm {

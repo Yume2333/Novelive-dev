@@ -945,12 +945,14 @@ export function MessageParts({
 	actions,
 	onPreview,
 	nested,
+	mine,
 }: {
 	parts: Part[]
 	activity: Activity
 	actions: ProposalActions
 	onPreview: (attachment: Attachment) => void
 	nested?: boolean
+	mine?: boolean
 }) {
 	const streaming = activity === 'streaming'
 	const hasActiveStep =
@@ -985,8 +987,9 @@ export function MessageParts({
 					return <StreamingPlaceholder key={key} />
 				}
 				const caret = streaming && index === lastNonEmptyTextIndex
+				const bubble = nested || mine ? undefined : styles.textBubble
 				return (
-					<div key={key}>
+					<div key={key} className={bubble}>
 						<Streamdown
 							className={styles.markdown}
 							codeBlockMaxHeight={0}

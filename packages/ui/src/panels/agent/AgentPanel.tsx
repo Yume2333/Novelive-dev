@@ -3,6 +3,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Maximize2,
+	MessageCircle,
 	Minimize2,
 	Pencil,
 	Plus,
@@ -129,6 +130,12 @@ function SessionMenu({
 											onClose()
 										}}
 									>
+										<MessageCircle
+											aria-hidden="true"
+											size={14}
+											strokeWidth={1.8}
+											className={styles.sessionIcon}
+										/>
 										{session.title}
 									</button>
 									<span className={`row-actions ${styles.rowActions}`}>
@@ -444,6 +451,7 @@ export function AgentPanel({
 												parts={entry.parts}
 												activity={activityOf(entry)}
 												actions={actions}
+												mine={entry.role === 'user'}
 												onPreview={(attachment) =>
 													setPreview({
 														src: window.novelive.resourceUrl(

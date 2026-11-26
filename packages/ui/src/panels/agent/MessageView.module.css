@@ -269,6 +269,19 @@
 	object-fit: cover;
 }
 
+/* ---- 助手文本气泡 ---- */
+.textBubble {
+	max-width: 92%;
+	padding: var(--space-px-9) 13px;
+	border: 1px solid var(--white-80);
+	border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg)
+		var(--radius-sm);
+	background: var(--white-60);
+	color: var(--color-on-surface);
+	font-size: 13px;
+	line-height: 1.65;
+}
+
 /* ---- 流式占位气泡 ---- */
 .streamBubble {
 	display: inline-flex;
