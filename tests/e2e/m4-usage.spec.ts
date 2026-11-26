@@ -128,15 +128,21 @@ test('M4 usage and stale assets', async () => {
 					}
 				}),
 			).toEqual(usage)
-			await expect(
-				page.getByRole('region', { name: '已发生用量' }),
-			).toContainText('fixture-art-image')
+			// 逐次调用列表已改为按日/按模型汇总（ui-polish 决定）：
+			// 模型 id 只出现在汇总表的行标签里，不再主导每一行
+			const byModelTable = page.getByRole('region', { name: '按模型汇总' })
+			await expect(byModelTable).toContainText('fixture-art-image')
+			await expect(byModelTable).toContainText('devin-swe-2')
+			const byDayTable = page.getByRole('region', { name: '按日汇总' })
+			await expect(byDayTable).toContainText('缓存命中')
+			// 内部 id（卷 id joined-<uuid>）绝不出现在界面上
+			await expect(page.getByText(/joined-/)).toHaveCount(0)
 			await page.getByRole('button', { name: '用量说明' }).click()
 			await expect(
 				page
 					.getByRole('tooltip')
 					.getByText(
-						'文本按 tokens，图片按张数；参考金额只计入有单价的调用，仅供参考，不设预算或自动停机。风格变更仅提示，不自动标记图片过期。',
+						'文本按 tokens，图片按张数；参考金额只计入有单价的调用，仅供参考，不设预算或自动停机。',
 					),
 			).toBeVisible()
 			await page.keyboard.press('Escape')
@@ -296,16 +302,15 @@ test('M4 usage and stale assets', async () => {
 			await drawer.getByRole('button', { name: '关闭' }).click()
 			await expect(drawer).toBeHidden()
 			await page.getByRole('link', { name: '用量', exact: true }).click()
-			const stale = page.getByRole('region', { name: '过期素材' })
-			for (const key of expected)
-				await expect(stale.getByText(key, { exact: true })).toBeVisible()
-			await expect(stale.getByText('cg-test', { exact: true })).toHaveCount(0)
+			// 「过期素材」栏已从用量页删除（ui-polish 决定：制作页拥有过期素材）；
+			// 后端数据仍由 listUsage 提供，上面已逐键断言
+			await expect(page.getByRole('region', { name: '过期素材' })).toHaveCount(
+				0,
+			)
+			await expect(page.getByText('cg-test', { exact: true })).toHaveCount(0)
 			await page.screenshot({
 				path: '.workflow/evidence/m4-longform/09-usage-staleness.png',
 				fullPage: true,
-			})
-			await stale.screenshot({
-				path: '.workflow/evidence/m4-longform/09-stale-assets.png',
 			})
 			const native = await page.evaluate(
 				() =>
@@ -320,24 +325,55 @@ test('M4 usage and stale assets', async () => {
 			expect(native).toBe(0)
 			await page.reload()
 			await expect(
-				page.getByRole('region', { name: '已发生用量' }),
+				page.getByRole('region', { name: '按模型汇总' }),
 			).toContainText('fixture-art-image')
 			expect((await listUsage(profile)).records).toEqual(usage.records)
 			await writeFile(
 				join(profile, 'projects', 'broken'),
 				join(root, 'missing'),
 			)
+			await writeFile(
+				join(profile, 'projects', 'broken-too'),
+				join(root, 'missing-too'),
+			)
 			const partial = await listUsage(profile)
 			expect(partial.records).toEqual(usage.records)
-			expect(partial.unreadableProjects).toEqual([
+			expect(
+				[...partial.unreadableProjects].sort((a, b) =>
+					a.projectId.localeCompare(b.projectId),
+				),
+			).toEqual([
 				{ projectId: 'broken', reason: '项目已移动或不存在' },
+				{ projectId: 'broken-too', reason: '项目已移动或不存在' },
 			])
 			await page.reload()
+			// 警示横幅：人话条目（一部作品无法读取 + 本地化原因），
+			// 原始 projectId 只进折叠的「详细信息」，绝不在主文案露 UUID
+			const warning = page.getByRole('alert').filter({
+				hasText: '部分作品无法读取，未计入统计',
+			})
+			// 同因多部合成一行「N 部作品无法读取 · 原因」，不再逐条重复
+			await expect(warning).toContainText('2 部作品无法读取')
+			await expect(warning).toContainText('项目已移动或删除')
+			expect(
+				await warning
+					.getByText('2 部作品无法读取 · 项目已移动或删除', { exact: true })
+					.count(),
+			).toBe(1)
+			// 原始 id 只在折叠的「详细信息」里：默认收起，展开后才可见
+			const detailsToggle = warning.getByRole('button', { name: '详细信息' })
+			await expect(detailsToggle).toHaveAttribute('aria-expanded', 'false')
+			await detailsToggle.click()
+			await expect(detailsToggle).toHaveAttribute('aria-expanded', 'true')
+			// 两个 broken 绑定的原始行都留在「详细信息」里
 			await expect(
-				page.getByRole('alert', { name: '部分项目无法读取' }),
-			).toContainText('broken：项目已移动或不存在')
+				warning.getByText(/^broken · 项目已移动或不存在$/),
+			).toBeVisible()
 			await expect(
-				page.getByRole('region', { name: '已发生用量' }),
+				warning.getByText(/^broken-too · 项目已移动或不存在$/),
+			).toBeVisible()
+			await expect(
+				page.getByRole('region', { name: '按模型汇总' }),
 			).toContainText('fixture-art-image')
 		} finally {
 			await app.close()

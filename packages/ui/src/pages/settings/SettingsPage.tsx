@@ -20,6 +20,7 @@ import {
 	Globe,
 	Image,
 	type LucideIcon,
+	RefreshCw,
 	RotateCcw,
 	X,
 	Zap,
@@ -27,15 +28,18 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Button, Spinner } from '../../components/Button'
+import { Card } from '../../components/Card'
 import { Collapse } from '../../components/Collapse'
+import { Banner } from '../../components/Extended'
+import { Details, ErrorNotice, LoadingState } from '../../components/Feedback'
 import { CompactSelect } from '../../components/Form'
 import { Modal } from '../../components/Modal'
 import { Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
+import { formatPath, useHomeDir } from '../../format/path'
 import { localeNames, locales, msg, scoped } from '../../i18n'
 import type { SettingsHost } from '../../shell/AppShell'
 import {
-	formatLabel,
 	type ModelDraft,
 	themes,
 	useImageFields,
@@ -222,7 +226,7 @@ function ModelCard({
 	) : null
 
 	return (
-		<section aria-label={title} className={styles.card}>
+		<section aria-label={title} className={`glass-panel ${styles.card}`}>
 			<div className={styles.cardHeader}>
 				<button
 					className={styles.expand}
@@ -353,7 +357,6 @@ function TextCard({
 			icon={icon}
 			summary={[
 				model.model || t('未填模型'),
-				formatLabel(connection.format),
 				slot !== 'fast' && 'inheritFast' in model && model.inheritFast
 					? t('同快速模型')
 					: '',
@@ -440,6 +443,7 @@ export function SettingsPage() {
 	const [about, setAbout] = useState<{ version: string; packaged: boolean }>()
 	const [checkingUpdates, setCheckingUpdates] = useState(false)
 	const [licensesOpen, setLicensesOpen] = useState(false)
+	const home = useHomeDir()
 	const aboutHost = window.novelive.host.about
 	useEffect(() => {
 		void aboutHost?.info().then(setAbout, () => setAbout(undefined))
@@ -455,35 +459,39 @@ export function SettingsPage() {
 	return (
 		<Page title={t('设置')} width={760}>
 			<div className={styles.page}>
-				{error && (
-					<p role="alert" className={styles.warning}>
-						{error}
-					</p>
-				)}
+				{error && <ErrorNotice message={error} />}
 				{!config ? (
-					<p className={styles.muted}>{t('正在读取设置…')}</p>
+					<LoadingState text={t('正在读取设置…')} />
 				) : 'configError' in config ? (
-					<div className={styles.warning} role="alert">
-						<AlertTriangle size={19} strokeWidth={1.8} aria-hidden="true" />
-						<div>
-							<strong>{t('配置文件无法读取')}</strong>
-							<p>{config.configError.reason}</p>
-							<p className={styles.path}>{config.configError.path}</p>
-						</div>
-						<Button
-							size="sm"
-							icon={RotateCcw}
-							disabled={resetting}
-							onClick={() => {
-								setResetting(true)
-								void apply(async () => {
-									await resetConfig()
-									toast(t('配置已重置'), RotateCcw)
-								}).finally(() => setResetting(false))
-							}}
+					<div role="alert" className={styles.configError}>
+						<Banner
+							kind="error"
+							action={
+								<Button
+									size="sm"
+									variant="ghost"
+									icon={RotateCcw}
+									disabled={resetting}
+									onClick={() => {
+										setResetting(true)
+										void apply(async () => {
+											await resetConfig()
+											toast(t('配置已重置'), RotateCcw)
+										}).finally(() => setResetting(false))
+									}}
+								>
+									{t('重置配置')}
+								</Button>
+							}
 						>
-							{t('重置配置')}
-						</Button>
+							<strong>{t('配置文件无法读取')}</strong>
+							{config.configError.reason}
+						</Banner>
+						<Details>
+							<span className={styles.path}>
+								{formatPath(config.configError.path, home)}
+							</span>
+						</Details>
 					</div>
 				) : (
 					<>
@@ -501,7 +509,7 @@ export function SettingsPage() {
 							<h2 id="appearance-settings" className="label-caps label-caps-zh">
 								{t('界面')}
 							</h2>
-							<div className={`${styles.card} ${styles.appearance}`}>
+							<Card className={styles.appearance}>
 								<SettingRow title={t('界面语言')} icon={Globe}>
 									<CompactSelect
 										aria-label={t('界面语言')}
@@ -530,16 +538,21 @@ export function SettingsPage() {
 										}
 									/>
 								</SettingRow>
-							</div>
+							</Card>
 						</section>
 						<section aria-labelledby="project-settings">
 							<h2 id="project-settings" className="label-caps label-caps-zh">
 								{t('工程')}
 							</h2>
-							<div className={styles.card}>
+							<Card>
 								<SettingRow title={t('默认工程位置')} icon={FolderOpen}>
-									<small className={styles.path}>
-										{config.projectDir || t('未设置')}
+									<small
+										className={styles.path}
+										title={config.projectDir || undefined}
+									>
+										{config.projectDir
+											? formatPath(config.projectDir, home)
+											: t('未设置')}
 									</small>
 									<Button
 										size="sm"
@@ -555,7 +568,7 @@ export function SettingsPage() {
 										{t('更改')}
 									</Button>
 								</SettingRow>
-							</div>
+							</Card>
 						</section>
 					</>
 				)}
@@ -563,14 +576,20 @@ export function SettingsPage() {
 					<h2 id="about-settings" className="label-caps label-caps-zh">
 						{t('关于')}
 					</h2>
-					<div className={`${styles.card} ${styles.about}`}>
-						<div className={styles.row}>
+					<Card className={styles.about}>
+						<div className={styles.aboutBrand}>
 							<IconTile icon={BookOpen} />
-							<span>
-								<strong>Novelive</strong>
-								<small>{t('把小说改编为视觉小说并直接游玩。')}</small>
-							</span>
-							<small>{about && `v${about.version} · `}AGPL-3.0</small>
+							<div className={styles.aboutNames}>
+								<span className={styles.aboutTitleRow}>
+									<strong>Novelive</strong>
+									<small className={styles.aboutVersion}>
+										{about ? `v${about.version} · ` : ''}AGPL-3.0
+									</small>
+								</span>
+								<small className={styles.aboutTagline}>
+									{t('把小说改编为视觉小说并直接游玩。')}
+								</small>
+							</div>
 						</div>
 						{aboutHost && (
 							<div className={styles.aboutLinks}>
@@ -578,31 +597,31 @@ export function SettingsPage() {
 									type="button"
 									onClick={() => void apply(() => aboutHost.open('license'))}
 								>
-									{t('开源许可')}
 									<ExternalLink
 										size={12}
 										strokeWidth={1.8}
 										aria-hidden="true"
 									/>
+									{t('开源许可')}
 								</button>
 								<button type="button" onClick={() => setLicensesOpen(true)}>
-									{t('第三方许可')}
 									<ExternalLink
 										size={12}
 										strokeWidth={1.8}
 										aria-hidden="true"
 									/>
+									{t('第三方许可')}
 								</button>
 								<button
 									type="button"
 									onClick={() => void apply(() => aboutHost.open('source'))}
 								>
-									{t('源代码')}
 									<ExternalLink
 										size={12}
 										strokeWidth={1.8}
 										aria-hidden="true"
 									/>
+									{t('源代码')}
 								</button>
 								<button
 									type="button"
@@ -614,11 +633,12 @@ export function SettingsPage() {
 										)
 									}}
 								>
+									<RefreshCw size={12} strokeWidth={1.8} aria-hidden="true" />
 									{checkingUpdates ? t('正在检查…') : t('检查更新')}
 								</button>
 							</div>
 						)}
-					</div>
+					</Card>
 				</section>
 			</div>
 			<Modal

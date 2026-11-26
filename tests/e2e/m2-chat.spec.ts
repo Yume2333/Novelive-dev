@@ -24,7 +24,7 @@ type Snapshot = CommandOutput<'chat.get'>
 type Entry = Snapshot['entries'][number]
 type Driver = { calls: Extract<ClientFrame, { type: 'call' }>[] }
 
-const at = '2026-11-23T08:00:00.000Z'
+const at = new Date(Date.now() - 3 * 86400000).toISOString()
 const message = (
 	id: string,
 	parentId: string | null,
@@ -55,6 +55,13 @@ const keeper: Snapshot = {
 				name: 'read_bible',
 				input: '{"entry":"守塔人","field":"年龄"}',
 				result: '{"年龄":"五十八岁","来源":"第一章"}',
+			},
+			{
+				type: 'tool',
+				id: 'tool-spawn',
+				name: 'spawn_agent',
+				input: '{"role":"reviewer","task":"核对第二章称呼"}',
+				result: '"称呼在第二章前后一致。"',
 			},
 			{
 				type: 'subtask',
@@ -143,7 +150,47 @@ async function installChatProjection(
 				const current = store[input.sessionId]
 				switch (data.command) {
 					case 'production.get':
-						respond({ workId: fixture.workId, chapterTitles: { two: '潮汐' } })
+						respond({
+							workId: fixture.workId,
+							chapterTitles: { two: '潮汐' },
+							chapters: [
+								{ chapterId: 'one', title: '第一章' },
+								{ chapterId: 'two', title: '潮汐' },
+							],
+						})
+						break
+					case 'library.list':
+						respond({
+							works: [
+								{
+									workId: fixture.workId,
+									project: { volumeId: 'vol01', volumeTitle: '第一卷' },
+								},
+							],
+						})
+						break
+					case 'bible.get':
+						respond({
+							revision: 'r1',
+							characters: [
+								{
+									id: 'lin',
+									status: 'confirmed',
+									name: '凛',
+									aliases: [],
+									costumes: [{ id: 'postal', description: '邮差大衣' }],
+									expressions: [{ id: 'smile', description: '微笑' }],
+								},
+							],
+							locations: [],
+							relations: [],
+							timeline: [],
+							foreshadowing: [],
+							styles: [],
+							glossary: [],
+							proposalIds: [],
+							proposalActions: {},
+						})
 						break
 					case 'chat.list':
 						respond({
@@ -193,16 +240,16 @@ async function installChatProjection(
 							role: 'assistant' as const,
 							parts: [
 								{
+									type: 'tool' as const,
+									id: 'tool-live',
+									name: 'list_assets',
+									input: '{}',
+								},
+								{
 									type: 'reasoning' as const,
 									text: '对照参考图里的外套颜色。',
 								},
-								{
-									type: 'tool' as const,
-									id: 'tool-live',
-									name: 'compare_image',
-									input: '{"attachment":"attachment-1"}',
-								},
-								{ type: 'text' as const, text: '正在比对参考图' },
+								{ type: 'text' as const, text: '' },
 							],
 						}
 						streamingId = reply.id
@@ -332,11 +379,14 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 			}, `#/work/${workId}/bible`)
 
 			await page.keyboard.press('Control+J')
-			const panel = page.getByRole('complementary', { name: 'Agent' })
+			const panel = page.getByRole('complementary', { name: 'Novelive Agent' })
 			await expect(panel).toBeVisible()
 			await expect(panel.getByText('守塔人的年龄统一成六十岁')).toBeVisible()
 			const branches = panel.getByRole('navigation', { name: '分支' })
 			await expect(branches.getByText('2/2')).toBeVisible()
+			// 上下文 chip 显示解析后的设定集条目名，绝不显示原始 id
+			await expect(panel.getByText(/附带：设定集 · 凛/)).toBeVisible()
+			await expect(panel.getByText(/附带：设定集 · lin\b/)).toHaveCount(0)
 
 			await branches.getByRole('button', { name: '上一个分支' }).click()
 			await expect(panel.getByText('守塔人的年龄写得前后不一')).toBeVisible()
@@ -346,17 +396,40 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 				sessionId: 'keeper',
 				headId: 'a1',
 			})
-			await panel.getByRole('button', { name: /读取设定集/ }).click()
+			const toolCard = panel.getByRole('button', { name: /读取设定集/ })
+			await toolCard.click()
+			await expect(panel.getByText('条目').first()).toBeVisible()
+			await expect(panel.getByText('守塔人').first()).toBeVisible()
+			// 详细信息的原始 JSON 默认收起（aria-expanded=false），点开才显示
+			const detailsToggle = panel
+				.getByRole('button', { name: '详细信息' })
+				.first()
+			await expect(detailsToggle).toHaveAttribute('aria-expanded', 'false')
+			await detailsToggle.click()
+			await expect(detailsToggle).toHaveAttribute('aria-expanded', 'true')
 			await expect(panel.getByText('"field": "年龄"')).toBeVisible()
 			await expect(panel.getByText('"来源": "第一章"')).toBeVisible()
-			await expect(panel.getByText('核对第二章称呼')).toBeVisible()
+			// 工具卡绝不渲染原始工具名；spawn_agent 卡整体隐藏，由子任务卡代表
+			await expect(panel.getByText('read_bible', { exact: true })).toHaveCount(
+				0,
+			)
+			await expect(panel.getByText('spawn_agent', { exact: true })).toHaveCount(
+				0,
+			)
+			await expect(panel.getByText('派出子任务')).toHaveCount(0)
+			await expect(panel.getByText('核对第二章称呼').first()).toBeVisible()
+			// 子任务角色渲染为本地化 chip，绝不出现英文枚举
+			await expect(panel.getByText('审稿').first()).toBeVisible()
+			await expect(panel.getByText('reviewer', { exact: true })).toHaveCount(0)
 			for (const block of await panel.locator('pre').all()) {
 				await expect(block).toHaveCSS('font-family', /Noto Sans CJK SC/)
 				await expect(block).toHaveCSS('font-family', /monospace/)
 			}
 			await capture(page, 'tool-detail')
 
-			const input = panel.getByRole('textbox', { name: '给 Agent 发消息' })
+			const input = panel.getByRole('textbox', {
+				name: '给 Novelive Agent 发消息',
+			})
 			await input.evaluate(async (element) => {
 				const canvas = document.createElement('canvas')
 				canvas.width = 32
@@ -385,12 +458,15 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 
 			await input.fill('按这张图调整外套')
 			await input.press('Enter')
-			await expect(panel.getByText('正在比对参考图')).toBeVisible()
+			await expect(
+				panel.getByRole('button', { name: /列出素材\s*运行中/ }),
+			).toBeVisible()
 			expect(await calls(app, 'chat.send')).toContainEqual({
 				workId,
 				sessionId: 'keeper',
 				expectedHeadId: 'a1',
 				parentId: 'a1',
+				position: { kind: 'bible', entryId: 'lin' },
 				content: { text: '按这张图调整外套', attachmentIds: ['attachment-1'] },
 			})
 			await expect(
@@ -399,24 +475,29 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 					.getByRole('img', { name: 'pasted.png' }),
 			).toBeVisible()
 			await expect(
-				panel.getByRole('button', { name: /compare_image\s*运行中/ }),
+				panel.getByRole('button', { name: /列出素材\s*运行中/ }),
 			).toBeVisible()
+			// 登记在册的工具渲染本地化标题，绝不出现原始工具名
+			await expect(panel.getByText('list_assets', { exact: true })).toHaveCount(
+				0,
+			)
 			await capture(page, 'streaming')
 			const toolHead = panel.getByRole('button', {
-				name: /compare_image\s*运行中/,
+				name: /列出素材\s*运行中/,
 			})
 			await expect(toolHead).toHaveCSS('font-family', /Noto Sans CJK SC/)
 			await expect(toolHead.getByText('运行中')).toHaveCSS(
 				'font-family',
 				/Noto Sans CJK SC/,
 			)
+			// 流式期间进行中的思考显示实时计时「正在思考 · X.Xs」
 			await expect(
-				panel.getByRole('button', { name: '思考过程' }).last(),
+				panel.getByRole('button', { name: /正在思考 · \d+\.\ds/ }).last(),
 			).toHaveCSS('font-family', /Noto Sans CJK SC/)
 
 			await panel.getByRole('button', { name: '停止', exact: true }).click()
 			await expect(
-				panel.getByRole('button', { name: /compare_image\s*已停止/ }),
+				panel.getByRole('button', { name: /列出素材\s*已停止/ }),
 			).toBeVisible()
 			await expect(
 				panel.getByRole('button', { name: '停止', exact: true }),
@@ -424,15 +505,40 @@ test('M2 chat panel pastes images, shows tools, stops, switches sessions and bra
 			expect((await calls(app, 'chat.stop')).length).toBe(1)
 
 			await panel.getByRole('button', { name: '切换会话' }).click()
+			// 会话行显示最近更新时间，区分同名会话
+			await expect(panel.getByText('3天前').first()).toBeVisible()
 			await panel
-				.getByRole('button', { name: '第二章节奏', exact: true })
+				.getByRole('button', { name: /第二章节奏/ })
+				.first()
 				.click()
 			const card = panel.getByRole('region', { name: '确认卡' })
-			await expect(card.getByText('影响：潮汐')).toBeVisible()
+			await expect(card.getByText('影响 第 2 章 · 潮汐')).toBeVisible()
 			await card.getByRole('button', { name: '确认', exact: true }).click()
+			// 受限原因本地化展示：一句话提示，英文原文只进折叠的「详细信息」
 			await expect(card.getByRole('status')).toHaveText(
-				'Unknown character reference: unpublished-speaker',
+				'现在无法确认这张卡，请刷新或调整后再试',
 			)
+			// 英文原文只存在于「详细信息」的折叠区里（inert 容器），正文没有
+			const rawReason = card.getByText(/Unknown character reference/)
+			await expect(rawReason).toHaveCount(1)
+			// 英文原文只存在于带 aria-hidden 的折叠容器内，正文不出现
+			const outsideCount = await card
+				.getByText(/Unknown character reference/)
+				.evaluateAll(
+					(elements) =>
+						elements.filter(
+							(element) => !element.closest('[aria-hidden="true"]'),
+						).length,
+				)
+			expect(outsideCount).toBe(0)
+			const reasonDetails = card
+				.getByRole('button', { name: '详细信息' })
+				.first()
+			await expect(reasonDetails).toHaveAttribute('aria-expanded', 'false')
+			await reasonDetails.click()
+			await expect(
+				card.getByText(/Unknown character reference: unpublished-speaker/),
+			).toBeVisible()
 			await expect(
 				card.getByRole('button', { name: '确认', exact: true }),
 			).toBeDisabled()
@@ -487,10 +593,11 @@ test('M2 chat panel hides actions only for a truly stale proposal', async () => 
 				window.location.hash = `/work/${id}/bible`
 			}, workId)
 			await page.keyboard.press('Control+J')
-			const panel = page.getByRole('complementary', { name: 'Agent' })
+			const panel = page.getByRole('complementary', { name: 'Novelive Agent' })
 			await panel.getByRole('button', { name: '切换会话' }).click()
 			await panel
-				.getByRole('button', { name: '第二章节奏', exact: true })
+				.getByRole('button', { name: /第二章节奏/ })
+				.first()
 				.click()
 			const card = panel.getByRole('region', { name: '确认卡' })
 			await card.getByRole('button', { name: '确认', exact: true }).click()

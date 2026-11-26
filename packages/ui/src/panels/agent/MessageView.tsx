@@ -24,10 +24,16 @@ import { Button, Spinner } from '../../components/Button'
 import { Chip } from '../../components/Card'
 import { Collapse } from '../../components/Collapse'
 import { Checkbox, ConfirmDialog } from '../../components/Extended'
+import { Details } from '../../components/Feedback'
 import { OverlayScrollbar } from '../../components/ScrollArea'
+import type { AssetLabelInfo } from '../../format/asset'
+import { formatAssetLabel } from '../../format/asset'
+import { formatChapterLabel } from '../../format/chapter'
+import { formatErrorText, humanizeError } from '../../format/errors'
 import { msg, scoped } from '../../i18n'
 import styles from './MessageView.module.css'
 import type { Attachment, Part } from './session'
+import { describeTool, type ToolDisplayContext } from './tool-display'
 
 const t = scoped('agent')
 
@@ -38,10 +44,55 @@ export type Activity = 'streaming' | 'stopped' | 'idle'
 
 export interface ProposalActions {
 	chapterTitles: Record<string, string>
+	/**
+	 * 章节次序，用于序号兜底（可选）。两种形状都接受：
+	 * 按书籍次序排列的章节 id 数组，或 chapterId → 1 起序号。
+	 */
+	chapterOrder?: readonly string[] | Readonly<Record<string, number>>
+	/** volumeId → 卷标题（可选） */
+	volumeTitles?: Readonly<Record<string, string>>
+	/** 设定集条目 id → 展示名（可选） */
+	entryNames?: Readonly<Record<string, string>>
+	/** 素材标签查找表，见 format/asset.ts（可选） */
+	assetInfo?: AssetLabelInfo
 	resolve(
 		proposal: Proposal,
 		decision: { kind: 'approve' } | { kind: 'reject'; reason?: string },
 	): Promise<Resolved>
+}
+
+/** chapterId → 1 起序号的查找；缺次序信息时序号为空 */
+function chapterOrdinalLookup(
+	order: ProposalActions['chapterOrder'],
+	chapterId: string,
+): number | undefined {
+	if (!order) return undefined
+	if (Array.isArray(order)) {
+		const index = (order as readonly string[]).indexOf(chapterId)
+		return index >= 0 ? index + 1 : undefined
+	}
+	const ordinal = (order as Readonly<Record<string, number>>)[chapterId]
+	return typeof ordinal === 'number' && ordinal >= 1 ? ordinal : undefined
+}
+
+function chapterOrderArray(
+	order: ProposalActions['chapterOrder'],
+): readonly string[] | undefined {
+	if (!order) return undefined
+	if (Array.isArray(order)) return order as readonly string[]
+	return Object.entries(order as Readonly<Record<string, number>>)
+		.sort(([, a], [, b]) => a - b)
+		.map(([chapterId]) => chapterId)
+}
+
+function toolContext(actions: ProposalActions): ToolDisplayContext {
+	return {
+		chapterTitles: actions.chapterTitles,
+		chapterOrder: chapterOrderArray(actions.chapterOrder),
+		volumeTitles: actions.volumeTitles,
+		entryNames: actions.entryNames,
+		assetInfo: actions.assetInfo,
+	}
 }
 
 const proposalKinds: Record<Proposal['payload']['kind'], string> = {
@@ -64,24 +115,25 @@ const proposalIcons = {
 	resynthesizeVolume: RefreshCw,
 } as const
 
-/* 工具 id → 人话标题；未登记的工具按原始 id 显示，展开详情里仍能见到原始 id */
-const toolNames: Record<string, string> = {
-	read_chapter_preview: msg('查看章节预览'),
-	read_bible: msg('读取设定集'),
-	read_glossary: msg('读取术语表'),
-	read_scene: msg('查看场景'),
-	read_source_range: msg('查看原文'),
-	list_assets: msg('列出素材'),
-	read_chapter_manifest: msg('查看章节清单'),
-	read_task_result: msg('查看任务结果'),
-	propose_bible_change: msg('提议修改设定集'),
-	propose_glossary_change: msg('提议修改术语表'),
-	propose_adaptation_notes: msg('提议修改改编要求'),
-	propose_rewrite_scene: msg('提议重写场景'),
-	propose_redraw_image: msg('提议重画图片'),
-	propose_redo_chapter: msg('提议重做章节'),
-	propose_resynthesize_volume: msg('提议重新综合'),
-	spawn_agent: msg('派出子任务'),
+/* 子任务角色 → 本地化名称，绝不渲染原始枚举 */
+const roleNames: Record<string, string> = {
+	organizer: msg('整理'),
+	writer: msg('写手'),
+	reviewer: msg('审稿'),
+	artDirector: msg('美术指导'),
+	visualAuditor: msg('视觉审核'),
+}
+
+function roleChip(role: string | undefined): string {
+	return (role && roleNames[role] ? t(roleNames[role]) : '') || t('子任务')
+}
+
+/* 子任务标题：后端通常给任务文本；若为空或恰好是角色枚举，退回本地化角色名 */
+function subtaskTitle(part: { label: string; role?: string }): string {
+	const label = part.label.trim()
+	if (!label || (part.role ? label === part.role : label in roleNames))
+		return roleChip(part.role)
+	return part.label
 }
 
 function pretty(value: string) {
@@ -151,9 +203,9 @@ function ThinkingBlock({
 		return () => window.clearInterval(timer)
 	}, [active])
 	const label = active
-		? t('思考过程 · {{seconds}}s', { seconds: elapsed.toFixed(1) })
+		? t('正在思考 · {{seconds}}s', { seconds: elapsed.toFixed(1) })
 		: elapsed > 0
-			? t('思考过程 · {{seconds}} 秒', {
+			? t('思考了 {{seconds}} 秒', {
 					seconds: Math.max(1, Math.round(elapsed)),
 				})
 			: t('思考过程')
@@ -182,7 +234,7 @@ function ThinkingBlock({
 	)
 }
 
-/* ---- 工具卡：标题行常显，展开看参数、结果、检查、缩略图与原始数据 ---- */
+/* ---- 工具卡：标题行常显，展开看精选参数/结果、检查与缩略图；原始数据只进折叠的「详细信息」 ---- */
 type ToolCheck = { label: string; pass: boolean; note: string }
 
 function readChecks(result: Record<string, unknown> | undefined): ToolCheck[] {
@@ -196,24 +248,43 @@ function readChecks(result: Record<string, unknown> | undefined): ToolCheck[] {
 
 function readImageRef(result: Record<string, unknown> | undefined): string {
 	if (!result) return ''
-	for (const key of ['imageThumb', 'cachePath', 'imagePath', 'imageUrl']) {
+	for (const key of ['cachePath', 'imagePath', 'imageUrl']) {
 		const value = result[key]
 		if (typeof value === 'string' && value) return value
 	}
+	const thumb = result.imageThumb
+	if (typeof thumb === 'string' && thumb)
+		return thumb.startsWith('data:') || thumb.startsWith('blob:') ? thumb : ''
 	return ''
+}
+
+function imageSource(ref: string): string {
+	if (ref.startsWith('data:') || ref.startsWith('blob:')) return ref
+	if (/^https?:\/\//.test(ref)) return ref
+	try {
+		return window.novelive.resourceUrl(ref)
+	} catch {
+		return ''
+	}
 }
 
 function ToolCard({
 	part,
 	activity,
+	actions,
+	hasSubtask,
 }: {
 	part: Extract<Part, { type: 'tool' }>
 	activity: Activity
+	actions: ProposalActions
+	/** 同一工具调用 id 的子任务卡是否存在（spawn_agent 是否已被代表） */
+	hasSubtask?: boolean
 }) {
 	const [open, setOpen] = useState(false)
-	const [rawOpen, setRawOpen] = useState(true)
 	const done = part.result !== undefined
+	const input = parseJson(part.input)
 	const result = parseJson(part.result)
+	const display = describeTool(part.name, input, result, toolContext(actions))
 	const resultObject = isPlainObject(result) ? result : undefined
 	const errorValue = resultObject?.error
 	const failed = errorValue !== undefined
@@ -228,34 +299,24 @@ function ToolCard({
 				? t('已停止')
 				: t('未完成')
 
-	const input = parseJson(part.input)
-	const inputEntries = isPlainObject(input) ? Object.entries(input) : []
 	const checks = readChecks(resultObject)
-	const errorText =
-		errorValue === undefined
-			? ''
-			: isPlainObject(errorValue)
-				? JSON.stringify(errorValue, null, 2)
-				: summarize(errorValue)
+	const humanized = failed ? humanizeError(errorValue) : undefined
 	const imageRef = readImageRef(resultObject)
-	const restEntries = resultObject
-		? Object.entries(resultObject).filter(
-				([key]) =>
-					![
-						'checks',
-						'error',
-						'imageUrl',
-						'cachePath',
-						'imagePath',
-						'imageThumb',
-					].includes(key),
-			)
-		: []
+	const imageUrl = imageRef ? imageSource(imageRef) : ''
+	// 标量结果：JSON 字符串值取其文本，避免带引号渲染
 	const scalarResult =
-		done && resultObject === undefined && !errorText ? (part.result ?? '') : ''
-	const displayName =
-		part.name in toolNames ? t(toolNames[part.name]) : part.name
+		done && resultObject === undefined && !failed
+			? typeof result === 'string'
+				? result
+				: (part.result ?? '')
+			: ''
+	const resultText =
+		scalarResult && !display.suppressResultText ? scalarResult : ''
 	const hasDetail = Boolean(part.input || part.result)
+
+	// spawn_agent：子任务卡已经代表这次委派时隐藏；
+	// 但子任务创建前就失败的委派没有子任务卡，仍要显示失败原因
+	if (display.hidden && (hasSubtask || !failed)) return null
 
 	return (
 		<div className={`glass-panel ${styles.glassCard}`}>
@@ -284,7 +345,7 @@ function ToolCard({
 						<CircleAlert aria-hidden="true" size={15} strokeWidth={1.8} />
 					)}
 				</span>
-				<span className={styles.cardTitle}>{displayName}</span>
+				<span className={styles.cardTitle}>{display.title}</span>
 				<span
 					className={`label-caps label-caps-zh ${styles.statusLabel}${running ? ' ink-shimmer' : ''}`}
 					data-tone={failed ? 'error' : undefined}
@@ -295,28 +356,27 @@ function ToolCard({
 			</button>
 			<Collapse open={open && hasDetail}>
 				<div className={styles.toolBody}>
-					{displayName !== part.name && (
-						<span className={styles.toolId}>{part.name}</span>
-					)}
-					{inputEntries.length > 0 && (
+					{display.args.length > 0 && (
 						<div>
-							{inputEntries.map(([key, value]) => (
-								<div key={key} className={styles.kvRow}>
-									<span className={styles.kvLabel}>{key}</span>
-									<span className={styles.kvValue}>{summarize(value)}</span>
+							{display.args.map((row) => (
+								<div key={row.label} className={styles.kvRow}>
+									<span className={styles.kvLabel}>{row.label}</span>
+									<span className={styles.kvValue}>{row.value}</span>
 								</div>
 							))}
 						</div>
 					)}
-					{errorText && (
+					{failed && humanized && (
 						<div className={styles.errorCallout} role="alert">
 							<CircleAlert aria-hidden="true" size={13} strokeWidth={1.8} />
-							<span className={styles.errorText}>{errorText}</span>
+							<span className={styles.errorText}>
+								{formatErrorText(humanized)}
+							</span>
 						</div>
 					)}
-					{imageRef && (
+					{imageUrl && (
 						<div className={styles.imagePreview}>
-							<ImageIcon aria-hidden="true" size={20} strokeWidth={1.8} />
+							<img src={imageUrl} alt={t('生成的图片')} />
 						</div>
 					)}
 					{checks.length > 0 && (
@@ -349,36 +409,24 @@ function ToolCard({
 							))}
 						</div>
 					)}
-					{restEntries.length > 0 && (
+					{display.results.length > 0 && (
 						<div>
-							{restEntries.map(([key, value]) => (
-								<div key={key} className={styles.kvRow}>
-									<span className={styles.kvLabel}>{key}</span>
-									<span className={styles.kvValue}>{summarize(value)}</span>
+							{display.results.map((row) => (
+								<div key={row.label} className={styles.kvRow}>
+									<span className={styles.kvLabel}>{row.label}</span>
+									<span className={styles.kvValue}>{row.value}</span>
 								</div>
 							))}
 						</div>
 					)}
-					{!restEntries.length &&
-						!errorText &&
-						!checks.length &&
-						scalarResult && <p className={styles.resultText}>{scalarResult}</p>}
-					<button
-						type="button"
-						className={styles.rawToggle}
-						aria-expanded={rawOpen}
-						onClick={() => setRawOpen((value) => !value)}
-					>
-						{t('原始数据')}
-						<ChevronIcon open={rawOpen} size={12} />
-					</button>
-					<Collapse open={rawOpen}>
+					{resultText && <p className={styles.resultText}>{resultText}</p>}
+					<Details>
 						<pre className={styles.code}>
 							{done
 								? `${t('参数')}\n${pretty(part.input)}\n${t('结果')}\n${pretty(part.result ?? '')}`
 								: pretty(part.input)}
 						</pre>
-					</Collapse>
+					</Details>
 				</div>
 			</Collapse>
 		</div>
@@ -406,6 +454,17 @@ function readNestedParts(part: SubtaskPart): Part[] {
 	)
 }
 
+function subtaskStatusLabel(
+	part: Extract<Part, { type: 'subtask' }>,
+	activity: Activity,
+): string {
+	return part.status === 'running' && activity === 'stopped'
+		? t('已停止')
+		: part.status === 'running' && activity !== 'streaming'
+			? t('已取消')
+			: t(subtaskLabels[part.status])
+}
+
 function SubtaskFlatRow({
 	part,
 	activity,
@@ -415,12 +474,7 @@ function SubtaskFlatRow({
 }) {
 	const running = part.status === 'running' && activity === 'streaming'
 	const failed = part.status === 'failed'
-	const label =
-		part.status === 'running' && activity === 'stopped'
-			? t('已停止')
-			: part.status === 'running' && activity !== 'streaming'
-				? t('已取消')
-				: t(subtaskLabels[part.status])
+	const label = subtaskStatusLabel(part, activity)
 	return (
 		<div className={`glass-panel ${styles.glassCard}`}>
 			<div className={styles.cardHead} data-static="true">
@@ -446,7 +500,8 @@ function SubtaskFlatRow({
 						<CircleAlert aria-hidden="true" size={15} strokeWidth={1.8} />
 					)}
 				</span>
-				<span className={styles.cardTitle}>{part.label}</span>
+				<span className={styles.cardTitle}>{subtaskTitle(part)}</span>
+				<Chip>{roleChip(part.role)}</Chip>
 				<span
 					className={`label-caps label-caps-zh ${styles.statusLabel}${running ? ' ink-shimmer' : ''}`}
 					data-tone={failed ? 'error' : undefined}
@@ -473,12 +528,7 @@ function SubtaskCard({
 	const running = part.status === 'running' && activity === 'streaming'
 	const failed = part.status === 'failed'
 	const nestedParts = readNestedParts(part)
-	const label =
-		part.status === 'running' && activity === 'stopped'
-			? t('已停止')
-			: part.status === 'running' && activity !== 'streaming'
-				? t('已取消')
-				: t(subtaskLabels[part.status])
+	const label = subtaskStatusLabel(part, activity)
 	return (
 		<div className={`glass-panel ${styles.glassCard}`}>
 			<button
@@ -498,8 +548,8 @@ function SubtaskCard({
 						<Spinner size={14} />
 					</span>
 				) : null}
-				<span className={styles.cardTitle}>{part.label}</span>
-				<Chip>{t('子任务')}</Chip>
+				<span className={styles.cardTitle}>{subtaskTitle(part)}</span>
+				<Chip>{roleChip(part.role)}</Chip>
 				<span
 					className={`label-caps label-caps-zh ${styles.statusLabel}${running ? ' ink-shimmer' : ''}`}
 					data-tone={failed ? 'error' : undefined}
@@ -600,6 +650,17 @@ function patchSummary(proposal: Proposal): { lines: string[]; note: string } {
 	return { lines: [], note: '' }
 }
 
+/* 章节 id → 「第 N 章 · 标题」；查不到时返回空串，由调用方舍弃该段，绝不渲染原始 id */
+function impactChapterLabel(
+	chapterId: string,
+	actions: ProposalActions,
+): string {
+	const title = actions.chapterTitles[chapterId]
+	const index = chapterOrdinalLookup(actions.chapterOrder, chapterId)
+	if (!title && index === undefined) return ''
+	return formatChapterLabel({ index, title })
+}
+
 function ProposalCard({
 	proposal,
 	savedRewrite,
@@ -621,9 +682,9 @@ function ProposalCard({
 	const [selected, setSelected] = useState<string[]>(
 		savedRewrite?.hunks.map((hunk) => hunk.id) ?? [],
 	)
-	const chapters = current.chapterIds.map(
-		(chapterId) => actions.chapterTitles[chapterId] ?? chapterId,
-	)
+	const chapters = current.chapterIds
+		.map((chapterId) => impactChapterLabel(chapterId, actions))
+		.filter(Boolean)
 	const decide = async (
 		decision: { kind: 'approve' } | { kind: 'reject'; reason?: string },
 	) => {
@@ -654,7 +715,7 @@ function ProposalCard({
 			setRestriction(result.status === 'restricted' ? result.reason : '')
 			setRejecting(false)
 		} catch {
-			setError(t('没能提交，请重试'))
+			setError(t('无法提交，请重试'))
 		} finally {
 			setBusy(false)
 		}
@@ -678,7 +739,7 @@ function ProposalCard({
 		>
 			{rewrite && (
 				<section className={styles.rewrite} aria-label={t('重写差异')}>
-					{rewrite.hunks.map((hunk) => (
+					{rewrite.hunks.map((hunk, index) => (
 						<div key={hunk.id} className={styles.rewriteHunk}>
 							<Checkbox
 								checked={selected.includes(hunk.id)}
@@ -689,7 +750,11 @@ function ProposalCard({
 											: ids.filter((id) => id !== hunk.id),
 									)
 								}
-								label={<span className={styles.rewriteHunkId}>{hunk.id}</span>}
+								label={
+									<span className={styles.rewriteHunkLabel}>
+										{t('第 {{index}} 处改动', { index: index + 1 })}
+									</span>
+								}
 							/>
 							<del>{hunk.before.join('\n')}</del>
 							<ins>{hunk.after.join('\n')}</ins>
@@ -721,7 +786,7 @@ function ProposalCard({
 										}),
 									)
 								} catch {
-									setError(t('没能应用，请刷新后重试'))
+									setError(t('无法应用差异，请刷新后重试'))
 								} finally {
 									setBusy(false)
 								}
@@ -773,7 +838,7 @@ function ProposalCard({
 			{payload.kind === 'redrawImage' && (
 				<div className={styles.diffLines}>
 					<span className={styles.diffAfter}>
-						{t('图片 {{assetId}}', { assetId: payload.assetId })}
+						{formatAssetLabel(payload.assetId, actions.assetInfo)}
 					</span>
 					{payload.instruction ? (
 						<span className={styles.diffNote}>{payload.instruction}</span>
@@ -785,14 +850,20 @@ function ProposalCard({
 					<span className={styles.diffNote}>{payload.request.instruction}</span>
 				</div>
 			) : null}
-			<p className={styles.impact}>
-				{t('影响：')}
-				{chapters.length ? chapters.join(t('、')) : t('不改动已生成的章节')}
-			</p>
-			{restriction && (
-				<p className={styles.resolution} data-tone="error" role="status">
-					{restriction}
+			{chapters.length ? (
+				<p className={styles.impact}>
+					{t('影响 {{chapters}}', { chapters: chapters.join(t('、')) })}
 				</p>
+			) : null}
+			{restriction && (
+				<div className={styles.restriction}>
+					<p className={styles.resolution} data-tone="error" role="status">
+						{t('现在无法确认这张卡，请刷新或调整后再试')}
+					</p>
+					<Details>
+						<pre className={styles.code}>{restriction}</pre>
+					</Details>
+				</div>
 			)}
 			{stale ? (
 				<p className={styles.resolution} role="status">
@@ -813,7 +884,7 @@ function ProposalCard({
 				<div className={styles.rejectBox}>
 					<ScrollField
 						aria-label={t('拒绝理由')}
-						placeholder={t('理由（可不填），Agent 会据此调整')}
+						placeholder={t('理由（可不填），Novelive Agent 会据此调整')}
 						rows={2}
 						value={reason}
 						onChange={(event) => setReason(event.target.value)}
@@ -1035,7 +1106,17 @@ export function MessageParts({
 					</span>
 				)
 			case 'tool':
-				return <ToolCard key={part.id} part={part} activity={activity} />
+				return (
+					<ToolCard
+						key={part.id}
+						part={part}
+						activity={activity}
+						actions={actions}
+						hasSubtask={parts.some(
+							(other) => other.type === 'subtask' && other.id === part.id,
+						)}
+					/>
+				)
 			case 'subtask':
 				return nested ? (
 					<SubtaskFlatRow key={part.id} part={part} activity={activity} />

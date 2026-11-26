@@ -43,6 +43,7 @@ import { Dropdown } from '../components/Dropdown'
 import { GradientCover } from '../components/GradientCover'
 import { usePresence } from '../components/Motion'
 import { ScrollArea } from '../components/ScrollArea'
+import { formatWorkTitle, workTitlesFromList } from '../format/work'
 import { msg, scoped } from '../i18n'
 import { AgentPanel } from '../panels/agent/AgentPanel'
 import { workRoute } from '../routes/production'
@@ -193,6 +194,8 @@ export function AppShell() {
 		: undefined
 	const workId = routeWorkId ?? (packageRef ? undefined : recentWorkId)
 	const work = works.find((item) => item.workId === workId)
+	// 侧边栏与切换菜单的作品名统一经过格式化：查不到绝不回退到 UUID
+	const workTitles = workTitlesFromList(works)
 	const showWork = Boolean(routeWorkId || work)
 	const isImportedPackage =
 		Boolean(recentPackage) || Boolean(routePackage && !work)
@@ -394,35 +397,57 @@ export function AppShell() {
 			localStorage.setItem(recentWorkKey, ref)
 		} catch {}
 	}
+	// 切换菜单按「工程 / 作品包」分组：分组标题是禁用的菜单项，
+	// 靠 menuitem 样式内的 disabled 态渲染成分组标签（不干预 Dropdown 组件）。
+	const projectItems = works.map((item) => ({
+		label: workTitles.get(item.workId) ?? item.title,
+		icon: item.workId === workId ? Check : NotebookPen,
+		onSelect: () => navigate(workRoute('work', item.workId)),
+	}))
+	const packageItems = packages.map((item) => {
+		const ref = `package:${item.workId}:${item.version}`
+		return {
+			label: t('{{title}} · v{{version}}', {
+				title: item.title,
+				version: item.version,
+			}),
+			icon: recentPackage === item ? Check : PlayCircle,
+			onSelect: () => {
+				rememberRecent(ref)
+				if (item.published > 0)
+					navigate(`/package/${item.workId}/${item.version}`)
+				else if (routeWorkId) navigate('/?tab=imported')
+			},
+		}
+	})
 	const switchItems = [
-		...works.map((item) => ({
-			label: item.title,
-			icon: item.workId === workId ? Check : NotebookPen,
-			onSelect: () => navigate(workRoute('work', item.workId)),
-		})),
-		...packages.map((item) => {
-			const ref = `package:${item.workId}:${item.version}`
-			return {
-				label: t('{{title}} · v{{version}}', {
-					title: item.title,
-					version: item.version,
-				}),
-				icon: recentPackage === item ? Check : PlayCircle,
-				onSelect: () => {
-					rememberRecent(ref)
-					if (item.published > 0)
-						navigate(`/package/${item.workId}/${item.version}`)
-					else if (routeWorkId) navigate('/?tab=imported')
-				},
-			}
-		}),
+		...(projectItems.length
+			? [
+					{
+						label: t('工程'),
+						disabled: true,
+						onSelect: () => {},
+					},
+					...projectItems,
+				]
+			: []),
+		...(packageItems.length
+			? [
+					{
+						label: t('作品包'),
+						disabled: true,
+						onSelect: () => {},
+					},
+					...packageItems,
+				]
+			: []),
 	]
 	const switcher = switchItems.length > 1 && (
 		<Dropdown
 			label={t('换一部作品')}
 			className={`nl-icon-btn ${styles.switcher}`}
 			trigger={
-				<ChevronsUpDown aria-hidden="true" size={17} strokeWidth={1.8} />
+				<ChevronsUpDown aria-hidden="true" size={16} strokeWidth={1.8} />
 			}
 			items={switchItems}
 		/>
@@ -519,7 +544,7 @@ export function AppShell() {
 										</div>
 										<div className={styles.workText}>
 											<div className={styles.workTitle}>
-												{work?.title ?? workId}
+												{work?.title ?? formatWorkTitle(workTitles, workId)}
 											</div>
 											{work && (
 												<div className={styles.workMeta}>
@@ -615,7 +640,7 @@ export function AppShell() {
 								type="button"
 								onClick={() => void runHostAction('openLogDir')}
 							>
-								{t('日志')}
+								{t('查看诊断信息')}
 							</button>
 							<button
 								type="button"

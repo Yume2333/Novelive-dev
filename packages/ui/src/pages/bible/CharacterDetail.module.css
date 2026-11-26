@@ -1,0 +1,15 @@
+/* CharacterDetail 局部样式：与 BiblePage.module.css 配合，只放本文件新增的类 */
+
+/* 角色徽标：尺寸与渐变背景由 CSS 自定义属性注入（随角色与尺寸变化） */
+.avatarBadge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--avatar-size);
+	height: var(--avatar-size);
+	flex-shrink: 0;
+	border-radius: var(--radius-lg);
+	background: var(--avatar-bg);
+	box-shadow: var(--shadow-glass);
+	color: var(--color-on-primary);
+}

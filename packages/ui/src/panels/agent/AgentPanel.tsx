@@ -12,12 +12,14 @@ import {
 	X,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { IconButton } from '../../components/Button'
+import { Button, IconButton } from '../../components/Button'
 import { Collapse } from '../../components/Collapse'
 import { ConfirmDialog, Tooltip } from '../../components/Extended'
+import { ErrorNotice } from '../../components/Feedback'
 import { Modal } from '../../components/Modal'
 import { ScrollArea } from '../../components/ScrollArea'
-import { scoped } from '../../i18n'
+import { formatChapterLabel } from '../../format/chapter'
+import { i18n, scoped } from '../../i18n'
 import styles from './AgentPanel.module.css'
 import { Composer } from './Composer'
 import {
@@ -41,6 +43,24 @@ import {
 const t = scoped('agent')
 
 type Chat = ReturnType<typeof useAgentChat>
+function sessionRecency(updatedAt: string): string {
+	const time = new Date(updatedAt).getTime()
+	if (!Number.isFinite(time)) return ''
+	const diff = time - Date.now()
+	const minutes = Math.round(diff / 60000)
+	const hours = Math.round(diff / 3600000)
+	const days = Math.round(diff / 86400000)
+	const locale = i18n.language
+	const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+	if (Math.abs(minutes) < 1) return relative.format(0, 'minute')
+	if (Math.abs(minutes) < 60) return relative.format(minutes, 'minute')
+	if (Math.abs(hours) < 24) return relative.format(hours, 'hour')
+	if (Math.abs(days) < 7) return relative.format(days, 'day')
+	return new Intl.DateTimeFormat(locale, {
+		month: 'short',
+		day: 'numeric',
+	}).format(time)
+}
 
 function RenameInput({
 	initial,
@@ -116,7 +136,10 @@ function SessionMenu({
 									onCancel={() => setRenaming(undefined)}
 									onSend={(next) => {
 										setRenaming(undefined)
-										guard(chat.rename(session.sessionId, next), t('没能重命名'))
+										guard(
+											chat.rename(session.sessionId, next),
+											t('无法重命名会话，请重试'),
+										)
 									}}
 								/>
 							) : (
@@ -136,7 +159,14 @@ function SessionMenu({
 											strokeWidth={1.8}
 											className={styles.sessionIcon}
 										/>
-										{session.title}
+										<span className={styles.sessionRowText}>
+											<span className={styles.sessionRowTitle}>
+												{session.title}
+											</span>
+											<span className={styles.sessionRowMeta}>
+												{sessionRecency(session.updatedAt)}
+											</span>
+										</span>
 									</button>
 									<span className={`row-actions ${styles.rowActions}`}>
 										<button
@@ -198,17 +228,17 @@ function EditBox({
 				}}
 			/>
 			<div className={styles.actions}>
-				<button type="button" className={styles.button} onClick={onCancel}>
+				<Button size="sm" variant="ghost" onClick={onCancel}>
 					{t('取消')}
-				</button>
-				<button
-					type="button"
-					className={styles.primary}
+				</Button>
+				<Button
+					size="sm"
+					variant="primary"
 					disabled={!allowEmpty && !text.trim()}
 					onClick={() => onSend(text.trim())}
 				>
 					{t('重新发送')}
-				</button>
+				</Button>
 			</div>
 		</div>
 	)
@@ -217,10 +247,18 @@ function EditBox({
 function contextLabelOf(
 	position: Position | undefined,
 	chapterTitles: Record<string, string>,
+	chapterOrder: Record<string, number>,
+	entryNames: Record<string, string>,
 ): string | null {
 	if (!position) return null
 	if (position.kind === 'editor') {
-		const chapter = chapterTitles[position.chapterId] ?? position.chapterId
+		const title = chapterTitles[position.chapterId]
+		const index = chapterOrder[position.chapterId]
+		const chapter =
+			title !== undefined || index !== undefined
+				? formatChapterLabel({ index, title })
+				: null
+		if (!chapter) return null
 		return position.sourceIds?.length
 			? t('编辑器 · {{chapter}} · {{count}} 段', {
 					chapter,
@@ -228,9 +266,9 @@ function contextLabelOf(
 				})
 			: t('编辑器 · {{chapter}}', { chapter })
 	}
-	return position.entryId
-		? t('设定集 · {{entry}}', { entry: position.entryId })
-		: t('设定集')
+	if (!position.entryId) return t('设定集')
+	const entry = entryNames[position.entryId]
+	return entry ? t('设定集 · {{entry}}', { entry }) : t('设定集')
 }
 
 export function AgentPanel({
@@ -274,6 +312,10 @@ export function AgentPanel({
 
 	const actions: ProposalActions = {
 		chapterTitles: chat.chapterTitles,
+		entryNames: chat.entryNames,
+		volumeTitles: chat.volumeTitles,
+		chapterOrder: chat.chapterOrder,
+		assetInfo: chat.assetInfo,
 		resolve: (proposal, decision) => chat.resolve(proposal.id, decision),
 	}
 	const activityOf = (message: Message): Activity =>
@@ -289,7 +331,12 @@ export function AgentPanel({
 	) => chat.send(text, attachmentIds, parentId, detached ? undefined : position)
 	const contextLabel = detached
 		? null
-		: contextLabelOf(position, chat.chapterTitles)
+		: contextLabelOf(
+				position,
+				chat.chapterTitles,
+				chat.chapterOrder,
+				chat.entryNames,
+			)
 	const awaiting =
 		streaming && (last?.kind !== 'message' || last.role === 'user')
 
@@ -299,7 +346,7 @@ export function AgentPanel({
 			tabIndex={-1}
 			className={styles.panel}
 			data-full={full}
-			aria-label="Agent"
+			aria-label={t('Novelive Agent')}
 			onKeyDown={(event) => {
 				if (event.key !== 'Escape') return
 				if (event.defaultPrevented) return
@@ -323,7 +370,7 @@ export function AgentPanel({
 							setRenamingCurrent(false)
 							void chat
 								.rename(snapshot.session.sessionId, next)
-								.catch(() => chat.setError(t('没能重命名')))
+								.catch(() => chat.setError(t('无法重命名会话，请重试')))
 						}}
 					/>
 				) : (
@@ -370,7 +417,7 @@ export function AgentPanel({
 					<button
 						type="button"
 						className={styles.iconButton}
-						aria-label={t('关闭 Agent')}
+						aria-label={t('关闭 Novelive Agent')}
 						onClick={onClose}
 					>
 						<X aria-hidden="true" size={16} strokeWidth={1.8} />
@@ -393,9 +440,7 @@ export function AgentPanel({
 				<div className={styles.messages}>
 					{chat.loaded && path.length === 0 && (
 						<p className={styles.empty}>
-							{t(
-								'可以让 Agent 改设定、调术语、重写场景或重做章节，所有改动都会先给你确认。',
-							)}
+							{t('和 Novelive Agent 讨论修改，改动都会先给你确认。')}
 						</p>
 					)}
 					{snapshot &&
@@ -430,7 +475,9 @@ export function AgentPanel({
 									className={styles.message}
 									data-role={entry.role}
 									aria-label={
-										entry.role === 'user' ? t('我的消息') : t('Agent 回复')
+										entry.role === 'user'
+											? t('我的消息')
+											: t('Novelive Agent 的回复')
 									}
 								>
 									{editing === entry.id ? (
@@ -441,7 +488,7 @@ export function AgentPanel({
 											onSend={(next) => {
 												setEditing(undefined)
 												void send(next, images, entry.parentId).catch(() =>
-													chat.setError(t('没能重新发送')),
+													chat.setError(t('无法重新发送，请重试')),
 												)
 											}}
 										/>
@@ -522,7 +569,7 @@ export function AgentPanel({
 						<article
 							className={styles.message}
 							data-role="assistant"
-							aria-label={t('Agent 回复')}
+							aria-label={t('Novelive Agent 的回复')}
 						>
 							<StreamingPlaceholder />
 						</article>
@@ -531,9 +578,7 @@ export function AgentPanel({
 				</div>
 			</ScrollArea>
 			{chat.error && (
-				<p className={styles.error} role="alert">
-					{chat.error}
-				</p>
+				<ErrorNotice className={styles.errorNotice} message={chat.error} />
 			)}
 			<Composer
 				streaming={streaming ?? false}
@@ -546,7 +591,7 @@ export function AgentPanel({
 				onAttach={chat.attach}
 				onSend={(text, ids) => send(text, ids, snapshot?.headId ?? null)}
 				onStop={() =>
-					void chat.stop().catch(() => chat.setError(t('没能停止')))
+					void chat.stop().catch(() => chat.setError(t('无法停止，请重试')))
 				}
 				onPreview={(src, name) => setPreview({ src, name })}
 			/>
@@ -566,7 +611,7 @@ export function AgentPanel({
 					if (deleting)
 						void chat
 							.remove(deleting.sessionId)
-							.catch(() => chat.setError(t('没能删除')))
+							.catch(() => chat.setError(t('无法删除会话，请重试')))
 					setDeleting(undefined)
 				}}
 				onCancel={() => setDeleting(undefined)}

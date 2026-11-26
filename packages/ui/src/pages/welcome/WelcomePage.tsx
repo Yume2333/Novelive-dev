@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../../components/Button'
-import { Banner, RadioGroup, Tooltip } from '../../components/Extended'
+import { Banner, RadioGroup, Stepper, Tooltip } from '../../components/Extended'
+import { LoadingState } from '../../components/Feedback'
 import { ScrollArea } from '../../components/ScrollArea'
 import { useToast } from '../../components/Toast'
 import {
@@ -21,16 +22,14 @@ import { WelcomeModels } from './WelcomeModels'
 import styles from './WelcomePage.module.css'
 
 const t = scoped('welcome')
-const steps = 3
 
-function Dots({ current }: { current: number }) {
+function Steps({ current }: { current: number }) {
 	return (
-		<div className={styles.dots} aria-hidden="true">
-			{Array.from({ length: steps }, (_, i) => (
-				// biome-ignore lint/suspicious/noArrayIndexKey: fixed step list
-				<span key={i} data-active={i === current} />
-			))}
-		</div>
+		<Stepper
+			className={styles.steps}
+			steps={[t('界面语言'), t('创作还是游玩'), t('模型配置')]}
+			current={current}
+		/>
 	)
 }
 
@@ -97,7 +96,7 @@ export function WelcomePage() {
 				</div>
 				{step === 0 && (
 					<section className={`glass-panel ${styles.card}`} key={0}>
-						<Dots current={0} />
+						<Steps current={0} />
 						<h1 className="headline">{t('欢迎使用 Novelive')}</h1>
 						<fieldset className={styles.languages}>
 							<legend className="label-caps label-caps-zh">
@@ -127,7 +126,7 @@ export function WelcomePage() {
 				)}
 				{step === 1 && (
 					<section className={`glass-panel ${styles.card}`} key={1}>
-						<Dots current={1} />
+						<Steps current={1} />
 						<h1 className="headline">{t('创作还是游玩')}</h1>
 						<div className={styles.paths}>
 							{(
@@ -173,13 +172,18 @@ export function WelcomePage() {
 				)}
 				{step === 2 && (
 					<section className={`glass-panel ${styles.card}`} key={2}>
-						<Dots current={2} />
+						<Steps current={2} />
 						<div className={styles.modelTitle}>
 							<h1 className="headline">{t('模型配置')}</h1>
 							<Tooltip text={t('Key 只保存在本机配置文件中')}>
 								<Info size={15} strokeWidth={1.8} aria-hidden="true" />
 							</Tooltip>
 						</div>
+						<p className={styles.modelIntro}>
+							{t(
+								'文字模型负责写作、审稿与视觉分析，图片模型负责绘制场景与立绘。',
+							)}
+						</p>
 						{path === 'play' && (
 							<div className={styles.playerNotice}>
 								<Banner kind="info" icon={PlayCircle}>
@@ -196,9 +200,7 @@ export function WelcomePage() {
 								onDone={enterLibrary}
 							/>
 						) : (
-							<p role="status" className={styles.muted}>
-								{t('正在读取设置…')}
-							</p>
+							<LoadingState text={t('正在读取设置…')} />
 						)}
 						<div className={styles.footer}>
 							<Button variant="ghost" onClick={() => setStep(1)}>
