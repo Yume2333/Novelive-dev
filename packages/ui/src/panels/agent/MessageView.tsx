@@ -24,12 +24,12 @@ import { Button, Spinner } from '../../components/Button'
 import { Chip } from '../../components/Card'
 import { Collapse } from '../../components/Collapse'
 import { Checkbox, ConfirmDialog } from '../../components/Extended'
-import { Details } from '../../components/Feedback'
+import { Details, ErrorNotice } from '../../components/Feedback'
 import { OverlayScrollbar } from '../../components/ScrollArea'
 import type { AssetLabelInfo } from '../../format/asset'
 import { formatAssetLabel } from '../../format/asset'
 import { formatChapterLabel } from '../../format/chapter'
-import { formatErrorText, humanizeError } from '../../format/errors'
+import { type HumanizedError, humanizeError } from '../../format/errors'
 import { msg, scoped } from '../../i18n'
 import styles from './MessageView.module.css'
 import type { Attachment, Part } from './session'
@@ -367,12 +367,7 @@ function ToolCard({
 						</div>
 					)}
 					{failed && humanized && (
-						<div className={styles.errorCallout} role="alert">
-							<CircleAlert aria-hidden="true" size={13} strokeWidth={1.8} />
-							<span className={styles.errorText}>
-								{formatErrorText(humanized)}
-							</span>
-						</div>
+						<ErrorNotice className={styles.toolErrorNotice} error={humanized} />
 					)}
 					{imageUrl && (
 						<div className={styles.imagePreview}>
@@ -676,7 +671,7 @@ function ProposalCard({
 	const [rejecting, setRejecting] = useState(false)
 	const [reason, setReason] = useState('')
 	const [busy, setBusy] = useState(false)
-	const [error, setError] = useState('')
+	const [error, setError] = useState<HumanizedError | undefined>()
 	const [rewrite, setRewrite] = useState(savedRewrite)
 	const [confirming, setConfirming] = useState(false)
 	const [selected, setSelected] = useState<string[]>(
@@ -689,7 +684,7 @@ function ProposalCard({
 		decision: { kind: 'approve' } | { kind: 'reject'; reason?: string },
 	) => {
 		setBusy(true)
-		setError('')
+		setError(undefined)
 		try {
 			const result = await actions.resolve(current, decision)
 			setCurrent(result.proposal)
@@ -714,8 +709,11 @@ function ProposalCard({
 			setStale(result.status === 'stale')
 			setRestriction(result.status === 'restricted' ? result.reason : '')
 			setRejecting(false)
-		} catch {
-			setError(t('无法提交，请重试'))
+		} catch (failure) {
+			setError({
+				...humanizeError(failure),
+				message: t('无法提交，请重试'),
+			})
 		} finally {
 			setBusy(false)
 		}
@@ -785,8 +783,11 @@ function ProposalCard({
 											},
 										}),
 									)
-								} catch {
-									setError(t('无法应用差异，请刷新后重试'))
+								} catch (failure) {
+									setError({
+										...humanizeError(failure),
+										message: t('无法应用差异，请刷新后重试'),
+									})
 								} finally {
 									setBusy(false)
 								}
@@ -933,9 +934,7 @@ function ProposalCard({
 				</div>
 			)}
 			{error && (
-				<p className={styles.error} role="alert">
-					{error}
-				</p>
+				<ErrorNotice className={styles.proposalErrorNotice} error={error} />
 			)}
 			<ConfirmDialog
 				open={confirming}

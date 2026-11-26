@@ -285,8 +285,8 @@ export async function installProjection(app: ElectronApplication) {
 						respond({
 							records: [],
 							staleAssets: [
-								{ workId, assetKey: 'keeper/coat' },
-								{ workId, assetKey: 'lighthouse/dusk' },
+								{ workId: fixture.workId, assetKey: 'keeper/coat' },
+								{ workId: fixture.workId, assetKey: 'lighthouse/dusk' },
 							],
 							unreadableProjects: [],
 						})
@@ -330,6 +330,7 @@ export async function installProjection(app: ElectronApplication) {
 			window.webContents.send('novelive:ready', { generation })
 		},
 		{
+			workId,
 			beforeVisual,
 			producing,
 			first,

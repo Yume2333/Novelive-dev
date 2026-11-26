@@ -121,27 +121,8 @@
 	color: var(--color-on-error-container);
 }
 
-.errorCallout {
-	display: flex;
-	align-items: flex-start;
-	gap: var(--space-px-6);
-	padding: var(--space-px-7) var(--space-2);
-	border-radius: var(--radius-md);
-	background: var(--color-error-container);
-	color: var(--color-on-error-container);
+.toolErrorNotice {
 	font-size: var(--text-12);
-	line-height: 1.6;
-}
-
-.errorCallout svg {
-	flex-shrink: 0;
-	margin-top: var(--space-px-2);
-}
-
-.errorText {
-	min-width: 0;
-	overflow-wrap: anywhere;
-	white-space: pre-wrap;
 }
 
 .resultText {
@@ -413,10 +394,8 @@
 	gap: var(--space-2);
 }
 
-.error {
-	margin: 0;
+.proposalErrorNotice {
 	font-size: var(--text-13);
-	color: var(--color-error);
 }
 
 /* ---- 滚动文本域（拒绝理由 / 编辑） ---- */

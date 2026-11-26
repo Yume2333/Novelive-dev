@@ -36,7 +36,11 @@ import './player.css'
 import { Button } from '../../components/Button'
 import { ErrorNotice } from '../../components/Feedback'
 import { useToast } from '../../components/Toast'
-import { type HumanizedError, humanizeError } from '../../format/errors'
+import {
+	formatErrorText,
+	type HumanizedError,
+	humanizeError,
+} from '../../format/errors'
 import { scoped } from '../../i18n'
 
 const t = scoped('player')
@@ -141,6 +145,7 @@ export function PlayerPage({
 		error: HumanizedError
 		retry?: () => void
 	}>()
+	const transientFailure = useRef<HumanizedError | undefined>(undefined)
 	const [loading, setLoading] = useState(false)
 	const toast = useToast()
 	const toastError = useCallback(
@@ -224,25 +229,29 @@ export function PlayerPage({
 			report: 'block' | 'none' = 'block',
 		) => {
 			if (!id || !progressId) return
-			const fail =
-				report === 'block'
-					? (error: HumanizedError) =>
-							setLoadError({
-								error,
-								retry: () =>
-									void loadProject(
-										directory,
-										chapterId,
-										mode,
-										waitForClick,
-										restore,
-										onValidated,
-										fromStart,
-										report,
-									),
-							})
-					: undefined
+			// 播放中途的失败（report: 'none'）不弹全屏错误层——播放器仍在运行，
+			// 全屏层会永久挡住菜单与舞台；只把人话错误存进 transientFailure，
+			// 由调用方以 toast 呈现。初始载入失败（report: 'block'）才用全屏层。
+			const fail = (error: HumanizedError) => {
+				transientFailure.current = error
+				if (report === 'block')
+					setLoadError({
+						error,
+						retry: () =>
+							void loadProject(
+								directory,
+								chapterId,
+								mode,
+								waitForClick,
+								restore,
+								onValidated,
+								fromStart,
+								report,
+							),
+					})
+			}
 			setLoadError(undefined)
+			transientFailure.current = undefined
 			setLoading(true)
 			try {
 				progressReady.current ??= (async () => {
@@ -508,6 +517,8 @@ export function PlayerPage({
 		background = false,
 	) {
 		if (snapshot) {
+			// 读档／回退发生在播放中途：播放器仍在运行，全屏错误层会永久挡住
+			// 菜单与舞台，因此一律用 'none' 上报，由 slotAction 的 catch 以 toast 呈现。
 			const loaded = await loadProject(
 				undefined,
 				snapshot.position.chapterId,
@@ -516,9 +527,14 @@ export function PlayerPage({
 				snapshot,
 				onValidated,
 				false,
-				background ? 'none' : 'block',
+				'none',
 			)
-			if (!loaded) throw new Error(t('无法读取存档，请重试。'))
+			if (!loaded)
+				throw new Error(
+					transientFailure.current
+						? formatErrorText(transientFailure.current)
+						: t('无法读取存档，请重试。'),
+				)
 		}
 	}
 	function restoreHistory(index: number) {
