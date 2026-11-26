@@ -12,7 +12,7 @@ import { Dropdown, type DropdownItem } from '../../components/Dropdown'
 import { CompactSelect, Field, TextInput } from '../../components/Form'
 import { Modal } from '../../components/Modal'
 import { useToast } from '../../components/Toast'
-import { formatAssetLabel } from '../../format/asset'
+import { type AssetLabelInfo, formatAssetLabel } from '../../format/asset'
 import { scoped } from '../../i18n'
 
 const t = scoped('editor')
@@ -29,7 +29,7 @@ export interface SceneImagesProps {
 	assets: readonly AssetEntry[]
 	activeBackgroundId?: string
 	activePortraitId?: string
-	speakerNames: Readonly<Record<string, string>>
+	assetInfo: AssetLabelInfo
 	disabled: boolean
 	run(action: () => Promise<void>): Promise<void>
 	onApplied(assetId: string): Promise<void>
@@ -50,17 +50,12 @@ function isPortraitLike(asset: AssetEntry) {
 	return asset.type === 'character' || asset.type === 'expression'
 }
 
-const assetLabel = (
-	id: string,
-	speakerNames: Readonly<Record<string, string>>,
-) => formatAssetLabel(id, { characters: speakerNames })
-
 export function SceneImages({
 	workId,
 	assets,
 	activeBackgroundId,
 	activePortraitId,
-	speakerNames,
+	assetInfo,
 	disabled,
 	run,
 	onApplied,
@@ -89,9 +84,9 @@ export function SceneImages({
 	const portraitAsset =
 		assets.find((asset) => asset.id === activePortraitId) ??
 		assets.find(isPortraitLike)
-	const bgLabelText = bgAsset ? assetLabel(bgAsset.id, speakerNames) : ''
+	const bgLabelText = bgAsset ? formatAssetLabel(bgAsset.id, assetInfo) : ''
 	const portraitLabelText = portraitAsset
-		? assetLabel(portraitAsset.id, speakerNames)
+		? formatAssetLabel(portraitAsset.id, assetInfo)
 		: ''
 
 	const generate = (
@@ -131,10 +126,10 @@ export function SceneImages({
 					setChoicesTitle(
 						kind === 'bg'
 							? t('背景 · {{name}}', {
-									name: assetLabel(assetId, speakerNames),
+									name: formatAssetLabel(assetId, assetInfo),
 								})
 							: t('立绘 · {{name}}', {
-									name: assetLabel(assetId, speakerNames),
+									name: formatAssetLabel(assetId, assetInfo),
 								}),
 					)
 				}
@@ -191,7 +186,7 @@ export function SceneImages({
 		</span>
 	)
 
-	const customOptions = customModal
+	const customOptionsList = customModal
 		? assets
 				.filter((asset) =>
 					customModal.kind === 'bg'
@@ -200,16 +195,9 @@ export function SceneImages({
 				)
 				.map((asset) => ({
 					value: asset.id,
-					label:
-						customModal.kind === 'bg'
-							? assetLabel(asset.id, speakerNames)
-							: assetLabel(asset.id, speakerNames),
+					label: formatAssetLabel(asset.id, assetInfo),
 				}))
 		: []
-	const customOptionsList =
-		customOptions.length > 0
-			? customOptions
-			: assets.map((asset) => ({ value: asset.id, label: asset.id }))
 
 	return (
 		<section className="editor-stage-footer" aria-label={t('场景图片')}>

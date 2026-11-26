@@ -4,18 +4,18 @@ import type {
 	RewriteProposal,
 } from '@novelive/creator/contract'
 import { compileScript } from '@novelive/format/script'
-import { effectiveMarkCss, mountMinimalPlayer } from '@novelive/player'
+import { mountMinimalPlayer } from '@novelive/player'
 import {
 	BookmarkPlus,
 	BookOpen,
 	ChevronRight,
+	FileText,
 	History,
 	Info,
 	MoreHorizontal,
 	Play,
 	Redo2,
 	RotateCcw,
-	Sparkles,
 	Undo2,
 	User,
 	WandSparkles,
@@ -25,18 +25,32 @@ import { useOutletContext, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '../../components/Button'
 import { Chip } from '../../components/Card'
 import { Dropdown } from '../../components/Dropdown'
-import { Banner, Tooltip } from '../../components/Extended'
+import { Tooltip } from '../../components/Extended'
+import { ErrorNotice, LoadingState } from '../../components/Feedback'
 import { CompactSelect } from '../../components/Form'
-import { Page } from '../../components/Page'
+import { EmptyState, Page } from '../../components/Page'
 import { useToast } from '../../components/Toast'
+import {
+	type AssetLabelInfo,
+	assetLabelInfoFromBible,
+} from '../../format/asset'
+import {
+	formatChapterLabel,
+	formatParagraphLabel,
+	formatSceneLabel,
+} from '../../format/chapter'
+import { humanizeError } from '../../format/errors'
 import { scoped } from '../../i18n'
+import { humanizeDiagnostics, rawDiagnosticsText } from './diagnostics'
+import { expressionLabel, speakerDisplayName } from './display'
 import { EditorPanels } from './EditorPanels'
 import { EditorStage } from './EditorStage'
 import { JumpPoints } from './JumpPoints'
+import { MarkProposalBanner } from './MarkProposalBanner'
 import { RewriteModal, SourceRewriteModal } from './RewriteModal'
 import { SceneImages } from './SceneImages'
 import { ScriptEditor } from './ScriptEditor'
-import { SentenceList } from './SentenceList'
+import { builtinMarks, markDisplayName, SentenceList } from './SentenceList'
 import { SourcePanel } from './SourcePanel'
 import {
 	buildParagraphFirstLine,
@@ -58,6 +72,18 @@ type Opening = CommandOutput<'editor.open'>
 type Chapter = Opening['chapter']
 type LineEdit = CommandInput<'editor.editLine'>['edit']
 
+type PageError = { text: string; detail?: string }
+
+/** 编辑器自己拼好的本地化错误：run() 里不再经 humanizeError 改写。 */
+class LocalizedError extends Error {}
+
+/** 后端抛出的错误先经 humanizeError 本地化；已是本地句子的原文保留。 */
+function toPageError(cause: unknown): PageError {
+	if (cause instanceof LocalizedError) return { text: cause.message }
+	const humanized = humanizeError(cause)
+	return { text: humanized.message, detail: humanized.detail }
+}
+
 export function EditorPage() {
 	const { id = '' } = useParams()
 	const outlet = useOutletContext<{
@@ -70,6 +96,7 @@ export function EditorPage() {
 	const sceneIdParam = params.get('sceneId')
 	const lineIdParam = params.get('lineId')
 	const [workTitle, setWorkTitle] = useState<string>()
+	const [workVolumeId, setWorkVolumeId] = useState<string>()
 	const [workChapters, setWorkChapters] = useState<
 		{ chapterId: string; index: number; title: string; published: boolean }[]
 	>([])
@@ -86,8 +113,12 @@ export function EditorPage() {
 							? `${item.project.seriesTitle} · ${item.title}`
 							: item.title),
 				)
+				setWorkVolumeId(item?.project?.volumeId)
 			},
-			() => setWorkTitle(undefined),
+			() => {
+				setWorkTitle(undefined)
+				setWorkVolumeId(undefined)
+			},
 		)
 		return () => pending.cancel()
 	}, [id])
@@ -118,7 +149,7 @@ export function EditorPage() {
 	const [source, setSource] = useState(false)
 	const [rewriteOpen, setRewriteOpen] = useState(false)
 	const rewriteRequest = useRef(0)
-	const [error, setError] = useState('')
+	const [error, setError] = useState<PageError | null>(null)
 	const [busy, setBusy] = useState(false)
 	const [undoLines, setUndoLines] = useState<string[]>([])
 	const [instruction, setInstruction] = useState('')
@@ -205,6 +236,45 @@ export function EditorPage() {
 	const currentChapterIndex =
 		workChapters.find((c) => c.chapterId === chapterId)?.index ?? 0
 
+	const sceneOrdinal = formatSceneLabel(sceneIndex + 1)
+	const sceneDisplay = snapshot.sceneTitle || sceneOrdinal
+
+	// --- 设定集素材名（拿不到时静默退回speakerNames，编辑器不阻塞） ---
+	const [bibleNames, setBibleNames] = useState<AssetLabelInfo | null>(null)
+	const bibleKeyRef = useRef('')
+	useEffect(() => {
+		// 卷 id 未知时先不取：拿错卷的设定集比拿不到更糟。
+		if (!workVolumeId) return
+		const key = `${id}${workVolumeId}`
+		// 同一卷的重取（章节切换等）保留旧名直到新结果回来，避免闪空。
+		if (bibleKeyRef.current !== key) {
+			bibleKeyRef.current = key
+			setBibleNames(null)
+		}
+		const pending = window.novelive.call('bible.get', {
+			workId: id,
+			volumeId: workVolumeId,
+		})
+		pending.promise.then(
+			(bible) => setBibleNames(assetLabelInfoFromBible(bible)),
+			() => {},
+		)
+		return () => pending.cancel()
+	}, [id, workVolumeId])
+	const assetInfo = useMemo<AssetLabelInfo>(
+		() => ({
+			...(bibleNames ?? {}),
+			characters: {
+				...(bibleNames?.characters ?? {}),
+				...(opening?.speakerNames ?? {}),
+			},
+		}),
+		[bibleNames, opening],
+	)
+	// 预览效果用 ref 读 assetInfo：设定集晚到不该重启正在播的预览。
+	const assetInfoRef = useRef(assetInfo)
+	assetInfoRef.current = assetInfo
+
 	// --- Agent integration ---
 	useEffect(() => {
 		if (scene)
@@ -222,7 +292,7 @@ export function EditorPage() {
 			outlet?.setAgentContext?.(
 				t('第 {{chapter}} 章 · {{scene}} · 第 {{sentence}} 句', {
 					chapter: currentChapterIndex || 1,
-					scene: snapshot.sceneTitle,
+					scene: sceneDisplay,
 					sentence: activeSentenceIdx + 1,
 				}),
 			)
@@ -231,15 +301,15 @@ export function EditorPage() {
 	}, [
 		scene,
 		activeSentence,
-		currentChapterIndex,
-		snapshot.sceneTitle,
 		activeSentenceIdx,
+		currentChapterIndex,
+		sceneDisplay,
 		outlet,
 	])
 
 	function handleAskAgent(sentence: SentenceLine) {
 		if (dirty && sentence.lineNumber !== line) {
-			setError(t('请先保存或放弃当前修改'))
+			setError({ text: t('请先保存或放弃当前修改') })
 			return
 		}
 		selectSentenceLine(sentence.lineNumber)
@@ -253,7 +323,7 @@ export function EditorPage() {
 			outlet?.setAgentContext?.(
 				t('第 {{chapter}} 章 · {{scene}} · 第 {{sentence}} 句', {
 					chapter: currentChapterIndex || 1,
-					scene: snapshot.sceneTitle,
+					scene: sceneDisplay,
 					sentence:
 						sentences.findIndex((s) => s.lineNumber === sentence.lineNumber) +
 						1,
@@ -283,7 +353,9 @@ export function EditorPage() {
 			if (workId === id && changedChapter === chapterId) {
 				if (dirty) {
 					setPendingRefresh(true)
-					setError(t('章节已更新，当前修改已保留；放弃修改后加载新版本'))
+					setError({
+						text: t('章节已更新，当前修改已保留；放弃修改后加载新版本'),
+					})
 				} else
 					void window.novelive
 						.call('editor.snapshot', {
@@ -355,7 +427,7 @@ export function EditorPage() {
 		let disposed = false
 		let opened: Opening | undefined
 		setOpening(undefined)
-		setError('')
+		setError(null)
 		setUndoLines([])
 		setSceneIndex(0)
 		setProposal(undefined)
@@ -411,7 +483,17 @@ export function EditorPage() {
 				setPosition((prev) => ({ line: targetLine, key: prev.key + 1 }))
 			})
 			.catch((cause) => {
-				if (!disposed) setError(cause.message ?? t('无法打开编辑器'))
+				if (!disposed) {
+					const humanized = humanizeError(cause)
+					const generic = humanizeError(undefined).message
+					setError({
+						text:
+							humanized.message === generic
+								? t('无法打开编辑器')
+								: humanized.message,
+						detail: humanized.detail,
+					})
+				}
 			})
 		return () => {
 			disposed = true
@@ -474,15 +556,11 @@ export function EditorPage() {
 	async function run(action: () => Promise<void>) {
 		if (busy) return
 		setBusy(true)
-		setError('')
+		setError(null)
 		try {
 			await action()
 		} catch (cause) {
-			setError(
-				cause instanceof Error
-					? cause.message
-					: ((cause as { message?: string }).message ?? t('操作失败')),
-			)
+			setError(toPageError(cause))
 		} finally {
 			setBusy(false)
 		}
@@ -501,7 +579,7 @@ export function EditorPage() {
 	function chooseScene(index: number, targetLine?: number) {
 		if (busy) return
 		if (dirty) {
-			setError(t('请先保存或放弃当前修改'))
+			setError({ text: t('请先保存或放弃当前修改') })
 			return
 		}
 		stopPreview()
@@ -532,14 +610,14 @@ export function EditorPage() {
 			changed.length !== 1 ||
 			index === undefined
 		)
-			throw new Error(t('每次保存请只修改一句，不能增加或删除行'))
+			throw new LocalizedError(t('每次保存请只修改一句，不能增加或删除行'))
 		const lineId = previous[index]?.match(/ #([0-9a-f]{4})\s*$/)?.[1]
 		if (
 			!lineId ||
 			!next[index]?.trim() ||
 			next[index]?.match(/ #([0-9a-f]{4})\s*$/)?.[1] !== lineId
 		)
-			throw new Error(t('请选择带句子 ID 的文本行，保留末尾 ID'))
+			throw new LocalizedError(t('这一行无法保存，请只修改句子内容'))
 		const edit: LineEdit = {
 			kind: 'text',
 			lineId,
@@ -622,7 +700,13 @@ export function EditorPage() {
 			customMarks: Object.keys(opening.settings.customMarks),
 		})
 		if (!result.ok) {
-			setError(result.diagnostics.map((item) => item.message).join('\n'))
+			setError({
+				text: humanizeDiagnostics(result.diagnostics, {
+					speakerNames: opening.speakerNames,
+					assetInfo: assetInfoRef.current,
+				}),
+				detail: rawDiagnosticsText(result.diagnostics),
+			})
 			return
 		}
 		const current = result.scenes[sceneIndex]
@@ -635,7 +719,7 @@ export function EditorPage() {
 			(beat) => beat.line && beat.line.line >= startLine + offset,
 		)
 		if (index < 0) {
-			setError(t('当前位置之后没有可预览的句子'))
+			setError({ text: t('当前位置之后没有可预览的句子') })
 			return
 		}
 		const beats = current.beats.slice(index)
@@ -649,7 +733,7 @@ export function EditorPage() {
 			opening.registry.entries.map((entry) => [entry.id, entry.path]),
 		)
 		const fail = () => {
-			if (!abort.signal.aborted) setError(t('无法加载舞台素材'))
+			if (!abort.signal.aborted) setError({ text: t('无法加载舞台素材') })
 		}
 		void mountMinimalPlayer(
 			stage.current,
@@ -657,7 +741,7 @@ export function EditorPage() {
 			{
 				resolveAsset: (asset) => {
 					const path = paths.get(asset)
-					if (!path) throw new Error(t('找不到素材'))
+					if (!path) throw new LocalizedError(t('找不到素材'))
 					return window.novelive.resourceUrl(path)
 				},
 			},
@@ -763,11 +847,13 @@ export function EditorPage() {
 		return () => window.removeEventListener('keydown', onKey)
 	})
 
-	const alert = (
-		<div className="editor-alert" role="alert">
-			{error}
-		</div>
-	)
+	const alert = error ? (
+		<ErrorNotice
+			className="editor-error"
+			message={error.text}
+			detail={error.detail}
+		/>
+	) : null
 	const rewriting = rewriteOpen || !!proposal
 
 	const listed = workChapters.filter(
@@ -826,10 +912,10 @@ export function EditorPage() {
 
 	function selectSentenceLine(nextLine: number) {
 		if (dirty && nextLine !== line) {
-			setError(t('请先保存或放弃当前修改'))
+			setError({ text: t('请先保存或放弃当前修改') })
 			return
 		}
-		setError('')
+		setError(null)
 		setLine(nextLine)
 		setPosition((value) => ({ line: nextLine, key: value.key + 1 }))
 	}
@@ -907,12 +993,10 @@ export function EditorPage() {
 							onChange={chooseChapter}
 							options={chapters.map((item) => ({
 								value: item.chapterId,
-								label: item.index
-									? t('第 {{index}} 章 {{title}}', {
-											index: item.index,
-											title: item.title ?? item.chapterId,
-										})
-									: (item.title ?? item.chapterId),
+								label: formatChapterLabel({
+									index: item.index || undefined,
+									title: item.title,
+								}),
 							}))}
 						/>
 						<ChevronRight
@@ -928,7 +1012,9 @@ export function EditorPage() {
 							onChange={(v) => chooseScene(Number(v))}
 							options={chapter.scenes.map((item, index) => ({
 								value: String(index),
-								label: item.nvs.match(/^scene (.+)/m)?.[1] ?? item.sceneId,
+								label:
+									item.nvs.match(/^scene (.+)/m)?.[1]?.trim() ||
+									formatSceneLabel(index + 1),
 							}))}
 						/>
 						<Tooltip text={t('只列已发布的章节')}>
@@ -1054,100 +1140,67 @@ export function EditorPage() {
 		>
 			<div className="editor-workbench" aria-busy={busy}>
 				{error && !rewriting && alert}
-				{!opening && !error && (
-					<p className="editor-muted" role="status">
-						{t('正在打开编辑器')}
-					</p>
-				)}
+				{!opening && !error && <LoadingState text={t('正在打开编辑器')} />}
 				{opening && (
 					<>
 						{chapter && chapter.markSuggestions.length > 0 && (
 							<div className="editor-banners">
 								{chapter.markSuggestions.map((mark) => (
-									<section key={mark.id} aria-label={t('新标记提议')}>
-										<Banner
-											kind="warning"
-											icon={Sparkles}
-											action={
-												<span className="editor-banner-actions">
-													<Button
-														size="sm"
-														variant="ghost"
-														disabled={busy || dirty}
-														onClick={() =>
-															void run(async () => {
-																if (!target) return
-																const resolved = await window.novelive.call(
-																	'editor.resolveMark',
-																	{
-																		...target,
-																		suggestionId: mark.id,
-																		decision: 'reject',
-																	},
-																).promise
-																accept(resolved)
-															})
-														}
-													>
-														{t('拒绝标记')}
-													</Button>
-													<Button
-														size="sm"
-														variant="primary"
-														disabled={busy || dirty}
-														onClick={() =>
-															void run(async () => {
-																if (!target) return
-																const resolved = await window.novelive.call(
-																	'editor.resolveMark',
-																	{
-																		...target,
-																		suggestionId: mark.id,
-																		decision: 'accept',
-																	},
-																).promise
-																const fresh = await window.novelive.call(
-																	'editor.snapshot',
-																	{
-																		workId: id,
-																		chapterId,
-																		editorId: opening?.editorId,
-																	},
-																).promise
-																setOpening((value) =>
-																	value
-																		? {
-																				...value,
-																				settings: fresh.settings,
-																				settingsRevision:
-																					fresh.settingsRevision,
-																			}
-																		: value,
-																)
-																accept(resolved)
-															})
-														}
-													>
-														{t('接受标记')}
-													</Button>
-												</span>
-											}
-										>
-											<strong>
-												{t('新标记：{{name}}', { name: mark.name })}
-											</strong>{' '}
-											<code>
-												{effectiveMarkCss(mark.name, mark.css) ||
-													t('无可渲染样式')}
-											</code>{' '}
-											{mark.perChar ? t('逐字') : t('整段')}
-										</Banner>
-									</section>
+									<MarkProposalBanner
+										key={mark.id}
+										mark={mark}
+										disabled={busy || dirty}
+										onReject={() =>
+											void run(async () => {
+												if (!target) return
+												const resolved = await window.novelive.call(
+													'editor.resolveMark',
+													{
+														...target,
+														suggestionId: mark.id,
+														decision: 'reject',
+													},
+												).promise
+												accept(resolved)
+											})
+										}
+										onAccept={() =>
+											void run(async () => {
+												if (!target) return
+												const resolved = await window.novelive.call(
+													'editor.resolveMark',
+													{
+														...target,
+														suggestionId: mark.id,
+														decision: 'accept',
+													},
+												).promise
+												const fresh = await window.novelive.call(
+													'editor.snapshot',
+													{
+														workId: id,
+														chapterId,
+														editorId: opening?.editorId,
+													},
+												).promise
+												setOpening((value) =>
+													value
+														? {
+																...value,
+																settings: fresh.settings,
+																settingsRevision: fresh.settingsRevision,
+															}
+														: value,
+												)
+												accept(resolved)
+											})
+										}
+									/>
 								))}
 							</div>
 						)}
 						{!scene ? (
-							<p className="editor-empty">{t('本章还没有剧本')}</p>
+							<EmptyState icon={FileText} text={t('本章还没有剧本')} />
 						) : (
 							<div className="editor-main" data-source={source || undefined}>
 								<div className="editor-stage-column">
@@ -1155,10 +1208,11 @@ export function EditorPage() {
 										<EditorStage
 											stageRef={stage}
 											stageBoxRef={stageBox}
-											snapshot={snapshot}
+											snapshot={{ ...snapshot, sceneTitle: sceneDisplay }}
 											sentences={sentences}
 											activeSentence={activeSentence}
 											speakerNames={opening.speakerNames}
+											assetInfo={assetInfo}
 											customMarks={opening.settings.customMarks}
 											playing={preview > 0}
 											paused={paused}
@@ -1189,7 +1243,10 @@ export function EditorPage() {
 												else
 													toast(
 														t('{{name}}在这一场没有台词', {
-															name: opening.speakerNames[charId] ?? charId,
+															name: speakerDisplayName(
+																opening.speakerNames,
+																charId,
+															),
 														}),
 														User,
 													)
@@ -1215,7 +1272,7 @@ export function EditorPage() {
 												(snapshot.cg ?? snapshot.background)?.id
 											}
 											activePortraitId={activePortraitId}
-											speakerNames={opening.speakerNames}
+											assetInfo={assetInfo}
 											disabled={busy || dirty}
 											run={run}
 											onRegeneratingChange={setRegeneratingTarget}
@@ -1224,7 +1281,7 @@ export function EditorPage() {
 													'production.resolveAsset',
 													{ workId: id, assetId },
 												).promise
-												if (!asset) throw new Error(t('找不到素材'))
+												if (!asset) throw new LocalizedError(t('找不到素材'))
 												setOpening((value) =>
 													value
 														? {
@@ -1251,16 +1308,16 @@ export function EditorPage() {
 								<section className="editor-panel editor-script-panel">
 									<header className="editor-panel-head">
 										<span className="editor-label">
-											{advancedMode ? t('NVS 剧本') : t('这一场的句子')}
+											{advancedMode ? t('剧本文本') : t('这一场的句子')}
 										</span>
-										<span className="editor-muted">
+										<span className="editor-panel-note">
 											{advancedMode
 												? t('当前行 {{line}}', { line })
 												: t('共 {{count}} 句', { count: sentences.length })}
 										</span>
 										<button
 											type="button"
-											className="editor-chip-button editor-mode-toggle"
+											className="editor-mode-toggle"
 											aria-pressed={advancedMode}
 											disabled={busy}
 											onClick={() => setAdvancedMode((value) => !value)}
@@ -1275,44 +1332,50 @@ export function EditorPage() {
 												role="toolbar"
 												aria-label={t('文本效果')}
 											>
-												{[
-													[t('强调'), '{em}', '{/em}'],
-													[t('加粗'), '{b}', '{/b}'],
-													[t('注音'), t('{ruby よみ}'), '{/ruby}'],
-													[t('停顿'), '{wait 0.5}', ''],
-													[t('变速'), '{speed 0.5}', '{/speed}'],
-												].map(([label, before, after]) => (
-													<button
-														type="button"
-														className="editor-chip-button"
-														key={label}
-														disabled={busy}
-														onClick={() =>
-															setInsert({
-																before: before as string,
-																after: after as string,
-																key: Date.now(),
-															})
+												{(
+													[
+														['em', '{em}', '{/em}'],
+														['b', '{b}', '{/b}'],
+														['ruby', t('{ruby よみ}'), '{/ruby}'],
+														['wait', '{wait 0.5}', ''],
+														['speed', '{speed 0.5}', '{/speed}'],
+													] as const
+												).map(([mark, before, after]) => (
+													<Chip
+														key={mark}
+														onClick={
+															busy
+																? undefined
+																: () =>
+																		setInsert({
+																			before,
+																			after,
+																			key: Date.now(),
+																		})
 														}
 													>
-														{label}
-													</button>
+														{markDisplayName(mark)}
+													</Chip>
 												))}
 												<Dropdown
 													label={t('文本标记')}
-													className="editor-chip-button"
-													trigger={<span>{t('更多标记')}</span>}
+													className="editor-more-marks-trigger nl-btn glass-panel"
+													trigger={
+														<span className="editor-more-marks-btn">
+															<MoreHorizontal
+																aria-hidden="true"
+																size={14}
+																strokeWidth={1.8}
+															/>
+															{t('更多标记')}
+														</span>
+													}
 													items={[
-														'em',
-														'b',
-														'dim',
-														'whisper',
-														'shout',
-														'glitch',
-														'hl',
+														...builtinMarks.map((item) => item.id),
 														...Object.keys(opening.settings.customMarks),
 													].map((name) => ({
-														label: name,
+														label: markDisplayName(name),
+														disabled: busy,
 														onSelect: () =>
 															setInsert({
 																before: `{${name}}`,
@@ -1329,13 +1392,14 @@ export function EditorPage() {
 														onChange={changeExpression}
 														options={expression.choices.map((choiceId) => ({
 															value: choiceId,
-															label: choiceId,
+															label: expressionLabel(choiceId, assetInfo),
 														}))}
 													/>
 												)}
 												<JumpPoints
 													script={draft}
 													disabled={busy}
+													speakerNames={opening.speakerNames}
 													onJump={(jumpLine) =>
 														setPosition((value) => ({
 															line: jumpLine,
@@ -1364,11 +1428,11 @@ export function EditorPage() {
 											pendingRefresh={pendingRefresh}
 											busy={busy}
 											playing={preview > 0}
-											hasSource={scene.sourceIds.length > 0}
 											editedLineIds={editedLineIds}
 											speakerNames={opening.speakerNames}
 											customMarks={opening.settings.customMarks}
 											expression={expression}
+											assetInfo={assetInfo}
 											onSelectLine={selectSentenceLine}
 											onUpdateLine={updateSentence}
 											onChangeExpression={changeExpression}
@@ -1402,7 +1466,7 @@ export function EditorPage() {
 													: undefined
 												if (targetSceneIdx !== sceneIndex) {
 													if (dirty) {
-														setError(t('请先保存或放弃当前修改'))
+														setError({ text: t('请先保存或放弃当前修改') })
 														return
 													}
 													chooseScene(targetSceneIdx, targetLine)
@@ -1429,6 +1493,9 @@ export function EditorPage() {
 								chapterRules={opening.settings.chapterRules[chapterId] ?? []}
 								disabled={busy}
 								revision={chapter?.revision ?? ''}
+								customMarks={opening.settings.customMarks}
+								speakerNames={opening.speakerNames}
+								assetInfo={assetInfo}
 								historyOpen={historyOpen}
 								rulesOpen={rulesOpen}
 								canUndo={undoLines.length > 0 && !dirty}
@@ -1467,11 +1534,13 @@ export function EditorPage() {
 								proposal={proposal}
 								selected={selected}
 								loading={busy && rewriting && !proposal}
-								error={rewriting ? error : ''}
+								error={rewriting ? (error ?? undefined) : undefined}
 								dirty={dirty}
 								busy={busy}
 								speakerNames={opening.speakerNames}
 								customMarks={opening.settings.customMarks}
+								sceneNvs={scene.nvs}
+								assetInfo={assetInfo}
 								onInstructionChange={setInstruction}
 								onToggleHunk={(hunkId, checked) =>
 									setSelected((value) =>
@@ -1506,15 +1575,20 @@ export function EditorPage() {
 								const targetScene = chapter?.scenes[resolvedIdx]
 								if (resolvedIdx !== sceneIndex) {
 									if (dirty) {
-										setError(t('请先保存或放弃当前修改'))
+										setError({ text: t('请先保存或放弃当前修改') })
 										return
 									}
 									chooseScene(resolvedIdx)
 								}
 								setRewriteSourceParagraph(paragraph)
+								const paragraphLabel = formatParagraphLabel(paragraph.id)
 								const instructionText =
 									sourceAskInstruction.trim() ||
-									t('按原文「{{id}}」调整这一场', { id: paragraph.id })
+									(paragraphLabel
+										? t('按原文{{paragraph}}调整这一场', {
+												paragraph: paragraphLabel,
+											})
+										: t('按这段原文调整这一场'))
 								setInstruction(instructionText)
 								setRewriteOpen(true)
 								// Kick off rewrite immediately

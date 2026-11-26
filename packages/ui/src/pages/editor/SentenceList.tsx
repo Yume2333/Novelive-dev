@@ -9,6 +9,7 @@ import {
 	Languages,
 	type LucideIcon,
 	MessageSquare,
+	MessageSquareText,
 	MoreHorizontal,
 	Sparkles,
 	Subtitles,
@@ -21,8 +22,15 @@ import { Collapse } from '../../components/Collapse'
 import { Dropdown } from '../../components/Dropdown'
 import { Tooltip } from '../../components/Extended'
 import { CompactSelect, Field, TextInput } from '../../components/Form'
+import { EmptyState } from '../../components/Page'
 import { OverlayScrollbar, ScrollArea } from '../../components/ScrollArea'
+import { humanizeSlug } from '../../format/asset'
 import { msg, scoped } from '../../i18n'
+import {
+	type AssetLabelInfo,
+	expressionLabel,
+	speakerDisplayName,
+} from './display'
 import { RichText } from './RichText'
 import {
 	type MarkSpan,
@@ -42,7 +50,7 @@ const kindMeta: Record<SentenceKind, { label: string; icon: LucideIcon }> = {
 	caption: { label: msg('字幕'), icon: Subtitles },
 }
 
-const builtinMarks = [
+export const builtinMarks = [
 	{ id: 'em', label: msg('强调') },
 	{ id: 'b', label: msg('加粗') },
 	{ id: 'dim', label: msg('弱化') },
@@ -52,7 +60,7 @@ const builtinMarks = [
 	{ id: 'hl', label: msg('高亮') },
 ] as const
 
-function markDisplayName(id: string): string {
+export function markDisplayName(id: string): string {
 	const found = builtinMarks.find((item) => item.id === id)
 	if (found) return t(found.label)
 	if (id === 'ruby') return t('注音')
@@ -68,7 +76,7 @@ function ActiveSentenceCard({
 	dirty,
 	pendingRefresh,
 	busy,
-	hasSource,
+	assetInfo,
 	expression,
 	customMarks,
 	onUpdateLine,
@@ -83,8 +91,8 @@ function ActiveSentenceCard({
 	dirty: boolean
 	pendingRefresh: boolean
 	busy: boolean
-	hasSource: boolean
 	expression: { lineId: string; current: string; choices: string[] } | undefined
+	assetInfo: AssetLabelInfo
 	customMarks: WorkSettings['customMarks']
 	onUpdateLine: (
 		lineNumber: number,
@@ -168,11 +176,7 @@ function ActiveSentenceCard({
 		<div className="editor-sentence-body">
 			<div className="editor-sentence-chips">
 				<Chip active>{t(kindMeta[sentence.kind].label)}</Chip>
-				{sentence.speaker && (
-					<Chip>{sentence.displayAs || speakerName || sentence.speaker}</Chip>
-				)}
-				{hasSource && <Chip>{t('有原文对照')}</Chip>}
-				{!sentence.click && <Chip>{t('连播')}</Chip>}
+				{sentence.speaker && <Chip>{sentence.displayAs || speakerName}</Chip>}
 			</div>
 
 			{sentence.speaker && (
@@ -189,7 +193,9 @@ function ActiveSentenceCard({
 								onChange={onChangeExpression}
 								options={expression.choices.map((id) => ({
 									value: id,
-									label: id.split('/').pop() ?? id,
+									label:
+										expressionLabel(id, assetInfo) ||
+										humanizeSlug(id.split('/').pop() ?? ''),
 								}))}
 							/>
 						</Field>
@@ -198,7 +204,7 @@ function ActiveSentenceCard({
 						<TextInput
 							aria-label={t('显示名')}
 							value={sentence.displayAs ?? ''}
-							placeholder={speakerName ?? sentence.speaker}
+							placeholder={speakerName}
 							disabled={busy || lockedByOtherDirty}
 							onChange={(value) =>
 								onUpdateLine(sentence.lineNumber, { displayAs: value })
@@ -483,7 +489,7 @@ export function SentenceList({
 	pendingRefresh,
 	busy,
 	playing = false,
-	hasSource = false,
+	assetInfo,
 	editedLineIds,
 	speakerNames,
 	customMarks,
@@ -503,11 +509,11 @@ export function SentenceList({
 	pendingRefresh: boolean
 	busy: boolean
 	playing?: boolean
-	hasSource?: boolean
 	editedLineIds?: ReadonlySet<string>
 	speakerNames: Record<string, string>
 	customMarks: WorkSettings['customMarks']
 	expression: { lineId: string; current: string; choices: string[] } | undefined
+	assetInfo: AssetLabelInfo
 	onSelectLine: (lineNumber: number) => void
 	onUpdateLine: (
 		lineNumber: number,
@@ -542,7 +548,12 @@ export function SentenceList({
 	}, [activeLine])
 
 	if (!sentences.length) {
-		return <p className="editor-empty">{t('这一场还没有可编辑的句子')}</p>
+		return (
+			<EmptyState
+				icon={MessageSquareText}
+				text={t('这一场还没有可编辑的句子')}
+			/>
+		)
 	}
 
 	return (
@@ -555,7 +566,7 @@ export function SentenceList({
 					const meta = kindMeta[sentence.kind]
 					const KindIcon = meta.icon
 					const speakerName = sentence.speaker
-						? (speakerNames[sentence.speaker] ?? sentence.speaker)
+						? speakerDisplayName(speakerNames, sentence.speaker)
 						: undefined
 					const edited =
 						lineDirty ||
@@ -637,7 +648,7 @@ export function SentenceList({
 										dirty={dirty}
 										pendingRefresh={pendingRefresh}
 										busy={busy}
-										hasSource={hasSource}
+										assetInfo={assetInfo}
 										expression={expression}
 										customMarks={customMarks}
 										onUpdateLine={onUpdateLine}

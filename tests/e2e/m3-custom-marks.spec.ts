@@ -130,9 +130,10 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			}, playerRef)
 			const accept = page.getByRole('button', { name: '接受标记' })
 			await expect(accept).toBeEnabled()
-			const proposedStyle = page
-				.getByRole('region', { name: '新标记提议' })
-				.locator('code')
+			const proposalRegion = page.getByRole('region', { name: '新标记提议' })
+			// 提议横幅渲染应用样式后的示例文字，原始 CSS 只收进折叠的详细信息
+			await expect(proposalRegion.locator('.editor-mark-sample')).toBeVisible()
+			const proposedStyle = proposalRegion.locator('.editor-mark-css')
 			await expect(proposedStyle).toContainText('text-shadow')
 			await expect(proposedStyle).not.toContainText('animation')
 			await accept.click()
@@ -142,7 +143,7 @@ test('M3 custom marks render an accepted per-glyph mark and a run mark in previe
 			const line = page.getByRole('menuitem', { name: /^4 ·/ })
 			await expect(line).toBeVisible()
 			await line.click()
-			const script = page.getByRole('textbox', { name: 'NVS 剧本' })
+			const script = page.getByRole('textbox', { name: '剧本文本' })
 			await script.press('End')
 			await script.press('Shift+Home')
 			await page.keyboard.insertText(
